@@ -1,5 +1,6 @@
-from __future__ import annotations
+from typing import Any, Iterator
 from abc import ABC, abstractmethod
+
 """
 This module contains definitions for common functions that are useful for symbolic expression manipulation.
 Its purpose is to provide a shared interface between various symbolic programming in Finch.
@@ -8,7 +9,7 @@ Classes:
     Term (ABC): An abstract base class representing a symbolic term. It provides methods to access the head
     of the term, its children, and to construct a new term with a similar structure.
 """
-from typing import Any, List
+
 
 class Term(ABC):
     def __init__(self):
@@ -19,7 +20,7 @@ class Term(ABC):
         """Return the head type of the S-expression."""
         pass
 
-    def children(self) -> List[Term]:
+    def children(self) -> list["Term"]:
         """Return the children (AKA tail) of the S-expression."""
         pass
 
@@ -29,27 +30,31 @@ class Term(ABC):
         pass
 
     @abstractmethod
-    def make_term(self, head: Any, children: List[Term]) -> Term:
+    def make_term(self, head: Any, children: list["Term"]) -> "Term":
         """
-            Construct a new term in the same family of terms with the given head type and children.
-            This function should satisfy `x == x.make_term(x.head(), *x.children())`
+        Construct a new term in the same family of terms with the given head type and children.
+        This function should satisfy `x == x.make_term(x.head(), *x.children())`
         """
         pass
 
     def __hash__(self) -> int:
         """Return the hash value of the term."""
         if self._hashcache is None:
-            self._hashcache = hash((0x1ca5c2adca744860, self.head(), tuple(self.children())))
+            self._hashcache = hash(
+                (0x1CA5C2ADCA744860, self.head(), tuple(self.children()))
+            )
         return self._hashcache
 
-    def __eq__(self, other: Term) -> bool:
+    def __eq__(self, other: "Term") -> bool:
         self.head() == other.head() and self.children() == other.children()
+
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
     if node.is_expr():
         for arg in node.children():
             yield from PostOrderDFS(arg)
     yield node
+
 
 def PreOrderDFS(node: Term) -> Iterator[Term]:
     yield node

@@ -1,13 +1,17 @@
-from finch.autoschedule import propagate_map_queries, lift_subqueries
+from finch.autoschedule import propagate_map_queries, lift_subqueries, push_fields
 from finch.finch_logic import (
     Plan,
     Query,
     Alias,
+    Field,
     Aggregate,
     Immediate,
     MapJoin,
     Produces,
+    Relabel,
+    Reorder,
     Subquery,
+    Table,
 )
 
 
@@ -90,4 +94,57 @@ def test_lift_subqueries():
     )
 
     result = lift_subqueries(plan)
+    assert result == expected
+
+
+def test_push_fields():
+    plan = Plan(
+        (
+            Relabel(
+                MapJoin(
+                    Immediate("+"),
+                    (
+                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Immediate("tbl2"), (Field("A2"), Field("A1"))),
+                    ),
+                ),
+                (Field("B1"), Field("B2")),
+            ),
+            Relabel(
+                Aggregate(
+                    Immediate("+"),
+                    Immediate(0),
+                    Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                    (Field("A2"),),
+                ),
+                (Field("B1"), Field("B3")),
+            ),
+        )
+    )
+
+    expected = Plan(
+        (
+            MapJoin(
+                Immediate("+"),
+                (
+                    Reorder(
+                        Table(Immediate("tbl1"), (Field("B1"), Field("B2"))),
+                        (Field("B1"), Field("B2")),
+                    ),
+                    Reorder(
+                        Table(Immediate("tbl2"), (Field("B2"), Field("B1"))),
+                        (Field("B1"), Field("B2")),
+                    ),
+                ),
+            ),
+            Aggregate(
+                Immediate("+"),
+                Immediate(0),
+                Table(Immediate(""), (Field("B1"), Field("A2"), Field("B3"))),
+                (Field("A2"),),
+            ),
+        ),
+    )
+
+    result = push_fields(plan)
     assert result == expected
