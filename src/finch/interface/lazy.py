@@ -331,3 +331,9 @@ def prod(arr: LazyTensor, dims) -> LazyTensor:
 
 def multiply(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
     return elementwise(operator.mul, x1, x2)
+
+def matmul(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
+    ...
+
+def tensordot(x1: LazyTensor, x2: LazyTensor, axes: int | Tuple[Sequence[int], Sequence[int]] = 2) -> LazyTensor:
+    ...
