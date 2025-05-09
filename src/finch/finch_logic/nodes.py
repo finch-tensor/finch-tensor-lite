@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 from ..symbolic import Term
 
 
@@ -37,8 +37,12 @@ class LogicNode(Term):
         """Returns the children of the node."""
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
+    def get_fields(self) -> Iterable["LogicNode"]:
+        """Returns fields of the node."""
+        raise Exception(f"`fields` isn't supported for {self.__class__}.")
+
     @classmethod
-    def make_term(cls, head, *args):
+    def make_term(cls, head: type, *args: Any) -> "LogicNode":
         """Creates a term with the given head and arguments."""
         return head(*args)
 
@@ -63,6 +67,10 @@ class Immediate(LogicNode):
     def is_stateful():
         """Determines if the node is stateful."""
         return False
+
+    def get_fields(self):
+        """Returns fields of the node."""
+        return []
 
 
 @dataclass(eq=True, frozen=True)
@@ -177,6 +185,14 @@ class Table(LogicNode):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.idxs
+
+    @classmethod
+    def make_term(cls, head, tns, *idxs):
+        return head(tns, idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class MapJoin(LogicNode):
@@ -207,6 +223,14 @@ class MapJoin(LogicNode):
     def children(self):
         """Returns the children of the node."""
         return [self.op, *self.args]
+
+    def get_fields(self):
+        """Returns fields of the node."""
+        # (mtsokol) I'm not sure if this comment still applies - the order is preserved.
+        # TODO: this is wrong here: the overall order should at least be concordant with
+        # the args if the args are concordant
+        fields = [f for fs in map(lambda x: x.get_fields(), self.args) for f in fs]
+        return list(dict.fromkeys(fields))
 
     @classmethod
     def make_term(cls, head, op, *args):
@@ -245,6 +269,14 @@ class Aggregate(LogicNode):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return [field for field in self.arg.get_fields() if field not in self.idxs]
+
+    @classmethod
+    def make_term(cls, head, op, init, arg, *idxs):
+        return head(op, init, arg, idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class Reorder(LogicNode):
@@ -275,6 +307,14 @@ class Reorder(LogicNode):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.idxs
+
+    @classmethod
+    def make_term(cls, head, arg, *idxs):
+        return head(arg, idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class Relabel(LogicNode):
@@ -302,6 +342,10 @@ class Relabel(LogicNode):
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
+
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.idxs
 
 
 @dataclass(eq=True, frozen=True)
@@ -331,6 +375,10 @@ class Reformat(LogicNode):
         """Returns the children of the node."""
         return [self.tns, self.arg]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.arg.get_fields()
+
 
 @dataclass(eq=True, frozen=True)
 class Subquery(LogicNode):
@@ -340,7 +388,7 @@ class Subquery(LogicNode):
 
     Attributes:
         lhs: The left-hand side of the binding.
-        rhs: The argument to evaluate.
+        arg: The argument to evaluate.
     """
 
     lhs: LogicNode
@@ -359,6 +407,10 @@ class Subquery(LogicNode):
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.arg]
+
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.arg.get_fields()
 
 
 @dataclass(eq=True, frozen=True)
