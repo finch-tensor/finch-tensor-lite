@@ -327,7 +327,64 @@ def prod(arr: LazyTensor, dims) -> LazyTensor:
     .. versionchanged:: 2023.12
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
-    return reduce(operator.mul, arr, dims, arr.fill_value)
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
 
 def multiply(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
     return elementwise(operator.mul, x1, x2)
+
+
+def sum(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    Calculates the sum of input array ``x`` elements.
+    """
+    return reduce(operator.add, arr, axis=dims, init=arr.fill_value)
+
+def any(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    Test whether any element of input array ``x`` along given axis is True.
+    """
+    return reduce(operator.or_, arr, axis=dims, init=arr.fill_value)
+
+def all(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    Test whether all elements of input array ``x`` along given axis are True.
+    """
+    return reduce(operator.and_, arr, axis=dims, init=arr.fill_value)
+
+
+def min(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    Return the minimum of input array ``x`` along given axis.
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
+
+def max(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    Return the maximum of input array ``x`` along given axis.
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
+
+def mean(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
+
+def std(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
+
+def var(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
+
+def argmin(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
+
+def argmax(arr: LazyTensor, dims) -> LazyTensor:
+    """
+    """
+    return reduce(operator.mul, arr, axis=dims, init=arr.fill_value)
