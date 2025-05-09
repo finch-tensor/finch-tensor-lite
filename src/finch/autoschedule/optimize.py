@@ -3,22 +3,79 @@ from collections.abc import Iterable
 from ..finch_logic import (
     Aggregate,
     Alias,
+    Field,
     LogicNode,
     MapJoin,
     Plan,
     Produces,
     Query,
+    Reformat,
     Relabel,
     Subquery,
+    Table,
 )
-from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
+from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite, gensym
 from .compiler import LogicCompiler
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
-    # ...
     prgm = lift_subqueries(prgm)
+
+    prgm = isolate_reformats(prgm)
+    prgm = isolate_aggregates(prgm)
+    prgm = isolate_tables(prgm)
+    prgm = lift_subqueries(prgm)
+
+    prgm = pretty_labels(prgm)
+
     return propagate_map_queries(prgm)
+
+
+def isolate_aggregates(root: LogicNode) -> LogicNode:
+    def rule_0(node):
+        match node:
+            case Aggregate() as agg:
+                name = Alias(gensym("A"))
+                return Subquery(name, agg)
+
+    return PostWalk(rule_0)(root)
+
+
+def isolate_reformats(root: LogicNode) -> LogicNode:
+    def rule_0(node):
+        match node:
+            case Reformat() as ref:
+                name = Alias(gensym("A"))
+                return Subquery(name, ref)
+
+    return PostWalk(rule_0)(root)
+
+
+def isolate_tables(root: LogicNode) -> LogicNode:
+    def rule_0(node):
+        match node:
+            case Table() as tbl:
+                name = Alias(gensym("A"))
+                return Subquery(name, tbl)
+
+    return PostWalk(rule_0)(root)
+
+
+def pretty_labels(root: LogicNode) -> LogicNode:
+    fields = {}
+    aliases = {}
+
+    def rule_0(node):
+        match node:
+            case Field() as f:
+                return fields.setdefault(f, Field(f":i{len(fields)}"))
+
+    def rule_1(node):
+        match node:
+            case Alias() as a:
+                return aliases.setdefault(a, Alias(f":A{len(aliases)}"))
+
+    return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
 
 
 def _lift_subqueries_expr(node: LogicNode, bindings: dict) -> LogicNode:

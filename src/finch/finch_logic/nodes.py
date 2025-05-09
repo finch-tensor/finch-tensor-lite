@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from ..symbolic import Term
 
@@ -39,12 +39,12 @@ class LogicNode(Term):
         """Returns the children of the node."""
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
-    def get_fields(self) -> Iterable["LogicNode"]:
+    def get_fields(self) -> Iterable[Self]:
         """Returns fields of the node."""
         raise Exception(f"`fields` isn't supported for {self.__class__}.")
 
     @classmethod
-    def make_term(cls, head: type, *args: Any) -> "LogicNode":
+    def make_term(cls, head: type, *args: Any) -> Self:
         """Creates a term with the given head and arguments."""
         return head(*args)
 

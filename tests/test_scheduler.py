@@ -1,4 +1,14 @@
-from finch.autoschedule import lift_subqueries, propagate_fields, propagate_map_queries
+import pytest
+
+from finch.autoschedule import (
+    isolate_aggregates,
+    isolate_reformats,
+    isolate_tables,
+    lift_subqueries,
+    pretty_labels,
+    propagate_fields,
+    propagate_map_queries,
+)
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -8,10 +18,12 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    Reformat,
     Relabel,
     Subquery,
     Table,
 )
+from finch.symbolic.gensym import _sg
 
 
 def test_propagate_map_queries_simple():
@@ -130,4 +142,53 @@ def test_propagate_fields():
     )
 
     result = propagate_fields(plan)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "node,pass_fn",
+    [
+        (
+            Aggregate(Immediate(""), Immediate(""), Immediate(""), ()),
+            isolate_aggregates,
+        ),
+        (Reformat(Immediate(""), Immediate("")), isolate_reformats),
+        (Table(Immediate(""), ()), isolate_tables),
+    ],
+)
+def test_isolate_passes(node, pass_fn):
+    plan = Plan((node, node, node))
+    expected = Plan(
+        (
+            Subquery(Alias(f"#A#{_sg.counter}"), node),
+            Subquery(Alias(f"#A#{_sg.counter + 1}"), node),
+            Subquery(Alias(f"#A#{_sg.counter + 2}"), node),
+        )
+    )
+
+    result = pass_fn(plan)
+    assert result == expected
+
+
+def test_pretty_labels():
+    plan = Plan(
+        (
+            Field("AA"),
+            Alias("BB"),
+            Alias("CC"),
+            Subquery(Alias("BB"), Field("AA")),
+            Subquery(Alias("CC"), Field("AA")),
+        )
+    )
+    expected = Plan(
+        (
+            Field(":i0"),
+            Alias(":A0"),
+            Alias(":A1"),
+            Subquery(Alias(":A0"), Field(":i0")),
+            Subquery(Alias(":A1"), Field(":i0")),
+        )
+    )
+
+    result = pretty_labels(plan)
     assert result == expected
