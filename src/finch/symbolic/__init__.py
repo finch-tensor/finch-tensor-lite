@@ -1,6 +1,7 @@
 from .gensym import gensym
 from .rewriters import (
     Chain,
+    Fixpoint,
     PostWalk,
     PreWalk,
     Rewrite,
@@ -19,5 +20,6 @@ __all__ = [
     "PreWalk",
     "PostWalk",
     "Chain",
+    "Fixpoint",
     "gensym",
 ]

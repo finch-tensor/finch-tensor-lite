@@ -101,7 +101,7 @@ class Deferred(LogicNode):
 
     def children(self):
         """Returns the children of the node."""
-        return [self.val, self.type_]
+        return [self.ex, self.type_]
 
 
 @dataclass(eq=True, frozen=True)

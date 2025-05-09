@@ -8,6 +8,7 @@ from finch.autoschedule import (
     pretty_labels,
     propagate_fields,
     propagate_map_queries,
+    push_fields,
 )
 from finch.finch_logic import (
     Aggregate,
@@ -20,6 +21,7 @@ from finch.finch_logic import (
     Query,
     Reformat,
     Relabel,
+    Reorder,
     Subquery,
     Table,
 )
@@ -191,4 +193,81 @@ def test_pretty_labels():
     )
 
     result = pretty_labels(plan)
+    assert result == expected
+
+
+def test_push_fields():
+    plan = Plan(
+        (
+            Relabel(
+                MapJoin(
+                    Immediate("+"),
+                    (
+                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Immediate("tbl2"), (Field("A2"), Field("A1"))),
+                    ),
+                ),
+                (Field("B1"), Field("B2")),
+            ),
+            Relabel(
+                Aggregate(
+                    Immediate("+"),
+                    Immediate(0),
+                    Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                    (Field("A2"),),
+                ),
+                (Field("B1"), Field("B3")),
+            ),
+            Reorder(
+                Aggregate(
+                    Immediate("+"),
+                    Immediate(0),
+                    Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                    (Field("A2"),),
+                ),
+                (Field("A3"), Field("A1")),
+            ),
+        )
+    )
+
+    expected = Plan(
+        (
+            MapJoin(
+                op=Immediate(val="+"),
+                args=(
+                    Table(
+                        tns=Immediate(val="tbl1"),
+                        idxs=(Field(name="B1"), Field(name="B2")),
+                    ),
+                    Table(
+                        tns=Immediate(val="tbl2"),
+                        idxs=(Field(name="B1"), Field(name="B2")),
+                    ),
+                ),
+            ),
+            Aggregate(
+                op=Immediate(val="+"),
+                init=Immediate(val=0),
+                arg=Table(
+                    tns=Immediate(val=""),
+                    idxs=(Field(name="B1"), Field(name="A2"), Field(name="B3")),
+                ),
+                idxs=(Field(name="A2"),),
+            ),
+            Reorder(
+                Aggregate(
+                    Immediate("+"),
+                    Immediate(0),
+                    Reorder(
+                        Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                        (Field("A3"), Field("A2"), Field("A1")),
+                    ),
+                    (Field("A2"),),
+                ),
+                (Field("A3"), Field("A1")),
+            ),
+        )
+    )
+
+    result = push_fields(plan)
     assert result == expected

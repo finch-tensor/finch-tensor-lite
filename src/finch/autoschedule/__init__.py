@@ -24,6 +24,7 @@ from .optimize import (
     pretty_labels,
     propagate_fields,
     propagate_map_queries,
+    push_fields,
 )
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "optimize",
     "propagate_fields",
     "propagate_map_queries",
+    "push_fields",
     "lift_subqueries",
     "isolate_aggregates",
     "isolate_reformats",
