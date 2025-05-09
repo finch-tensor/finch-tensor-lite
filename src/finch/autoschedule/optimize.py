@@ -4,12 +4,16 @@ from ..finch_logic import (
     Alias,
     LogicNode,
     MapJoin,
+    Immediate,
+    Reorder,
     Plan,
     Produces,
     Query,
     Subquery,
+    Table,
+    Relabel,
 )
-from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
+from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite, Fixpoint
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
@@ -87,6 +91,77 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
 
     root = Rewrite(PreWalk(Chain([rule_0, rule_1])))(root)
     return Rewrite(PostWalk(rule_2))(root)
+
+
+def _tuple_diff(a: tuple, b: tuple) -> tuple:
+    return tuple([i for i in a if i not in b])
+
+
+def push_fields(root):
+    def rule_0(ex):
+        # relabel(mapjoin(_, [1,2], [1,2]), [11,22]) =>
+        #     mapjoin(_, relabel(reorder([1,2], _), [11,22]), relabel(reorder([1,2], _), [11,22]))
+        match ex:
+            case Relabel(MapJoin(op, args) as mj, idxs):
+                return MapJoin(
+                    op,
+                    tuple(
+                        [Relabel(Reorder(arg, mj.get_fields()), idxs) for arg in args]
+                    ),
+                )
+
+    def rule_1(ex):
+        # relabel(agg(..., [1,2,3], 3), [11,22]) => agg(..., relabel([1,2,3], [11,22,3]), 3)
+        match ex:
+            case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
+                diff_idxs = _tuple_diff(arg.get_fields(), agg_idxs)
+                reidx_dict = dict(zip(diff_idxs, relabel_idxs))
+                relabeled_idxs = tuple(
+                    [reidx_dict.get(idx, idx) for idx in arg.get_fields()]
+                )
+                return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
+
+    def rule_2(ex):
+        match ex:
+            case Relabel(Relabel(arg, _), idxs):
+                return Relabel(arg, idxs)
+
+    def rule_3(ex):
+        # relabel(reorder(_, [2,1]), [11,22]) => reorder(relabel(_, [22,11]), [11,22])
+        match ex:
+            case Relabel(Reorder(arg, idxs_1), idxs_2):
+                idxs_3 = arg.get_fields()
+                reidx_dict = dict(zip(idxs_1, idxs_2))
+                idxs_4 = tuple([reidx_dict.get(idx, idx) for idx in idxs_3])
+                return Reorder(Relabel(arg, idxs_4), idxs_2)
+
+    def rule_4(ex):
+        match ex:
+            case Relabel(Table(arg, _), idxs):
+                return Table(arg, idxs)
+
+    def rule_5(ex):
+        match ex:
+            case Relabel(Immediate() as arg):
+                return arg
+
+    root = Rewrite(
+        PreWalk(Fixpoint(Chain([rule_0, rule_1, rule_2, rule_3, rule_4, rule_5])))
+    )(root)
+
+    def rule_6(ex):
+        match ex:
+            case Reorder(MapJoin(op, args), idxs):
+                return MapJoin(op, tuple([Reorder(arg, idxs) for arg in args]))
+
+    def rule_7(ex):
+        match ex:
+            case Reorder(Reorder(arg, _), idxs):
+                return Reorder(arg, idxs)
+
+    root = Rewrite(PreWalk(Fixpoint(Chain([rule_6, rule_7]))))(root)
+
+    return root
 
 
 class DefaultLogicOptimizer:
