@@ -1,3 +1,5 @@
+from typing import Any, Iterable
+
 from .compiler import LogicCompiler
 from ..finch_logic import (
     Aggregate,
@@ -7,6 +9,7 @@ from ..finch_logic import (
     Plan,
     Produces,
     Query,
+    Relabel,
     Subquery,
 )
 from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
@@ -87,6 +90,30 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
 
     root = Rewrite(PreWalk(Chain([rule_0, rule_1])))(root)
     return Rewrite(PostWalk(rule_2))(root)
+
+
+def _propagate_fields(
+    root: LogicNode, fields: dict[LogicNode, Iterable[LogicNode]]
+) -> LogicNode:
+    match root:
+        case Plan(bodies):
+            return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
+        case Query(lhs, rhs):
+            rhs = _propagate_fields(rhs, fields)
+            fields[lhs] = rhs.get_fields()
+            return Query(lhs, rhs)
+        case Alias() as a:
+            return Relabel(a, tuple(fields[a]))
+        case node if node.is_expr():
+            return node.make_term(
+                node.head(), *[_propagate_fields(c, fields) for c in node.children()]
+            )
+        case node:
+            return node
+
+
+def propagate_fields(root: LogicNode) -> LogicNode:
+    return _propagate_fields(root, fields={})
 
 
 class DefaultLogicOptimizer:

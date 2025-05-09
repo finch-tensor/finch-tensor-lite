@@ -16,6 +16,7 @@ from ..finch_logic import (
 )
 from .optimize import (
     optimize,
+    propagate_fields,
     propagate_map_queries,
     lift_subqueries,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "Subquery",
     "Table",
     "optimize",
+    "propagate_fields",
     "propagate_map_queries",
     "lift_subqueries",
     "PostOrderDFS",
