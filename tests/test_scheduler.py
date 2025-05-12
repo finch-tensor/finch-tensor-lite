@@ -1,12 +1,12 @@
-from finch.autoschedule import propagate_map_queries, lift_subqueries
+from finch.autoschedule import lift_subqueries, propagate_map_queries
 from finch.finch_logic import (
-    Plan,
-    Query,
-    Alias,
     Aggregate,
+    Alias,
     Immediate,
     MapJoin,
+    Plan,
     Produces,
+    Query,
     Subquery,
 )
 

@@ -1,7 +1,31 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
 from ..symbolic import Term
+
+if TYPE_CHECKING:
+    pass
+
+__all__ = [
+    "LogicNode",
+    "Immediate",
+    "Deferred",
+    "Field",
+    "Alias",
+    "Table",
+    "MapJoin",
+    "Aggregate",
+    "Reorder",
+    "Relabel",
+    "Reformat",
+    "Subquery",
+    "Query",
+    "Produces",
+    "Plan",
+]
 
 
 @dataclass(eq=True, frozen=True)
@@ -33,12 +57,12 @@ class LogicNode(Term):
         """Returns the head of the node."""
         return cls
 
-    def children(self):
+    def children(self) -> list[LogicNode]:
         """Returns the children of the node."""
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
     @classmethod
-    def make_term(cls, head, *args):
+    def make_term(cls, head, args):
         """Creates a term with the given head and arguments."""
         return head(*args)
 
@@ -91,7 +115,7 @@ class Deferred(LogicNode):
 
     def children(self):
         """Returns the children of the node."""
-        return [self.val, self.type_]
+        return [self.ex, self.type_]
 
 
 @dataclass(eq=True, frozen=True)
@@ -152,16 +176,16 @@ class Alias(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Table(LogicNode):
     """
-    Represents a logical AST expression for a tensor object `tns`, indexed by fields `idxs...`.
-    A table is a tensor with named dimensions.
+    Represents a logical AST expression for a tensor object `tns`, indexed by fields
+    `idxs...`. A table is a tensor with named dimensions.
 
     Attributes:
         tns: The tensor object.
         idxs: The fields indexing the tensor.
     """
 
-    tns: LogicNode
-    idxs: tuple[LogicNode]
+    tns: Immediate
+    idxs: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -192,7 +216,7 @@ class MapJoin(LogicNode):
     """
 
     op: LogicNode
-    args: tuple[LogicNode]
+    args: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -209,8 +233,8 @@ class MapJoin(LogicNode):
         return [self.op, *self.args]
 
     @classmethod
-    def make_term(cls, head, op, *args):
-        return head(op, args)
+    def make_term(cls, head, args):
+        return head(args[0], tuple(args[1:]))
 
 
 @dataclass(eq=True, frozen=True)
@@ -229,7 +253,7 @@ class Aggregate(LogicNode):
     op: LogicNode
     init: LogicNode
     arg: LogicNode
-    idxs: tuple[LogicNode]
+    idxs: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -249,9 +273,9 @@ class Aggregate(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Reorder(LogicNode):
     """
-    Represents a logical AST statement that reorders the dimensions of `arg` to be `idxs...`.
-    Dimensions known to be length 1 may be dropped. Dimensions that do not exist in
-    `arg` may be added.
+    Represents a logical AST statement that reorders the dimensions of `arg` to be
+    `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not
+    exist in `arg` may be added.
 
     Attributes:
         arg: The argument to reorder.
@@ -259,7 +283,7 @@ class Reorder(LogicNode):
     """
 
     arg: LogicNode
-    idxs: tuple[LogicNode]
+    idxs: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -279,7 +303,8 @@ class Reorder(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Relabel(LogicNode):
     """
-    Represents a logical AST statement that relabels the dimensions of `arg` to be `idxs...`.
+    Represents a logical AST statement that relabels the dimensions of `arg` to be
+    `idxs...`.
 
     Attributes:
         arg: The argument to relabel.
@@ -287,7 +312,7 @@ class Relabel(LogicNode):
     """
 
     arg: LogicNode
-    idxs: tuple[LogicNode]
+    idxs: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -335,8 +360,8 @@ class Reformat(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Subquery(LogicNode):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`,
-    and returns `rhs`.
+    Represents a logical AST statement that evaluates `rhs`, binding the result to
+    `lhs`, and returns `rhs`.
 
     Attributes:
         lhs: The left-hand side of the binding.
@@ -364,7 +389,8 @@ class Subquery(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Query(LogicNode):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`.
+    Represents a logical AST statement that evaluates `rhs`, binding the result to
+    `lhs`.
 
     Attributes:
         lhs: The left-hand side of the binding.
@@ -413,24 +439,24 @@ class Produces(LogicNode):
 
     def children(self):
         """Returns the children of the node."""
-        return [*self.args]
+        return list(self.args)
 
     @classmethod
-    def make_term(cls, head, *args):
-        return head(args)
+    def make_term(cls, head, args):
+        return head(tuple(args))
 
 
 @dataclass(eq=True, frozen=True)
 class Plan(LogicNode):
     """
-    Represents a logical AST statement that executes a sequence of statements `bodies...`.
-    Returns the last statement.
+    Represents a logical AST statement that executes a sequence of statements
+    `bodies...`. Returns the last statement.
 
     Attributes:
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[LogicNode] = ()
+    bodies: tuple[LogicNode, ...] = ()
 
     @staticmethod
     def is_expr():
@@ -444,8 +470,8 @@ class Plan(LogicNode):
 
     def children(self):
         """Returns the children of the node."""
-        return [*self.bodies]
+        return tuple(self.bodies)
 
     @classmethod
-    def make_term(cls, head, *val):
-        return head(val)
+    def make_term(cls, head, val):
+        return head(tuple(val))

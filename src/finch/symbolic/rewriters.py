@@ -20,13 +20,27 @@ Classes:
     Memo: Caches the results of a rewriter to avoid redundant computations.
 """
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable
+
 from .term import Term
+
+__all__ = [
+    "default_rewrite",
+    "Rewrite",
+    "PreWalk",
+    "PostWalk",
+    "Chain",
+    "Fixpoint",
+    "Prestep",
+    "Memo",
+]
 
 RwCallable = Callable[[Term], Term | None]
 
+
 def default_rewrite(x: Term | None, y: Term) -> Term:
     return x if x is not None else y
+
 
 class Rewrite:
     """
@@ -35,11 +49,13 @@ class Rewrite:
     Attributes:
         rw (RwCallable): The rewriter function to apply.
     """
+
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
     def __call__(self, x: Term) -> Term:
         return default_rewrite(self.rw(x), x)
+
 
 class PreWalk:
     """
@@ -50,6 +66,7 @@ class PreWalk:
     Attributes:
         rw (RwCallable): The rewriter function to apply.
     """
+
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
@@ -58,13 +75,18 @@ class PreWalk:
         if y is not None:
             if y.is_expr():
                 args = y.children()
-                return y.make_term(y.head(), *[default_rewrite(self(arg), arg) for arg in args])
+                return y.make_term(
+                    y.head(), [default_rewrite(self(arg), arg) for arg in args]
+                )
             return y
         if x.is_expr():
             args = x.children()
             new_args = list(map(self, args))
             if not all(arg is None for arg in new_args):
-                return x.make_term(x.head(), *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args))
+                return x.make_term(
+                    x.head(),
+                    list(map(lambda x1, x2: default_rewrite(x1, x2), new_args, args)),
+                )
             return None
         return None
 
@@ -78,6 +100,7 @@ class PostWalk:
     Attributes:
         rw (RwCallable): The rewriter function to apply.
     """
+
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
@@ -87,9 +110,13 @@ class PostWalk:
             new_args = list(map(self, args))
             if all(arg is None for arg in new_args):
                 return self.rw(x)
-            y = x.make_term(x.head(), *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args))
+            y = x.make_term(
+                x.head(),
+                list(map(lambda x1, x2: default_rewrite(x1, x2), new_args, args)),
+            )
             return default_rewrite(self.rw(y), y)
         return self.rw(x)
+
 
 class Chain:
     """
@@ -99,6 +126,7 @@ class Chain:
     Attributes:
         rws (Iterable[RwCallable]): A collection of rewriter functions to apply.
     """
+
     def __init__(self, rws: Iterable[RwCallable]):
         self.rws = rws
 
@@ -113,6 +141,7 @@ class Chain:
             return x
         return None
 
+
 class Fixpoint:
     """
     A rewriter which repeatedly applies `rw` to `x` until no changes are made. If
@@ -121,17 +150,17 @@ class Fixpoint:
     Attributes:
         rw (RwCallable): The rewriter function to apply.
     """
+
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
     def __call__(self, x: Term) -> Term | None:
         y = self.rw(x)
-        if y is not None:
-            while y is not None and x != y:
-                x = y
-                y = self.rw(x)
-        else:
-            return None
+        while y is not None and x != y:
+            x = y
+            y = self.rw(x)
+        return y
+
 
 class Prestep:
     """
@@ -141,6 +170,7 @@ class Prestep:
     Attributes:
         rw (RwCallable): The rewriter function to apply.
     """
+
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
@@ -149,9 +179,12 @@ class Prestep:
         if y is not None:
             if y.is_expr():
                 y_args = y.children()
-                return y.make_term(y.head(), *[default_rewrite(self(arg), arg) for arg in y_args])
+                return y.make_term(
+                    y.head(), [default_rewrite(self(arg), arg) for arg in y_args]
+                )
             return y
         return None
+
 
 class Memo:
     """
@@ -162,7 +195,8 @@ class Memo:
         rw (RwCallable): The rewriter function to apply.
         cache (dict): A dictionary to store cached results.
     """
-    def __init__(self, rw: RwCallable, cache: dict = None):
+
+    def __init__(self, rw: RwCallable, cache: dict | None = None):
         self.rw = rw
         self.cache = cache if cache is not None else {}
 
@@ -170,13 +204,3 @@ class Memo:
         if x not in self.cache:
             self.cache[x] = self.rw(x)
         return self.cache[x]
-
-
-
-
-
-
-
-
-
-
