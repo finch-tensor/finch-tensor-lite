@@ -8,19 +8,19 @@ from ..finch_logic import (
     Query,
     Subquery,
 )
-from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
+from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite, Term
 from .compiler import LogicCompiler
 
 
-def optimize(prgm: LogicNode) -> LogicNode:
+def optimize(prgm: Term) -> Term:
     # ...
     prgm = lift_subqueries(prgm)
     return propagate_map_queries(prgm)
 
 
 def _lift_subqueries_expr(
-    node: LogicNode, bindings: dict[LogicNode, LogicNode]
-) -> LogicNode:
+    node: Term, bindings: dict[Term, Term]
+) -> Term:
     match node:
         case Subquery(lhs, arg):
             if lhs not in bindings:
@@ -36,12 +36,12 @@ def _lift_subqueries_expr(
             return node
 
 
-def lift_subqueries(node: LogicNode) -> LogicNode:
+def lift_subqueries(node: Term) -> Term:
     match node:
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
         case Query(lhs, rhs):
-            bindings: dict[LogicNode, LogicNode] = {}
+            bindings: dict[Term, Term] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
@@ -52,14 +52,14 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
             raise Exception(f"Invalid node: {node}")
 
 
-def _get_productions(root: LogicNode) -> list[LogicNode]:
+def _get_productions(root: Term) -> list[Term]:
     for node in PostOrderDFS(root):
         if isinstance(node, Produces):
             return [arg for arg in PostOrderDFS(node) if isinstance(arg, Alias)]
     return []
 
 
-def propagate_map_queries(root: LogicNode) -> LogicNode:
+def propagate_map_queries(root: Term) -> Term:
     def rule_agg_to_mapjoin(ex):
         match ex:
             case Aggregate(op, init, arg, ()):
@@ -94,6 +94,6 @@ class DefaultLogicOptimizer:
     def __init__(self, ctx: LogicCompiler):
         self.ctx = ctx
 
-    def __call__(self, prgm: LogicNode):
+    def __call__(self, prgm: Term):
         prgm = optimize(prgm)
         return self.ctx(prgm)

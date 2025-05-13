@@ -49,10 +49,10 @@ from typing import Any, Callable
 
 import numpy as np
 
-_properties: dict[tuple[Hashable, str, str], Any] = {}
+_properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
 
-def query_property(obj: Hashable, attr: str, prop: Hashable, *args: Any) -> Any:
+def query_property(obj: type | Hashable, attr: str, prop: str, *args: Any) -> Any:
     """Queries a property of an attribute of an object or class.  Properties can
     be overridden by calling register_property on the object or it's class.
 
@@ -72,7 +72,7 @@ def query_property(obj: Hashable, attr: str, prop: Hashable, *args: Any) -> Any:
     if not isinstance(obj, Hashable):
         T = type(obj)
     to_query = {T}
-    queried: set[type] = set()
+    queried: set[type | Hashable] = set()
     while len(to_query) != len(queried):
         to_query_new = to_query.copy()
         for o in to_query:
@@ -81,7 +81,7 @@ def query_property(obj: Hashable, attr: str, prop: Hashable, *args: Any) -> Any:
                 return method(obj, *args)
             queried.add(o)
             if not isinstance(o, type):
-                to_query_new.update(type(o))
+                to_query_new.add(type(o))
                 continue
             to_query_new.update(o.__mro__)
         to_query = to_query_new
@@ -89,7 +89,7 @@ def query_property(obj: Hashable, attr: str, prop: Hashable, *args: Any) -> Any:
     raise NotImplementedError(f"Property {prop} not implemented for {type(obj)}")
 
 
-def register_property(cls: type, attr: str, prop: str, f: Callable) -> None:
+def register_property(cls: type | Hashable, attr: str, prop: str, f: Callable) -> None:
     """Registers a property for a class or object.
 
     Args:
@@ -181,17 +181,15 @@ _reflexive_operators = {
 }
 
 for op, (meth, rmeth) in _reflexive_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            lambda op, a, b, meth=meth, rmeth=rmeth: query_property(
-                a, meth, "return_type", b
-            )
-            if hasattr(a, meth)
-            else query_property(b, rmeth, "return_type", a),
-        ),
+    register_property(
+        op,
+        "__call__",
+        "return_type",
+        lambda op, a, b, meth=meth, rmeth=rmeth: query_property(
+            a, meth, "return_type", b
+        )
+        if hasattr(a, meth)
+        else query_property(b, rmeth, "return_type", a),
     )
 
     def _return_type(meth):

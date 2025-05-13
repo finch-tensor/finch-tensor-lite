@@ -1,6 +1,7 @@
 from collections.abc import Hashable
 from textwrap import dedent
-from typing import Any
+from typing import Any, TypeVar
+from ..symbolic import Term
 
 from ..finch_logic import (
     Alias,
@@ -17,8 +18,9 @@ from ..finch_logic import (
     Table,
 )
 
+T = TypeVar('T', bound=Term)
 
-def get_or_insert(dictionary: dict[Hashable, Any], key: Hashable, default: Any) -> Any:
+def get_or_insert(dictionary: dict[str, Term], key: str, default: Any) -> Any:
     if key in dictionary:
         return dictionary[key]
     dictionary[key] = default
@@ -26,8 +28,8 @@ def get_or_insert(dictionary: dict[Hashable, Any], key: Hashable, default: Any) 
 
 
 def get_structure(
-    node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]
-) -> LogicNode:
+    node: T, fields: dict[str, Term], aliases: dict[str, Term]
+) -> T:
     match node:
         case Field(name):
             return get_or_insert(fields, name, Immediate(len(fields) + len(aliases)))
@@ -35,19 +37,20 @@ def get_structure(
             return get_or_insert(aliases, name, Immediate(len(fields) + len(aliases)))
         case Subquery(Alias(name) as lhs, arg):
             if name in aliases:
-                return aliases[name]
-            return Subquery(
+                return aliases[name]  # type: ignore[return-value]
+            return Subquery(  # type: ignore[return-value]
                 get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases)
             )
         case Table(tns, idxs):
-            return Table(
+            return Table(  # type: ignore[return-value]
                 Immediate(type(tns.val)),
                 tuple(get_structure(idx, fields, aliases) for idx in idxs),
             )
-        case any if any.is_tree():
-            return any.from_arguments(
-                *[get_structure(arg, fields, aliases) for arg in any.get_arguments()]
-            )
+        # TODO: `is_tree` isn't defined
+        # case any if any.is_tree():
+        #     return any.from_arguments(
+        #         *[get_structure(arg, fields, aliases) for arg in any.get_arguments()]
+        #     )
         case _:
             return node
 
@@ -81,7 +84,7 @@ def compile_pointwise_logic(ex: LogicNode) -> tuple:
     return (code, ctx.bound_idxs)
 
 
-def compile_logic_constant(ex: LogicNode) -> str:
+def compile_logic_constant(ex: Term) -> str:
     match ex:
         case Immediate(val):
             return val
@@ -107,7 +110,7 @@ class LogicLowerer:
     def __init__(self, mode: str = "fast"):
         self.mode = mode
 
-    def __call__(self, ex: LogicNode):
+    def __call__(self, ex: Term) -> str:
         match ex:
             case Query(Alias(name), Table(tns, _)):
                 return f":({name} = {compile_logic_constant(tns)})"
@@ -153,6 +156,6 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm):
+    def __call__(self, prgm: Term) -> str:
         # prgm = format_queries(prgm, True)  # noqa: F821
         return self.ll(prgm)

@@ -25,9 +25,10 @@ class AbstractTensor(ABC):
 
 def fill_value(arg):
     from ..interface.lazy import LazyTensor
+    from ..finch_logic import Immediate
 
-    if isinstance(arg, LazyTensor):
+    if isinstance(arg, LazyTensor | Immediate):
         return arg.fill_value
     if isinstance(arg, (int, float, bool, complex)):
         return arg
-    raise ValueError("Unsupported type for fill_value")
+    raise TypeError("Unsupported type for fill_value")

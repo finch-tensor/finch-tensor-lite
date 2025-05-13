@@ -371,7 +371,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
 
 
-def prod(arr: LazyTensor, dims) -> LazyTensor:
+def prod(arr: LazyTensor, dims: tuple[int, ...]) -> LazyTensor:
     """
     Calculates the product of input array ``x`` elements.
 
@@ -430,7 +430,7 @@ def prod(arr: LazyTensor, dims) -> LazyTensor:
     handled as if the operation is implemented by successive application of
     :func:`~array_api.multiply`.
     """
-    return functools.reduce(operator.mul, arr, dims, arr.fill_value)
+    return reduce(operator.mul, arr, axis=dims)
 
 
 def multiply(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:

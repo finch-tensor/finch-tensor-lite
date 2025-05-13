@@ -57,7 +57,7 @@ class LogicNode(Term):
         """Returns the head of the node."""
         return cls
 
-    def children(self) -> list[LogicNode]:
+    def children(self) -> list[Term]:
         """Returns the children of the node."""
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
@@ -87,6 +87,12 @@ class Immediate(LogicNode):
     def is_stateful():
         """Determines if the node is stateful."""
         return False
+
+    @property
+    def fill_value(self):
+        from ..algebra import fill_value
+
+        return fill_value(self)
 
 
 @dataclass(eq=True, frozen=True)
@@ -185,7 +191,7 @@ class Table(LogicNode):
     """
 
     tns: Immediate
-    idxs: tuple[LogicNode, ...]
+    idxs: tuple[Field, ...]
 
     @staticmethod
     def is_expr():
@@ -215,8 +221,8 @@ class MapJoin(LogicNode):
         args: The arguments to map the function across.
     """
 
-    op: LogicNode
-    args: tuple[LogicNode, ...]
+    op: Immediate
+    args: tuple[Term, ...]
 
     @staticmethod
     def is_expr():
@@ -250,10 +256,10 @@ class Aggregate(LogicNode):
         idxs: The dimensions to reduce.
     """
 
-    op: LogicNode
-    init: LogicNode
-    arg: LogicNode
-    idxs: tuple[LogicNode, ...]
+    op: Immediate
+    init: Immediate
+    arg: Term
+    idxs: tuple[Field, ...]
 
     @staticmethod
     def is_expr():
@@ -282,8 +288,8 @@ class Reorder(LogicNode):
         idxs: The new order of dimensions.
     """
 
-    arg: LogicNode
-    idxs: tuple[LogicNode, ...]
+    arg: Term
+    idxs: tuple[Field, ...]
 
     @staticmethod
     def is_expr():
@@ -311,8 +317,8 @@ class Relabel(LogicNode):
         idxs: The new labels for dimensions.
     """
 
-    arg: LogicNode
-    idxs: tuple[LogicNode, ...]
+    arg: Term
+    idxs: tuple[Field, ...]
 
     @staticmethod
     def is_expr():
@@ -339,8 +345,8 @@ class Reformat(LogicNode):
         arg: The argument to reformat.
     """
 
-    tns: LogicNode
-    arg: LogicNode
+    tns: Immediate
+    arg: Term
 
     @staticmethod
     def is_expr():
@@ -368,8 +374,8 @@ class Subquery(LogicNode):
         rhs: The argument to evaluate.
     """
 
-    lhs: LogicNode
-    arg: LogicNode
+    lhs: Term
+    arg: Term
 
     @staticmethod
     def is_expr():
@@ -397,8 +403,8 @@ class Query(LogicNode):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: LogicNode
-    rhs: LogicNode
+    lhs: Term
+    rhs: Term
 
     @staticmethod
     def is_expr():
@@ -425,7 +431,7 @@ class Produces(LogicNode):
         args: The arguments to return.
     """
 
-    args: tuple[LogicNode]
+    args: tuple[Term, ...]
 
     @staticmethod
     def is_expr():
@@ -456,7 +462,7 @@ class Plan(LogicNode):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[LogicNode, ...] = ()
+    bodies: tuple[Term, ...] = ()
 
     @staticmethod
     def is_expr():
