@@ -1,14 +1,15 @@
-[tool.poetry]
+[project]
 name = "finch-tensor-lite"
-version = "0.1.0"
 description = ""
-authors = ["Willow Ahrens <willow.marie.ahrens@gmail.com>"]
+version = "0.1.0"
 readme = "README.md"
-packages = [{include = "finch", from = "src"}]
+authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
+requires-python = '>=3.11,<4.0'
+dependencies = ['numpy (>=1.19)']
 
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = ">=1.19"
+[tool.poetry]
+packages = [{include = "finch", from = "src"}]
+requires-poetry = '>=2.0,<3.0'
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.4"
