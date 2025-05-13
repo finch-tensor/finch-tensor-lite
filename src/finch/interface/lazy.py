@@ -1,5 +1,4 @@
 import builtins
-import functools
 import itertools
 import operator
 from collections.abc import Callable

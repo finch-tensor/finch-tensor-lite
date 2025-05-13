@@ -44,8 +44,8 @@ each subclass individually.
 """
 
 import operator
-from collections.abc import Hashable
-from typing import Any, Callable
+from collections.abc import Callable, Hashable
+from typing import Any
 
 import numpy as np
 

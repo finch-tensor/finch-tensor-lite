@@ -1,7 +1,6 @@
 from ..finch_logic import (
     Aggregate,
     Alias,
-    LogicNode,
     MapJoin,
     Plan,
     Produces,
@@ -18,9 +17,7 @@ def optimize(prgm: Term) -> Term:
     return propagate_map_queries(prgm)
 
 
-def _lift_subqueries_expr(
-    node: Term, bindings: dict[Term, Term]
-) -> Term:
+def _lift_subqueries_expr(node: Term, bindings: dict[Term, Term]) -> Term:
     match node:
         case Subquery(lhs, arg):
             if lhs not in bindings:

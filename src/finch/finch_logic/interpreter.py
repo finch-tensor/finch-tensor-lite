@@ -20,7 +20,6 @@ from ..finch_logic import (
     Reorder,
     Subquery,
     Table,
-    LogicNode
 )
 
 
@@ -57,9 +56,9 @@ class FinchLogicInterpreter:
                 raise ValueError("Fields cannot be used in expressions")
             case Alias(name):
                 alias = self.bindings.get(name, None)
-                if alias is not None:
-                    return alias
-                raise ValueError(f"undefined tensor alias {node.val}")
+                if alias is None:
+                    raise ValueError(f"undefined tensor alias {name}")
+                return alias
             case Table(Immediate(val), idxs):
                 return TableValue(val, idxs)
             case MapJoin(Immediate(op), args):
@@ -67,7 +66,7 @@ class FinchLogicInterpreter:
                 dims = {}
                 idxs = []
                 for arg in args:
-                    for idx, dim in zip(arg.idxs, arg.tns.shape):
+                    for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                         if idx in dims:
                             if dims[idx] != dim:
                                 raise ValueError("Dimensions mismatched in map")
@@ -80,8 +79,10 @@ class FinchLogicInterpreter:
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
                 )
                 for crds in product(*[range(dims[idx]) for idx in idxs]):
-                    idx_crds = dict(zip(idxs, crds))
-                    vals = [arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args]
+                    idx_crds = dict(zip(idxs, crds, strict=True))
+                    vals = [
+                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args
+                    ]
                     result[*crds] = op(*vals)
                 return TableValue(result, idxs)
             case Aggregate(op, init, arg, idxs):
@@ -91,16 +92,20 @@ class FinchLogicInterpreter:
                 dtype = fixpoint_type(op, init, element_type(arg.tns))
                 new_shape = tuple(
                     dim
-                    for (dim, idx) in zip(arg.tns.shape, arg.idxs)
+                    for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
                     if idx not in node.idxs
                 )
                 result = self.make_tensor(new_shape, init, dtype=dtype)
                 for crds in product(*[range(dim) for dim in arg.tns.shape]):
                     out_crds = [
-                        crd for (crd, idx) in zip(crds, arg.idxs) if idx not in node.idxs
+                        crd
+                        for (crd, idx) in zip(crds, arg.idxs, strict=True)
+                        if idx not in node.idxs
                     ]
                     result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
-                return TableValue(result, [idx for idx in arg.idxs if idx not in node.idxs])
+                return TableValue(
+                    result, [idx for idx in arg.idxs if idx not in node.idxs]
+                )
             case Relabel(arg, idxs):
                 if len(arg.idxs) != len(idxs):
                     raise ValueError("The number of indices in the relabel must match")
@@ -111,11 +116,13 @@ class FinchLogicInterpreter:
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx not in idxs and dim != 1:
                         raise ValueError("Trying to drop a dimension that is not 1")
-                arg_dims = dict(zip(arg.idxs, arg.tns.shape))
+                arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
-                result = self.make_tensor(dims, fill_value(arg.tns), dtype=arg.tns.dtype)
+                result = self.make_tensor(
+                    dims, fill_value(arg.tns), dtype=arg.tns.dtype
+                )
                 for crds in product(*[range(dim) for dim in dims]):
-                    node_crds = dict(zip(idxs, crds))
+                    node_crds = dict(zip(idxs, crds, strict=True))
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
                     result[*crds] = arg.tns[*in_crds]
                 return TableValue(result, idxs)

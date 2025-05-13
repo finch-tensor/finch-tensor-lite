@@ -1,7 +1,5 @@
-from collections.abc import Hashable
 from textwrap import dedent
 from typing import Any, TypeVar
-from ..symbolic import Term
 
 from ..finch_logic import (
     Alias,
@@ -17,8 +15,10 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
+from ..symbolic import Term
 
-T = TypeVar('T', bound=Term)
+T = TypeVar("T", bound=Term)
+
 
 def get_or_insert(dictionary: dict[str, Term], key: str, default: Any) -> Any:
     if key in dictionary:
@@ -27,9 +27,7 @@ def get_or_insert(dictionary: dict[str, Term], key: str, default: Any) -> Any:
     return default
 
 
-def get_structure(
-    node: T, fields: dict[str, Term], aliases: dict[str, Term]
-) -> T:
+def get_structure(node: T, fields: dict[str, Term], aliases: dict[str, Term]) -> T:
     match node:
         case Field(name):
             return get_or_insert(fields, name, Immediate(len(fields) + len(aliases)))
