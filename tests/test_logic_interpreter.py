@@ -1,5 +1,10 @@
 from operator import add, mul
 
+import numpy as np
+from numpy.testing import assert_equal
+
+import pytest
+
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -13,11 +18,6 @@ from finch.finch_logic import (
     Table,
 )
 from finch.finch_logic.interpreter import FinchLogicInterpreter
-
-import numpy as np
-from numpy.testing import assert_equal
-
-import pytest
 
 
 @pytest.mark.parametrize(

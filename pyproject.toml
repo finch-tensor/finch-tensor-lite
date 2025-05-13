@@ -38,8 +38,8 @@ docstring-code-format = true
 section-order = [
     "future",
     "standard-library",
-    "first-party",
     "numpy",
     "third-party",
+    "first-party",
     "local-folder",
 ]

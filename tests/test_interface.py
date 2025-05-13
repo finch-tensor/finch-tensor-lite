@@ -1,11 +1,11 @@
 from operator import add, mul
 
-import finch
-
 import numpy as np
 from numpy.testing import assert_equal
 
 import pytest
+
+import finch
 
 
 @pytest.mark.parametrize(
