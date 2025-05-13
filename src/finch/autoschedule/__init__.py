@@ -19,6 +19,10 @@ from .optimize import (
     propagate_fields,
     propagate_map_queries,
     lift_subqueries,
+    isolate_aggregates,
+    isolate_reformats,
+    isolate_tables,
+    pretty_labels,
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 
@@ -41,6 +45,10 @@ __all__ = [
     "propagate_fields",
     "propagate_map_queries",
     "lift_subqueries",
+    "isolate_aggregates",
+    "isolate_reformats",
+    "isolate_tables",
+    "pretty_labels",
     "PostOrderDFS",
     "PostWalk",
     "PreWalk",

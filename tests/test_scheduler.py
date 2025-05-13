@@ -1,5 +1,13 @@
+import pytest
+
 from finch.autoschedule import (
-    propagate_fields, propagate_map_queries, lift_subqueries
+    propagate_fields,
+    propagate_map_queries,
+    lift_subqueries,
+    isolate_reformats,
+    isolate_aggregates,
+    isolate_tables,
+    pretty_labels,
 )
 from finch.finch_logic import (
     Plan,
@@ -13,7 +21,9 @@ from finch.finch_logic import (
     Relabel,
     Subquery,
     Table,
+    Reformat,
 )
+from finch.symbolic.gensym import _sg
 
 
 def test_propagate_map_queries_simple():
@@ -99,33 +109,86 @@ def test_lift_subqueries():
 
 
 def test_propagate_fields():
-    plan = Plan((
-        Query(
-            Alias("A10"),
-            MapJoin(
-                Immediate("op"),
-                (
-                    Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
-                    Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+    plan = Plan(
+        (
+            Query(
+                Alias("A10"),
+                MapJoin(
+                    Immediate("op"),
+                    (
+                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+                    ),
                 ),
             ),
-        ),
-        Alias("A10"),
-    ))
+            Alias("A10"),
+        )
+    )
 
-    expected = Plan((
-        Query(
-            Alias("A10"),
-            MapJoin(
-                Immediate("op"),
-                (
-                    Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
-                    Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+    expected = Plan(
+        (
+            Query(
+                Alias("A10"),
+                MapJoin(
+                    Immediate("op"),
+                    (
+                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+                    ),
                 ),
             ),
-        ),
-        Relabel(Alias("A10"), (Field("A1"), Field("A2"), Field("A3"))),
-    ))
+            Relabel(Alias("A10"), (Field("A1"), Field("A2"), Field("A3"))),
+        )
+    )
 
     result = propagate_fields(plan)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "node,pass_fn",
+    [
+        (
+            Aggregate(Immediate(""), Immediate(""), Immediate(""), ()),
+            isolate_aggregates,
+        ),
+        (Reformat(Immediate(""), Immediate("")), isolate_reformats),
+        (Table(Immediate(""), ()), isolate_tables),
+    ],
+)
+def test_isolate_passes(node, pass_fn):
+    plan = Plan((node, node, node))
+    expected = Plan(
+        (
+            Subquery(Alias(f"#A#{_sg.counter}"), node),
+            Subquery(Alias(f"#A#{_sg.counter + 1}"), node),
+            Subquery(Alias(f"#A#{_sg.counter + 2}"), node),
+        )
+    )
+
+    result = pass_fn(plan)
+    assert result == expected
+
+
+def test_pretty_labels():
+    plan = Plan(
+        (
+            Field("AA"),
+            Alias("BB"),
+            Alias("CC"),
+            Subquery(Alias("BB"), Field("AA")),
+            Subquery(Alias("CC"), Field("AA")),
+        )
+    )
+    expected = Plan(
+        (
+            Field(":i0"),
+            Alias(":A0"),
+            Alias(":A1"),
+            Subquery(Alias(":A0"), Field(":i0")),
+            Subquery(Alias(":A1"), Field(":i0")),
+        )
+    )
+
+    result = pretty_labels(plan)
     assert result == expected
