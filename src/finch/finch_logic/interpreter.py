@@ -54,10 +54,10 @@ class FinchLogicInterpreter:
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
-            case Alias(name):
-                alias = self.bindings.get(name, None)
+            case Alias(_):
+                alias = self.bindings.get(node, None)
                 if alias is None:
-                    raise ValueError(f"undefined tensor alias {name}")
+                    raise ValueError(f"undefined tensor alias {node}")
                 return alias
             case Table(Immediate(val), idxs):
                 return TableValue(val, idxs)
@@ -107,9 +107,9 @@ class FinchLogicInterpreter:
                     result, [idx for idx in arg.idxs if idx not in node.idxs]
                 )
             case Relabel(arg, idxs):
+                arg = self(arg)
                 if len(arg.idxs) != len(idxs):
                     raise ValueError("The number of indices in the relabel must match")
-                arg = self(arg)
                 return TableValue(arg.tns, idxs)
             case Reorder(arg, idxs):
                 arg = self(arg)
@@ -126,7 +126,7 @@ class FinchLogicInterpreter:
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
                     result[*crds] = arg.tns[*in_crds]
                 return TableValue(result, idxs)
-            case Query(rhs, lhs):
+            case Query(lhs, rhs):
                 rhs = self(rhs)
                 self.bindings[lhs] = rhs
                 return (rhs,)
