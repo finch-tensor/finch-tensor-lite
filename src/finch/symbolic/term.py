@@ -13,9 +13,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any, Self
 
 __all__ = ["Term", "PreOrderDFS", "PostOrderDFS"]
+
+if TYPE_CHECKING:
+    from ..finch_logic import LogicNode
 
 
 class Term(ABC):
@@ -27,7 +30,7 @@ class Term(ABC):
         """Return the head type of the S-expression."""
 
     @abstractmethod
-    def children(self) -> list[Term]:
+    def children(self) -> list[LogicNode]:
         """Return the children (AKA tail) of the S-expression."""
 
     @abstractmethod
@@ -37,11 +40,11 @@ class Term(ABC):
         `children()` if `True`."""
 
     @abstractmethod
-    def make_term(self, head: Any, children: list[Term]) -> Term:
+    def make_term(self, head: Any, *children: Term) -> Self:
         """
         Construct a new term in the same family of terms with the given head type and
         children. This function should satisfy
-        `x == x.make_term(x.head(), *x.children())`
+        `x == x.make_term(*x.children())`
         """
 
     def __hash__(self) -> int:
@@ -60,6 +63,7 @@ class Term(ABC):
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
     if node.is_expr():
+        arg: Term
         for arg in node.children():
             yield from PostOrderDFS(arg)
     yield node
@@ -68,5 +72,6 @@ def PostOrderDFS(node: Term) -> Iterator[Term]:
 def PreOrderDFS(node: Term) -> Iterator[Term]:
     yield node
     if node.is_expr():
+        arg: Term
         for arg in node.children():
             yield from PreOrderDFS(arg)

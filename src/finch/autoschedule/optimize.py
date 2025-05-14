@@ -1,6 +1,7 @@
 from ..finch_logic import (
     Aggregate,
     Alias,
+    LogicNode,
     MapJoin,
     Plan,
     Produces,
@@ -17,7 +18,9 @@ def optimize(prgm: Term) -> Term:
     return propagate_map_queries(prgm)
 
 
-def _lift_subqueries_expr(node: Term, bindings: dict[Term, Term]) -> Term:
+def _lift_subqueries_expr(
+    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+) -> LogicNode:
     match node:
         case Subquery(lhs, arg):
             if lhs not in bindings:
@@ -26,19 +29,18 @@ def _lift_subqueries_expr(node: Term, bindings: dict[Term, Term]) -> Term:
             return lhs
         case any if any.is_expr():
             return any.make_term(
-                any.head(),
-                [_lift_subqueries_expr(x, bindings) for x in any.children()],
+                *tuple(_lift_subqueries_expr(x, bindings) for x in any.children()),
             )
         case _:
             return node
 
 
-def lift_subqueries(node: Term) -> Term:
+def lift_subqueries(node: Term) -> LogicNode:
     match node:
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
         case Query(lhs, rhs):
-            bindings: dict[Term, Term] = {}
+            bindings: dict[LogicNode, LogicNode] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
@@ -91,6 +93,6 @@ class DefaultLogicOptimizer:
     def __init__(self, ctx: LogicCompiler):
         self.ctx = ctx
 
-    def __call__(self, prgm: Term):
+    def __call__(self, prgm: Term) -> str:
         prgm = optimize(prgm)
         return self.ctx(prgm)

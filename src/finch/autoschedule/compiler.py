@@ -17,17 +17,19 @@ from ..finch_logic import (
 )
 from ..symbolic import Term
 
-T = TypeVar("T", bound=Term)
+T = TypeVar("T", bound="LogicNode")
 
 
-def get_or_insert(dictionary: dict[str, Term], key: str, default: Any) -> Any:
+def get_or_insert(dictionary: dict[str, LogicNode], key: str, default: Any) -> Any:
     if key in dictionary:
         return dictionary[key]
     dictionary[key] = default
     return default
 
 
-def get_structure(node: T, fields: dict[str, Term], aliases: dict[str, Term]) -> T:
+def get_structure(
+    node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]
+) -> LogicNode:
     match node:
         case Field(name):
             return get_or_insert(fields, name, Immediate(len(fields) + len(aliases)))
@@ -35,20 +37,20 @@ def get_structure(node: T, fields: dict[str, Term], aliases: dict[str, Term]) ->
             return get_or_insert(aliases, name, Immediate(len(fields) + len(aliases)))
         case Subquery(Alias(name) as lhs, arg):
             if name in aliases:
-                return aliases[name]  # type: ignore[return-value]
-            return Subquery(  # type: ignore[return-value]
+                return aliases[name]
+            return Subquery(
                 get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases)
             )
         case Table(tns, idxs):
-            return Table(  # type: ignore[return-value]
+            assert all(isinstance(idx, Field) for idx in idxs)
+            return Table(
                 Immediate(type(tns.val)),
-                tuple(get_structure(idx, fields, aliases) for idx in idxs),
+                tuple(get_structure(idx, fields, aliases) for idx in idxs),  # type: ignore[misc]
             )
-        # TODO: `is_tree` isn't defined
-        # case any if any.is_tree():
-        #     return any.from_arguments(
-        #         *[get_structure(arg, fields, aliases) for arg in any.get_arguments()]
-        #     )
+        case any if any.is_expr():
+            return any.make_term(
+                *[get_structure(arg, fields, aliases) for arg in any.children()]
+            )
         case _:
             return node
 

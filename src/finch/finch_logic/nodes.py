@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any, Self, TypeVar
 
 from ..symbolic import Term
-
-if TYPE_CHECKING:
-    pass
 
 __all__ = [
     "LogicNode",
@@ -26,6 +23,9 @@ __all__ = [
     "Produces",
     "Plan",
 ]
+
+
+T = TypeVar("T", bound="LogicNode")
 
 
 @dataclass(eq=True, frozen=True)
@@ -57,14 +57,14 @@ class LogicNode(Term):
         """Returns the head of the node."""
         return cls
 
-    def children(self) -> list[Term]:
+    @abstractmethod
+    def children(self) -> list[LogicNode]:
         """Returns the children of the node."""
-        raise Exception(f"`children` isn't supported for {self.__class__}.")
 
     @classmethod
-    def make_term(cls, head, args):
+    def make_term(cls, *args: Term) -> Self:
         """Creates a term with the given head and arguments."""
-        return head(*args)
+        return cls(*args)
 
 
 @dataclass(eq=True, frozen=True)
@@ -93,6 +93,9 @@ class Immediate(LogicNode):
         from ..algebra import fill_value
 
         return fill_value(self)
+
+    def children(self):
+        raise TypeError(f"`{type(self).__name__}` doesn't support `.children()`.")
 
 
 @dataclass(eq=True, frozen=True)
@@ -222,7 +225,7 @@ class MapJoin(LogicNode):
     """
 
     op: Immediate
-    args: tuple[Term, ...]
+    args: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -239,8 +242,8 @@ class MapJoin(LogicNode):
         return [self.op, *self.args]
 
     @classmethod
-    def make_term(cls, head, args):
-        return head(args[0], tuple(args[1:]))
+    def make_term(cls, op: Immediate, *args: LogicNode) -> Self:  # type: ignore[override]
+        return cls(op, tuple(args))
 
 
 @dataclass(eq=True, frozen=True)
@@ -258,7 +261,7 @@ class Aggregate(LogicNode):
 
     op: Immediate
     init: Immediate
-    arg: Term
+    arg: LogicNode
     idxs: tuple[Field, ...]
 
     @staticmethod
@@ -288,7 +291,7 @@ class Reorder(LogicNode):
         idxs: The new order of dimensions.
     """
 
-    arg: Term
+    arg: LogicNode
     idxs: tuple[Field, ...]
 
     @staticmethod
@@ -317,7 +320,7 @@ class Relabel(LogicNode):
         idxs: The new labels for dimensions.
     """
 
-    arg: Term
+    arg: LogicNode
     idxs: tuple[Field, ...]
 
     @staticmethod
@@ -346,7 +349,7 @@ class Reformat(LogicNode):
     """
 
     tns: Immediate
-    arg: Term
+    arg: LogicNode
 
     @staticmethod
     def is_expr():
@@ -374,8 +377,8 @@ class Subquery(LogicNode):
         rhs: The argument to evaluate.
     """
 
-    lhs: Term
-    arg: Term
+    lhs: LogicNode
+    arg: LogicNode
 
     @staticmethod
     def is_expr():
@@ -403,8 +406,8 @@ class Query(LogicNode):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Term
-    rhs: Term
+    lhs: LogicNode
+    rhs: LogicNode
 
     @staticmethod
     def is_expr():
@@ -431,7 +434,7 @@ class Produces(LogicNode):
         args: The arguments to return.
     """
 
-    args: tuple[Term, ...]
+    args: tuple[LogicNode, ...]
 
     @staticmethod
     def is_expr():
@@ -445,11 +448,11 @@ class Produces(LogicNode):
 
     def children(self):
         """Returns the children of the node."""
-        return list(self.args)
+        return [*self.args]
 
     @classmethod
-    def make_term(cls, head, args):
-        return head(tuple(args))
+    def make_term(cls, *args: LogicNode) -> Self:  # type: ignore[override]
+        return cls(tuple(args))
 
 
 @dataclass(eq=True, frozen=True)
@@ -462,7 +465,7 @@ class Plan(LogicNode):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[Term, ...] = ()
+    bodies: tuple[LogicNode, ...] = ()
 
     @staticmethod
     def is_expr():
@@ -479,5 +482,5 @@ class Plan(LogicNode):
         return tuple(self.bodies)
 
     @classmethod
-    def make_term(cls, head, val):
-        return head(tuple(val))
+    def make_term(cls, *bodies: LogicNode) -> Self:  # type: ignore[override]
+        return cls(tuple(bodies))
