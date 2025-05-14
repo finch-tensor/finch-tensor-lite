@@ -7,7 +7,7 @@ from ..util.config import get_config
 from ..util.cache import file_cache
 from functools import lru_cache
 
-@file_cache(sysconfig.get_config_var('SHLIB_SUFFIX'), cache_dir="finch_cache")
+@file_cache(ext=sysconfig.get_config_var('SHLIB_SUFFIX'), domain="c")
 def create_shared_lib(filename, c_code, cc, cflags):
     """
     Compiles a C function into a shared library and returns the path.
@@ -16,11 +16,11 @@ def create_shared_lib(filename, c_code, cc, cflags):
     :return: The result of the function call.
     """
     tmp_dir = get_config("FINCH_TMP")
-    os.makepaths(tmp_dir, exist_ok=True)
+    os.makedirs(tmp_dir, exist_ok=True)
     # Create a temporary directory to store the C file and shared library
     with tempfile.TemporaryDirectory(prefix=tmp_dir) as staging_dir:
         c_file_path = os.path.join(staging_dir, "temp.c")
-        shared_lib_path = tempfile.TemporaryDirectory(prefix=tmp_dir) / "libtemp.{ext}"
+        shared_lib_path = filename
 
         # Write the C code to a file
         with open(c_file_path, "w") as c_file:

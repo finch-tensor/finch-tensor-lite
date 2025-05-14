@@ -43,7 +43,14 @@ def get_config(var):
     """
     Get the configuration value for a given variable.
     """
-    return os.getenv(var, custom_config.get(var, default_config[var]))
+    val = os.getenv(var)
+    if val is not None:
+        try:
+            return json.loads(val)
+        except json.decoder.JSONDecodeError:
+            raise ValueError(f"Environment variable {var} is not a valid JSON value.")
+    else:
+        return custom_config.get(var, default_config[var])
 
 def set_config(var, val):
     """
