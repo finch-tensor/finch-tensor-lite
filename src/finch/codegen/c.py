@@ -2,8 +2,9 @@ import ctypes
 import os
 import tempfile
 import subprocess
+from .config import get_config
 
-def compile_and_run_c_function(c_code, function_name, *args):
+def compile_to_callable(c_code, function_name, *args):
     """
     Compiles a C function into a shared library, loads it using ctypes, and calls the function.
 
@@ -23,7 +24,11 @@ def compile_and_run_c_function(c_code, function_name, *args):
 
         # Compile the C code into a shared library
         compile_command = [
-            "gcc", "-shared", "-o", shared_lib_path, "-fPIC", c_file_path
+            get_config("FINCH_CC"),
+            *get_config("FINCH_CFLAGS"),
+            "-o"
+            shared_lib_path,
+            c_file_path
         ]
         subprocess.run(compile_command, check=True)
 
