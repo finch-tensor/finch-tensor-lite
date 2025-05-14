@@ -19,25 +19,25 @@ Configuration details:
 Use this module to easily manage and retrieve Finch-specific settings.
 """
 
-depot_path = os.path.realpath(os.path.expanduser(os.getenv('FINCH_PATH', os.path.joinpath("~", ".finch"))))
+depot_dir = os.path.realpath(os.path.expanduser(os.getenv('FINCH_PATH', os.path.joinpath("~", ".finch"))))
 
 default_config = {
-    "FINCH_CACHE_PATH": os.path.join(depot_path, "cache"),
+    "FINCH_CACHE_PATH": os.path.join(depot_dir, "cache"),
     "FINCH_CACHE_SIZE": 10000,
     "FINCH_CACHE_ENABLE": True,
-    "FINCH_TMP": os.path.join(depot_path, "tmp"),
-    "FINCH_LOG_PATH": os.path.join(depot_path, "log.txt"),
+    "FINCH_TMP": os.path.join(depot_dir, "tmp"),
+    "FINCH_LOG_PATH": os.path.join(depot_dir, "log.txt"),
     "FINCH_CC": "gcc",
     "FINCH_CFLAGS": ["-shared", "-fPIC", "-O3"],
 }
 
-if not os.path.exists(depot_path):
-    os.mkdir(depot_path)
+if not os.path.exists(depot_dir):
+    os.mkdir(depot_dir)
 
-if not os.path.exists(os.path.joinpath(depot_path, "config.json")):
-    json.dump(default_config, open(os.path.joinpath(depot_path, "config.json"), "w"))
+if not os.path.exists(os.path.joinpath(depot_dir, "config.json")):
+    json.dump(default_config, open(os.path.joinpath(depot_dir, "config.json"), "w"))
 
-custom_config = json.load(open(os.path.joinpath(depot_path, "config.json"), "r"))
+custom_config = json.load(open(os.path.joinpath(depot_dir, "config.json"), "r"))
 
 def get_config(var):
     """
@@ -50,7 +50,7 @@ def set_config(var, val):
     Get the configuration value for a given variable.
     """
     custom_config[var] = val
-    json.dump(custom_config, open(os.path.joinpath(depot_path, "config.json"), "w"))
+    json.dump(custom_config, open(os.path.joinpath(depot_dir, "config.json"), "w"))
 
 def reset_config():
     """
@@ -58,4 +58,4 @@ def reset_config():
     """
     global custom_config
     custom_config = default_config.copy()
-    json.dump(custom_config, open(os.path.join(depot_path, "config.json"), "w"))
+    json.dump(custom_config, open(os.path.join(depot_dir, "config.json"), "w"))

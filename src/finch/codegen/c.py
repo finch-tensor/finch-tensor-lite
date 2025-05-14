@@ -2,21 +2,26 @@ import ctypes
 import os
 import tempfile
 import subprocess
-from .config import get_config
+import sysconfig
+from ..util.config import get_config
+from ..util.cache import file_cache
+from functools import lru_cache
 
-def compile_to_callable(c_code, function_name, *args):
+
+@file_cache(sysconfig.get_config_var('SHLIB_SUFFIX'), cache_dir="finch_cache")
+def create_shared_lib(filename, c_code, cc, cflags):
     """
-    Compiles a C function into a shared library, loads it using ctypes, and calls the function.
+    Compiles a C function into a shared library and returns the path.
 
     :param c_code: The C code as a string.
-    :param function_name: The name of the function to call.
-    :param args: The arguments to pass to the function.
     :return: The result of the function call.
     """
+    tmp_dir = get_config("FINCH_TMP")
+    os.makepaths(tmp_dir, exist_ok=True)
     # Create a temporary directory to store the C file and shared library
-    with tempfile.TemporaryDirectory() as temp_dir:
-        c_file_path = os.path.join(temp_dir, "temp.c")
-        shared_lib_path = os.path.join(temp_dir, "libtemp.so")
+    with tempfile.TemporaryDirectory(prefix=tmp_dir) as staging_dir:
+        c_file_path = os.path.join(staging_dir, "temp.c")
+        shared_lib_path = tempfile.TemporaryDirectory(prefix=tmp_dir) / "libtemp.{ext}"
 
         # Write the C code to a file
         with open(c_file_path, "w") as c_file:
@@ -24,24 +29,30 @@ def compile_to_callable(c_code, function_name, *args):
 
         # Compile the C code into a shared library
         compile_command = [
-            get_config("FINCH_CC"),
-            *get_config("FINCH_CFLAGS"),
+            cc,
+            *cflags,
             "-o"
             shared_lib_path,
             c_file_path
         ]
         subprocess.run(compile_command, check=True)
+        assert os.path.exists(shared_lib_path), f"Compilation failed: {compile_command}"
 
-        # Load the shared library using ctypes
-        shared_lib = ctypes.CDLL(shared_lib_path)
+@lru_cache(maxsize=10_000)
+def get_c_function(function_name, c_code):
+    """
+    :param function_name: The name of the function to call.
+    :param c_code: The code to compile
+    """
+    shared_lib_path = create_shared_lib(c_code, get_config("FINCH_CC"), get_config("FINCH_CFLAGS"))
 
-        # Get the function from the shared library
-        c_function = getattr(shared_lib, function_name)
+    # Load the shared library using ctypes
+    shared_lib = ctypes.CDLL(shared_lib_path)
 
-        # Call the function with the provided arguments
-        result = c_function(*args)
+    # Get the function from the shared library
+    c_function = getattr(shared_lib, function_name)
 
-        return result
+    return c_function
 
 # Example usage
 if __name__ == "__main__":
@@ -52,5 +63,6 @@ if __name__ == "__main__":
         return a + b;
     }
     """
-    result = compile_and_run_c_function(c_code, "add", 5, 3)
+    f = get_c_function("add", c_code)
+    result = f(3, 4)
     print("Result:", result)
