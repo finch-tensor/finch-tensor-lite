@@ -52,11 +52,6 @@ class LogicNode(Term):
         """Determines if the node is stateful."""
         ...
 
-    @classmethod
-    def head(cls):
-        """Returns the head of the node."""
-        return cls
-
     @abstractmethod
     def children(self) -> list[LogicNode]:
         """Returns the children of the node."""
