@@ -264,7 +264,7 @@ class MapJoin(WithFields):
         for arg in self.args:
             fs.extend(arg.get_fields())
 
-        return tuple(fs)
+        return tuple(dict.fromkeys(fs))
 
     @classmethod
     def make_term(cls, op: Immediate, *args: WithFields) -> Self:  # type: ignore[override]
