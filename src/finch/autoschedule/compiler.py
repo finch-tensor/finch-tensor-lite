@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from ..finch_logic import (
     Alias,
@@ -14,15 +14,17 @@ from ..finch_logic import (
     Reorder,
     Subquery,
     Table,
+    WithFields,
 )
 from ..symbolic import Term
 
 T = TypeVar("T", bound="LogicNode")
 
 
-def get_or_insert(dictionary: dict[str, LogicNode], key: str, default: Any) -> Any:
-    if key in dictionary:
-        return dictionary[key]
+def get_or_insert(dictionary: dict[str, T], key: str, default: T) -> T:
+    val = dictionary.get(key)
+    if val is not None:
+        return val
     dictionary[key] = default
     return default
 
@@ -36,11 +38,14 @@ def get_structure(
         case Alias(name):
             return get_or_insert(aliases, name, Immediate(len(fields) + len(aliases)))
         case Subquery(Alias(name) as lhs, arg):
-            if name in aliases:
-                return aliases[name]
-            return Subquery(
-                get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases)
-            )
+            alias = aliases.get(name)
+            if alias is not None:
+                return alias
+            in_lhs = get_structure(lhs, fields, aliases)
+            assert isinstance(in_lhs, WithFields)
+            in_arg = get_structure(arg, fields, aliases)
+            assert isinstance(in_arg, WithFields)
+            return Subquery(in_lhs, in_arg)
         case Table(tns, idxs):
             assert all(isinstance(idx, Field) for idx in idxs)
             return Table(

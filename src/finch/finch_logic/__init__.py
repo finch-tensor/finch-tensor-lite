@@ -14,6 +14,7 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    WithFields,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "Reformat",
     "Subquery",
     "Table",
+    "WithFields",
 ]

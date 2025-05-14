@@ -1,13 +1,16 @@
-from finch.autoschedule import lift_subqueries, propagate_map_queries
+from finch.autoschedule import lift_subqueries, propagate_fields, propagate_map_queries
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Field,
     Immediate,
     MapJoin,
     Plan,
     Produces,
     Query,
+    Relabel,
     Subquery,
+    Table,
 )
 
 
@@ -90,4 +93,41 @@ def test_lift_subqueries():
     )
 
     result = lift_subqueries(plan)
+    assert result == expected
+
+
+def test_propagate_fields():
+    plan = Plan(
+        (
+            Query(
+                Alias("A10"),
+                MapJoin(
+                    Immediate("op"),
+                    (
+                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+                    ),
+                ),
+            ),
+            Alias("A10"),
+        )
+    )
+
+    expected = Plan(
+        (
+            Query(
+                Alias("A10"),
+                MapJoin(
+                    Immediate("op"),
+                    (
+                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+                    ),
+                ),
+            ),
+            Relabel(Alias("A10"), (Field("A1"), Field("A2"), Field("A3"))),
+        )
+    )
+
+    result = propagate_fields(plan)
     assert result == expected

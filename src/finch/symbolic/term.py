@@ -40,9 +40,9 @@ class Term(ABC):
         `children()` if `True`."""
 
     @abstractmethod
-    def make_term(self, head: Any, *children: Term) -> Self:
+    def make_term(self, *children: Term) -> Self:
         """
-        Construct a new term in the same family of terms with the given head type and
+        Construct a new term in the same family of terms with the given
         children. This function should satisfy
         `x == x.make_term(*x.children())`
         """

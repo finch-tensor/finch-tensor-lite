@@ -68,7 +68,14 @@ class LogicNode(Term):
 
 
 @dataclass(eq=True, frozen=True)
-class Immediate(LogicNode):
+class WithFields(LogicNode):
+    @abstractmethod
+    def get_fields(self) -> tuple[Field, ...]:
+        """Get this node's fields."""
+
+
+@dataclass(eq=True, frozen=True)
+class Immediate(WithFields):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -96,6 +103,10 @@ class Immediate(LogicNode):
 
     def children(self):
         raise TypeError(f"`{type(self).__name__}` doesn't support `.children()`.")
+
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return ()
 
 
 @dataclass(eq=True, frozen=True)
@@ -183,7 +194,7 @@ class Alias(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Table(LogicNode):
+class Table(WithFields):
     """
     Represents a logical AST expression for a tensor object `tns`, indexed by fields
     `idxs...`. A table is a tensor with named dimensions.
@@ -210,9 +221,17 @@ class Table(LogicNode):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.idxs
+
+    @classmethod
+    def make_term(cls, tns: Immediate, *idxs: Field) -> Self:  # type: ignore[override]
+        return cls(tns, idxs)
+
 
 @dataclass(eq=True, frozen=True)
-class MapJoin(LogicNode):
+class MapJoin(WithFields):
     """
     Represents a logical AST expression for mapping the function `op` across `args...`.
     Dimensions which are not present are broadcasted. Dimensions which are
@@ -225,7 +244,7 @@ class MapJoin(LogicNode):
     """
 
     op: Immediate
-    args: tuple[LogicNode, ...]
+    args: tuple[WithFields, ...]
 
     @staticmethod
     def is_expr():
@@ -241,8 +260,19 @@ class MapJoin(LogicNode):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        # (mtsokol) I'm not sure if this comment still applies - the order is preserved.
+        # TODO: this is wrong here: the overall order should at least be concordant with
+        # the args if the args are concordant
+        fs: list[Field] = []
+        for arg in self.args:
+            fs.extend(arg.get_fields())
+
+        return tuple(fs)
+
     @classmethod
-    def make_term(cls, op: Immediate, *args: LogicNode) -> Self:  # type: ignore[override]
+    def make_term(cls, op: Immediate, *args: WithFields) -> Self:  # type: ignore[override]
         return cls(op, tuple(args))
 
 
@@ -261,7 +291,7 @@ class Aggregate(LogicNode):
 
     op: Immediate
     init: Immediate
-    arg: LogicNode
+    arg: WithFields
     idxs: tuple[Field, ...]
 
     @staticmethod
@@ -278,9 +308,19 @@ class Aggregate(LogicNode):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return tuple(field for field in self.arg.get_fields() if field not in self.idxs)
+
+    @classmethod
+    def make_term(  # type: ignore[override]
+        cls, op: Immediate, init: Immediate, arg: WithFields, *idxs: Field
+    ) -> Self:
+        return cls(op, init, arg, idxs)
+
 
 @dataclass(eq=True, frozen=True)
-class Reorder(LogicNode):
+class Reorder(WithFields):
     """
     Represents a logical AST statement that reorders the dimensions of `arg` to be
     `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not
@@ -308,9 +348,17 @@ class Reorder(LogicNode):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.idxs
+
+    @classmethod
+    def make_term(cls, arg: LogicNode, *idxs: Field) -> Self:  # type: ignore[override]
+        return cls(arg, idxs)
+
 
 @dataclass(eq=True, frozen=True)
-class Relabel(LogicNode):
+class Relabel(WithFields):
     """
     Represents a logical AST statement that relabels the dimensions of `arg` to be
     `idxs...`.
@@ -337,9 +385,13 @@ class Relabel(LogicNode):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.idxs
+
 
 @dataclass(eq=True, frozen=True)
-class Reformat(LogicNode):
+class Reformat(WithFields):
     """
     Represents a logical AST statement that reformats `arg` into the tensor `tns`.
 
@@ -349,7 +401,7 @@ class Reformat(LogicNode):
     """
 
     tns: Immediate
-    arg: LogicNode
+    arg: WithFields
 
     @staticmethod
     def is_expr():
@@ -365,20 +417,24 @@ class Reformat(LogicNode):
         """Returns the children of the node."""
         return [self.tns, self.arg]
 
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.arg.get_fields()
+
 
 @dataclass(eq=True, frozen=True)
-class Subquery(LogicNode):
+class Subquery(WithFields):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`, and returns `rhs`.
 
     Attributes:
         lhs: The left-hand side of the binding.
-        rhs: The argument to evaluate.
+        arg: The argument to evaluate.
     """
 
     lhs: LogicNode
-    arg: LogicNode
+    arg: WithFields
 
     @staticmethod
     def is_expr():
@@ -393,6 +449,10 @@ class Subquery(LogicNode):
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.arg]
+
+    def get_fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.arg.get_fields()
 
 
 @dataclass(eq=True, frozen=True)

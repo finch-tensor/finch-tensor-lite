@@ -1,12 +1,17 @@
+from collections.abc import Iterable
+
 from ..finch_logic import (
     Aggregate,
     Alias,
+    Field,
     LogicNode,
     MapJoin,
     Plan,
     Produces,
     Query,
+    Relabel,
     Subquery,
+    WithFields,
 )
 from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite, Term
 from .compiler import LogicCompiler
@@ -87,6 +92,31 @@ def propagate_map_queries(root: Term) -> Term:
 
     root = Rewrite(PreWalk(Chain([rule_0, rule_1])))(root)
     return Rewrite(PostWalk(rule_2))(root)
+
+
+def _propagate_fields(
+    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicNode:
+    match root:
+        case Plan(bodies):
+            return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
+        case Query(lhs, rhs):
+            rhs = _propagate_fields(rhs, fields)
+            assert isinstance(rhs, WithFields)
+            fields[lhs] = rhs.get_fields()
+            return Query(lhs, rhs)
+        case Alias() as a:
+            return Relabel(a, tuple(fields[a]))
+        case node if node.is_expr():
+            return node.make_term(
+                *[_propagate_fields(c, fields) for c in node.children()]
+            )
+        case node:
+            return node
+
+
+def propagate_fields(root: LogicNode) -> LogicNode:
+    return _propagate_fields(root, fields={})
 
 
 class DefaultLogicOptimizer:

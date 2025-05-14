@@ -18,6 +18,7 @@ from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .optimize import (
     lift_subqueries,
     optimize,
+    propagate_fields,
     propagate_map_queries,
 )
 
@@ -37,6 +38,7 @@ __all__ = [
     "Subquery",
     "Table",
     "optimize",
+    "propagate_fields",
     "propagate_map_queries",
     "lift_subqueries",
     "PostOrderDFS",
