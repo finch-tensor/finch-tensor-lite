@@ -37,8 +37,6 @@ def create_shared_lib(filename, c_code, cc, cflags):
         subprocess.run(compile_command, check=True)
         assert os.path.exists(shared_lib_path), f"Compilation failed: {compile_command}"
 
-
-
 @lru_cache(maxsize=10_000)
 def get_c_function(function_name, c_code):
     """
