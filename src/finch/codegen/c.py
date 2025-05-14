@@ -7,7 +7,6 @@ from ..util.config import get_config
 from ..util.cache import file_cache
 from functools import lru_cache
 
-
 @file_cache(sysconfig.get_config_var('SHLIB_SUFFIX'), cache_dir="finch_cache")
 def create_shared_lib(filename, c_code, cc, cflags):
     """
@@ -31,12 +30,14 @@ def create_shared_lib(filename, c_code, cc, cflags):
         compile_command = [
             cc,
             *cflags,
-            "-o"
+            "-o",
             shared_lib_path,
             c_file_path
         ]
         subprocess.run(compile_command, check=True)
         assert os.path.exists(shared_lib_path), f"Compilation failed: {compile_command}"
+
+
 
 @lru_cache(maxsize=10_000)
 def get_c_function(function_name, c_code):
@@ -53,16 +54,3 @@ def get_c_function(function_name, c_code):
     c_function = getattr(shared_lib, function_name)
 
     return c_function
-
-# Example usage
-if __name__ == "__main__":
-    c_code = """
-    #include <stdio.h>
-
-    int add(int a, int b) {
-        return a + b;
-    }
-    """
-    f = get_c_function("add", c_code)
-    result = f(3, 4)
-    print("Result:", result)
