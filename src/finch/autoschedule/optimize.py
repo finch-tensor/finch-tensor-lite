@@ -4,9 +4,9 @@ from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
+    LogicExpression,
     LogicNode,
     MapJoin,
-    NodeWithFields,
     Plan,
     Produces,
     Query,
@@ -32,10 +32,10 @@ def _lift_subqueries_expr(
                 arg_2 = _lift_subqueries_expr(arg, bindings)
                 bindings[lhs] = arg_2
             return lhs
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *tuple(_lift_subqueries_expr(x, bindings) for x in any.children()),
+        case LogicExpression() as expr:
+            return expr.make_term(
+                expr.head(),
+                *tuple(_lift_subqueries_expr(x, bindings) for x in expr.children()),
             )
         case _:
             return node
@@ -103,14 +103,14 @@ def _propagate_fields(
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
         case Query(lhs, rhs):
             rhs = _propagate_fields(rhs, fields)
-            assert isinstance(rhs, NodeWithFields)
+            assert isinstance(rhs, LogicExpression)
             fields[lhs] = rhs.get_fields()
             return Query(lhs, rhs)
         case Alias() as a:
             return Relabel(a, tuple(fields[a]))
-        case node if node.is_expr():
-            return node.make_term(
-                node.head(), *[_propagate_fields(c, fields) for c in node.children()]
+        case LogicExpression() as expr:
+            return expr.make_term(
+                expr.head(), *[_propagate_fields(c, fields) for c in expr.children()]
             )
         case node:
             return node

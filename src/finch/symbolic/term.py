@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
-from typing import Self
+from typing import Any, Self
 
 __all__ = ["Term", "PreOrderDFS", "PostOrderDFS"]
 
@@ -28,14 +28,8 @@ class Term(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def children(self) -> list[Term]:
+    def children(self) -> list[Any]:
         """Return the children (AKA tail) of the S-expression."""
-
-    @abstractmethod
-    def is_expr(self) -> bool:
-        """
-        Return True if the term is an expression tree, False otherwise. Must implement
-        `children()` if `True`."""
 
     @classmethod
     def make_term(cls, head: Callable[..., Self], *children: Term) -> Self:
@@ -61,16 +55,20 @@ class Term(ABC):
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
-    if node.is_expr():
-        arg: Term
-        for arg in node.children():
-            yield from PostOrderDFS(arg)
+    from ..finch_logic import LogicExpression
+
+    match node:
+        case LogicExpression() as expr:
+            for arg in expr.children():
+                yield from PostOrderDFS(arg)
     yield node
 
 
 def PreOrderDFS(node: Term) -> Iterator[Term]:
     yield node
-    if node.is_expr():
-        arg: Term
-        for arg in node.children():
-            yield from PreOrderDFS(arg)
+    from ..finch_logic import LogicExpression
+
+    match node:
+        case LogicExpression() as expr:
+            for arg in expr.children():
+                yield from PreOrderDFS(arg)

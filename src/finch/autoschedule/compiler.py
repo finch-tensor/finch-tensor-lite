@@ -6,9 +6,9 @@ from ..finch_logic import (
     Deferred,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
     MapJoin,
-    NodeWithFields,
     Query,
     Reformat,
     Relabel,
@@ -38,9 +38,9 @@ def get_structure(
             if alias is not None:
                 return alias
             in_lhs = get_structure(lhs, fields, aliases)
-            assert isinstance(in_lhs, NodeWithFields)
+            assert isinstance(in_lhs, LogicExpression)
             in_arg = get_structure(arg, fields, aliases)
-            assert isinstance(in_arg, NodeWithFields)
+            assert isinstance(in_arg, LogicExpression)
             return Subquery(in_lhs, in_arg)
         case Table(tns, idxs):
             assert all(isinstance(idx, Field) for idx in idxs)
@@ -48,10 +48,10 @@ def get_structure(
                 Immediate(type(tns.val)),
                 tuple(get_structure(idx, fields, aliases) for idx in idxs),  # type: ignore[misc]
             )
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *[get_structure(arg, fields, aliases) for arg in any.children()],
+        case LogicExpression() as expr:
+            return expr.make_term(
+                expr.head(),
+                *[get_structure(arg, fields, aliases) for arg in expr.children()],
             )
         case _:
             return node

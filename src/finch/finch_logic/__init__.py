@@ -4,9 +4,9 @@ from .nodes import (
     Deferred,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
     MapJoin,
-    NodeWithFields,
     Plan,
     Produces,
     Query,
@@ -35,5 +35,5 @@ __all__ = [
     "Reformat",
     "Subquery",
     "Table",
-    "NodeWithFields",
+    "LogicExpression",
 ]

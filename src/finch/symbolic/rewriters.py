@@ -77,23 +77,24 @@ class PreWalk:
         self.rw = rw
 
     def __call__(self, x: T) -> T | None:
+        from ..finch_logic import LogicExpression
+
         y = self.rw(x)
-        if y is not None:
-            if y.is_expr():
-                args = y.children()
-                return y.make_term(
-                    y.head(), *tuple(default_rewrite(self(arg), arg) for arg in args)
+        match y:
+            case LogicExpression() as expr:
+                args = expr.children()
+                return expr.make_term(  # type: ignore[return-value]
+                    expr.head(), *tuple(default_rewrite(self(arg), arg) for arg in args)
                 )
-            return y
-        if x.is_expr():
-            args = x.children()
-            new_args = list(map(self, args))
-            if not all(arg is None for arg in new_args):
-                return x.make_term(
-                    x.head(),
-                    *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
-                )
-            return None
+        match x:
+            case LogicExpression() as expr:
+                args = expr.children()
+                new_args = list(map(self, args))
+                if not all(arg is None for arg in args):
+                    return expr.make_term(  # type: ignore[return-value]
+                        expr.head(),
+                        *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
+                    )
         return None
 
 
@@ -111,16 +112,19 @@ class PostWalk:
         self.rw = rw
 
     def __call__(self, x: T) -> T | None:
-        if x.is_expr():
-            args = x.children()
-            new_args = list(map(self, args))
-            if all(arg is None for arg in new_args):
-                return self.rw(x)
-            y = x.make_term(
-                x.head(),
-                *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
-            )
-            return default_rewrite(self.rw(y), y)
+        from ..finch_logic import LogicExpression
+
+        match x:
+            case LogicExpression() as expr:
+                args = expr.children()
+                new_args = list(map(self, args))
+                if all(arg is None for arg in new_args):
+                    return self.rw(expr)
+                y = expr.make_term(
+                    expr.head(),
+                    *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
+                )
+                return default_rewrite(self.rw(y), y)  # type: ignore[return-value]
         return self.rw(x)
 
 
@@ -181,15 +185,16 @@ class Prestep:
         self.rw = rw
 
     def __call__(self, x: T) -> T | None:
+        from ..finch_logic import LogicExpression
+
         y = self.rw(x)
-        if y is not None:
-            if y.is_expr():
-                y_args = y.children()
-                return y.make_term(
-                    y.head(), *(default_rewrite(self(arg), arg) for arg in y_args)
+        match y:
+            case LogicExpression() as expr:
+                args = expr.children()
+                return expr.make_term(  # type: ignore[return-value]
+                    expr.head(), *(default_rewrite(self(arg), arg) for arg in args)
                 )
-            return y
-        return None
+        return y
 
 
 class Memo:
