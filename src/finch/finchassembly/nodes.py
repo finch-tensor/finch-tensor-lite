@@ -160,7 +160,7 @@ class Function(AssemblyNode):
     """
 
     name: str
-    args: tuple[AssemblyNode]
+    args: tuple[AssemblyNode, ...]
     body: AssemblyNode
 
 
