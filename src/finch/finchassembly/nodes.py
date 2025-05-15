@@ -352,7 +352,7 @@ class Block(AssemblyNode):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyNode] = ()
+    bodies: tuple[AssemblyNode, ...] = ()
 
     @staticmethod
     def is_expr():
