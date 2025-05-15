@@ -99,7 +99,7 @@ class Buffer(AssemblyNode):
     """
 
     tns: AssemblyNode
-    idxs: tuple[AssemblyNode]
+    idxs: tuple[AssemblyNode, ...]
 
     @staticmethod
     def is_expr():
