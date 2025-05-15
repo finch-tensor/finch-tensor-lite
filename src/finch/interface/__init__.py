@@ -12,7 +12,7 @@ __all__ = [
     "squeeze",
     "identify",
     "reduce",
-    "broadcast",
+    "elementwise",
     "prod",
     "multiply",
 ]

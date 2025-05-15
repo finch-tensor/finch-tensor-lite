@@ -2,7 +2,7 @@ from collections.abc import Hashable
 from textwrap import dedent
 from typing import Any
 
-from .finch_logic import (
+from ..finch_logic import (
     Alias,
     Deferred,
     Field,

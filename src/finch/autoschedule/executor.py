@@ -1,5 +1,5 @@
 from .compiler import LogicCompiler
-from .rewrite_tools import gensym
+from ..symbolic import gensym
 
 
 class LogicExecutor:

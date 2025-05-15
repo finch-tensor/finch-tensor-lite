@@ -1,36 +1,53 @@
-from __future__ import annotations
+from dataclasses import dataclass
 from itertools import product
+from typing import Iterable, Any
 import numpy as np
-from ..finch_logic import *
-from ..symbolic import Term
-from ..algebra import *
+from ..finch_logic import (
+    Immediate,
+    Deferred,
+    Field,
+    Alias,
+    Table,
+    MapJoin,
+    Aggregate,
+    Query,
+    Plan,
+    Produces,
+    Subquery,
+    Relabel,
+    Reorder,
+)
+from ..algebra import return_type, fill_value, element_type, fixpoint_type
+
 
 @dataclass(eq=True, frozen=True)
-class TableValue():
+class TableValue:
     tns: Any
     idxs: Iterable[Any]
+
     def __post_init__(self):
         if isinstance(self.tns, TableValue):
             raise ValueError("The tensor (tns) cannot be a TableValue")
 
-from typing import Any, Type
 
 class FinchLogicInterpreter:
     def __init__(self, *, make_tensor=np.full):
         self.verbose = False
         self.bindings = {}
         self.make_tensor = make_tensor  # Added make_tensor argument
-    
+
     def __call__(self, node):
         # Example implementation for evaluating an expression
         if self.verbose:
-            print(f"Evaluating: {expression}")
+            print(f"Evaluating: {node}")
         # Placeholder for actual logic
         head = node.head()
         if head == Immediate:
             return node.val
         elif head == Deferred:
-            raise ValueError("The interpreter cannot evaluate a deferred node, a compiler might generate code for it")
+            raise ValueError(
+                "The interpreter cannot evaluate a deferred node, a compiler might generate code for it"
+            )
         elif head == Field:
             raise ValueError("Fields cannot be used in expressions")
         elif head == Alias:
@@ -59,7 +76,9 @@ class FinchLogicInterpreter:
                         dims[idx] = dim
             fill_val = op(*[fill_value(arg.tns) for arg in args])
             dtype = return_type(op, *[element_type(arg.tns) for arg in args])
-            result = self.make_tensor(tuple(dims[idx] for idx in idxs), fill_val, dtype = dtype) 
+            result = self.make_tensor(
+                tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
+            )
             for crds in product(*[range(dims[idx]) for idx in idxs]):
                 idx_crds = {idx: crd for (idx, crd) in zip(idxs, crds)}
                 vals = [arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args]
@@ -74,10 +93,16 @@ class FinchLogicInterpreter:
             init = node.init.val
             op = node.op.val
             dtype = fixpoint_type(op, init, element_type(arg.tns))
-            new_shape = [dim for (dim, idx) in zip(arg.tns.shape, arg.idxs) if not idx in node.idxs]
+            new_shape = [
+                dim
+                for (dim, idx) in zip(arg.tns.shape, arg.idxs)
+                if idx not in node.idxs
+            ]
             result = self.make_tensor(new_shape, init, dtype=dtype)
             for crds in product(*[range(dim) for dim in arg.tns.shape]):
-                out_crds = [crd for (crd, idx) in zip(crds, arg.idxs) if not idx in node.idxs]
+                out_crds = [
+                    crd for (crd, idx) in zip(crds, arg.idxs) if idx not in node.idxs
+                ]
                 result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
             return TableValue(result, [idx for idx in arg.idxs if idx not in node.idxs])
         elif head == Relabel:
@@ -92,7 +117,7 @@ class FinchLogicInterpreter:
                     raise ValueError("Trying to drop a dimension that is not 1")
             arg_dims = {idx: dim for idx, dim in zip(arg.idxs, arg.tns.shape)}
             dims = [arg_dims.get(idx, 1) for idx in node.idxs]
-            result = self.make_tensor(dims, fill_value(arg.tns), dtype = arg.tns.dtype)
+            result = self.make_tensor(dims, fill_value(arg.tns), dtype=arg.tns.dtype)
             for crds in product(*[range(dim) for dim in dims]):
                 node_crds = {idx: crd for (idx, crd) in zip(node.idxs, crds)}
                 in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
@@ -110,8 +135,8 @@ class FinchLogicInterpreter:
         elif head == Produces:
             return tuple(self(arg).tns for arg in node.args)
         elif head == Subquery:
-            if not node.lhs in self.bindings:
-                self.bindings[node.lhs] = self(node.rhs)
+            if node.lhs not in self.bindings:
+                self.bindings[node.lhs] = self(node.arg)
             return self.bindings[node.lhs]
         else:
             raise ValueError(f"Unknown expression type: {head}")

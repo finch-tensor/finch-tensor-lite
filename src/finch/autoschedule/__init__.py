@@ -1,4 +1,4 @@
-from .finch_logic import (
+from ..finch_logic import (
     Aggregate,
     Alias,
     Deferred,
@@ -14,8 +14,13 @@ from .finch_logic import (
     Subquery,
     Table,
 )
-from .optimize import optimize, propagate_map_queries
-from .rewrite_tools import PostOrderDFS, PostWalk, PreWalk
+from .optimize import (
+    optimize,
+    propagate_fields,
+    propagate_map_queries,
+    lift_subqueries,
+)
+from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 
 __all__ = [
     "Aggregate",
@@ -33,7 +38,9 @@ __all__ = [
     "Subquery",
     "Table",
     "optimize",
+    "propagate_fields",
     "propagate_map_queries",
+    "lift_subqueries",
     "PostOrderDFS",
     "PostWalk",
     "PreWalk",

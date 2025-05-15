@@ -1,20 +1,27 @@
 from abc import abstractmethod
-from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 from ..symbolic import Term
+
 
 @dataclass(eq=True, frozen=True)
 class LogicNode(Term):
     """
     LogicNode
 
-    Represents a Finch Logic IR node. Finch uses a variant of Concrete Field Notation 
+    Represents a Finch Logic IR node. Finch uses a variant of Concrete Field Notation
     as an intermediate representation.
 
-    The LogicNode struct represents many different Finch IR nodes. The nodes are 
+    The LogicNode struct represents many different Finch IR nodes. The nodes are
     differentiated by a `FinchLogic.LogicNodeKind` enum.
     """
+
+    @staticmethod
+    @abstractmethod
+    def is_expr():
+        """Determines if the node is expresion."""
+        ...
+
     @staticmethod
     @abstractmethod
     def is_stateful():
@@ -26,8 +33,16 @@ class LogicNode(Term):
         """Returns the head of the node."""
         return cls
 
+    def children(self):
+        """Returns the children of the node."""
+        raise Exception(f"`children` isn't supported for {self.__class__}.")
+
+    def get_fields(self) -> Iterable["LogicNode"]:
+        """Returns fields of the node."""
+        raise Exception(f"`fields` isn't supported for {self.__class__}.")
+
     @classmethod
-    def make_term(cls, head, *args):
+    def make_term(cls, head: type, *args: Any) -> "LogicNode":
         """Creates a term with the given head and arguments."""
         return head(*args)
 
@@ -40,6 +55,7 @@ class Immediate(LogicNode):
     Attributes:
         val: The literal value.
     """
+
     val: Any
 
     @staticmethod
@@ -52,17 +68,22 @@ class Immediate(LogicNode):
         """Determines if the node is stateful."""
         return False
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return []
+
 
 @dataclass(eq=True, frozen=True)
 class Deferred(LogicNode):
     """
-    Represents a logical AST expression for an expression `ex` of type `type`, 
+    Represents a logical AST expression for an expression `ex` of type `type`,
     yet to be evaluated.
 
     Attributes:
         ex: The expression to be evaluated.
         type_: The type of the expression.
     """
+
     ex: Any
     type_: Any
 
@@ -91,6 +112,7 @@ class Field(LogicNode):
     Attributes:
         name: The name of the field.
     """
+
     name: str
 
     @staticmethod
@@ -117,6 +139,7 @@ class Alias(LogicNode):
     Attributes:
         name: The name of the alias.
     """
+
     name: str
 
     @staticmethod
@@ -144,8 +167,9 @@ class Table(LogicNode):
         tns: The tensor object.
         idxs: The fields indexing the tensor.
     """
+
     tns: LogicNode
-    idxs: Iterable[LogicNode]
+    idxs: tuple[LogicNode]
 
     @staticmethod
     def is_expr():
@@ -161,6 +185,14 @@ class Table(LogicNode):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.idxs
+
+    @classmethod
+    def make_term(cls, head, tns, *idxs):
+        return head(tns, idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class MapJoin(LogicNode):
@@ -174,8 +206,9 @@ class MapJoin(LogicNode):
         op: The function to map.
         args: The arguments to map the function across.
     """
+
     op: LogicNode
-    args: Iterable[LogicNode]
+    args: tuple[LogicNode]
 
     @staticmethod
     def is_expr():
@@ -191,6 +224,18 @@ class MapJoin(LogicNode):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        # (mtsokol) I'm not sure if this comment still applies - the order is preserved.
+        # TODO: this is wrong here: the overall order should at least be concordant with
+        # the args if the args are concordant
+        fields = [f for fs in map(lambda x: x.get_fields(), self.args) for f in fs]
+        return list(dict.fromkeys(fields))
+
+    @classmethod
+    def make_term(cls, head, op, *args):
+        return head(op, args)
+
 
 @dataclass(eq=True, frozen=True)
 class Aggregate(LogicNode):
@@ -204,10 +249,11 @@ class Aggregate(LogicNode):
         arg: The argument to reduce.
         idxs: The dimensions to reduce.
     """
+
     op: LogicNode
     init: LogicNode
     arg: LogicNode
-    idxs: Iterable[LogicNode]
+    idxs: tuple[LogicNode]
 
     @staticmethod
     def is_expr():
@@ -223,6 +269,14 @@ class Aggregate(LogicNode):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return [field for field in self.arg.get_fields() if field not in self.idxs]
+
+    @classmethod
+    def make_term(cls, head, op, init, arg, *idxs):
+        return head(op, init, arg, idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class Reorder(LogicNode):
@@ -235,8 +289,9 @@ class Reorder(LogicNode):
         arg: The argument to reorder.
         idxs: The new order of dimensions.
     """
+
     arg: LogicNode
-    idxs: Iterable[LogicNode]
+    idxs: tuple[LogicNode]
 
     @staticmethod
     def is_expr():
@@ -251,6 +306,14 @@ class Reorder(LogicNode):
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
+
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.idxs
+
+    @classmethod
+    def make_term(cls, head, arg, *idxs):
+        return head(arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -262,8 +325,9 @@ class Relabel(LogicNode):
         arg: The argument to relabel.
         idxs: The new labels for dimensions.
     """
+
     arg: LogicNode
-    idxs: Iterable[LogicNode]
+    idxs: tuple[LogicNode]
 
     @staticmethod
     def is_expr():
@@ -279,6 +343,10 @@ class Relabel(LogicNode):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.idxs
+
 
 @dataclass(eq=True, frozen=True)
 class Reformat(LogicNode):
@@ -289,6 +357,7 @@ class Reformat(LogicNode):
         tns: The target tensor.
         arg: The argument to reformat.
     """
+
     tns: LogicNode
     arg: LogicNode
 
@@ -306,19 +375,24 @@ class Reformat(LogicNode):
         """Returns the children of the node."""
         return [self.tns, self.arg]
 
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.arg.get_fields()
+
 
 @dataclass(eq=True, frozen=True)
 class Subquery(LogicNode):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`, 
+    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`,
     and returns `rhs`.
 
     Attributes:
         lhs: The left-hand side of the binding.
-        rhs: The argument to evaluate.
+        arg: The argument to evaluate.
     """
+
     lhs: LogicNode
-    rhs: LogicNode
+    arg: LogicNode
 
     @staticmethod
     def is_expr():
@@ -332,7 +406,11 @@ class Subquery(LogicNode):
 
     def children(self):
         """Returns the children of the node."""
-        return [self.lhs, self.rhs]
+        return [self.lhs, self.arg]
+
+    def get_fields(self):
+        """Returns fields of the node."""
+        return self.arg.get_fields()
 
 
 @dataclass(eq=True, frozen=True)
@@ -344,6 +422,7 @@ class Query(LogicNode):
         lhs: The left-hand side of the binding.
         rhs: The right-hand side to evaluate.
     """
+
     lhs: LogicNode
     rhs: LogicNode
 
@@ -365,13 +444,14 @@ class Query(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Produces(LogicNode):
     """
-    Represents a logical AST statement that returns `args...` from the current plan. 
+    Represents a logical AST statement that returns `args...` from the current plan.
     Halts execution of the program.
 
     Attributes:
         args: The arguments to return.
     """
-    args: Iterable[LogicNode]
+
+    args: tuple[LogicNode]
 
     @staticmethod
     def is_expr():
@@ -387,17 +467,22 @@ class Produces(LogicNode):
         """Returns the children of the node."""
         return [*self.args]
 
+    @classmethod
+    def make_term(cls, head, *args):
+        return head(args)
+
 
 @dataclass(eq=True, frozen=True)
 class Plan(LogicNode):
     """
-    Represents a logical AST statement that executes a sequence of statements `bodies...`. 
+    Represents a logical AST statement that executes a sequence of statements `bodies...`.
     Returns the last statement.
 
     Attributes:
         bodies: The sequence of statements to execute.
     """
-    bodies: Iterable[LogicNode] = ()
+
+    bodies: tuple[LogicNode] = ()
 
     @staticmethod
     def is_expr():
@@ -412,3 +497,7 @@ class Plan(LogicNode):
     def children(self):
         """Returns the children of the node."""
         return [*self.bodies]
+
+    @classmethod
+    def make_term(cls, head, *val):
+        return head(val)
