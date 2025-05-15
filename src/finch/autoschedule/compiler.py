@@ -22,11 +22,7 @@ T = TypeVar("T", bound="LogicNode")
 
 
 def get_or_insert(dictionary: dict[str, T], key: str, default: T) -> T:
-    val = dictionary.get(key)
-    if val is not None:
-        return val
-    dictionary[key] = default
-    return default
+    return dictionary.setdefault(key, default)
 
 
 def get_structure(
