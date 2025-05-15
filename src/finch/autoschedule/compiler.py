@@ -8,13 +8,13 @@ from ..finch_logic import (
     Immediate,
     LogicNode,
     MapJoin,
+    NodeWithFields,
     Query,
     Reformat,
     Relabel,
     Reorder,
     Subquery,
     Table,
-    WithFields,
 )
 from ..symbolic import Term
 
@@ -42,9 +42,9 @@ def get_structure(
             if alias is not None:
                 return alias
             in_lhs = get_structure(lhs, fields, aliases)
-            assert isinstance(in_lhs, WithFields)
+            assert isinstance(in_lhs, NodeWithFields)
             in_arg = get_structure(arg, fields, aliases)
-            assert isinstance(in_arg, WithFields)
+            assert isinstance(in_arg, NodeWithFields)
             return Subquery(in_lhs, in_arg)
         case Table(tns, idxs):
             assert all(isinstance(idx, Field) for idx in idxs)

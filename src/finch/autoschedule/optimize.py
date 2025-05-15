@@ -6,12 +6,12 @@ from ..finch_logic import (
     Field,
     LogicNode,
     MapJoin,
+    NodeWithFields,
     Plan,
     Produces,
     Query,
     Relabel,
     Subquery,
-    WithFields,
 )
 from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite, Term
 from .compiler import LogicCompiler
@@ -102,7 +102,7 @@ def _propagate_fields(
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
         case Query(lhs, rhs):
             rhs = _propagate_fields(rhs, fields)
-            assert isinstance(rhs, WithFields)
+            assert isinstance(rhs, NodeWithFields)
             fields[lhs] = rhs.get_fields()
             return Query(lhs, rhs)
         case Alias() as a:

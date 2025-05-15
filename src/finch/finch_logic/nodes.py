@@ -63,14 +63,14 @@ class LogicNode(Term):
 
 
 @dataclass(eq=True, frozen=True)
-class WithFields(LogicNode):
+class NodeWithFields(LogicNode):
     @abstractmethod
     def get_fields(self) -> tuple[Field, ...]:
         """Get this node's fields."""
 
 
 @dataclass(eq=True, frozen=True)
-class Immediate(WithFields):
+class Immediate(NodeWithFields):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -189,7 +189,7 @@ class Alias(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Table(WithFields):
+class Table(NodeWithFields):
     """
     Represents a logical AST expression for a tensor object `tns`, indexed by fields
     `idxs...`. A table is a tensor with named dimensions.
@@ -226,7 +226,7 @@ class Table(WithFields):
 
 
 @dataclass(eq=True, frozen=True)
-class MapJoin(WithFields):
+class MapJoin(NodeWithFields):
     """
     Represents a logical AST expression for mapping the function `op` across `args...`.
     Dimensions which are not present are broadcasted. Dimensions which are
@@ -239,7 +239,7 @@ class MapJoin(WithFields):
     """
 
     op: Immediate
-    args: tuple[WithFields, ...]
+    args: tuple[NodeWithFields, ...]
 
     @staticmethod
     def is_expr():
@@ -267,7 +267,7 @@ class MapJoin(WithFields):
         return tuple(dict.fromkeys(fs))
 
     @classmethod
-    def make_term(cls, op: Immediate, *args: WithFields) -> Self:  # type: ignore[override]
+    def make_term(cls, op: Immediate, *args: NodeWithFields) -> Self:  # type: ignore[override]
         return cls(op, tuple(args))
 
 
@@ -286,7 +286,7 @@ class Aggregate(LogicNode):
 
     op: Immediate
     init: Immediate
-    arg: WithFields
+    arg: NodeWithFields
     idxs: tuple[Field, ...]
 
     @staticmethod
@@ -309,13 +309,13 @@ class Aggregate(LogicNode):
 
     @classmethod
     def make_term(  # type: ignore[override]
-        cls, op: Immediate, init: Immediate, arg: WithFields, *idxs: Field
+        cls, op: Immediate, init: Immediate, arg: NodeWithFields, *idxs: Field
     ) -> Self:
         return cls(op, init, arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
-class Reorder(WithFields):
+class Reorder(NodeWithFields):
     """
     Represents a logical AST statement that reorders the dimensions of `arg` to be
     `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not
@@ -353,7 +353,7 @@ class Reorder(WithFields):
 
 
 @dataclass(eq=True, frozen=True)
-class Relabel(WithFields):
+class Relabel(NodeWithFields):
     """
     Represents a logical AST statement that relabels the dimensions of `arg` to be
     `idxs...`.
@@ -386,7 +386,7 @@ class Relabel(WithFields):
 
 
 @dataclass(eq=True, frozen=True)
-class Reformat(WithFields):
+class Reformat(NodeWithFields):
     """
     Represents a logical AST statement that reformats `arg` into the tensor `tns`.
 
@@ -396,7 +396,7 @@ class Reformat(WithFields):
     """
 
     tns: Immediate
-    arg: WithFields
+    arg: NodeWithFields
 
     @staticmethod
     def is_expr():
@@ -418,7 +418,7 @@ class Reformat(WithFields):
 
 
 @dataclass(eq=True, frozen=True)
-class Subquery(WithFields):
+class Subquery(NodeWithFields):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`, and returns `rhs`.
@@ -429,7 +429,7 @@ class Subquery(WithFields):
     """
 
     lhs: LogicNode
-    arg: WithFields
+    arg: NodeWithFields
 
     @staticmethod
     def is_expr():
