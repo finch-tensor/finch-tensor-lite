@@ -322,7 +322,7 @@ class Return(AssemblyNode):
         arg: The argument to return.
     """
 
-    args: tuple[AssemblyNode]
+    args: tuple[AssemblyNode, ...]
 
     @staticmethod
     def is_expr():
