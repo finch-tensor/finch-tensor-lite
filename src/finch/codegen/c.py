@@ -6,6 +6,9 @@ import sysconfig
 from ..util.config import get_config
 from ..util.cache import file_cache
 from functools import lru_cache
+from operator import methodcaller
+from abc import ABC, abstractmethod
+
 
 @file_cache(ext=sysconfig.get_config_var('SHLIB_SUFFIX'), domain="c")
 def create_shared_lib(filename, c_code, cc, cflags):
@@ -52,3 +55,40 @@ def get_c_function(function_name, c_code):
     c_function = getattr(shared_lib, function_name)
 
     return c_function
+
+class CBufferFormat(ABC):
+    @abstractmethod
+    def c_load(self, name, index_name, index_type):
+        """
+        Return C code which loads a named buffer at the given index.
+        """
+        pass
+
+    @abstractmethod
+    def c_store(self, name, value_name, value_type, index_name, index_type):
+        """
+        Return C code which stores a named buffer to the given index.
+        """
+        pass
+
+    @abstractmethod
+    def c_resize(self, name, new_length_name, new_length_type):
+        """
+        Return C code which resizes a named buffer to the given length.
+        """
+        pass
+
+class CKernel:
+    """
+    A class to represent a C kernel.
+    """
+    def __init__(self, finch, c_code):
+        self.function_name = function_name
+        self.c_code = c_code
+        self.c_function = get_c_function(function_name, c_code)
+    
+    def __call__(self, *args):
+        """
+        Calls the C function with the given arguments.
+        """
+        return self.c_function(*map(methodcaller('to_c'), args))
