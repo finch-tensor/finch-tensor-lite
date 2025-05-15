@@ -1,17 +1,6 @@
-# from .tensor import *
-from .fuse import fuse, fused
-from .lazy import (
-    compute,
-    elementwise,
-    expand_dims,
-    identify,
-    lazy,
-    multiply,
-    permute_dims,
-    prod,
-    reduce,
-    squeeze,
-)
+from .lazy import *
+#from .tensor import *
+from .fuse import *
 
 __all__ = [
     "lazy",

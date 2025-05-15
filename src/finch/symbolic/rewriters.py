@@ -1,8 +1,8 @@
 """
 This module provides a set of classes and utilities for symbolic term rewriting.
 Rewriters transform terms based on specific rules.  A rewriter is any callable
-which takes a term and returns a term or `None`.  A rewriter can return `None`
-if there are no changes applicable to the input term.  The module includes
+which takes a Term and returns a Term or `None`.  A rewriter can return `None`
+if there are no changes applicable to the input Term.  The module includes
 various strategies for applying rewriters, such as recursive rewriting, chaining
 multiple rewriters, and caching results.
 
@@ -20,31 +20,13 @@ Classes:
     Memo: Caches the results of a rewriter to avoid redundant computations.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable, Iterable
-from typing import TypeVar
-
 from .term import Term
 
-T = TypeVar("T", bound="Term")
-U = TypeVar("U", bound="Term")
-
-RwCallable = Callable[[T], T | None]
-
-__all__ = [
-    "default_rewrite",
-    "Rewrite",
-    "PreWalk",
-    "PostWalk",
-    "Chain",
-    "Fixpoint",
-    "Prestep",
-    "Memo",
-]
+RwCallable = Callable[[Term], Term | None]
 
 
-def default_rewrite(x: T | None, y: U) -> T | U:
+def default_rewrite(x: Term | None, y: Term) -> Term:
     return x if x is not None else y
 
 
@@ -59,7 +41,7 @@ class Rewrite:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: T) -> T:
+    def __call__(self, x: Term) -> Term:
         return default_rewrite(self.rw(x), x)
 
 
@@ -76,25 +58,24 @@ class PreWalk:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: T) -> T | None:
-        from ..finch_logic import LogicExpression
-
+    def __call__(self, x: Term) -> Term | None:
         y = self.rw(x)
-        match y:
-            case LogicExpression() as expr:
-                args = expr.children()
-                return expr.make_term(  # type: ignore[return-value]
-                    expr.head(), *tuple(default_rewrite(self(arg), arg) for arg in args)
+        if y is not None:
+            if y.is_expr():
+                args = y.children()
+                return y.make_term(
+                    y.head(), *[default_rewrite(self(arg), arg) for arg in args]
                 )
-        match x:
-            case LogicExpression() as expr:
-                args = expr.children()
-                new_args = list(map(self, args))
-                if not all(arg is None for arg in args):
-                    return expr.make_term(  # type: ignore[return-value]
-                        expr.head(),
-                        *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
-                    )
+            return y
+        if x.is_expr():
+            args = x.children()
+            new_args = list(map(self, args))
+            if not all(arg is None for arg in new_args):
+                return x.make_term(
+                    x.head(),
+                    *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
+                )
+            return None
         return None
 
 
@@ -111,20 +92,16 @@ class PostWalk:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: T) -> T | None:
-        from ..finch_logic import LogicExpression
-
-        match x:
-            case LogicExpression() as expr:
-                args = expr.children()
-                new_args = list(map(self, args))
-                if all(arg is None for arg in new_args):
-                    return self.rw(expr)
-                y = expr.make_term(
-                    expr.head(),
-                    *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
-                )
-                return default_rewrite(self.rw(y), y)  # type: ignore[return-value]
+    def __call__(self, x: Term) -> Term | None:
+        if x.is_expr():
+            args = x.children()
+            new_args = list(map(self, args))
+            if all(arg is None for arg in new_args):
+                return self.rw(x)
+            y = x.make_term(
+                x.head(), *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args)
+            )
+            return default_rewrite(self.rw(y), y)
         return self.rw(x)
 
 
@@ -140,7 +117,7 @@ class Chain:
     def __init__(self, rws: Iterable[RwCallable]):
         self.rws = rws
 
-    def __call__(self, x: T) -> T | None:
+    def __call__(self, x: Term) -> Term | None:
         is_success = False
         for rw in self.rws:
             y = rw(x)
@@ -164,12 +141,15 @@ class Fixpoint:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: T) -> T | None:
+    def __call__(self, x: Term) -> Term | None:
         y = self.rw(x)
-        while y is not None and x != y:
-            x = y
-            y = self.rw(x)
-        return y
+        if y is not None:
+            while y is not None and x != y:
+                x = y
+                y = self.rw(x)
+            return x
+        else:
+            return None
 
 
 class Prestep:
@@ -184,17 +164,16 @@ class Prestep:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: T) -> T | None:
-        from ..finch_logic import LogicExpression
-
+    def __call__(self, x: Term) -> Term | None:
         y = self.rw(x)
-        match y:
-            case LogicExpression() as expr:
-                args = expr.children()
-                return expr.make_term(  # type: ignore[return-value]
-                    expr.head(), *(default_rewrite(self(arg), arg) for arg in args)
+        if y is not None:
+            if y.is_expr():
+                y_args = y.children()
+                return y.make_term(
+                    y.head(), *[default_rewrite(self(arg), arg) for arg in y_args]
                 )
-        return y
+            return y
+        return None
 
 
 class Memo:
@@ -207,11 +186,11 @@ class Memo:
         cache (dict): A dictionary to store cached results.
     """
 
-    def __init__(self, rw: RwCallable, cache: dict | None = None):
+    def __init__(self, rw: RwCallable, cache: dict = None):
         self.rw = rw
         self.cache = cache if cache is not None else {}
 
-    def __call__(self, x: T) -> T | None:
+    def __call__(self, x: Term) -> Term | None:
         if x not in self.cache:
             self.cache[x] = self.rw(x)
         return self.cache[x]

@@ -24,7 +24,6 @@ sparse = "*"
 numba = ">=0.60"
 scipy = "*"
 numpy = "==2.*"
-mypy = ">=1.15.0,<2"
 
 [feature.test.tasks]
 test = { cmd = "pytest", depends-on = ["compile"] }

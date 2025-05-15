@@ -1,12 +1,14 @@
+from .lazy import *
+from ..finch_logic import *
+from ..symbolic import gensym
+from ..algebra import *
 """
-This module provides functionality for array fusion and computation using lazy
-evaluation.
+This module provides functionality for array fusion and computation using lazy evaluation.
 
 Overview:
 ---------
-Array fusion allows composing multiple array operations into a single kernel, enabling
-significant performance optimizations by letting the compiler optimize the entire
-operation at once.
+Array fusion allows composing multiple array operations into a single kernel, enabling significant
+performance optimizations by letting the compiler optimize the entire operation at once.
 
 Key Functions:
 --------------
@@ -23,15 +25,13 @@ Examples:
     >>> E = (C + D) / 2
     >>> compute(E)
 
-    In this example, `E` represents a fused operation that adds `C` and `D` together and
-    divides the result by 2. The `compute` function optimizes and executes the operation
-    efficiently.
+    In this example, `E` represents a fused operation that adds `C` and `D` together and divides
+    the result by 2. The `compute` function optimizes and executes the operation efficiently.
 
 2. Using `fuse` as a higher-order function:
     >>> result = fuse(lambda x, y: (x + y) / 2, A, B)
 
-    Here, `fuse` combines the addition and division operations into a single fused
-    kernel.
+    Here, `fuse` combines the addition and division operations into a single fused kernel.
 
 3. Using the `fused` decorator:
     >>> @fused
@@ -44,44 +44,35 @@ Examples:
 Performance:
 ------------
 - Using `lazy` and `compute` results in faster execution due to operation fusion.
-- Different optimizers can be used with `compute`, such as the Galley optimizer, which
-  adapts to the sparsity patterns of the inputs.
-- The optimizer can be set using the `ctx` argument in `compute`, or via `set_scheduler`
-  or `with_scheduler`.
+- Different optimizers can be used with `compute`, such as the Galley optimizer, which adapts to
+  the sparsity patterns of the inputs.
+- The optimizer can be set using the `ctx` argument in `compute`, or via `set_scheduler` or `with_scheduler`.
 """
 
-from .lazy import compute, get_default_scheduler, lazy
-
-
-def fuse(f, *args, ctx=None):
+def fuse(f, *args, ctx=get_default_scheduler()):
     """
     - fuse(f, *args, ctx=get_default_scheduler()):
-        Fuses multiple array operations into a single kernel. This function allows for
-        composing operations and executing them efficiently.
+        Fuses multiple array operations into a single kernel. This function allows for composing
+        operations and executing them efficiently.
 
         Parameters:
-        - f: The function representing the operation to be fused, returning a tensor or
-          tuple of tensor results.
+        - f: The function representing the operation to be fused, returning a tensor or tuple of tensor results.
         - *args: The input arrays or LazyTensors to be fused.
-        - ctx: The scheduler to use for computation. Defaults to the result of
-          `get_default_scheduler()`.
+        - ctx: The scheduler to use for computation. Defaults to the result of `get_default_scheduler()`.
 
         Returns:
         - The result of the fused operation, a tensor or tuple of tensors.
     """
-    if ctx is None:
-        ctx = get_default_scheduler()
     args = [lazy(arg) for arg in args]
     if len(args) == 1:
         return f(args[0])
     return compute(f(*args), ctx=ctx)
 
-
-def fused(f, /, ctx=None):
+def fused(f, /, ctx=get_default_scheduler()):
     """
     - fused(f):
-    A decorator that marks a function as fused. This allows the function to be used with
-    the `fuse` function for automatic fusion of operations.
+    A decorator that marks a function as fused. This allows the function to be used with the
+    `fuse` function for automatic fusion of operations.
 
     Parameters:
     - f: The function to be marked as fused.
@@ -89,10 +80,6 @@ def fused(f, /, ctx=None):
     Returns:
     - A wrapper function that applies the fusion mechanism to the original function.
     """
-    if ctx is None:
-        ctx = get_default_scheduler()
-
     def wrapper(*args):
         return fuse(f, *args, ctx=ctx)
-
     return wrapper

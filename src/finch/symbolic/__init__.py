@@ -1,14 +1,14 @@
-from .gensym import gensym
-from .rewriters import Chain, PostWalk, PreWalk, Rewrite
-from .term import PostOrderDFS, PreOrderDFS, Term
+from .rewriters import *
+from .term import *
+from .gensym import *
 
 __all__ = [
     "PostOrderDFS",
     "PreOrderDFS",
     "Term",
-    "Rewrite",
+    "Rewriter",
     "PreWalk",
     "PostWalk",
     "Chain",
-    "gensym",
+    "gensym"
 ]
