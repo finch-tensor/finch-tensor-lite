@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import json
+import toml
 
 """
 Finch Configuration Module
@@ -74,3 +75,20 @@ def reset_config():
     custom_config = default_config.copy()
     with config_path.open("w") as f:
         json.dump(custom_config, f)
+
+
+def get_version():
+    """
+    Get the version of Finch.
+    """
+    pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+    if not pyproject_path.exists():
+        raise FileNotFoundError("pyproject.toml not found.")
+
+    with pyproject_path.open("r") as f:
+        pyproject_data = toml.load(f)
+
+    try:
+        return pyproject_data["project"]["version"]
+    except KeyError:
+        raise ValueError("Version not found in pyproject.toml.")

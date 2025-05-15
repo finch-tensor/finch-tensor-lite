@@ -1,4 +1,4 @@
-from .config import get_config
+from .config import get_config, get_version
 from typing import Callable
 from pathlib import Path
 import uuid
@@ -27,7 +27,7 @@ def file_cache(*, ext: str, domain: str) -> Callable:
         nonlocal ext
         ext = ext.lstrip(".")
         if get_config("FINCH_CACHE_ENABLE"):
-            cache_dir = Path(get_config("FINCH_CACHE_PATH")) / domain
+            cache_dir = Path(get_config("FINCH_CACHE_PATH")) / get_version() / domain
         else:
             cache_dir = Path(
                 tempfile.mkdtemp(prefix=str(Path(get_config("FINCH_TMP")) / domain))
