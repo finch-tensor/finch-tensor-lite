@@ -72,10 +72,12 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args: Any) -> An
     if not isinstance(obj, Hashable):
         T = type(obj)
     to_query = {T}
+    to_query_new: set[type | Hashable] = set()
     queried: set[type | Hashable] = set()
-    while len(to_query) != len(queried):
-        to_query_new = to_query.copy()
+    while len(to_query) != 0:
         for o in to_query:
+            if o in queried:
+                continue
             method = _properties.get((o, attr, prop), None)
             if method is not None:
                 return method(obj, *args)
@@ -84,7 +86,8 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args: Any) -> An
                 to_query_new.add(type(o))
                 continue
             to_query_new.update(o.__mro__)
-        to_query = to_query_new
+        to_query.clear()
+        to_query, to_query_new = to_query_new, to_query
 
     raise NotImplementedError(f"Property {prop} not implemented for {type(obj)}")
 
