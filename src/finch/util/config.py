@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import json
 
@@ -19,27 +20,27 @@ Configuration details:
 Use this module to easily manage and retrieve Finch-specific settings.
 """
 
-depot_dir = os.path.realpath(
-    os.path.expanduser(os.getenv("FINCH_PATH", os.path.join("~", ".finch")))
-)
+depot_dir = Path(os.getenv("FINCH_PATH", Path.home() / ".finch"))
 
 default_config = {
-    "FINCH_CACHE_PATH": os.path.join(depot_dir, "cache"),
+    "FINCH_CACHE_PATH": str(depot_dir / "cache"),
     "FINCH_CACHE_SIZE": 10000,
     "FINCH_CACHE_ENABLE": True,
-    "FINCH_TMP": os.path.join(depot_dir, "tmp"),
-    "FINCH_LOG_PATH": os.path.join(depot_dir, "log.txt"),
+    "FINCH_TMP": str(depot_dir / "tmp"),
+    "FINCH_LOG_PATH": str(depot_dir / "log.txt"),
     "FINCH_CC": os.environ.get("CC", "cc"),
     "FINCH_CFLAGS": ["-shared", "-fPIC", "-O3"],
 }
 
-if not os.path.exists(depot_dir):
-    os.mkdir(depot_dir)
+depot_dir.mkdir(parents=True, exist_ok=True)
 
-if not os.path.exists(os.path.join(depot_dir, "config.json")):
-    json.dump(default_config, open(os.path.join(depot_dir, "config.json"), "w"))
+config_path = depot_dir / "config.json"
+if not config_path.exists():
+    with config_path.open("w") as f:
+        json.dump(default_config, f)
 
-custom_config = json.load(open(os.path.join(depot_dir, "config.json"), "r"))
+with config_path.open("r") as f:
+    custom_config = json.load(f)
 
 
 def get_config(var):
@@ -58,10 +59,11 @@ def get_config(var):
 
 def set_config(var, val):
     """
-    Get the configuration value for a given variable.
+    Set the configuration value for a given variable.
     """
     custom_config[var] = val
-    json.dump(custom_config, open(os.path.join(depot_dir, "config.json"), "w"))
+    with config_path.open("w") as f:
+        json.dump(custom_config, f)
 
 
 def reset_config():
@@ -70,4 +72,5 @@ def reset_config():
     """
     global custom_config
     custom_config = default_config.copy()
-    json.dump(custom_config, open(os.path.join(depot_dir, "config.json"), "w"))
+    with config_path.open("w") as f:
+        json.dump(custom_config, f)
