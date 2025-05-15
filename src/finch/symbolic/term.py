@@ -1,41 +1,48 @@
-from typing import Any, Iterator
-from abc import ABC, abstractmethod
-
 """
-This module contains definitions for common functions that are useful for symbolic expression manipulation.
-Its purpose is to provide a shared interface between various symbolic programming in Finch.
+This module contains definitions for common functions that are useful for symbolic
+expression manipulation. Its purpose is to provide a shared interface between various
+symbolic programming in Finch.
 
 Classes:
-    Term (ABC): An abstract base class representing a symbolic term. It provides methods to access the head
-    of the term, its children, and to construct a new term with a similar structure.
+    Term (ABC): An abstract base class representing a symbolic term. It provides methods
+    to access the head of the term, its children, and to construct a new term with a
+    similar structure.
 """
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
+from typing import Any, Self
+
+__all__ = ["Expression", "Leaf", "Term", "PreOrderDFS", "PostOrderDFS"]
 
 
 class Term(ABC):
     def __init__(self):
         self._hashcache = None  # Private field to cache the hash value
 
-    @abstractmethod
-    def head(self) -> Any:
+    @classmethod
+    def head(cls) -> Callable[..., Self]:
         """Return the head type of the S-expression."""
-        pass
+        raise NotImplementedError
 
-    def children(self) -> list["Term"]:
+    @abstractmethod
+    def children(self) -> list[Any]:
         """Return the children (AKA tail) of the S-expression."""
-        pass
 
-    @abstractmethod
-    def is_expr(self) -> bool:
-        """Return True if the term is an expression tree, False otherwise. Must implement children() if True."""
-        pass
+    @classmethod
+    def make_term(cls, head: Callable[..., Self], *children: Term) -> Self:
+        """
+        Construct a new term in the same family of terms with the given
+        children. This function should satisfy
+        `x == x.make_term(x.head(), *x.children())`
+        """
+        raise NotImplementedError
 
-    @abstractmethod
-    def make_term(self, head: Any, children: list["Term"]) -> "Term":
-        """
-        Construct a new term in the same family of terms with the given head type and children.
-        This function should satisfy `x == x.make_term(x.head(), *x.children())`
-        """
-        pass
+    @classmethod
+    def is_expr(cls) -> bool:
+        raise NotImplementedError
 
     def __hash__(self) -> int:
         """Return the hash value of the term."""
@@ -45,19 +52,38 @@ class Term(ABC):
             )
         return self._hashcache
 
-    def __eq__(self, other: "Term") -> bool:
-        self.head() == other.head() and self.children() == other.children()
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Term):
+            return NotImplemented
+        return self.head() is other.head() and self.children() == other.children()
+
+
+class Expression(Term):
+    @classmethod
+    def is_expr(cls) -> bool:
+        return True
+
+    @abstractmethod
+    def children(self) -> list[Term]: ...
+
+
+class Leaf(Term):
+    @classmethod
+    def is_expr(cls) -> bool:
+        return False
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
-    if node.is_expr():
-        for arg in node.children():
-            yield from PostOrderDFS(arg)
+    match node:
+        case Expression() as expr:
+            for arg in expr.children():
+                yield from PostOrderDFS(arg)
     yield node
 
 
 def PreOrderDFS(node: Term) -> Iterator[Term]:
     yield node
-    if node.is_expr():
-        for arg in node.children():
-            yield from PreOrderDFS(arg)
+    match node:
+        case Expression() as expr:
+            for arg in expr.children():
+                yield from PreOrderDFS(arg)

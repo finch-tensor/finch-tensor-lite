@@ -1,9 +1,10 @@
-from typing import Any, Iterable
+from collections.abc import Iterable
 
-from .compiler import LogicCompiler
 from ..finch_logic import (
     Aggregate,
     Alias,
+    Field,
+    LogicExpression,
     LogicNode,
     MapJoin,
     Plan,
@@ -13,26 +14,28 @@ from ..finch_logic import (
     Subquery,
 )
 from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
+from .compiler import LogicCompiler
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
     # ...
     prgm = lift_subqueries(prgm)
-    prgm = propagate_map_queries(prgm)
-    return prgm
+    return propagate_map_queries(prgm)
 
 
-def _lift_subqueries_expr(node: LogicNode, bindings: dict) -> LogicNode:
+def _lift_subqueries_expr(
+    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+) -> LogicNode:
     match node:
         case Subquery(lhs, arg):
             if lhs not in bindings:
                 arg_2 = _lift_subqueries_expr(arg, bindings)
                 bindings[lhs] = arg_2
             return lhs
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *map(lambda x: _lift_subqueries_expr(x, bindings), any.children()),
+        case LogicExpression() as expr:
+            return expr.make_term(
+                expr.head(),
+                *tuple(_lift_subqueries_expr(x, bindings) for x in expr.children()),
             )
         case _:
             return node
@@ -43,7 +46,7 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
         case Query(lhs, rhs):
-            bindings = {}
+            bindings: dict[LogicNode, LogicNode] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
@@ -93,20 +96,21 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
 
 
 def _propagate_fields(
-    root: LogicNode, fields: dict[LogicNode, Iterable[LogicNode]]
+    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicNode:
     match root:
         case Plan(bodies):
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
         case Query(lhs, rhs):
             rhs = _propagate_fields(rhs, fields)
+            assert isinstance(rhs, LogicExpression)
             fields[lhs] = rhs.get_fields()
             return Query(lhs, rhs)
         case Alias() as a:
             return Relabel(a, tuple(fields[a]))
-        case node if node.is_expr():
-            return node.make_term(
-                node.head(), *[_propagate_fields(c, fields) for c in node.children()]
+        case LogicExpression() as expr:
+            return expr.make_term(
+                expr.head(), *[_propagate_fields(c, fields) for c in expr.children()]
             )
         case node:
             return node
@@ -120,6 +124,6 @@ class DefaultLogicOptimizer:
     def __init__(self, ctx: LogicCompiler):
         self.ctx = ctx
 
-    def __call__(self, prgm: LogicNode):
+    def __call__(self, prgm: LogicNode) -> str:
         prgm = optimize(prgm)
         return self.ctx(prgm)

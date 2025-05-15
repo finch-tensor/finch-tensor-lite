@@ -1,8 +1,23 @@
-from .nodes import *
-from .interpreter import FinchLogicInterpreter
+from .nodes import (
+    Aggregate,
+    Alias,
+    Deferred,
+    Field,
+    Immediate,
+    LogicExpression,
+    LogicNode,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Reformat,
+    Relabel,
+    Reorder,
+    Subquery,
+    Table,
+)
 
 __all__ = [
-    "FinchLogicInterpreter",
     "LogicNode",
     "Deferred",
     "Aggregate",
@@ -13,8 +28,12 @@ __all__ = [
     "Plan",
     "Produces",
     "Query",
+    "Subquery",
+    "Reformat",
     "Relabel",
     "Reorder",
+    "Reformat",
     "Subquery",
     "Table",
+    "LogicExpression",
 ]
