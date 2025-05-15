@@ -126,7 +126,7 @@ class Call(AssemblyNode):
         args: The arguments to call on the function.
     """
     op: AssemblyNode
-    args: tuple[AssemblyNode]
+    args: tuple[AssemblyNode, ...]
 
     @staticmethod
     def is_expr():
