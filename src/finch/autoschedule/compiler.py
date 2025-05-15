@@ -1,12 +1,12 @@
-from collections.abc import Hashable
 from textwrap import dedent
-from typing import Any
+from typing import TypeVar
 
 from ..finch_logic import (
     Alias,
     Deferred,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
     MapJoin,
     Query,
@@ -16,29 +16,43 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
+from ..symbolic import Term
+
+T = TypeVar("T", bound="LogicNode")
 
 
-def get_or_insert(dictionary: dict[Hashable, Any], key: Hashable, default: Any) -> Any:
-    if key in dictionary:
-        return dictionary[key]
-    dictionary[key] = default
-    return default
+def get_or_insert(dictionary: dict[str, T], key: str, default: T) -> T:
+    return dictionary.setdefault(key, default)
 
 
-def get_structure(node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]) -> LogicNode:
+def get_structure(
+    node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]
+) -> LogicNode:
     match node:
         case Field(name):
             return get_or_insert(fields, name, Immediate(len(fields) + len(aliases)))
         case Alias(name):
             return get_or_insert(aliases, name, Immediate(len(fields) + len(aliases)))
         case Subquery(Alias(name) as lhs, arg):
-            if name in aliases:
-                return aliases[name]
-            return Subquery(get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases))
+            alias = aliases.get(name)
+            if alias is not None:
+                return alias
+            in_lhs = get_structure(lhs, fields, aliases)
+            assert isinstance(in_lhs, LogicExpression)
+            in_arg = get_structure(arg, fields, aliases)
+            assert isinstance(in_arg, LogicExpression)
+            return Subquery(in_lhs, in_arg)
         case Table(tns, idxs):
-            return Table(Immediate(type(tns.val)), tuple(get_structure(idx, fields, aliases) for idx in idxs))
-        case any if any.is_tree():
-            return any.from_arguments(*[get_structure(arg, fields, aliases) for arg in any.get_arguments()])
+            assert all(isinstance(idx, Field) for idx in idxs)
+            return Table(
+                Immediate(type(tns.val)),
+                tuple(get_structure(idx, fields, aliases) for idx in idxs),  # type: ignore[misc]
+            )
+        case LogicExpression() as expr:
+            return expr.make_term(
+                expr.head(),
+                *[get_structure(arg, fields, aliases) for arg in expr.children()],
+            )
         case _:
             return node
 
@@ -53,7 +67,11 @@ class PointwiseLowerer:
                 return f":({val}({','.join([self(arg) for arg in args])}))"
             case Reorder(Relabel(Alias(name), idxs_1), idxs_2):
                 self.bound_idxs.append(idxs_1)
-                return f":({name}[{','.join([idx.name if idx in idxs_2 else 1 for idx in idxs_1])}])"
+                return (
+                    f":({name}"
+                    + ",".join([idx.name if idx in idxs_2 else 1 for idx in idxs_1])
+                    + ")"
+                )
             case Reorder(Immediate(val), _):
                 return val
             case Immediate(val):
@@ -68,7 +86,7 @@ def compile_pointwise_logic(ex: LogicNode) -> tuple:
     return (code, ctx.bound_idxs)
 
 
-def compile_logic_constant(ex: LogicNode) -> str:
+def compile_logic_constant(ex: Term) -> str:
     match ex:
         case Immediate(val):
             return val
@@ -94,15 +112,23 @@ class LogicLowerer:
     def __init__(self, mode: str = "fast"):
         self.mode = mode
 
-    def __call__(self, ex: LogicNode):
+    def __call__(self, ex: Term) -> str:
         match ex:
             case Query(Alias(name), Table(tns, _)):
                 return f":({name} = {compile_logic_constant(tns)})"
 
-            case Query(Alias(_) as lhs, Reformat(tns, Reorder(Relabel(Alias(_) as arg, idxs_1), idxs_2))):
-                loop_idxs = [idx.name for idx in with_subsequence(intersect(idxs_1, idxs_2), idxs_2)]
+            case Query(
+                Alias(_) as lhs,
+                Reformat(tns, Reorder(Relabel(Alias(_) as arg, idxs_1), idxs_2)),
+            ):
+                loop_idxs = [
+                    idx.name
+                    for idx in with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
+                ]
                 lhs_idxs = [idx.name for idx in idxs_2]
-                (rhs, rhs_idxs) = compile_pointwise_logic(Reorder(Relabel(arg, idxs_1), idxs_2))
+                (rhs, rhs_idxs) = compile_pointwise_logic(
+                    Reorder(Relabel(arg, idxs_1), idxs_2)
+                )
                 body = f":({lhs.name}[{','.join(lhs_idxs)}] = {rhs})"
                 for idx in loop_idxs:
                     if Field(idx) in rhs_idxs:
@@ -132,6 +158,6 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm):
+    def __call__(self, prgm: Term) -> str:
         # prgm = format_queries(prgm, True)  # noqa: F821
         return self.ll(prgm)
