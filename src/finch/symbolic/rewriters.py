@@ -1,8 +1,8 @@
 """
 This module provides a set of classes and utilities for symbolic term rewriting.
 Rewriters transform terms based on specific rules.  A rewriter is any callable
-which takes a Term and returns a Term or `None`.  A rewriter can return `None`
-if there are no changes applicable to the input Term.  The module includes
+which takes a term and returns a term or `None`.  A rewriter can return `None`
+if there are no changes applicable to the input term.  The module includes
 various strategies for applying rewriters, such as recursive rewriting, chaining
 multiple rewriters, and caching results.
 
@@ -20,10 +20,17 @@ Classes:
     Memo: Caches the results of a rewriter to avoid redundant computations.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable
 from typing import TypeVar
 
 from .term import Term
+
+T = TypeVar("T", bound="Term")
+U = TypeVar("U", bound="Term")
+
+RwCallable = Callable[[T], T | None]
 
 __all__ = [
     "default_rewrite",
@@ -35,11 +42,6 @@ __all__ = [
     "Prestep",
     "Memo",
 ]
-
-T = TypeVar("T", bound="Term")
-U = TypeVar("U", bound="Term")
-
-RwCallable = Callable[[Term], Term | None]
 
 
 def default_rewrite(x: T | None, y: U) -> T | U:
@@ -57,7 +59,7 @@ class Rewrite:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: Term) -> Term:
+    def __call__(self, x: T) -> T:
         return default_rewrite(self.rw(x), x)
 
 
@@ -74,7 +76,7 @@ class PreWalk:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: Term) -> Term | None:
+    def __call__(self, x: T) -> T | None:
         y = self.rw(x)
         if y is not None:
             if y.is_expr():
@@ -108,7 +110,7 @@ class PostWalk:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: Term) -> Term | None:
+    def __call__(self, x: T) -> T | None:
         if x.is_expr():
             args = x.children()
             new_args = list(map(self, args))
@@ -134,7 +136,7 @@ class Chain:
     def __init__(self, rws: Iterable[RwCallable]):
         self.rws = rws
 
-    def __call__(self, x: Term) -> Term | None:
+    def __call__(self, x: T) -> T | None:
         is_success = False
         for rw in self.rws:
             y = rw(x)
@@ -158,7 +160,7 @@ class Fixpoint:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: Term) -> Term | None:
+    def __call__(self, x: T) -> T | None:
         y = self.rw(x)
         while y is not None and x != y:
             x = y
@@ -178,7 +180,7 @@ class Prestep:
     def __init__(self, rw: RwCallable):
         self.rw = rw
 
-    def __call__(self, x: Term) -> Term | None:
+    def __call__(self, x: T) -> T | None:
         y = self.rw(x)
         if y is not None:
             if y.is_expr():
@@ -204,7 +206,7 @@ class Memo:
         self.rw = rw
         self.cache = cache if cache is not None else {}
 
-    def __call__(self, x: Term) -> Term | None:
+    def __call__(self, x: T) -> T | None:
         if x not in self.cache:
             self.cache[x] = self.rw(x)
         return self.cache[x]

@@ -13,11 +13,11 @@ from ..finch_logic import (
     Relabel,
     Subquery,
 )
-from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite, Term
+from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
 from .compiler import LogicCompiler
 
 
-def optimize(prgm: Term) -> Term:
+def optimize(prgm: LogicNode) -> LogicNode:
     # ...
     prgm = lift_subqueries(prgm)
     return propagate_map_queries(prgm)
@@ -41,7 +41,7 @@ def _lift_subqueries_expr(
             return node
 
 
-def lift_subqueries(node: Term) -> LogicNode:
+def lift_subqueries(node: LogicNode) -> LogicNode:
     match node:
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
@@ -57,14 +57,14 @@ def lift_subqueries(node: Term) -> LogicNode:
             raise Exception(f"Invalid node: {node}")
 
 
-def _get_productions(root: Term) -> list[Term]:
+def _get_productions(root: LogicNode) -> list[LogicNode]:
     for node in PostOrderDFS(root):
         if isinstance(node, Produces):
             return [arg for arg in PostOrderDFS(node) if isinstance(arg, Alias)]
     return []
 
 
-def propagate_map_queries(root: Term) -> Term:
+def propagate_map_queries(root: LogicNode) -> LogicNode:
     def rule_agg_to_mapjoin(ex):
         match ex:
             case Aggregate(op, init, arg, ()):
@@ -124,6 +124,6 @@ class DefaultLogicOptimizer:
     def __init__(self, ctx: LogicCompiler):
         self.ctx = ctx
 
-    def __call__(self, prgm: Term) -> str:
+    def __call__(self, prgm: LogicNode) -> str:
         prgm = optimize(prgm)
         return self.ctx(prgm)
