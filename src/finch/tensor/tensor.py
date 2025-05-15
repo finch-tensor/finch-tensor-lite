@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class AbstractTensor(ABC):
     @abstractmethod
     def shape(self):
@@ -21,10 +22,13 @@ class AbstractTensor(ABC):
     def __mul__(self, other):
         pass
 
+
 def fill_value(arg):
-    if isinstance(arg, LazyTensor):
+    from ..finch_logic import Immediate
+    from ..interface.lazy import LazyTensor
+
+    if isinstance(arg, LazyTensor | Immediate):
         return arg.fill_value
-    elif isinstance(arg, (int, float)):
+    if isinstance(arg, int | float | bool | complex):
         return arg
-    else:
-        raise ValueError("Unsupported type for fill_value")
+    raise TypeError("Unsupported type for fill_value")

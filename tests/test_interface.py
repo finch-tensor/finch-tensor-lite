@@ -1,8 +1,12 @@
+from operator import add, mul
+
 import numpy as np
 from numpy.testing import assert_equal
+
 import pytest
+
 import finch
-from operator import add, mul
+
 
 @pytest.mark.parametrize(
     "a, b",
@@ -12,8 +16,14 @@ from operator import add, mul
     ],
 )
 def test_matrix_multiplication(a, b):
-    result = finch.fuse(lambda a, b: finch.reduce(add, finch.elementwise(mul, finch.expand_dims(a, 2), b), axis=1), a, b)
+    result = finch.fuse(
+        lambda a, b: finch.reduce(
+            add, finch.elementwise(mul, finch.expand_dims(a, 2), b), axis=1
+        ),
+        a,
+        b,
+    )
 
     expected = np.matmul(a, b)
-    
+
     assert_equal(result, expected)
