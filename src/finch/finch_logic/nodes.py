@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
@@ -44,27 +45,25 @@ class LogicNode(Term):
     @abstractmethod
     def is_expr():
         """Determines if the node is expresion."""
-        ...
 
     @staticmethod
     @abstractmethod
     def is_stateful():
         """Determines if the node is stateful."""
-        ...
 
     @classmethod
-    def head(cls):
+    def head(cls) -> type[Self]:
         """Returns the head of the node."""
         return cls
 
     @abstractmethod
-    def children(self) -> list[LogicNode]:
+    def children(self) -> list[LogicNode]:  # type: ignore[override]
         """Returns the children of the node."""
 
     @classmethod
-    def make_term(cls, *args: Term) -> Self:
+    def make_term(cls, head: Callable[..., Self], *args: Term) -> Self:
         """Creates a term with the given head and arguments."""
-        return cls(*args)
+        return head(*args)
 
 
 @dataclass(eq=True, frozen=True)
@@ -226,8 +225,13 @@ class Table(NodeWithFields):
         return self.idxs
 
     @classmethod
-    def make_term(cls, tns: Immediate, *idxs: Field) -> Self:  # type: ignore[override]
-        return cls(tns, idxs)
+    def make_term(  # type: ignore[override]
+        cls,
+        head: Callable[[Immediate, tuple[Field, ...]], Self],
+        tns: Immediate,
+        *idxs: Field,
+    ) -> Self:
+        return head(tns, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -272,8 +276,13 @@ class MapJoin(NodeWithFields):
         return tuple(dict.fromkeys(fs))
 
     @classmethod
-    def make_term(cls, op: Immediate, *args: NodeWithFields) -> Self:  # type: ignore[override]
-        return cls(op, tuple(args))
+    def make_term(  # type: ignore[override]
+        cls,
+        head: Callable[[Immediate, tuple[NodeWithFields, ...]], Self],
+        op: Immediate,
+        *args: NodeWithFields,
+    ) -> Self:
+        return head(op, tuple(args))
 
 
 @dataclass(eq=True, frozen=True)
@@ -314,9 +323,14 @@ class Aggregate(LogicNode):
 
     @classmethod
     def make_term(  # type: ignore[override]
-        cls, op: Immediate, init: Immediate, arg: NodeWithFields, *idxs: Field
+        cls,
+        head: Callable[[Immediate, Immediate, NodeWithFields, tuple[Field, ...]], Self],
+        op: Immediate,
+        init: Immediate,
+        arg: NodeWithFields,
+        *idxs: Field,
     ) -> Self:
-        return cls(op, init, arg, idxs)
+        return head(op, init, arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -353,8 +367,13 @@ class Reorder(NodeWithFields):
         return self.idxs
 
     @classmethod
-    def make_term(cls, arg: LogicNode, *idxs: Field) -> Self:  # type: ignore[override]
-        return cls(arg, idxs)
+    def make_term(  # type: ignore[override]
+        cls,
+        head: Callable[[LogicNode, tuple[Field, ...]], Self],
+        arg: LogicNode,
+        *idxs: Field,
+    ) -> Self:
+        return head(arg, tuple(idxs))
 
 
 @dataclass(eq=True, frozen=True)
@@ -511,8 +530,10 @@ class Produces(LogicNode):
         return [*self.args]
 
     @classmethod
-    def make_term(cls, *args: LogicNode) -> Self:  # type: ignore[override]
-        return cls(tuple(args))
+    def make_term(  # type: ignore[override]
+        cls, head: Callable[[tuple[LogicNode, ...]], Self], *args: LogicNode
+    ) -> Self:
+        return head(tuple(args))
 
 
 @dataclass(eq=True, frozen=True)
@@ -542,5 +563,7 @@ class Plan(LogicNode):
         return tuple(self.bodies)
 
     @classmethod
-    def make_term(cls, *bodies: LogicNode) -> Self:  # type: ignore[override]
-        return cls(tuple(bodies))
+    def make_term(  # type: ignore[override]
+        cls, head: Callable[[tuple[LogicNode, ...]], Self], *bodies: LogicNode
+    ) -> Self:
+        return head(tuple(bodies))

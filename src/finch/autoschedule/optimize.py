@@ -34,6 +34,7 @@ def _lift_subqueries_expr(
             return lhs
         case any if any.is_expr():
             return any.make_term(
+                any.head(),
                 *tuple(_lift_subqueries_expr(x, bindings) for x in any.children()),
             )
         case _:
@@ -109,7 +110,7 @@ def _propagate_fields(
             return Relabel(a, tuple(fields[a]))
         case node if node.is_expr():
             return node.make_term(
-                *[_propagate_fields(c, fields) for c in node.children()]
+                node.head(), *[_propagate_fields(c, fields) for c in node.children()]
             )
         case node:
             return node

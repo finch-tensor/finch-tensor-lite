@@ -54,7 +54,8 @@ def get_structure(
             )
         case any if any.is_expr():
             return any.make_term(
-                *[get_structure(arg, fields, aliases) for arg in any.children()]
+                any.head(),
+                *[get_structure(arg, fields, aliases) for arg in any.children()],
             )
         case _:
             return node

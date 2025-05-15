@@ -80,7 +80,7 @@ class PreWalk:
             if y.is_expr():
                 args = y.children()
                 return y.make_term(
-                    *tuple(default_rewrite(self(arg), arg) for arg in args)
+                    y.head(), *tuple(default_rewrite(self(arg), arg) for arg in args)
                 )
             return y
         if x.is_expr():
@@ -88,6 +88,7 @@ class PreWalk:
             new_args = list(map(self, args))
             if not all(arg is None for arg in new_args):
                 return x.make_term(
+                    x.head(),
                     *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
                 )
             return None
@@ -114,6 +115,7 @@ class PostWalk:
             if all(arg is None for arg in new_args):
                 return self.rw(x)
             y = x.make_term(
+                x.head(),
                 *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
             )
             return default_rewrite(self.rw(y), y)
@@ -181,7 +183,9 @@ class Prestep:
         if y is not None:
             if y.is_expr():
                 y_args = y.children()
-                return y.make_term(*(default_rewrite(self(arg), arg) for arg in y_args))
+                return y.make_term(
+                    y.head(), *(default_rewrite(self(arg), arg) for arg in y_args)
+                )
             return y
         return None
 
