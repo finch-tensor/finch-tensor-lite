@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 __all__ = ["Term", "PreOrderDFS", "PostOrderDFS"]
 
@@ -24,6 +24,10 @@ if TYPE_CHECKING:
 class Term(ABC):
     def __init__(self):
         self._hashcache = None  # Private field to cache the hash value
+
+    @abstractmethod
+    def head(self) -> Any:
+        """Return the head type of the S-expression."""
 
     @abstractmethod
     def children(self) -> list[LogicNode]:
@@ -47,14 +51,14 @@ class Term(ABC):
         """Return the hash value of the term."""
         if self._hashcache is None:
             self._hashcache = hash(
-                (0x1CA5C2ADCA744860, type(self), tuple(self.children()))
+                (0x1CA5C2ADCA744860, self.head(), tuple(self.children()))
             )
         return self._hashcache
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Term):
             return NotImplemented
-        return type(self) is type(other) and self.children() == other.children()
+        return self.head() == other.head() and self.children() == other.children()
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
