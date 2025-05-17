@@ -33,8 +33,31 @@ class TestEagerTensor(finch.EagerTensor):
     def __repr__(self):
         return f"TestEagerTensor({self.array})"
 
-    def __getitem__(self, *item):
-        return self.array[*item]
+    def __getitem__(self, item):
+        return self.array[item]
+
+    @property
+    def dtype(self):
+        return self.array.dtype
+
+    @property
+    def shape(self):
+        return self.array.shape
+
+    @property
+    def ndim(self):
+        return self.array.ndim
+
+    @property
+    def fill_value(self):
+        return finch.fill_value(self.array)
+
+    @property
+    def element_type(self):
+        return finch.element_type(self.array)
+
+    def to_numpy(self):
+        return self.array
 
 
 @pytest.mark.parametrize(

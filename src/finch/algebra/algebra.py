@@ -43,10 +43,10 @@ them automatically apply to all subclasses, without having to register the
 property for each subclass individually.
 """
 import operator
-from typing import Union
 import numpy as np
 
 _properties = {}
+
 
 def query_property(obj, attr, prop, *args):
     """Queries a property of an attribute of an object or class.  Properties can
@@ -77,7 +77,8 @@ def query_property(obj, attr, prop, *args):
         if T is object:
             break
         T = T.__base__
-    raise NotImplementedError(f"Property {prop} not implemented for {type(obj)}")
+    raise NotImplementedError(f"Property {prop} not implemented for {obj}")
+
 
 def register_property(cls, attr, prop, f):
     """Registers a property for a class or object.
@@ -89,6 +90,7 @@ def register_property(cls, attr, prop, f):
             object and any additional arguments as input.
     """
     _properties[(cls, attr, prop)] = f
+
 
 def fill_value(arg: Any) -> Any:
     """The fill value for the given argument.  The fill value is the
@@ -104,9 +106,15 @@ def fill_value(arg: Any) -> Any:
     Raises:
         NotImplementedError: If the fill value is not implemented for the given type.
     """
-    return query_property(arg, '__self__', 'fill_value')
+    if hasattr(arg, "fill_value"):
+        return arg.fill_value
+    return query_property(arg, "__self__", "fill_value")
 
-register_property(np.ndarray, '__self__', 'fill_value', lambda x: np.zeros((), dtype=x.dtype)[()])
+
+register_property(
+    np.ndarray, "__self__", "fill_value", lambda x: np.zeros((), dtype=x.dtype)[()]
+)
+
 
 def element_type(arg: Any) -> Type:
     """The element type of the given argument.  The element type is the scalar type of
@@ -122,9 +130,18 @@ def element_type(arg: Any) -> Type:
     Raises:
         NotImplementedError: If the element type is not implemented for the given type.
     """
-    return query_property(arg, '__self__', 'element_type')
+    if hasattr(arg, "element_type"):
+        return arg.element_type
+    return query_property(arg, "__self__", "element_type")
 
-register_property(np.ndarray, '__self__', 'element_type', lambda x: type(np.zeros((), dtype=x.dtype)[()]))
+
+register_property(
+    np.ndarray,
+    "__self__",
+    "element_type",
+    lambda x: type(np.zeros((), dtype=x.dtype)[()]),
+)
+
 
 def return_type(op: Any, *args: Any) -> Any:
     """The return type of the given function on the given argument types.
@@ -136,7 +153,8 @@ def return_type(op: Any, *args: Any) -> Any:
     Returns:
         The return type of op(*args: arg_types)
     """
-    return query_property(op, '__call__', 'return_type', *args)
+    return query_property(op, "__call__", "return_type", *args)
+
 
 StableNumber = (np.number, bool, int, float, complex)
 
@@ -157,18 +175,63 @@ _reflexive_operators = {
     operator.or_: ("__or__", "__ror__"),
 }
 
+
+def _return_type_reflexive(meth):
+    def _return_type_closure(a, b):
+        if issubclass(b, StableNumber):
+            return type(getattr(a(True), meth)(b(True)))
+        else:
+            raise TypeError(
+                f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}"
+            )
+
+    return _return_type_closure
+
+
 for op, (meth, rmeth) in _reflexive_operators.items():
-    register_property(op, '__call__', 'return_type', lambda op, a, b: query_property(a, meth, 'return_type', b) if hasattr(a, meth) else query_property(b, rmeth, 'return_type', a)),
-    def _return_type(meth):
-        def _return_type_closure(a, b):
-            if issubclass(b, StableNumber):
-                return type(getattr(a(True), meth)(b(True)))
-            else:
-                raise TypeError(f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}")
-        return _return_type_closure
+    (
+        register_property(
+            op,
+            "__call__",
+            "return_type",
+            lambda op, a, b, meth=meth: query_property(a, meth, "return_type", b)
+            if hasattr(a, meth)
+            else query_property(b, rmeth, "return_type", a),
+        ),
+    )
+
     for T in StableNumber:
-        register_property(T, meth, 'return_type', _return_type(meth))
-        register_property(T, rmeth, 'return_type', _return_type(rmeth))
+        register_property(T, meth, "return_type", _return_type_reflexive(meth))
+        register_property(T, rmeth, "return_type", _return_type_reflexive(rmeth))
+
+
+_unary_operators = {
+    operator.abs: "__abs__",
+    operator.pos: "__pos__",
+    operator.neg: "__neg__",
+}
+
+
+def _return_type_unary(meth):
+    def _return_type_closure(a):
+        return type(getattr(a(True), meth)())
+
+    return _return_type_closure
+
+
+for op, meth in _unary_operators.items():
+    (
+        register_property(
+            op,
+            "__call__",
+            "return_type",
+            lambda op, a, meth=meth: query_property(a, meth, "return_type"),
+        ),
+    )
+
+    for T in StableNumber:
+        register_property(T, meth, "return_type", _return_type_unary(meth))
+
 
 def is_associative(op: Any) -> bool:
     """Returns whether the given function is associative, that is, whether the
@@ -176,14 +239,16 @@ def is_associative(op: Any) -> bool:
 
     Args:
         op: The function to check.
-    
+
     Returns:
         True if the function can be proven to be associative, False otherwise.
     """
-    return query_property(op, '__call__', 'is_associative')
+    return query_property(op, "__call__", "is_associative")
+
 
 for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
-    register_property(op, '__call__', 'is_associative', lambda op: True) 
+    register_property(op, "__call__", "is_associative", lambda op: True)
+
 
 def fixpoint_type(op: Any, z: Any, T: Type) -> Type:
     """Determines the fixpoint type after repeated calling the given operation.
@@ -200,8 +265,11 @@ def fixpoint_type(op: Any, z: Any, T: Type) -> Type:
     R = type(z)
     while R not in S:
         S.add(R)
-        R = return_type(op, type(z), T)  # Assuming `op` is a callable that takes `z` and `T` as arguments
+        R = return_type(
+            op, type(z), T
+        )  # Assuming `op` is a callable that takes `z` and `T` as arguments
     return R
+
 
 def init_value(op, arg) -> Any:
     """Returns the initial value for a reduction operation on the given type.
@@ -216,15 +284,21 @@ def init_value(op, arg) -> Any:
     Raises:
         NotImplementedError: If the initial value is not implemented for the given type and operation.
     """
-    return query_property(op, '__call__', 'init_value', arg)
+    return query_property(op, "__call__", "init_value", arg)
+
 
 for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
     (meth, rmeth) = _reflexive_operators[op]
-    register_property(op, '__call__', 'init_value', lambda op, arg: query_property(arg, meth, 'init_value', arg))
+    register_property(
+        op,
+        "__call__",
+        "init_value",
+        lambda op, arg: query_property(arg, meth, "init_value", arg),
+    )
 
 for T in StableNumber:
-    register_property(T, '__add__', 'init_value', lambda a, b: a(False))
-    register_property(T, '__mul__', 'init_value', lambda a, b: a(True))
-    register_property(T, '__and__', 'init_value', lambda a, b: a(True))
-    register_property(T, '__xor__', 'init_value', lambda a, b: a(False))
-    register_property(T, '__or__', 'init_value', lambda a, b: a(False))
+    register_property(T, "__add__", "init_value", lambda a, b: a(False))
+    register_property(T, "__mul__", "init_value", lambda a, b: a(True))
+    register_property(T, "__and__", "init_value", lambda a, b: a(True))
+    register_property(T, "__xor__", "init_value", lambda a, b: a(False))
+    register_property(T, "__or__", "init_value", lambda a, b: a(False))

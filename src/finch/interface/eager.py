@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from . import lazy
 from .lazy import LazyTensor, defer
 from .fuse import compute
@@ -6,68 +6,32 @@ from typing import Callable, Tuple
 
 
 class EagerTensor(ABC):
-    @abstractmethod
-    def shape(self):
-        """Return the shape of the tensor."""
-        pass
-
-    @abstractmethod
-    def dtype(self):
-        """Return the data type of the tensor."""
-        pass
-
-    @abstractmethod
-    def to_numpy(self):
-        """Convert the tensor to a NumPy array."""
-        pass
-
     def __add__(self, other):
-        if isinstance(other, LazyTensor):
-            return defer(self).__add__(other)
-        else:
-            return compute(defer(self).__add__(other))
+        return add(self, other)
+
+    def __radd__(self, other):
+        return add(other, self)
 
     def __sub__(self, other):
-        """Define subtraction for tensors."""
-        if isinstance(other, LazyTensor):
-            return defer(self).__sub__(other)
-        else:
-            return compute(defer(self).__sub__(other))
+        return subtract(self, other)
+
+    def __rsub__(self, other):
+        return subtract(other, self)
 
     def __mul__(self, other):
-        """Define multiplication for tensors."""
-        if isinstance(other, LazyTensor):
-            return defer(self).__mul__(other)
-        else:
-            return compute(defer(self).__mul__(other))
+        return multiply(self, other)
+
+    def __rmul__(self, other):
+        return multiply(other, self)
 
     def __abs__(self):
-        """Define absolute value for tensors."""
-        compute(defer(self).__abs__())
+        return abs(self)
 
     def __pos__(self):
-        """Define unary plus for tensors."""
-        compute(defer(self).__pos__())
+        return positive(self)
 
     def __neg__(self):
-        """Define negation for tensors."""
-        compute(defer(self).__neg__())
-
-    def __complex__(self):
-        """Convert the tensor to a complex number."""
-        complex(self.__getitem__())
-
-    def __int__(self):
-        """Convert the tensor to an integer."""
-        int(self.__getitem__())
-
-    def __float__(self):
-        """Convert the tensor to a float."""
-        float(self.__getitem__())
-
-    def __bool__(self):
-        """Convert the tensor to a boolean."""
-        bool(self.__getitem__())
+        return negative(self)
 
 
 def permute_dims(arg, /, axis: Tuple[int, ...]):
@@ -163,13 +127,13 @@ def abs(x):
 
 def positive(x):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.pos(x)
+        return lazy.positive(x)
     else:
-        return compute(lazy.pos(defer(x)))
+        return compute(lazy.positive(defer(x)))
 
 
 def negative(x):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.neg(x)
+        return lazy.negative(x)
     else:
-        return compute(lazy.neg(defer(x)))
+        return compute(lazy.negative(defer(x)))

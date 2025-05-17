@@ -6,7 +6,6 @@ from typing import Any, Tuple
 from itertools import accumulate
 from numpy.core.numeric import normalize_axis_tuple
 from ..algebra import return_type, fixpoint_type, init_value, element_type, fill_value
-from ..algebra import register_property
 
 from ..finch_logic import LogicNode
 from ..finch_logic import (
@@ -23,6 +22,11 @@ from ..finch_logic import (
 from ..symbolic import gensym
 
 
+def identify(data):
+    lhs = Alias(gensym("A"))
+    return Subquery(lhs, data)
+
+
 @dataclass
 class LazyTensor:
     data: LogicNode
@@ -33,6 +37,33 @@ class LazyTensor:
     @property
     def ndim(self) -> int:
         return len(self.shape)
+
+    def __add__(self, other):
+        return add(self, defer(other))
+
+    def __radd__(self, other):
+        return add(defer(other), self)
+
+    def __sub__(self, other):
+        return subtract(self, defer(other))
+
+    def __rsub__(self, other):
+        return subtract(defer(other), self)
+
+    def __mul__(self, other):
+        return multiply(self, defer(other))
+
+    def __rmul__(self, other):
+        return multiply(defer(other), self)
+
+    def __abs__(self):
+        return abs(self)
+
+    def __pos__(self):
+        return positive(self)
+
+    def __neg__(self):
+        return negative(self)
 
 
 def defer(arr) -> LazyTensor:
@@ -54,10 +85,6 @@ def defer(arr) -> LazyTensor:
     shape = tuple(arr.shape)
     tns = Subquery(name, Table(Immediate(arr), idxs))
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
-
-
-register_property(LazyTensor, "__self__", "fill_value", lambda x: x.fill_value)
-register_property(LazyTensor, "__self__", "element_type", lambda x: x.element_type)
 
 
 def permute_dims(arg: LazyTensor, /, axis: Tuple[int, ...]) -> LazyTensor:
@@ -84,11 +111,6 @@ def permute_dims(arg: LazyTensor, /, axis: Tuple[int, ...]) -> LazyTensor:
         arg.fill_value,
         arg.element_type,
     )
-
-
-def identify(data):
-    lhs = Alias(gensym("A"))
-    return Subquery(lhs, data)
 
 
 def expand_dims(
@@ -232,7 +254,7 @@ def reduce(
     return LazyTensor(identify(data), shape, init, dtype)
 
 
-def elementwise(f: Callable, *args) -> LazyTensor:
+def elementwise(f: Callable, *args: LazyTensor) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
 
@@ -255,20 +277,19 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    largs = list(map(defer, args))
-    ndim = builtins.max([arg.ndim for arg in largs])
+    ndim = builtins.max([arg.ndim for arg in args])
     shape = tuple(
         builtins.max(
             [
                 arg.shape[i - ndim + arg.ndim] if i - ndim + arg.ndim >= 0 else 1
-                for arg in largs
+                for arg in args
             ]
         )
         for i in range(ndim)
     )
     idxs = [Field(gensym("i")) for _ in range(ndim)]
     bargs = []
-    for arg in largs:
+    for arg in args:
         idims = []
         odims = []
         for i in range(ndim - arg.ndim, ndim):
@@ -281,8 +302,8 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
     data = MapJoin(Immediate(f), tuple(bargs))
-    new_fill_value = f(*[x.fill_value for x in largs])
-    new_element_type = return_type(f, *[x.element_type for x in largs])
+    new_fill_value = f(*[x.fill_value for x in args])
+    new_element_type = return_type(f, *[x.element_type for x in args])
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
 
 
@@ -333,5 +354,25 @@ def prod(arr: LazyTensor, dims) -> LazyTensor:
     return reduce(operator.mul, arr, dims, arr.fill_value)
 
 
+def add(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
+    return elementwise(operator.add, x1, x2)
+
+
+def subtract(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
+    return elementwise(operator.sub, x1, x2)
+
+
 def multiply(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
     return elementwise(operator.mul, x1, x2)
+
+
+def abs(x: LazyTensor) -> LazyTensor:
+    return elementwise(operator.abs, x)
+
+
+def positive(x: LazyTensor) -> LazyTensor:
+    return elementwise(operator.pos, x)
+
+
+def negative(x: LazyTensor) -> LazyTensor:
+    return elementwise(operator.neg, x)

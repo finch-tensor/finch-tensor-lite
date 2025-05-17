@@ -1,4 +1,4 @@
-from .lazy import lazy, LazyTensor
+from .lazy import defer, LazyTensor
 
 # from .tensor import *
 from .fuse import compute, fuse, fused
@@ -19,7 +19,7 @@ from .eager import (
 )
 
 __all__ = [
-    "lazy",
+    "defer",
     "compute",
     "fuse",
     "fused",
