@@ -54,9 +54,9 @@ class TestEagerTensor(finch.EagerTensor):
 )
 def test_elementwise_operations(a, b, op, finch_op, np_op):
     ea = TestEagerTensor(a)
-    la = finch.lazy(a)
+    la = finch.defer(a)
     eb = TestEagerTensor(b)
-    lb = finch.lazy(b)
+    lb = finch.defer(b)
 
     expected = np_op(a, b)
 
@@ -102,7 +102,7 @@ def test_elementwise_operations(a, b, op, finch_op, np_op):
 )
 def test_unary_operations(a, op, finch_op, np_op):
     ea = TestEagerTensor(a)
-    la = finch.lazy(a)
+    la = finch.defer(a)
 
     expected = np_op(a)
 

@@ -2,13 +2,26 @@ import operator
 import builtins
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Tuple, Iterable
+from typing import Any, Tuple
 from itertools import accumulate
-from numpy.core.numeric import normalize_axis_index, normalize_axis_tuple
-from ..algebra import *
+from numpy.core.numeric import normalize_axis_tuple
+from ..algebra import return_type, fixpoint_type, init_value, element_type, fill_value
+from ..algebra import register_property
 
-from ..finch_logic import *
+from ..finch_logic import LogicNode
+from ..finch_logic import (
+    Immediate,
+    Table,
+    Alias,
+    Field,
+    Subquery,
+    MapJoin,
+    Aggregate,
+    Reorder,
+    Relabel,
+)
 from ..symbolic import gensym
+
 
 @dataclass
 class LazyTensor:
@@ -21,17 +34,18 @@ class LazyTensor:
     def ndim(self) -> int:
         return len(self.shape)
 
-def lazy(arr) -> LazyTensor:
+
+def defer(arr) -> LazyTensor:
     """
-        - lazy(arr) -> LazyTensor:
-        Converts an array into a LazyTensor. If the input is already a LazyTensor, it is returned as-is.
-        Otherwise, it creates a LazyTensor representation of the input array.
+    - defer(arr) -> LazyTensor:
+    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is returned as-is.
+    Otherwise, it creates a LazyTensor representation of the input array.
 
-        Parameters:
-        - arr: The input array to be converted into a LazyTensor.
+    Parameters:
+    - arr: The input array to be converted into a LazyTensor.
 
-        Returns:
-        - LazyTensor: A lazy representation of the input array.
+    Returns:
+    - LazyTensor: A lazy representation of the input array.
     """
     if isinstance(arr, LazyTensor):
         return arr
@@ -41,37 +55,10 @@ def lazy(arr) -> LazyTensor:
     tns = Subquery(name, Table(Immediate(arr), idxs))
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
 
-def get_default_scheduler():
-    return FinchLogicInterpreter()
-
-def compute(arg, ctx=get_default_scheduler()):
-    """
-    - compute(arg, ctx=get_default_scheduler()):
-    Executes a fused operation represented by LazyTensors. This function evaluates the entire
-    operation in an optimized manner using the provided scheduler.
-
-    Parameters:
-    - arg: A lazy tensor or a tuple of lazy tensors representing the fused operation to be computed.
-    - ctx: The scheduler to use for computation. Defaults to the result of `get_default_scheduler()`.
-
-    Returns:
-    - A tensor or a list of tensors computed by the fused operation.
-    """
-    if isinstance(arg, tuple):
-        args = arg
-    else:
-        args = (arg,)
-    vars = tuple(Alias(gensym("A")) for _ in args)
-    bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
-    prgm = Plan(bodies + (Produces(vars),))
-    res = ctx(prgm)
-    if isinstance(arg, tuple):
-        return tuple(res)
-    else:
-        return res[0]
 
 register_property(LazyTensor, "__self__", "fill_value", lambda x: x.fill_value)
 register_property(LazyTensor, "__self__", "element_type", lambda x: x.element_type)
+
 
 def permute_dims(arg: LazyTensor, /, axis: Tuple[int, ...]) -> LazyTensor:
     """
@@ -98,9 +85,11 @@ def permute_dims(arg: LazyTensor, /, axis: Tuple[int, ...]) -> LazyTensor:
         arg.element_type,
     )
 
+
 def identify(data):
     lhs = Alias(gensym("A"))
     return Subquery(lhs, data)
+
 
 def expand_dims(
     x: LazyTensor,
@@ -143,10 +132,10 @@ def expand_dims(
     ]
     data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
     shape_2 = tuple(
-        1 if n in axis else x.shape[n - offset[n]]
-        for n in range(x.ndim + len(axis))
+        1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
     return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
+
 
 def squeeze(
     x: LazyTensor,
@@ -187,15 +176,17 @@ def squeeze(
     shape_2 = tuple(x.shape[n] for n in newaxis)
     return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
 
+
 def reduce(
     op: Callable,
     x: LazyTensor,
     /,
     *,
     axis: int | tuple[int, ...] | None = None,
-    dtype = None,
+    dtype=None,
     keepdims: bool = False,
-    init = None):
+    init=None,
+):
     """
     Reduces the input array ``x`` with the binary operator ``op``. Reduces along
     the specified `axis`, with an initial value `init`.
@@ -212,9 +203,9 @@ def reduce(
 
     keepdims: bool
         if ``True``, the reduced axes (dimensions) must be included in the result as singleton dimensions, and, accordingly, the result must be compatible with the input array (see :ref:`broadcasting`). Otherwise, if ``False``, the reduced axes (dimensions) must not be included in the result. Default: ``False``.
-    
+
     init: Optional
-        Initial value for the reduction. If ``None``, a suitable initial value will be calculated. The initial value must be compatible with the operation defined by ``op``. For example, if ``op`` is addition, the initial value should be zero; if ``op`` is multiplication, the initial value should be one.   
+        Initial value for the reduction. If ``None``, a suitable initial value will be calculated. The initial value must be compatible with the operation defined by ``op``. For example, if ``op`` is addition, the initial value should be zero; if ``op`` is multiplication, the initial value should be one.
 
     Returns
     -------
@@ -226,7 +217,12 @@ def reduce(
     axis = normalize_axis_tuple(axis, x.ndim)
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = [Field(gensym("i")) for _ in range(x.ndim)]
-    data = Aggregate(Immediate(op), Immediate(init), Relabel(x.data, fields), [fields[i] for i in axis])
+    data = Aggregate(
+        Immediate(op),
+        Immediate(init),
+        Relabel(x.data, fields),
+        [fields[i] for i in axis],
+    )
     if keepdims:
         keeps = [fields[i] if i in axis else Field(gensym("j")) for i in range(x.ndim)]
         data = Reorder(data, keeps)
@@ -234,6 +230,7 @@ def reduce(
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
     return LazyTensor(identify(data), shape, init, dtype)
+
 
 def elementwise(f: Callable, *args) -> LazyTensor:
     """
@@ -252,16 +249,21 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     - f: The function to apply elementwise.
     - *args: The tensors to apply the function to. These tensors should be
         compatible for broadcasting.
-    
+
     Returns:
     - LazyTensor: The tensor, `out`, of results from applying `f` elementwise to
-    the input tensors.  After broadcasting the arguments to the same shape, for 
+    the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    largs = list(map(lazy, args))
+    largs = list(map(defer, args))
     ndim = builtins.max([arg.ndim for arg in largs])
     shape = tuple(
-        builtins.max([arg.shape[i - ndim + arg.ndim] if i - ndim + arg.ndim >= 0 else 1 for arg in largs])
+        builtins.max(
+            [
+                arg.shape[i - ndim + arg.ndim] if i - ndim + arg.ndim >= 0 else 1
+                for arg in largs
+            ]
+        )
         for i in range(ndim)
     )
     idxs = [Field(gensym("i")) for _ in range(ndim)]
@@ -269,7 +271,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     for arg in largs:
         idims = []
         odims = []
-        for i in range(ndim - arg.ndim,ndim):
+        for i in range(ndim - arg.ndim, ndim):
             if arg.shape[i - ndim + arg.ndim] == shape[i]:
                 idims.append(idxs[i])
                 odims.append(idxs[i])
@@ -282,6 +284,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     new_fill_value = f(*[x.fill_value for x in largs])
     new_element_type = return_type(f, *[x.element_type for x in largs])
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
+
 
 def prod(arr: LazyTensor, dims) -> LazyTensor:
     """
@@ -328,6 +331,7 @@ def prod(arr: LazyTensor, dims) -> LazyTensor:
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
     return reduce(operator.mul, arr, dims, arr.fill_value)
+
 
 def multiply(x1: LazyTensor, x2: LazyTensor) -> LazyTensor:
     return elementwise(operator.mul, x1, x2)

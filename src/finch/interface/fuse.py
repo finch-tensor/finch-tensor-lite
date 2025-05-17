@@ -1,7 +1,13 @@
-from .lazy import *
-from ..finch_logic import *
+from .lazy import defer
+from ..finch_logic import FinchLogicInterpreter
+from ..finch_logic import (
+    Plan,
+    Query,
+    Produces,
+    Alias,
+)
 from ..symbolic import gensym
-from ..algebra import *
+
 """
 This module provides functionality for array fusion and computation using lazy evaluation.
 
@@ -20,8 +26,8 @@ Key Functions:
 Examples:
 ---------
 1. Basic Usage:
-    >>> C = lazy(A)
-    >>> D = lazy(B)
+    >>> C = defer(A)
+    >>> D = defer(B)
     >>> E = (C + D) / 2
     >>> compute(E)
 
@@ -49,6 +55,38 @@ Performance:
 - The optimizer can be set using the `ctx` argument in `compute`, or via `set_scheduler` or `with_scheduler`.
 """
 
+
+def get_default_scheduler():
+    return FinchLogicInterpreter()
+
+
+def compute(arg, ctx=get_default_scheduler()):
+    """
+    - compute(arg, ctx=get_default_scheduler()):
+    Executes a fused operation represented by LazyTensors. This function evaluates the entire
+    operation in an optimized manner using the provided scheduler.
+
+    Parameters:
+    - arg: A lazy tensor or a tuple of lazy tensors representing the fused operation to be computed.
+    - ctx: The scheduler to use for computation. Defaults to the result of `get_default_scheduler()`.
+
+    Returns:
+    - A tensor or a list of tensors computed by the fused operation.
+    """
+    if isinstance(arg, tuple):
+        args = arg
+    else:
+        args = (arg,)
+    vars = tuple(Alias(gensym("A")) for _ in args)
+    bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
+    prgm = Plan(bodies + (Produces(vars),))
+    res = ctx(prgm)
+    if isinstance(arg, tuple):
+        return tuple(res)
+    else:
+        return res[0]
+
+
 def fuse(f, *args, ctx=get_default_scheduler()):
     """
     - fuse(f, *args, ctx=get_default_scheduler()):
@@ -63,10 +101,11 @@ def fuse(f, *args, ctx=get_default_scheduler()):
         Returns:
         - The result of the fused operation, a tensor or tuple of tensors.
     """
-    args = [lazy(arg) for arg in args]
+    args = [defer(arg) for arg in args]
     if len(args) == 1:
         return f(args[0])
     return compute(f(*args), ctx=ctx)
+
 
 def fused(f, /, ctx=get_default_scheduler()):
     """
@@ -80,6 +119,8 @@ def fused(f, /, ctx=get_default_scheduler()):
     Returns:
     - A wrapper function that applies the fusion mechanism to the original function.
     """
+
     def wrapper(*args):
         return fuse(f, *args, ctx=ctx)
+
     return wrapper
