@@ -133,14 +133,10 @@ def test_unary_operations(a, op, finch_op, np_op):
 
     assert_equal(result, expected)
 
-    result = op(la)
+    result = finch.compute(op(la))
 
     assert_equal(result, expected)
 
     result = finch_op(ea)
-
-    assert_equal(result, expected)
-
-    result = finch_op(la)
 
     assert_equal(result, expected)

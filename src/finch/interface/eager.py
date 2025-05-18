@@ -3,6 +3,7 @@ from . import lazy
 from .lazy import LazyTensor, defer
 from .fuse import compute
 from typing import Callable, Tuple
+import numpy as np
 
 
 class EagerTensor(ABC):
@@ -32,6 +33,44 @@ class EagerTensor(ABC):
 
     def __neg__(self):
         return negative(self)
+
+    def __array_function__(self, func, types, args, kwargs):
+        """Override NumPy functions for EagerTensor using the __array_function__ protocol."""
+        # Map NumPy functions to EagerTensor methods or module-level functions
+        function_map = {
+            np.add: add,
+            np.subtract: subtract,
+            np.multiply: multiply,
+            np.abs: abs,
+            np.positive: positive,
+            np.negative: negative,
+            np.expand_dims: expand_dims,
+            np.squeeze: squeeze,
+            np.prod: prod,
+        }
+        if func in function_map:
+            return function_map[func](*args, **kwargs)
+        return NotImplemented
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        """Override NumPy ufuncs for EagerTensor using the __array_ufunc__ protocol."""
+        # Only handle the default '__call__' method
+        if method != '__call__':
+            return NotImplemented
+        # Map ufuncs to EagerTensor operations
+        ufunc_map = {
+            np.add: add,
+            np.subtract: subtract,
+            np.multiply: multiply,
+            np.negative: negative,
+            np.positive: positive,
+            np.absolute: abs,
+            np.abs: abs,
+            # Add more ufuncs as needed
+        }
+        if ufunc in ufunc_map:
+            return ufunc_map[ufunc](*inputs, **kwargs)
+        return NotImplemented
 
 
 def permute_dims(arg, /, axis: Tuple[int, ...]):
@@ -99,21 +138,21 @@ def prod(arr, /, axis=None):
 
 def add(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.add(x1, x2)
+        return lazy.add(defer(x1), defer(x2))
     else:
         return compute(lazy.add(defer(x1), defer(x2)))
 
 
 def subtract(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.subtract(x1, x2)
+        return lazy.subtract(defer(x1), defer(x2))
     else:
         return compute(lazy.subtract(defer(x1), defer(x2)))
 
 
 def multiply(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.multiply(x1, x2)
+        return lazy.multiply(defer(x1), defer(x2))
     else:
         return compute(lazy.multiply(defer(x1), defer(x2)))
 
