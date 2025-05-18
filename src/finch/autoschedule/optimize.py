@@ -1,4 +1,4 @@
-from typing import Any, Iterable
+from typing import Iterable
 
 from .compiler import LogicCompiler
 from ..finch_logic import (
