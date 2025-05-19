@@ -81,7 +81,6 @@ class CKernel:
     """
     A class to represent a C kernel.
     """
-
     def __init__(self, function_name, c_code):
         self.function_name = function_name
         self.c_code = c_code

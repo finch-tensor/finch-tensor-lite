@@ -1,7 +1,7 @@
 from pathlib import Path
 import os
 import json
-import toml
+import tomllib
 
 """
 Finch Configuration Module
@@ -81,12 +81,12 @@ def get_version():
     """
     Get the version of Finch.
     """
-    pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+    pyproject_path = Path(__file__).parent.parent.parent.parent / "pyproject.toml"
     if not pyproject_path.exists():
         raise FileNotFoundError("pyproject.toml not found.")
 
-    with pyproject_path.open("r") as f:
-        pyproject_data = toml.load(f)
+    with pyproject_path.open("rb") as f:
+        pyproject_data = tomllib.load(f)
 
     try:
         return pyproject_data["project"]["version"]
