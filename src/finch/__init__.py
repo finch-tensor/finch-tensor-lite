@@ -1,6 +1,7 @@
 from . import finch_logic
 from .interface import *
 from .algebra import fill_value, element_type
+from .codegen import *
 
 __all__ = [
     "defer",
