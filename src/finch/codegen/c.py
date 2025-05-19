@@ -8,6 +8,9 @@ from ..util.cache import file_cache
 from functools import lru_cache
 from operator import methodcaller
 from abc import ABC, abstractmethod
+from ...finch import finchassembly as asm
+from ..algebra import query_property, register_property
+
 
 
 @file_cache(ext=sysconfig.get_config_var("SHLIB_SUFFIX"), domain="c")
@@ -76,7 +79,6 @@ class CBufferFormat(ABC):
         """
         pass
 
-
 class CKernel:
     """
     A class to represent a C kernel.
@@ -91,3 +93,62 @@ class CKernel:
         Calls the C function with the given arguments.
         """
         return self.c_function(*map(methodcaller("to_c"), args))
+
+
+
+def to_c_literal(val):
+    if hasattr(val, "to_c_literal"):
+        return val.to_c_literal()
+    return query_property(val, "__self__", "to_c_literal")
+
+register_property(int, "__self__", "to_c_literal", lambda x: str(x))
+
+class CContext:
+    """
+    A class to represent a C context.
+    """
+    def __init__(self, level=0):
+        self.level = level
+    
+    def indent(self):
+        return CContext(self.level + 1)
+
+    def prefix(self):
+        return "    " * self.level
+    
+    def __call__(self, node):
+        match node:
+            case asm.Immediate(val):
+                return to_c_literal(val)
+            case asm.Variable(name):
+                return name
+            case asm.Call(name, args):
+                return f"{name}({', '.join(self(arg) for arg in args)})"
+            case asm.Assignment(var, value):
+                return f"""
+{self.prefix()}{var} = {self(value)};
+"""
+            case asm.ForLoop(var, start, end, body):
+                return f"""
+{self.prefix()}for (int {var} = {self(start)}; {var} < {self(end)}; {var}++) {{
+{self.indent()(body)}
+{self.prefix()}}}
+"""
+            case asm.Block(bodies):
+                return f"""
+{self.prefix()}{{ 
+{"\n".join(self.indent()(body) for body in bodies)}
+{self.prefix()}}}
+"""
+            case asm.Return(value):
+                return f"""
+{self.prefix()}return {self(value)};
+"""
+            case asm.Function(name, args, body):
+                return f"""
+{self.prefix()}void {name}({', '.join(self(arg) for arg in args)}) {{
+{self.indent()(body)}
+{self.prefix()}}}
+"""
+            case asm.Module(funcs, main):
+                return "\n".join(map(self, list(*funcs, main)))

@@ -371,3 +371,34 @@ class Block(AssemblyNode):
     @classmethod
     def make_term(cls, head, *val):
         return head(val)
+
+@dataclass(eq=True, frozen=True)
+class Module(AssemblyNode):
+    """
+    Represents a group of functions. This is the toplevel translation unit for FinchAssembly.
+
+    Attributes:
+        funcs: The functions defined in the module.
+        main: The main function of the module.
+    """
+
+    funcs: tuple[AssemblyNode, ...] = ()
+    main: AssemblyNode = None
+
+    @staticmethod
+    def is_expr():
+        """Determines if the node is an expression."""
+        return True
+
+    @staticmethod
+    def is_stateful():
+        """Determines if the node is stateful."""
+        return True
+
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.funcs, self.main]
+
+    @classmethod
+    def make_term(cls, head, *val):
+        return head(val[1:-2], val[-1])
