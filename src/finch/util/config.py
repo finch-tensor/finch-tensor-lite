@@ -2,6 +2,9 @@ from pathlib import Path
 import os
 import json
 import tomllib
+import sysconfig
+import sys
+import shutil
 
 """
 Finch Configuration Module
@@ -23,14 +26,37 @@ Use this module to easily manage and retrieve Finch-specific settings.
 
 depot_dir = Path(os.getenv("FINCH_PATH", Path.home() / ".finch"))
 
+is_windows = os.name == "nt"
+is_apple = sys.platform == "darwin"
+
 default_config = {
     "FINCH_CACHE_PATH": str(depot_dir / "cache"),
-    "FINCH_CACHE_SIZE": 10000,
+    "FINCH_CACHE_SIZE": 10_000,
     "FINCH_CACHE_ENABLE": True,
     "FINCH_TMP": str(depot_dir / "tmp"),
     "FINCH_LOG_PATH": str(depot_dir / "log.txt"),
-    "FINCH_CC": os.environ.get("CC", "cc"),
-    "FINCH_CFLAGS": ["-shared", "-fPIC", "-O3"],
+    "FINCH_CC": (
+        os.getenv("CC")
+        or sysconfig.get_config_var("CC")
+        or str(
+            shutil.which("gcc") 
+            or "cl"
+            if is_windows 
+            else "cc"
+        )
+    ),
+    "FINCH_CFLAGS": os.getenv(
+        "CFLAGS",
+        [
+            "-shared",
+            "-fPIC",
+            "-O3",
+        ],
+    ),
+    "FINCH_SHLIB_SUFFIX": (
+        sysconfig.get_config_var("SHLIB_SUFFIX")
+        or (".dll" if is_windows else ".so")
+    ),
 }
 
 depot_dir.mkdir(parents=True, exist_ok=True)

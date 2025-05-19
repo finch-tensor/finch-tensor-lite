@@ -9,10 +9,11 @@ from functools import lru_cache
 from operator import methodcaller
 from abc import ABC, abstractmethod
 from ..algebra import query_property, register_property
+import shutil
 
 
 
-@file_cache(ext=sysconfig.get_config_var("SHLIB_SUFFIX"), domain="c")
+@file_cache(ext=get_config("FINCH_SHLIB_SUFFIX"), domain="c")
 def create_shared_lib(filename, c_code, cc, cflags):
     """
     Compiles a C function into a shared library and returns the path.
@@ -32,7 +33,9 @@ def create_shared_lib(filename, c_code, cc, cflags):
         c_file_path.write_text(c_code)
 
         # Compile the C code into a shared library
-        compile_command = [cc, *cflags, "-o", str(shared_lib_path), str(c_file_path)]
+        compile_command = [str(cc), *cflags, "-o", str(shared_lib_path), str(c_file_path)]
+        if not shutil.which(cc):
+            raise FileNotFoundError(f"Compiler '{cc}' not found. Ensure it is installed and in your PATH.")
         subprocess.run(compile_command, check=True)
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
 
@@ -48,7 +51,7 @@ def get_c_function(function_name, c_code):
     )
 
     # Load the shared library using ctypes
-    shared_lib = ctypes.CDLL(shared_lib_path)
+    shared_lib = ctypes.CDLL(str(shared_lib_path))
 
     # Get the function from the shared library
     c_function = getattr(shared_lib, function_name)
