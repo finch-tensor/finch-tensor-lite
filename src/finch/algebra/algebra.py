@@ -1,6 +1,8 @@
 from typing import Any, Type
 from collections.abc import Hashable
 
+import math
+
 """
 Finch performs extensive rewriting and defining of functions.  The Finch
 compiler is designed to inspect objects and functions defined by other
@@ -158,6 +160,12 @@ def return_type(op: Any, *args: Any) -> Any:
 
 StableNumber = (np.number, bool, int, float, complex)
 
+def logical_and(a, b):
+    return operator.truth(a) and operator.truth(b)
+
+def logical_or(a, b):
+    return operator.truth(a) or operator.truth(b)
+
 _reflexive_operators = {
     operator.add: ("__add__", "__radd__"),
     operator.sub: ("__sub__", "__rsub__"),
@@ -173,6 +181,10 @@ _reflexive_operators = {
     operator.and_: ("__and__", "__rand__"),
     operator.xor: ("__xor__", "__rxor__"),
     operator.or_: ("__or__", "__ror__"),
+    logical_and: ("__any__", "__rany__"),
+    logical_or: ("__all__", "__rall__"),
+    min: ("__min__", "__rmin__"),
+    max: ("__max__", "__rmax__"),
 }
 
 
@@ -204,6 +216,8 @@ for op, (meth, rmeth) in _reflexive_operators.items():
         register_property(T, meth, "return_type", _return_type_reflexive(meth))
         register_property(T, rmeth, "return_type", _return_type_reflexive(rmeth))
 
+register_property(logical_or , '__call__', 'return_type', lambda op,a,b: bool)
+register_property(logical_and, '__call__', 'return_type', lambda op,a,b: bool)
 
 _unary_operators = {
     operator.abs: "__abs__",
@@ -302,3 +316,35 @@ for T in StableNumber:
     register_property(T, "__and__", "init_value", lambda a, b: a(True))
     register_property(T, "__xor__", "init_value", lambda a, b: a(False))
     register_property(T, "__or__", "init_value", lambda a, b: a(False))
+
+# TODO: Insert these init_value handlers into above loops
+def _any_init(arg):
+    return True
+
+def _all_init(arg):
+    return False
+
+def _min_init(arg):
+    dtype = np.dtype(arg) if isinstance(arg, np.ndarray) else np.dtype(arg)
+    if np.issubdtype(dtype, np.floating):
+        return math.inf
+    if np.issubdtype(dtype, np.integer):
+        return np.iinfo(dtype).max
+    if np.issubdtype(dtype, np.bool_):
+        return True
+    raise TypeError("Unsupported dtype for min")
+
+def _max_init(arg):
+    dtype = np.dtype(arg) if isinstance(arg, np.ndarray) else np.dtype(arg)
+    if np.issubdtype(dtype, np.floating):
+        return -math.inf
+    if np.issubdtype(dtype, np.integer):
+        return np.iinfo(dtype).min
+    if np.issubdtype(dtype, np.bool_):
+        return False
+    raise TypeError("Unsupported dtype for max")
+
+register_property(logical_and, '__call__', 'init_value', lambda op, arg: _any_init(arg))
+register_property(logical_or,  '__call__', 'init_value', lambda op, arg: _all_init(arg))
+register_property(min, '__call__', 'init_value', lambda op, arg: _min_init(element_type(arg)))
+register_property(max, '__call__', 'init_value', lambda op, arg: _max_init(element_type(arg)))

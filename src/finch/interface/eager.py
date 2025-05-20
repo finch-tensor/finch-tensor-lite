@@ -161,3 +161,113 @@ def negative(x):
         return lazy.negative(x)
     else:
         return compute(lazy.negative(x))
+
+def any(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.any(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.any(x, axis=axis, keepdims=keepdims))
+
+def all(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.all(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.all(x, axis=axis, keepdims=keepdims))
+
+def min(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.min(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.min(x, axis=axis, keepdims=keepdims))
+
+def max(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.max(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.max(x, axis=axis, keepdims=keepdims))
+
+def mean(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.mean(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+
+def var(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: int | float = 0.0,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.var(x, axis=axis, correction=correction, keepdims=keepdims)
+    else:
+        return compute(lazy.var(x, axis=axis, keepdims=keepdims))
+
+def std(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: int | float = 0.0,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.std(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
+
+def argmin(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.argmin(x, axis=axis, keepdims=keepdims))
+
+def argmax(
+    x: LazyTensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmax(x, axis=axis, keepdims=keepdims)
+    else:
+        return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
