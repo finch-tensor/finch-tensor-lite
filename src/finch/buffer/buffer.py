@@ -56,15 +56,25 @@ class AbstractBuffer(ABC):
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
-def numpy_buffer_resize_callback(arr_ptr, new_length):
+def numpy_buffer_resize_callback(buf_ptr, new_length):
     """
     A Python callback function that resizes the NumPy array.
     """
-    numpy_array = arr_ptr.contents.value
-    resized_array = np.resize(numpy_array, new_length)
-    arr_ptr.contents.value = resized_array
-    return ctypes.cast(resized_array.ctypes.data, ctypes.c_void_p)
+    buf = buf_ptr.contents.value
+    buf.arr = np.resize(buf.arr, new_length)
+    return ctypes.cast(buf.arr.ctypes.data, ctypes.c_void_p)
 
+
+class CNumpyBuffer(ctypes.Structure):
+    _fields_ = [
+        ("arr", ctypes.py_object),
+        ("data", ctypes.c_void_p),
+        ("length", ctypes.c_size_t),
+        (
+            "resize",
+            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t),
+        ),
+    ]
 
 class NumpyBuffer(AbstractBuffer, CArgument):
     """
@@ -90,31 +100,16 @@ class NumpyBuffer(AbstractBuffer, CArgument):
         """
         Serialize the NumPy buffer to a C-compatible structure.
         """
-        data = self.arr.ctypes.data_as(
-            ctypes.POINTER(np.ctypeslib.as_ctypes_type(self.arr.dtype))
-        )
+        data = ctypes.c_void_p(self.arr.ctypes.data)
         length = self.arr.size
         arr = ctypes.py_object(self.arr)
-        return CNumpyBuffer(arr, data, length, numpy_buffer_resize_callback)
+        return CNumpyBuffer(self, data, length, numpy_buffer_resize_callback)
 
     def deserialize_from_c(self, c_buffer):
         """
         Update this buffer based on how the C call modified the CNumpyBuffer structure.
         """
         self.arr = ctypes.cast(c_buffer.arr, ctypes.py_object).value
-
-
-# Dynamically define the CNumpyBuffer structure
-class CNumpyBuffer(ctypes.Structure):
-    _fields_ = [
-        ("arr", ctypes.py_object),
-        ("data", ctypes.c_void_p),
-        ("length", ctypes.c_size_t),
-        (
-            "resize",
-            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.py_object, ctypes.c_size_t),
-        ),
-    ]
 
 
 # class NumpyBufferFormat(AbstractBufferFormat, codegen.c.CBufferFormat):

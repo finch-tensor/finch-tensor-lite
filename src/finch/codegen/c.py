@@ -122,8 +122,7 @@ class CKernel:
         for argtype, arg in zip(self.argtypes, args, strict=False):
             if not isinstance(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        serial_args = list(map(methodcaller("serialize_to_c"), args))
-        res = self.c_function(*map(methodcaller("to_c"), args))
+        res = self.c_function(*map(methodcaller("serialize_to_c"), args))
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
         return res
