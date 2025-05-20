@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from ..codegen.c import CArgument
+import ctypes
 
 class AbstractBuffer(ABC):
     """
@@ -48,13 +49,14 @@ class AbstractBuffer(ABC):
 #        """
 #        pass
 
-class NumpyBuffer(AbstractBuffer):
+class NumpyBuffer(AbstractBuffer, CArgument):
     """
     A buffer that uses NumPy arrays to store data. This is a concrete implementation
     of the AbstractBuffer class.
     """
-    def __init__(self, np_array: np.ndarray):
-        self._buffer = np_array
+    def __init__(self, np_array: np.ndarray, own: bool = False):
+        self.data = np_array
+        self.own = own
 
 #    def get_format(self):
 #        """
@@ -64,13 +66,38 @@ class NumpyBuffer(AbstractBuffer):
 #        return NumpyBufferFormat(self._buffer.dtype)
 
     def load(self, index: int):
-        return self._buffer[index]
+        return self.buffer[index]
 
     def store(self, index: int, value):
-        self._buffer[index] = value
+        self.data[index] = value
 
     def resize(self, new_length: int):
-        self._buffer.resize(new_length)
+        self.data.resize(new_length)
+    
+    def serialize_to_c(self):
+        if not np_array.flags['C_CONTIGUOUS']:
+            raise ValueError("NumPy array must be C-contiguous")
+        data = np_array.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        length = np_array.size
+        return CNumpyBuffer(data, length, own)
+
+    def deserialize_from_c(self, obj):
+        """
+        Update this buffer based on how the C call modified `obj`, the result
+        of `serialize_to_c`.
+        """
+        pass
+
+class CNumpyBuffer(ctypes.Structure):
+    """
+    A ctypes structure that represents a NumPy-like buffer in C.
+    """
+    _fields_ = [
+    ("data", ctypes.POINTER(ctypes.c_double)),  # Pointer to the data
+    ("length", ctypes.c_size_t),                # Length of the buffer
+    ("own", ctypes.c_bool),                     # Whether the data is owned by this buffer
+    ]
+
 
 #class NumpyBufferFormat(AbstractBufferFormat, codegen.c.CBufferFormat):
 #    """
