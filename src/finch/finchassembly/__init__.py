@@ -1,5 +1,5 @@
-from .nodes import *
 from .interpreter import FinchAssemblyInterpreter
+from .nodes import *
 
 __all__ = [
     "FinchAssemblyInterpreter",

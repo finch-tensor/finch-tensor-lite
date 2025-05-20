@@ -1,5 +1,6 @@
 import finch
 
+
 def test_add_function():
     c_code = """
     #include <stdio.h>

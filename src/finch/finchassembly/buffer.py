@@ -82,7 +82,7 @@ class NumpyBufferFormat(AbstractBufferFormat, codegen.c.CBufferFormat):
 
     def make_buffer(self, length: int):
         return NumpyBuffer(np.zeros(length, dtype=self._dtype))
-    
+
     def c_load(self, name: str, index_name: str):
         return f"""
         {name}[index]

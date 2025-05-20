@@ -16,9 +16,8 @@ class FinchAssemblyInterpreter:
         head = node.head()
         if head == Literal:
             return node.val
-        elif head == Variable:
+        if head == Variable:
             if node in self.bindings:
                 return self.bindings[node]
-            else:
-                raise ValueError(f"undefined variable {node.val}")
+            raise ValueError(f"undefined variable {node.val}")
         # TODO not done

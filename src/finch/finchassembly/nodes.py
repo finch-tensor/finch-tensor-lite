@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any
+
 from ..symbolic import Term
 
 
@@ -50,6 +51,7 @@ class Immediate(AssemblyNode):
     Attributes:
         val: The literal value.
     """
+
     val: Any
 
     @staticmethod
@@ -62,6 +64,7 @@ class Immediate(AssemblyNode):
         """Determines if the node is stateful."""
         return False
 
+
 @dataclass(eq=True, frozen=True)
 class Variable(AssemblyNode):
     """
@@ -70,6 +73,7 @@ class Variable(AssemblyNode):
     Attributes:
         name: The name of the variable.
     """
+
     name: str
 
     @staticmethod
@@ -125,6 +129,7 @@ class Call(AssemblyNode):
         op: The function to call.
         args: The arguments to call on the function.
     """
+
     op: AssemblyNode
     args: tuple[AssemblyNode, ...]
 
@@ -163,7 +168,6 @@ class Function(AssemblyNode):
     args: tuple[AssemblyNode, ...]
     body: AssemblyNode
 
-
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
@@ -181,6 +185,7 @@ class Function(AssemblyNode):
     def make_term(self, head, *args):
         """Creates a term with the given head and arguments."""
         return head(*args[1], args[2:-2], args[-1])
+
 
 @dataclass(eq=True, frozen=True)
 class ForLoop(AssemblyNode):
@@ -217,6 +222,7 @@ class ForLoop(AssemblyNode):
     def make_term(cls, head, *args):
         return head(*args)
 
+
 @dataclass(eq=True, frozen=True)
 class BufferLoop(AssemblyNode):
     """
@@ -249,6 +255,7 @@ class BufferLoop(AssemblyNode):
     @classmethod
     def make_term(cls, head, *args):
         return head(*args)
+
 
 @dataclass(eq=True, frozen=True)
 class WhileLoop(AssemblyNode):
@@ -371,6 +378,7 @@ class Block(AssemblyNode):
     @classmethod
     def make_term(cls, head, *val):
         return head(val)
+
 
 @dataclass(eq=True, frozen=True)
 class Module(AssemblyNode):

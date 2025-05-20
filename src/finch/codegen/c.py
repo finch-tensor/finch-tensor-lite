@@ -61,33 +61,32 @@ def get_c_function(function_name, c_code):
     # Get the function from the shared library
     return getattr(shared_lib, function_name)
 
+
 class CBufferFormat(ABC):
     @abstractmethod
     def c_load(self, name, index_name, index_type):
         """
         Return C code which loads a named buffer at the given index.
         """
-        pass
 
     @abstractmethod
     def c_store(self, name, value_name, value_type, index_name, index_type):
         """
         Return C code which stores a named buffer to the given index.
         """
-        pass
 
     @abstractmethod
     def c_resize(self, name, new_length_name, new_length_type):
         """
         Return C code which resizes a named buffer to the given length.
         """
-        pass
 
 
 class CKernel:
     """
     A class to represent a C kernel.
     """
+
     def __init__(self, function_name, c_code):
         self.function_name = function_name
         self.c_code = c_code
@@ -100,27 +99,29 @@ class CKernel:
         return self.c_function(*map(methodcaller("to_c"), args))
 
 
-
 def to_c_literal(val):
     if hasattr(val, "to_c_literal"):
         return val.to_c_literal()
     return query_property(val, "__self__", "to_c_literal")
 
+
 register_property(int, "__self__", "to_c_literal", lambda x: str(x))
+
 
 class CContext:
     """
     A class to represent a C context.
     """
+
     def __init__(self, level=0):
         self.level = level
-    
+
     def indent(self):
         return CContext(self.level + 1)
 
     def prefix(self):
         return "    " * self.level
-    
+
     def __call__(self, node):
         match node:
             case asm.Immediate(val):
@@ -141,7 +142,7 @@ class CContext:
 """
             case asm.Block(bodies):
                 return f"""
-{self.prefix()}{{ 
+{self.prefix()}{{
 {"\n".join(self.indent()(body) for body in bodies)}
 {self.prefix()}}}
 """
@@ -151,7 +152,7 @@ class CContext:
 """
             case asm.Function(name, args, body):
                 return f"""
-{self.prefix()}void {name}({', '.join(self(arg) for arg in args)}) {{
+{self.prefix()}void {name}({", ".join(self(arg) for arg in args)}) {{
 {self.indent()(body)}
 {self.prefix()}}}
 """
