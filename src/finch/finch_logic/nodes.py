@@ -1,6 +1,8 @@
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
+
 from ..symbolic import Term
 
 
@@ -160,8 +162,8 @@ class Alias(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Table(LogicNode):
     """
-    Represents a logical AST expression for a tensor object `tns`, indexed by fields `idxs...`.
-    A table is a tensor with named dimensions.
+    Represents a logical AST expression for a tensor object `tns`, indexed by fields
+    `idxs...`. A table is a tensor with named dimensions.
 
     Attributes:
         tns: The tensor object.
@@ -229,7 +231,7 @@ class MapJoin(LogicNode):
         # (mtsokol) I'm not sure if this comment still applies - the order is preserved.
         # TODO: this is wrong here: the overall order should at least be concordant with
         # the args if the args are concordant
-        fields = [f for fs in map(lambda x: x.get_fields(), self.args) for f in fs]
+        fields = [f for fs in (x.get_fields() for x in self.args) for f in fs]
         return list(dict.fromkeys(fields))
 
     @classmethod
@@ -281,9 +283,9 @@ class Aggregate(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Reorder(LogicNode):
     """
-    Represents a logical AST statement that reorders the dimensions of `arg` to be `idxs...`.
-    Dimensions known to be length 1 may be dropped. Dimensions that do not exist in
-    `arg` may be added.
+    Represents a logical AST statement that reorders the dimensions of `arg` to be
+    `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not
+    exist in `arg` may be added.
 
     Attributes:
         arg: The argument to reorder.
@@ -319,7 +321,8 @@ class Reorder(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Relabel(LogicNode):
     """
-    Represents a logical AST statement that relabels the dimensions of `arg` to be `idxs...`.
+    Represents a logical AST statement that relabels the dimensions of `arg` to be
+    `idxs...`.
 
     Attributes:
         arg: The argument to relabel.
@@ -383,8 +386,8 @@ class Reformat(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Subquery(LogicNode):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`,
-    and returns `rhs`.
+    Represents a logical AST statement that evaluates `rhs`, binding the result to
+    `lhs`, and returns `rhs`.
 
     Attributes:
         lhs: The left-hand side of the binding.
@@ -416,7 +419,8 @@ class Subquery(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Query(LogicNode):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`.
+    Represents a logical AST statement that evaluates `rhs`, binding the result to
+    `lhs`.
 
     Attributes:
         lhs: The left-hand side of the binding.
@@ -475,8 +479,8 @@ class Produces(LogicNode):
 @dataclass(eq=True, frozen=True)
 class Plan(LogicNode):
     """
-    Represents a logical AST statement that executes a sequence of statements `bodies...`.
-    Returns the last statement.
+    Represents a logical AST statement that executes a sequence of statements
+    `bodies...`. Returns the last statement.
 
     Attributes:
         bodies: The sequence of statements to execute.

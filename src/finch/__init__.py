@@ -1,6 +1,25 @@
-from . import finch_logic
-from .interface import *
-from .algebra import fill_value, element_type
+from .algebra import element_type, fill_value
+from .interface import (
+    AbstractEagerTensor,
+    LazyTensor,
+    abs,
+    add,
+    compute,
+    defer,
+    elementwise,
+    expand_dims,
+    fuse,
+    fused,
+    multiply,
+    negative,
+    permute_dims,
+    positive,
+    prod,
+    reduce,
+    squeeze,
+    subtract,
+    sum,
+)
 
 __all__ = [
     "defer",

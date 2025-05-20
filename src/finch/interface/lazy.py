@@ -1,28 +1,28 @@
-import operator
 import builtins
+import operator
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Tuple
 from itertools import accumulate
-from numpy.core.numeric import normalize_axis_tuple
-from ..algebra import return_type, fixpoint_type, init_value, element_type, fill_value
-import numpy as np
-from .overrides import AbstractOverrideTensor
-import sys
+from typing import Any
 
-from ..finch_logic import LogicNode
+from numpy.core.numeric import normalize_axis_tuple
+
+from ..algebra import element_type, fill_value, fixpoint_type, init_value, return_type
 from ..finch_logic import (
-    Immediate,
-    Table,
+    Aggregate,
     Alias,
     Field,
-    Subquery,
+    Immediate,
+    LogicNode,
     MapJoin,
-    Aggregate,
-    Reorder,
     Relabel,
+    Reorder,
+    Subquery,
+    Table,
 )
 from ..symbolic import gensym
+from .overrides import AbstractOverrideTensor
 
 
 def identify(data):
@@ -33,7 +33,7 @@ def identify(data):
 @dataclass
 class LazyTensor(AbstractOverrideTensor):
     data: LogicNode
-    shape: Tuple
+    shape: tuple
     fill_value: Any
     element_type: Any
 
@@ -71,10 +71,12 @@ class LazyTensor(AbstractOverrideTensor):
     def __neg__(self):
         return negative(self)
 
+
 def defer(arr) -> LazyTensor:
     """
     - defer(arr) -> LazyTensor:
-    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is returned as-is.
+    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
+    returned as-is.
     Otherwise, it creates a LazyTensor representation of the input array.
 
     Parameters:
@@ -92,7 +94,7 @@ def defer(arr) -> LazyTensor:
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
 
 
-def permute_dims(arg, /, axis: Tuple[int, ...]) -> LazyTensor:
+def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -101,12 +103,14 @@ def permute_dims(arg, /, axis: Tuple[int, ...]) -> LazyTensor:
     x: array
         input array.
     axes: Tuple[int, ...]
-        tuple containing a permutation of ``(0, 1, ..., N-1)`` where ``N`` is the number of axes (dimensions) of ``x``.
+        tuple containing a permutation of ``(0, 1, ..., N-1)`` where ``N`` is the number
+        of axes (dimensions) of ``x``.
 
     Returns
     -------
     out: array
-        an array containing the axes permutation. The returned array must have the same data type as ``x``.
+        an array containing the axes permutation. The returned array must have the same
+        data type as ``x``.
     """
     arg = defer(arg)
     axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
@@ -125,14 +129,21 @@ def expand_dims(
     axis: int | tuple[int, ...] = 0,
 ) -> LazyTensor:
     """
-    Expands the shape of an array by inserting a new axis (dimension) of size one at the position specified by ``axis``.
+    Expands the shape of an array by inserting a new axis (dimension) of size one at the
+    position specified by ``axis``.
 
     Parameters
     ----------
     x: array
         input array.
     axis: int
-        axis position (zero-based). If ``x`` has rank (i.e, number of dimensions) ``N``, a valid ``axis`` must reside on the closed-interval ``[-N-1, N]``. If provided a negative ``axis``, the axis position at which to insert a singleton dimension must be computed as ``N + axis + 1``. Hence, if provided ``-1``, the resolved axis position must be ``N`` (i.e., a singleton dimension must be appended to the input array ``x``). If provided ``-N-1``, the resolved axis position must be ``0`` (i.e., a singleton dimension must be prepended to the input array ``x``).
+        axis position (zero-based). If ``x`` has rank (i.e, number of dimensions) ``N``,
+        a valid ``axis`` must reside on the closed-interval ``[-N-1, N]``. If provided a
+        negative ``axis``, the axis position at which to insert a singleton dimension
+        must be computed as ``N + axis + 1``. Hence, if provided ``-1``, the resolved
+        axis position must be ``N`` (i.e., a singleton dimension must be appended to the
+        input array ``x``). If provided ``-N-1``, the resolved axis position must be
+        ``0`` (i.e., a singleton dimension must be prepended to the input array ``x``).
 
     Returns
     -------
@@ -226,21 +237,33 @@ def reduce(
     x: array
         input array. Should have a numeric data type.
     axis: Optional[Union[int, Tuple[int, ...]]]
-        axis or axes along which reduction must be computed. By default, the reduction must be computed over the entire array. If a tuple of integers, reductions must be computed over multiple axes. Default: ``None``.
+        axis or axes along which reduction must be computed. By default, the reduction
+        must be computed over the entire array. If a tuple of integers, reductions must
+        be computed over multiple axes. Default: ``None``.
 
     dtype: Optional[dtype]
-        data type of the returned array. If ``None``, a suitable data type will be calculated.
+        data type of the returned array. If ``None``, a suitable data type will be
+        calculated.
 
     keepdims: bool
-        if ``True``, the reduced axes (dimensions) must be included in the result as singleton dimensions, and, accordingly, the result must be compatible with the input array (see :ref:`broadcasting`). Otherwise, if ``False``, the reduced axes (dimensions) must not be included in the result. Default: ``False``.
+        if ``True``, the reduced axes (dimensions) must be included in the result as
+        singleton dimensions, and, accordingly, the result must be compatible with the
+        input array (see :ref:`broadcasting`). Otherwise, if ``False``, the reduced axes
+        (dimensions) must not be included in the result. Default: ``False``.
 
     init: Optional
-        Initial value for the reduction. If ``None``, a suitable initial value will be calculated. The initial value must be compatible with the operation defined by ``op``. For example, if ``op`` is addition, the initial value should be zero; if ``op`` is multiplication, the initial value should be one.
+        Initial value for the reduction. If ``None``, a suitable initial value will be
+        calculated. The initial value must be compatible with the operation defined by
+        ``op``. For example, if ``op`` is addition, the initial value should be zero; if
+        ``op`` is multiplication, the initial value should be one.
 
     Returns
     -------
     out: array
-        If the reduction was computed over the entire array, a zero-dimensional array containing the reduction; otherwise, a non-zero-dimensional array containing the reduction. The returned array must have a data type as described by the ``dtype`` parameter above.
+        If the reduction was computed over the entire array, a zero-dimensional array
+        containing the reduction; otherwise, a non-zero-dimensional array containing the
+        reduction. The returned array must have a data type as described by the
+        ``dtype`` parameter above.
     """
     x = defer(x)
     if init is None:

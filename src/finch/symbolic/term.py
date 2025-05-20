@@ -1,13 +1,16 @@
-from typing import Any, Iterator
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from typing import Any
 
 """
-This module contains definitions for common functions that are useful for symbolic expression manipulation.
-Its purpose is to provide a shared interface between various symbolic programming in Finch.
+This module contains definitions for common functions that are useful for symbolic
+expression manipulation. Its purpose is to provide a shared interface between various
+symbolic programming in Finch.
 
 Classes:
-    Term (ABC): An abstract base class representing a symbolic term. It provides methods to access the head
-    of the term, its children, and to construct a new term with a similar structure.
+    Term (ABC): An abstract base class representing a symbolic term. It provides methods
+    to access the head of the term, its children, and to construct a new term with a
+    similar structure.
 """
 
 
@@ -18,24 +21,25 @@ class Term(ABC):
     @abstractmethod
     def head(self) -> Any:
         """Return the head type of the S-expression."""
-        pass
 
+    @abstractmethod
     def children(self) -> list["Term"]:
         """Return the children (AKA tail) of the S-expression."""
-        pass
 
     @abstractmethod
     def is_expr(self) -> bool:
-        """Return True if the term is an expression tree, False otherwise. Must implement children() if True."""
-        pass
+        """
+        Return True if the term is an expression tree, False otherwise. Must implement
+        children() if True.
+        """
 
     @abstractmethod
     def make_term(self, head: Any, children: list["Term"]) -> "Term":
         """
-        Construct a new term in the same family of terms with the given head type and children.
-        This function should satisfy `x == x.make_term(x.head(), *x.children())`
+        Construct a new term in the same family of terms with the given head type and
+        children. This function should satisfy
+        `x == x.make_term(x.head(), *x.children())`
         """
-        pass
 
     def __hash__(self) -> int:
         """Return the hash value of the term."""

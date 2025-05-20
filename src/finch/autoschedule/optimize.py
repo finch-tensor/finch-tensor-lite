@@ -1,6 +1,5 @@
-from typing import Any, Iterable
+from collections.abc import Iterable
 
-from .compiler import LogicCompiler
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -13,13 +12,13 @@ from ..finch_logic import (
     Subquery,
 )
 from ..symbolic import Chain, PostOrderDFS, PostWalk, PreWalk, Rewrite
+from .compiler import LogicCompiler
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
     # ...
     prgm = lift_subqueries(prgm)
-    prgm = propagate_map_queries(prgm)
-    return prgm
+    return propagate_map_queries(prgm)
 
 
 def _lift_subqueries_expr(node: LogicNode, bindings: dict) -> LogicNode:
@@ -32,7 +31,7 @@ def _lift_subqueries_expr(node: LogicNode, bindings: dict) -> LogicNode:
         case any if any.is_expr():
             return any.make_term(
                 any.head(),
-                *map(lambda x: _lift_subqueries_expr(x, bindings), any.children()),
+                *(_lift_subqueries_expr(x, bindings) for x in any.children()),
             )
         case _:
             return node

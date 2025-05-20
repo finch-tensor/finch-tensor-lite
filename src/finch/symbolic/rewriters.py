@@ -21,6 +21,7 @@ Classes:
 """
 
 from collections.abc import Callable, Iterable
+
 from .term import Term
 
 RwCallable = Callable[[Term], Term | None]
@@ -148,8 +149,7 @@ class Fixpoint:
                 x = y
                 y = self.rw(x)
             return x
-        else:
-            return None
+        return None
 
 
 class Prestep:

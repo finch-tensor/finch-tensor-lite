@@ -1,8 +1,24 @@
+from operator import add, mul
+
+import pytest
+
 import numpy as np
 from numpy.testing import assert_equal
-import pytest
-from finch.finch_logic import *
-from operator import add, mul
+
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    FinchLogicInterpreter,
+    Immediate,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Reorder,
+    Table,
+)
+
 
 @pytest.mark.parametrize(
     "a, b",
@@ -16,16 +32,23 @@ def test_matrix_multiplication(a, b):
     j = Field("j")
     k = Field("k")
 
-    p = Plan([
-        Query(Alias("A"), Table(Immediate(a), (i, k))),
-        Query(Alias("B"), Table(Immediate(b), (k, j))),
-        Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
-        Query(Alias("C"), Reorder(Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,)), (i, j))),
-        Produces((Alias("C"),)),
-    ])
+    p = Plan(
+        [
+            Query(Alias("A"), Table(Immediate(a), (i, k))),
+            Query(Alias("B"), Table(Immediate(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
+            Query(
+                Alias("C"),
+                Reorder(
+                    Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,)), (i, j)
+                ),
+            ),
+            Produces((Alias("C"),)),
+        ]
+    )
 
     result = FinchLogicInterpreter()(p)[0]
 
     expected = np.matmul(a, b)
-    
+
     assert_equal(result, expected)

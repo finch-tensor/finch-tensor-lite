@@ -1,23 +1,26 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import product
-from typing import Iterable, Any
+from typing import Any
+
 import numpy as np
-from ..finch_logic import (
-    Immediate,
+
+from ..algebra import element_type, fill_value, fixpoint_type, return_type
+from .nodes import (
+    Aggregate,
+    Alias,
     Deferred,
     Field,
-    Alias,
-    Table,
+    Immediate,
     MapJoin,
-    Aggregate,
-    Query,
     Plan,
     Produces,
-    Subquery,
+    Query,
     Relabel,
     Reorder,
+    Subquery,
+    Table,
 )
-from ..algebra import return_type, fill_value, element_type, fixpoint_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -44,22 +47,22 @@ class FinchLogicInterpreter:
         head = node.head()
         if head == Immediate:
             return node.val
-        elif head == Deferred:
+        if head == Deferred:
             raise ValueError(
-                "The interpreter cannot evaluate a deferred node, a compiler might generate code for it"
+                "The interpreter cannot evaluate a deferred node, a compiler might "
+                "generate code for it"
             )
-        elif head == Field:
+        if head == Field:
             raise ValueError("Fields cannot be used in expressions")
-        elif head == Alias:
+        if head == Alias:
             if node in self.bindings:
                 return self.bindings[node]
-            else:
-                raise ValueError(f"undefined tensor alias {node.val}")
-        elif head == Table:
+            raise ValueError(f"undefined tensor alias {node.val}")
+        if head == Table:
             if node.tns.head() != Immediate:
                 raise ValueError("The table data must be Immediate")
             return TableValue(node.tns.val, node.idxs)
-        elif head == MapJoin:
+        if head == MapJoin:
             if node.op.head() != Immediate:
                 raise ValueError("The mapjoin operator must be Immediate")
             op = node.op.val
@@ -67,7 +70,7 @@ class FinchLogicInterpreter:
             dims = {}
             idxs = []
             for arg in args:
-                for idx, dim in zip(arg.idxs, arg.tns.shape):
+                for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx in dims:
                         if dims[idx] != dim:
                             raise ValueError("Dimensions mismatched in map")
@@ -80,11 +83,11 @@ class FinchLogicInterpreter:
                 tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
             )
             for crds in product(*[range(dims[idx]) for idx in idxs]):
-                idx_crds = {idx: crd for (idx, crd) in zip(idxs, crds)}
+                idx_crds = dict(zip(idxs, crds, strict=True))
                 vals = [arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args]
                 result[*crds] = op(*vals)
             return TableValue(result, idxs)
-        elif head == Aggregate:
+        if head == Aggregate:
             if node.op.head() != Immediate:
                 raise ValueError("The aggregate operator must be Immediate")
             if node.init.head() != Immediate:
@@ -95,48 +98,49 @@ class FinchLogicInterpreter:
             dtype = fixpoint_type(op, init, element_type(arg.tns))
             new_shape = [
                 dim
-                for (dim, idx) in zip(arg.tns.shape, arg.idxs)
+                for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
                 if idx not in node.idxs
             ]
             result = self.make_tensor(new_shape, init, dtype=dtype)
             for crds in product(*[range(dim) for dim in arg.tns.shape]):
                 out_crds = [
-                    crd for (crd, idx) in zip(crds, arg.idxs) if idx not in node.idxs
+                    crd
+                    for (crd, idx) in zip(crds, arg.idxs, strict=True)
+                    if idx not in node.idxs
                 ]
                 result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
             return TableValue(result, [idx for idx in arg.idxs if idx not in node.idxs])
-        elif head == Relabel:
+        if head == Relabel:
             arg = self(node.arg)
             if len(arg.idxs) != len(node.idxs):
                 raise ValueError("The number of indices in the relabel must match")
             return TableValue(arg.tns, node.idxs)
-        elif head == Reorder:
+        if head == Reorder:
             arg = self(node.arg)
-            for idx, dim in zip(arg.idxs, arg.tns.shape):
+            for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                 if idx not in node.idxs and dim != 1:
                     raise ValueError("Trying to drop a dimension that is not 1")
-            arg_dims = {idx: dim for idx, dim in zip(arg.idxs, arg.tns.shape)}
+            arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
             dims = [arg_dims.get(idx, 1) for idx in node.idxs]
             result = self.make_tensor(dims, fill_value(arg.tns), dtype=arg.tns.dtype)
             for crds in product(*[range(dim) for dim in dims]):
-                node_crds = {idx: crd for (idx, crd) in zip(node.idxs, crds)}
+                node_crds = dict(zip(node.idxs, crds, strict=True))
                 in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
                 result[*crds] = arg.tns[*in_crds]
             return TableValue(result, node.idxs)
-        elif head == Query:
+        if head == Query:
             rhs = self(node.rhs)
             self.bindings[node.lhs] = rhs
             return (rhs,)
-        elif head == Plan:
+        if head == Plan:
             res = ()
             for body in node.bodies:
                 res = self(body)
             return res
-        elif head == Produces:
+        if head == Produces:
             return tuple(self(arg).tns for arg in node.args)
-        elif head == Subquery:
+        if head == Subquery:
             if node.lhs not in self.bindings:
                 self.bindings[node.lhs] = self(node.arg)
             return self.bindings[node.lhs]
-        else:
-            raise ValueError(f"Unknown expression type: {head}")
+        raise ValueError(f"Unknown expression type: {head}")

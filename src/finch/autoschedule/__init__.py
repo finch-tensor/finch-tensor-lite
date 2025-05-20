@@ -14,13 +14,13 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
+from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .optimize import (
+    lift_subqueries,
     optimize,
     propagate_fields,
     propagate_map_queries,
-    lift_subqueries,
 )
-from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 
 __all__ = [
     "Aggregate",

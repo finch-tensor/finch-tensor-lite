@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 
+from ..algebra import StableNumber
+
+
 class AbstractTensor(ABC):
     @abstractmethod
     def shape(self):
@@ -21,10 +24,10 @@ class AbstractTensor(ABC):
     def __mul__(self, other):
         pass
 
+
 def fill_value(arg):
-    if isinstance(arg, LazyTensor):
+    if isinstance(arg, AbstractTensor):
         return arg.fill_value
-    elif isinstance(arg, (int, float)):
+    if isinstance(arg, StableNumber):
         return arg
-    else:
-        raise ValueError("Unsupported type for fill_value")
+    raise ValueError("Unsupported type for fill_value")
