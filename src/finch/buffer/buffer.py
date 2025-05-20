@@ -72,9 +72,12 @@ class CNumpyBuffer(ctypes.Structure):
         ("length", ctypes.c_size_t),
         (
             "resize",
-            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t),
+            ctypes.CFUNCTYPE(
+                ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t
+            ),
         ),
     ]
+
 
 class NumpyBuffer(AbstractBuffer, CArgument):
     """
@@ -102,14 +105,12 @@ class NumpyBuffer(AbstractBuffer, CArgument):
         """
         data = ctypes.c_void_p(self.arr.ctypes.data)
         length = self.arr.size
-        arr = ctypes.py_object(self.arr)
         return CNumpyBuffer(self, data, length, numpy_buffer_resize_callback)
 
     def deserialize_from_c(self, c_buffer):
         """
         Update this buffer based on how the C call modified the CNumpyBuffer structure.
         """
-        pass
 
 
 # class NumpyBufferFormat(AbstractBufferFormat, codegen.c.CBufferFormat):

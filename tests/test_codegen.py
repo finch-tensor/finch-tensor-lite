@@ -19,7 +19,6 @@ def test_add_function():
 
 
 def test_buffer_function():
-
     c_code = """
     #include <stdio.h>
     #include <stdlib.h>
@@ -60,5 +59,6 @@ def test_buffer_function():
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
+
 
 test_buffer_function()
