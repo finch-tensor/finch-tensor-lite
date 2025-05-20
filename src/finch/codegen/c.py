@@ -2,6 +2,7 @@ import ctypes
 import shutil
 import subprocess
 import tempfile
+from abc import ABC, abstractmethod
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
@@ -62,18 +63,67 @@ def get_c_function(function_name, c_code):
     return getattr(shared_lib, function_name)
 
 
+class CArgument(ABC):
+    @abstractmethod
+    def serialize_to_c(self, name):
+        """
+        Return a ctypes-compatible struct to be used in place of this argument
+        for the c backend.
+        """
+
+    @abstractmethod
+    def deserialize_from_c(self, obj):
+        """
+        Update this argument based on how the c call modified `obj`, the result
+        of `serialize_to_c`.
+        """
+
+
+# class CBufferFormat(CArgument, ABC):
+#    @abstractmethod
+#    def c_load(self, name, index_name, index_type):
+#        """
+#        Return C code which loads a named buffer at the given index.
+#        """
+#
+#    @abstractmethod
+#    def c_store(self, name, value_name, value_type, index_name, index_type):
+#        """
+#        Return C code which stores a named buffer to the given index.
+#        """
+#
+#    @abstractmethod
+#    def c_resize(self, name, new_length_name, new_length_type):
+#        """
+#        Return C code which resizes a named buffer to the given length.
+#        """
+#
+
+
 class CKernel:
     """
     A class to represent a C kernel.
     """
 
-    def __init__(self, function_name, c_code):
+    def __init__(self, function_name, c_code, argtypes):
         self.function_name = function_name
         self.c_code = c_code
         self.c_function = get_c_function(function_name, c_code)
+        self.argtypes = argtypes
 
     def __call__(self, *args):
         """
         Calls the C function with the given arguments.
         """
-        return self.c_function(*map(methodcaller("to_c"), args))
+        if len(args) != len(self.argtypes):
+            raise ValueError(
+                f"Expected {len(self.argtypes)} arguments, got {len(args)}"
+            )
+        for argtype, arg in zip(self.argtypes, args, strict=False):
+            if not isinstance(arg, argtype):
+                raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
+        serial_args = list(map(methodcaller("serialize_to_c"), args))
+        res = self.c_function(*map(methodcaller("to_c"), args))
+        for arg, serial_arg in zip(args, serial_args, strict=False):
+            arg.deserialize_from_c(serial_arg)
+        return res
