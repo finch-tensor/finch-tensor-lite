@@ -1,10 +1,10 @@
-from pathlib import Path
-import os
 import json
-import tomllib
-import sysconfig
-import sys
+import os
 import shutil
+import sys
+import sysconfig
+import tomllib
+from pathlib import Path
 
 """
 Finch Configuration Module
@@ -38,12 +38,7 @@ default_config = {
     "FINCH_CC": (
         os.getenv("CC")
         or sysconfig.get_config_var("CC")
-        or str(
-            shutil.which("gcc") 
-            or "cl"
-            if is_windows 
-            else "cc"
-        )
+        or str(shutil.which("gcc") or "cl" if is_windows else "cc")
     ),
     "FINCH_CFLAGS": os.getenv(
         "CFLAGS",
@@ -54,8 +49,7 @@ default_config = {
         ],
     ),
     "FINCH_SHLIB_SUFFIX": (
-        sysconfig.get_config_var("SHLIB_SUFFIX")
-        or (".dll" if is_windows else ".so")
+        sysconfig.get_config_var("SHLIB_SUFFIX") or (".dll" if is_windows else ".so")
     ),
 }
 
@@ -79,7 +73,9 @@ def get_config(var):
         try:
             return json.loads(val)
         except json.decoder.JSONDecodeError:
-            raise ValueError(f"Environment variable {var} is not a valid JSON value.")
+            raise ValueError(
+                f"Environment variable {var} is not a valid JSON value."
+            ) from None
     else:
         return custom_config.get(var, default_config[var])
 
@@ -117,4 +113,4 @@ def get_version():
     try:
         return pyproject_data["project"]["version"]
     except KeyError:
-        raise ValueError("Version not found in pyproject.toml.")
+        raise ValueError("Version not found in pyproject.toml.") from None

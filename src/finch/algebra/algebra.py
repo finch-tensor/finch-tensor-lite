@@ -1,6 +1,3 @@
-from typing import Any, Type
-from collections.abc import Hashable
-
 """
 Finch performs extensive rewriting and defining of functions.  The Finch
 compiler is designed to inspect objects and functions defined by other
@@ -22,7 +19,8 @@ is associative with the following code:
 
 ```python
 from finch import register_property
-register_property(complex, '__add__', 'is_associative', lambda obj: True)
+
+register_property(complex, "__add__", "is_associative", lambda obj: True)
 ```
 
 Finch includes a convenience functions to query each property as well,
@@ -30,19 +28,25 @@ for example:
 ```python
 from finch import query_property
 from operator import add
-query_property(complex, '__add__', 'is_associative')
+
+query_property(complex, "__add__", "is_associative")
 # True
 is_associative(add, complex, complex)
 # True
 ```
 
-Properties can be inherited in the same way as methods. First we check whether properties have been defined for the object itself (in the case of functions), then we check For example, if you
-register a property for a class, all subclasses of that class will inherit
-that property. This allows you to define properties for a class and have
+Properties can be inherited in the same way as methods. First we check whether
+properties have been defined for the object itself (in the case of functions), then we
+check For example, if you register a property for a class, all subclasses of that class
+will inherit that property. This allows you to define properties for a class and have
 them automatically apply to all subclasses, without having to register the
 property for each subclass individually.
 """
+
 import operator
+from collections.abc import Hashable
+from typing import Any
+
 import numpy as np
 
 _properties = {}
@@ -67,9 +71,8 @@ def query_property(obj, attr, prop, *args):
     if isinstance(obj, type):
         T = obj
     else:
-        if isinstance(obj, Hashable):
-            if (obj, attr, prop) in _properties:
-                return _properties[(obj, attr, prop)](obj, *args)
+        if isinstance(obj, Hashable) and (obj, attr, prop) in _properties:
+            return _properties[(obj, attr, prop)](obj, *args)
         T = type(obj)
     while True:
         if (T, attr, prop) in _properties:
@@ -116,7 +119,7 @@ register_property(
 )
 
 
-def element_type(arg: Any) -> Type:
+def element_type(arg: Any) -> type:
     """The element type of the given argument.  The element type is the scalar type of
     the elements in a tensor, which may be different from the data type of the
     tensor.
@@ -156,7 +159,7 @@ def return_type(op: Any, *args: Any) -> Any:
     return query_property(op, "__call__", "return_type", *args)
 
 
-StableNumber = (np.number, bool, int, float, complex)
+StableNumber = bool | int | float | complex | np.generic
 
 _reflexive_operators = {
     operator.add: ("__add__", "__radd__"),
@@ -180,10 +183,7 @@ def _return_type_reflexive(meth):
     def _return_type_closure(a, b):
         if issubclass(b, StableNumber):
             return type(getattr(a(True), meth)(b(True)))
-        else:
-            raise TypeError(
-                f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}"
-            )
+        raise TypeError(f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}")
 
     return _return_type_closure
 
@@ -194,13 +194,15 @@ for op, (meth, rmeth) in _reflexive_operators.items():
             op,
             "__call__",
             "return_type",
-            lambda op, a, b, meth=meth: query_property(a, meth, "return_type", b)
+            lambda op, a, b, meth=meth, rmeth=rmeth: query_property(
+                a, meth, "return_type", b
+            )
             if hasattr(a, meth)
             else query_property(b, rmeth, "return_type", a),
         ),
     )
 
-    for T in StableNumber:
+    for T in StableNumber.__args__:
         register_property(T, meth, "return_type", _return_type_reflexive(meth))
         register_property(T, rmeth, "return_type", _return_type_reflexive(rmeth))
 
@@ -229,7 +231,7 @@ for op, meth in _unary_operators.items():
         ),
     )
 
-    for T in StableNumber:
+    for T in StableNumber.__args__:
         register_property(T, meth, "return_type", _return_type_unary(meth))
 
 
@@ -250,7 +252,7 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
     register_property(op, "__call__", "is_associative", lambda op: True)
 
 
-def fixpoint_type(op: Any, z: Any, T: Type) -> Type:
+def fixpoint_type(op: Any, z: Any, T: type) -> type:
     """Determines the fixpoint type after repeated calling the given operation.
 
     Args:
@@ -282,7 +284,8 @@ def init_value(op, arg) -> Any:
         The initial value for the given operation and type.
 
     Raises:
-        NotImplementedError: If the initial value is not implemented for the given type and operation.
+        NotImplementedError: If the initial value is not implemented for the given type
+        and operation.
     """
     return query_property(op, "__call__", "init_value", arg)
 
@@ -296,7 +299,7 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
         lambda op, arg, meth=meth: query_property(arg, meth, "init_value", arg),
     )
 
-for T in StableNumber:
+for T in StableNumber.__args__:
     register_property(T, "__add__", "init_value", lambda a, b: a(False))
     register_property(T, "__mul__", "init_value", lambda a, b: a(True))
     register_property(T, "__and__", "init_value", lambda a, b: a(True))

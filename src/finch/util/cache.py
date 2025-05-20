@@ -1,11 +1,12 @@
-from .config import get_config, get_version
-from typing import Callable
-from pathlib import Path
-import uuid
-import tempfile
 import atexit
 import shutil
+import tempfile
+import uuid
+from collections.abc import Callable
+from pathlib import Path
 from uuid import UUID
+
+from .config import get_config, get_version
 
 finch_uuid = UUID("ef66f312-ff6e-4b8a-bb8c-9a843f3ecdf4")
 
@@ -39,10 +40,8 @@ def file_cache(*, ext: str, domain: str) -> Callable:
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         def inner(*args):
-            filename = (
-                cache_dir
-                / f"{f.__name__}_{uuid.uuid5(finch_uuid, str((f.__name__, args)))}.{ext}"
-            )
+            id = uuid.uuid5(finch_uuid, str((f.__name__, f.__module__, args)))
+            filename = cache_dir / f"{f.__name__}_{id}.{ext}"
             if not get_config("FINCH_CACHE_ENABLE") or not filename.exists():
                 f(str(filename), *args)
             return filename

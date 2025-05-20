@@ -25,7 +25,9 @@ def get_or_insert(dictionary: dict[Hashable, Any], key: Hashable, default: Any) 
     return default
 
 
-def get_structure(node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]) -> LogicNode:
+def get_structure(
+    node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]
+) -> LogicNode:
     match node:
         case Field(name):
             return get_or_insert(fields, name, Immediate(len(fields) + len(aliases)))
@@ -34,11 +36,18 @@ def get_structure(node: LogicNode, fields: dict[str, LogicNode], aliases: dict[s
         case Subquery(Alias(name) as lhs, arg):
             if name in aliases:
                 return aliases[name]
-            return Subquery(get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases))
+            return Subquery(
+                get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases)
+            )
         case Table(tns, idxs):
-            return Table(Immediate(type(tns.val)), tuple(get_structure(idx, fields, aliases) for idx in idxs))
+            return Table(
+                Immediate(type(tns.val)),
+                tuple(get_structure(idx, fields, aliases) for idx in idxs),
+            )
         case any if any.is_tree():
-            return any.from_arguments(*[get_structure(arg, fields, aliases) for arg in any.get_arguments()])
+            return any.from_arguments(
+                *[get_structure(arg, fields, aliases) for arg in any.get_arguments()]
+            )
         case _:
             return node
 
@@ -53,7 +62,10 @@ class PointwiseLowerer:
                 return f":({val}({','.join([self(arg) for arg in args])}))"
             case Reorder(Relabel(Alias(name), idxs_1), idxs_2):
                 self.bound_idxs.append(idxs_1)
-                return f":({name}[{','.join([idx.name if idx in idxs_2 else 1 for idx in idxs_1])}])"
+                idxs_str = ",".join(
+                    [idx.name if idx in idxs_2 else 1 for idx in idxs_1]
+                )
+                return f":({name}[{idxs_str}])"
             case Reorder(Immediate(val), _):
                 return val
             case Immediate(val):
@@ -99,10 +111,18 @@ class LogicLowerer:
             case Query(Alias(name), Table(tns, _)):
                 return f":({name} = {compile_logic_constant(tns)})"
 
-            case Query(Alias(_) as lhs, Reformat(tns, Reorder(Relabel(Alias(_) as arg, idxs_1), idxs_2))):
-                loop_idxs = [idx.name for idx in with_subsequence(intersect(idxs_1, idxs_2), idxs_2)]
+            case Query(
+                Alias(_) as lhs,
+                Reformat(tns, Reorder(Relabel(Alias(_) as arg, idxs_1), idxs_2)),
+            ):
+                loop_idxs = [
+                    idx.name
+                    for idx in with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
+                ]
                 lhs_idxs = [idx.name for idx in idxs_2]
-                (rhs, rhs_idxs) = compile_pointwise_logic(Reorder(Relabel(arg, idxs_1), idxs_2))
+                (rhs, rhs_idxs) = compile_pointwise_logic(
+                    Reorder(Relabel(arg, idxs_1), idxs_2)
+                )
                 body = f":({lhs.name}[{','.join(lhs_idxs)}] = {rhs})"
                 for idx in loop_idxs:
                     if Field(idx) in rhs_idxs:

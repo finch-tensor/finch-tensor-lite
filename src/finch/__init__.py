@@ -1,7 +1,26 @@
-from . import finch_logic
-from .interface import *
-from .algebra import fill_value, element_type
-from .codegen import *
+from .algebra import element_type, fill_value
+from .codegen import CKernel, get_c_function
+from .interface import (
+    AbstractEagerTensor,
+    LazyTensor,
+    abs,
+    add,
+    compute,
+    defer,
+    elementwise,
+    expand_dims,
+    fuse,
+    fused,
+    multiply,
+    negative,
+    permute_dims,
+    positive,
+    prod,
+    reduce,
+    squeeze,
+    subtract,
+    sum,
+)
 
 __all__ = [
     "defer",
@@ -25,4 +44,6 @@ __all__ = [
     "LazyTensor",
     "fill_value",
     "element_type",
+    "get_c_function",
+    "CKernel",
 ]

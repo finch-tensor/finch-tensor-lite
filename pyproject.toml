@@ -22,3 +22,28 @@ numba = "^0.61.0"
 [build-system]
 requires = ["poetry-core>=1.0.8"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF"]
+
+[tool.ruff.lint.isort.sections]
+numpy = ["numpy", "numpy.*", "scipy", "scipy.*"]
+pytest = ["pytest", "pytest.*"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+section-order = [
+    "future",
+    "standard-library",
+    "pytest",
+    "numpy",
+    "third-party",
+    "first-party",
+    "local-folder",
+]

@@ -1,23 +1,25 @@
 import operator
-import numpy as np
 from abc import ABC, abstractmethod
-    
+
+import numpy as np
+
 ufunc_map = {
     np.add: operator.add,
-        np.subtract: operator.sub,
-        np.multiply: operator.mul,
-        np.negative: operator.neg,
-        np.positive: operator.pos,
-        np.absolute: operator.abs,
-        np.abs: operator.abs,
-        # Add more ufuncs as needed
-    }
+    np.subtract: operator.sub,
+    np.multiply: operator.mul,
+    np.negative: operator.neg,
+    np.positive: operator.pos,
+    np.absolute: operator.abs,
+    np.abs: operator.abs,
+    # Add more ufuncs as needed
+}
+
+
 class AbstractOverrideTensor(ABC):
     @abstractmethod
     def override_module(self):
         """Return the module that implements the override logic."""
-        pass
-    
+
     def __array_function__(self, func, types, args, kwargs):
         """Override NumPy functions using the __array_function__ protocol."""
         # https://numpy.org/neps/nep-0018-array-function-protocol.html
@@ -32,18 +34,20 @@ class AbstractOverrideTensor(ABC):
         # https://numpy.org/devdocs/reference/ufuncs.html#ufuncs-methods
         if kwargs.get("out") is not None:
             raise NotImplementedError("out parameter is not supported")
-        elif kwargs.get("where") is not None:
+        if kwargs.get("where") is not None:
             raise NotImplementedError("where parameter is not supported")
-        elif kwargs.get("casting") is not None:
+        if kwargs.get("casting") is not None:
             raise NotImplementedError("casting parameter is not supported")
-        elif kwargs.get("order") is not None:
+        if kwargs.get("order") is not None:
             raise NotImplementedError("order parameter is not supported")
-        elif kwargs.get("axes") is not None:
+        if kwargs.get("axes") is not None:
             kwargs["axis"] = kwargs.pop("axes")
         if ufunc in ufunc_map:
             if method == "__call__":
-                return self.override_module().elementwise(ufunc_map[ufunc], *inputs, **kwargs)
-            elif method == "reduce":
+                return self.override_module().elementwise(
+                    ufunc_map[ufunc], *inputs, **kwargs
+                )
+            if method == "reduce":
                 return self.override_module().reduce(ufunc, *inputs, **kwargs)
         return NotImplemented
 

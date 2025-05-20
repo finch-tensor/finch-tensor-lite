@@ -10,10 +10,14 @@ repos:
     - id: no-commit-to-branch
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.11.8
+  rev: v0.11.10
   hooks:
-    - id: ruff
-      args: ["--fix"]
+    - id: ruff-check
+      args: [--fix, --config=pyproject.toml]
       types_or: [ python, pyi, jupyter ]
     - id: ruff-format
+      args: [--config=pyproject.toml]
       types_or: [ python, pyi, jupyter ]
+
+ci:
+    autofix_prs: false

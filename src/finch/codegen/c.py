@@ -1,17 +1,13 @@
 import ctypes
-from pathlib import Path
-import tempfile
+import shutil
 import subprocess
-import sysconfig
-from ..util.config import get_config
-from ..util.cache import file_cache
+import tempfile
 from functools import lru_cache
 from operator import methodcaller
-from abc import ABC, abstractmethod
-from ...finch import finchassembly as asm
-from ..algebra import query_property, register_property
-import shutil
+from pathlib import Path
 
+from ..util.cache import file_cache
+from ..util.config import get_config
 
 
 @file_cache(ext=get_config("FINCH_SHLIB_SUFFIX"), domain="c")
@@ -34,9 +30,17 @@ def create_shared_lib(filename, c_code, cc, cflags):
         c_file_path.write_text(c_code)
 
         # Compile the C code into a shared library
-        compile_command = [str(cc), *cflags, "-o", str(shared_lib_path), str(c_file_path)]
+        compile_command = [
+            str(cc),
+            *cflags,
+            "-o",
+            str(shared_lib_path),
+            str(c_file_path),
+        ]
         if not shutil.which(cc):
-            raise FileNotFoundError(f"Compiler '{cc}' not found. Ensure it is installed and in your PATH.")
+            raise FileNotFoundError(
+                f"Compiler '{cc}' not found. Ensure it is installed and in your PATH."
+            )
         subprocess.run(compile_command, check=True)
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
 
@@ -55,10 +59,7 @@ def get_c_function(function_name, c_code):
     shared_lib = ctypes.CDLL(str(shared_lib_path))
 
     # Get the function from the shared library
-    c_function = getattr(shared_lib, function_name)
-
-    return c_function
-
+    return getattr(shared_lib, function_name)
 
 class CBufferFormat(ABC):
     @abstractmethod
@@ -81,6 +82,7 @@ class CBufferFormat(ABC):
         Return C code which resizes a named buffer to the given length.
         """
         pass
+
 
 class CKernel:
     """

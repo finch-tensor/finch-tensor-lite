@@ -1,8 +1,11 @@
+import operator
+
+import pytest
+
 import numpy as np
 from numpy.testing import assert_equal
-import pytest
+
 import finch
-import operator
 
 
 @pytest.mark.parametrize(
@@ -145,6 +148,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
             result = finch.compute(result)
 
         assert_equal(result, expected)
+
 
 @pytest.mark.parametrize(
     "a",
