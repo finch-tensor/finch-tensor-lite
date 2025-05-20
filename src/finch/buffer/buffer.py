@@ -20,7 +20,8 @@ class AbstractBuffer(ABC):
     #    @abstractmethod
     #    def get_format(self):
     #        """
-    #        Return the format of the buffer. The format defines how the data is organized
+    #        Return the format of the buffer. The format defines how the data is
+    #        organized
     #        and accessed.
     #        """
     #        pass
@@ -54,6 +55,17 @@ class AbstractBuffer(ABC):
 #        pass
 
 
+@ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
+def numpy_buffer_resize_callback(arr_ptr, new_length):
+    """
+    A Python callback function that resizes the NumPy array.
+    """
+    numpy_array = arr_ptr.contents.value
+    resized_array = np.resize(numpy_array, new_length)
+    arr_ptr.contents.value = resized_array
+    return ctypes.cast(resized_array.ctypes.data, ctypes.c_void_p)
+
+
 class NumpyBuffer(AbstractBuffer, CArgument):
     """
     A buffer that uses NumPy arrays to store data. This is a concrete implementation
@@ -72,30 +84,18 @@ class NumpyBuffer(AbstractBuffer, CArgument):
         self.arr[index] = value
 
     def resize(self, new_length: int):
-        self.arr.resize(new_length, refcheck=False)
-
-    def get_resize_callback(self):
-        """
-        Create a ctypes callback that closes over the instance's NumPy array.
-        """
-        def resize_callback(arr, new_length):
-            """
-            A Python callback function that resizes the NumPy array.
-            """
-            numpy_array = ctypes.cast(arr, ctypes.py_object).value
-            numpy_array.resize(new_length, refcheck=False)
-            return ctypes.cast(numpy_array.ctypes.data, ctypes.c_void_p)
-
-        return ctypes.CFUNCTYPE(None, ctypes.py_object, ctypes.c_size_t)(resize_callback)
+        self.arr = np.resize(self.arr, new_length)
 
     def serialize_to_c(self):
         """
         Serialize the NumPy buffer to a C-compatible structure.
         """
-        data = self.arr.ctypes.data_as(ctypes.POINTER(np.ctypeslib.as_ctypes_type(self.arr.dtype)))
+        data = self.arr.ctypes.data_as(
+            ctypes.POINTER(np.ctypeslib.as_ctypes_type(self.arr.dtype))
+        )
         length = self.arr.size
         arr = ctypes.py_object(self.arr)
-        return CNumpyBuffer(arr, data, length, self.get_resize_callback())
+        return CNumpyBuffer(arr, data, length, numpy_buffer_resize_callback)
 
     def deserialize_from_c(self, c_buffer):
         """
@@ -110,7 +110,10 @@ class CNumpyBuffer(ctypes.Structure):
         ("arr", ctypes.py_object),
         ("data", ctypes.c_void_p),
         ("length", ctypes.c_size_t),
-        ("resize", ctypes.CFUNCTYPE(None, ctypes.py_object, ctypes.c_size_t)),
+        (
+            "resize",
+            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.py_object, ctypes.c_size_t),
+        ),
     ]
 
 
