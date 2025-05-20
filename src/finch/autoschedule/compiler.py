@@ -15,6 +15,7 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
+from ._utils import intersect, with_subsequence
 
 
 def get_or_insert(
@@ -87,18 +88,6 @@ def compile_logic_constant(ex: LogicNode) -> str:
             return f":({ex}::{type_})"
         case _:
             raise Exception(f"Invalid constant: {ex}")
-
-
-def intersect(x1: tuple, x2: tuple) -> tuple:
-    return tuple(x for x in x1 if x in x2)
-
-
-def with_subsequence(x1: tuple, x2: tuple) -> tuple:
-    res = list(x2)
-    indices = [idx for idx, val in enumerate(x2) if val in x1]
-    for idx, i in enumerate(indices):
-        res[i] = x1[idx]
-    return tuple(res)
 
 
 class LogicLowerer:
