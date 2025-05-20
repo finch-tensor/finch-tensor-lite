@@ -61,14 +61,9 @@ class NumpyBuffer(AbstractBuffer, CArgument):
     """
 
     def __init__(self, arr: np.ndarray):
+        if not arr.flags["C_CONTIGUOUS"]:
+            raise ValueError("NumPy array must be C-contiguous")
         self.arr = arr
-
-    #    def get_format(self):
-    #        """
-    #        Return the format of the buffer. The format defines how the data is organized
-    #        and accessed.
-    #        """
-    #        return NumpyBufferFormat(self._buffer.dtype)
 
     def load(self, index: int):
         return self.arr[index]
@@ -77,68 +72,47 @@ class NumpyBuffer(AbstractBuffer, CArgument):
         self.arr[index] = value
 
     def resize(self, new_length: int):
-        self.arr.resize(new_length)
+        self.arr.resize(new_length, refcheck=False)
 
     def get_resize_callback(self):
         """
         Create a ctypes callback that closes over the instance's NumPy array.
         """
-        def resize_callback(c_buffer, new_length):
+        def resize_callback(arr, new_length):
             """
             A Python callback function that resizes the NumPy array.
             """
-            # Access the NumPy array from the closure
-            numpy_array = ctypes.cast(c_buffer.contents.arr, ctypes.py_object).value
-            # Resize the NumPy array
+            numpy_array = ctypes.cast(arr, ctypes.py_object).value
             numpy_array.resize(new_length, refcheck=False)
-            # Update the length and data pointer in the CNumpyBuffer structure
-            c_buffer.contents.length = new_length
-            c_buffer.contents.data = numpy_array.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-            print(f"Resized array to length: {new_length}")
+            return ctypes.cast(numpy_array.ctypes.data, ctypes.c_void_p)
 
-        # Wrap the closure in a ctypes-compatible function pointer
-        return ctypes.CFUNCTYPE(None, ctypes.POINTER(CNumpyBuffer), ctypes.c_size_t)(resize_callback)
-
+        return ctypes.CFUNCTYPE(None, ctypes.py_object, ctypes.c_size_t)(resize_callback)
 
     def serialize_to_c(self):
-        if not self.arr.flags["C_CONTIGUOUS"]:
-            raise ValueError("NumPy array must be C-contiguous")
-        data = np_array.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-        length = np_array.size
+        """
+        Serialize the NumPy buffer to a C-compatible structure.
+        """
+        data = self.arr.ctypes.data_as(ctypes.POINTER(np.ctypeslib.as_ctypes_type(self.arr.dtype)))
+        length = self.arr.size
         arr = ctypes.py_object(self.arr)
-        return CNumpyBuffer(arr, data, length)
+        return CNumpyBuffer(arr, data, length, self.get_resize_callback())
 
-    def deserialize_from_c(self, obj):
+    def deserialize_from_c(self, c_buffer):
         """
-        Update this buffer based on how the C call modified `obj`, the result
-        of `serialize_to_c`.
+        Update this buffer based on how the C call modified the CNumpyBuffer structure.
         """
+        self.arr = ctypes.cast(c_buffer.arr, ctypes.py_object).value
 
 
+# Dynamically define the CNumpyBuffer structure
 class CNumpyBuffer(ctypes.Structure):
-    """
-    A ctypes structure that represents a NumPy-like buffer in C.
-    """
-
     _fields_ = [
-        ("arr", ctypes.py_object),  # Python object for the NumPy array
-        ("data", ctypes.c_void_p),  # Pointer to the data (generic type)
-        ("length", ctypes.c_size_t),  # Length of the buffer
+        ("arr", ctypes.py_object),
+        ("data", ctypes.c_void_p),
+        ("length", ctypes.c_size_t),
+        ("resize", ctypes.CFUNCTYPE(None, ctypes.py_object, ctypes.c_size_t)),
     ]
 
-
-@ctypes.CFUNCTYPE(ctypes.void, ctypes.POINTER(CNumpyBuffer), ctypes.c_size_t)
-def resize_callback(c_buffer, new_length):
-    """
-    A Python callback function that can be called from C to resize the NumPy array.
-    """
-    # Extract the NumPy array from the CNumpyBuffer structure
-    numpy_array = ctypes.cast(c_buffer.contents.arr, ctypes.py_object).value
-    # Resize the NumPy array
-    numpy_array.resize(new_length, refcheck=False)
-    # Update the length in the CNumpyBuffer structure
-    c_buffer.contents.length = new_length
-    c_buffer.contents.data = numpy_array.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
 
 # class NumpyBufferFormat(AbstractBufferFormat, codegen.c.CBufferFormat):
 #    """
