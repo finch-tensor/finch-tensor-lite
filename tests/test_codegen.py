@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.testing import assert_equal
 
 import finch
 import finch.buffer
@@ -26,9 +27,9 @@ def test_buffer_function():
     #include <string.h>
 
     typedef struct CNumpyBuffer {
+        void* arr;
         void* data;
         size_t length;
-        void* arr;
         void* (*resize)(void**, size_t);
     } CNumpyBuffer;
 
@@ -41,9 +42,12 @@ def test_buffer_function():
         buffer->data = buffer->resize(&(buffer->arr), length * 2);
         buffer->length *= 2;
 
+        // Update the data pointer after resizing
+        data = (double*)(buffer->data);
+
         // Copy the original data to the second half of the new buffer
         for (size_t i = 0; i < length; ++i) {
-            data[length + i] = data[i];
+            data[length + i] = data[i] + 1;
         }
     }
     """
@@ -52,5 +56,9 @@ def test_buffer_function():
     f = finch.codegen.c.CKernel(
         "concat_buffer_with_self", c_code, [finch.buffer.NumpyBuffer]
     )
-    result = f(b)
-    np.assert_equal(result, np.array([1, 2, 3, 1, 2, 3], dtype=np.float64))
+    f(b)
+    result = b.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    assert_equal(result, expected)
+
+test_buffer_function()

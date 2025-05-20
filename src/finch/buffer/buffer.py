@@ -62,7 +62,7 @@ def numpy_buffer_resize_callback(buf_ptr, new_length):
     """
     buf = buf_ptr.contents.value
     buf.arr = np.resize(buf.arr, new_length)
-    return ctypes.cast(buf.arr.ctypes.data, ctypes.c_void_p)
+    return buf.arr.ctypes.data
 
 
 class CNumpyBuffer(ctypes.Structure):
@@ -109,7 +109,7 @@ class NumpyBuffer(AbstractBuffer, CArgument):
         """
         Update this buffer based on how the C call modified the CNumpyBuffer structure.
         """
-        self.arr = ctypes.cast(c_buffer.arr, ctypes.py_object).value
+        pass
 
 
 # class NumpyBufferFormat(AbstractBufferFormat, codegen.c.CBufferFormat):

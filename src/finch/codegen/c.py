@@ -52,9 +52,12 @@ def get_c_function(function_name, c_code):
     :param function_name: The name of the function to call.
     :param c_code: The code to compile
     """
-    shared_lib_path = create_shared_lib(
-        c_code, get_config("FINCH_CC"), get_config("FINCH_CFLAGS")
-    )
+    cc = get_config("FINCH_CC")
+    cflags = [
+        *get_config("FINCH_CFLAGS").split(),
+        *get_config("FINCH_SHLIB_FLAGS").split(),
+    ]
+    shared_lib_path = create_shared_lib(c_code, cc, cflags)
 
     # Load the shared library using ctypes
     shared_lib = ctypes.CDLL(str(shared_lib_path))
@@ -122,7 +125,8 @@ class CKernel:
         for argtype, arg in zip(self.argtypes, args, strict=False):
             if not isinstance(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        res = self.c_function(*map(methodcaller("serialize_to_c"), args))
+        serial_args = list(map(methodcaller("serialize_to_c"), args))
+        res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
         return res

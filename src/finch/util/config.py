@@ -40,14 +40,8 @@ default_config = {
         or sysconfig.get_config_var("CC")
         or str(shutil.which("gcc") or "cl" if is_windows else "cc")
     ),
-    "FINCH_CFLAGS": os.getenv(
-        "CFLAGS",
-        [
-            "-shared",
-            "-fPIC",
-            "-O3",
-        ],
-    ),
+    "FINCH_CFLAGS": os.getenv("CFLAGS", "-O3"),
+    "FINCH_SHLIB_FLAGS": "-shared -fPIC",
     "FINCH_SHLIB_SUFFIX": (
         sysconfig.get_config_var("SHLIB_SUFFIX") or (".dll" if is_windows else ".so")
     ),
