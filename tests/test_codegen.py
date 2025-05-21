@@ -36,13 +36,6 @@ def test_buffer_function():
         double* data = (double*)(buffer->data);
         size_t length = buffer->length;
 
-        printf("Original length: %zu\\n", length);
-        printf("Original data: ");
-        for (size_t i = 0; i < length; ++i) {
-            printf("%f ", data[i]);
-        }
-        printf("\\n");
-
         // Resize the buffer to double its length
         buffer->data = buffer->resize(&(buffer->arr), length * 2);
         buffer->length *= 2;
@@ -50,18 +43,10 @@ def test_buffer_function():
         // Update the data pointer after resizing
         data = (double*)(buffer->data);
 
-        printf("After resize, new length: %zu\\n", buffer->length);
-
         // Copy the original data to the second half of the new buffer
         for (size_t i = 0; i < length; ++i) {
             data[length + i] = data[i] + 1;
         }
-
-        printf("After concat, data: ");
-        for (size_t i = 0; i < buffer->length; ++i) {
-            printf("%f ", data[i]);
-        }
-        printf("\\n");
     }
     """
     a = np.array([1, 2, 3], dtype=np.float64)
