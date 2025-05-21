@@ -1,5 +1,5 @@
-import ctypes
 from abc import ABC, abstractmethod
+
 
 class AbstractBuffer(ABC):
     """
@@ -48,4 +48,3 @@ class AbstractBuffer(ABC):
 #        Create a new buffer of the given length
 #        """
 #        pass
-

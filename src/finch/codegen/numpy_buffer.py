@@ -2,8 +2,8 @@ import ctypes
 
 import numpy as np
 
-from .c import CArgument
 from .abstract_buffer import AbstractBuffer
+from .c import CArgument
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
