@@ -52,9 +52,11 @@ def get_c_function(function_name, c_code):
     :param function_name: The name of the function to call.
     :param c_code: The code to compile
     """
-    cc = config.get("cc")
-    cflags = [*config.get("cflags").split(), *config.get("shared_cflags").split()]
-    shared_lib_path = create_shared_lib(c_code, cc, cflags)
+    shared_lib_path = create_shared_lib(
+        c_code,
+        config.get("cc"),
+        [*config.get("cflags").split(), *config.get("shared_cflags").split()],
+    )
 
     # Load the shared library using ctypes
     shared_lib = ctypes.CDLL(str(shared_lib_path))
