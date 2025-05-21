@@ -21,13 +21,8 @@ class CNumpyBuffer(ctypes.Structure):
         ("arr", ctypes.py_object),
         ("data", ctypes.c_void_p),
         ("length", ctypes.c_size_t),
-        (
-            "resize",
-            ctypes.CFUNCTYPE(
-                ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t
-            ),
-        ),
-    ]
+        ( "resize", type(numpy_buffer_resize_callback) ),
+]
 
 
 class NumpyBuffer(AbstractBuffer, CArgument):
