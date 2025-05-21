@@ -51,9 +51,10 @@ class NumpyBuffer(AbstractBuffer, CArgument):
         """
         data = ctypes.c_void_p(self.arr.ctypes.data)
         length = self.arr.size
+        self._self_obj = ctypes.py_object(self)
         self._c_callback = numpy_buffer_resize_callback
-        self._c_buffer = CNumpyBuffer(self, data, length, self._c_callback)
-        return self._c_buffer
+        self._c_buffer = CNumpyBuffer(self._self_obj, data, length, self._c_callback)
+        return ctypes.pointer(self._c_buffer)
 
     def deserialize_from_c(self, c_buffer):
         """
