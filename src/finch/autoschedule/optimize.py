@@ -17,7 +17,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite, gensym
-from ._utils import intersect, is_subsequence, with_subsequence
+from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 from .compiler import LogicCompiler
 
 
@@ -184,14 +184,6 @@ def propagate_fields(root: LogicNode) -> LogicNode:
     return _propagate_fields(root, fields={})
 
 
-def _tuple_diff(x1: tuple, x2: tuple) -> tuple:
-    return tuple([x for x in x1 if x not in x2])
-
-
-def _intersect(x1: tuple, x2: tuple) -> tuple:
-    return tuple(x for x in x1 if x in x2)
-
-
 def push_fields(root):
     def rule_0(ex):
         # relabel(mapjoin(_, [1,2], [1,2]), [11,22]) =>
@@ -214,7 +206,7 @@ def push_fields(root):
         #     agg(..., relabel([1,2,3], [11,22,3]), 3)
         match ex:
             case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
-                diff_idxs = _tuple_diff(arg.get_fields(), agg_idxs)
+                diff_idxs = setdiff(arg.get_fields(), agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
                 relabeled_idxs = tuple(
                     reidx_dict.get(idx, idx) for idx in arg.get_fields()
@@ -261,7 +253,7 @@ def push_fields(root):
                     MapJoin(
                         op,
                         tuple(
-                            Reorder(arg, _intersect(idxs, arg.get_fields()))
+                            Reorder(arg, intersect(idxs, arg.get_fields()))
                             for arg in args
                         ),
                     ),
