@@ -2,7 +2,6 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finch
-import finch.buffer
 
 
 def test_add_function():
@@ -51,10 +50,8 @@ def test_buffer_function():
     }
     """
     a = np.array([1, 2, 3], dtype=np.float64)
-    b = finch.buffer.NumpyBuffer(a)
-    f = finch.codegen.c.CKernel(
-        "concat_buffer_with_self", c_code, [finch.buffer.NumpyBuffer]
-    )
+    b = finch.NumpyBuffer(a)
+    f = finch.codegen.c.CKernel("concat_buffer_with_self", c_code, [finch.NumpyBuffer])
     f(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)

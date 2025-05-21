@@ -1,5 +1,5 @@
 from .algebra import element_type, fill_value
-from .codegen import CKernel, get_c_function
+from .codegen import AbstractBuffer, CKernel, NumpyBuffer, get_c_function
 from .interface import (
     AbstractEagerTensor,
     LazyTensor,
@@ -46,4 +46,6 @@ __all__ = [
     "element_type",
     "get_c_function",
     "CKernel",
+    "AbstractBuffer",
+    "NumpyBuffer",
 ]

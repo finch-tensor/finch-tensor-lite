@@ -53,7 +53,7 @@ def get_c_function(function_name, c_code):
     :param c_code: The code to compile
     """
     cc = config.get("cc")
-    cflags = ([*config.get("cflags").split(), *config.get("shared_cflags").split()],)
+    cflags = [*config.get("cflags").split(), *config.get("shared_cflags").split()]
     shared_lib_path = create_shared_lib(c_code, cc, cflags)
 
     # Load the shared library using ctypes
