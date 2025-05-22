@@ -161,6 +161,12 @@ class AbstractCFormat(AbstractFormat, ABC):
 
 class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
     @abstractmethod
+    def c_length(self, name, index_name, index_type):
+        """
+        Return C code which loads a named buffer at the given index.
+        """
+
+    @abstractmethod
     def c_load(self, name, index_name, index_type):
         """
         Return C code which loads a named buffer at the given index.

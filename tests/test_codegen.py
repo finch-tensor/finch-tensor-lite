@@ -61,7 +61,11 @@ def test_buffer_function():
 def test_codegen():
     a = finch.NumpyBufferFormat(np.float64)
     def f(ctx, a):
-        pass
+        a_2 = ctx.unpack(a, "a")
+        ctx.exec(f"""
+        """)
+
+
 
         
-    finch.codegen.c.c_function_entrypoint(f, ("hello",), (a,)):
+    finch.codegen.c.c_function_entrypoint(f, ("a",), (a,)):

@@ -18,6 +18,13 @@ class AbstractBuffer(ABC):
         Return the format of the buffer. The format defines how the data is
         organized and accessed.
         """
+    
+    @abstractmethod
+    def length(self):
+        """
+        Return the length of the buffer.
+        """
+        pass
 
     @abstractmethod
     def load(self, index: int):

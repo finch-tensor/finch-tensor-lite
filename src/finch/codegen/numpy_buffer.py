@@ -36,6 +36,9 @@ class NumpyBuffer(AbstractBuffer, AbstractCArgument):
             raise ValueError("NumPy array must be C-contiguous")
         self.arr = arr
 
+    def length(self):
+        return self.arr.size
+
     def load(self, index: int):
         return self.arr[index]
 
@@ -99,6 +102,9 @@ class NumpySymbolicCBuffer(AbstractSymbolicCBuffer):
         self.name = name
         self.data = data
         self.length = length
+    
+    def c_length(self):
+        return self.length
 
     def c_load(self, index_name: str):
         return f"{self.data}[{index_name}]"
