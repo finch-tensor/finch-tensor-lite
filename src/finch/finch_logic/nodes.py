@@ -350,6 +350,10 @@ class Relabel(LogicNode):
         """Returns fields of the node."""
         return self.idxs
 
+    @classmethod
+    def make_term(cls, head, arg, *idxs):
+        return head(arg, idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class Reformat(LogicNode):

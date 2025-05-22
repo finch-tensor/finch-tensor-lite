@@ -4,10 +4,14 @@ from finch.autoschedule import (
     isolate_aggregates,
     isolate_reformats,
     isolate_tables,
+    lift_fields,
     lift_subqueries,
     pretty_labels,
+    propagate_copy_queries,
     propagate_fields,
+    propagate_into_reformats,
     propagate_map_queries,
+    propagate_transpose_queries,
     push_fields,
 )
 from finch.finch_logic import (
@@ -270,4 +274,193 @@ def test_push_fields():
     )
 
     result = push_fields(plan)
+    assert result == expected
+
+
+def test_propagate_copy_queries():
+    plan = Plan(
+        (
+            Query(Alias("A0"), Alias("A0")),
+            Query(Alias("A1"), Alias("A2")),
+            Query(Alias("A1"), Immediate(0)),
+        )
+    )
+
+    expected = Plan(
+        (
+            Plan(),
+            Plan(),
+            Query(Alias("A2"), Immediate(0)),
+        )
+    )
+
+    result = propagate_copy_queries(plan)
+    assert result == expected
+
+
+def test_propagate_into_reformats():
+    plan = Plan(
+        (
+            Query(Alias("A1"), Alias("A0")),
+            Query(
+                Alias("D0"),
+                Aggregate(Immediate("*"), Immediate(1), Alias("A1"), (Field("i2"),)),
+            ),
+            Query(
+                Alias("B0"),
+                Aggregate(Immediate("+"), Immediate(0), Alias("A1"), (Field("i1"),)),
+            ),
+            Immediate(1),
+            Query(Alias("C0"), Reformat(Immediate(3), Alias("B0"))),
+            Query(Alias("E0"), Reformat(Immediate(4), Alias("D0"))),
+            Immediate(2),
+        )
+    )
+
+    expected = Plan(
+        (
+            Query(Alias("A1"), Alias("A0")),
+            Query(
+                Alias("E0"),
+                Reformat(
+                    Immediate(4),
+                    Aggregate(
+                        Immediate("*"), Immediate(1), Alias("A1"), (Field("i2"),)
+                    ),
+                ),
+            ),
+            Query(
+                Alias("C0"),
+                Reformat(
+                    Immediate(3),
+                    Aggregate(
+                        Immediate("+"), Immediate(0), Alias("A1"), (Field("i1"),)
+                    ),
+                ),
+            ),
+            Immediate(1),
+            Immediate(2),
+        )
+    )
+
+    result = propagate_into_reformats(plan)
+    assert result == expected
+
+
+def test_propagate_transpose_queries():
+    plan = Plan(
+        (
+            Query(
+                Alias("A1"),
+                Relabel(
+                    Relabel(
+                        Alias("XD"),
+                        (Field("i1"), Field("i2")),
+                    ),
+                    (Field("j1"), Field("j2")),
+                ),
+            ),
+            Query(Alias("A2"), Reorder(Alias("A1"), (Field("j2"), Field("j1")))),
+            Produces((Alias("A2"),)),
+        )
+    )
+
+    expected = Plan(
+        (
+            Plan(),
+            Plan(),
+            Produces(
+                (
+                    Reorder(
+                        Relabel(Alias("XD"), (Field("j1"), Field("j2"))),
+                        (Field("j2"), Field("j1")),
+                    ),
+                )
+            ),
+        )
+    )
+
+    result = propagate_transpose_queries(plan)
+    assert result == expected
+
+
+def test_lift_fields():
+    plan = Plan(
+        (
+            Aggregate(
+                Immediate("*"),
+                Immediate(1),
+                Table(Immediate(2), (Field("i1"), Field("i2"))),
+                (Field("i2"),),
+            ),
+            Query(
+                Alias("A0"),
+                MapJoin(
+                    Immediate("*"),
+                    (
+                        Table(Immediate(2), (Field("i1"), Field("i2"))),
+                        Table(Immediate(4), (Field("i1"), Field("i2"))),
+                    ),
+                ),
+            ),
+            Query(
+                Alias("A0"),
+                Reformat(
+                    Immediate(0),
+                    MapJoin(
+                        Immediate("*"),
+                        (
+                            Table(Immediate(2), (Field("i1"), Field("i2"))),
+                            Table(Immediate(4), (Field("i1"), Field("i2"))),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    expected = Plan(
+        (
+            Aggregate(
+                Immediate("*"),
+                Immediate(1),
+                Reorder(
+                    Table(Immediate(2), (Field("i1"), Field("i2"))),
+                    (Field("i1"), Field("i2")),
+                ),
+                (Field("i2"),),
+            ),
+            Query(
+                Alias("A0"),
+                Reorder(
+                    MapJoin(
+                        Immediate("*"),
+                        (
+                            Table(Immediate(2), (Field("i1"), Field("i2"))),
+                            Table(Immediate(4), (Field("i1"), Field("i2"))),
+                        ),
+                    ),
+                    (Field("i1"), Field("i2")),
+                ),
+            ),
+            Query(
+                Alias("A0"),
+                Reformat(
+                    Immediate(0),
+                    Reorder(
+                        MapJoin(
+                            Immediate("*"),
+                            (
+                                Table(Immediate(2), (Field("i1"), Field("i2"))),
+                                Table(Immediate(4), (Field("i1"), Field("i2"))),
+                            ),
+                        ),
+                        (Field("i1"), Field("i2")),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = lift_fields(plan)
     assert result == expected

@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from ..finch_logic import (
     Aggregate,
@@ -112,7 +113,7 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
         case Produces() as p:
             return p
         case _:
-            raise Exception(f"Invalid node: {node}")
+            raise Exception(f"Invalid node: {node} in lift_subqueries")
 
 
 def _get_productions(root: LogicNode) -> list[LogicNode]:
@@ -152,6 +153,60 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
 
     root = Rewrite(PreWalk(Chain([rule_0, rule_1])))(root)
     return Rewrite(PostWalk(rule_2))(root)
+
+
+def propagate_copy_queries(root):
+    copies = {}
+    for node in PostOrderDFS(root):
+        match node:
+            case Query(lhs, Alias(_) as rhs):
+                copies[lhs] = copies.get(rhs, rhs)
+
+    def rule_0(ex):
+        match ex:
+            case Query(lhs, rhs) if lhs == rhs:
+                return Plan()
+
+    return Rewrite(PostWalk(Chain([lambda node: copies.get(node), rule_0])))(root)
+
+
+def propagate_into_reformats(root):
+    @dataclass
+    class Entry:
+        node: Query
+        node_pos: int
+        matched: Query | None = None
+        matched_pos: int | None = None
+
+    def rule_0(ex):
+        match ex:
+            case Plan(bodies):
+                queries: list[Entry] = []
+                for idx, node in enumerate(bodies):
+                    match node:
+                        case Query(_, Reformat(_, arg)) as que_ref:
+                            for q in queries[::-1]:
+                                if q.node.lhs == arg:
+                                    q.matched = que_ref
+                                    q.matched_pos = idx
+                                    break
+                        case Query(_, _) as q:
+                            queries.append(Entry(q, idx))
+
+                for q in queries[::-1]:
+                    if q.matched is not None:
+                        bodies = list(bodies)
+                        bodies.pop(q.matched_pos)
+                        if q.node.lhs not in PostOrderDFS(
+                            Plan(bodies[q.node_pos + 1 :])
+                        ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
+                            bodies[q.node_pos] = Query(
+                                q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
+                            )
+                            return Plan(tuple(bodies))
+                return None
+
+    return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
 
 def _propagate_fields(
@@ -270,6 +325,53 @@ def push_fields(root):
                 )
 
     return Rewrite(PreWalk(Chain([Fixpoint(rule_6), rule_7, rule_8])))(root)
+
+
+def lift_fields(root):
+    def rule_0(ex):
+        match ex:
+            case Aggregate(op, init, arg, idxs):
+                return Aggregate(op, init, Reorder(arg, tuple(arg.get_fields())), idxs)
+
+    def rule_1(ex):
+        match ex:
+            case Query(lhs, MapJoin() as rhs):
+                return Query(lhs, Reorder(rhs, tuple(rhs.get_fields())))
+
+    def rule_2(ex):
+        match ex:
+            case Query(lhs, Reformat(tns, MapJoin() as arg)):
+                return Query(lhs, Reformat(tns, Reorder(arg, tuple(arg.get_fields()))))
+
+    return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
+
+
+def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
+    match root:
+        case Plan(bodies):
+            return Plan(
+                tuple(_propagate_transpose_queries(body, bindings) for body in bodies)
+            )
+        case Query(lhs, rhs) as query:
+            rhs = push_fields(
+                Rewrite(PostWalk(lambda node: bindings.get(node, node)))(rhs)
+            )
+            match rhs:
+                case Reorder(Relabel(Alias(_), _), _) | Relabel(Alias(_), _) | Alias(_):
+                    bindings[lhs] = rhs
+                    return Plan()
+                case _:
+                    return query
+        case Produces(_) as prod:
+            return push_fields(
+                Rewrite(PostWalk(lambda node: bindings.get(node, node)))(prod)
+            )
+        case _:
+            raise Exception(f"Invalid node: {root} in propagate_transpose_queries")
+
+
+def propagate_transpose_queries(root):
+    return _propagate_transpose_queries(root, bindings={})
 
 
 class DefaultLogicOptimizer:
