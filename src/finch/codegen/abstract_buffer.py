@@ -12,14 +12,12 @@ class AbstractBuffer(ABC):
     def __init__(self, length: int, dtype: type):
         pass
 
-    #    @abstractmethod
-    #    def get_format(self):
-    #        """
-    #        Return the format of the buffer. The format defines how the data is
-    #        organized
-    #        and accessed.
-    #        """
-    #        pass
+    @abstractmethod
+    def get_format(self):
+        """
+        Return the format of the buffer. The format defines how the data is
+        organized and accessed.
+        """
 
     @abstractmethod
     def load(self, index: int):
@@ -36,15 +34,14 @@ class AbstractBuffer(ABC):
         """
 
 
-# class AbstractBufferFormat(ABC):
-#    """
-#    Abstract base class for the format of buffers. The format defines how the data
-#    in an AbstractBuffer is organized and accessed.
-#    """
-#
-#    @abstractmethod
-#    def make_buffer(self, length):
-#        """
-#        Create a new buffer of the given length
-#        """
-#        pass
+class AbstractFormat(ABC):
+    """
+    Abstract base class for the format of arguments. The format defines how the
+    data structures store data, and can construct a data structure with the call method.
+    """
+
+    @abstractmethod
+    def __call__(self, *args):
+        """
+        Create an instance of an object in this format with the given arguments.
+        """

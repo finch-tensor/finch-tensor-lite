@@ -58,4 +58,10 @@ def test_buffer_function():
     assert_equal(result, expected)
 
 
-test_buffer_function()
+def test_codegen():
+    a = finch.NumpyBufferFormat(np.float64)
+    def f(ctx, a):
+        pass
+
+        
+    finch.codegen.c.c_function_entrypoint(f, ("hello",), (a,)):

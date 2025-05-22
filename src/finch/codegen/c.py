@@ -7,8 +7,10 @@ from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 
+from ..symbolic import AbstractContext, AbstractSymbolic
 from ..util import config
 from ..util.cache import file_cache
+from .abstract_buffer import AbstractFormat
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -65,7 +67,7 @@ def get_c_function(function_name, c_code):
     return getattr(shared_lib, function_name)
 
 
-class CArgument(ABC):
+class AbstractCArgument(ABC):
     @abstractmethod
     def serialize_to_c(self, name):
         """
@@ -79,27 +81,6 @@ class CArgument(ABC):
         Update this argument based on how the c call modified `obj`, the result
         of `serialize_to_c`.
         """
-
-
-# class CBufferFormat(CArgument, ABC):
-#    @abstractmethod
-#    def c_load(self, name, index_name, index_type):
-#        """
-#        Return C code which loads a named buffer at the given index.
-#        """
-#
-#    @abstractmethod
-#    def c_store(self, name, value_name, value_type, index_name, index_type):
-#        """
-#        Return C code which stores a named buffer to the given index.
-#        """
-#
-#    @abstractmethod
-#    def c_resize(self, name, new_length_name, new_length_type):
-#        """
-#        Return C code which resizes a named buffer to the given length.
-#        """
-#
 
 
 class CKernel:
@@ -129,3 +110,80 @@ class CKernel:
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
         return res
+
+
+class CContext(AbstractContext):
+    """
+    A class to represent a C environment.
+    """
+
+    def __init__(self, tab="    ", indent=0, **kwargs):
+        super().__init__(**kwargs)
+        self.indent = indent
+
+    def exec(self, thunk):
+        super().exec(self.tab * self.indent + str(thunk))
+
+    def post(self, thunk):
+        super().post(self.tab * self.indent + str(thunk))
+
+    def make_block(self):
+        blk = super().make_block()
+        blk.indent = self.indent + 1
+        blk.tab = self.tab
+        return blk
+
+    def emit(self, thunk):
+        space = self.tab * self.indent
+        return (
+            space
+            + "{\n"
+            + "\n".join(self.preamble)
+            + "\n"
+            + "\n".join(self.epilogue)
+            + space
+            + "}\n"
+        )
+
+
+class AbstractCFormat(AbstractFormat, ABC):
+    """
+    Abstract base class for the format of datastructures. The format defines how
+    the data in an AbstractBuffer is organized and accessed.
+    """
+
+    @abstractmethod
+    def unpack_c(self, ctx, name):
+        """
+        Unpack the C object into a symbolic representation.
+        """
+
+
+class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
+    @abstractmethod
+    def c_load(self, name, index_name, index_type):
+        """
+        Return C code which loads a named buffer at the given index.
+        """
+
+    @abstractmethod
+    def c_store(self, name, value_name, value_type, index_name, index_type):
+        """
+        Return C code which stores a named buffer to the given index.
+        """
+
+    @abstractmethod
+    def c_resize(self, name, new_length_name, new_length_type):
+        """
+        Return C code which resizes a named buffer to the given length.
+        """
+
+
+def c_function_entrypoint(f, arg_names, *args):
+    ctx = CContext()
+    with ctx.block() as ctx_2:
+        sym_args = [
+            arg.unpack_c(ctx_2) for arg, name in zip(args, arg_names, strict=False)
+        ]
+        f(ctx_2, sym_args)
+    return ctx.emit()
