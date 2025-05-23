@@ -119,6 +119,7 @@ class CContext(AbstractContext):
 
     def __init__(self, tab="    ", indent=0, **kwargs):
         super().__init__(**kwargs)
+        self.tab = tab
         self.indent = indent
 
     def exec(self, thunk):
@@ -133,7 +134,7 @@ class CContext(AbstractContext):
         blk.tab = self.tab
         return blk
 
-    def emit(self, thunk):
+    def emit(self):
         space = self.tab * self.indent
         return (
             space
@@ -161,35 +162,35 @@ class AbstractCFormat(AbstractFormat, ABC):
 
 class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
     @abstractmethod
-    def c_length(self, name, index_name, index_type):
+    def c_length(self, ctx):
         """
         Return C code which loads a named buffer at the given index.
         """
 
     @abstractmethod
-    def c_load(self, name, index_name, index_type):
+    def c_load(self, ctx, index):
         """
         Return C code which loads a named buffer at the given index.
         """
 
     @abstractmethod
-    def c_store(self, name, value_name, value_type, index_name, index_type):
+    def c_store(self, ctx, index, value):
         """
         Return C code which stores a named buffer to the given index.
         """
 
     @abstractmethod
-    def c_resize(self, name, new_length_name, new_length_type):
+    def c_resize(self, ctx, new_length):
         """
         Return C code which resizes a named buffer to the given length.
         """
 
 
-def c_function_entrypoint(f, arg_names, *args):
+def c_function_entrypoint(f, arg_names, args):
     ctx = CContext()
     with ctx.block() as ctx_2:
         sym_args = [
-            arg.unpack_c(ctx_2) for arg, name in zip(args, arg_names, strict=False)
+            arg.unpack_c(ctx_2, name) for arg, name in zip(args, arg_names)
         ]
-        f(ctx_2, sym_args)
+        f(ctx_2, *sym_args)
     return ctx.emit()

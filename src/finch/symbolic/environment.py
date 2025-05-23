@@ -1,13 +1,16 @@
 import re
+from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Tuple, Type
 from contextlib import contextmanager
+from typing import Any
 
 """
     Namespace
 
 A namespace for managing variable names and aesthetic fresh variable generation.
 """
+
+
 class Namespace:
     def __init__(self):
         self.counts = defaultdict(int)
@@ -25,8 +28,8 @@ class Namespace:
         self.counts[tag] = n
         if n == 1:
             return tag
-        else:
-            return f"{tag}_{n}"
+        return f"{tag}_{n}"
+
 
 """
     AbstractContext
@@ -34,6 +37,8 @@ class Namespace:
 A context for compiling code, managing side effects, and
 variable names in the generated code of the executing environment.
 """
+
+
 class AbstractContext(ABC):
     def __init__(self, namespace=None, preamble=None, epilogue=None):
         self.namespace = namespace if namespace is not None else Namespace()
@@ -48,7 +53,7 @@ class AbstractContext(ABC):
 
     def freshen(self, *tags):
         return self.namespace.freshen(*tags)
-    
+
     @abstractmethod
     def make_block(self):
         """
@@ -58,6 +63,7 @@ class AbstractContext(ABC):
         blk.namespace = self.namespace
         blk.preamble = []
         blk.epilogue = []
+        return blk
 
     @contextmanager
     def block(self, task=None):
@@ -72,17 +78,21 @@ class AbstractContext(ABC):
         for thunk in ctx_2.preamble:
             self.exec(thunk)
         for thunk in ctx_2.epilogue:
-            self.finalize(thunk)
-    
+            self.post(thunk)
+
     @abstractmethod
     def emit(self):
         """
         Emit the code in this context.
         """
-        pass
+
 
 class AbstractSymbolic(ABC):
     """
-    Abstract base class for symbolic objects. Symbolic objects are used to represent
-    objects that are defined with respect to the state inside a symbolic computation context.
+    Abstract base class for symbolic objects. Symbolic objects are used to
+    represent objects that are defined with respect to the state inside a
+    symbolic computation context.
     """
+
+    def foo(x):
+        x + 1

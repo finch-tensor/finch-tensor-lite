@@ -79,8 +79,8 @@ class NumpyBufferFormat(AbstractCFormat):
 
     def unpack_c(self, ctx, name: str):
         c_dtype_type = np.ctypeslib.as_ctypes_type(self._dtype).__name__
-        data = ctx.freshen("{name}_data")
-        length = ctx.freshen("{name}_length")
+        data = ctx.freshen(f"{name}_data")
+        length = ctx.freshen(f"{name}_length")
         ctx.exec(f"""
             {c_dtype_type}* {data} = {name}->data;
             size_t {length} = {name}->length;
@@ -102,19 +102,19 @@ class NumpySymbolicCBuffer(AbstractSymbolicCBuffer):
         self.name = name
         self.data = data
         self.length = length
-    
-    def c_length(self):
+
+    def c_length(self, ctx):
         return self.length
 
-    def c_load(self, index_name: str):
-        return f"{self.data}[{index_name}]"
+    def c_load(self, ctx, index: str):
+        return f"{self.data}[{index}]"
 
-    def c_store(self, index_name: str, value_name: str):
-        return f"{self.data}[{index_name}] = {value_name};"
+    def c_store(self, ctx, index: str, value: str):
+        return f"{self.data}[{index}] = {value};"
 
     def c_resize(self, ctx, new_length: str):
         name = self.name
-        f"""
+        return f"""
         {name}->data = {name}->resize(&({name}->arr), {new_length});
         {self.length} = new_length;
         {self.data} = {name}->data;
