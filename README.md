@@ -31,7 +31,7 @@ Finch uses [poetry](https://python-poetry.org/) for packaging.
 
 To install for development, clone the repository and run:
 ```bash
-poetry install --with test
+poetry install --extras test
 ```
 to install the current project and dev dependencies.
 
