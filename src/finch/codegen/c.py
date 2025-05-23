@@ -2,12 +2,15 @@ import ctypes
 import shutil
 import subprocess
 import tempfile
+from abc import ABC, abstractmethod
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 
+from ..symbolic import AbstractContext, AbstractSymbolic
 from ..util import config
 from ..util.cache import file_cache
+from .abstract_buffer import AbstractFormat
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -64,18 +67,130 @@ def get_c_function(function_name, c_code):
     return getattr(shared_lib, function_name)
 
 
+class AbstractCArgument(ABC):
+    @abstractmethod
+    def serialize_to_c(self, name):
+        """
+        Return a ctypes-compatible struct to be used in place of this argument
+        for the c backend.
+        """
+
+    @abstractmethod
+    def deserialize_from_c(self, obj):
+        """
+        Update this argument based on how the c call modified `obj`, the result
+        of `serialize_to_c`.
+        """
+
+
 class CKernel:
     """
     A class to represent a C kernel.
     """
 
-    def __init__(self, function_name, c_code):
+    def __init__(self, function_name, c_code, argtypes):
         self.function_name = function_name
         self.c_code = c_code
         self.c_function = get_c_function(function_name, c_code)
+        self.argtypes = argtypes
 
     def __call__(self, *args):
         """
         Calls the C function with the given arguments.
         """
-        return self.c_function(*map(methodcaller("to_c"), args))
+        if len(args) != len(self.argtypes):
+            raise ValueError(
+                f"Expected {len(self.argtypes)} arguments, got {len(args)}"
+            )
+        for argtype, arg in zip(self.argtypes, args, strict=False):
+            if not isinstance(arg, argtype):
+                raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
+        serial_args = list(map(methodcaller("serialize_to_c"), args))
+        res = self.c_function(*serial_args)
+        for arg, serial_arg in zip(args, serial_args, strict=False):
+            arg.deserialize_from_c(serial_arg)
+        return res
+
+
+class CContext(AbstractContext):
+    """
+    A class to represent a C environment.
+    """
+
+    def __init__(self, tab="    ", indent=0, **kwargs):
+        super().__init__(**kwargs)
+        self.tab = tab
+        self.indent = indent
+
+    def exec(self, thunk):
+        super().exec(self.tab * self.indent + str(thunk))
+
+    def post(self, thunk):
+        super().post(self.tab * self.indent + str(thunk))
+
+    def make_block(self):
+        blk = super().make_block()
+        blk.indent = self.indent + 1
+        blk.tab = self.tab
+        return blk
+
+    def emit(self):
+        space = self.tab * self.indent
+        return (
+            space
+            + "{\n"
+            + "\n".join(self.preamble)
+            + "\n"
+            + "\n".join(self.epilogue)
+            + space
+            + "}\n"
+        )
+
+
+class AbstractCFormat(AbstractFormat, ABC):
+    """
+    Abstract base class for the format of datastructures. The format defines how
+    the data in an AbstractBuffer is organized and accessed.
+    """
+
+    @abstractmethod
+    def unpack_c(self, ctx, name):
+        """
+        Unpack the C object into a symbolic representation.
+        """
+
+
+class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
+    @abstractmethod
+    def c_length(self, ctx):
+        """
+        Return C code which loads a named buffer at the given index.
+        """
+
+    @abstractmethod
+    def c_load(self, ctx, index):
+        """
+        Return C code which loads a named buffer at the given index.
+        """
+
+    @abstractmethod
+    def c_store(self, ctx, index, value):
+        """
+        Return C code which stores a named buffer to the given index.
+        """
+
+    @abstractmethod
+    def c_resize(self, ctx, new_length):
+        """
+        Return C code which resizes a named buffer to the given length.
+        """
+
+
+def c_function_entrypoint(f, arg_names, args):
+    ctx = CContext()
+    with ctx.block() as ctx_2:
+        sym_args = [
+            arg.unpack_c(ctx_2, name) for arg, name in zip(args, arg_names)
+        ]
+        f(ctx_2, *sym_args)
+    return ctx.emit()
