@@ -11,6 +11,9 @@ from ..symbolic import AbstractContext, AbstractSymbolic
 from ..util import config
 from ..util.cache import file_cache
 from .abstract_buffer import AbstractFormat
+from ..finch_assembly import 
+
+
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -112,6 +115,62 @@ class CKernel:
         return res
 
 
+def c_func_name(op: Any, *args: Any) -> str:
+    """Returns the C function name corresponding to the given Python function and argument types.
+
+    Args:
+        op: The Python function or operator.
+        *args: The argument types.
+
+    Returns:
+        The C function name as a string.
+
+    Raises:
+        NotImplementedError: If the C function name is not implemented for the given function and types.
+    """
+    return query_property(op, "__call__", "c_func_name", *args)
+
+
+# Example: Register C function names for basic operators and numeric types
+_c_func_map = {
+    operator.add: "add",
+    operator.sub: "sub",
+    operator.mul: "mul",
+    operator.truediv: "div",
+    operator.floordiv: "floordiv",
+    operator.mod: "mod",
+    operator.pow: "pow",
+    operator.neg: "neg",
+    operator.abs: "abs",
+}
+
+_type_c_name = {
+    bool: "bool",
+    int: "int",
+    float: "float",
+    complex: "complex",
+    np.bool_: "bool",
+    np.int32: "int32",
+    np.int64: "int64",
+    np.float32: "float32",
+    np.float64: "float64",
+    np.complex64: "complex64",
+    np.complex128: "complex128",
+}
+
+def _default_c_func_name(op, *args):
+    op_name = _c_func_map.get(op, op.__name__ if hasattr(op, "__name__") else str(op))
+    type_names = [ _type_c_name.get(a, getattr(a, "__name__", str(a))) for a in args ]
+    return f"{op_name}_{'_'.join(type_names)}"
+
+for op in _c_func_map:
+    register_property(
+        op,
+        "__call__",
+        "c_func_name",
+        lambda op, *args, op_=op: _default_c_func_name(op_, *args)
+    )
+
 class CContext(AbstractContext):
     """
     A class to represent a C environment.
@@ -146,6 +205,79 @@ class CContext(AbstractContext):
             + "}\n"
         )
 
+    def __call__(self, prgm: AssemblyNode):
+        """
+        lower the program to C code.
+        """
+        match(prgm):
+            case Immediate(value):
+                if can_be_c_literal(value):
+                    return value
+                else:
+                    return self.register_value(value)
+            case Variable(name):
+                return name
+            case Symbolic():
+                return self.to_c_value(ctx):
+            case Assign(var, val):
+                var = self(var)
+                val = self(val)
+                return f"{var} = {val};"
+            case Block(bodies):
+                with self.block() as ctx:
+                    for body in bodies:
+                        ctx(body)
+            case Call(f, args):
+                args = list(map(self, args))
+                f_name = c_func_name(f, *map(python_type, args))
+                return f_name + "(" + ", ".join(args) + ")"
+            case MethodCall(obj, method, args):
+                obj = self(obj)
+                assert method.head() == Immediate
+                method_name = c_method_call(method.val, args)
+                return f"{obj}->{method_name}({', '.join(args)})"
+            case Load(buf, index):
+                buf = self(buf)
+                index = self(index)
+                return buf.obj.c_load(index)
+            case Store(buf, index, value):
+                buf = self(buf)
+                index = self(index)
+                value = self(value)
+                return buf.obj.c_store(index, value)
+            case Resize(buf, new_length):
+                buf = self(buf)
+                new_length = self(new_length)
+                return buf.obj.c_resize(new_length)
+            case Length(buf):
+                buf = self(buf)
+                return buf.obj.c_length()
+            case ForLoop(var, start, end, body):
+                var = self(var)
+                start = self(start)
+                end = self(end)
+                with self.block() as ctx:
+                    ctx(f"for ({var} = {start}; {var} < {end}; {var}++) {{")
+                    ctx(body)
+                    ctx("}")
+            case BufferLoop(buf, var, body):
+                idx = Variable(self.freshen(var.name + "_i"))
+                buf = self(buf)
+                start = Immediate(0)
+                stop = Call(Immediate(-), Length(buf), Immediate(1))
+                body_2 = Block(
+                    Assign(var, Load(buf, idx)),
+                    body)
+                self(ForLoop(idx, start, stop, body_2))
+            case WhileLoop(cond, body):
+                with self.block() as ctx:
+                    cond = self(cond)
+                    ctx(f"while ({cond}) {{")
+                    ctx(body)
+                    ctx("}")
+            case Return(value):
+                value = self(value)
+                return f"return {value};"
 
 class AbstractCFormat(AbstractFormat, ABC):
     """
@@ -185,7 +317,6 @@ class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
         Return C code which resizes a named buffer to the given length.
         """
 
-
 def c_function_entrypoint(f, arg_names, args):
     ctx = CContext()
     with ctx.block() as ctx_2:
@@ -194,3 +325,5 @@ def c_function_entrypoint(f, arg_names, args):
         ]
         f(ctx_2, *sym_args)
     return ctx.emit()
+
+
