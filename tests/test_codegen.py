@@ -2,7 +2,8 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finch
-
+import finch.finch_assembly as asm
+import operator
 
 def test_add_function():
     c_code = """
@@ -62,13 +63,21 @@ def test_codegen():
     a = finch.NumpyBufferFormat(np.float64)
 
     def f(ctx, a_2):
-        ctx.exec(f"""
-            {a_2.c_resize(ctx, f"{a_2.c_length(ctx)} * 2")};
-            size_t length = {a_2.c_length(ctx)};
-            for (int i = 0; i < a->length; ++i) {{
-                {a_2.c_store(ctx, f"{a_2.c_load(ctx, 'i')} * 2", "i + length")};
-            }}
-        """)
+        #ctx.exec(f"""
+        #    {a_2.c_resize(ctx, f"{a_2.c_length(ctx)} * 2")};
+        #    size_t length = {a_2.c_length(ctx)};
+        #    for (int i = 0; i < a->length; ++i) {{
+        #        {a_2.c_store(ctx, f"{a_2.c_load(ctx, 'i')} * 2", "i + length")};
+        #    }}
+        #""")
+        i = asm.Variable("i")
+        a_2 = asm.Symbolic(a_2)
+        ctx(asm.Block((
+            asm.Resize(a_2, asm.Call(asm.Immediate(operator.mul), (asm.Length(a_2), asm.Immediate(2)))),
+            asm.ForLoop(i, asm.Immediate(0), asm.Length(a_2),
+                asm.Store(a_2, asm.Call(asm.Immediate(operator.mul), (asm.Load(a_2, i), asm.Immediate(2))), asm.Call(asm.Immediate(operator.add), (i, asm.Length(a_2))))),
+            )),
+        )
 
     return finch.codegen.c.c_function_entrypoint(f, ("a",), (a,))
 

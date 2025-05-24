@@ -9,7 +9,7 @@ from operator import methodcaller
 from pathlib import Path
 from typing import Any
 
-from algebra import query_property, register_property
+from ..algebra import query_property, register_property
 
 from .. import finch_assembly as asm
 from ..symbolic import AbstractContext, AbstractSymbolic
@@ -133,7 +133,7 @@ def c_function_name(op: Any, ctx, *args: Any) -> str:
         NotImplementedError: If the C function name is not implemented for the
         given function and types.
     """
-    return query_property(op, "__self__", "c_function_name", ctx, *args)
+    return query_property(op, "__call__", "c_function_name", ctx, *args)
 
 
 def c_function_call(op: Any, ctx, *args: Any) -> str:
@@ -151,7 +151,7 @@ def c_function_call(op: Any, ctx, *args: Any) -> str:
     if hasattr(op, "c_function_call"):
         return op.c_function_call(ctx, *args)
     try:
-        return query_property(op, "__self__", "c_function_call", ctx, *args)
+        return query_property(op, "__call__", "c_function_call", ctx, *args)
     except NotImplementedError:
         return f"{c_function_name(op, ctx, *args)}({', '.join(map(ctx, args))})"
 
@@ -193,8 +193,8 @@ for op, symbol in [
     (operator.le, "<="),
     (operator.gt, ">"),
     (operator.ge, ">="),
-    (operator.shift_left, "<<"),
-    (operator.shift_right, ">>"),
+    (operator.lshift, "<<"),
+    (operator.rshift, ">>"),
     (operator.floordiv, "/"),
     (operator.truediv, "/"),
     (operator.mod, "%"),
@@ -237,7 +237,7 @@ def c_literal(ctx, val):
     return query_property(val, "__self__", "c_literal", ctx)
 
 
-register_property(int, "__self__", "to_c_literal", lambda x: str(x))
+register_property(int, "__self__", "c_literal", lambda x, ctx: str(x))
 
 
 class CContext(AbstractContext):
@@ -280,6 +280,8 @@ class CContext(AbstractContext):
         """
         match prgm:
             case asm.Immediate(value):
+                #in the future, would be nice to be able to pass in constants that
+                # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
             case asm.Variable(name):
                 return name
@@ -288,25 +290,26 @@ class CContext(AbstractContext):
             case asm.Assign(var, val):
                 var = self(var)
                 val = self(val)
-                return f"{var} = {val};"
+                ctx.exec(f"{var} = {val};")
             case asm.Call(f, args):
-                return c_function_call(f, self, *args)
+                assert isinstance(f, asm.Immediate)
+                return c_function_call(f.val, self, *args)
             case asm.Load(buf, index):
-                buf = self(buf)
+                assert isinstance(buf, asm.Symbolic)
                 index = self(index)
-                return buf.obj.c_load(index)
+                return buf.obj.c_load(self, index)
             case asm.Store(buf, index, value):
-                buf = self(buf)
+                assert isinstance(buf, asm.Symbolic)
                 index = self(index)
                 value = self(value)
-                return buf.obj.c_store(index, value)
+                return buf.obj.c_store(self, index, value)
             case asm.Resize(buf, new_length):
-                buf = self(buf)
+                assert isinstance(buf, asm.Symbolic)
                 new_length = self(new_length)
-                return buf.obj.c_resize(new_length)
+                return buf.obj.c_resize(self, new_length)
             case asm.Length(buf):
-                buf = self(buf)
-                return buf.obj.c_length()
+                assert isinstance(buf, asm.Symbolic)
+                return buf.obj.c_length(self)
             case asm.Block(bodies):
                 with self.block() as ctx:
                     for body in bodies:
@@ -316,14 +319,15 @@ class CContext(AbstractContext):
                 var = self(var)
                 start = self(start)
                 end = self(end)
-                with self.block() as ctx:
-                    ctx(f"for ({var} = {start}; {var} < {end}; {var}++) {{")
-                    ctx(body)
-                    ctx("}")
+                ctx = self.make_block()
+                ctx(body)
+                self.exec(f"""
+                for ({var} = {start}; {var} < {end}; {var}++) {{
+                    {ctx.emit()}
+                }}""")
                 return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(self.freshen(var.name + "_i"))
-                buf = self(buf)
                 start = asm.Immediate(0)
                 stop = asm.Call(
                     asm.Immediate(operator.sub), asm.Length(buf), asm.Immediate(1)

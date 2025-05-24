@@ -1,6 +1,6 @@
 from .nodes import (
     AssemblyNode,
-    Assignment,
+    Assign,
     Block,
     BufferLoop,
     Call,
@@ -32,7 +32,7 @@ __all__ = [
     "ForLoop",
     "BufferLoop",
     "WhileLoop",
-    "Assignment",
+    "Assign",
     "Return",
     "Block",
     "Module",

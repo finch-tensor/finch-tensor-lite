@@ -110,12 +110,12 @@ class NumpySymbolicCBuffer(AbstractSymbolicCBuffer):
         return f"{self.data}[{index}]"
 
     def c_store(self, ctx, index: str, value: str):
-        return f"{self.data}[{index}] = {value};"
+        ctx.exec(f"{self.data}[{index}] = {value};")
 
     def c_resize(self, ctx, new_length: str):
         name = self.name
-        return f"""
+        ctx.exec(f"""
         {name}->data = {name}->resize(&({name}->arr), {new_length});
         {self.length} = new_length;
         {self.data} = {name}->data;
-        """
+        """)

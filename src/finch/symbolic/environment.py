@@ -75,10 +75,7 @@ class AbstractContext(ABC):
         """
         ctx_2 = self.make_block()
         yield ctx_2
-        for thunk in ctx_2.preamble:
-            self.exec(thunk)
-        for thunk in ctx_2.epilogue:
-            self.post(thunk)
+        self.exec(ctx_2.emit())
 
     @abstractmethod
     def emit(self):
