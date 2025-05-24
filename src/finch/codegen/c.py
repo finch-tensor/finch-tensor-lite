@@ -7,6 +7,9 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
+from typing import Any
+
+from algebra import query_property, register_property
 
 from .. import finch_assembly as asm
 from ..symbolic import AbstractContext, AbstractSymbolic
@@ -114,89 +117,127 @@ class CKernel:
         return res
 
 
-def c_func_name(op: Any, *args: Any) -> str:
-    """Returns the C function name corresponding to the given Python function and argument types.
+def c_function_name(op: Any, ctx, *args: Any) -> str:
+    """Returns the C function name corresponding to the given Python function
+    and argument types.
 
     Args:
         op: The Python function or operator.
+        ctx: The context in which the function will be called.
         *args: The argument types.
 
     Returns:
         The C function name as a string.
 
     Raises:
-        NotImplementedError: If the C function name is not implemented for the given function and types.
+        NotImplementedError: If the C function name is not implemented for the
+        given function and types.
     """
-    return query_property(op, "__call__", "c_func_name", *args)
+    return query_property(op, "__self__", "c_function_name", ctx, *args)
 
 
-# Example: Register C function names for basic operators and numeric types
-_c_func_map = {
-    operator.add: "add",
-    operator.sub: "sub",
-    operator.mul: "mul",
-    operator.truediv: "div",
-    operator.floordiv: "floordiv",
-    operator.mod: "mod",
-    operator.pow: "pow",
-    operator.neg: "neg",
-    operator.abs: "abs",
-}
-
-_type_c_name = {
-    bool: "bool",
-    int: "int",
-    float: "float",
-    complex: "complex",
-    np.bool_: "bool",
-    np.int32: "int32",
-    np.int64: "int64",
-    np.float32: "float32",
-    np.float64: "float64",
-    np.complex64: "complex64",
-    np.complex128: "complex128",
-}
-
-
-def _default_c_func_name(op, *args):
-    op_name = _c_func_map.get(op, op.__name__ if hasattr(op, "__name__") else str(op))
-    type_names = [_type_c_name.get(a, getattr(a, "__name__", str(a))) for a in args]
-    return f"{op_name}_{'_'.join(type_names)}"
-
-
-for op in _c_func_map:
-    register_property(
-        op,
-        "__call__",
-        "c_func_name",
-        lambda op, *args, op_=op: _default_c_func_name(op_, *args),
-    )
-
-
-def to_c_literal(val):
-    if hasattr(val, "to_c_literal"):
-        return val.to_c_literal()
-    return query_property(val, "__self__", "to_c_literal")
-
-
-register_property(int, "__self__", "to_c_literal", lambda x: str(x))
-
-
-def c_method_call(method, args):
-    """
-    Returns the C method call name corresponding to the given Python method and argument types.
+def c_function_call(op: Any, ctx, *args: Any) -> str:
+    """Returns a call to the C function corresponding to the given Python
+    function and argument types.
 
     Args:
-        method: The Python method.
+        op: The Python function or operator.
+        ctx: The context in which the function will be called.
         *args: The argument types.
 
     Returns:
-        The C method call name as a string.
-
-    Raises:
-        NotImplementedError: If the C method call name is not implemented for the given method and types.
+        The C function call as a string.
     """
-    return query_property(method, "__call__", "c_method_call", *args)
+    if hasattr(op, "c_function_call"):
+        return op.c_function_call(ctx, *args)
+    try:
+        return query_property(op, "__self__", "c_function_call", ctx, *args)
+    except NotImplementedError:
+        return f"{c_function_name(op, ctx, *args)}({', '.join(map(ctx, args))})"
+
+
+def register_n_ary_c_op_call(op, symbol):
+    def property_func(op, ctx, *args):
+        assert len(args) > 0
+        if len(args) == 1:
+            return f"{symbol}{ctx(args[0])}"
+        return f" {symbol} ".join(map(ctx, args))
+
+    return property_func
+
+
+for op, symbol in [
+    (operator.add, "+"),
+    (operator.sub, "-"),
+    (operator.mul, "*"),
+    (operator.and_, "&"),
+    (operator.or_, "|"),
+    (operator.xor, "^"),
+]:
+    register_property(
+        op, "__call__", "c_function_call", register_n_ary_c_op_call(op, symbol)
+    )
+
+
+def register_binary_c_op_call(op, symbol):
+    def property_func(op, ctx, a, b):
+        return f"{ctx(a)} {symbol} {ctx(b)}"
+
+    return property_func
+
+
+for op, symbol in [
+    (operator.eq, "=="),
+    (operator.ne, "!="),
+    (operator.lt, "<"),
+    (operator.le, "<="),
+    (operator.gt, ">"),
+    (operator.ge, ">="),
+    (operator.shift_left, "<<"),
+    (operator.shift_right, ">>"),
+    (operator.floordiv, "/"),
+    (operator.truediv, "/"),
+    (operator.mod, "%"),
+    (operator.pow, "**"),
+]:
+    register_property(
+        op, "__call__", "c_function_call", register_binary_c_op_call(op, symbol)
+    )
+
+
+def register_unary_c_op_call(op, symbol):
+    def property_func(op, ctx, a):
+        return f"{symbol}{ctx(a)}"
+
+    return property_func
+
+
+for op, symbol in [
+    (operator.not_, "!"),
+    (operator.invert, "~"),
+]:
+    register_property(
+        op, "__call__", "c_function_call", register_unary_c_op_call(op, symbol)
+    )
+
+
+def c_literal(ctx, val):
+    """
+    Returns the C literal corresponding to the given Python value.
+
+    Args:
+        ctx: The context in which the value is used.
+        val: The Python value.
+
+    Returns:
+        The C literal as a string.
+    """
+    if hasattr(val, "c_literal"):
+        return val.c_literal(ctx)
+    return query_property(val, "__self__", "c_literal", ctx)
+
+
+register_property(int, "__self__", "to_c_literal", lambda x: str(x))
 
 
 class CContext(AbstractContext):
@@ -239,30 +280,17 @@ class CContext(AbstractContext):
         """
         match prgm:
             case asm.Immediate(value):
-                if can_be_c_literal(value):
-                    return value
-                return self.register_value(value)
+                return c_literal(self, value)
             case asm.Variable(name):
                 return name
             case asm.Symbolic():
-                return self.to_c_value(ctx)
+                return self.to_c_value(self)
             case asm.Assign(var, val):
                 var = self(var)
                 val = self(val)
                 return f"{var} = {val};"
-            case asm.Block(bodies):
-                with self.block() as ctx:
-                    for body in bodies:
-                        ctx(body)
             case asm.Call(f, args):
-                args = list(map(self, args))
-                f_name = c_func_name(f, *map(python_type, args))
-                return f_name + "(" + ", ".join(args) + ")"
-            case asm.MethodCall(obj, method, args):
-                obj = self(obj)
-                assert method.head() == asm.Immediate
-                method_name = c_method_call(method.val, args)
-                return f"{obj}->{method_name}({', '.join(args)})"
+                return c_function_call(f, self, *args)
             case asm.Load(buf, index):
                 buf = self(buf)
                 index = self(index)
@@ -279,6 +307,11 @@ class CContext(AbstractContext):
             case asm.Length(buf):
                 buf = self(buf)
                 return buf.obj.c_length()
+            case asm.Block(bodies):
+                with self.block() as ctx:
+                    for body in bodies:
+                        ctx(body)
+                return None
             case asm.ForLoop(var, start, end, body):
                 var = self(var)
                 start = self(start)
@@ -287,6 +320,7 @@ class CContext(AbstractContext):
                     ctx(f"for ({var} = {start}; {var} < {end}; {var}++) {{")
                     ctx(body)
                     ctx("}")
+                return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(self.freshen(var.name + "_i"))
                 buf = self(buf)
@@ -295,16 +329,18 @@ class CContext(AbstractContext):
                     asm.Immediate(operator.sub), asm.Length(buf), asm.Immediate(1)
                 )
                 body_2 = asm.Block(asm.Assign(var, asm.Load(buf, idx)), body)
-                self(asm.ForLoop(idx, start, stop, body_2))
+                return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
                 with self.block() as ctx:
                     cond = self(cond)
                     ctx(f"while ({cond}) {{")
                     ctx(body)
                     ctx("}")
+                return None
             case asm.Return(value):
                 value = self(value)
-                return f"return {value};"
+                self.exec(f"return {value};")
+                return None
 
 
 class AbstractCFormat(AbstractFormat, ABC):

@@ -7,5 +7,6 @@ __all__ = [
     "CKernel",
     "NumpyBuffer",
     "AbstractBuffer",
+    "AbstractFormat",
     "NumpyBufferFormat",
 ]

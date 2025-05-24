@@ -10,10 +10,10 @@ class AssemblyNode(Term):
     """
     AssemblyNode
 
-    Represents a FinchAssembly IR node. FinchAssembly is the final intermediate representation
-    before code generation (translation to the output language). It is a low-level imperative
-    description of the program, with control flow, linear memory regions called "buffers", and
-    explicit memory management.
+    Represents a FinchAssembly IR node. FinchAssembly is the final intermediate
+    representation before code generation (translation to the output language).
+    It is a low-level imperative description of the program, with control flow,
+    linear memory regions called "buffers", and explicit memory management.
     """
 
     @staticmethod
@@ -252,7 +252,8 @@ class Call(AssemblyNode):
 @dataclass(eq=True, frozen=True)
 class Function(AssemblyNode):
     """
-    Represents a logical AST statement that defines a function `fun` on the arguments `args...`.
+    Represents a logical AST statement that defines a function `fun` on the
+    arguments `args...`.
 
     Attributes:
         name: The name of the function to define.
@@ -389,7 +390,8 @@ class WhileLoop(AssemblyNode):
 @dataclass(eq=True, frozen=True)
 class Assign(AssemblyNode):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to `lhs`.
+    Represents a logical AST statement that evaluates `rhs`, binding the result
+    to `lhs`.
 
     Attributes:
         type: The type of the new binding.
@@ -480,7 +482,8 @@ class Block(AssemblyNode):
 @dataclass(eq=True, frozen=True)
 class Module(AssemblyNode):
     """
-    Represents a group of functions. This is the toplevel translation unit for FinchAssembly.
+    Represents a group of functions. This is the toplevel translation unit for
+    FinchAssembly.
 
     Attributes:
         funcs: The functions defined in the module.
