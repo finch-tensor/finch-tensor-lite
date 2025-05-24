@@ -72,4 +72,5 @@ def test_codegen():
 
     return finch.codegen.c.c_function_entrypoint(f, ("a",), (a,))
 
+
 print(test_codegen())

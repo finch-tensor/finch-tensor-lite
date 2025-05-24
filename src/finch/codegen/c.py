@@ -1,4 +1,5 @@
 import ctypes
+import operator
 import shutil
 import subprocess
 import tempfile
@@ -7,13 +8,11 @@ from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 
+from .. import finch_assembly as asm
 from ..symbolic import AbstractContext, AbstractSymbolic
 from ..util import config
 from ..util.cache import file_cache
 from .abstract_buffer import AbstractFormat
-from ..finch_assembly import 
-
-
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -158,18 +157,47 @@ _type_c_name = {
     np.complex128: "complex128",
 }
 
+
 def _default_c_func_name(op, *args):
     op_name = _c_func_map.get(op, op.__name__ if hasattr(op, "__name__") else str(op))
-    type_names = [ _type_c_name.get(a, getattr(a, "__name__", str(a))) for a in args ]
+    type_names = [_type_c_name.get(a, getattr(a, "__name__", str(a))) for a in args]
     return f"{op_name}_{'_'.join(type_names)}"
+
 
 for op in _c_func_map:
     register_property(
         op,
         "__call__",
         "c_func_name",
-        lambda op, *args, op_=op: _default_c_func_name(op_, *args)
+        lambda op, *args, op_=op: _default_c_func_name(op_, *args),
     )
+
+
+def to_c_literal(val):
+    if hasattr(val, "to_c_literal"):
+        return val.to_c_literal()
+    return query_property(val, "__self__", "to_c_literal")
+
+
+register_property(int, "__self__", "to_c_literal", lambda x: str(x))
+
+
+def c_method_call(method, args):
+    """
+    Returns the C method call name corresponding to the given Python method and argument types.
+
+    Args:
+        method: The Python method.
+        *args: The argument types.
+
+    Returns:
+        The C method call name as a string.
+
+    Raises:
+        NotImplementedError: If the C method call name is not implemented for the given method and types.
+    """
+    return query_property(method, "__call__", "c_method_call", *args)
+
 
 class CContext(AbstractContext):
     """
@@ -205,54 +233,53 @@ class CContext(AbstractContext):
             + "}\n"
         )
 
-    def __call__(self, prgm: AssemblyNode):
+    def __call__(self, prgm: asm.AssemblyNode):
         """
         lower the program to C code.
         """
-        match(prgm):
-            case Immediate(value):
+        match prgm:
+            case asm.Immediate(value):
                 if can_be_c_literal(value):
                     return value
-                else:
-                    return self.register_value(value)
-            case Variable(name):
+                return self.register_value(value)
+            case asm.Variable(name):
                 return name
-            case Symbolic():
-                return self.to_c_value(ctx):
-            case Assign(var, val):
+            case asm.Symbolic():
+                return self.to_c_value(ctx)
+            case asm.Assign(var, val):
                 var = self(var)
                 val = self(val)
                 return f"{var} = {val};"
-            case Block(bodies):
+            case asm.Block(bodies):
                 with self.block() as ctx:
                     for body in bodies:
                         ctx(body)
-            case Call(f, args):
+            case asm.Call(f, args):
                 args = list(map(self, args))
                 f_name = c_func_name(f, *map(python_type, args))
                 return f_name + "(" + ", ".join(args) + ")"
-            case MethodCall(obj, method, args):
+            case asm.MethodCall(obj, method, args):
                 obj = self(obj)
-                assert method.head() == Immediate
+                assert method.head() == asm.Immediate
                 method_name = c_method_call(method.val, args)
                 return f"{obj}->{method_name}({', '.join(args)})"
-            case Load(buf, index):
+            case asm.Load(buf, index):
                 buf = self(buf)
                 index = self(index)
                 return buf.obj.c_load(index)
-            case Store(buf, index, value):
+            case asm.Store(buf, index, value):
                 buf = self(buf)
                 index = self(index)
                 value = self(value)
                 return buf.obj.c_store(index, value)
-            case Resize(buf, new_length):
+            case asm.Resize(buf, new_length):
                 buf = self(buf)
                 new_length = self(new_length)
                 return buf.obj.c_resize(new_length)
-            case Length(buf):
+            case asm.Length(buf):
                 buf = self(buf)
                 return buf.obj.c_length()
-            case ForLoop(var, start, end, body):
+            case asm.ForLoop(var, start, end, body):
                 var = self(var)
                 start = self(start)
                 end = self(end)
@@ -260,24 +287,25 @@ class CContext(AbstractContext):
                     ctx(f"for ({var} = {start}; {var} < {end}; {var}++) {{")
                     ctx(body)
                     ctx("}")
-            case BufferLoop(buf, var, body):
-                idx = Variable(self.freshen(var.name + "_i"))
+            case asm.BufferLoop(buf, var, body):
+                idx = asm.Variable(self.freshen(var.name + "_i"))
                 buf = self(buf)
-                start = Immediate(0)
-                stop = Call(Immediate(-), Length(buf), Immediate(1))
-                body_2 = Block(
-                    Assign(var, Load(buf, idx)),
-                    body)
-                self(ForLoop(idx, start, stop, body_2))
-            case WhileLoop(cond, body):
+                start = asm.Immediate(0)
+                stop = asm.Call(
+                    asm.Immediate(operator.sub), asm.Length(buf), asm.Immediate(1)
+                )
+                body_2 = asm.Block(asm.Assign(var, asm.Load(buf, idx)), body)
+                self(asm.ForLoop(idx, start, stop, body_2))
+            case asm.WhileLoop(cond, body):
                 with self.block() as ctx:
                     cond = self(cond)
                     ctx(f"while ({cond}) {{")
                     ctx(body)
                     ctx("}")
-            case Return(value):
+            case asm.Return(value):
                 value = self(value)
                 return f"return {value};"
+
 
 class AbstractCFormat(AbstractFormat, ABC):
     """
@@ -317,13 +345,13 @@ class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
         Return C code which resizes a named buffer to the given length.
         """
 
+
 def c_function_entrypoint(f, arg_names, args):
     ctx = CContext()
     with ctx.block() as ctx_2:
         sym_args = [
-            arg.unpack_c(ctx_2, name) for arg, name in zip(args, arg_names)
+            arg.unpack_c(ctx_2, name)
+            for arg, name in zip(args, arg_names, strict=False)
         ]
         f(ctx_2, *sym_args)
     return ctx.emit()
-
-

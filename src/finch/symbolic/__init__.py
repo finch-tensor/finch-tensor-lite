@@ -1,7 +1,7 @@
 from .environment import (
     AbstractContext,
-    Namespace,
     AbstractSymbolic,
+    Namespace,
 )
 from .gensym import gensym
 from .rewriters import (
