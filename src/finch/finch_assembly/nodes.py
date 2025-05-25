@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..symbolic import Term
+from ..algebra import element_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -22,12 +23,6 @@ class AssemblyNode(Term):
         """Determines if the node is expresion."""
         ...
 
-    @staticmethod
-    @abstractmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        ...
-
     @classmethod
     def head(cls):
         """Returns the head of the node."""
@@ -43,8 +38,14 @@ class AssemblyNode(Term):
         return head(*args)
 
 
+class AssemblyExpression(AssemblyNode):
+    @abstractmethod
+    def get_type():
+        """Returns the type of the expression."""
+
+
 @dataclass(eq=True, frozen=True)
-class Immediate(AssemblyNode):
+class Immediate(AssemblyExpression):
     """
     Represents the literal value `val`.
 
@@ -59,14 +60,13 @@ class Immediate(AssemblyNode):
         """Determines if the node is an expression."""
         return False
 
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
+    def get_type(self):
+        """Returns the type of the expression."""
+        return type(self.val)
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(AssemblyNode):
+class Variable(AssemblyExpression):
     """
     Represents a logical AST expression for a variable named `name`.
 
@@ -75,24 +75,20 @@ class Variable(AssemblyNode):
     """
 
     name: str
+    type: None
 
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
         return False
 
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.name]
+    def get_type(self):
+        """Returns the type of the expression."""
+        return self.type
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolic(AssemblyNode):
+class Symbolic(AssemblyExpression):
     """
     Represents a logical AST expression for a symbolic object `obj`.
 
@@ -100,25 +96,24 @@ class Symbolic(AssemblyNode):
         obj: The tensor object.
     """
 
-    obj: AssemblyNode
+    obj: Any
 
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
         return False
 
     def children(self):
         """Returns the children of the node."""
         return [self.obj]
+    
+    def get_type(self):
+        """Returns the type of the expression."""
+        return self.obj.get_type()
 
 
 @dataclass(eq=True, frozen=True)
-class Load(AssemblyNode):
+class Load(AssemblyExpression):
     """
     Represents loading a value from a buffer at a given index.
 
@@ -127,19 +122,19 @@ class Load(AssemblyNode):
         index: The index to load at.
     """
 
-    buffer: AssemblyNode
-    index: AssemblyNode
+    buffer: AssemblyExpression
+    index: AssemblyExpression
 
     @staticmethod
     def is_expr():
         return True
 
-    @staticmethod
-    def is_stateful():
-        return False
-
     def children(self):
         return [self.buffer, self.index]
+    
+    def get_type(self):
+        """Returns the type of the expression."""
+        return element_type(self.buffer)
 
 
 @dataclass(eq=True, frozen=True)
@@ -159,10 +154,6 @@ class Store(AssemblyNode):
 
     @staticmethod
     def is_expr():
-        return True
-
-    @staticmethod
-    def is_stateful():
         return True
 
     def children(self):
@@ -186,16 +177,12 @@ class Resize(AssemblyNode):
     def is_expr():
         return True
 
-    @staticmethod
-    def is_stateful():
-        return True
-
     def children(self):
         return [self.buffer, self.new_size]
 
 
 @dataclass(eq=True, frozen=True)
-class Length(AssemblyNode):
+class Length(AssemblyExpression):
     """
     Represents getting the length of a buffer.
 
@@ -209,12 +196,12 @@ class Length(AssemblyNode):
     def is_expr():
         return True
 
-    @staticmethod
-    def is_stateful():
-        return False
-
     def children(self):
         return [self.buffer]
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return index_type(self.buffer)
 
 
 @dataclass(eq=True, frozen=True)
@@ -227,18 +214,13 @@ class Call(AssemblyNode):
         args: The arguments to call on the function.
     """
 
-    op: AssemblyNode
+    op: Immediate
     args: tuple[AssemblyNode, ...]
 
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
         return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
 
     def children(self):
         """Returns the children of the node."""
@@ -247,6 +229,11 @@ class Call(AssemblyNode):
     @classmethod
     def make_term(cls, head, op, *args):
         return head(op, args)
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        arg_types = [arg.get_type() for arg in self.args]
+        return return_type(self.op.val, *arg_types)
 
 
 @dataclass(eq=True, frozen=True)
@@ -270,11 +257,6 @@ class Function(AssemblyNode):
     def is_expr():
         """Determines if the node is an expression."""
         return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
 
     def children(self):
         """Returns the children of the node."""
@@ -307,11 +289,6 @@ class ForLoop(AssemblyNode):
         """Determines if the node is an expression."""
         return False
 
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
-
     def children(self):
         """Returns the children of the node."""
         return [self.var, self.start, self.end, self.body]
@@ -341,11 +318,6 @@ class BufferLoop(AssemblyNode):
         """Determines if the node is an expression."""
         return False
 
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
-
     def children(self):
         """Returns the children of the node."""
         return [self.buffer, self.var, self.body]
@@ -372,11 +344,6 @@ class WhileLoop(AssemblyNode):
     def is_expr():
         """Determines if the node is an expression."""
         return False
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
 
     def children(self):
         """Returns the children of the node."""
@@ -408,11 +375,6 @@ class Assign(AssemblyNode):
         """Determines if the node is an expression."""
         return True
 
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
-
     def children(self):
         """Returns the children of the node."""
         return [self.type, self.lhs, self.rhs]
@@ -433,11 +395,6 @@ class Return(AssemblyNode):
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
         return True
 
     def children(self):
@@ -463,11 +420,6 @@ class Block(AssemblyNode):
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
         return True
 
     def children(self):
@@ -496,11 +448,6 @@ class Module(AssemblyNode):
     @staticmethod
     def is_expr():
         """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
         return True
 
     def children(self):

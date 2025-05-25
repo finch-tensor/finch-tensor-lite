@@ -278,7 +278,7 @@ class CContext(AbstractContext):
                 #in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
-            case asm.Variable(name):
+            case asm.Variable(name, type):
                 return name
             case asm.Symbolic():
                 return self.to_c_value(self)
