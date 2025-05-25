@@ -249,30 +249,25 @@ class CContext(AbstractContext):
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
+    
+    @property
+    def feed(self):
+        return self.tab * self.indent
 
-    def exec(self, thunk):
-        super().exec(self.tab * self.indent + str(thunk))
+    def block(self):
+        blk = super().block()
+        blk.indent = self.indent
+        blk.tab = self.tab
+        return blk
 
-    def post(self, thunk):
-        super().post(self.tab * self.indent + str(thunk))
-
-    def make_block(self):
-        blk = super().make_block()
+    def subblock(self):
+        blk = super().block()
         blk.indent = self.indent + 1
         blk.tab = self.tab
         return blk
 
     def emit(self):
-        space = self.tab * self.indent
-        return (
-            space
-            + "{\n"
-            + "\n".join(self.preamble)
-            + "\n"
-            + "\n".join(self.epilogue)
-            + space
-            + "}\n"
-        )
+        return "\n".join([*self.preamble, *self.epilogue])
 
     def __call__(self, prgm: asm.AssemblyNode):
         """
@@ -290,7 +285,7 @@ class CContext(AbstractContext):
             case asm.Assign(var, val):
                 var = self(var)
                 val = self(val)
-                ctx.exec(f"{var} = {val};")
+                self.exec(f"{self.feed}{var} = {val};")
             case asm.Call(f, args):
                 assert isinstance(f, asm.Immediate)
                 return c_function_call(f.val, self, *args)
@@ -311,20 +306,21 @@ class CContext(AbstractContext):
                 assert isinstance(buf, asm.Symbolic)
                 return buf.obj.c_length(self)
             case asm.Block(bodies):
-                with self.block() as ctx:
-                    for body in bodies:
-                        ctx(body)
+                ctx_2 = self.block()
+                for body in bodies:
+                    ctx_2(body)
+                self.exec(ctx_2.emit())
                 return None
             case asm.ForLoop(var, start, end, body):
                 var = self(var)
                 start = self(start)
                 end = self(end)
-                ctx = self.make_block()
-                ctx(body)
-                self.exec(f"""
-                for ({var} = {start}; {var} < {end}; {var}++) {{
-                    {ctx.emit()}
-                }}""")
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                self.exec(f"{self.feed}for ({var} = {start}; {var} < {end}; {var}++) {{\n"
+                    + body_code
+                    + f"\n{self.feed}}}")
                 return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(self.freshen(var.name + "_i"))
@@ -335,15 +331,29 @@ class CContext(AbstractContext):
                 body_2 = asm.Block(asm.Assign(var, asm.Load(buf, idx)), body)
                 return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
-                with self.block() as ctx:
-                    cond = self(cond)
-                    ctx(f"while ({cond}) {{")
-                    ctx(body)
-                    ctx("}")
+                if not isinstance(cond, asm.Immediate | asm.Variable):
+                    cond_var = asm.Variable(self.freshen("cond"))
+                    new_prgm = asm.Block((
+                        asm.Assign(cond_var, cond),
+                        asm.While(cond_var, asm.Block((
+                            body,
+                            asm.Assign(cond_var, cond),
+                        )))
+                    ))
+                    return self(new_prgm)
+                cond_code = self(cond)
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                self.exec(
+                    f"{self.feed}while ({cond_code}) {{\n"
+                    + body_code
+                    + f"\n{self.feed}}}"
+                )
                 return None
             case asm.Return(value):
                 value = self(value)
-                self.exec(f"return {value};")
+                self.exec(f"{self.feed}return {value};")
                 return None
 
 
@@ -388,10 +398,9 @@ class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
 
 def c_function_entrypoint(f, arg_names, args):
     ctx = CContext()
-    with ctx.block() as ctx_2:
-        sym_args = [
-            arg.unpack_c(ctx_2, name)
-            for arg, name in zip(args, arg_names, strict=False)
-        ]
-        f(ctx_2, *sym_args)
+    sym_args = [
+        arg.unpack_c(ctx, name)
+        for arg, name in zip(args, arg_names, strict=False)
+    ]
+    f(ctx, *sym_args)
     return ctx.emit()

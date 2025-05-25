@@ -54,28 +54,15 @@ class AbstractContext(ABC):
     def freshen(self, *tags):
         return self.namespace.freshen(*tags)
 
-    @abstractmethod
-    def make_block(self):
+    def block(self):
         """
-        Create a new block context.
+        Create a new block. Preambles and epilogues will stay within this block.
         """
         blk = self.__class__()
         blk.namespace = self.namespace
         blk.preamble = []
         blk.epilogue = []
         return blk
-
-    @contextmanager
-    def block(self, task=None):
-        """
-        Context manager to handle preamble and epilogue execution.
-        Usage:
-            with ctx.block() as ctx2:
-                # do work with ctx2
-        """
-        ctx_2 = self.make_block()
-        yield ctx_2
-        self.exec(ctx_2.emit())
 
     @abstractmethod
     def emit(self):

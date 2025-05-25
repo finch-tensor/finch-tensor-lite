@@ -81,14 +81,12 @@ class NumpyBufferFormat(AbstractCFormat):
         c_dtype_type = np.ctypeslib.as_ctypes_type(self._dtype).__name__
         data = ctx.freshen(f"{name}_data")
         length = ctx.freshen(f"{name}_length")
-        ctx.exec(f"""
-            {c_dtype_type}* {data} = {name}->data;
-            size_t {length} = {name}->length;
-        """)
-        ctx.post(f"""
-            {name}->data = {data};
-            {name}->length = {length};
-        """)
+        ctx.exec(
+            f"{ctx.feed}{c_dtype_type}* {data} = {name}->data;\n"
+            +f"{ctx.feed}size_t {length} = {name}->length;")
+        ctx.post(
+            f"{ctx.feed}{name}->data = {data};\n"
+            +f"{name}->length = {length};")
         return NumpySymbolicCBuffer(self, name, data, length)
 
 
@@ -110,12 +108,12 @@ class NumpySymbolicCBuffer(AbstractSymbolicCBuffer):
         return f"{self.data}[{index}]"
 
     def c_store(self, ctx, index: str, value: str):
-        ctx.exec(f"{self.data}[{index}] = {value};")
+        ctx.exec(f"{ctx.feed}{self.data}[{index}] = {value};")
 
     def c_resize(self, ctx, new_length: str):
         name = self.name
-        ctx.exec(f"""
-        {name}->data = {name}->resize(&({name}->arr), {new_length});
-        {self.length} = new_length;
-        {self.data} = {name}->data;
-        """)
+        ctx.exec(
+            f"{ctx.feed}{name}->data = {name}->resize(&({name}->arr), {new_length});\n"
+            + f"{ctx.feed}{self.length} = new_length;\n"
+            + f"{ctx.feed}{self.data} = {name}->data;"
+        )
