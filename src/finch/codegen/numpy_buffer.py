@@ -83,10 +83,9 @@ class NumpyBufferFormat(AbstractCFormat):
         t = ctx.ctype_name(np.ctypeslib.as_ctypes_type(self._dtype))
         ctx.exec(
             f"{ctx.feed}{t}* {data} = ({t}*){name}->data;\n"
-            + f"{ctx.feed}size_t {length} = {name}->length;")
-        ctx.post(
-            f"{ctx.feed}{name}->data = {data};\n"
-            +f"{name}->length = {length};")
+            + f"{ctx.feed}size_t {length} = {name}->length;"
+        )
+        ctx.post(f"{ctx.feed}{name}->data = {data};\n" + f"{name}->length = {length};")
         return NumpySymbolicCBuffer(self, name, data, length)
 
 

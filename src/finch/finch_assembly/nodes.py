@@ -2,8 +2,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..symbolic import Term
 from ..algebra import element_type
+from ..symbolic import Term
 
 
 @dataclass(eq=True, frozen=True)
@@ -106,7 +106,7 @@ class Symbolic(AssemblyExpression):
     def children(self):
         """Returns the children of the node."""
         return [self.obj]
-    
+
     def get_type(self):
         """Returns the type of the expression."""
         return self.obj.get_type()
@@ -131,7 +131,7 @@ class Load(AssemblyExpression):
 
     def children(self):
         return [self.buffer, self.index]
-    
+
     def get_type(self):
         """Returns the type of the expression."""
         return element_type(self.buffer)

@@ -9,9 +9,8 @@ from operator import methodcaller
 from pathlib import Path
 from typing import Any
 
-from ..algebra import query_property, register_property
-
 from .. import finch_assembly as asm
+from ..algebra import query_property, register_property
 from ..symbolic import AbstractContext, AbstractSymbolic
 from ..util import config
 from ..util.cache import file_cache
@@ -255,6 +254,7 @@ def c_type(t):
         return t.c_type()
     return query_property(t, "__self__", "c_type")
 
+
 register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
 
 
@@ -291,6 +291,7 @@ ctype_to_c_name = {
     ctypes.c_void_p: "void*",
 }
 
+
 class CContext(AbstractContext):
     """
     A class to represent a C environment.
@@ -309,7 +310,9 @@ class CContext(AbstractContext):
             return name
         if isinstance(t, ctypes.Structure):
             name = t.__name__
-            args = [f"{field.name}: {self.ctype_name(field.type)}" for field in t._fields_]
+            args = [
+                f"{field.name}: {self.ctype_name(field.type)}" for field in t._fields_
+            ]
             header = (
                 f"struct {name} {{\n"
                 + "\n".join(f"    {arg};" for arg in args)
@@ -320,7 +323,7 @@ class CContext(AbstractContext):
         if isinstance(t, ctypes._Pointer):
             return f"{self.ctype_name(t._type_)}*"
         raise NotImplementedError(f"No C type mapping for {t}")
-    
+
     @property
     def feed(self):
         return self.tab * self.indent
@@ -348,7 +351,7 @@ class CContext(AbstractContext):
         """
         match prgm:
             case asm.Immediate(value):
-                #in the future, would be nice to be able to pass in constants that
+                # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
             case asm.Variable(name, type):
@@ -394,9 +397,11 @@ class CContext(AbstractContext):
                 ctx_2 = self.subblock()
                 ctx_2(body)
                 body_code = ctx_2.emit()
-                self.exec(f"{self.feed}for ({var_t} {var} = {start}; {var} < {end}; {var}++) {{\n"
+                self.exec(
+                    f"{self.feed}for ({var_t} {var} = {start}; {var} < {end}; {var}++) {{\n"
                     + body_code
-                    + f"\n{self.feed}}}")
+                    + f"\n{self.feed}}}"
+                )
                 return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(self.freshen(var.name + "_i"))
@@ -409,13 +414,20 @@ class CContext(AbstractContext):
             case asm.WhileLoop(cond, body):
                 if not isinstance(cond, asm.Immediate | asm.Variable):
                     cond_var = asm.Variable(self.freshen("cond"))
-                    new_prgm = asm.Block((
-                        asm.Assign(cond_var, cond),
-                        asm.While(cond_var, asm.Block((
-                            body,
+                    new_prgm = asm.Block(
+                        (
                             asm.Assign(cond_var, cond),
-                        )))
-                    ))
+                            asm.While(
+                                cond_var,
+                                asm.Block(
+                                    (
+                                        body,
+                                        asm.Assign(cond_var, cond),
+                                    )
+                                ),
+                            ),
+                        )
+                    )
                     return self(new_prgm)
                 cond_code = self(cond)
                 ctx_2 = self.subblock()
@@ -475,8 +487,7 @@ class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
 def c_function_entrypoint(f, arg_names, args):
     ctx = CContext()
     sym_args = [
-        arg.unpack_c(ctx, name)
-        for arg, name in zip(args, arg_names, strict=False)
+        arg.unpack_c(ctx, name) for arg, name in zip(args, arg_names, strict=False)
     ]
     f(ctx, *sym_args)
     return ctx.emit()
