@@ -297,7 +297,9 @@ class CContext(AbstractContext):
     A class to represent a C environment.
     """
 
-    def __init__(self, tab="    ", indent=0, headers=[], **kwargs):
+    def __init__(self, tab="    ", indent=0, headers=None, **kwargs):
+        if headers is None:
+            headers = []
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
@@ -346,6 +348,7 @@ class CContext(AbstractContext):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def __call__(self, prgm: asm.AssemblyNode):
+        feed = self.feed
         """
         lower the program to C code.
         """
@@ -354,16 +357,16 @@ class CContext(AbstractContext):
                 # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
-            case asm.Variable(name, type):
+            case asm.Variable(name, _):
                 return name
             case asm.Symbolic():
                 return self.to_c_value(self)
             case asm.Assign(var, val):
-                t = var.get_type()
                 var_t = self.ctype_name(c_type(var.get_type()))
                 var = self(var)
                 val = self(val)
-                self.exec(f"{self.feed}{var_t} {var} = {val};")
+                self.exec(f"{feed}{var_t} {var} = {val};")
+                return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Immediate)
                 return c_function_call(f.val, self, *args)
@@ -398,9 +401,9 @@ class CContext(AbstractContext):
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 self.exec(
-                    f"{self.feed}for ({var_t} {var} = {start}; {var} < {end}; {var}++) {{\n"
-                    + body_code
-                    + f"\n{self.feed}}}"
+                    f"{feed}for ({var_t} {var} = {start}; {var} < {end}; {var}++) {{\n"
+                    f"{body_code}"
+                    f"\n{feed}}}"
                 )
                 return None
             case asm.BufferLoop(buf, var, body):
@@ -434,14 +437,14 @@ class CContext(AbstractContext):
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 self.exec(
-                    f"{self.feed}while ({cond_code}) {{\n"
-                    + body_code
-                    + f"\n{self.feed}}}"
+                    f"{feed}while ({cond_code}) {{\n"
+                    f"{body_code}"
+                    f"\n{feed}}}"
                 )
                 return None
             case asm.Return(value):
                 value = self(value)
-                self.exec(f"{self.feed}return {value};")
+                self.exec(f"{feed}return {value};")
                 return None
 
 

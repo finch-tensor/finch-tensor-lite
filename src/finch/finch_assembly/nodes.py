@@ -201,7 +201,7 @@ class Length(AssemblyExpression):
 
     def get_type(self):
         """Returns the type of the expression."""
-        return index_type(self.buffer)
+        return self.buffer.val.index_type()
 
 
 @dataclass(eq=True, frozen=True)
@@ -233,7 +233,7 @@ class Call(AssemblyNode):
     def get_type(self):
         """Returns the type of the expression."""
         arg_types = [arg.get_type() for arg in self.args]
-        return return_type(self.op.val, *arg_types)
+        return self.return_type(self.op.val, *arg_types)
 
 
 @dataclass(eq=True, frozen=True)
