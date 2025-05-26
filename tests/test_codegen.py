@@ -63,7 +63,7 @@ def test_codegen():
     a = finch.NumpyBufferFormat(np.float64)
 
     def f(ctx, a_2):
-        i = asm.Variable("i")
+        i = asm.Variable("i", int)
         a_2 = asm.Symbolic(a_2)
         ctx(asm.Block((
             asm.Resize(a_2, asm.Call(asm.Immediate(operator.mul), (asm.Length(a_2), asm.Immediate(2)))),
