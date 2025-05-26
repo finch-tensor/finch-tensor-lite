@@ -10,12 +10,14 @@ from .term import (
     PostOrderDFS,
     PreOrderDFS,
     Term,
+    TermTree,
 )
 
 __all__ = [
     "PostOrderDFS",
     "PreOrderDFS",
     "Term",
+    "TermTree",
     "Rewrite",
     "PreWalk",
     "PostWalk",

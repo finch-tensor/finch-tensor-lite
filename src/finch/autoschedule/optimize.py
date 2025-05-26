@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TypeVar
 
 from ..finch_logic import (
     Aggregate,
@@ -7,6 +8,7 @@ from ..finch_logic import (
     Field,
     Immediate,
     LogicNode,
+    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -20,6 +22,8 @@ from ..finch_logic import (
 from ..symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite, gensym
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 from .compiler import LogicCompiler
+
+T = TypeVar("T", bound="LogicNode")
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
@@ -91,10 +95,10 @@ def _lift_subqueries_expr(
                 arg_2 = _lift_subqueries_expr(arg, bindings)
                 bindings[lhs] = arg_2
             return lhs
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *(_lift_subqueries_expr(x, bindings) for x in any.children()),
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(),
+                *(_lift_subqueries_expr(x, bindings) for x in tree.children()),
             )
         case _:
             return node
@@ -107,6 +111,7 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
         case Query(lhs, rhs):
             bindings: dict[LogicNode, LogicNode] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
+            assert isinstance(rhs_2, LogicTree)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
             )
@@ -210,20 +215,21 @@ def propagate_into_reformats(root):
 
 
 def _propagate_fields(
-    root: LogicNode, fields: dict[LogicNode, Iterable[LogicNode]]
+    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicNode:
     match root:
         case Plan(bodies):
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
         case Query(lhs, rhs):
-            rhs = _propagate_fields(rhs, fields)
-            fields[lhs] = rhs.get_fields()
-            return Query(lhs, rhs)
-        case Alias() as a:
+            rhs_2 = _propagate_fields(rhs, fields)
+            assert isinstance(rhs_2, LogicTree)
+            fields[lhs] = rhs_2.get_fields()
+            return Query(lhs, rhs_2)
+        case Alias(_) as a:
             return Relabel(a, tuple(fields[a]))
-        case node if node.is_expr():
-            return node.make_term(
-                node.head(), *[_propagate_fields(c, fields) for c in node.children()]
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(), *(_propagate_fields(c, fields) for c in tree.children())
             )
         case node:
             return node

@@ -1,4 +1,5 @@
 from textwrap import dedent
+from typing import TypeVar
 
 from ..algebra import fill_value
 from ..finch_logic import (
@@ -7,6 +8,7 @@ from ..finch_logic import (
     Field,
     Immediate,
     LogicNode,
+    LogicTree,
     MapJoin,
     Query,
     Reformat,
@@ -17,15 +19,15 @@ from ..finch_logic import (
 )
 from ._utils import intersect, with_subsequence
 
+T = TypeVar("T", bound="LogicNode")
 
-def get_or_insert(
-    dictionary: dict[str, LogicNode], key: str, default: LogicNode
-) -> LogicNode:
+
+def get_or_insert(dictionary: dict[str, T], key: str, default: T) -> T:
     return dictionary.setdefault(key, default)
 
 
 def get_structure(
-    node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]
+    node: LogicNode, fields: dict[str, Immediate], aliases: dict[str, LogicNode]
 ) -> LogicNode:
     match node:
         case Field(name):
@@ -35,19 +37,19 @@ def get_structure(
         case Subquery(Alias(name) as lhs, arg):
             if name in aliases:
                 return aliases[name]
-            return Subquery(
-                get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases)
-            )
+            arg_2 = get_structure(arg, fields, aliases)
+            assert isinstance(arg_2, LogicTree)
+            return Subquery(get_structure(lhs, fields, aliases), arg_2)
         case Table(tns, idxs):
             assert isinstance(tns, Immediate), "tns must be an Immediate"
             return Table(
                 Immediate(type(tns.val)),
                 tuple(get_structure(idx, fields, aliases) for idx in idxs),
             )
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *[get_structure(arg, fields, aliases) for arg in any.children()],
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(),
+                *(get_structure(arg, fields, aliases) for arg in tree.children()),
             )
         case _:
             return node
