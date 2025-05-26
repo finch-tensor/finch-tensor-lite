@@ -240,15 +240,86 @@ def c_literal(ctx, val):
 register_property(int, "__self__", "c_literal", lambda x, ctx: str(x))
 
 
+def c_type(t):
+    """
+    Returns the C type corresponding to the given Python type.
+
+    Args:
+        ctx: The context in which the value is used.
+        t: The Python type.
+
+    Returns:
+        The corresponding C type as a ctypes type.
+    """
+    if hasattr(t, "c_type"):
+        return t.c_type()
+    return query_property(t, "__self__", "c_type")
+
+register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
+
+
+ctype_to_c_name = {
+    ctypes.c_bool: "bool",
+    ctypes.c_char: "char",
+    ctypes.c_wchar: "wchar_t",
+    ctypes.c_byte: "char",
+    ctypes.c_ubyte: "unsigned char",
+    ctypes.c_short: "short",
+    ctypes.c_ushort: "unsigned short",
+    ctypes.c_int: "int",
+    ctypes.c_int8: "int8_t",
+    ctypes.c_int16: "int16_t",
+    ctypes.c_int32: "int32_t",
+    ctypes.c_int64: "int64_t",
+    ctypes.c_uint: "unsigned int",
+    ctypes.c_uint8: "uint8_t",
+    ctypes.c_uint16: "uint16_t",
+    ctypes.c_uint32: "uint32_t",
+    ctypes.c_uint64: "uint64_t",
+    ctypes.c_long: "long",
+    ctypes.c_ulong: "unsigned long",
+    ctypes.c_longlong: "long long",
+    ctypes.c_ulonglong: "unsigned long long",
+    ctypes.c_size_t: "size_t",
+    ctypes.c_ssize_t: "ssize_t",
+    ctypes.c_time_t: "time_t",
+    ctypes.c_float: "float",
+    ctypes.c_double: "double",
+    ctypes.c_longdouble: "long double",
+    ctypes.c_char_p: "char*",
+    ctypes.c_wchar_p: "wchar_t*",
+    ctypes.c_void_p: "void*",
+}
+
 class CContext(AbstractContext):
     """
     A class to represent a C environment.
     """
 
-    def __init__(self, tab="    ", indent=0, **kwargs):
+    def __init__(self, tab="    ", indent=0, headers=[], **kwargs):
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
+        self.headers = headers
+
+    def ctype_name(self, t):
+        # Mapping from ctypes types to their C type names
+        name = ctype_to_c_name.get(t)
+        if name is not None:
+            return name
+        if isinstance(t, ctypes.Structure):
+            name = t.__name__
+            args = [f"{field.name}: {self.ctype_name(field.type)}" for field in t._fields_]
+            header = (
+                f"struct {name} {{\n"
+                + "\n".join(f"    {arg};" for arg in args)
+                + "\n};"
+            )
+            self.headers.push(header)
+            return name
+        if isinstance(t, ctypes._Pointer):
+            return f"{self.ctype_name(t._type_)}*"
+        raise NotImplementedError(f"No C type mapping for {t}")
     
     @property
     def feed(self):
@@ -258,12 +329,14 @@ class CContext(AbstractContext):
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
+        blk.headers = self.headers
         return blk
 
     def subblock(self):
         blk = super().block()
         blk.indent = self.indent + 1
         blk.tab = self.tab
+        blk.headers = self.headers
         return blk
 
     def emit(self):
@@ -283,9 +356,11 @@ class CContext(AbstractContext):
             case asm.Symbolic():
                 return self.to_c_value(self)
             case asm.Assign(var, val):
+                t = var.get_type()
+                var_t = self.ctype_name(c_type(var.get_type()))
                 var = self(var)
                 val = self(val)
-                self.exec(f"{self.feed}{var} = {val};")
+                self.exec(f"{self.feed}{var_t} {var} = {val};")
             case asm.Call(f, args):
                 assert isinstance(f, asm.Immediate)
                 return c_function_call(f.val, self, *args)
@@ -312,13 +387,14 @@ class CContext(AbstractContext):
                 self.exec(ctx_2.emit())
                 return None
             case asm.ForLoop(var, start, end, body):
+                var_t = self.ctype_name(c_type(var.get_type()))
                 var = self(var)
                 start = self(start)
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
                 body_code = ctx_2.emit()
-                self.exec(f"{self.feed}for ({var} = {start}; {var} < {end}; {var}++) {{\n"
+                self.exec(f"{self.feed}for ({var_t} {var} = {start}; {var} < {end}; {var}++) {{\n"
                     + body_code
                     + f"\n{self.feed}}}")
                 return None
