@@ -11,8 +11,9 @@ ufunc_map = {
     np.positive: operator.pos,
     np.absolute: operator.abs,
     np.abs: operator.abs,
-    # Add more ufuncs as needed
     np.bitwise_and: operator.and_,
+    np.bitwise_or: operator.or_,
+    np.bitwise_xor: operator.xor
 }
 
 
