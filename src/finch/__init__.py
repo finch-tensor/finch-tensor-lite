@@ -20,6 +20,7 @@ from .interface import (
     squeeze,
     subtract,
     sum,
+    bitwise_and
 )
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "element_type",
     "get_c_function",
     "CKernel",
+    "bitwise_and"
 ]

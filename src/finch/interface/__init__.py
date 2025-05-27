@@ -13,6 +13,7 @@ from .eager import (
     squeeze,
     subtract,
     sum,
+    bitwise_and
 )
 
 # from .tensor import *
@@ -39,4 +40,5 @@ __all__ = [
     "negative",
     "AbstractEagerTensor",
     "LazyTensor",
+    "bitwise_and"
 ]

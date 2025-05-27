@@ -37,6 +37,40 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
 
     def __neg__(self):
         return negative(self)
+    
+    def __and__(self, other):
+        return bitwise_and(self, other)
+
+    def __rand__(self, other):
+        return bitwise_and(other, self)
+
+    def __lshift__(self, other):
+        return bitwise_lshift(self, other)
+
+    def __rlshift__(self, other):
+        return bitwise_lshift(other, self)
+
+    def __invert__(self):
+        return bitwise_invert(self)
+
+    def __or__(self, other):
+        return bitwise_or(self, other)
+
+    def __ror__(self, other):
+        return bitwise_or(other, self)
+
+    def __rshift__(self, other):
+        return bitwise_rshift(self, other)
+
+    def __rrshift__(self, other):
+        return bitwise_rshift(other, self)
+
+    def __xor__(self, other):
+        return bitwise_xor(self, other)
+
+    def __rxor__(self, other):
+        return bitwise_xor(other, self)
+
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
@@ -148,3 +182,38 @@ def negative(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.negative(x)
     return compute(lazy.negative(x))
+
+def bitwise_and(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_and(x1, x2)
+    return compute(lazy.bitwise_and(x1, x2))
+
+
+def bitwise_lshift(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_lshift(x1, x2)
+    return compute(lazy.bitwise_lshift(x1, x2))
+
+
+def bitwise_invert(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.bitwise_invert(x)
+    return compute(lazy.bitwise_invert(x))
+
+
+def bitwise_or(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_or(x1, x2)
+    return compute(lazy.bitwise_or(x1, x2))
+
+
+def bitwise_rshift(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_rshift(x1, x2)
+    return compute(lazy.bitwise_rshift(x1, x2))
+
+
+def bitwise_xor(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_xor(x1, x2)
+    return compute(lazy.bitwise_xor(x1, x2))

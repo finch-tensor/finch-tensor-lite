@@ -12,6 +12,7 @@ ufunc_map = {
     np.absolute: operator.abs,
     np.abs: operator.abs,
     # Add more ufuncs as needed
+    np.bitwise_and: operator.and_,
 }
 
 
