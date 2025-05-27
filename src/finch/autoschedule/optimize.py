@@ -1,12 +1,13 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import TypeVar, overload
 
 from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
     LogicTree,
     MapJoin,
@@ -86,6 +87,24 @@ def pretty_labels(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
 
 
+@overload
+def _lift_subqueries_expr(  # type: ignore[overload-overlap]
+    node: Subquery, bindings: dict[LogicNode, LogicNode]
+) -> LogicExpression: ...
+
+
+@overload
+def _lift_subqueries_expr(
+    node: LogicTree, bindings: dict[LogicNode, LogicNode]
+) -> LogicTree: ...
+
+
+@overload
+def _lift_subqueries_expr(
+    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+) -> LogicNode: ...
+
+
 def _lift_subqueries_expr(
     node: LogicNode, bindings: dict[LogicNode, LogicNode]
 ) -> LogicNode:
@@ -111,7 +130,6 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
         case Query(lhs, rhs):
             bindings: dict[LogicNode, LogicNode] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
-            assert isinstance(rhs_2, LogicTree)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
             )
@@ -214,6 +232,34 @@ def propagate_into_reformats(root):
     return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
 
+@overload
+def _propagate_fields(root: Plan, fields: dict[LogicNode, Iterable[Field]]) -> Plan: ...
+
+
+@overload
+def _propagate_fields(
+    root: Query, fields: dict[LogicNode, Iterable[Field]]
+) -> Query: ...
+
+
+@overload
+def _propagate_fields(
+    root: Alias, fields: dict[LogicNode, Iterable[Field]]
+) -> Relabel: ...
+
+
+@overload
+def _propagate_fields(
+    root: LogicTree, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicTree: ...
+
+
+@overload
+def _propagate_fields(
+    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicNode: ...
+
+
 def _propagate_fields(
     root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicNode:
@@ -222,7 +268,7 @@ def _propagate_fields(
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
         case Query(lhs, rhs):
             rhs_2 = _propagate_fields(rhs, fields)
-            assert isinstance(rhs_2, LogicTree)
+            assert isinstance(rhs_2, LogicExpression)
             fields[lhs] = rhs_2.get_fields()
             return Query(lhs, rhs_2)
         case Alias(_) as a:

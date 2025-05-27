@@ -5,6 +5,7 @@ from .nodes import (
     Deferred,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
     LogicTree,
     MapJoin,
@@ -20,6 +21,7 @@ from .nodes import (
 
 __all__ = [
     "FinchLogicInterpreter",
+    "LogicExpression",
     "LogicNode",
     "LogicTree",
     "Deferred",

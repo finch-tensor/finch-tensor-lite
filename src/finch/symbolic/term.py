@@ -17,18 +17,10 @@ Classes:
 """
 
 
-class Term: ...
-
-
-@dataclass(frozen=True, eq=True)
-class TermTree(Term, ABC):
+class Term:
     @abstractmethod
     def head(self) -> Any:
         """Return the head type of the S-expression."""
-
-    @abstractmethod
-    def children(self) -> list[Term]:
-        """Return the children (AKA tail) of the S-expression."""
 
     @classmethod
     @abstractmethod
@@ -38,6 +30,13 @@ class TermTree(Term, ABC):
         children. This function should satisfy
         `x == x.make_term(x.head(), *x.children())`
         """
+
+
+@dataclass(frozen=True, eq=True)
+class TermTree(Term, ABC):
+    @abstractmethod
+    def children(self) -> list[Term]:
+        """Return the children (AKA tail) of the S-expression."""
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:

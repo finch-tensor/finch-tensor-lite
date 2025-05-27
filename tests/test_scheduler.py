@@ -155,10 +155,10 @@ def test_propagate_fields():
     "node,pass_fn",
     [
         (
-            Aggregate(Immediate(""), Immediate(""), Immediate(""), ()),
+            Aggregate(Immediate(""), Immediate(""), Reorder(Immediate(""), ()), ()),
             isolate_aggregates,
         ),
-        (Reformat(Immediate(""), Immediate("")), isolate_reformats),
+        (Reformat(Immediate(""), Reorder(Immediate(""), ())), isolate_reformats),
         (Table(Immediate(""), ()), isolate_tables),
     ],
 )
