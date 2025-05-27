@@ -34,8 +34,8 @@ class TableValue:
 
 
 class FinchLogicInterpreter:
-    def __init__(self, *, make_tensor=np.full):
-        self.verbose = False
+    def __init__(self, *, make_tensor=np.full, verbose=False):
+        self.verbose = verbose
         self.bindings = {}
         self.make_tensor = make_tensor  # Added make_tensor argument
 
@@ -72,8 +72,11 @@ class FinchLogicInterpreter:
             for arg in args:
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx in dims:
-                        if dims[idx] != dim:
-                            raise ValueError("Dimensions mismatched in map")
+                        if dims[idx] != dim and dim != 1:
+                            if dims[idx] == 1:  # broadcasting of 1-length dims
+                                dims[idx] = dim
+                            else:
+                                raise ValueError("Dimensions mismatched in map")
                     else:
                         idxs.append(idx)
                         dims[idx] = dim
@@ -84,7 +87,15 @@ class FinchLogicInterpreter:
             )
             for crds in product(*[range(dims[idx]) for idx in idxs]):
                 idx_crds = dict(zip(idxs, crds, strict=True))
-                vals = [arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args]
+                vals = []
+                for arg in args:
+                    indices = [idx_crds[idx] for idx in arg.idxs]
+                    # broadcasting of 1-length dims
+                    indices = [
+                        idx if arg.tns.shape[shape_idx] != 1 else 0
+                        for shape_idx, idx in enumerate(indices)
+                    ]
+                    vals.append(arg.tns[*indices])
                 result[*crds] = op(*vals)
             return TableValue(result, idxs)
         if head == Aggregate:
@@ -113,7 +124,10 @@ class FinchLogicInterpreter:
         if head == Relabel:
             arg = self(node.arg)
             if len(arg.idxs) != len(node.idxs):
-                raise ValueError("The number of indices in the relabel must match")
+                raise ValueError(
+                    "The number of indices in the relabel must match: "
+                    f"{arg.idxs} vs {node.idxs}"
+                )
             return TableValue(arg.tns, node.idxs)
         if head == Reorder:
             arg = self(node.arg)

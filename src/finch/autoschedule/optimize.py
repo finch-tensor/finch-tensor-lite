@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -25,6 +26,8 @@ from .compiler import LogicCompiler
 def optimize(prgm: LogicNode) -> LogicNode:
     prgm = lift_subqueries(prgm)
 
+    # prgm = propagate_map_queries_backward(prgm)
+
     prgm = isolate_reformats(prgm)
     prgm = isolate_aggregates(prgm)
     prgm = isolate_tables(prgm)
@@ -32,7 +35,29 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = pretty_labels(prgm)
 
-    return propagate_map_queries(prgm)
+    prgm = propagate_fields(prgm)
+    prgm = propagate_copy_queries(prgm)
+    prgm = propagate_transpose_queries(prgm)
+    prgm = propagate_map_queries(prgm)
+
+    prgm = propagate_fields(prgm)
+    prgm = push_fields(prgm)
+    prgm = lift_fields(prgm)
+    prgm = push_fields(prgm)
+
+    prgm = propagate_transpose_queries(prgm)
+    # prgm = set_loop_order(prgm)
+    prgm = push_fields(prgm)
+
+    # prgm = concordize(prgm)
+
+    # prgm = materialize_squeeze_expand_productions(prgm)
+    prgm = propagate_copy_queries(prgm)
+
+    prgm = propagate_into_reformats(prgm)
+    prgm = propagate_copy_queries(prgm)
+
+    return normalize_names(prgm)
 
 
 def isolate_aggregates(root: LogicNode) -> LogicNode:
@@ -352,7 +377,7 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
             return Plan(
                 tuple(_propagate_transpose_queries(body, bindings) for body in bodies)
             )
-        case Query(lhs, rhs) as query:
+        case Query(lhs, rhs):
             rhs = push_fields(
                 Rewrite(PostWalk(lambda node: bindings.get(node, node)))(rhs)
             )
@@ -361,7 +386,7 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
                     bindings[lhs] = rhs
                     return Plan()
                 case _:
-                    return query
+                    return Query(lhs, rhs)
         case Produces(_) as prod:
             return push_fields(
                 Rewrite(PostWalk(lambda node: bindings.get(node, node)))(prod)
@@ -372,6 +397,58 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
 
 def propagate_transpose_queries(root):
     return _propagate_transpose_queries(root, bindings={})
+
+
+def normalize_names(root):
+    return _normalize_names(root, counts={})
+
+
+def freshen(counts: dict[str, int], symbol: str) -> str:
+    "Return a fresh variable in the current context"
+    if match_obj := re.search(r"^(.*)_(\d*)$", symbol):
+        tag, n = match_obj.groups()
+        n = int(n)
+    else:
+        tag, n = symbol, 1
+
+    n = max(counts.get(tag, 0) + 1, n)
+    counts[tag] = n
+    return f"{tag}_{n}" if n > 1 else tag
+
+
+def _normalize_names(root, counts: dict[str, int]):
+    scope_dict: dict[str, str] = {}
+
+    def normname(symbol: str) -> str:
+        if symbol in scope_dict:
+            return scope_dict[symbol]
+
+        if "#" in symbol:
+            if (match_obj := re.search(r"##(.+)#\d+", symbol)) or (
+                match_obj := re.search(r"#\d+#(.+)", symbol)
+            ):
+                (new_sym,) = match_obj.groups()
+            else:
+                raise Exception(f"Invalid symbol: {symbol}")
+        else:
+            new_sym = symbol
+
+        new_sym = freshen(counts, new_sym)
+        scope_dict[symbol] = new_sym
+        return new_sym
+
+    def rule_0(ex):
+        match ex:
+            case Alias(name):
+                return Alias(normname(name))
+
+    def rule_1(ex):
+        match ex:
+            case Field(name):
+                return Field(normname(name))
+
+    root = Rewrite(PostWalk(rule_0))(root)
+    return Rewrite(PostWalk(rule_1))(root)
 
 
 class DefaultLogicOptimizer:
