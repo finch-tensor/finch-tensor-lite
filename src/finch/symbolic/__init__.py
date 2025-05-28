@@ -1,6 +1,4 @@
 from .environment import (
-    AbstractContext,
-    AbstractSymbolic,
     Namespace,
 )
 from .gensym import gensym
@@ -28,6 +26,4 @@ __all__ = [
     "Fixpoint",
     "gensym",
     "Namespace",
-    "AbstractContext",
-    "AbstractSymbolic",
 ]
