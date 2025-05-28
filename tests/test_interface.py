@@ -94,7 +94,9 @@ class TestEagerTensor(finch.AbstractEagerTensor):
         ((operator.mul, finch.multiply, np.multiply), np.multiply),
         ((operator.and_, finch.bitwise_and, np.bitwise_and), np.bitwise_and),
         ((operator.or_, finch.bitwise_or, np.bitwise_or), np.bitwise_or),
-        ((operator.xor, finch.bitwise_xor, np.bitwise_xor), np.bitwise_xor)
+        ((operator.xor, finch.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
+        ((operator.lshift, finch.bitwise_lshift, np.bitwise_left_shift), np.bitwise_left_shift),
+        ((operator.rshift, finch.bitwise_rshift, np.bitwise_right_shift), np.bitwise_right_shift) 
     ]
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -135,6 +137,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((operator.abs, finch.abs, np.abs), np.abs),
         ((operator.pos, finch.positive, np.positive), np.positive),
         ((operator.neg, finch.negative, np.negative), np.negative),
+        ((operator.invert, finch.bitwise_invert, np.bitwise_invert), np.bitwise_invert)
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):

@@ -215,6 +215,7 @@ _unary_operators: dict[Callable, str] = {
     operator.abs: "__abs__",
     operator.pos: "__pos__",
     operator.neg: "__neg__",
+    operator.invert: "__invert__"
 }
 
 

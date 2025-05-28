@@ -22,7 +22,10 @@ from .interface import (
     sum,
     bitwise_and,
     bitwise_or,
-    bitwise_xor
+    bitwise_xor,
+    bitwise_invert,
+    bitwise_lshift,
+    bitwise_rshift
 )
 
 __all__ = [
@@ -51,5 +54,8 @@ __all__ = [
     "CKernel",
     "bitwise_and",
     "bitwise_or",
-    "bitwise_xor"
+    "bitwise_xor",
+    "bitwise_invert",
+    "bitwise_lshift",
+    "bitwise_rshift"
 ]

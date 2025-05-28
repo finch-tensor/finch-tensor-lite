@@ -15,7 +15,10 @@ from .eager import (
     sum,
     bitwise_and,
     bitwise_or,
-    bitwise_xor
+    bitwise_xor,
+    bitwise_invert,
+    bitwise_lshift,
+    bitwise_rshift
 )
 
 # from .tensor import *
@@ -44,5 +47,8 @@ __all__ = [
     "LazyTensor",
     "bitwise_and",
     "bitwise_or",
-    "bitwise_xor"
+    "bitwise_xor",
+    "bitwise_invert",
+    "bitwise_lshift",
+    "bitwise_rshift"
 ]
