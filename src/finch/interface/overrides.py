@@ -16,7 +16,8 @@ ufunc_map = {
     np.bitwise_xor: operator.xor,
     np.bitwise_invert: operator.invert,
     np.bitwise_left_shift: operator.lshift,
-    np.bitwise_right_shift: operator.rshift
+    np.bitwise_right_shift: operator.rshift,
+    np.matmul: operator.matmul
 }
 
 

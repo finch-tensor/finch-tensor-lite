@@ -25,7 +25,8 @@ from .interface import (
     bitwise_xor,
     bitwise_invert,
     bitwise_lshift,
-    bitwise_rshift
+    bitwise_rshift,
+    matmul
 )
 
 __all__ = [
@@ -57,5 +58,6 @@ __all__ = [
     "bitwise_xor",
     "bitwise_invert",
     "bitwise_lshift",
-    "bitwise_rshift"
+    "bitwise_rshift",
+    "matmul"
 ]

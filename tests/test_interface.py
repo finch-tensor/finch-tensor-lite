@@ -96,7 +96,7 @@ class TestEagerTensor(finch.AbstractEagerTensor):
         ((operator.or_, finch.bitwise_or, np.bitwise_or), np.bitwise_or),
         ((operator.xor, finch.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         ((operator.lshift, finch.bitwise_lshift, np.bitwise_left_shift), np.bitwise_left_shift),
-        ((operator.rshift, finch.bitwise_rshift, np.bitwise_right_shift), np.bitwise_right_shift) 
+        ((operator.rshift, finch.bitwise_rshift, np.bitwise_right_shift), np.bitwise_right_shift)
     ]
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):

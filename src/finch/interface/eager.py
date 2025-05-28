@@ -94,8 +94,61 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
     
     def __ixor__(self, other):
         return bitwise_xor(self, other)
+    
+    def __matmul__(self, other):
+        return matmul(self, other)
+    
+    def __rmatmul__(self, other):
+        return matmul(other, self)
+    
+    def __imatmul__(self, other):
+        return matmul(self, other)
+    
+    def __truediv__(self, other):
+        return truediv(self, other)
+    
+    def __rtruediv__(self, other):
+        return truediv(other, self)
+    
+    def __itruediv__(self, other):
+        return truediv(self, other)
+    
+    def __floordiv__(self, other):
+        return floordiv(self, other)
+    
+    def __rfloordiv__(self, other):
+        return floordiv(other, self)
+    
+    def __ifloordiv__(self, other):
+        return floordiv(self, other)
+    
+    def __mod__(self, other):
+        return mod(self, other)
+    
+    def __rmod__(self, other):
+        return mod(other, self)
+    
+    def __imod__(self, other):
+        return mod(self, other)
 
-
+    def __divmod__(self, other):
+        return divmod(self, other)
+    
+    def __rdivmod__(self, other):
+        return divmod(other, self)
+    
+    def __idivmod__(self, other):
+        return divmod(self, other)
+    
+    def __pow__(self, other):
+        return pow(self, other)
+    
+    def __rpow__(self, other):
+        return pow(other, self)
+                   
+    def __ipow__(self, other):
+        return pow(self, other)
+    
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
@@ -241,3 +294,39 @@ def bitwise_xor(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_xor(x1, x2)
     return compute(lazy.bitwise_xor(x1, x2))
+
+
+def matmul(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.matmul(x1, x2)
+    return compute(lazy.matmul(x1, x2))
+
+
+def truediv(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.truediv(x1, x2)
+    return compute(lazy.truediv(x1, x2))
+
+
+def floordiv(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.floordiv(x1, x2)
+    return compute(lazy.floordiv(x1, x2))
+
+
+def mod(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.mod(x1, x2)
+    return compute(lazy.mod(x1, x2))
+
+
+def pow_(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.pow(x1, x2)
+    return compute(lazy.pow(x1, x2))
+
+
+def divmod(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.divmod(x1, x2)
+    return compute(lazy.divmod(x1,x2))

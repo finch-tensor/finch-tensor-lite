@@ -127,7 +127,60 @@ class LazyTensor(AbstractOverrideTensor):
     
     def __ixor__(self, other):
         return bitwise_xor(self, defer(other))
+    
+    def __matmul__(self, other):
+        return matmul(self, defer(other))
+    
+    def __rmatmul__(self, other):
+        return matmul(defer(other), self)
+    
+    def __imatmul__(self, other):
+        return matmul(self, defer(other))
+    
+    def __truediv__(self, other):
+        return truediv(self, defer(other))
+    
+    def __rtruediv__(self, other):
+        return truediv(defer(other), self)
+    
+    def __itruediv__(self, other):
+        return truediv(self, defer(other))
+    
+    def __floordiv__(self, other):
+        return floordiv(self, defer(other))
+    
+    def __rfloordiv__(self, other):
+        return floordiv(defer(other), self)
 
+    def __ifloordiv__(self, other):
+        return floordiv(self, defer(other))
+    
+    def __mod__(self, other):
+        return mod(self, defer(other))
+    
+    def __rmod__(self, other):
+        return mod(defer(other), self)
+
+    def __imod__(self, other):
+        return mod(self, defer(other))
+    
+    def __pow__(self, other):
+        return pow(self, defer(other))
+    
+    def __rpow__(self, other):
+        return pow(defer(other), self)
+    
+    def __ipow__(self, other):
+        return pow(self, defer(other))
+    
+    def __divmod__(self, other):
+        return divmod(self, defer(other))
+    
+    def __rdivmod__(self, other):
+        return divmod(defer(other), self)
+
+    def __idivmod__(self, other):
+        return divmod(self, defer(other))
 
 
 def defer(arr) -> LazyTensor:
@@ -474,3 +527,27 @@ def bitwise_rshift(x1, x2) -> LazyTensor:
 
 def bitwise_xor(x1, x2) -> LazyTensor:
     return elementwise(operator.xor, defer(x1), defer(x2))
+
+
+def matmul(x1, x2) -> LazyTensor:
+    return elementwise(operator.matmul, defer(x1), defer(x2))
+
+
+def truediv(x1, x2) -> LazyTensor:
+    return elementwise(operator.truediv, defer(x1), defer(x2))
+
+
+def floordiv(x1, x2) -> LazyTensor:
+    return elementwise(operator.floordiv, defer(x1), defer(x2))
+
+
+def mod(x1, x2) -> LazyTensor:
+    return elementwise(operator.mod, defer(x1), defer(x2))
+
+
+def pow(x1, x2) -> LazyTensor:
+    return elementwise(operator.pow, defer(x1), defer(x2))
+
+
+def divmod(x1, x2) -> tuple[LazyTensor, LazyTensor]:
+    return elementwise(operator.floordiv, defer(x1), defer(x2)), elementwise(operator.mod, defer(x1), defer(x2))
