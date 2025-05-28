@@ -1,6 +1,7 @@
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import reduce
 
 from ..finch_logic import (
     Aggregate,
@@ -18,7 +19,16 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite, gensym
+from ..symbolic import (
+    Chain,
+    Fixpoint,
+    Namespace,
+    PostOrderDFS,
+    PostWalk,
+    PreWalk,
+    Rewrite,
+    gensym,
+)
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 from .compiler import LogicCompiler
 
@@ -49,7 +59,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
     # prgm = set_loop_order(prgm)
     prgm = push_fields(prgm)
 
-    # prgm = concordize(prgm)
+    prgm = flatten_plans(prgm)  # concordize(prgm)
 
     # prgm = materialize_squeeze_expand_productions(prgm)
     prgm = propagate_copy_queries(prgm)
@@ -270,7 +280,7 @@ def push_fields(root):
                 return MapJoin(
                     op,
                     tuple(
-                        Relabel(arg, tuple(reidx[f] for f in mj.get_fields()))
+                        Relabel(arg, tuple(reidx[f] for f in arg.get_fields()))
                         for arg in args
                     ),
                 )
@@ -371,6 +381,31 @@ def lift_fields(root):
     return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
 
 
+def flatten_plans(root):
+    def rule_0(ex):
+        match ex:
+            case Plan(bodies):
+                new_bodies = [
+                    tuple(body.bodies) if isinstance(body, Plan) else (body,)
+                    for body in bodies
+                ]
+                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies))
+                return Plan(flatten_bodies)
+
+    def rule_1(ex):
+        match ex:
+            case Plan(bodies):
+                body_iter = iter(bodies)
+                new_bodies = []
+                while (body := next(body_iter, None)) is not None:
+                    new_bodies.append(body)
+                    if isinstance(body, Produces):
+                        break
+                return Plan(tuple(new_bodies))
+
+    return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+
+
 def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
     match root:
         case Plan(bodies):
@@ -400,23 +435,7 @@ def propagate_transpose_queries(root):
 
 
 def normalize_names(root):
-    return _normalize_names(root, counts={})
-
-
-def freshen(counts: dict[str, int], symbol: str) -> str:
-    "Return a fresh variable in the current context"
-    if match_obj := re.search(r"^(.*)_(\d*)$", symbol):
-        tag, n = match_obj.groups()
-        n = int(n)
-    else:
-        tag, n = symbol, 1
-
-    n = max(counts.get(tag, 0) + 1, n)
-    counts[tag] = n
-    return f"{tag}_{n}" if n > 1 else tag
-
-
-def _normalize_names(root, counts: dict[str, int]):
+    namespace: Namespace = Namespace()
     scope_dict: dict[str, str] = {}
 
     def normname(symbol: str) -> str:
@@ -433,7 +452,7 @@ def _normalize_names(root, counts: dict[str, int]):
         else:
             new_sym = symbol
 
-        new_sym = freshen(counts, new_sym)
+        new_sym = namespace.freshen(new_sym)
         scope_dict[symbol] = new_sym
         return new_sym
 

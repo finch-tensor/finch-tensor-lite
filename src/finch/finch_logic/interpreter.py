@@ -72,11 +72,8 @@ class FinchLogicInterpreter:
             for arg in args:
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx in dims:
-                        if dims[idx] != dim and dim != 1:
-                            if dims[idx] == 1:  # broadcasting of 1-length dims
-                                dims[idx] = dim
-                            else:
-                                raise ValueError("Dimensions mismatched in map")
+                        if dims[idx] != dim:
+                            raise ValueError("Dimensions mismatched in map")
                     else:
                         idxs.append(idx)
                         dims[idx] = dim
@@ -87,15 +84,7 @@ class FinchLogicInterpreter:
             )
             for crds in product(*[range(dims[idx]) for idx in idxs]):
                 idx_crds = dict(zip(idxs, crds, strict=True))
-                vals = []
-                for arg in args:
-                    indices = [idx_crds[idx] for idx in arg.idxs]
-                    # broadcasting of 1-length dims
-                    indices = [
-                        idx if arg.tns.shape[shape_idx] != 1 else 0
-                        for shape_idx, idx in enumerate(indices)
-                    ]
-                    vals.append(arg.tns[*indices])
+                vals = [arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args]
                 result[*crds] = op(*vals)
             return TableValue(result, idxs)
         if head == Aggregate:

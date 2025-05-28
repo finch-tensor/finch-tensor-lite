@@ -3,6 +3,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Self
 
+import numpy as np
+
 from ..symbolic import Term
 
 
@@ -73,6 +75,10 @@ class Immediate(LogicNode):
     def get_fields(self):
         """Returns fields of the node."""
         return []
+
+    def __hash__(self):
+        val = self.val
+        return id(val) if isinstance(val, np.ndarray) else hash(val)
 
 
 @dataclass(eq=True, frozen=True)

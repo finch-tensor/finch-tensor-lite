@@ -1,3 +1,8 @@
+from .environment import (
+    AbstractContext,
+    AbstractSymbolic,
+    Namespace,
+)
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -22,4 +27,7 @@ __all__ = [
     "Chain",
     "Fixpoint",
     "gensym",
+    "Namespace",
+    "AbstractContext",
+    "AbstractSymbolic",
 ]

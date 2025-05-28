@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 
 from finch.autoschedule import (
+    flatten_plans,
     isolate_aggregates,
     isolate_reformats,
     isolate_tables,
@@ -37,7 +38,6 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.interpreter import FinchLogicInterpreter
 from finch.symbolic.gensym import _sg
-from tests.test_interface import TestEagerTensor
 
 
 def test_propagate_map_queries():
@@ -253,7 +253,7 @@ def test_push_fields():
                     ),
                     Table(
                         tns=Immediate(val="tbl2"),
-                        idxs=(Field(name="B1"), Field(name="B2")),
+                        idxs=(Field(name="B2"), Field(name="B1")),
                     ),
                 ),
             ),
@@ -505,12 +505,43 @@ def test_normalize_names():
     assert result == expected
 
 
-class HashableEagerTensor(TestEagerTensor):
-    # TODO: @mtsokol This is dreadful but it's only for testing
-    #       purposes. The plan that we pass to scheduler needs
-    #       be hashable, as well arrays that are within.
-    def __hash__(self):
-        return id(self.array)
+def test_flatten_plans():
+    plan = Plan(
+        (
+            Plan(
+                (
+                    Field("i0"),
+                    Field("i1"),
+                )
+            ),
+            Alias("A0"),
+            Plan(
+                (
+                    Plan(
+                        (
+                            Field("i3"),
+                            Produces((Alias("A1"),)),
+                        )
+                    ),
+                )
+            ),
+            Field("i4"),
+            Alias("A2"),
+        )
+    )
+
+    expected = Plan(
+        (
+            Field("i0"),
+            Field("i1"),
+            Alias("A0"),
+            Field("i3"),
+            Produces((Alias("A1"),)),
+        )
+    )
+
+    result = flatten_plans(plan)
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -523,16 +554,11 @@ class HashableEagerTensor(TestEagerTensor):
 def test_scheduler_E2E(a, b):
     i, j, k = Field("i"), Field("j"), Field("k")
 
-    tns_a = HashableEagerTensor(a)
-    tns_b = HashableEagerTensor(b)
-
     plan = Plan(
         [
-            Query(Alias("A0"), Table(Immediate(tns_a), (i, k))),
-            Query(Alias("B0"), Table(Immediate(tns_b), (k, j))),
-            Query(Alias("A1"), Reorder(Alias("A0"), (i, k, j))),
-            Query(Alias("B1"), Reorder(Alias("B0"), (i, k, j))),
-            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A1"), Alias("B1")))),
+            Query(Alias("A"), Table(Immediate(a), (i, k))),
+            Query(Alias("B"), Table(Immediate(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
             Query(
                 Alias("C"),
                 Reorder(
@@ -544,6 +570,7 @@ def test_scheduler_E2E(a, b):
     )
 
     plan_opt = optimize(plan)
+
     result = FinchLogicInterpreter()(plan_opt)[0]
 
     expected = np.matmul(a, b)
