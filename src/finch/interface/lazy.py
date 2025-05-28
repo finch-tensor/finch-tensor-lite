@@ -49,6 +49,9 @@ class LazyTensor(AbstractOverrideTensor):
 
     def __radd__(self, other):
         return add(defer(other), self)
+    
+    def __iadd__(self, other):
+        return add(self, defer(other))
 
     def __sub__(self, other):
         return subtract(self, defer(other))
@@ -56,11 +59,17 @@ class LazyTensor(AbstractOverrideTensor):
     def __rsub__(self, other):
         return subtract(defer(other), self)
 
+    def __isub__(self, other):
+        return subtract(self, defer(other))
+
     def __mul__(self, other):
         return multiply(self, defer(other))
 
     def __rmul__(self, other):
         return multiply(defer(other), self)
+
+    def __imul__(self, other):
+        return multiply(self, defer(other))
 
     def __abs__(self):
         return abs(self)
@@ -77,11 +86,17 @@ class LazyTensor(AbstractOverrideTensor):
     def __rand__(self, other):
         return bitwise_and(defer(other), self)
 
+    def __iand__(self, other):
+        return bitwise_and(self, defer(other))
+
     def __lshift__(self, other):
         return bitwise_lshift(self, defer(other))
 
     def __rlshift__(self, other):
         return bitwise_lshift(defer(other), self)
+
+    def __ilshift__(self, other):
+        return bitwise_lshift(self, defer(other))
 
     def __invert__(self):
         return bitwise_invert(self)
@@ -92,17 +107,26 @@ class LazyTensor(AbstractOverrideTensor):
     def __ror__(self, other):
         return bitwise_or(defer(other), self)
 
+    def __ior__(self, other):
+        return bitwise_or(self, defer(other))
+
     def __rshift__(self, other):
         return bitwise_rshift(self, defer(other))
 
     def __rrshift__(self, other):
         return bitwise_rshift(defer(other), self)
 
+    def __lrshift__(self, other):
+        return bitwise_rshift(self, defer(other))
+
     def __xor__(self, other):
         return bitwise_xor(self, defer(other))
 
     def __rxor__(self, other):
         return bitwise_xor(defer(other), self)
+    
+    def __ixor__(self, other):
+        return bitwise_xor(self, defer(other))
 
 
 

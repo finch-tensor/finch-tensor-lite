@@ -16,18 +16,27 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
 
     def __radd__(self, other):
         return add(other, self)
+    
+    def __iadd__(self, other):
+        return add(self, other)
 
     def __sub__(self, other):
         return subtract(self, other)
 
     def __rsub__(self, other):
         return subtract(other, self)
+    
+    def __isub__(self, other):
+        return subtract(self, other)
 
     def __mul__(self, other):
         return multiply(self, other)
 
     def __rmul__(self, other):
         return multiply(other, self)
+    
+    def __imul__(self, other):
+        return multiply(self, other)
 
     def __abs__(self):
         return abs(self)
@@ -43,12 +52,18 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
 
     def __rand__(self, other):
         return bitwise_and(other, self)
+    
+    def __iand__(self, other):
+        return bitwise_and(self, other)
 
     def __lshift__(self, other):
         return bitwise_lshift(self, other)
 
     def __rlshift__(self, other):
         return bitwise_lshift(other, self)
+    
+    def __ilshift__(self, other):
+        return bitwise_lshift(self, other)
 
     def __invert__(self):
         return bitwise_invert(self)
@@ -59,17 +74,26 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
     def __ror__(self, other):
         return bitwise_or(other, self)
 
+    def __ior__(self, other):
+        return bitwise_or(self, other)
+
     def __rshift__(self, other):
         return bitwise_rshift(self, other)
 
     def __rrshift__(self, other):
         return bitwise_rshift(other, self)
 
+    def __irshift__(self, other):
+        return bitwise_rshift(self, other)
+
     def __xor__(self, other):
         return bitwise_xor(self, other)
 
     def __rxor__(self, other):
         return bitwise_xor(other, self)
+    
+    def __ixor__(self, other):
+        return bitwise_xor(self, other)
 
 
 
