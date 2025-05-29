@@ -1,8 +1,8 @@
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TypeVar, overload
 from functools import reduce
+from typing import TypeVar, overload
 
 from ..finch_logic import (
     Aggregate,

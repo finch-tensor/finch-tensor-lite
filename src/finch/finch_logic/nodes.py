@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self
 
-from ..symbolic import Term, TermTree
-
 import numpy as np
+
+from ..symbolic import Term, TermTree
 
 
 @dataclass(eq=True, frozen=True)
@@ -59,6 +59,7 @@ class Immediate(LogicNode):
     def __hash__(self):
         val = self.val
         return id(val) if isinstance(val, np.ndarray) else hash(val)
+
 
 @dataclass(eq=True, frozen=True)
 class Deferred(LogicNode):
@@ -163,7 +164,7 @@ class MapJoin(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Aggregate(LogicTree):
+class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
     with `init`.  `idxs` are the dimensions to reduce. May happen in any order.
@@ -250,7 +251,7 @@ class Relabel(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Reformat(LogicTree):
+class Reformat(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reformats `arg` into the tensor `tns`.
 
