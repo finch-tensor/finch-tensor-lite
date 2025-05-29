@@ -6,6 +6,8 @@ from typing import Any, Self
 
 from ..symbolic import Term, TermTree
 
+import numpy as np
+
 
 @dataclass(eq=True, frozen=True)
 class LogicNode(Term, ABC):
@@ -54,6 +56,9 @@ class Immediate(LogicNode):
 
     val: Any
 
+    def __hash__(self):
+        val = self.val
+        return id(val) if isinstance(val, np.ndarray) else hash(val)
 
 @dataclass(eq=True, frozen=True)
 class Deferred(LogicNode):

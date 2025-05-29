@@ -1,3 +1,6 @@
+from .environment import (
+    Namespace,
+)
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -24,4 +27,5 @@ __all__ = [
     "Chain",
     "Fixpoint",
     "gensym",
+    "Namespace",
 ]

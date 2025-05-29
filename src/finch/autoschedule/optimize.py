@@ -1,6 +1,8 @@
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TypeVar, overload
+from functools import reduce
 
 from ..finch_logic import (
     Aggregate,
@@ -20,7 +22,16 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite, gensym
+from ..symbolic import (
+    Chain,
+    Fixpoint,
+    Namespace,
+    PostOrderDFS,
+    PostWalk,
+    PreWalk,
+    Rewrite,
+    gensym,
+)
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 from .compiler import LogicCompiler
 
@@ -30,6 +41,8 @@ T = TypeVar("T", bound="LogicNode")
 def optimize(prgm: LogicNode) -> LogicNode:
     prgm = lift_subqueries(prgm)
 
+    # prgm = propagate_map_queries_backward(prgm)
+
     prgm = isolate_reformats(prgm)
     prgm = isolate_aggregates(prgm)
     prgm = isolate_tables(prgm)
@@ -37,7 +50,29 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = pretty_labels(prgm)
 
-    return propagate_map_queries(prgm)
+    prgm = propagate_fields(prgm)
+    prgm = propagate_copy_queries(prgm)
+    prgm = propagate_transpose_queries(prgm)
+    prgm = propagate_map_queries(prgm)
+
+    prgm = propagate_fields(prgm)
+    prgm = push_fields(prgm)
+    prgm = lift_fields(prgm)
+    prgm = push_fields(prgm)
+
+    prgm = propagate_transpose_queries(prgm)
+    # prgm = set_loop_order(prgm)
+    prgm = push_fields(prgm)
+
+    prgm = flatten_plans(prgm)  # concordize(prgm)
+
+    # prgm = materialize_squeeze_expand_productions(prgm)
+    prgm = propagate_copy_queries(prgm)
+
+    prgm = propagate_into_reformats(prgm)
+    prgm = propagate_copy_queries(prgm)
+
+    return normalize_names(prgm)
 
 
 def isolate_aggregates(root: LogicNode) -> LogicNode:
@@ -297,7 +332,7 @@ def push_fields(root):
                 return MapJoin(
                     op,
                     tuple(
-                        Relabel(arg, tuple(reidx[f] for f in mj.get_fields()))
+                        Relabel(arg, tuple(reidx[f] for f in arg.get_fields()))
                         for arg in args
                     ),
                 )
@@ -398,13 +433,38 @@ def lift_fields(root):
     return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
 
 
+def flatten_plans(root):
+    def rule_0(ex):
+        match ex:
+            case Plan(bodies):
+                new_bodies = [
+                    tuple(body.bodies) if isinstance(body, Plan) else (body,)
+                    for body in bodies
+                ]
+                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies))
+                return Plan(flatten_bodies)
+
+    def rule_1(ex):
+        match ex:
+            case Plan(bodies):
+                body_iter = iter(bodies)
+                new_bodies = []
+                while (body := next(body_iter, None)) is not None:
+                    new_bodies.append(body)
+                    if isinstance(body, Produces):
+                        break
+                return Plan(tuple(new_bodies))
+
+    return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+
+
 def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
     match root:
         case Plan(bodies):
             return Plan(
                 tuple(_propagate_transpose_queries(body, bindings) for body in bodies)
             )
-        case Query(lhs, rhs) as query:
+        case Query(lhs, rhs):
             rhs = push_fields(
                 Rewrite(PostWalk(lambda node: bindings.get(node, node)))(rhs)
             )
@@ -413,7 +473,7 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
                     bindings[lhs] = rhs
                     return Plan()
                 case _:
-                    return query
+                    return Query(lhs, rhs)
         case Produces(_) as prod:
             return push_fields(
                 Rewrite(PostWalk(lambda node: bindings.get(node, node)))(prod)
@@ -424,6 +484,42 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
 
 def propagate_transpose_queries(root):
     return _propagate_transpose_queries(root, bindings={})
+
+
+def normalize_names(root):
+    namespace: Namespace = Namespace()
+    scope_dict: dict[str, str] = {}
+
+    def normname(symbol: str) -> str:
+        if symbol in scope_dict:
+            return scope_dict[symbol]
+
+        if "#" in symbol:
+            if (match_obj := re.search(r"##(.+)#\d+", symbol)) or (
+                match_obj := re.search(r"#\d+#(.+)", symbol)
+            ):
+                (new_sym,) = match_obj.groups()
+            else:
+                raise Exception(f"Invalid symbol: {symbol}")
+        else:
+            new_sym = symbol
+
+        new_sym = namespace.freshen(new_sym)
+        scope_dict[symbol] = new_sym
+        return new_sym
+
+    def rule_0(ex):
+        match ex:
+            case Alias(name):
+                return Alias(normname(name))
+
+    def rule_1(ex):
+        match ex:
+            case Field(name):
+                return Field(normname(name))
+
+    root = Rewrite(PostWalk(rule_0))(root)
+    return Rewrite(PostWalk(rule_1))(root)
 
 
 class DefaultLogicOptimizer:

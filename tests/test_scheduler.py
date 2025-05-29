@@ -1,11 +1,18 @@
+from operator import add, mul
+
 import pytest
 
+import numpy as np
+
 from finch.autoschedule import (
+    flatten_plans,
     isolate_aggregates,
     isolate_reformats,
     isolate_tables,
     lift_fields,
     lift_subqueries,
+    normalize_names,
+    optimize,
     pretty_labels,
     propagate_copy_queries,
     propagate_fields,
@@ -29,10 +36,11 @@ from finch.finch_logic import (
     Subquery,
     Table,
 )
+from finch.finch_logic.interpreter import FinchLogicInterpreter
 from finch.symbolic.gensym import _sg
 
 
-def test_propagate_map_queries_simple():
+def test_propagate_map_queries():
     plan = Plan(
         (
             Query(
@@ -245,7 +253,7 @@ def test_push_fields():
                     ),
                     Table(
                         tns=Immediate(val="tbl2"),
-                        idxs=(Field(name="B1"), Field(name="B2")),
+                        idxs=(Field(name="B2"), Field(name="B1")),
                     ),
                 ),
             ),
@@ -464,3 +472,107 @@ def test_lift_fields():
 
     result = lift_fields(plan)
     assert result == expected
+
+
+def test_normalize_names():
+    plan = Plan(
+        (
+            Field("##foo#8"),
+            Field("##foo#1"),
+            Field("#2#foo"),
+            Alias("##foo#9"),
+            Field("#10#A"),
+            Alias("bar"),
+            Field("j"),
+            Alias("##test#0"),
+        )
+    )
+
+    expected = Plan(
+        (
+            Field("foo_2"),
+            Field("foo_3"),
+            Field("foo_4"),
+            Alias("foo"),
+            Field("A"),
+            Alias("bar"),
+            Field("j"),
+            Alias("test"),
+        )
+    )
+
+    result = normalize_names(plan)
+    assert result == expected
+
+
+def test_flatten_plans():
+    plan = Plan(
+        (
+            Plan(
+                (
+                    Field("i0"),
+                    Field("i1"),
+                )
+            ),
+            Alias("A0"),
+            Plan(
+                (
+                    Plan(
+                        (
+                            Field("i3"),
+                            Produces((Alias("A1"),)),
+                        )
+                    ),
+                )
+            ),
+            Field("i4"),
+            Alias("A2"),
+        )
+    )
+
+    expected = Plan(
+        (
+            Field("i0"),
+            Field("i1"),
+            Alias("A0"),
+            Field("i3"),
+            Produces((Alias("A1"),)),
+        )
+    )
+
+    result = flatten_plans(plan)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
+        (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
+    ],
+)
+def test_scheduler_E2E(a, b):
+    i, j, k = Field("i"), Field("j"), Field("k")
+
+    plan = Plan(
+        [
+            Query(Alias("A"), Table(Immediate(a), (i, k))),
+            Query(Alias("B"), Table(Immediate(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
+            Query(
+                Alias("C"),
+                Reorder(
+                    Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,)), (i, j)
+                ),
+            ),
+            Produces((Alias("C"),)),
+        ]
+    )
+
+    plan_opt = optimize(plan)
+
+    result = FinchLogicInterpreter()(plan_opt)[0]
+
+    expected = np.matmul(a, b)
+
+    np.testing.assert_equal(result, expected)

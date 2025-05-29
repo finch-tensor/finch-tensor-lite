@@ -16,11 +16,13 @@ from ..finch_logic import (
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .optimize import (
+    flatten_plans,
     isolate_aggregates,
     isolate_reformats,
     isolate_tables,
     lift_fields,
     lift_subqueries,
+    normalize_names,
     optimize,
     pretty_labels,
     propagate_copy_queries,
@@ -46,6 +48,8 @@ __all__ = [
     "Reorder",
     "Subquery",
     "Table",
+    "flatten_plans",
+    "normalize_names",
     "optimize",
     "propagate_fields",
     "propagate_map_queries",
