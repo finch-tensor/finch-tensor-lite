@@ -16,27 +16,18 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
 
     def __radd__(self, other):
         return add(other, self)
-    
-    def __iadd__(self, other):
-        return add(self, other)
 
     def __sub__(self, other):
         return subtract(self, other)
 
     def __rsub__(self, other):
         return subtract(other, self)
-    
-    def __isub__(self, other):
-        return subtract(self, other)
 
     def __mul__(self, other):
         return multiply(self, other)
 
     def __rmul__(self, other):
         return multiply(other, self)
-    
-    def __imul__(self, other):
-        return multiply(self, other)
 
     def __abs__(self):
         return abs(self)
@@ -46,27 +37,18 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
 
     def __neg__(self):
         return negative(self)
-    
+
     def __and__(self, other):
         return bitwise_and(self, other)
 
     def __rand__(self, other):
         return bitwise_and(other, self)
-    
-    def __iand__(self, other):
-        return bitwise_and(self, other)
 
     def __lshift__(self, other):
         return bitwise_lshift(self, other)
 
     def __rlshift__(self, other):
         return bitwise_lshift(other, self)
-    
-    def __ilshift__(self, other):
-        return bitwise_lshift(self, other)
-
-    def __invert__(self):
-        return bitwise_invert(self)
 
     def __or__(self, other):
         return bitwise_or(self, other)
@@ -74,81 +56,42 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
     def __ror__(self, other):
         return bitwise_or(other, self)
 
-    def __ior__(self, other):
-        return bitwise_or(self, other)
-
     def __rshift__(self, other):
         return bitwise_rshift(self, other)
 
     def __rrshift__(self, other):
         return bitwise_rshift(other, self)
 
-    def __irshift__(self, other):
-        return bitwise_rshift(self, other)
-
     def __xor__(self, other):
         return bitwise_xor(self, other)
 
     def __rxor__(self, other):
         return bitwise_xor(other, self)
-    
-    def __ixor__(self, other):
-        return bitwise_xor(self, other)
-    
-    def __matmul__(self, other):
-        return matmul(self, other)
-    
-    def __rmatmul__(self, other):
-        return matmul(other, self)
-    
-    def __imatmul__(self, other):
-        return matmul(self, other)
-    
+
     def __truediv__(self, other):
         return truediv(self, other)
-    
+
     def __rtruediv__(self, other):
         return truediv(other, self)
-    
-    def __itruediv__(self, other):
-        return truediv(self, other)
-    
+
     def __floordiv__(self, other):
         return floordiv(self, other)
-    
+
     def __rfloordiv__(self, other):
         return floordiv(other, self)
-    
-    def __ifloordiv__(self, other):
-        return floordiv(self, other)
-    
+
     def __mod__(self, other):
         return mod(self, other)
-    
+
     def __rmod__(self, other):
         return mod(other, self)
-    
-    def __imod__(self, other):
-        return mod(self, other)
 
-    def __divmod__(self, other):
-        return divmod(self, other)
-    
-    def __rdivmod__(self, other):
-        return divmod(other, self)
-    
-    def __idivmod__(self, other):
-        return divmod(self, other)
-    
     def __pow__(self, other):
         return pow(self, other)
-    
+
     def __rpow__(self, other):
         return pow(other, self)
-                   
-    def __ipow__(self, other):
-        return pow(self, other)
-    
+
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
@@ -260,6 +203,7 @@ def negative(x):
         return lazy.negative(x)
     return compute(lazy.negative(x))
 
+
 def bitwise_and(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_and(x1, x2)
@@ -270,12 +214,6 @@ def bitwise_lshift(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_lshift(x1, x2)
     return compute(lazy.bitwise_lshift(x1, x2))
-
-
-def bitwise_invert(x):
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.bitwise_invert(x)
-    return compute(lazy.bitwise_invert(x))
 
 
 def bitwise_or(x1, x2):
@@ -294,12 +232,6 @@ def bitwise_xor(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_xor(x1, x2)
     return compute(lazy.bitwise_xor(x1, x2))
-
-
-def matmul(x1, x2):
-    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.matmul(x1, x2)
-    return compute(lazy.matmul(x1, x2))
 
 
 def truediv(x1, x2):
@@ -324,9 +256,3 @@ def pow_(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.pow(x1, x2)
     return compute(lazy.pow(x1, x2))
-
-
-def divmod(x1, x2):
-    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.divmod(x1, x2)
-    return compute(lazy.divmod(x1,x2))

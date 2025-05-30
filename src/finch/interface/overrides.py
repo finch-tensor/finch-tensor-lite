@@ -14,10 +14,8 @@ ufunc_map = {
     np.bitwise_and: operator.and_,
     np.bitwise_or: operator.or_,
     np.bitwise_xor: operator.xor,
-    np.bitwise_invert: operator.invert,
     np.bitwise_left_shift: operator.lshift,
-    np.bitwise_right_shift: operator.rshift,
-    np.matmul: operator.matmul
+    np.bitwise_right_shift: operator.rshift
 }
 
 

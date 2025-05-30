@@ -16,10 +16,8 @@ from .eager import (
     bitwise_and,
     bitwise_or,
     bitwise_xor,
-    bitwise_invert,
     bitwise_lshift,
-    bitwise_rshift,
-    matmul
+    bitwise_rshift
 )
 
 # from .tensor import *
@@ -49,8 +47,6 @@ __all__ = [
     "bitwise_and",
     "bitwise_or",
     "bitwise_xor",
-    "bitwise_invert",
     "bitwise_lshift",
-    "bitwise_rshift",
-    "matmul"
+    "bitwise_rshift"
 ]
