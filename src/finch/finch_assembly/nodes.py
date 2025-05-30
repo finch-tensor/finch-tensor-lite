@@ -6,7 +6,6 @@ from ..algebra import element_type
 from ..symbolic import Term
 
 
-@dataclass(eq=True, frozen=True)
 class AssemblyNode(Term):
     """
     AssemblyNode
@@ -17,25 +16,20 @@ class AssemblyNode(Term):
     linear memory regions called "buffers", and explicit memory management.
     """
 
-    @staticmethod
-    @abstractmethod
-    def is_expr():
-        """Determines if the node is expresion."""
-        ...
-
     @classmethod
     def head(cls):
         """Returns the head of the node."""
         return cls
 
-    def children(self):
-        """Returns the children of the node."""
-        raise Exception(f"`children` isn't supported for {self.__class__}.")
-
     @classmethod
     def make_term(cls, head, *args):
         """Creates a term with the given head and arguments."""
         return head(*args)
+
+class AssemblyTree(TermTree):
+    def children(self):
+        """Returns the children of the node."""
+        raise Exception(f"`children` isn't supported for {self.__class__}.")
 
 
 class AssemblyExpression(AssemblyNode):
@@ -55,11 +49,6 @@ class Immediate(AssemblyExpression):
 
     val: Any
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
     def get_type(self):
         """Returns the type of the expression."""
         return type(self.val)
@@ -77,11 +66,6 @@ class Variable(AssemblyExpression):
     name: str
     type: None
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
     def get_type(self):
         """Returns the type of the expression."""
         return self.type
@@ -97,11 +81,6 @@ class Symbolic(AssemblyExpression):
     """
 
     obj: Any
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
 
     def children(self):
         """Returns the children of the node."""
@@ -124,10 +103,6 @@ class Load(AssemblyExpression):
 
     buffer: AssemblyExpression
     index: AssemblyExpression
-
-    @staticmethod
-    def is_expr():
-        return True
 
     def children(self):
         return [self.buffer, self.index]
@@ -152,10 +127,6 @@ class Store(AssemblyNode):
     index: AssemblyNode
     value: AssemblyNode
 
-    @staticmethod
-    def is_expr():
-        return True
-
     def children(self):
         return [self.buffer, self.index, self.value]
 
@@ -173,10 +144,6 @@ class Resize(AssemblyNode):
     buffer: AssemblyNode
     new_size: AssemblyNode
 
-    @staticmethod
-    def is_expr():
-        return True
-
     def children(self):
         return [self.buffer, self.new_size]
 
@@ -191,10 +158,6 @@ class Length(AssemblyExpression):
     """
 
     buffer: AssemblyNode
-
-    @staticmethod
-    def is_expr():
-        return True
 
     def children(self):
         return [self.buffer]
@@ -216,11 +179,6 @@ class Call(AssemblyNode):
 
     op: Immediate
     args: tuple[AssemblyNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
 
     def children(self):
         """Returns the children of the node."""
@@ -253,11 +211,6 @@ class Function(AssemblyNode):
     args: tuple[AssemblyNode, ...]
     body: AssemblyNode
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
     def children(self):
         """Returns the children of the node."""
         return [self.name, *self.args, self.body]
@@ -284,11 +237,6 @@ class ForLoop(AssemblyNode):
     end: AssemblyNode
     body: AssemblyNode
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
     def children(self):
         """Returns the children of the node."""
         return [self.var, self.start, self.end, self.body]
@@ -313,11 +261,6 @@ class BufferLoop(AssemblyNode):
     var: AssemblyNode
     body: AssemblyNode
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
     def children(self):
         """Returns the children of the node."""
         return [self.buffer, self.var, self.body]
@@ -339,11 +282,6 @@ class WhileLoop(AssemblyNode):
 
     condition: AssemblyNode
     body: AssemblyNode
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
 
     def children(self):
         """Returns the children of the node."""
@@ -370,11 +308,6 @@ class Assign(AssemblyNode):
     lhs: AssemblyNode
     rhs: AssemblyNode
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
     def children(self):
         """Returns the children of the node."""
         return [self.type, self.lhs, self.rhs]
@@ -391,11 +324,6 @@ class Return(AssemblyNode):
     """
 
     args: tuple[AssemblyNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
 
     def children(self):
         """Returns the children of the node."""
@@ -416,11 +344,6 @@ class Block(AssemblyNode):
     """
 
     bodies: tuple[AssemblyNode, ...] = ()
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
 
     def children(self):
         """Returns the children of the node."""
@@ -444,11 +367,6 @@ class Module(AssemblyNode):
 
     funcs: tuple[AssemblyNode, ...] = ()
     main: AssemblyNode = None
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
 
     def children(self):
         """Returns the children of the node."""
