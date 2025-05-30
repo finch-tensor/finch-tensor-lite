@@ -24,7 +24,11 @@ from .interface import (
     bitwise_or,
     bitwise_xor,
     bitwise_lshift,
-    bitwise_rshift
+    bitwise_rshift,
+    truediv,
+    floordiv,
+    mod,
+    pow
 )
 
 __all__ = [
@@ -55,5 +59,9 @@ __all__ = [
     "bitwise_or",
     "bitwise_xor",
     "bitwise_lshift",
-    "bitwise_rshift"
+    "bitwise_rshift",
+    "truediv",
+    "floordiv",
+    "mod",
+    "pow"
 ]

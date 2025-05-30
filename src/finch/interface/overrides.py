@@ -15,7 +15,11 @@ ufunc_map = {
     np.bitwise_or: operator.or_,
     np.bitwise_xor: operator.xor,
     np.bitwise_left_shift: operator.lshift,
-    np.bitwise_right_shift: operator.rshift
+    np.bitwise_right_shift: operator.rshift,
+    np.true_divide: operator.truediv,
+    np.floor_divide: operator.floordiv,
+    np.mod: operator.mod,
+    np.pow: operator.pow
 }
 
 

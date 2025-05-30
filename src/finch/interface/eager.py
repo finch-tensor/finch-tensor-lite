@@ -252,7 +252,7 @@ def mod(x1, x2):
     return compute(lazy.mod(x1, x2))
 
 
-def pow_(x1, x2):
+def pow(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.pow(x1, x2)
     return compute(lazy.pow(x1, x2))

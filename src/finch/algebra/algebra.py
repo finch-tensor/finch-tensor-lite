@@ -275,6 +275,13 @@ def is_identity(op: Any, val: Any) -> bool:
 
 register_property(operator.add, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.mul, "__call__", "is_identity", lambda op, val: val == 1)
+register_property(operator.or_, "__call__", "is_identity", lambda op, val: val == 0)
+register_property(operator.xor, "__call__", "is_identity", lambda op, val: val == 0)
+register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
+register_property(operator.floordiv, "__call__", "is_identity", lambda op, val: val == 1)
+register_property(operator.lshift,  "__call__", "is_identity", lambda op, val: val == 0)
+register_property(operator.rshift,  "__call__", "is_identity", lambda op, val: val == 0)
+register_property(operator.pow,  "__call__", "is_identity", lambda op, val: val == 1)
 
 
 def is_distributive(op, other_op):

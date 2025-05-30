@@ -17,7 +17,11 @@ from .eager import (
     bitwise_or,
     bitwise_xor,
     bitwise_lshift,
-    bitwise_rshift
+    bitwise_rshift,
+    truediv,
+    floordiv,
+    mod,
+    pow
 )
 
 # from .tensor import *
@@ -48,5 +52,9 @@ __all__ = [
     "bitwise_or",
     "bitwise_xor",
     "bitwise_lshift",
-    "bitwise_rshift"
+    "bitwise_rshift",
+    "truediv",
+    "floordiv",
+    "mod",
+    "pow"
 ]
