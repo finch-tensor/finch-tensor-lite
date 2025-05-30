@@ -13,17 +13,7 @@ compile = "python -c 'import finch'"
 python = ">=3.10,<3.13"
 
 [pypi-dependencies]
-finch-tensor-lite = { path = ".", editable = true }
-numpy = ">=1.19"
-
-[feature.test.pypi-dependencies]
-pytest = "*"
-pytest-cov = "*"
-sparse = "*"
-numba = ">=0.60"
-scipy = "*"
-numpy = "==2.*"
-mypy = "==1.15.*"
+finch-tensor-lite = { path = ".", editable = true, extras = ["test"] }
 
 [feature.test.tasks]
 test = { cmd = "pytest", depends-on = ["compile"] }

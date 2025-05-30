@@ -1,11 +1,19 @@
+import re
 from collections.abc import Iterable
+from dataclasses import dataclass
+from functools import reduce
+from typing import TypeVar, overload
+
+from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 
 from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
+    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -16,13 +24,26 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite, gensym
+from ..symbolic import (
+    Chain,
+    Fixpoint,
+    Namespace,
+    PostOrderDFS,
+    PostWalk,
+    PreWalk,
+    Rewrite,
+    gensym,
+)
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 from .compiler import LogicCompiler
+
+T = TypeVar("T", bound="LogicNode")
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
     prgm = lift_subqueries(prgm)
+
+    prgm = propagate_map_queries_backward(prgm)
 
     prgm = isolate_reformats(prgm)
     prgm = isolate_aggregates(prgm)
@@ -31,7 +52,29 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = pretty_labels(prgm)
 
-    return propagate_map_queries(prgm)
+    prgm = propagate_fields(prgm)
+    prgm = propagate_copy_queries(prgm)
+    prgm = propagate_transpose_queries(prgm)
+    prgm = propagate_map_queries(prgm)
+
+    prgm = propagate_fields(prgm)
+    prgm = push_fields(prgm)
+    prgm = lift_fields(prgm)
+    prgm = push_fields(prgm)
+
+    prgm = propagate_transpose_queries(prgm)
+    # prgm = set_loop_order(prgm)
+    prgm = push_fields(prgm)
+
+    prgm = flatten_plans(prgm)  # concordize(prgm)
+
+    prgm = materialize_squeeze_expand_productions(prgm)
+    prgm = propagate_copy_queries(prgm)
+
+    prgm = propagate_into_reformats(prgm)
+    prgm = propagate_copy_queries(prgm)
+
+    return normalize_names(prgm)
 
 
 def isolate_aggregates(root: LogicNode) -> LogicNode:
@@ -81,6 +124,24 @@ def pretty_labels(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
 
 
+@overload
+def _lift_subqueries_expr(  # type: ignore[overload-overlap]
+    node: Subquery, bindings: dict[LogicNode, LogicNode]
+) -> LogicExpression: ...
+
+
+@overload
+def _lift_subqueries_expr(
+    node: LogicTree, bindings: dict[LogicNode, LogicNode]
+) -> LogicTree: ...
+
+
+@overload
+def _lift_subqueries_expr(
+    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+) -> LogicNode: ...
+
+
 def _lift_subqueries_expr(
     node: LogicNode, bindings: dict[LogicNode, LogicNode]
 ) -> LogicNode:
@@ -90,10 +151,10 @@ def _lift_subqueries_expr(
                 arg_2 = _lift_subqueries_expr(arg, bindings)
                 bindings[lhs] = arg_2
             return lhs
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *(_lift_subqueries_expr(x, bindings) for x in any.children()),
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(),
+                *(_lift_subqueries_expr(x, bindings) for x in tree.children()),
             )
         case _:
             return node
@@ -112,7 +173,7 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
         case Produces() as p:
             return p
         case _:
-            raise Exception(f"Invalid node: {node}")
+            raise Exception(f"Invalid node: {node} in lift_subqueries")
 
 
 def _get_productions(root: LogicNode) -> list[LogicNode]:
@@ -154,21 +215,182 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(rule_2))(root)
 
 
+def propagate_map_queries_backward(root):
+    def rule_0(ex):
+        match ex:
+            case Aggregate(op, init, arg, ()):
+                return MapJoin(op, (init, arg))
+
+    root = Rewrite(PostWalk(rule_0))(root)
+
+    uses: dict[LogicNode, int] = {}
+    defs: dict[LogicNode, LogicNode] = {}
+    rets = _get_productions(root)
+    for node in PostOrderDFS(root):
+        match node:
+            case Alias() as a:
+                uses[a] = uses.get(a, 0) + 1
+            case Query(a, b):
+                uses[a] = uses.get(a, 0) - 1
+                defs[a] = b
+
+    def rule_1(ex):
+        match ex:
+            case Query(a, _) if uses[a] == 1 and a not in rets:
+                return Plan()
+
+    def rule_2(ex):
+        match ex:
+            case a if uses.get(a, 0) == 1 and a not in rets:
+                return defs.get(a, a)
+
+    root = Rewrite(PreWalk(Chain([rule_1, rule_2])))(root)
+    root = push_fields(root)
+
+    def rule_1(ex):
+        match ex:
+            case MapJoin(
+                Immediate() as f,
+                args,
+            ):
+                for idx, item in reversed(list(enumerate(args))):
+                    before_item = args[:idx]
+                    after_item = args[idx + 1 :]
+                    match item:
+                        case (
+                            Aggregate(
+                                Immediate() as g, Immediate() as init, arg, idxs
+                            ) as agg
+                        ) if (
+                            is_distributive(f.val, g.val)
+                            and is_annihilator(f.val, init.val)
+                            and len(agg.get_fields())
+                            == len(MapJoin(f, (*before_item, *after_item)).get_fields())
+                        ):
+                            return Aggregate(
+                                g,
+                                init,
+                                MapJoin(f, (*before_item, arg, *after_item)),
+                                idxs,
+                            )
+                return None
+
+    def rule_2(ex):
+        match ex:
+            case Aggregate(
+                Immediate() as op_1,
+                Immediate() as init_1,
+                Aggregate(op_2, Immediate() as init_2, arg, idxs_1),
+                idxs_2,
+            ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
+                return Aggregate(op_1, init_1, arg, idxs_1 + idxs_2)
+
+    def rule_3(ex):
+        match ex:
+            case Reorder(Aggregate(op, init, arg, idxs_1), idxs_2):
+                return Aggregate(op, init, Reorder(arg, idxs_2 + idxs_1), idxs_1)
+
+    return Rewrite(Fixpoint(PreWalk(Chain([rule_1, rule_2, rule_3]))))(root)
+
+
+def propagate_copy_queries(root):
+    copies = {}
+    for node in PostOrderDFS(root):
+        match node:
+            case Query(lhs, Alias(_) as rhs):
+                copies[lhs] = copies.get(rhs, rhs)
+
+    def rule_0(ex):
+        match ex:
+            case Query(lhs, rhs) if lhs == rhs:
+                return Plan()
+
+    return Rewrite(PostWalk(Chain([lambda node: copies.get(node), rule_0])))(root)
+
+
+def propagate_into_reformats(root):
+    @dataclass
+    class Entry:
+        node: Query
+        node_pos: int
+        matched: Query | None = None
+        matched_pos: int | None = None
+
+    def rule_0(ex):
+        match ex:
+            case Plan(bodies):
+                queries: list[Entry] = []
+                for idx, node in enumerate(bodies):
+                    match node:
+                        case Query(_, Reformat(_, arg)) as que_ref:
+                            for q in queries[::-1]:
+                                if q.node.lhs == arg:
+                                    q.matched = que_ref
+                                    q.matched_pos = idx
+                                    break
+                        case Query(_, _) as q:
+                            queries.append(Entry(q, idx))
+
+                for q in queries[::-1]:
+                    if q.matched is not None:
+                        bodies = list(bodies)
+                        bodies.pop(q.matched_pos)
+                        if q.node.lhs not in PostOrderDFS(
+                            Plan(bodies[q.node_pos + 1 :])
+                        ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
+                            bodies[q.node_pos] = Query(
+                                q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
+                            )
+                            return Plan(tuple(bodies))
+                return None
+
+    return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
+
+
+@overload
+def _propagate_fields(root: Plan, fields: dict[LogicNode, Iterable[Field]]) -> Plan: ...
+
+
+@overload
 def _propagate_fields(
-    root: LogicNode, fields: dict[LogicNode, Iterable[LogicNode]]
+    root: Query, fields: dict[LogicNode, Iterable[Field]]
+) -> Query: ...
+
+
+@overload
+def _propagate_fields(
+    root: Alias, fields: dict[LogicNode, Iterable[Field]]
+) -> Relabel: ...
+
+
+@overload
+def _propagate_fields(
+    root: LogicTree, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicTree: ...
+
+
+@overload
+def _propagate_fields(
+    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicNode: ...
+
+
+def _propagate_fields(
+    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicNode:
     match root:
         case Plan(bodies):
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
         case Query(lhs, rhs):
-            rhs = _propagate_fields(rhs, fields)
-            fields[lhs] = rhs.get_fields()
-            return Query(lhs, rhs)
-        case Alias() as a:
+            rhs_2 = _propagate_fields(rhs, fields)
+            assert isinstance(rhs_2, LogicExpression)
+            fields[lhs] = rhs_2.get_fields()
+            return Query(lhs, rhs_2)
+        case Alias(_) as a:
             return Relabel(a, tuple(fields[a]))
-        case node if node.is_expr():
-            return node.make_term(
-                node.head(), *[_propagate_fields(c, fields) for c in node.children()]
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(), *(_propagate_fields(c, fields) for c in tree.children())
             )
         case node:
             return node
@@ -190,7 +412,7 @@ def push_fields(root):
                 return MapJoin(
                     op,
                     tuple(
-                        Relabel(arg, tuple(reidx[f] for f in mj.get_fields()))
+                        Relabel(arg, tuple(reidx[f] for f in arg.get_fields()))
                         for arg in args
                     ),
                 )
@@ -270,6 +492,141 @@ def push_fields(root):
                 )
 
     return Rewrite(PreWalk(Chain([Fixpoint(rule_6), rule_7, rule_8])))(root)
+
+
+def lift_fields(root):
+    def rule_0(ex):
+        match ex:
+            case Aggregate(op, init, arg, idxs):
+                return Aggregate(op, init, Reorder(arg, tuple(arg.get_fields())), idxs)
+
+    def rule_1(ex):
+        match ex:
+            case Query(lhs, MapJoin() as rhs):
+                return Query(lhs, Reorder(rhs, tuple(rhs.get_fields())))
+
+    def rule_2(ex):
+        match ex:
+            case Query(lhs, Reformat(tns, MapJoin() as arg)):
+                return Query(lhs, Reformat(tns, Reorder(arg, tuple(arg.get_fields()))))
+
+    return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
+
+
+def flatten_plans(root):
+    def rule_0(ex):
+        match ex:
+            case Plan(bodies):
+                new_bodies = [
+                    tuple(body.bodies) if isinstance(body, Plan) else (body,)
+                    for body in bodies
+                ]
+                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies))
+                return Plan(flatten_bodies)
+
+    def rule_1(ex):
+        match ex:
+            case Plan(bodies):
+                body_iter = iter(bodies)
+                new_bodies = []
+                while (body := next(body_iter, None)) is not None:
+                    new_bodies.append(body)
+                    if isinstance(body, Produces):
+                        break
+                return Plan(tuple(new_bodies))
+
+    return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+
+
+def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
+    match root:
+        case Plan(bodies):
+            return Plan(
+                tuple(_propagate_transpose_queries(body, bindings) for body in bodies)
+            )
+        case Query(lhs, rhs):
+            rhs = push_fields(
+                Rewrite(PostWalk(lambda node: bindings.get(node, node)))(rhs)
+            )
+            match rhs:
+                case Reorder(Relabel(Alias(_), _), _) | Relabel(Alias(_), _) | Alias(_):
+                    bindings[lhs] = rhs
+                    return Plan()
+                case _:
+                    return Query(lhs, rhs)
+        case Produces(_) as prod:
+            return push_fields(
+                Rewrite(PostWalk(lambda node: bindings.get(node, node)))(prod)
+            )
+        case _:
+            raise Exception(f"Invalid node: {root} in propagate_transpose_queries")
+
+
+def propagate_transpose_queries(root):
+    return _propagate_transpose_queries(root, bindings={})
+
+
+def normalize_names(root):
+    namespace: Namespace = Namespace()
+    scope_dict: dict[str, str] = {}
+
+    def normname(symbol: str) -> str:
+        if symbol in scope_dict:
+            return scope_dict[symbol]
+
+        if "#" in symbol:
+            if (match_obj := re.search(r"##(.+)#\d+", symbol)) or (
+                match_obj := re.search(r"#\d+#(.+)", symbol)
+            ):
+                (new_sym,) = match_obj.groups()
+            else:
+                raise Exception(f"Invalid symbol: {symbol}")
+        else:
+            new_sym = symbol
+
+        new_sym = namespace.freshen(new_sym)
+        scope_dict[symbol] = new_sym
+        return new_sym
+
+    def rule_0(ex):
+        match ex:
+            case Alias(name):
+                return Alias(normname(name))
+
+    def rule_1(ex):
+        match ex:
+            case Field(name):
+                return Field(normname(name))
+
+    root = Rewrite(PostWalk(rule_0))(root)
+    return Rewrite(PostWalk(rule_1))(root)
+
+
+def materialize_squeeze_expand_productions(root):
+    def rule_0(ex: LogicNode, preamble: list[Query]):
+        match ex:
+            case Reorder(Relabel(Alias(_) as tns, idxs_1), idxs_2) if set(
+                idxs_1
+            ) != set(idxs_2):
+                new_tns = Alias(gensym("A"))
+                new_idxs = with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
+                preamble.append(Query(new_tns, Reorder(Relabel(tns, idxs_1), new_idxs)))
+                if new_idxs == idxs_2:
+                    return new_tns
+                return Reorder(Relabel(new_tns, new_idxs), idxs_2)
+            case Reorder(Relabel(arg, idxs_1), idxs_2) if idxs_1 == idxs_2:
+                return arg
+            case node:
+                return node
+
+    def rule_1(ex):
+        match ex:
+            case Produces(bodies):
+                preamble = []
+                new_bodies = tuple(rule_0(body, preamble) for body in bodies)
+                return Plan(tuple(preamble + [Produces(new_bodies)]))
+
+    return Rewrite(PostWalk(rule_1))(root)
 
 
 class DefaultLogicOptimizer:

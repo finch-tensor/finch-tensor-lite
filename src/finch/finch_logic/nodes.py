@@ -1,13 +1,16 @@
-from abc import abstractmethod
-from collections.abc import Iterable
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self
 
-from ..symbolic import Term
+import numpy as np
+
+from ..symbolic import Term, TermTree
 
 
 @dataclass(eq=True, frozen=True)
-class LogicNode(Term):
+class LogicNode(Term, ABC):
     """
     LogicNode
 
@@ -18,35 +21,28 @@ class LogicNode(Term):
     differentiated by a `FinchLogic.LogicNodeKind` enum.
     """
 
-    @staticmethod
-    @abstractmethod
-    def is_expr():
-        """Determines if the node is expresion."""
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        ...
-
     @classmethod
     def head(cls):
         """Returns the head of the node."""
         return cls
 
-    def children(self):
-        """Returns the children of the node."""
-        raise Exception(f"`children` isn't supported for {self.__class__}.")
-
-    def get_fields(self) -> Iterable[Self]:
-        """Returns fields of the node."""
-        raise Exception(f"`fields` isn't supported for {self.__class__}.")
-
     @classmethod
-    def make_term(cls, head: type, *args: Any) -> Self:
-        """Creates a term with the given head and arguments."""
-        return head(*args)
+    def make_term(cls, head, *children: Term) -> Self:
+        return head(*children)
+
+
+@dataclass(eq=True, frozen=True)
+class LogicTree(LogicNode, TermTree, ABC):
+    @abstractmethod
+    def children(self) -> list[LogicNode]:  # type: ignore[override]
+        ...
+
+
+class LogicExpression(LogicNode):
+    @abstractmethod
+    def get_fields(self) -> list[Field]:
+        """Returns fields of the node."""
+        ...
 
 
 @dataclass(eq=True, frozen=True)
@@ -60,19 +56,9 @@ class Immediate(LogicNode):
 
     val: Any
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
-    def get_fields(self):
-        """Returns fields of the node."""
-        return []
+    def __hash__(self):
+        val = self.val
+        return id(val) if isinstance(val, np.ndarray) else hash(val)
 
 
 @dataclass(eq=True, frozen=True)
@@ -89,20 +75,6 @@ class Deferred(LogicNode):
     ex: Any
     type_: Any
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.ex, self.type_]
-
 
 @dataclass(eq=True, frozen=True)
 class Field(LogicNode):
@@ -117,20 +89,6 @@ class Field(LogicNode):
 
     name: str
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.name]
-
 
 @dataclass(eq=True, frozen=True)
 class Alias(LogicNode):
@@ -144,23 +102,9 @@ class Alias(LogicNode):
 
     name: str
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return False
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.name]
-
 
 @dataclass(eq=True, frozen=True)
-class Table(LogicNode):
+class Table(LogicTree, LogicExpression):
     """
     Represents a logical AST expression for a tensor object `tns`, indexed by fields
     `idxs...`. A table is a tensor with named dimensions.
@@ -170,26 +114,16 @@ class Table(LogicNode):
         idxs: The fields indexing the tensor.
     """
 
-    tns: LogicNode
-    idxs: tuple[LogicNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
+    tns: Immediate | Deferred
+    idxs: tuple[Field, ...]
 
     def children(self):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
-        return self.idxs
+        return [*self.idxs]
 
     @classmethod
     def make_term(cls, head, tns, *idxs):
@@ -197,7 +131,7 @@ class Table(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class MapJoin(LogicNode):
+class MapJoin(LogicTree, LogicExpression):
     """
     Represents a logical AST expression for mapping the function `op` across `args...`.
     Dimensions which are not present are broadcasted. Dimensions which are
@@ -210,23 +144,13 @@ class MapJoin(LogicNode):
     """
 
     op: LogicNode
-    args: tuple[LogicNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
+    args: tuple[LogicExpression, ...]
 
     def children(self):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
         # (mtsokol) I'm not sure if this comment still applies - the order is preserved.
         # TODO: this is wrong here: the overall order should at least be concordant with
@@ -240,7 +164,7 @@ class MapJoin(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Aggregate(LogicNode):
+class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
     with `init`.  `idxs` are the dimensions to reduce. May happen in any order.
@@ -254,25 +178,16 @@ class Aggregate(LogicNode):
 
     op: LogicNode
     init: LogicNode
-    arg: LogicNode
+    arg: LogicExpression
     idxs: tuple[LogicNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
 
     def children(self):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
+        assert isinstance(self.arg, LogicExpression)
         return [field for field in self.arg.get_fields() if field not in self.idxs]
 
     @classmethod
@@ -281,7 +196,7 @@ class Aggregate(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Reorder(LogicNode):
+class Reorder(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reorders the dimensions of `arg` to be
     `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not
@@ -295,23 +210,13 @@ class Reorder(LogicNode):
     arg: LogicNode
     idxs: tuple[Field, ...]
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
-        return self.idxs
+        return [*self.idxs]
 
     @classmethod
     def make_term(cls, head, arg, *idxs):
@@ -319,7 +224,7 @@ class Reorder(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Relabel(LogicNode):
+class Relabel(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that relabels the dimensions of `arg` to be
     `idxs...`.
@@ -330,29 +235,23 @@ class Relabel(LogicNode):
     """
 
     arg: LogicNode
-    idxs: tuple[LogicNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
+    idxs: tuple[Field, ...]
 
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
-        return self.idxs
+        return [*self.idxs]
+
+    @classmethod
+    def make_term(cls, head, arg, *idxs):
+        return head(arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
-class Reformat(LogicNode):
+class Reformat(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reformats `arg` into the tensor `tns`.
 
@@ -362,29 +261,20 @@ class Reformat(LogicNode):
     """
 
     tns: LogicNode
-    arg: LogicNode
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
+    arg: LogicExpression
 
     def children(self):
         """Returns the children of the node."""
         return [self.tns, self.arg]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
+        assert isinstance(self.arg, LogicExpression)
         return self.arg.get_fields()
 
 
 @dataclass(eq=True, frozen=True)
-class Subquery(LogicNode):
+class Subquery(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`, and returns `rhs`.
@@ -397,27 +287,18 @@ class Subquery(LogicNode):
     lhs: LogicNode
     arg: LogicNode
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return False
-
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.arg]
 
-    def get_fields(self):
+    def get_fields(self) -> list[Field]:
         """Returns fields of the node."""
+        assert isinstance(self.arg, LogicExpression)
         return self.arg.get_fields()
 
 
 @dataclass(eq=True, frozen=True)
-class Query(LogicNode):
+class Query(LogicTree):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`.
@@ -430,23 +311,13 @@ class Query(LogicNode):
     lhs: LogicNode
     rhs: LogicNode
 
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
-
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
 
 
 @dataclass(eq=True, frozen=True)
-class Produces(LogicNode):
+class Produces(LogicTree):
     """
     Represents a logical AST statement that returns `args...` from the current plan.
     Halts execution of the program.
@@ -456,16 +327,6 @@ class Produces(LogicNode):
     """
 
     args: tuple[LogicNode, ...]
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
 
     def children(self):
         """Returns the children of the node."""
@@ -477,7 +338,7 @@ class Produces(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Plan(LogicNode):
+class Plan(LogicTree):
     """
     Represents a logical AST statement that executes a sequence of statements
     `bodies...`. Returns the last statement.
@@ -487,16 +348,6 @@ class Plan(LogicNode):
     """
 
     bodies: tuple[LogicNode, ...] = ()
-
-    @staticmethod
-    def is_expr():
-        """Determines if the node is an expression."""
-        return True
-
-    @staticmethod
-    def is_stateful():
-        """Determines if the node is stateful."""
-        return True
 
     def children(self):
         """Returns the children of the node."""

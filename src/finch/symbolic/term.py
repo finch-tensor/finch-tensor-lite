@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any, Self
 
 """
@@ -14,49 +17,30 @@ Classes:
 """
 
 
-class Term(ABC):
-    def __init__(self):
-        self._hashcache = None  # Private field to cache the hash value
-
+class Term:
     @abstractmethod
     def head(self) -> Any:
         """Return the head type of the S-expression."""
 
+    @classmethod
     @abstractmethod
-    def children(self) -> list["Term"]:
-        """Return the children (AKA tail) of the S-expression."""
-
-    @abstractmethod
-    def is_expr(self) -> bool:
-        """
-        Return True if the term is an expression tree, False otherwise. Must implement
-        children() if True.
-        """
-
-    @abstractmethod
-    def make_term(self, head: Any, *children: "Term") -> Self:
+    def make_term(cls, head: Any, *children: Term) -> Self:
         """
         Construct a new term in the same family of terms with the given head type and
         children. This function should satisfy
         `x == x.make_term(x.head(), *x.children())`
         """
 
-    def __hash__(self) -> int:
-        """Return the hash value of the term."""
-        if self._hashcache is None:
-            self._hashcache = hash(
-                (0x1CA5C2ADCA744860, self.head(), tuple(self.children()))
-            )
-        return self._hashcache
 
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, Term):
-            return NotImplemented
-        return self.head() == other.head() and self.children() == other.children()
+@dataclass(frozen=True, eq=True)
+class TermTree(Term, ABC):
+    @abstractmethod
+    def children(self) -> list[Term]:
+        """Return the children (AKA tail) of the S-expression."""
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
-    if node.is_expr():
+    if isinstance(node, TermTree):
         for arg in node.children():
             yield from PostOrderDFS(arg)
     yield node
@@ -64,6 +48,6 @@ def PostOrderDFS(node: Term) -> Iterator[Term]:
 
 def PreOrderDFS(node: Term) -> Iterator[Term]:
     yield node
-    if node.is_expr():
+    if isinstance(node, TermTree):
         for arg in node.children():
             yield from PreOrderDFS(arg)

@@ -70,19 +70,20 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
     Raises:
         NotImplementedError: If the property is not implemented for the given type.
     """
-    T: type | Hashable
-    if isinstance(obj, type):
-        T = obj
-    else:
-        if isinstance(obj, Hashable) and (obj, attr, prop) in _properties:
-            return _properties[(obj, attr, prop)](obj, *args)
+    if not isinstance(obj, type):
+        if isinstance(obj, Hashable):
+            query_fn = _properties.get((obj, attr, prop))
+            if query_fn is not None:
+                return query_fn(obj, *args)
         T = type(obj)
-    while True:
-        if (T, attr, prop) in _properties:
-            return _properties[(T, attr, prop)](obj, *args)
-        if T.__base__ is None:
-            break
-        T = T.__base__
+    else:
+        T = obj
+
+    for Ti in T.__mro__:
+        query_fn = _properties.get((Ti, attr, prop))
+        if query_fn is not None:
+            return query_fn(obj, *args)
+
     raise NotImplementedError(f"Property {prop} not implemented for {obj}")
 
 
@@ -239,7 +240,8 @@ for op, meth in _unary_operators.items():
 
 
 def is_associative(op: Any) -> bool:
-    """Returns whether the given function is associative, that is, whether the
+    """
+    Returns whether the given function is associative, that is, whether the
     op(op(a, b), c) == op(a, op(b, c)) for all a, b, c.
 
     Args:
@@ -255,8 +257,75 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
     register_property(op, "__call__", "is_associative", lambda op: True)
 
 
+def is_identity(op: Any, val: Any) -> bool:
+    """
+    Returns whether the given object is an identity for the given function, that is,
+    whether the `op(a, val) == a for all a`.
+
+    Args:
+        op: The function to check.
+        val: The value to check for identity.
+
+    Returns:
+        True if the value can be proven to be an identity, False otherwise.
+    """
+    return query_property(op, "__call__", "is_identity", val)
+
+
+register_property(operator.add, "__call__", "is_identity", lambda op, val: val == 0)
+register_property(operator.mul, "__call__", "is_identity", lambda op, val: val == 1)
+
+
+def is_distributive(op, other_op):
+    """
+    Returns whether the given pair of functions are distributive, that is,
+    whether the `f(a, g(b, c)) = g(f(a, b), f(a, c))` for all a, b, c`.
+
+    Args:
+        op: The function to check.
+        other_op: The other function to check for distributiveness.
+
+    Returns:
+        True if the pair of functions can be proven to be distributive, False otherwise.
+    """
+    return query_property(op, "__call__", "is_distributive", other_op)
+
+
+register_property(
+    operator.mul,
+    "__call__",
+    "is_distributive",
+    lambda op, other_op: other_op == operator.add,
+)
+
+
+def is_annihilator(op, val):
+    """
+    Returns whether the given object is an annihilator for the given function, that is,
+    whether the `op(a, val) == val for all a`.
+
+    Args:
+        op: The function to check.
+        val: The value to check for annihilator.
+
+    Returns:
+        True if the value can be proven to be an annihilator, False otherwise.
+    """
+    return query_property(op, "__call__", "is_annihilator", val)
+
+
+for op, func in [
+    (operator.add, lambda op, val: np.isinf(val)),
+    (operator.mul, lambda op, val: val == 0),
+    (operator.or_, lambda op, val: bool(val)),
+    (operator.and_, lambda op, val: not bool(val)),
+]:
+    register_property(op, "__call__", "is_annihilator", func)
+
+
 def fixpoint_type(op: Any, z: Any, T: type) -> type:
-    """Determines the fixpoint type after repeated calling the given operation.
+    """
+    Determines the fixpoint type after repeated calling the given operation.
 
     Args:
         op: The operation to evaluate.

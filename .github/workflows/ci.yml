@@ -26,7 +26,7 @@ jobs:
         uses: snok/install-poetry@v1
       - name: Install package
         run: |
-          poetry install --with test
+          poetry install --extras test
       - name: Run tests
         run: |
           poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml

@@ -34,8 +34,8 @@ class TableValue:
 
 
 class FinchLogicInterpreter:
-    def __init__(self, *, make_tensor=np.full):
-        self.verbose = False
+    def __init__(self, *, make_tensor=np.full, verbose=False):
+        self.verbose = verbose
         self.bindings = {}
         self.make_tensor = make_tensor  # Added make_tensor argument
 
@@ -113,7 +113,10 @@ class FinchLogicInterpreter:
         if head == Relabel:
             arg = self(node.arg)
             if len(arg.idxs) != len(node.idxs):
-                raise ValueError("The number of indices in the relabel must match")
+                raise ValueError(
+                    "The number of indices in the relabel must match: "
+                    f"{arg.idxs} vs {node.idxs}"
+                )
             return TableValue(arg.tns, node.idxs)
         if head == Reorder:
             arg = self(node.arg)

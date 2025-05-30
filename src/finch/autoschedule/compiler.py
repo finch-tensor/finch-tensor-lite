@@ -1,4 +1,5 @@
 from textwrap import dedent
+from typing import TypeVar, overload
 
 from ..algebra import fill_value
 from ..finch_logic import (
@@ -6,7 +7,9 @@ from ..finch_logic import (
     Deferred,
     Field,
     Immediate,
+    LogicExpression,
     LogicNode,
+    LogicTree,
     MapJoin,
     Query,
     Reformat,
@@ -17,37 +20,75 @@ from ..finch_logic import (
 )
 from ._utils import intersect, with_subsequence
 
+T = TypeVar("T", bound="LogicNode")
 
-def get_or_insert(
-    dictionary: dict[str, LogicNode], key: str, default: LogicNode
-) -> LogicNode:
-    return dictionary.setdefault(key, default)
+
+@overload
+def get_structure(
+    node: Field, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Field: ...
+
+
+@overload
+def get_structure(
+    node: Alias, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Alias: ...
+
+
+@overload
+def get_structure(
+    node: Subquery, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Subquery: ...
+
+
+@overload
+def get_structure(
+    node: Table, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Table: ...
+
+
+@overload
+def get_structure(
+    node: LogicTree, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicTree: ...
+
+
+@overload
+def get_structure(
+    node: LogicExpression, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicExpression: ...
+
+
+@overload
+def get_structure(
+    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicNode: ...
 
 
 def get_structure(
-    node: LogicNode, fields: dict[str, LogicNode], aliases: dict[str, LogicNode]
+    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicNode:
     match node:
         case Field(name):
-            return get_or_insert(fields, name, Immediate(len(fields) + len(aliases)))
+            return fields.setdefault(name, Field(f"{len(fields) + len(aliases)}"))
         case Alias(name):
-            return get_or_insert(aliases, name, Immediate(len(fields) + len(aliases)))
+            return aliases.setdefault(name, Alias(f"{len(fields) + len(aliases)}"))
         case Subquery(Alias(name) as lhs, arg):
             if name in aliases:
                 return aliases[name]
-            return Subquery(
-                get_structure(lhs, fields, aliases), get_structure(arg, fields, aliases)
-            )
+            arg_2 = get_structure(arg, fields, aliases)
+            lhs_2 = get_structure(lhs, fields, aliases)
+            return Subquery(lhs_2, arg_2)
         case Table(tns, idxs):
             assert isinstance(tns, Immediate), "tns must be an Immediate"
             return Table(
                 Immediate(type(tns.val)),
                 tuple(get_structure(idx, fields, aliases) for idx in idxs),
             )
-        case any if any.is_expr():
-            return any.make_term(
-                any.head(),
-                *[get_structure(arg, fields, aliases) for arg in any.children()],
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(),
+                *(get_structure(arg, fields, aliases) for arg in tree.children()),
             )
         case _:
             return node
@@ -95,7 +136,7 @@ class LogicLowerer:
     def __init__(self, mode: str = "fast"):
         self.mode = mode
 
-    def __call__(self, ex: LogicNode):
+    def __call__(self, ex: LogicNode) -> str:
         match ex:
             case Query(Alias(name), Table(tns, _)):
                 return f":({name} = {compile_logic_constant(tns)})"
@@ -141,6 +182,6 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm):
+    def __call__(self, prgm: LogicNode) -> str:
         # prgm = format_queries(prgm, True)  # noqa: F821
         return self.ll(prgm)
