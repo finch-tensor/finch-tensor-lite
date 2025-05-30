@@ -66,7 +66,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
     # prgm = set_loop_order(prgm)
     prgm = push_fields(prgm)
 
-    prgm = flatten_plans(prgm)  # concordize(prgm)
+    prgm = concordize(prgm)
 
     prgm = materialize_squeeze_expand_productions(prgm)
     prgm = propagate_copy_queries(prgm)
@@ -564,6 +564,44 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
 
 def propagate_transpose_queries(root):
     return _propagate_transpose_queries(root, bindings={})
+
+
+def concordize(root):
+    needed_swizzles: dict[Alias, dict[..., Alias]] = {}
+    namespace = Namespace()
+
+    def rule_0(ex):
+        match ex:
+            case Reorder(Relabel(Alias(a), idxs_1), idxs_2):
+                if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
+                    idxs_4 = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
+                    perm = ...
+                    return Reorder(
+                        Relabel(
+                            ...,
+                            idxs_4,
+                        ),
+                        idxs_2,
+                    )
+
+    def rule_1(ex):
+        match ex:
+            case Query(a, b) as q if a in needed_swizzles:
+                idxs = b.get_fields()
+                swizzle_queries = [
+                    Query(v, Reorder(Relabel(a, idxs), idxs[k]))
+                    for k, v in needed_swizzles[a].items()
+                ]
+
+                return Plan((q, *swizzle_queries))
+
+    root = flatten_plans(root)
+    match root:
+        case Plan((*bodies, Produces(_) as prod)):
+            root = Plan(bodies)
+            root = Rewrite(PostWalk(rule_0))(root)
+            root = Rewrite(PostWalk(rule_1))(root)
+            return flatten_plans(Plan((root, prod)))
 
 
 def normalize_names(root):
