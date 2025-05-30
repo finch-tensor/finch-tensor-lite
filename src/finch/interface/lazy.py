@@ -393,3 +393,79 @@ def positive(x) -> LazyTensor:
 
 def negative(x) -> LazyTensor:
     return elementwise(operator.neg, defer(x))
+
+
+def any(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Test whether any element of input array ``x`` along given axis is True.
+    """
+    if init is None:
+        init = init_value(builtins.any, x)
+    return reduce(
+        operator.or_,
+        elementwise(operator.truth, x),
+        axis=axis,
+        keepdims=keepdims,
+        init=init,
+    )
+
+
+def all(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Test whether all elements of input array ``x`` along given axis are True.
+    """
+    if init is None:
+        init = init_value(builtins.all, x)
+    return reduce(
+        operator.and_,
+        elementwise(operator.truth, x),
+        axis=axis,
+        keepdims=keepdims,
+        init=init,
+    )
+
+
+def min(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Return the minimum of input array ``arr`` along given axis.
+    """
+    if init is None:
+        init = init_value(builtins.min, x)
+    return reduce(builtins.min, x, axis=axis, keepdims=keepdims, init=init)
+
+
+def max(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Return the maximum of input array ``arr`` along given axis.
+    """
+    if init is None:
+        init = init_value(builtins.max, x)
+    return reduce(builtins.max, x, axis=axis, keepdims=keepdims, init=init)
