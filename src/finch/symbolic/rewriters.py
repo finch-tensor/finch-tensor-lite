@@ -23,7 +23,7 @@ Classes:
 from collections.abc import Callable, Iterable
 from typing import TypeVar
 
-from .term import Term
+from .term import Term, TermTree
 
 T = TypeVar("T", bound="Term")
 
@@ -65,21 +65,20 @@ class PreWalk:
     def __call__(self, x: T) -> T | None:
         y = self.rw(x)
         if y is not None:
-            if y.is_expr():
+            if isinstance(y, TermTree):
                 args = y.children()
-                return y.make_term(
+                return y.make_term(  # type: ignore[return-value]
                     y.head(), *[default_rewrite(self(arg), arg) for arg in args]
                 )
             return y
-        if x.is_expr():
+        if isinstance(x, TermTree):
             args = x.children()
             new_args = list(map(self, args))
             if not all(arg is None for arg in new_args):
-                return x.make_term(
+                return x.make_term(  # type: ignore[return-value]
                     x.head(),
                     *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
                 )
-            return None
         return None
 
 
@@ -97,7 +96,7 @@ class PostWalk:
         self.rw = rw
 
     def __call__(self, x: T) -> T | None:
-        if x.is_expr():
+        if isinstance(x, TermTree):
             args = x.children()
             new_args = list(map(self, args))
             if all(arg is None for arg in new_args):
@@ -105,7 +104,7 @@ class PostWalk:
             y = x.make_term(
                 x.head(), *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args)
             )
-            return default_rewrite(self.rw(y), y)
+            return default_rewrite(self.rw(y), y)  # type: ignore[return-value]
         return self.rw(x)
 
 
@@ -169,14 +168,12 @@ class Prestep:
 
     def __call__(self, x: T) -> T | None:
         y = self.rw(x)
-        if y is not None:
-            if y.is_expr():
-                y_args = y.children()
-                return y.make_term(
-                    y.head(), *[default_rewrite(self(arg), arg) for arg in y_args]
-                )
-            return y
-        return None
+        if y is not None and isinstance(y, TermTree):
+            y_args = y.children()
+            return y.make_term(
+                y.head(), *[default_rewrite(self(arg), arg) for arg in y_args]
+            )
+        return y
 
 
 class Memo:
