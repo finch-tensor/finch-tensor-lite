@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
@@ -163,6 +164,10 @@ def register_n_ary_c_op_call(op, symbol):
         return f" {symbol} ".join(map(ctx, args))
 
     return property_func
+
+
+op: Any
+symbol: str
 
 
 for op, symbol in [
@@ -359,8 +364,8 @@ class CContext(AbstractContext):
                 return c_literal(self, value)
             case asm.Variable(name, _):
                 return name
-            case asm.Symbolic():
-                return self.to_c_value(self)
+            case asm.Symbolic(obj):
+                return obj.to_c_value(self)
             case asm.Assign(var, val):
                 var_t = self.ctype_name(c_type(var.get_type()))
                 var = self(var)
@@ -407,20 +412,21 @@ class CContext(AbstractContext):
                 )
                 return None
             case asm.BufferLoop(buf, var, body):
-                idx = asm.Variable(self.freshen(var.name + "_i"))
+                assert isinstance(buf, asm.Symbolic)
+                idx = asm.Variable(self.freshen(var.name + "_i"), buf.obj.index_type())
                 start = asm.Immediate(0)
                 stop = asm.Call(
-                    asm.Immediate(operator.sub), asm.Length(buf), asm.Immediate(1)
+                    asm.Immediate(operator.sub), (asm.Length(buf), asm.Immediate(1))
                 )
-                body_2 = asm.Block(asm.Assign(var, asm.Load(buf, idx)), body)
+                body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
                 if not isinstance(cond, asm.Immediate | asm.Variable):
-                    cond_var = asm.Variable(self.freshen("cond"))
+                    cond_var = asm.Variable(self.freshen("cond"), cond.get_type())
                     new_prgm = asm.Block(
                         (
                             asm.Assign(cond_var, cond),
-                            asm.While(
+                            asm.WhileLoop(
                                 cond_var,
                                 asm.Block(
                                     (
@@ -436,11 +442,7 @@ class CContext(AbstractContext):
                 ctx_2 = self.subblock()
                 ctx_2(body)
                 body_code = ctx_2.emit()
-                self.exec(
-                    f"{feed}while ({cond_code}) {{\n"
-                    f"{body_code}"
-                    f"\n{feed}}}"
-                )
+                self.exec(f"{feed}while ({cond_code}) {{\n{body_code}\n{feed}}}")
                 return None
             case asm.Return(value):
                 value = self(value)

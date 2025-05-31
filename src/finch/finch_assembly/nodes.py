@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..algebra import element_type
-from ..symbolic import Term
+from ..symbolic import Term, TermTree
 
 
 class AssemblyNode(Term):
@@ -24,9 +24,18 @@ class AssemblyNode(Term):
     @classmethod
     def make_term(cls, head, *args):
         """Creates a term with the given head and arguments."""
-        return head(*args)
+        return head.from_children(*args)
 
-class AssemblyTree(TermTree):
+    @classmethod
+    def from_children(cls, *children):
+        """
+        Creates a term from the given children. This is used to create terms
+        from the children of a node.
+        """
+        return cls(*children)
+
+
+class AssemblyTree(AssemblyNode, TermTree):
     def children(self):
         """Returns the children of the node."""
         raise Exception(f"`children` isn't supported for {self.__class__}.")
@@ -34,7 +43,7 @@ class AssemblyTree(TermTree):
 
 class AssemblyExpression(AssemblyNode):
     @abstractmethod
-    def get_type():
+    def get_type(self):
         """Returns the type of the expression."""
 
 
@@ -64,11 +73,58 @@ class Variable(AssemblyExpression):
     """
 
     name: str
-    type: None
+    type: type
 
     def get_type(self):
         """Returns the type of the expression."""
         return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Assign(AssemblyTree):
+    """
+    Represents a logical AST statement that evaluates `rhs`, binding the result
+    to `lhs`.
+
+    Attributes:
+        type: The type of the new binding.
+        lhs: The left-hand side of the binding.
+        rhs: The right-hand side to evaluate.
+    """
+
+    lhs: Variable
+    rhs: AssemblyExpression
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Call(AssemblyExpression, AssemblyTree):
+    """
+    Represents an expression for calling the function `op` on `args...`.
+
+    Attributes:
+        op: The function to call.
+        args: The arguments to call on the function.
+    """
+
+    op: Immediate
+    args: tuple[AssemblyNode, ...]
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.op, *self.args]
+
+    @classmethod
+    def from_children(cls, op, *args):
+        return cls(op, args)
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        arg_types = [arg.get_type() for arg in self.args]
+        return self.return_type(self.op.val, *arg_types)
 
 
 @dataclass(eq=True, frozen=True)
@@ -92,7 +148,7 @@ class Symbolic(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Load(AssemblyExpression):
+class Load(AssemblyExpression, AssemblyTree):
     """
     Represents loading a value from a buffer at a given index.
 
@@ -113,7 +169,7 @@ class Load(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Store(AssemblyNode):
+class Store(AssemblyTree):
     """
     Represents storing a value into a buffer at a given index.
 
@@ -132,7 +188,7 @@ class Store(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Resize(AssemblyNode):
+class Resize(AssemblyTree):
     """
     Represents resizing a buffer to a new size.
 
@@ -149,7 +205,7 @@ class Resize(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Length(AssemblyExpression):
+class Length(AssemblyExpression, AssemblyTree):
     """
     Represents getting the length of a buffer.
 
@@ -168,60 +224,7 @@ class Length(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(AssemblyNode):
-    """
-    Represents an expression for calling the function `op` on `args...`.
-
-    Attributes:
-        op: The function to call.
-        args: The arguments to call on the function.
-    """
-
-    op: Immediate
-    args: tuple[AssemblyNode, ...]
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.op, *self.args]
-
-    @classmethod
-    def make_term(cls, head, op, *args):
-        return head(op, args)
-
-    def get_type(self):
-        """Returns the type of the expression."""
-        arg_types = [arg.get_type() for arg in self.args]
-        return self.return_type(self.op.val, *arg_types)
-
-
-@dataclass(eq=True, frozen=True)
-class Function(AssemblyNode):
-    """
-    Represents a logical AST statement that defines a function `fun` on the
-    arguments `args...`.
-
-    Attributes:
-        name: The name of the function to define.
-        args: The arguments to the function.
-        body: The body of the function. If it does not contain a return statement,
-            the function returns the value of `body`.
-    """
-
-    name: str
-    args: tuple[AssemblyNode, ...]
-    body: AssemblyNode
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.name, *self.args, self.body]
-
-    def make_term(self, head, *args):
-        """Creates a term with the given head and arguments."""
-        return head(*args[1], args[2:-2], args[-1])
-
-
-@dataclass(eq=True, frozen=True)
-class ForLoop(AssemblyNode):
+class ForLoop(AssemblyTree):
     """
     Represents a for loop that iterates over a range of values.
 
@@ -232,22 +235,18 @@ class ForLoop(AssemblyNode):
         body: The body of the loop to execute.
     """
 
-    var: AssemblyNode
-    start: AssemblyNode
-    end: AssemblyNode
+    var: Variable
+    start: AssemblyExpression
+    end: AssemblyExpression
     body: AssemblyNode
 
     def children(self):
         """Returns the children of the node."""
         return [self.var, self.start, self.end, self.body]
 
-    @classmethod
-    def make_term(cls, head, *args):
-        return head(*args)
-
 
 @dataclass(eq=True, frozen=True)
-class BufferLoop(AssemblyNode):
+class BufferLoop(AssemblyTree):
     """
     Represents a loop that iterates over the elements of a buffer.
 
@@ -257,21 +256,17 @@ class BufferLoop(AssemblyNode):
         body: The body of the loop to execute for each element.
     """
 
-    buffer: AssemblyNode
-    var: AssemblyNode
+    buffer: AssemblyExpression
+    var: Variable
     body: AssemblyNode
 
     def children(self):
         """Returns the children of the node."""
         return [self.buffer, self.var, self.body]
 
-    @classmethod
-    def make_term(cls, head, *args):
-        return head(*args)
-
 
 @dataclass(eq=True, frozen=True)
-class WhileLoop(AssemblyNode):
+class WhileLoop(AssemblyTree):
     """
     Represents a while loop that executes as long as the condition is true.
 
@@ -280,41 +275,43 @@ class WhileLoop(AssemblyNode):
         body: The body of the loop to execute.
     """
 
-    condition: AssemblyNode
+    condition: AssemblyExpression
     body: AssemblyNode
 
     def children(self):
         """Returns the children of the node."""
         return [self.condition, self.body]
 
-    @classmethod
-    def make_term(cls, head, *args):
-        return head(*args)
-
 
 @dataclass(eq=True, frozen=True)
-class Assign(AssemblyNode):
+class Function(AssemblyTree):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result
-    to `lhs`.
+    Represents a logical AST statement that defines a function `fun` on the
+    arguments `args...`.
 
     Attributes:
-        type: The type of the new binding.
-        lhs: The left-hand side of the binding.
-        rhs: The right-hand side to evaluate.
+        name: The name of the function to define as a variable typed with the
+        return type of this function.
+        args: The arguments to the function.
+        body: The body of the function. If it does not contain a return statement,
+            the function returns the value of `body`.
     """
 
-    type: AssemblyNode
-    lhs: AssemblyNode
-    rhs: AssemblyNode
+    name: Variable
+    args: tuple[AssemblyNode, ...]
+    body: AssemblyNode
 
     def children(self):
         """Returns the children of the node."""
-        return [self.type, self.lhs, self.rhs]
+        return [self.name, *self.args, self.body]
+
+    def from_children(cls, name, *args, body):
+        """Creates a term with the given head and arguments."""
+        return cls(name, args, body)
 
 
 @dataclass(eq=True, frozen=True)
-class Return(AssemblyNode):
+class Return(AssemblyTree):
     """
     Represents a return statement that returns `arg` from the current function.
     Halts execution of the function body.
@@ -323,19 +320,15 @@ class Return(AssemblyNode):
         arg: The argument to return.
     """
 
-    args: tuple[AssemblyNode, ...]
+    arg: AssemblyExpression
 
     def children(self):
         """Returns the children of the node."""
         return [self.arg]
 
-    @classmethod
-    def make_term(cls, head, *args):
-        return head(args)
-
 
 @dataclass(eq=True, frozen=True)
-class Block(AssemblyNode):
+class Block(AssemblyTree):
     """
     Represents a statement that executes a sequence of statements `bodies...`.
 
@@ -350,12 +343,12 @@ class Block(AssemblyNode):
         return [*self.bodies]
 
     @classmethod
-    def make_term(cls, head, *val):
-        return head(val)
+    def from_children(cls, *bodies):
+        return cls(bodies)
 
 
 @dataclass(eq=True, frozen=True)
-class Module(AssemblyNode):
+class Module(AssemblyTree):
     """
     Represents a group of functions. This is the toplevel translation unit for
     FinchAssembly.
@@ -365,13 +358,13 @@ class Module(AssemblyNode):
         main: The main function of the module.
     """
 
-    funcs: tuple[AssemblyNode, ...] = ()
-    main: AssemblyNode = None
+    funcs: tuple[AssemblyNode, ...]
+    main: AssemblyNode
 
     def children(self):
         """Returns the children of the node."""
         return [*self.funcs, self.main]
 
     @classmethod
-    def make_term(cls, head, *val):
-        return head(val[1:-2], val[-1])
+    def from_children(cls, *funcs, main):
+        return cls(funcs, main)

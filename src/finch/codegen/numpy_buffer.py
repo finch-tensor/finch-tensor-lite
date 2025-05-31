@@ -36,6 +36,12 @@ class NumpyBuffer(AbstractBuffer, AbstractCArgument):
             raise ValueError("NumPy array must be C-contiguous")
         self.arr = arr
 
+    def get_format(self):
+        """
+        Returns the format of the buffer, which is a NumpyBufferFormat.
+        """
+        return NumpyBufferFormat(self.arr.dtype.type)
+
     def length(self):
         return self.arr.size
 
