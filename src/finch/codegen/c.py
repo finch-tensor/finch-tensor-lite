@@ -4,7 +4,6 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
