@@ -215,7 +215,6 @@ _unary_operators: dict[Callable, str] = {
     operator.abs: "__abs__",
     operator.pos: "__pos__",
     operator.neg: "__neg__",
-    operator.invert: "__invert__"
 }
 
 
@@ -275,8 +274,8 @@ def is_identity(op: Any, val: Any) -> bool:
 
 register_property(operator.add, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.mul, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(operator.or_, "__call__", "is_identity", lambda op, val: val == 0)
-register_property(operator.xor, "__call__", "is_identity", lambda op, val: val == 0)
+register_property(operator.or_, "__call__", "is_identity", lambda op, val: not bool(val))
+register_property(operator.and_, "__call__", "is_identity", lambda op, val: bool(val))
 register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
 register_property(operator.floordiv, "__call__", "is_identity", lambda op, val: val == 1)
 register_property(operator.lshift,  "__call__", "is_identity", lambda op, val: val == 0)

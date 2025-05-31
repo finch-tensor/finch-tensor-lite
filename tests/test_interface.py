@@ -100,7 +100,7 @@ class TestEagerTensor(finch.AbstractEagerTensor):
         ((operator.truediv, finch.truediv, np.true_divide), np.true_divide),
         ((operator.floordiv, finch.floordiv, np.floor_divide), np.floor_divide),
         ((operator.mod, finch.mod, np.mod), np.mod),
-        ((operator.pow, finch.pow, np.pow), np.pow)
+        ((operator.pow, finch.pow, np.pow), np.pow),
     ]
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -140,7 +140,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     [
         ((operator.abs, finch.abs, np.abs), np.abs),
         ((operator.pos, finch.positive, np.positive), np.positive),
-        ((operator.neg, finch.negative, np.negative), np.negative)
+        ((operator.neg, finch.negative, np.negative), np.negative),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):

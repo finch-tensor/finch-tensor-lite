@@ -19,7 +19,8 @@ ufunc_map = {
     np.true_divide: operator.truediv,
     np.floor_divide: operator.floordiv,
     np.mod: operator.mod,
-    np.pow: operator.pow
+    np.pow: operator.pow,
+    # Add more ufuncs as needed
 }
 
 

@@ -28,7 +28,7 @@ from .interface import (
     truediv,
     floordiv,
     mod,
-    pow
+    pow,
 )
 
 __all__ = [
@@ -63,5 +63,5 @@ __all__ = [
     "truediv",
     "floordiv",
     "mod",
-    "pow"
+    "pow",
 ]
