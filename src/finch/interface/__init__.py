@@ -21,7 +21,7 @@ from .eager import (
     truediv,
     floordiv,
     mod,
-    pow
+    pow,
 )
 
 # from .tensor import *
@@ -56,5 +56,5 @@ __all__ = [
     "truediv",
     "floordiv",
     "mod",
-    "pow"
+    "pow",
 ]
