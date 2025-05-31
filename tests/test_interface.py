@@ -101,7 +101,7 @@ class TestEagerTensor(finch.AbstractEagerTensor):
         ((operator.floordiv, finch.floordiv, np.floor_divide), np.floor_divide),
         ((operator.mod, finch.mod, np.mod), np.mod),
         ((operator.pow, finch.pow, np.pow), np.pow),
-    ]
+    ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     wa = a_wrap(a)
