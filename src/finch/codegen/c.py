@@ -287,7 +287,6 @@ ctype_to_c_name = {
     ctypes.c_ulonglong: "unsigned long long",
     ctypes.c_size_t: "size_t",
     ctypes.c_ssize_t: "ssize_t",
-    ctypes.c_time_t: "time_t",
     ctypes.c_float: "float",
     ctypes.c_double: "double",
     ctypes.c_longdouble: "long double",
