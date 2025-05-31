@@ -28,7 +28,11 @@ class LogicNode(Term, ABC):
 
     @classmethod
     def make_term(cls, head, *children: Term) -> Self:
-        return head(*children)
+        return head.from_children(*children)
+
+    @classmethod
+    def from_children(cls, *children: Term) -> Self:
+        return cls(*children)
 
 
 @dataclass(eq=True, frozen=True)
@@ -126,8 +130,8 @@ class Table(LogicTree, LogicExpression):
         return [*self.idxs]
 
     @classmethod
-    def make_term(cls, head, tns, *idxs):
-        return head(tns, idxs)
+    def from_children(cls, tns, *idxs):
+        return cls(tns, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -159,8 +163,8 @@ class MapJoin(LogicTree, LogicExpression):
         return list(dict.fromkeys(fields))
 
     @classmethod
-    def make_term(cls, head, op, *args):
-        return head(op, args)
+    def from_children(cls, op, *args):
+        return cls(op, args)
 
 
 @dataclass(eq=True, frozen=True)
@@ -191,8 +195,8 @@ class Aggregate(LogicTree, LogicExpression):
         return [field for field in self.arg.get_fields() if field not in self.idxs]
 
     @classmethod
-    def make_term(cls, head, op, init, arg, *idxs):
-        return head(op, init, arg, idxs)
+    def from_children(cls, op, init, arg, *idxs):
+        return cls(op, init, arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -219,8 +223,8 @@ class Reorder(LogicTree, LogicExpression):
         return [*self.idxs]
 
     @classmethod
-    def make_term(cls, head, arg, *idxs):
-        return head(arg, idxs)
+    def from_children(cls, arg, *idxs):
+        return cls(arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -246,8 +250,8 @@ class Relabel(LogicTree, LogicExpression):
         return [*self.idxs]
 
     @classmethod
-    def make_term(cls, head, arg, *idxs):
-        return head(arg, idxs)
+    def from_children(cls, arg, *idxs):
+        return cls(arg, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -333,8 +337,8 @@ class Produces(LogicTree):
         return [*self.args]
 
     @classmethod
-    def make_term(cls, head, *args):
-        return head(args)
+    def from_children(cls, *args):
+        return cls(args)
 
 
 @dataclass(eq=True, frozen=True)
@@ -354,5 +358,5 @@ class Plan(LogicTree):
         return [*self.bodies]
 
     @classmethod
-    def make_term(cls, head, *val):
-        return head(val)
+    def from_children(cls, *bodies):
+        return cls(bodies)
