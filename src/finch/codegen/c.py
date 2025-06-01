@@ -522,12 +522,3 @@ class AbstractCFormat(AbstractFormat, ABC):
         """
         Return C code which resizes a named buffer to the given length.
         """
-
-
-def c_function_entrypoint(f, arg_names, args):
-    ctx = CContext()
-    sym_args = [
-        arg.unpack_c(ctx, name) for arg, name in zip(args, arg_names, strict=False)
-    ]
-    f(ctx, *sym_args)
-    return ctx.emit()
