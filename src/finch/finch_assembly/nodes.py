@@ -128,23 +128,45 @@ class Call(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolic(AssemblyExpression):
+class GetAttr(AssemblyExpression, AssemblyTree):
     """
-    Represents a logical AST expression for a symbolic object `obj`.
+    Represents an expression for getting an attribute `attr` from the object `obj`.
 
     Attributes:
-        obj: The tensor object.
+        obj: The object to get the attribute from.
+        attr: The name of the attribute to get.
     """
 
-    obj: Any
+    obj: AssemblyExpression
+    attr: Immediate
 
     def children(self):
         """Returns the children of the node."""
-        return [self.obj]
+        return [self.obj, self.attr]
 
     def get_type(self):
         """Returns the type of the expression."""
-        return self.obj.get_type()
+        return self.obj.get_type().__dict__[self.attr]
+
+
+@dataclass(eq=True, frozen=True)
+class SetAttr(AssemblyTree):
+    """
+    Represents a statement for setting an attribute `attr` on the object `obj` to `value`.
+
+    Attributes:
+        obj: The object to set the attribute on.
+        attr: The name of the attribute to set.
+        value: The value to set the attribute to.
+    """
+
+    obj: AssemblyExpression
+    attr: Immediate
+    value: AssemblyExpression
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.obj, self.attr, self.value]
 
 
 @dataclass(eq=True, frozen=True)
@@ -282,7 +304,6 @@ class WhileLoop(AssemblyTree):
         """Returns the children of the node."""
         return [self.condition, self.body]
 
-
 @dataclass(eq=True, frozen=True)
 class Function(AssemblyTree):
     """
@@ -298,7 +319,7 @@ class Function(AssemblyTree):
     """
 
     name: Variable
-    args: tuple[AssemblyNode, ...]
+    args: tuple[Variable, ...]
     body: AssemblyNode
 
     def children(self):
@@ -308,6 +329,30 @@ class Function(AssemblyTree):
     def from_children(cls, name, *args, body):
         """Creates a term with the given head and arguments."""
         return cls(name, args, body)
+
+
+@dataclass(eq=True, frozen=True)
+class Exclusive(AssemblyTree):
+    """
+    Asserts that each variable in vars holds an exclusive reference to the
+    structure to which it points for the duration of the block. This allows
+    the implementation to inline the implementation of buffers.
+
+    Attributes:
+        vars: The variables that hold exclusive references.
+        body: The body of the block in which access is exclusive.
+    """
+
+    vars: tuple[Variable, ...]
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.vars, self.body]
+
+    def from_children(cls, *vars, body):
+        """Creates a term with the given head and arguments."""
+        return cls(vars, body)
 
 
 @dataclass(eq=True, frozen=True)

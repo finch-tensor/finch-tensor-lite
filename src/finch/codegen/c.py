@@ -320,7 +320,7 @@ class CContext(AbstractContext):
             ]
             header = (
                 f"struct {name} {{\n"
-                + "\n".join(f"    {arg};" for arg in args)
+                + "\n".join(f"{self.tab}{arg};" for arg in args)
                 + "\n};"
             )
             self.headers.push(header)
@@ -360,10 +360,9 @@ class CContext(AbstractContext):
                 # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
-            case asm.Variable(name, _):
+            case asm.Variable(name, t):
+                self.repack(name, t)
                 return name
-            case asm.Symbolic(obj):
-                return obj.to_c_value(self)
             case asm.Assign(var, val):
                 var_t = self.ctype_name(c_type(var.get_type()))
                 var = self(var)
@@ -374,21 +373,21 @@ class CContext(AbstractContext):
                 assert isinstance(f, asm.Immediate)
                 return c_function_call(f.val, self, *args)
             case asm.Load(buf, index):
-                assert isinstance(buf, asm.Symbolic)
+                assert isinstance(buf, asm.Variable)
                 index = self(index)
-                return buf.obj.c_load(self, index)
+                return buf.type.c_load(self, index)
             case asm.Store(buf, index, value):
-                assert isinstance(buf, asm.Symbolic)
+                assert isinstance(buf, asm.Variable)
                 index = self(index)
                 value = self(value)
-                return buf.obj.c_store(self, index, value)
+                return buf.type.c_store(self, index, value)
             case asm.Resize(buf, new_length):
-                assert isinstance(buf, asm.Symbolic)
+                assert isinstance(buf, asm.Variable)
                 new_length = self(new_length)
-                return buf.obj.c_resize(self, new_length)
+                return buf.type.c_resize(self, new_length)
             case asm.Length(buf):
-                assert isinstance(buf, asm.Symbolic)
-                return buf.obj.c_length(self)
+                assert isinstance(buf, asm.Variable)
+                return buf.type.c_length(self)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -410,8 +409,8 @@ class CContext(AbstractContext):
                 )
                 return None
             case asm.BufferLoop(buf, var, body):
-                assert isinstance(buf, asm.Symbolic)
-                idx = asm.Variable(self.freshen(var.name + "_i"), buf.obj.index_type())
+                assert isinstance(buf, asm.Variable)
+                idx = asm.Variable(self.freshen(var.name + "_i"), buf.type.index_type())
                 start = asm.Immediate(0)
                 stop = asm.Call(
                     asm.Immediate(operator.sub), (asm.Length(buf), asm.Immediate(1))
@@ -441,6 +440,28 @@ class CContext(AbstractContext):
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}while ({cond_code}) {{\n{body_code}\n{feed}}}")
+                return None
+            case asm.Function(asm.Variable(name, return_t), args, body):
+                ctx_2 = self.subblock()
+                arg_decls = []
+                for arg in args:
+                    match arg:
+                        case asm.Variable(name, t):
+                            t_name = self.ctype_name(c_type(t))
+                            arg_decls.append(f"{t_name} {name}")
+                            ctx_2.unpack(name, t_name)
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {arg}"
+                            )
+                body_code = ctx_2(body)
+                return_t_name = self.ctype_name(c_type(return_t))
+                feed = self.feed
+                self.exec(
+                    f"{feed}{return_t_name}({', '.join(arg_decls)}) {{\n"
+                    f"{body}\n"
+                    f"{feed}}}"
+                )
                 return None
             case asm.Return(value):
                 value = self(value)

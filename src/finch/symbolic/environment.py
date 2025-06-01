@@ -13,6 +13,7 @@ A namespace for managing variable names and aesthetic fresh variable generation.
 class Namespace:
     def __init__(self):
         self.counts = defaultdict(int)
+        self.resolutions = {}
 
     def freshen(self, *tags):
         name = "_".join(str(tag) for tag in tags)
@@ -28,6 +29,13 @@ class Namespace:
         if n == 1:
             return tag
         return f"{tag}_{n}"
+    
+    def resolve(self, *names: str):
+        """
+        Resolve a list of namespaced variable names to a unique name.
+        e.g. `resolve("a", "b")` might return `a_b_1` if `a_b` has already been used in scope.
+        """
+        self.resolutions.setdefault(names, lambda: self.freshen("_".join(names)))
 
 
 """
@@ -52,6 +60,9 @@ class AbstractContext(ABC):
 
     def freshen(self, *tags):
         return self.namespace.freshen(*tags)
+    
+    def resolve(self, *names: str):
+        return self.namespace.resolve(*names)
 
     def block(self):
         """

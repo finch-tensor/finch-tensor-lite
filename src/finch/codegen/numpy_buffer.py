@@ -84,41 +84,39 @@ class NumpyBufferFormat(AbstractCFormat):
         return NumpyBuffer(np.zeros(length, dtype=self._dtype))
 
     def unpack_c(self, ctx, name: str):
-        data = ctx.freshen(f"{name}_data")
-        length = ctx.freshen(f"{name}_length")
+        data = ctx.resolve(name, "data")
+        length = ctx.resolve(name, "length")
         t = ctx.ctype_name(np.ctypeslib.as_ctypes_type(self._dtype))
         ctx.exec(
             f"{ctx.feed}{t}* {data} = ({t}*){name}->data;\n"
             f"{ctx.feed}size_t {length} = {name}->length;"
         )
-        ctx.post(f"{ctx.feed}{name}->data = {data};\n" + f"{name}->length = {length};")
+        ctx.post(
+            f"{ctx.feed}{name}->data = {data};\n"
+            f"{ctx.feed}{name}->length = {length};"
+        )
         return NumpySymbolicCBuffer(self, name, data, length)
+    
+    def c_type(self):
+        return NumpyCBuffer
 
+    def c_length(self, ctx, name: str):
+        length = ctx.resolve(name, "length")
+        return length
 
-class NumpySymbolicCBuffer(AbstractSymbolicCBuffer):
-    """
-    A symbolic representation of a NumPy buffer.
-    """
+    def c_load(self, ctx, name, index: str):
+        data = ctx.resolve(name, "data")
+        return f"{data}[{index}]"
 
-    def __init__(self, fmt, name, data, length):
-        self.fmt = fmt
-        self.name = name
-        self.data = data
-        self.length = length
-
-    def c_length(self, ctx):
-        return self.length
-
-    def c_load(self, ctx, index: str):
-        return f"{self.data}[{index}]"
-
-    def c_store(self, ctx, index: str, value: str):
+    def c_store(self, ctx, name, index: str, value: str):
+        data = ctx.resolve(name, "data")
         ctx.exec(f"{ctx.feed}{self.data}[{index}] = {value};")
 
     def c_resize(self, ctx, new_length: str):
+        length = ctx.resolve(name, "length")
+        data = ctx.resolve(name, "data")
         name = self.name
         ctx.exec(
-            f"{ctx.feed}{name}->data = {name}->resize(&({name}->arr), {new_length});\n"
-            f"{ctx.feed}{self.length} = new_length;\n"
-            f"{ctx.feed}{self.data} = {name}->data;"
+            f"{ctx.feed}{self.data} = {name}->resize(&({name}->arr), {new_length});\n"
+            f"{ctx.feed}{self.length} = new_length;"
         )
