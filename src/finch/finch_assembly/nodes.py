@@ -81,6 +81,80 @@ class Variable(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class Stack(AssemblyExpression):
+    """
+    Represents a logical AST expression for an object unpacked to the stack
+    under the namespace `name`.
+
+    Unpacking an object assumes that this function retains sole ownership of the
+    object, and that any modifications to the object will occur only through
+    method calls in this function body.
+
+    Attributes:
+        name: The name of the stack.
+    """
+
+    name: str
+    type: type
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Unpack(AssemblyExpression):
+    """
+    Represents unpacking a value onto the stack.
+
+    Unpacking an object assumes that this function retains sole ownership of the
+    object, and that any modifications to the object will occur only through
+    method calls in this function body.
+
+    Attributes:
+        var: The name to unpack into.
+        val: The value to unpack.
+    """
+
+    var: Stack
+    val: AssemblyExpression
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.var, self.val]
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return self.var.get_type()
+
+
+@dataclass(eq=True, frozen=True)
+class Repack(AssemblyExpression):
+    """
+    Represents repacking a value from the stack into an object.
+
+    Repacking assumes that this function has retained sole ownership of the
+    object, and that any modifications to the object have occurred only through
+    method calls in this function body.
+
+    Attributes:
+        var: The variable to repack into.
+        val: The value to repack from the stack.
+    """
+
+    var: AssemblyExpression
+    val: Stack
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.var, self.val]
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return self.var.get_type()
+
+
+@dataclass(eq=True, frozen=True)
 class Assign(AssemblyTree):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
