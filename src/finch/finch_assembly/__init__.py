@@ -13,7 +13,6 @@ from .nodes import (
     Resize,
     Return,
     Store,
-    Symbolic,
     Variable,
     WhileLoop,
 )
@@ -22,7 +21,6 @@ __all__ = [
     "AssemblyNode",
     "Immediate",
     "Variable",
-    "Symbolic",
     "Load",
     "Store",
     "Resize",

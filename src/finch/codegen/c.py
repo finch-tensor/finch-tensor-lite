@@ -11,7 +11,7 @@ from typing import Any
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..symbolic import AbstractContext, AbstractSymbolic
+from ..symbolic import AbstractContext
 from ..util import config
 from ..util.cache import file_cache
 from .abstract_buffer import AbstractFormat
@@ -292,6 +292,7 @@ ctype_to_c_name = {
     ctypes.c_char_p: "char*",
     ctypes.c_wchar_p: "wchar_t*",
     ctypes.c_void_p: "void*",
+    ctypes.py_object: "void*",
 }
 
 
@@ -307,26 +308,43 @@ class CContext(AbstractContext):
         self.tab = tab
         self.indent = indent
         self.headers = headers
+        self._headerset = set(headers)
+
+    def add_header(self, header):
+        if header not in self._headerset:
+            self.headers.append(header)
+            self._headerset.add(header)
+
+    def emit_global(self):
+        """
+        Emit the headers for the C code.
+        """
+        return "\n".join([*self.headers, self.emit()])
 
     def ctype_name(self, t):
         # Mapping from ctypes types to their C type names
         name = ctype_to_c_name.get(t)
         if name is not None:
             return name
-        if isinstance(t, ctypes.Structure):
+        if issubclass(t, ctypes.Structure):
             name = t.__name__
             args = [
-                f"{field.name}: {self.ctype_name(field.type)}" for field in t._fields_
+                f"{self.ctype_name(f_type)} {f_name}" for (f_name, f_type) in t._fields_
             ]
             header = (
                 f"struct {name} {{\n"
-                + "\n".join(f"    {arg};" for arg in args)
+                + "\n".join(f"{self.tab}{arg};" for arg in args)
                 + "\n};"
             )
-            self.headers.push(header)
+            self.add_header(header)
             return name
-        if isinstance(t, ctypes._Pointer):
+        if issubclass(t, ctypes._Pointer):
             return f"{self.ctype_name(t._type_)}*"
+        if issubclass(t, ctypes._CFuncPtr):
+            arg_types = ", ".join(
+                self.ctype_name(arg_type) for arg_type in t._argtypes_
+            )
+            return f"{self.ctype_name(t._restype_)} (*)( {arg_types} )"
         raise NotImplementedError(f"No C type mapping for {t}")
 
     @property
@@ -338,6 +356,7 @@ class CContext(AbstractContext):
         blk.indent = self.indent
         blk.tab = self.tab
         blk.headers = self.headers
+        blk._headerset = self._headerset
         return blk
 
     def subblock(self):
@@ -345,6 +364,7 @@ class CContext(AbstractContext):
         blk.indent = self.indent + 1
         blk.tab = self.tab
         blk.headers = self.headers
+        blk._headerset = self._headerset
         return blk
 
     def emit(self):
@@ -360,10 +380,8 @@ class CContext(AbstractContext):
                 # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
-            case asm.Variable(name, _):
+            case asm.Variable(name, t):
                 return name
-            case asm.Symbolic(obj):
-                return obj.to_c_value(self)
             case asm.Assign(var, val):
                 var_t = self.ctype_name(c_type(var.get_type()))
                 var = self(var)
@@ -373,22 +391,14 @@ class CContext(AbstractContext):
             case asm.Call(f, args):
                 assert isinstance(f, asm.Immediate)
                 return c_function_call(f.val, self, *args)
-            case asm.Load(buf, index):
-                assert isinstance(buf, asm.Symbolic)
-                index = self(index)
-                return buf.obj.c_load(self, index)
-            case asm.Store(buf, index, value):
-                assert isinstance(buf, asm.Symbolic)
-                index = self(index)
-                value = self(value)
-                return buf.obj.c_store(self, index, value)
-            case asm.Resize(buf, new_length):
-                assert isinstance(buf, asm.Symbolic)
-                new_length = self(new_length)
-                return buf.obj.c_resize(self, new_length)
+            case asm.Load(buf, idx):
+                return buf.get_type().c_load(self, buf, idx)
+            case asm.Store(buf, idx, val):
+                return buf.get_type().c_store(self, buf, idx, val)
+            case asm.Resize(buf, len):
+                return buf.get_type().c_resize(self, buf, len)
             case asm.Length(buf):
-                assert isinstance(buf, asm.Symbolic)
-                return buf.obj.c_length(self)
+                return buf.get_type().c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -410,8 +420,9 @@ class CContext(AbstractContext):
                 )
                 return None
             case asm.BufferLoop(buf, var, body):
-                assert isinstance(buf, asm.Symbolic)
-                idx = asm.Variable(self.freshen(var.name + "_i"), buf.obj.index_type())
+                idx = asm.Variable(
+                    self.freshen(var.name + "_i"), buf.get_type().index_type()
+                )
                 start = asm.Immediate(0)
                 stop = asm.Call(
                     asm.Immediate(operator.sub), (asm.Length(buf), asm.Immediate(1))
@@ -442,6 +453,28 @@ class CContext(AbstractContext):
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}while ({cond_code}) {{\n{body_code}\n{feed}}}")
                 return None
+            case asm.Function(asm.Variable(func_name, return_t), args, body):
+                ctx_2 = self.subblock()
+                arg_decls = []
+                for arg in args:
+                    match arg:
+                        case asm.Variable(name, t):
+                            t_name = self.ctype_name(c_type(t))
+                            arg_decls.append(f"{t_name} {name}")
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {arg}"
+                            )
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                return_t_name = self.ctype_name(c_type(return_t))
+                feed = self.feed
+                self.exec(
+                    f"{feed}{return_t_name} {func_name}({', '.join(arg_decls)}) {{\n"
+                    f"{body_code}\n"
+                    f"{feed}}}"
+                )
+                return None
             case asm.Return(value):
                 value = self(value)
                 self.exec(f"{feed}return {value};")
@@ -455,33 +488,25 @@ class AbstractCFormat(AbstractFormat, ABC):
     """
 
     @abstractmethod
-    def unpack_c(self, ctx, name):
-        """
-        Unpack the C object into a symbolic representation.
-        """
-
-
-class AbstractSymbolicCBuffer(AbstractSymbolic, ABC):
-    @abstractmethod
-    def c_length(self, ctx):
+    def c_length(self, ctx, buffer):
         """
         Return C code which loads a named buffer at the given index.
         """
 
     @abstractmethod
-    def c_load(self, ctx, index):
+    def c_load(self, ctx, buffer, index):
         """
         Return C code which loads a named buffer at the given index.
         """
 
     @abstractmethod
-    def c_store(self, ctx, index, value):
+    def c_store(self, ctx, buffer, index, value):
         """
         Return C code which stores a named buffer to the given index.
         """
 
     @abstractmethod
-    def c_resize(self, ctx, new_length):
+    def c_resize(self, ctx, buffer, new_length):
         """
         Return C code which resizes a named buffer to the given length.
         """

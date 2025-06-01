@@ -26,15 +26,15 @@ class AbstractBuffer(ABC):
         """
 
     @abstractmethod
-    def load(self, index: int):
+    def load(self, idx: int):
         pass
 
     @abstractmethod
-    def store(self, index: int, value):
+    def store(self, idx: int, val):
         pass
 
     @abstractmethod
-    def resize(self, new_length: int):
+    def resize(self, len: int):
         """
         Resize the buffer to the new length.
         """

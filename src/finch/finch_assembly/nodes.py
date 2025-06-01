@@ -128,26 +128,6 @@ class Call(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolic(AssemblyExpression):
-    """
-    Represents a logical AST expression for a symbolic object `obj`.
-
-    Attributes:
-        obj: The tensor object.
-    """
-
-    obj: Any
-
-    def children(self):
-        """Returns the children of the node."""
-        return [self.obj]
-
-    def get_type(self):
-        """Returns the type of the expression."""
-        return self.obj.get_type()
-
-
-@dataclass(eq=True, frozen=True)
 class Load(AssemblyExpression, AssemblyTree):
     """
     Represents loading a value from a buffer at a given index.
@@ -179,9 +159,9 @@ class Store(AssemblyTree):
         value: The value to store.
     """
 
-    buffer: AssemblyNode
-    index: AssemblyNode
-    value: AssemblyNode
+    buffer: AssemblyExpression
+    index: AssemblyExpression
+    value: AssemblyExpression
 
     def children(self):
         return [self.buffer, self.index, self.value]
@@ -197,8 +177,8 @@ class Resize(AssemblyTree):
         new_size: The new size for the buffer.
     """
 
-    buffer: AssemblyNode
-    new_size: AssemblyNode
+    buffer: AssemblyExpression
+    new_size: AssemblyExpression
 
     def children(self):
         return [self.buffer, self.new_size]
@@ -213,7 +193,7 @@ class Length(AssemblyExpression, AssemblyTree):
         buffer: The buffer whose length is queried.
     """
 
-    buffer: AssemblyNode
+    buffer: AssemblyExpression
 
     def children(self):
         return [self.buffer]
@@ -298,7 +278,7 @@ class Function(AssemblyTree):
     """
 
     name: Variable
-    args: tuple[AssemblyNode, ...]
+    args: tuple[Variable, ...]
     body: AssemblyNode
 
     def children(self):

@@ -3,7 +3,7 @@ import ctypes
 import numpy as np
 
 from .abstract_buffer import AbstractBuffer
-from .c import AbstractCArgument, AbstractCFormat, AbstractSymbolicCBuffer
+from .c import AbstractCArgument, AbstractCFormat
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -83,42 +83,24 @@ class NumpyBufferFormat(AbstractCFormat):
     def __call__(self, length: int):
         return NumpyBuffer(np.zeros(length, dtype=self._dtype))
 
-    def unpack_c(self, ctx, name: str):
-        data = ctx.freshen(f"{name}_data")
-        length = ctx.freshen(f"{name}_length")
-        t = ctx.ctype_name(np.ctypeslib.as_ctypes_type(self._dtype))
+    def c_type(self):
+        return ctypes.POINTER(NumpyCBuffer)
+
+    def c_length(self, ctx, buffer):
+        return f"{ctx(buffer)}->length"
+
+    def c_load(self, ctx, buffer, index):
+        return f"{ctx(buffer)}->data[{ctx(index)}]"
+
+    def c_store(self, ctx, buffer, index, value):
+        data = f"{ctx(buffer)}->data"
+        ctx.exec(f"{ctx.feed}{data}[{ctx(index)}] = {ctx(value)};")
+
+    def c_resize(self, ctx, buffer, new_length):
+        data = f"{ctx(buffer)}->data"
+        arr = f"{ctx(buffer)}->arr"
+        length = f"{ctx(buffer)}->length"
         ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){name}->data;\n"
-            f"{ctx.feed}size_t {length} = {name}->length;"
-        )
-        ctx.post(f"{ctx.feed}{name}->data = {data};\n" + f"{name}->length = {length};")
-        return NumpySymbolicCBuffer(self, name, data, length)
-
-
-class NumpySymbolicCBuffer(AbstractSymbolicCBuffer):
-    """
-    A symbolic representation of a NumPy buffer.
-    """
-
-    def __init__(self, fmt, name, data, length):
-        self.fmt = fmt
-        self.name = name
-        self.data = data
-        self.length = length
-
-    def c_length(self, ctx):
-        return self.length
-
-    def c_load(self, ctx, index: str):
-        return f"{self.data}[{index}]"
-
-    def c_store(self, ctx, index: str, value: str):
-        ctx.exec(f"{ctx.feed}{self.data}[{index}] = {value};")
-
-    def c_resize(self, ctx, new_length: str):
-        name = self.name
-        ctx.exec(
-            f"{ctx.feed}{name}->data = {name}->resize(&({name}->arr), {new_length});\n"
-            f"{ctx.feed}{self.length} = new_length;\n"
-            f"{ctx.feed}{self.data} = {name}->data;"
+            f"{ctx.feed}{data} = {ctx(buffer)}->resize(&{arr}, {ctx(new_length)});\n"
+            f"{ctx.feed}{length} = {ctx(new_length)};"
         )

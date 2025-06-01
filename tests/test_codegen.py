@@ -4,6 +4,7 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finch
+import finch.codegen.c as c
 import finch.finch_assembly as asm
 
 
@@ -62,39 +63,42 @@ def test_buffer_function():
 
 
 def test_codegen():
-    a = finch.NumpyBufferFormat(np.float64)
-
-    def f(ctx, a_2):
-        i = asm.Variable("i", int)
-        a_2 = asm.Symbolic(a_2)
-        ctx(
+    a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
+    i = asm.Variable("i", int)
+    ctx = c.CContext()
+    ctx(
+        asm.Function(
+            asm.Variable("test_function", int),
+            (a,),
             asm.Block(
                 (
                     asm.Resize(
-                        a_2,
+                        a,
                         asm.Call(
                             asm.Immediate(operator.mul),
-                            (asm.Length(a_2), asm.Immediate(2)),
+                            (asm.Length(a), asm.Immediate(2)),
                         ),
                     ),
                     asm.ForLoop(
                         i,
                         asm.Immediate(0),
-                        asm.Length(a_2),
+                        asm.Length(a),
                         asm.Store(
-                            a_2,
+                            a,
+                            asm.Call(asm.Immediate(operator.add), (i, asm.Length(a))),
                             asm.Call(
                                 asm.Immediate(operator.mul),
-                                (asm.Load(a_2, i), asm.Immediate(2)),
+                                (asm.Load(a, i), asm.Immediate(2)),
                             ),
-                            asm.Call(asm.Immediate(operator.add), (i, asm.Length(a_2))),
                         ),
                     ),
+                    asm.Return(asm.Immediate(0)),
                 )
             ),
         )
+    )
 
-    return finch.codegen.c.c_function_entrypoint(f, ("a",), (a,))
+    return ctx.emit_global()
 
 
 print(test_codegen())
