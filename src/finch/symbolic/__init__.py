@@ -1,8 +1,4 @@
-from .environment import (
-    AbstractContext,
-    AbstractSymbolic,
-    Namespace,
-)
+from .environment import AbstractContext, AbstractSymbolic, Namespace, ScopedDict
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -32,4 +28,5 @@ __all__ = [
     "Namespace",
     "AbstractContext",
     "AbstractSymbolic",
+    "ScopedDict",
 ]

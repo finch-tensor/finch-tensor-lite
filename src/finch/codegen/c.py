@@ -11,7 +11,7 @@ from typing import Any
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..symbolic import AbstractContext
+from ..symbolic import AbstractContext, ScopedDict
 from ..util import config
 from ..util.cache import file_cache
 from .abstract_buffer import AbstractFormat
@@ -301,14 +301,17 @@ class CContext(AbstractContext):
     A class to represent a C environment.
     """
 
-    def __init__(self, tab="    ", indent=0, headers=None, **kwargs):
+    def __init__(self, tab="    ", indent=0, headers=None, bindings=None, **kwargs):
         if headers is None:
             headers = []
+        if bindings is None:
+            bindings = ScopedDict()
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
         self.headers = headers
         self._headerset = set(headers)
+        self.bindings = bindings
 
     def add_header(self, header):
         if header not in self._headerset:
@@ -357,6 +360,7 @@ class CContext(AbstractContext):
         blk.tab = self.tab
         blk.headers = self.headers
         blk._headerset = self._headerset
+        blk.bindings = self.bindings
         return blk
 
     def subblock(self):
@@ -365,6 +369,7 @@ class CContext(AbstractContext):
         blk.tab = self.tab
         blk.headers = self.headers
         blk._headerset = self._headerset
+        blk.bindings = self.bindings.scope()
         return blk
 
     def emit(self):
@@ -383,10 +388,14 @@ class CContext(AbstractContext):
             case asm.Variable(name, t):
                 return name
             case asm.Assign(var, val):
-                var_t = self.ctype_name(c_type(var.get_type()))
-                var = self(var)
-                val = self(val)
-                self.exec(f"{feed}{var_t} {var} = {val};")
+                if var.name in self.bindings:
+                    self.exec(f"{feed}{var} = {val};")
+                else:
+                    self.bindings[var.name] = var.get_type()
+                    var_t = self.ctype_name(c_type(self.bindings[var.name]))
+                    var = self(var)
+                    val = self(val)
+                    self.exec(f"{feed}{var_t} {var} = {val};")
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Immediate)
@@ -407,14 +416,16 @@ class CContext(AbstractContext):
                 return None
             case asm.ForLoop(var, start, end, body):
                 var_t = self.ctype_name(c_type(var.get_type()))
-                var = self(var)
+                var_2 = self(var)
                 start = self(start)
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
+                ctx_2.bindings[var.name] = var.get_type()
                 body_code = ctx_2.emit()
                 self.exec(
-                    f"{feed}for ({var_t} {var} = {start}; {var} < {end}; {var}++) {{\n"
+                    f"{feed}for ({var_t} {var_2} = {start};"
+                    "{var_2} < {end}; {var_2}++) {{\n"
                     f"{body_code}"
                     f"\n{feed}}}"
                 )
@@ -461,6 +472,7 @@ class CContext(AbstractContext):
                         case asm.Variable(name, t):
                             t_name = self.ctype_name(c_type(t))
                             arg_decls.append(f"{t_name} {name}")
+                            ctx_2.bindings[name] = t
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
