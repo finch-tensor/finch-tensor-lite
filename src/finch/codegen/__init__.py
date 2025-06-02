@@ -1,12 +1,12 @@
-from ..finch_assembly.abstract_buffer import AbstractBuffer, AbstractFormat
-from .c import CKernel, get_c_function
+from .c import CKernel, CModule, CCompiler, AbstractCArgument, AbstractCFormat
 from .numpy_buffer import NumpyBuffer, NumpyBufferFormat
 
 __all__ = [
-    "get_c_function",
     "CKernel",
+    "CModule",
+    "CCompiler",
+    "AbstractCArgument",
+    "AbstractCFormat",
     "NumpyBuffer",
-    "AbstractBuffer",
-    "AbstractFormat",
     "NumpyBufferFormat",
 ]

@@ -53,22 +53,26 @@ def create_shared_lib(filename, c_code, cc, cflags):
 
 
 @lru_cache(maxsize=10_000)
-def get_c_function(function_name, c_code):
+def load_shared_lib(c_code, cc=None, cflags=None):
     """
     :param function_name: The name of the function to call.
     :param c_code: The code to compile
     """
+    if cc is None:
+        cc = config.get("cc"),
+    if cflags is None:
+        cflags = [*config.get("cflags").split(), *config.get("shared_cflags").split()],
+
     shared_lib_path = create_shared_lib(
         c_code,
-        config.get("cc"),
-        [*config.get("cflags").split(), *config.get("shared_cflags").split()],
+        cc,
+        cflags,
     )
 
     # Load the shared library using ctypes
     shared_lib = ctypes.CDLL(str(shared_lib_path))
 
-    # Get the function from the shared library
-    return getattr(shared_lib, function_name)
+    return shared_lib
 
 
 class AbstractCArgument(ABC):
@@ -92,10 +96,9 @@ class CKernel:
     A class to represent a C kernel.
     """
 
-    def __init__(self, function_name, c_code, argtypes):
-        self.function_name = function_name
-        self.c_code = c_code
-        self.c_function = get_c_function(function_name, c_code)
+    def __init__(self, c_function, ret_type, argtypes):
+        self.c_function = c_function
+        self.ret_type = ret_type
         self.argtypes = argtypes
 
     def __call__(self, *args):
@@ -113,7 +116,65 @@ class CKernel:
         res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
-        return res
+        return self.ret_type(res)
+
+
+class CModule:
+    """
+    A class to represent a C module.
+    """
+
+    def __init__(self, c_module, kernels):
+        self.c_module = c_module
+        self.kernels = kernels
+
+        def __getattr__(self, name):
+            # Allow attribute access to kernels by name
+            if name in self.kernels:
+                return self.kernels[name]
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+
+
+class CCompiler:
+    """
+    A class to compile and run FinchAssembly.
+    """
+
+    def __init__(self, ctx = None, cc=None, cflags=None, shared_cflags=None):
+        if cc is None:
+            cc = config.get("cc")
+        if cflags is None:
+            cflags = config.get("cflags").split()
+        if shared_cflags is None:
+            shared_cflags = config.get("shared_cflags").split()
+
+    def __call__(self, prgm):
+        ctx = CContext()
+        ctx(prgm)
+        c_code = ctx.emit_global()
+        lib = load_shared_lib(
+            c_code=c_code,
+            cc=self.cc,
+            cflags=[*self.cflags, *self.shared_cflags],
+        )
+        kernels = {}
+        if prgm.head() != asm.Module:
+            raise ValueError(
+                "CCompiler expects a Module as the head of the program, "
+                f"got {type(prgm.head())}"
+            )
+        for func in prgm.head().funcs:
+            match func:
+                case asm.Function(asm.Variable(func_name, return_t), args, _):
+                    return_t = c_type(return_t)
+                    arg_ts = [arg.get_type() for arg in args]
+                    kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
+                    kernels[func_name] = kern
+                case _:
+                    raise NotImplementedError(
+                        f"Unrecognized function type: {type(func)}"
+                    )
+        return CModule(lib, kernels)
 
 
 def c_function_name(op: Any, ctx, *args: Any) -> str:

@@ -6,6 +6,7 @@ from numpy.testing import assert_equal
 import finch
 import finch.codegen.c as c
 import finch.finch_assembly as asm
+from finch.codegen import CCompiler
 
 
 def test_add_function():
@@ -16,7 +17,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finch.codegen.c.get_c_function("add", c_code)
+    f = finch.codegen.c.get_c_module(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -55,8 +56,9 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = finch.NumpyBuffer(a)
-    f = finch.codegen.c.CKernel("concat_buffer_with_self", c_code, [finch.NumpyBuffer])
-    f(b)
+    f = finch.codegen.c.get_c_module(c_code).concat_buffer_with_self
+    k = finch.codegen.c.CKernel(f, type(None), [finch.NumpyBuffer])
+    k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
@@ -65,8 +67,7 @@ def test_buffer_function():
 def test_codegen():
     a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
     i = asm.Variable("i", int)
-    ctx = c.CContext()
-    ctx(
+    prgm = asm.Module(
         asm.Function(
             asm.Variable("test_function", int),
             (a,),
@@ -95,10 +96,20 @@ def test_codegen():
                     asm.Return(asm.Immediate(0)),
                 )
             ),
-        )
+        ),
     )
+    ctx = CCompiler()
+    mod = ctx(prgm)
+    f = mod.test_function
 
-    return ctx.emit_global()
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = finch.NumpyBuffer(a)
+    f(b)
+    result = b.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    assert_equal(result, expected)
+
+
 
 
 print(test_codegen())
