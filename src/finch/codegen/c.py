@@ -103,6 +103,7 @@ class CKernel:
         self.c_function = c_function
         self.ret_type = ret_type
         self.argtypes = argtypes
+        self.c_function.restype = c_type(ret_type)
 
     def __call__(self, *args):
         """
@@ -336,6 +337,8 @@ register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
 register_property(
     np.generic, "__self__", "c_type", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
+register_property(ctypes._SimpleCData, "__self__", "c_type", lambda x: x)
+register_property(type(None), "__self__", "c_type", lambda x: None)
 
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
