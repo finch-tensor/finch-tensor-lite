@@ -104,6 +104,9 @@ class CKernel:
         self.ret_type = ret_type
         self.argtypes = argtypes
         self.c_function.restype = c_type(ret_type)
+        self.c_function.argtypes = tuple(
+            c_type(argtype) for argtype in argtypes
+        )
 
     def __call__(self, *args):
         """
@@ -179,7 +182,7 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    return_t = c_type(return_t)
+                    return_t = return_t
                     arg_ts = [arg.get_type() for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern

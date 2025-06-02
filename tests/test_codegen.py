@@ -56,7 +56,7 @@ def test_buffer_function():
     a = np.array([1, 2, 3], dtype=np.float64)
     b = finch.NumpyBuffer(a)
     f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finch.codegen.c.CKernel(f, type(None), [finch.NumpyBuffer])
+    k = finch.codegen.c.CKernel(f, type(None), [finch.NumpyBufferFormat(np.float64)])
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
