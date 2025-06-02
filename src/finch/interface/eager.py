@@ -207,7 +207,7 @@ def negative(x):
 def matmul(x1, x2, /):
     """
     Computes the matrix product.
-    
+
     Returns a LazyTensor if either x1 or x2 is a LazyTensor.
     Otherwise, computes the result eagerly.
     """

@@ -240,12 +240,10 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
         ),
         # mismatch dimensions
         (
-            np.arange(7 * 2 * 4 * 3).reshape(7, 2, 3, 4),
+            np.arange(7 * 2 * 3 * 4).reshape(7, 2, 3, 4),
             np.arange(2 * 3 * 4).reshape(2, 3, 4),
         ),
-        (
-            np.arange(5), np.arange(4)
-        ),
+        (np.arange(5), np.arange(4)),
     ],
 )
 @pytest.mark.parametrize(
@@ -274,8 +272,8 @@ def test_matmul(a, b, a_wrap, b_wrap):
     try:
         expected = np.linalg.matmul(a, b)
     except ValueError:
-        with pytest.raises(Exception):
-            finch.matmul(wa, wb) # make sure matmul raises error too
+        with pytest.raises(ValueError):
+            finch.matmul(wa, wb)  # make sure matmul raises error too
         return
 
     result = finch.matmul(wa, wb)
@@ -292,7 +290,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     [
         np.arange(6).reshape(2, 3),
         np.arange(12).reshape(1, 12),
-        np.arange(24).reshape(2, 3, 4), # 3D array
+        np.arange(24).reshape(2, 3, 4),  # 3D array
     ],
 )
 @pytest.mark.parametrize(
@@ -315,4 +313,3 @@ def test_matrix_transpose(a, a_wrap):
     if isinstance(result, finch.LazyTensor):
         result = finch.compute(result)
     assert_equal(result, expected)
-

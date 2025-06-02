@@ -1,4 +1,3 @@
-
 """
 This module provides functionality for array fusion and computation using lazy
 evaluation.
@@ -60,7 +59,6 @@ from ..finch_logic import (
 )
 from ..symbolic import gensym
 from .lazy import defer
-
 
 
 def get_default_scheduler():

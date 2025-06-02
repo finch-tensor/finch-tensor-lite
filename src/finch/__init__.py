@@ -17,6 +17,8 @@ from .interface import (
     floordiv,
     fuse,
     fused,
+    matmul,
+    matrix_transpose,
     mod,
     multiply,
     negative,
@@ -28,8 +30,6 @@ from .interface import (
     squeeze,
     subtract,
     sum,
-    matmul,
-    matrix_transpose,
     truediv,
 )
 

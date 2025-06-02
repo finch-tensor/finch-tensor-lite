@@ -10,6 +10,8 @@ from .eager import (
     elementwise,
     expand_dims,
     floordiv,
+    matmul,
+    matrix_transpose,
     mod,
     multiply,
     negative,
@@ -21,8 +23,6 @@ from .eager import (
     squeeze,
     subtract,
     sum,
-    matmul,
-    matrix_transpose,
     truediv,
 )
 

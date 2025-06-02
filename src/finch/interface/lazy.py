@@ -448,6 +448,7 @@ def positive(x) -> LazyTensor:
 def negative(x) -> LazyTensor:
     return elementwise(operator.neg, defer(x))
 
+
 def matmul(x1, x2) -> LazyTensor:
     """
     Performs matrix multiplication between two tensors.
@@ -458,13 +459,14 @@ def matmul(x1, x2) -> LazyTensor:
         For arrays greater than 1D
         """
         assert a.ndim >= 2 and b.ndim >= 2, "Both inputs must be at least 2D arrays"
-        assert (
-            a.shape[-1] == b.shape[-2]
-        ), "Dimensions mismatch for matrix multiplication"
+        if a.shape[-1] != b.shape[-2]:
+            raise ValueError("Dimensions mismatch for matrix multiplication")
         # check all preceeding dimensions match
-        assert (
-            a.shape[-len(b.shape) : -2] == b.shape[-len(a.shape) : -2]
-        ), "Preceeding dimensions must match for matrix multiplication"
+        if a.shape[-len(b.shape) : -2] != b.shape[-len(a.shape) : -2]:
+            raise ValueError(
+                "Preceeding dimensions of the two arrays must",
+                "match for matrix multiplication",
+            )
         return reduce(
             operator.add,
             multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
@@ -475,14 +477,12 @@ def matmul(x1, x2) -> LazyTensor:
     x2 = defer(x2)
 
     if x1.ndim == 1 and x2.ndim == 1:
-        result = reduce(operator.add, multiply(x1, x2), axis=0)
-        return result
+        return reduce(operator.add, multiply(x1, x2), axis=0)
 
     if x1.ndim == 1:
         x1 = expand_dims(x1, axis=0)  # make it a row vector
         result = _matmul_helper(x1, x2)
-        result = squeeze(result, axis=-2)  # remove the prepended singleton dimension
-        return result
+        return squeeze(result, axis=-2)  # remove the prepended singleton dimension
 
     if x2.ndim == 1:
         x2 = expand_dims(x2, axis=1)  # make it a column vector
@@ -508,13 +508,15 @@ def matrix_transpose(x):
     """
     x = defer(x)
     if x.ndim == 1:
-        # this is following numpy's behavior. 
+        # this is following numpy's behavior.
         # data-apis specification assumes that input is atleast 2D
         raise ValueError(
-            "Cannot transpose a vector. Use `expand_dims` to convert it to a matrix first."
+            "Cannot transpose a vector. ",
+            "Use `expand_dims` to convert it to a matrix first.",
         )
     # swap the last two axes
     return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
+
 
 def bitwise_and(x1, x2) -> LazyTensor:
     return elementwise(operator.and_, defer(x1), defer(x2))
