@@ -104,9 +104,7 @@ class CKernel:
         self.ret_type = ret_type
         self.argtypes = argtypes
         self.c_function.restype = c_type(ret_type)
-        self.c_function.argtypes = tuple(
-            c_type(argtype) for argtype in argtypes
-        )
+        self.c_function.argtypes = tuple(c_type(argtype) for argtype in argtypes)
 
     def __call__(self, *args):
         """
