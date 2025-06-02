@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ..symbolic import ScopedDict
 from . import nodes as asm
+from .abstract_buffer import AbstractFormat, AbstractBuffer
 
 
 class AssemblyInterpreterKernel:
@@ -39,23 +40,31 @@ class AssemblyInterpreter:
         self.loop = loop
         self.ret = ret
 
-    def scope(self, **kwargs):
+    def scope(self, bindings=None, types=None, loop=None, ret=None):
         """
         Create a new scope for the interpreter.
         This allows for nested scopes and variable shadowing.
         """
+        if bindings is None:
+            bindings = self.bindings.scope()
+        if types is None:
+            types = self.types.scope()
+        if loop is None:
+            loop = self.loop
+        if ret is None:
+            ret = self.ret
         return AssemblyInterpreter(
-            bindings=self.bindings.scope(),
-            types=self.types.scope(),
-            loop=self.loop,
-            ret=self.ret,
-            **kwargs,
+            bindings=bindings,
+            types=types,
+            loop=loop,
+            ret=ret,
         )
 
     def should_halt(self):
         """
         Check if the interpreter should halt execution.
-        This is used to stop execution in loops or when a return statement is encountered.
+        This is used to stop execution in loops or when a return
+        statement is encountered.
         """
         return self.loop or self.ret
 
@@ -75,8 +84,7 @@ class AssemblyInterpreter:
                             f"but used as type {var_t}."
                         )
                 if var_n in self.bindings:
-                    var_e = self.bindings[var_n]
-                    return var_e
+                    return self.bindings[var_n]
                 raise KeyError(
                     f"Variable '{var_n}' is not defined in the current context."
                 )
@@ -84,7 +92,8 @@ class AssemblyInterpreter:
                 val_e = self(val)
                 if not isinstance(val_e, var_t):
                     raise TypeError(
-                        f"Assigned value {val_e} is not of type {var_t} for variable '{var}'."
+                        f"Assigned value {val_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
                     )
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
@@ -96,16 +105,16 @@ class AssemblyInterpreter:
             case asm.Load(buf, idx):
                 buf_e = self(buf)
                 idx_e = self(idx)
-                return buf.load(buf_e, idx_e)
+                return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
                 buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
-            case asm.Resize(buf, len):
+            case asm.Resize(buf, len_):
                 buf_e = self(buf)
-                len_e = self(len)
+                len_e = self(len_)
                 buf_e.resize(len_e)
                 return None
             case asm.Length(buf):
@@ -122,29 +131,35 @@ class AssemblyInterpreter:
                 end_e = self(end)
                 if not isinstance(start_e, var_t):
                     raise TypeError(
-                        f"Start value {start_e} is not of type {var_t} for variable '{var_n}'."
+                        f"Start value {start_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
                     )
                 if not isinstance(end_e, var_t):
                     raise TypeError(
-                        f"End value {end_e} is not of type {var_t} for variable '{var_n}'."
+                        f"End value {end_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
                     )
+                assert isinstance(start_e, int)
+                assert isinstance(end_e, int)
                 ctx_2 = self.scope(loop=[])
                 for var_e in range(start_e, end_e):
                     if ctx_2.should_halt():
                         break
                     ctx_3 = self.scope()
-                    ctx_3(asm.Block(asm.Assign(var, asm.Immediate(var_e)), body))
+                    ctx_3(asm.Block((asm.Assign(var, asm.Immediate(var_e)), body)))
                 return None
             case asm.BufferLoop(buf, var, body):
                 ctx_2 = self.scope(loop=[])
-                for i in range(buf.length()):
+                buf_e = self(buf)
+                for i in range(buf_e.length()):
                     if ctx_2.should_halt():
                         break
                     ctx_3 = ctx_2.scope()
                     ctx_3(
-                        asm.Block(
-                            asm.Assign(var, asm.Load(buf, asm.Immediate(i))), body
-                        )
+                        asm.Block((
+                            asm.Assign(var, asm.Load(buf, asm.Immediate(i))),
+                            body
+                        ))
                     )
                 return None
             case asm.WhileLoop(cond, body):
@@ -156,7 +171,6 @@ class AssemblyInterpreter:
                     ctx_3(body)
                 return None
             case asm.Function(asm.Variable(func_n, ret_t), args, body):
-
                 def my_func(*args_e):
                     ctx_2 = self.scope(ret=[])
                     if len(args_e) != len(args):
@@ -167,11 +181,19 @@ class AssemblyInterpreter:
                     for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
                             case asm.Variable(arg_n, arg_t):
-                                if not isinstance(arg_e, arg_t):
-                                    raise TypeError(
-                                        f"Argument '{arg_n}' is expected to be of type {arg_t}, "
-                                        f"but got {type(arg_e)}."
-                                    )
+                                # Only check type if arg_t is a type, not a buffer format
+                                if isinstance(arg_t, type):
+                                    if not isinstance(arg_e, arg_t):
+                                        raise TypeError(
+                                            f"Argument '{arg_n}' is expected to be of type "
+                                            f"{arg_t}, but got {type(arg_e)}."
+                                        )
+                                if isinstance(arg_t, asm.AbstractFormat):
+                                    if arg_e.get_format() != arg_t:
+                                        raise TypeError(
+                                            f"Argument '{arg_n}' is expected to be of format "
+                                            f"{arg_t}, but got {arg_e.get_format()}."
+                                        )
                                 ctx_2.bindings[arg_n] = arg_e
                             case _:
                                 raise NotImplementedError(
@@ -182,18 +204,27 @@ class AssemblyInterpreter:
                         ret_e = ctx_2.ret[1]
                         if not isinstance(ret_e, ret_t):
                             raise TypeError(
-                                f"Return value {ret_e} is not of type {ret_t} for function '{func_n}'."
+                                f"Return value {ret_e} is not of type {ret_t} "
+                                f"for function '{func_n}'."
                             )
                         return ret_e
                     raise ValueError(
                         f"Function '{func_n}' did not return a value, "
                         f"but expected type {ret_t}."
                     )
-
                 self.bindings[func_n] = my_func
+                return None
             case asm.Return(value):
                 self.ret.append(self(value))
                 return None
             case asm.Break():
                 self.loop.append([])
                 return None
+            case asm.Module(nodes):
+                for node in nodes:
+                    self(node)
+                return None
+            case _:
+                raise NotImplementedError(
+                    f"Unrecognized assembly node type: {type(prgm)}"
+                )

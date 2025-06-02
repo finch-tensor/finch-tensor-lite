@@ -40,5 +40,6 @@ __all__ = [
     "Module",
     "AbstractBuffer",
     "AbstractFormat",
-    "AssemblyInterpreterAssemblyInterpreterKernel",
+    "AssemblyInterpreter",
+    "AssemblyInterpreterKernel",
 ]
