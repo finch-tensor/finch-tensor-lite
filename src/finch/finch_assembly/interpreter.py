@@ -191,7 +191,7 @@ class AssemblyInterpreter:
                                         f"{arg_t}, but got {type(arg_e)}."
                                     )
                                 if isinstance(arg_t, AbstractFormat):
-                                    arg_f = arg_t.get_format()
+                                    arg_f = arg_e.get_format()
                                     if arg_f != arg_t:
                                         raise TypeError(
                                             f"Argument '{arg_n}' is expected to be "
