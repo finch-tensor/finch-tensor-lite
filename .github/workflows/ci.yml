@@ -27,6 +27,8 @@ jobs:
       - name: Install package
         run: |
           poetry install --extras test
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Run tests
         run: |
           poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
