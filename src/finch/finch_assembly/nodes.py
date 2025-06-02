@@ -306,6 +306,7 @@ class Return(AssemblyTree):
         """Returns the children of the node."""
         return [self.arg]
 
+
 @dataclass(eq=True, frozen=True)
 class Break(AssemblyTree):
     """
@@ -315,6 +316,7 @@ class Break(AssemblyTree):
     def children(self):
         """Returns the children of the node."""
         return []
+
 
 @dataclass(eq=True, frozen=True)
 class Block(AssemblyTree):

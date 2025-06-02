@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 from ..symbolic import ScopedDict
 from . import nodes as asm
 
-class AssemblyInterpreterKernel():
+
+class AssemblyInterpreterKernel:
     """
     A kernel for interpreting FinchAssembly code.
     This is a simple interpreter that executes the assembly code.
     """
+
     def __init__(self, prgm, func_n, ret_t):
         self.ctx = AssemblyInterpreter()
         self.func = asm.Variable(func_n, ret_t)
@@ -16,11 +19,13 @@ class AssemblyInterpreterKernel():
         args_i = (asm.Immediate(arg) for arg in args)
         return self.ctx(asm.Call(self.func, args_i))
 
-class AssemblyInterpreter():
+
+class AssemblyInterpreter:
     """
     An interpreter for FinchAssembly.
     """
-    def __init__(self, bindings=None, types=None, loop = None, ret=None):
+
+    def __init__(self, bindings=None, types=None, loop=None, ret=None):
         if bindings is None:
             bindings = ScopedDict()
         if types is None:
@@ -34,7 +39,6 @@ class AssemblyInterpreter():
         self.loop = loop
         self.ret = ret
 
-
     def scope(self, **kwargs):
         """
         Create a new scope for the interpreter.
@@ -45,9 +49,8 @@ class AssemblyInterpreter():
             types=self.types.scope(),
             loop=self.loop,
             ret=self.ret,
-            **kwargs
+            **kwargs,
         )
-
 
     def should_halt(self):
         """
@@ -56,10 +59,9 @@ class AssemblyInterpreter():
         """
         return self.loop or self.ret
 
-
     def __call__(self, prgm: asm.AssemblyNode):
         """
-            Run the program.
+        Run the program.
         """
         match prgm:
             case asm.Immediate(value):
@@ -131,10 +133,7 @@ class AssemblyInterpreter():
                     if ctx_2.should_halt():
                         break
                     ctx_3 = self.scope()
-                    ctx_3(asm.Block(
-                        asm.Assign(var, asm.Immediate(var_e)),
-                        body
-                    ))
+                    ctx_3(asm.Block(asm.Assign(var, asm.Immediate(var_e)), body))
                 return None
             case asm.BufferLoop(buf, var, body):
                 ctx_2 = self.scope(loop=[])
@@ -142,10 +141,11 @@ class AssemblyInterpreter():
                     if ctx_2.should_halt():
                         break
                     ctx_3 = ctx_2.scope()
-                    ctx_3(asm.Block(
-                        asm.Assign(var, asm.Load(buf, asm.Immediate(i))),
-                        body
-                    ))
+                    ctx_3(
+                        asm.Block(
+                            asm.Assign(var, asm.Load(buf, asm.Immediate(i))), body
+                        )
+                    )
                 return None
             case asm.WhileLoop(cond, body):
                 ctx_2 = self.scope(loop=[])
@@ -156,14 +156,15 @@ class AssemblyInterpreter():
                     ctx_3(body)
                 return None
             case asm.Function(asm.Variable(func_n, ret_t), args, body):
+
                 def my_func(*args_e):
-                    ctx_2 = self.scope(ret = [])
+                    ctx_2 = self.scope(ret=[])
                     if len(args_e) != len(args):
                         raise ValueError(
                             f"Function '{func_n}' expects {len(args)} arguments, "
                             f"but got {len(args_e)}."
                         )
-                    for arg, arg_e in zip(args, args_e):
+                    for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
                             case asm.Variable(arg_n, arg_t):
                                 if not isinstance(arg_e, arg_t):
@@ -184,11 +185,11 @@ class AssemblyInterpreter():
                                 f"Return value {ret_e} is not of type {ret_t} for function '{func_n}'."
                             )
                         return ret_e
-                    else:
-                        raise ValueError(
-                            f"Function '{func_n}' did not return a value, "
-                            f"but expected type {ret_t}."
-                        )
+                    raise ValueError(
+                        f"Function '{func_n}' did not return a value, "
+                        f"but expected type {ret_t}."
+                    )
+
                 self.bindings[func_n] = my_func
             case asm.Return(value):
                 self.ret.append(self(value))

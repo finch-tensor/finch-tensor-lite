@@ -72,10 +72,8 @@ class ScopedDict(Generic[T]):
         else:
             leaf.bindings[key] = value
 
-
     def __setitem__(self, key: str, value: T) -> None:
         self.set_in_ancestor(self, key, value)
-
 
     def __contains__(self, key: str) -> bool:
         return key in self.bindings or (self.parent is not None and key in self.parent)

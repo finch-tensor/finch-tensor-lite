@@ -11,10 +11,10 @@ from typing import Any
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
+from ..finch_assembly.abstract_buffer import AbstractFormat
 from ..symbolic import AbstractContext, ScopedDict
 from ..util import config
 from ..util.cache import file_cache
-from ..finch_assembly.abstract_buffer import AbstractFormat
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")

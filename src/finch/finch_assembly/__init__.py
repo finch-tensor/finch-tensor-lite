@@ -1,3 +1,5 @@
+from .abstract_buffer import AbstractBuffer, AbstractFormat
+from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
     Assign,
@@ -17,8 +19,6 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
-from .abstract_buffer import AbstractBuffer, AbstractFormat
-from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 
 __all__ = [
     "AssemblyNode",
@@ -40,6 +40,5 @@ __all__ = [
     "Module",
     "AbstractBuffer",
     "AbstractFormat",
-    "AssemblyInterpreter"
-    "AssemblyInterpreterKernel",
+    "AssemblyInterpreterAssemblyInterpreterKernel",
 ]
