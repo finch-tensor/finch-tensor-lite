@@ -148,3 +148,24 @@ def negative(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.negative(x)
     return compute(lazy.negative(x))
+
+
+def matmul(x1, x2, /):
+    """
+    Computes the matrix product.
+    
+    Returns a LazyTensor if either x1 or x2 is a LazyTensor.
+    Otherwise, computes the result eagerly.
+    """
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.matmul(x1, x2)
+    return compute(lazy.matmul(x1, x2))
+
+
+def matrix_transpose(x, /):
+    """
+    Computes the transpose of a matrix or stack of matrices.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.matrix_transpose(x)
+    return compute(lazy.matrix_transpose(x))

@@ -13,6 +13,8 @@ from .eager import (
     squeeze,
     subtract,
     sum,
+    matmul,
+    matrix_transpose,
 )
 
 # from .tensor import *
@@ -39,4 +41,6 @@ __all__ = [
     "negative",
     "AbstractEagerTensor",
     "LazyTensor",
+    "matmul",
+    "matrix_transpose",
 ]

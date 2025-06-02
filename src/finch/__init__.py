@@ -20,6 +20,8 @@ from .interface import (
     squeeze,
     subtract,
     sum,
+    matmul,
+    matrix_transpose,
 )
 
 __all__ = [
@@ -46,4 +48,6 @@ __all__ = [
     "element_type",
     "get_c_function",
     "CKernel",
+    "matmul",
+    "matrix_transpose",
 ]

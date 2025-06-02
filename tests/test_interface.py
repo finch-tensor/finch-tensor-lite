@@ -195,3 +195,108 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
             result = finch.compute(result)
 
         assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        # 1D x 1D (dot product)
+        (np.array([1, 2, 3]), np.array([4, 5, 6])),
+        # 2D x 2D
+        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
+        # 2D x 1D
+        (np.array([[1, 2], [3, 4]]), np.array([5, 6])),
+        # 1D x 2D
+        (np.array([1, 2]), np.array([[3, 4], [5, 6]])),
+        # 3D x 3D (batched matmul)
+        (
+            np.arange(2 * 3 * 4).reshape(2, 3, 4),
+            np.arange(2 * 4 * 5).reshape(2, 4, 5),
+        ),
+        # Broadcasting cases
+        # 1D x 2D (broadcasting)
+        (np.array([1, 2]), np.arange(2 * 4).reshape(2, 4)),
+        # 1D x 3D (broadcasting)
+        (np.array([1, 2]), np.arange(3 * 2 * 5).reshape(3, 2, 5)),
+        #  4D x 3D (broadcasting)
+        (
+            np.arange(7 * 2 * 4 * 3).reshape(7, 2, 4, 3),
+            np.arange(2 * 3 * 4).reshape(2, 3, 4),
+        ),
+        # mismatch dimensions
+        (
+            np.arange(7 * 2 * 4 * 3).reshape(7, 2, 3, 4),
+            np.arange(2 * 3 * 4).reshape(2, 3, 4),
+        ),
+        (
+            np.arange(5), np.arange(4)
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_matmul(a, b, a_wrap, b_wrap):
+    """
+    Tests for matrix multiplication using finch's matmul function.
+    """
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+
+    try:
+        expected = np.linalg.matmul(a, b)
+    except ValueError:
+        with pytest.raises(Exception):
+            finch.matmul(wa, wb) # make sure matmul raises error too
+        return
+
+    result = finch.matmul(wa, wb)
+
+    if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
+        assert isinstance(result, finch.LazyTensor)
+        result = finch.compute(result)
+
+    assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.arange(6).reshape(2, 3),
+        np.arange(12).reshape(1, 12),
+        np.arange(24).reshape(2, 3, 4), # 3D array
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_matrix_transpose(a, a_wrap):
+    """
+    Tests for matrix transpose
+    """
+    a = np.array(a)
+    expected = np.linalg.matrix_transpose(a)
+
+    result = finch.matrix_transpose(a)
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+    assert_equal(result, expected)
+
