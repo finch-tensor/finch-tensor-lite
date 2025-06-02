@@ -14,7 +14,7 @@ from ..algebra import query_property, register_property
 from ..symbolic import AbstractContext, ScopedDict
 from ..util import config
 from ..util.cache import file_cache
-from .abstract_buffer import AbstractFormat
+from ..finch_assembly.abstract_buffer import AbstractFormat
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -490,6 +490,9 @@ class CContext(AbstractContext):
             case asm.Return(value):
                 value = self(value)
                 self.exec(f"{feed}return {value};")
+                return None
+            case asm.Break():
+                self.exec(f"{feed}break;")
                 return None
 
 

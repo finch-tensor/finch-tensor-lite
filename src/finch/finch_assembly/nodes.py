@@ -306,6 +306,15 @@ class Return(AssemblyTree):
         """Returns the children of the node."""
         return [self.arg]
 
+@dataclass(eq=True, frozen=True)
+class Break(AssemblyTree):
+    """
+    Represents a break statement that exits the current loop.
+    """
+
+    def children(self):
+        """Returns the children of the node."""
+        return []
 
 @dataclass(eq=True, frozen=True)
 class Block(AssemblyTree):
@@ -339,7 +348,7 @@ class Module(AssemblyTree):
     """
 
     funcs: tuple[AssemblyNode, ...]
-    main: AssemblyNode
+    main: Variable
 
     def children(self):
         """Returns the children of the node."""

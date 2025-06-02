@@ -2,7 +2,7 @@ import ctypes
 
 import numpy as np
 
-from .abstract_buffer import AbstractBuffer
+from ..finch_assembly.abstract_buffer import AbstractBuffer
 from .c import AbstractCArgument, AbstractCFormat
 
 

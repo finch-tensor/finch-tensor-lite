@@ -64,8 +64,18 @@ class ScopedDict(Generic[T]):
             return self.parent[key]
         raise KeyError(f"Key '{key}' not found in scoped dictionary.")
 
+    def set_in_ancestor(self, leaf, key: str, value: T) -> None:
+        if key in self.bindings:
+            self.bindings[key] = value
+        elif self.parent is not None:
+            self.parent.set_in_ancestor(leaf, key, value)
+        else:
+            leaf.bindings[key] = value
+
+
     def __setitem__(self, key: str, value: T) -> None:
-        self.bindings[key] = value
+        self.set_in_ancestor(self, key, value)
+
 
     def __contains__(self, key: str) -> bool:
         return key in self.bindings or (self.parent is not None and key in self.parent)
@@ -75,23 +85,6 @@ class ScopedDict(Generic[T]):
         Create a new scoped dictionary that inherits from this one.
         """
         return ScopedDict(parent=self)
-
-    def get(self, key: str, default: T | None = None) -> T | None:
-        """
-        Get the value for a key, returning default if not found.
-        """
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def setdefault(self, key: str, default: T) -> T:
-        """
-        Set the default value for a key if it does not exist.
-        """
-        if key not in self.bindings:
-            self.bindings[key] = default
-        return self.bindings[key]
 
 
 """
