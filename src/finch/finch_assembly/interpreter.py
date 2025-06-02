@@ -1,6 +1,6 @@
-
-from ..finch_assembly import asm
+from __future__ import annotations
 from ..symbolic import ScopedDict
+from . import nodes as asm
 
 class AssemblyInterpreterKernel():
     """

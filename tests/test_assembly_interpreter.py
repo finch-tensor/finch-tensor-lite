@@ -28,8 +28,8 @@ def test_dot_product(a, b):
     f = asm.Variable("dot_product", np.float64)
     prgm = asm.Module((
         asm.Function(f, (
-            asm.Variable("a", ab.format()),
-            asm.Variable("b", bb.format())
+            asm.Variable("a", ab.get_format()),
+            asm.Variable("b", bb.get_format())
         ), asm.Block((
             asm.Assign(c, asm.Immediate(np.float64(0.0))),
             asm.ForLoop(i, asm.Immediate(0), asm.Length(a), asm.Block((
