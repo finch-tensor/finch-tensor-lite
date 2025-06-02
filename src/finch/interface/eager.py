@@ -38,6 +38,60 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
     def __neg__(self):
         return negative(self)
 
+    def __and__(self, other):
+        return bitwise_and(self, other)
+
+    def __rand__(self, other):
+        return bitwise_and(other, self)
+
+    def __lshift__(self, other):
+        return bitwise_lshift(self, other)
+
+    def __rlshift__(self, other):
+        return bitwise_lshift(other, self)
+
+    def __or__(self, other):
+        return bitwise_or(self, other)
+
+    def __ror__(self, other):
+        return bitwise_or(other, self)
+
+    def __rshift__(self, other):
+        return bitwise_rshift(self, other)
+
+    def __rrshift__(self, other):
+        return bitwise_rshift(other, self)
+
+    def __xor__(self, other):
+        return bitwise_xor(self, other)
+
+    def __rxor__(self, other):
+        return bitwise_xor(other, self)
+
+    def __truediv__(self, other):
+        return truediv(self, other)
+
+    def __rtruediv__(self, other):
+        return truediv(other, self)
+
+    def __floordiv__(self, other):
+        return floordiv(self, other)
+
+    def __rfloordiv__(self, other):
+        return floordiv(other, self)
+
+    def __mod__(self, other):
+        return mod(self, other)
+
+    def __rmod__(self, other):
+        return mod(other, self)
+
+    def __pow__(self, other):
+        return pow(self, other)
+
+    def __rpow__(self, other):
+        return pow(other, self)
+
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
@@ -148,3 +202,57 @@ def negative(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.negative(x)
     return compute(lazy.negative(x))
+
+
+def bitwise_and(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_and(x1, x2)
+    return compute(lazy.bitwise_and(x1, x2))
+
+
+def bitwise_lshift(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_lshift(x1, x2)
+    return compute(lazy.bitwise_lshift(x1, x2))
+
+
+def bitwise_or(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_or(x1, x2)
+    return compute(lazy.bitwise_or(x1, x2))
+
+
+def bitwise_rshift(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_rshift(x1, x2)
+    return compute(lazy.bitwise_rshift(x1, x2))
+
+
+def bitwise_xor(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.bitwise_xor(x1, x2)
+    return compute(lazy.bitwise_xor(x1, x2))
+
+
+def truediv(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.truediv(x1, x2)
+    return compute(lazy.truediv(x1, x2))
+
+
+def floordiv(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.floordiv(x1, x2)
+    return compute(lazy.floordiv(x1, x2))
+
+
+def mod(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.mod(x1, x2)
+    return compute(lazy.mod(x1, x2))
+
+
+def pow(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.pow(x1, x2)
+    return compute(lazy.pow(x1, x2))
