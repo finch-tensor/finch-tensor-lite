@@ -334,7 +334,7 @@ def c_type(t):
 
 register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
 register_property(
-    np.generic, "__self__", "c_type", lambda x: np.ctypeslib.as_ctypes_type(type(x))
+    np.generic, "__self__", "c_type", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
 
 

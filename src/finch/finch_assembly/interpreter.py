@@ -11,14 +11,31 @@ class AssemblyInterpreterKernel:
     This is a simple interpreter that executes the assembly code.
     """
 
-    def __init__(self, prgm, func_n, ret_t):
-        self.ctx = AssemblyInterpreter()
+    def __init__(self, ctx, func_n, ret_t):
+        self.ctx = ctx
         self.func = asm.Variable(func_n, ret_t)
-        self.ctx(prgm)
 
     def __call__(self, *args):
         args_i = (asm.Immediate(arg) for arg in args)
         return self.ctx(asm.Call(self.func, args_i))
+
+
+class AssemblyInterpreterModule:
+    """
+    A class to represent an interpreted module of FinchAssembly.
+    """
+
+    def __init__(self, ctx, kernels):
+        self.ctx = ctx
+        self.kernels = kernels
+
+    def __getattr__(self, name):
+        # Allow attribute access to kernels by name
+        if name in self.kernels:
+            return self.kernels[name]
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
 
 
 class AssemblyInterpreter:
@@ -208,10 +225,20 @@ class AssemblyInterpreter:
             case asm.Break():
                 self.loop.append([])
                 return None
-            case asm.Module(nodes):
-                for node in nodes:
-                    self(node)
-                return None
+            case asm.Module(funcs):
+                for func in funcs:
+                    self(func)
+                kernels = {}
+                for func in funcs:
+                    match func:
+                        case asm.Function(asm.Variable(func_n, ret_t), args, _):
+                            kernel = AssemblyInterpreterKernel(self, func_n, ret_t)
+                            kernels[func_n] = kernel
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized function definition: {func}"
+                            )
+                return AssemblyInterpreterModule(self, kernels)
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"
