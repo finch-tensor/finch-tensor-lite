@@ -344,16 +344,14 @@ class Module(AssemblyTree):
 
     Attributes:
         funcs: The functions defined in the module.
-        main: The main function of the module.
     """
 
     funcs: tuple[AssemblyNode, ...]
-    main: Variable
 
     def children(self):
         """Returns the children of the node."""
-        return [*self.funcs, self.main]
+        return [*self.funcs]
 
     @classmethod
-    def from_children(cls, *funcs, main):
-        return cls(funcs, main)
+    def from_children(cls, *funcs):
+        return cls(funcs)

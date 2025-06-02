@@ -25,9 +25,8 @@ def test_dot_product(a, b):
     i = asm.Variable("i", np.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
-    f = asm.Variable("dot_product", np.float64)
     prgm = asm.Module((
-        asm.Function(f, (
+        asm.Function(asm.Variable("dot_product", np.float64), (
             asm.Variable("a", ab.get_format()),
             asm.Variable("b", bb.get_format())
         ), asm.Block((
@@ -48,7 +47,7 @@ def test_dot_product(a, b):
             asm.Return(c),
         ))),
     ))
-    kernel = AssemblyInterpreterKernel(prgm, f)
+    kernel = AssemblyInterpreterKernel(prgm, "dot_product",  np.float64)
     result = kernel(ab, bb)
     expected = np.dot(a, b)
     assert np.allclose(result, expected)

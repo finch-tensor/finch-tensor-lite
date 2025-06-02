@@ -9,7 +9,7 @@ class AssemblyInterpreterKernel():
     """
     def __init__(self, prgm, func_n, ret_t):
         self.ctx = AssemblyInterpreter()
-        self.func = asm.Variable(self.func_n, ret_t)
+        self.func = asm.Variable(func_n, ret_t)
         self.ctx(prgm)
 
     def __call__(self, *args):
