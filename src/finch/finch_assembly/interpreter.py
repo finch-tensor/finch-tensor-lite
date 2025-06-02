@@ -3,7 +3,6 @@ from __future__ import annotations
 from ..symbolic import ScopedDict
 from . import nodes as asm
 from .abstract_buffer import AbstractFormat
-import numpy as np
 
 
 class AssemblyInterpreterKernel:
@@ -142,7 +141,7 @@ class AssemblyInterpreter:
                         break
                     ctx_3 = self.scope()
                     ctx_3(asm.Block((asm.Assign(var, asm.Immediate(var_e)), body)))
-                    var_e += np.uint8(1)
+                    var_e = type(var_e)(var_e + 1)  # type: ignore[call-arg,operator]
                 return None
             case asm.BufferLoop(buf, var, body):
                 ctx_2 = self.scope(loop=[])

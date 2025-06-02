@@ -55,7 +55,10 @@ def test_dot_product(a, b):
                                                 c,
                                                 asm.Call(
                                                     asm.Immediate(operator.mul),
-                                                    (asm.Load(ab_v, i), asm.Load(bb_v, i)),
+                                                    (
+                                                        asm.Load(ab_v, i),
+                                                        asm.Load(bb_v, i),
+                                                    ),
                                                 ),
                                             ),
                                         ),
