@@ -465,9 +465,6 @@ def matmul(x1, x2) -> LazyTensor:
         assert (
             a.shape[-len(b.shape) : -2] == b.shape[-len(a.shape) : -2]
         ), "Preceeding dimensions must match for matrix multiplication"
-        print(
-            f"Performing matmul on shapes {a.shape} and {b.shape} with element types {a.element_type} and {b.element_type}"
-        )
         return reduce(
             operator.add,
             multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
@@ -484,9 +481,7 @@ def matmul(x1, x2) -> LazyTensor:
     if x1.ndim == 1:
         x1 = expand_dims(x1, axis=0)  # make it a row vector
         result = _matmul_helper(x1, x2)
-        print(f"Matmul result shape: {result.shape}")
         result = squeeze(result, axis=-2)  # remove the prepended singleton dimension
-        print(f"Matmul result shape after squeeze: {result.shape}")
         return result
 
     if x2.ndim == 1:

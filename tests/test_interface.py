@@ -308,9 +308,10 @@ def test_matrix_transpose(a, a_wrap):
     Tests for matrix transpose
     """
     a = np.array(a)
+    wa = a_wrap(a)
     expected = np.linalg.matrix_transpose(a)
 
-    result = finch.matrix_transpose(a)
+    result = finch.matrix_transpose(wa)
     if isinstance(result, finch.LazyTensor):
         result = finch.compute(result)
     assert_equal(result, expected)
