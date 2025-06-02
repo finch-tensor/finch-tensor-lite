@@ -66,7 +66,7 @@ def test_buffer_function():
 def test_codegen():
     a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
     i = asm.Variable("i", int)
-    l = asm.Variable("l", int)
+    length_var = asm.Variable("l", int)
     prgm = asm.Module(
         (
             asm.Function(
@@ -74,7 +74,7 @@ def test_codegen():
                 (a,),
                 asm.Block(
                     (
-                        asm.Assign(l, asm.Length(a)),
+                        asm.Assign(length_var, asm.Length(a)),
                         asm.Resize(
                             a,
                             asm.Call(
@@ -85,10 +85,10 @@ def test_codegen():
                         asm.ForLoop(
                             i,
                             asm.Immediate(0),
-                            l,
+                            length_var,
                             asm.Store(
                                 a,
-                                asm.Call(asm.Immediate(operator.add), (i, l)),
+                                asm.Call(asm.Immediate(operator.add), (i, length_var)),
                                 asm.Call(
                                     asm.Immediate(operator.add),
                                     (asm.Load(a, i), asm.Immediate(1)),

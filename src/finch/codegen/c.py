@@ -9,7 +9,7 @@ from operator import methodcaller
 from pathlib import Path
 from typing import Any
 
-import numpy
+import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -75,9 +75,7 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     )
 
     # Load the shared library using ctypes
-    shared_lib = ctypes.CDLL(str(shared_lib_path))
-
-    return shared_lib
+    return ctypes.CDLL(str(shared_lib_path))
 
 
 class AbstractCArgument(ABC):
@@ -123,7 +121,7 @@ class CKernel:
             arg.deserialize_from_c(serial_arg)
         if isinstanceorformat(res, self.ret_type):
             return res
-        if self.ret_type == type(None):
+        if self.ret_type is type(None):
             return None
         return self.ret_type(res)
 
@@ -336,7 +334,7 @@ def c_type(t):
 
 register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
 register_property(
-    numpy.generic, "__self__", "c_type", lambda x: numpy.ctypeslib.as_ctypes_type(x)
+    np.generic, "__self__", "c_type", lambda x: np.ctypeslib.as_ctypes_type(type(x))
 )
 
 
@@ -391,7 +389,7 @@ class CContext(AbstractContext):
         self.indent = indent
         self.headers = headers
         self._headerset = set(headers)
-        self.fptr = dict()
+        self.fptr = {}
         self.bindings = bindings
 
     def add_header(self, header):
@@ -447,13 +445,12 @@ class CContext(AbstractContext):
                 for arg_type in getattr(t, "_argtypes_", [])  # type: ignore[attr-defined]
             )
             # type: ignore[arg-type]
-            key = f"{self.ctype_name(getattr(t, '_restype_', object))} (*)( {arg_types} );"
+            res_t = self.ctype_name(getattr(t, "_restype_", object))
+            key = f"{res_t} (*)( {arg_types} );"
             name = self.fptr.get(key)
             if name is None:
                 name = self.freshen("fptr")
-                self.add_header(
-                    f"typedef {self.ctype_name(getattr(t, '_restype_', object))} (*{name})( {arg_types} );"
-                )
+                self.add_header(f"typedef {res_t} (*{name})( {arg_types} );")
                 self.fptr[key] = name
             return name
         raise NotImplementedError(f"No C type mapping for {t}")
