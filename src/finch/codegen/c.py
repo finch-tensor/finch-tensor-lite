@@ -173,7 +173,7 @@ class CCompiler:
             cc=self.cc,
             cflags=(*self.cflags, *self.shared_cflags),
         )
-        print(ccode)
+        print(c_code)
         kernels = {}
         if prgm.head() != asm.Module:
             raise ValueError(
