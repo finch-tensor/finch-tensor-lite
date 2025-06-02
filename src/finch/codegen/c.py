@@ -371,7 +371,6 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
     ctypes.c_float: ("float", []),
     ctypes.c_double: ("double", []),
-    ctypes.c_longdouble: ("long double", []),
     ctypes.c_char_p: ("char*", []),
     ctypes.c_wchar_p: ("wchar_t*", ["wchar.h"]),
     ctypes.c_void_p: ("void*", []),
