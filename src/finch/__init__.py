@@ -1,8 +1,8 @@
 from .algebra import element_type, fill_value
 from .codegen import (
+    CCompiler,
     CKernel,
     CModule,
-    CCompiler,
     NumpyBuffer,
     NumpyBufferFormat,
 )

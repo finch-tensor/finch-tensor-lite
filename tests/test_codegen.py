@@ -17,7 +17,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finch.codegen.c.get_c_module(c_code).add
+    f = finch.codegen.c.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -56,7 +56,7 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = finch.NumpyBuffer(a)
-    f = finch.codegen.c.get_c_module(c_code).concat_buffer_with_self
+    f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
     k = finch.codegen.c.CKernel(f, type(None), [finch.NumpyBuffer])
     k(b)
     result = b.arr
@@ -67,12 +67,14 @@ def test_buffer_function():
 def test_codegen():
     a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
     i = asm.Variable("i", int)
+    l = asm.Variable("l", int)
     prgm = asm.Module((
         asm.Function(
             asm.Variable("test_function", int),
             (a,),
             asm.Block(
                 (
+                    asm.Assign(l, asm.Length(a)),
                     asm.Resize(
                         a,
                         asm.Call(
@@ -83,13 +85,13 @@ def test_codegen():
                     asm.ForLoop(
                         i,
                         asm.Immediate(0),
-                        asm.Length(a),
+                        l,
                         asm.Store(
                             a,
-                            asm.Call(asm.Immediate(operator.add), (i, asm.Length(a))),
+                            asm.Call(asm.Immediate(operator.add), (i, l)),
                             asm.Call(
-                                asm.Immediate(operator.mul),
-                                (asm.Load(a, i), asm.Immediate(2)),
+                                asm.Immediate(operator.add),
+                                (asm.Load(a, i), asm.Immediate(1)),
                             ),
                         ),
                     ),

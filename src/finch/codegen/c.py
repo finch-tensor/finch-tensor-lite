@@ -8,11 +8,12 @@ from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 from typing import Any
+
 import numpy
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly.abstract_buffer import AbstractFormat
+from ..finch_assembly.abstract_buffer import AbstractFormat, isinstanceorformat
 from ..symbolic import AbstractContext, ScopedDict
 from ..util import config
 from ..util.cache import file_cache
@@ -60,9 +61,11 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     :param c_code: The code to compile
     """
     if cc is None:
-        cc = config.get("cc"),
+        cc = config.get("cc")
     if cflags is None:
-        cflags = [*config.get("cflags").split(), *config.get("shared_cflags").split()],
+        cflags = (
+            *config.get("cflags").split(), *config.get("shared_cflags").split(),
+        )
 
     shared_lib_path = create_shared_lib(
         c_code,
@@ -111,12 +114,16 @@ class CKernel:
                 f"Expected {len(self.argtypes)} arguments, got {len(args)}"
             )
         for argtype, arg in zip(self.argtypes, args, strict=False):
-            if not isinstance(arg, argtype):
+            if not isinstanceorformat(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
         serial_args = list(map(methodcaller("serialize_to_c"), args))
         res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
+        if isinstanceorformat(res, self.ret_type):
+            return res
+        elif self.ret_type == type(None):
+            return None
         return self.ret_type(res)
 
 
@@ -129,11 +136,13 @@ class CModule:
         self.c_module = c_module
         self.kernels = kernels
 
-        def __getattr__(self, name):
-            # Allow attribute access to kernels by name
-            if name in self.kernels:
-                return self.kernels[name]
-            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+    def __getattr__(self, name):
+        # Allow attribute access to kernels by name
+        if name in self.kernels:
+            return self.kernels[name]
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
 
 
 class CCompiler:
@@ -141,7 +150,7 @@ class CCompiler:
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(self, ctx = None, cc=None, cflags=None, shared_cflags=None):
+    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -156,7 +165,6 @@ class CCompiler:
         ctx = CContext()
         ctx(prgm)
         c_code = ctx.emit_global()
-        print(c_code)
         lib = load_shared_lib(
             c_code=c_code,
             cc=self.cc,
@@ -326,7 +334,9 @@ def c_type(t):
 
 
 register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
-register_property(numpy.generic, "__self__", "c_type", lambda x: numpy.ctypeslib.as_ctypes_type(x))
+register_property(
+    numpy.generic, "__self__", "c_type", lambda x: numpy.ctypeslib.as_ctypes_type(x)
+)
 
 
 ctype_to_c_name = {
@@ -368,7 +378,7 @@ class CContext(AbstractContext):
     A class to represent a C environment.
     """
 
-    def __init__(self, tab="    ", indent=0, headers=None, bindings=None, **kwargs):
+    def __init__(self, tab="    ", indent=0, headers=None, bindings=None, fptr=None, **kwargs):
         if headers is None:
             headers = []
         if bindings is None:
@@ -378,6 +388,7 @@ class CContext(AbstractContext):
         self.indent = indent
         self.headers = headers
         self._headerset = set(headers)
+        self.fptr = dict()
         self.bindings = bindings
 
     def add_header(self, header):
@@ -416,7 +427,15 @@ class CContext(AbstractContext):
             arg_types = ", ".join(
                 self.ctype_name(arg_type) for arg_type in t._argtypes_
             )
-            return f"{self.ctype_name(t._restype_)} (*)( {arg_types} )"
+            key = f"{self.ctype_name(t._restype_)} (*)( {arg_types} );"
+            name = self.fptr.get(key)
+            if name is None:
+                name = self.freshen("fptr")
+                self.add_header(
+                    f"typedef {self.ctype_name(t._restype_)} (*{name})( {arg_types} );"
+                )
+                self.fptr[key] = name
+            return name
         raise NotImplementedError(f"No C type mapping for {t}")
 
     @property
@@ -575,6 +594,7 @@ class CContext(AbstractContext):
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"
                 )
+
 
 class AbstractCFormat(AbstractFormat, ABC):
     """

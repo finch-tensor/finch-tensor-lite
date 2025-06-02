@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ..symbolic import ScopedDict
 from . import nodes as asm
-from .abstract_buffer import AbstractFormat
+from .abstract_buffer import AbstractFormat, isinstanceorformat
 
 
 class AssemblyInterpreterKernel:
@@ -165,7 +165,6 @@ class AssemblyInterpreter:
                     ctx_3(body)
                 return None
             case asm.Function(asm.Variable(func_n, ret_t), args, body):
-
                 def my_func(*args_e):
                     ctx_2 = self.scope(ret=[])
                     if len(args_e) != len(args):
@@ -176,22 +175,11 @@ class AssemblyInterpreter:
                     for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
                             case asm.Variable(arg_n, arg_t):
-                                # Only check type if arg_t is a type,
-                                # not a buffer format
-                                if isinstance(arg_t, type) and not isinstance(
-                                    arg_e, arg_t
-                                ):
+                                if not isinstanceorformat(arg_e, arg_t):
                                     raise TypeError(
                                         f"Argument '{arg_n}' is expected to be of type "
                                         f"{arg_t}, but got {type(arg_e)}."
                                     )
-                                if isinstance(arg_t, AbstractFormat):
-                                    arg_f = arg_e.get_format()
-                                    if arg_f != arg_t:
-                                        raise TypeError(
-                                            f"Argument '{arg_n}' is expected to be "
-                                            f"of format {arg_t}, but got {arg_f}."
-                                        )
                                 ctx_2.bindings[arg_n] = arg_e
                             case _:
                                 raise NotImplementedError(
