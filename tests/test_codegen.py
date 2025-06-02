@@ -4,7 +4,6 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finch
-import finch.codegen.c as c
 import finch.finch_assembly as asm
 from finch.codegen import CCompiler
 
@@ -68,38 +67,40 @@ def test_codegen():
     a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
     i = asm.Variable("i", int)
     l = asm.Variable("l", int)
-    prgm = asm.Module((
-        asm.Function(
-            asm.Variable("test_function", int),
-            (a,),
-            asm.Block(
-                (
-                    asm.Assign(l, asm.Length(a)),
-                    asm.Resize(
-                        a,
-                        asm.Call(
-                            asm.Immediate(operator.mul),
-                            (asm.Length(a), asm.Immediate(2)),
-                        ),
-                    ),
-                    asm.ForLoop(
-                        i,
-                        asm.Immediate(0),
-                        l,
-                        asm.Store(
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("test_function", int),
+                (a,),
+                asm.Block(
+                    (
+                        asm.Assign(l, asm.Length(a)),
+                        asm.Resize(
                             a,
-                            asm.Call(asm.Immediate(operator.add), (i, l)),
                             asm.Call(
-                                asm.Immediate(operator.add),
-                                (asm.Load(a, i), asm.Immediate(1)),
+                                asm.Immediate(operator.mul),
+                                (asm.Length(a), asm.Immediate(2)),
                             ),
                         ),
-                    ),
-                    asm.Return(asm.Immediate(0)),
-                )
+                        asm.ForLoop(
+                            i,
+                            asm.Immediate(0),
+                            l,
+                            asm.Store(
+                                a,
+                                asm.Call(asm.Immediate(operator.add), (i, l)),
+                                asm.Call(
+                                    asm.Immediate(operator.add),
+                                    (asm.Load(a, i), asm.Immediate(1)),
+                                ),
+                            ),
+                        ),
+                        asm.Return(asm.Immediate(0)),
+                    )
+                ),
             ),
-        ),
-    ))
+        )
+    )
     ctx = CCompiler()
     mod = ctx(prgm)
     f = mod.test_function
@@ -110,8 +111,6 @@ def test_codegen():
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
-
-
 
 
 print(test_codegen())

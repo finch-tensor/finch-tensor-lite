@@ -64,7 +64,8 @@ def load_shared_lib(c_code, cc=None, cflags=None):
         cc = config.get("cc")
     if cflags is None:
         cflags = (
-            *config.get("cflags").split(), *config.get("shared_cflags").split(),
+            *config.get("cflags").split(),
+            *config.get("shared_cflags").split(),
         )
 
     shared_lib_path = create_shared_lib(
@@ -122,7 +123,7 @@ class CKernel:
             arg.deserialize_from_c(serial_arg)
         if isinstanceorformat(res, self.ret_type):
             return res
-        elif self.ret_type == type(None):
+        if self.ret_type == type(None):
             return None
         return self.ret_type(res)
 
@@ -339,7 +340,7 @@ register_property(
 )
 
 
-ctype_to_c_name = {
+ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
     ctypes.c_char: ("char", []),
     ctypes.c_wchar: ("wchar_t", ["wchar.h"]),
@@ -378,7 +379,9 @@ class CContext(AbstractContext):
     A class to represent a C environment.
     """
 
-    def __init__(self, tab="    ", indent=0, headers=None, bindings=None, fptr=None, **kwargs):
+    def __init__(
+        self, tab="    ", indent=0, headers=None, bindings=None, fptr=None, **kwargs
+    ):
         if headers is None:
             headers = []
         if bindings is None:
@@ -402,17 +405,24 @@ class CContext(AbstractContext):
         """
         return "\n".join([*self.headers, self.emit()])
 
-    def ctype_name(self, t):
+    def ctype_name(self, t: type) -> str:
         # Mapping from ctypes types to their C type names
+        # mypy: ignore-errors for ctypes internals
         if t in ctype_to_c_name:
-            name, libs = ctype_to_c_name[t]
+            (name, libs) = ctype_to_c_name[t]
             for lib in libs:
                 self.add_header(f"#include <{lib}>")
             return name
-        if issubclass(t, ctypes.Structure):
+        # The following use of ctypes internals is not type safe, so we ignore mypy
+        if (
+            hasattr(ctypes, "Structure")
+            and isinstance(t, type)
+            and issubclass(t, ctypes.Structure)
+        ):  # type: ignore[attr-defined]
             name = t.__name__
             args = [
-                f"{self.ctype_name(f_type)} {f_name}" for (f_name, f_type) in t._fields_
+                f"{self.ctype_name(f_type)} {f_name}"
+                for (f_name, f_type, *_) in t._fields_
             ]
             header = (
                 f"struct {name} {{\n"
@@ -421,28 +431,38 @@ class CContext(AbstractContext):
             )
             self.add_header(header)
             return f"struct {name}"
-        if issubclass(t, ctypes._Pointer):
-            return f"{self.ctype_name(t._type_)}*"
-        if issubclass(t, ctypes._CFuncPtr):
+        if (
+            hasattr(ctypes, "_Pointer")
+            and isinstance(t, type)
+            and issubclass(t, ctypes._Pointer)
+        ):  # type: ignore[attr-defined]
+            return f"{self.ctype_name(t._type_)}*"  # type: ignore[attr-defined]
+        if (
+            hasattr(ctypes, "_CFuncPtr")
+            and isinstance(t, type)
+            and issubclass(t, ctypes._CFuncPtr)
+        ):  # type: ignore[attr-defined]
             arg_types = ", ".join(
-                self.ctype_name(arg_type) for arg_type in t._argtypes_
+                self.ctype_name(arg_type)
+                for arg_type in getattr(t, "_argtypes_", [])  # type: ignore[attr-defined]
             )
-            key = f"{self.ctype_name(t._restype_)} (*)( {arg_types} );"
+            # type: ignore[arg-type]
+            key = f"{self.ctype_name(getattr(t, '_restype_', object))} (*)( {arg_types} );"
             name = self.fptr.get(key)
             if name is None:
                 name = self.freshen("fptr")
                 self.add_header(
-                    f"typedef {self.ctype_name(t._restype_)} (*{name})( {arg_types} );"
+                    f"typedef {self.ctype_name(getattr(t, '_restype_', object))} (*{name})( {arg_types} );"
                 )
                 self.fptr[key] = name
             return name
         raise NotImplementedError(f"No C type mapping for {t}")
 
     @property
-    def feed(self):
+    def feed(self) -> str:
         return self.tab * self.indent
 
-    def block(self):
+    def block(self) -> "CContext":
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab

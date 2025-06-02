@@ -52,10 +52,11 @@ class AbstractFormat(ABC):
         Create an instance of an object in this format with the given arguments.
         """
 
+
 def isinstanceorformat(x, format_or_type):
     """
     Check if x is an instance of the given format or type.
     """
     if isinstance(format_or_type, AbstractFormat):
-        return hasattr(x, 'get_format') and x.get_format() == format_or_type
+        return hasattr(x, "get_format") and x.get_format() == format_or_type
     return isinstance(x, format_or_type)

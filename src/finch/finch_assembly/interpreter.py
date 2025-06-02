@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ..symbolic import ScopedDict
 from . import nodes as asm
-from .abstract_buffer import AbstractFormat, isinstanceorformat
+from .abstract_buffer import isinstanceorformat
 
 
 class AssemblyInterpreterKernel:
@@ -165,6 +165,7 @@ class AssemblyInterpreter:
                     ctx_3(body)
                 return None
             case asm.Function(asm.Variable(func_n, ret_t), args, body):
+
                 def my_func(*args_e):
                     ctx_2 = self.scope(ret=[])
                     if len(args_e) != len(args):
