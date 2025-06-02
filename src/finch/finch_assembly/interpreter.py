@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..symbolic import ScopedDict
 from . import nodes as asm
 from .abstract_buffer import AbstractFormat
+import numpy as np
 
 
 class AssemblyInterpreterKernel:
@@ -134,19 +135,14 @@ class AssemblyInterpreter:
                         f"Start value {start_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
                     )
-                if not isinstance(end_e, var_t):
-                    raise TypeError(
-                        f"End value {end_e} is not of type {var_t} for "
-                        f"variable '{var_n}'."
-                    )
-                assert isinstance(start_e, int)
-                assert isinstance(end_e, int)
                 ctx_2 = self.scope(loop=[])
-                for var_e in range(start_e, end_e):
+                var_e = start_e
+                while var_e < end_e:
                     if ctx_2.should_halt():
                         break
                     ctx_3 = self.scope()
                     ctx_3(asm.Block((asm.Assign(var, asm.Immediate(var_e)), body)))
+                    var_e += np.uint8(1)
                 return None
             case asm.BufferLoop(buf, var, body):
                 ctx_2 = self.scope(loop=[])
@@ -204,7 +200,7 @@ class AssemblyInterpreter:
                                 )
                     ctx_2(body)
                     if len(ctx_2.ret) > 0:
-                        ret_e = ctx_2.ret[1]
+                        ret_e = ctx_2.ret[0]
                         if not isinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "

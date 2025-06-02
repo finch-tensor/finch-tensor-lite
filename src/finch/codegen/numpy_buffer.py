@@ -80,27 +80,35 @@ class NumpyBufferFormat(AbstractCFormat):
     def __init__(self, dtype: type):
         self._dtype = dtype
 
-    def __call__(self, length: int):
-        return NumpyBuffer(np.zeros(length, dtype=self._dtype))
+    def __eq__(self, other):
+        if not isinstance(other, NumpyBufferFormat):
+            return False
+        return self._dtype == other._dtype
+
+    def __hash__(self):
+        return hash(self._dtype)
+
+    def __call__(self, len_: int):
+        return NumpyBuffer(np.zeros(len_, dtype=self._dtype))
 
     def c_type(self):
         return ctypes.POINTER(NumpyCBuffer)
 
-    def c_length(self, ctx, buffer):
-        return f"{ctx(buffer)}->length"
+    def c_length(self, ctx, buf):
+        return f"{ctx(buf)}->length"
 
-    def c_load(self, ctx, buffer, index):
-        return f"{ctx(buffer)}->data[{ctx(index)}]"
+    def c_load(self, ctx, buf, idx):
+        return f"{ctx(buf)}->data[{ctx(idx)}]"
 
-    def c_store(self, ctx, buffer, index, value):
-        data = f"{ctx(buffer)}->data"
-        ctx.exec(f"{ctx.feed}{data}[{ctx(index)}] = {ctx(value)};")
+    def c_store(self, ctx, buf, idx, value):
+        data = f"{ctx(buf)}->data"
+        ctx.exec(f"{ctx.feed}{data}[{ctx(idx)}] = {ctx(value)};")
 
-    def c_resize(self, ctx, buffer, new_length):
-        data = f"{ctx(buffer)}->data"
-        arr = f"{ctx(buffer)}->arr"
-        length = f"{ctx(buffer)}->length"
+    def c_resize(self, ctx, buf, new_len):
+        data = f"{ctx(buf)}->data"
+        arr = f"{ctx(buf)}->arr"
+        length = f"{ctx(buf)}->length"
         ctx.exec(
-            f"{ctx.feed}{data} = {ctx(buffer)}->resize(&{arr}, {ctx(new_length)});\n"
-            f"{ctx.feed}{length} = {ctx(new_length)};"
+            f"{ctx.feed}{data} = {ctx(buf)}->resize(&{arr}, {ctx(new_len)});\n"
+            f"{ctx.feed}{length} = {ctx(new_len)};"
         )
