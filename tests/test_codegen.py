@@ -67,7 +67,7 @@ def test_buffer_function():
 def test_codegen():
     a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
     i = asm.Variable("i", int)
-    prgm = asm.Module(
+    prgm = asm.Module((
         asm.Function(
             asm.Variable("test_function", int),
             (a,),
@@ -97,7 +97,7 @@ def test_codegen():
                 )
             ),
         ),
-    )
+    ))
     ctx = CCompiler()
     mod = ctx(prgm)
     f = mod.test_function

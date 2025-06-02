@@ -8,6 +8,7 @@ from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 from typing import Any
+import numpy
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -147,15 +148,19 @@ class CCompiler:
             cflags = config.get("cflags").split()
         if shared_cflags is None:
             shared_cflags = config.get("shared_cflags").split()
+        self.cc = cc
+        self.cflags = cflags
+        self.shared_cflags = shared_cflags
 
     def __call__(self, prgm):
         ctx = CContext()
         ctx(prgm)
         c_code = ctx.emit_global()
+        print(c_code)
         lib = load_shared_lib(
             c_code=c_code,
             cc=self.cc,
-            cflags=[*self.cflags, *self.shared_cflags],
+            cflags=(*self.cflags, *self.shared_cflags),
         )
         kernels = {}
         if prgm.head() != asm.Module:
@@ -163,7 +168,7 @@ class CCompiler:
                 "CCompiler expects a Module as the head of the program, "
                 f"got {type(prgm.head())}"
             )
-        for func in prgm.head().funcs:
+        for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
                     return_t = c_type(return_t)
@@ -321,39 +326,40 @@ def c_type(t):
 
 
 register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
+register_property(numpy.generic, "__self__", "c_type", lambda x: numpy.ctypeslib.as_ctypes_type(x))
 
 
 ctype_to_c_name = {
-    ctypes.c_bool: "bool",
-    ctypes.c_char: "char",
-    ctypes.c_wchar: "wchar_t",
-    ctypes.c_byte: "char",
-    ctypes.c_ubyte: "unsigned char",
-    ctypes.c_short: "short",
-    ctypes.c_ushort: "unsigned short",
-    ctypes.c_int: "int",
-    ctypes.c_int8: "int8_t",
-    ctypes.c_int16: "int16_t",
-    ctypes.c_int32: "int32_t",
-    ctypes.c_int64: "int64_t",
-    ctypes.c_uint: "unsigned int",
-    ctypes.c_uint8: "uint8_t",
-    ctypes.c_uint16: "uint16_t",
-    ctypes.c_uint32: "uint32_t",
-    ctypes.c_uint64: "uint64_t",
-    ctypes.c_long: "long",
-    ctypes.c_ulong: "unsigned long",
-    ctypes.c_longlong: "long long",
-    ctypes.c_ulonglong: "unsigned long long",
-    ctypes.c_size_t: "size_t",
-    ctypes.c_ssize_t: "ssize_t",
-    ctypes.c_float: "float",
-    ctypes.c_double: "double",
-    ctypes.c_longdouble: "long double",
-    ctypes.c_char_p: "char*",
-    ctypes.c_wchar_p: "wchar_t*",
-    ctypes.c_void_p: "void*",
-    ctypes.py_object: "void*",
+    ctypes.c_bool: ("bool", ["stdbool.h"]),
+    ctypes.c_char: ("char", []),
+    ctypes.c_wchar: ("wchar_t", ["wchar.h"]),
+    ctypes.c_byte: ("char", []),
+    ctypes.c_ubyte: ("unsigned char", []),
+    ctypes.c_short: ("short", []),
+    ctypes.c_ushort: ("unsigned short", []),
+    ctypes.c_int: ("int", []),
+    ctypes.c_int8: ("int8_t", ["stdint.h"]),
+    ctypes.c_int16: ("int16_t", ["stdint.h"]),
+    ctypes.c_int32: ("int32_t", ["stdint.h"]),
+    ctypes.c_int64: ("int64_t", ["stdint.h"]),
+    ctypes.c_uint: ("unsigned int", []),
+    ctypes.c_uint8: ("uint8_t", ["stdint.h"]),
+    ctypes.c_uint16: ("uint16_t", ["stdint.h"]),
+    ctypes.c_uint32: ("uint32_t", ["stdint.h"]),
+    ctypes.c_uint64: ("uint64_t", ["stdint.h"]),
+    ctypes.c_long: ("long", []),
+    ctypes.c_ulong: ("unsigned long", []),
+    ctypes.c_longlong: ("long long", []),
+    ctypes.c_ulonglong: ("unsigned long long", []),
+    ctypes.c_size_t: ("size_t", ["stddef.h"]),
+    ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
+    ctypes.c_float: ("float", []),
+    ctypes.c_double: ("double", []),
+    ctypes.c_longdouble: ("long double", []),
+    ctypes.c_char_p: ("char*", []),
+    ctypes.c_wchar_p: ("wchar_t*", ["wchar.h"]),
+    ctypes.c_void_p: ("void*", []),
+    ctypes.py_object: ("void*", []),
 }
 
 
@@ -387,8 +393,10 @@ class CContext(AbstractContext):
 
     def ctype_name(self, t):
         # Mapping from ctypes types to their C type names
-        name = ctype_to_c_name.get(t)
-        if name is not None:
+        if t in ctype_to_c_name:
+            name, libs = ctype_to_c_name[t]
+            for lib in libs:
+                self.add_header(f"#include <{lib}>")
             return name
         if issubclass(t, ctypes.Structure):
             name = t.__name__
@@ -401,7 +409,7 @@ class CContext(AbstractContext):
                 + "\n};"
             )
             self.add_header(header)
-            return name
+            return f"struct {name}"
         if issubclass(t, ctypes._Pointer):
             return f"{self.ctype_name(t._type_)}*"
         if issubclass(t, ctypes._CFuncPtr):
@@ -486,7 +494,7 @@ class CContext(AbstractContext):
                 body_code = ctx_2.emit()
                 self.exec(
                     f"{feed}for ({var_t} {var_2} = {start};"
-                    "{var_2} < {end}; {var_2}++) {{\n"
+                    f"{var_2} < {end}; {var_2}++) {{\n"
                     f"{body_code}"
                     f"\n{feed}}}"
                 )
@@ -555,7 +563,18 @@ class CContext(AbstractContext):
             case asm.Break():
                 self.exec(f"{feed}break;")
                 return None
-
+            case asm.Module(funcs):
+                for func in funcs:
+                    if not isinstance(func, asm.Function):
+                        raise NotImplementedError(
+                            f"Unrecognized function type: {type(func)}"
+                        )
+                    self(func)
+                return None
+            case _:
+                raise NotImplementedError(
+                    f"Unrecognized assembly node type: {type(prgm)}"
+                )
 
 class AbstractCFormat(AbstractFormat, ABC):
     """

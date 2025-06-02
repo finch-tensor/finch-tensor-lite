@@ -3,7 +3,7 @@ import ctypes
 import numpy as np
 
 from ..finch_assembly.abstract_buffer import AbstractBuffer
-from .c import AbstractCArgument, AbstractCFormat
+from .c import AbstractCArgument, AbstractCFormat, c_type
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -98,11 +98,13 @@ class NumpyBufferFormat(AbstractCFormat):
         return f"{ctx(buf)}->length"
 
     def c_load(self, ctx, buf, idx):
-        return f"{ctx(buf)}->data[{ctx(idx)}]"
+        t = ctx.ctype_name(c_type(self._dtype))
+        return f"(({t}*){ctx(buf)}->data)[{ctx(idx)}]"
 
     def c_store(self, ctx, buf, idx, value):
         data = f"{ctx(buf)}->data"
-        ctx.exec(f"{ctx.feed}{data}[{ctx(idx)}] = {ctx(value)};")
+        t = ctx.ctype_name(c_type(self._dtype))
+        ctx.exec(f"{ctx.feed}(({t}*){data})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf, new_len):
         data = f"{ctx(buf)}->data"
