@@ -492,7 +492,7 @@ def matmul(x1, x2) -> LazyTensor:
     return _matmul_helper(x1, x2)
 
 
-def matrix_transpose(x):
+def matrix_transpose(x) -> LazyTensor:
     """
     Transposes the input tensor `x`.
 
