@@ -125,6 +125,12 @@ class LazyTensor(AbstractOverrideTensor):
     def __rpow__(self, other):
         return pow(defer(other), self)
 
+    def __matmul__(self, other):
+        return matmul(self, defer(other))
+
+    def __rmatmul__(self, other):
+        return matmul(defer(other), self)
+
 
 def defer(arr) -> LazyTensor:
     """
@@ -458,7 +464,8 @@ def matmul(x1, x2) -> LazyTensor:
         """
         For arrays greater than 1D
         """
-        assert a.ndim >= 2 and b.ndim >= 2, "Both inputs must be at least 2D arrays"
+        if a.ndim < 2 or b.ndim < 2:
+            raise ValueError("Both inputs must be at least 2D arrays")
         if a.shape[-1] != b.shape[-2]:
             raise ValueError("Dimensions mismatch for matrix multiplication")
         # check all preceeding dimensions match
@@ -475,6 +482,9 @@ def matmul(x1, x2) -> LazyTensor:
 
     x1 = defer(x1)
     x2 = defer(x2)
+
+    if x1.ndim < 1 or x2.ndim < 1:
+        raise ValueError("Both inputs must be at least 1D arrays")
 
     if x1.ndim == 1 and x2.ndim == 1:
         return reduce(operator.add, multiply(x1, x2), axis=0)
