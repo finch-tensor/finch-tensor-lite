@@ -96,11 +96,11 @@ class TestEagerTensor(finch.AbstractEagerTensor):
         ((operator.or_, finch.bitwise_or, np.bitwise_or), np.bitwise_or),
         ((operator.xor, finch.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         (
-            (operator.lshift, finch.bitwise_lshift, np.bitwise_left_shift),
+            (operator.lshift, finch.bitwise_left_shift, np.bitwise_left_shift),
             np.bitwise_left_shift,
         ),
         (
-            (operator.rshift, finch.bitwise_rshift, np.bitwise_right_shift),
+            (operator.rshift, finch.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
         ((operator.truediv, finch.truediv, np.true_divide), np.true_divide),
