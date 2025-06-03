@@ -3,7 +3,7 @@ import operator
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from itertools import accumulate
+from itertools import accumulate, zip_longest
 from typing import Any
 
 from numpy.core.numeric import normalize_axis_tuple
@@ -469,8 +469,6 @@ def matmul(x1, x2) -> LazyTensor:
         if a.shape[-1] != b.shape[-2]:
             raise ValueError("Dimensions mismatch for matrix multiplication")
         # check all preceeding dimensions match
-        from itertools import zip_longest
-
         batch_a, batch_b = a.shape[:-2], b.shape[:-2]
         for da, db in zip_longest(reversed(batch_a), reversed(batch_b), fillvalue=1):
             if da != db and da != 1 and db != 1:
