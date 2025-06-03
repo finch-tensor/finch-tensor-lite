@@ -25,6 +25,22 @@ class AbstractBuffer(ABC):
         Return the length of the buffer.
         """
 
+    @property
+    def element_type(self):
+        """
+        Return the type of elements stored in the buffer.
+        This is typically the same as the dtype used to create the buffer.
+        """
+        return self.get_format().element_type()
+
+    @property
+    def length_type(self):
+        """
+        Return the type of indices used to access elements in the buffer.
+        This is typically an integer type.
+        """
+        return self.get_format().length_type()
+
     @abstractmethod
     def load(self, idx: int):
         pass
@@ -51,6 +67,21 @@ class AbstractFormat(ABC):
         """
         Create an instance of an object in this format with the given arguments.
         """
+
+    @property
+    @abstractmethod
+    def element_type(self):
+        """
+        Return the type of elements stored in the buffer.
+        This is typically the same as the dtype used to create the buffer.
+        """
+
+    @property
+    def length_type(self):
+        """
+        Returns the type used for the length of the buffer.
+        """
+        return int
 
 
 def isinstanceorformat(x, format_or_type):

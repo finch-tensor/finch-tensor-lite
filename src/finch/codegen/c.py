@@ -8,6 +8,7 @@ from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 from typing import Any
+import sys
 
 import numpy as np
 
@@ -50,7 +51,17 @@ def create_shared_lib(filename, c_code, cc, cflags):
             raise FileNotFoundError(
                 f"Compiler '{cc}' not found. Ensure it is installed and in your PATH."
             )
-        subprocess.run(compile_command, check=True)
+        try:
+            subprocess.run(compile_command, check=True)
+        except subprocess.CalledProcessError as e:
+            print(
+                f"Compilation failed with command:\n"
+                f"    {compile_command}\n"
+                f"on the following code:\n{c_code}"
+                f"\nError message: {e}",
+                file=sys.stderr
+            )
+            raise RuntimeError("C Compilation failed")
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
 
 
@@ -151,7 +162,7 @@ class CCompiler:
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None):
+    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None, verbose=False):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -161,17 +172,19 @@ class CCompiler:
         self.cc = cc
         self.cflags = cflags
         self.shared_cflags = shared_cflags
+        self.verbose = verbose
 
     def __call__(self, prgm):
         ctx = CContext()
         ctx(prgm)
         c_code = ctx.emit_global()
+        if self.verbose:
+            print(f"Compiling C code:\n{c_code}", file=sys.stderr)
         lib = load_shared_lib(
             c_code=c_code,
             cc=self.cc,
             cflags=(*self.cflags, *self.shared_cflags),
         )
-        print(c_code)
         kernels = {}
         if prgm.head() != asm.Module:
             raise ValueError(
@@ -181,7 +194,7 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    return_t = return_t
+                    return_t = c_type(return_t)
                     arg_ts = [arg.get_type() for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
@@ -317,7 +330,29 @@ def c_literal(ctx, val):
 
 
 register_property(int, "__self__", "c_literal", lambda x, ctx: str(x))
+register_property(float, "__self__", "c_literal", lambda x, ctx: str(x))
+register_property(
+    np.generic,
+    "__self__",
+    "c_literal",
+    lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x))
+)
+for t in (ctypes.c_bool, ctypes.c_uint8, ctypes.c_uint16, ctypes.c_uint32, ctypes.c_uint64, 
+          ctypes.c_int8, ctypes.c_int16, ctypes.c_int32, ctypes.c_int64):
+    register_property(
+        t,
+        "__self__",
+        "c_literal",
+        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}"
+    )
 
+for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):
+    register_property(
+        t,
+        "__self__",
+        "c_literal",
+        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}"
+    )
 
 def c_type(t):
     """
@@ -496,15 +531,17 @@ class CContext(AbstractContext):
                 return c_literal(self, value)
             case asm.Variable(name, t):
                 return name
-            case asm.Assign(var, val):
-                if var.name in self.bindings:
-                    self.exec(f"{feed}{var} = {val};")
+            case asm.Assign(asm.Variable(var_n, var_t), val):
+                val_code = self(val)
+                if val.get_type() != var_t:
+                    raise TypeError(f"Type mismatch: {val.get_type()} != {var_t}")
+                if var_n in self.bindings:
+                    assert var_t == self.bindings[var_n]
+                    self.exec(f"{feed}{var_n} = {val_code};")
                 else:
-                    self.bindings[var.name] = var.get_type()
-                    var_t = self.ctype_name(c_type(self.bindings[var.name]))
-                    var = self(var)
-                    val = self(val)
-                    self.exec(f"{feed}{var_t} {var} = {val};")
+                    self.bindings[var_n] = var_t
+                    var_t_code = self.ctype_name(c_type(var_t))
+                    self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Immediate)
@@ -533,7 +570,7 @@ class CContext(AbstractContext):
                 ctx_2.bindings[var.name] = var.get_type()
                 body_code = ctx_2.emit()
                 self.exec(
-                    f"{feed}for ({var_t} {var_2} = {start};"
+                    f"{feed}for ({var_t} {var_2} = {start}; "
                     f"{var_2} < {end}; {var_2}++) {{\n"
                     f"{body_code}"
                     f"\n{feed}}}"

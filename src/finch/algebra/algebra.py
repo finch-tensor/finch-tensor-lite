@@ -71,10 +71,13 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
         NotImplementedError: If the property is not implemented for the given type.
     """
     if not isinstance(obj, type):
-        if isinstance(obj, Hashable):
+        try:
+            hash(obj)
             query_fn = _properties.get((obj, attr, prop))
             if query_fn is not None:
                 return query_fn(obj, *args)
+        except TypeError:
+            pass
         T = type(obj)
     else:
         T = obj
@@ -147,6 +150,56 @@ register_property(
     "__self__",
     "element_type",
     lambda x: x.dtype.type,
+)
+
+def length_type(arg: Any) -> type:
+    """The length type of the given argument. The length type is the type of
+    the value returned by len(arg).
+
+    Args:
+        arg: The object to determine the length type for.
+
+    Returns:
+        The length type of the given object.
+
+    Raises:
+        NotImplementedError: If the length type is not implemented for the given type.
+    """
+    if hasattr(arg, "length_type"):
+        return arg.length_type
+    return query_property(arg, "__self__", "length_type")
+
+
+def shape_type(arg: Any) -> type:
+    """The shape type of the given argument. The shape type is the type of
+    the value returned by arg.shape.
+
+    Args:
+        arg: The object to determine the shape type for.
+
+    Returns:
+        The shape type of the given object.
+
+    Raises:
+        NotImplementedError: If the shape type is not implemented for the given type.
+    """
+    if hasattr(arg, "shape_type"):
+        return arg.shape_type
+    return query_property(arg, "__self__", "shape_type")
+
+
+register_property(
+    np.ndarray,
+    "__self__",
+    "length_type",
+    lambda x: int,
+)
+
+register_property(
+    np.ndarray,
+    "__self__",
+    "shape_type",
+    lambda x: tuple,
 )
 
 

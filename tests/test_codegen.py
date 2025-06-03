@@ -5,7 +5,9 @@ from numpy.testing import assert_equal
 
 import finch
 import finch.finch_assembly as asm
-from finch.codegen import CCompiler
+from finch.codegen import CCompiler, NumpyBuffer
+
+import pytest
 
 
 def test_add_function():
@@ -114,3 +116,75 @@ def test_codegen():
 
 
 print(test_codegen())
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(verbose=True), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ]
+)
+def test_dot_product(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    a_buf = buffer(a)
+    b_buf = buffer(b)
+
+    c = asm.Variable("c", np.float64)
+    i = asm.Variable("i", np.int64)
+    ab = NumpyBuffer(a)
+    bb = NumpyBuffer(b)
+    ab_v = asm.Variable("a", ab.get_format())
+    bb_v = asm.Variable("b", bb.get_format())
+    prgm = asm.Module((
+        asm.Function(
+            asm.Variable("dot_product", np.float64),
+            (
+                ab_v,
+                bb_v,
+            ),
+            asm.Block(
+                (
+                    asm.Assign(c, asm.Immediate(np.float64(0.0))),
+                    asm.ForLoop(
+                        i,
+                        asm.Immediate(np.int64(0)),
+                        asm.Length(ab_v),
+                        asm.Block(
+                            (
+                                asm.Assign(
+                                    c,
+                                    asm.Call(
+                                        asm.Immediate(operator.add),
+                                        (
+                                            c,
+                                            asm.Call(
+                                                asm.Immediate(operator.mul),
+                                                (
+                                                    asm.Load(ab_v, i),
+                                                    asm.Load(bb_v, i),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            )
+                        ),
+                    ),
+                    asm.Return(c),
+                )
+            ),
+        ),
+    ))
+
+    mod = compiler(prgm)
+
+    result = mod.dot_product(a_buf, b_buf)
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.dot_product(a_buf, b_buf)
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"

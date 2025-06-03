@@ -85,6 +85,21 @@ class NumpyBufferFormat(AbstractCFormat):
             return False
         return self._dtype == other._dtype
 
+    @property
+    def length_type(self):
+        """
+        Returns the type used for the length of the buffer.
+        """
+        return int
+
+    @property
+    def element_type(self):
+        """
+        Returns the type of elements stored in the buffer.
+        This is typically the same as the dtype used to create the buffer.
+        """
+        return self._dtype
+
     def __hash__(self):
         return hash(self._dtype)
 

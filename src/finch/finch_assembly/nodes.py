@@ -2,7 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type
+from ..algebra import element_type, length_type, return_type
 from ..symbolic import Term, TermTree
 
 
@@ -73,7 +73,7 @@ class Variable(AssemblyExpression):
     """
 
     name: str
-    type: type
+    type: Any
 
     def get_type(self):
         """Returns the type of the expression."""
@@ -124,7 +124,7 @@ class Call(AssemblyExpression, AssemblyTree):
     def get_type(self):
         """Returns the type of the expression."""
         arg_types = [arg.get_type() for arg in self.args]
-        return self.return_type(self.op.val, *arg_types)
+        return return_type(self.op.val, *arg_types)
 
 
 @dataclass(eq=True, frozen=True)
@@ -145,7 +145,7 @@ class Load(AssemblyExpression, AssemblyTree):
 
     def get_type(self):
         """Returns the type of the expression."""
-        return element_type(self.buffer)
+        return element_type(self.buffer.get_type())
 
 
 @dataclass(eq=True, frozen=True)
@@ -200,7 +200,7 @@ class Length(AssemblyExpression, AssemblyTree):
 
     def get_type(self):
         """Returns the type of the expression."""
-        return self.buffer.val.index_type()
+        return length_type(self.buffer.get_type())
 
 
 @dataclass(eq=True, frozen=True)

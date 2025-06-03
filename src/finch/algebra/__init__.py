@@ -1,6 +1,8 @@
 from .algebra import (
     StableNumber,
     element_type,
+    length_type,
+    shape_type,
     fill_value,
     fixpoint_type,
     init_value,
@@ -17,6 +19,8 @@ __all__ = [
     "StableNumber",
     "fill_value",
     "element_type",
+    "length_type",
+    "shape_type",
     "return_type",
     "fixpoint_type",
     "init_value",
