@@ -8,6 +8,23 @@ from numpy.testing import assert_equal
 import finch
 
 
+# Utility function to generate random complex numpy tensors
+def random_complex_array(shape):
+    """Generates a random complex array. Uses integers for both real
+    and imaginary parts to avoid floating-point issues in tests.
+
+    Args:
+        shape: A tuple specifying the shape of the array.
+
+    Returns:
+        A NumPy array of complex numbers with the given shape.
+    """
+    rng = np.random.default_rng()
+    real_part = rng.integers(0, 10, shape)
+    imag_part = rng.integers(0, 10, shape)
+    return real_part + 1j * imag_part
+
+
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -238,6 +255,15 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
             np.arange(7 * 2 * 4 * 3).reshape(7, 2, 4, 3),
             np.arange(2 * 3 * 4).reshape(2, 3, 4),
         ),
+        # 3D x 1D (broadcasting)
+        (np.arange(3 * 2 * 4).reshape(3, 2, 4), np.arange(4)),
+        # (1, 3, 2) x (5, 2, 3)
+        (np.arange(1 * 3 * 2).reshape(1, 3, 2), np.arange(5 * 2 * 3).reshape(5, 2, 3)),
+        # Complex numbers, 4D x 5D
+        (
+            random_complex_array((2, 3, 4, 5)),
+            random_complex_array((3, 5, 6)),
+        ),
         # mismatch dimensions
         (
             np.arange(7 * 2 * 3 * 4).reshape(7, 2, 3, 4),
@@ -291,6 +317,8 @@ def test_matmul(a, b, a_wrap, b_wrap):
         np.arange(6).reshape(2, 3),
         np.arange(12).reshape(1, 12),
         np.arange(24).reshape(2, 3, 4),  # 3D array
+        # Complex
+        random_complex_array((5, 1, 4)),
     ],
 )
 @pytest.mark.parametrize(
