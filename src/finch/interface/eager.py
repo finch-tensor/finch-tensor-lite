@@ -45,10 +45,10 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
         return bitwise_and(other, self)
 
     def __lshift__(self, other):
-        return bitwise_lshift(self, other)
+        return bitwise_left_shift(self, other)
 
     def __rlshift__(self, other):
-        return bitwise_lshift(other, self)
+        return bitwise_left_shift(other, self)
 
     def __or__(self, other):
         return bitwise_or(self, other)
@@ -57,10 +57,10 @@ class AbstractEagerTensor(AbstractOverrideTensor, ABC):
         return bitwise_or(other, self)
 
     def __rshift__(self, other):
-        return bitwise_rshift(self, other)
+        return bitwise_right_shift(self, other)
 
     def __rrshift__(self, other):
-        return bitwise_rshift(other, self)
+        return bitwise_right_shift(other, self)
 
     def __xor__(self, other):
         return bitwise_xor(self, other)
@@ -210,10 +210,10 @@ def bitwise_and(x1, x2):
     return compute(lazy.bitwise_and(x1, x2))
 
 
-def bitwise_lshift(x1, x2):
+def bitwise_left_shift(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.bitwise_lshift(x1, x2)
-    return compute(lazy.bitwise_lshift(x1, x2))
+        return lazy.bitwise_left_shift(x1, x2)
+    return compute(lazy.bitwise_left_shift(x1, x2))
 
 
 def bitwise_or(x1, x2):
@@ -222,10 +222,10 @@ def bitwise_or(x1, x2):
     return compute(lazy.bitwise_or(x1, x2))
 
 
-def bitwise_rshift(x1, x2):
+def bitwise_right_shift(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.bitwise_rshift(x1, x2)
-    return compute(lazy.bitwise_rshift(x1, x2))
+        return lazy.bitwise_right_shift(x1, x2)
+    return compute(lazy.bitwise_right_shift(x1, x2))
 
 
 def bitwise_xor(x1, x2):
