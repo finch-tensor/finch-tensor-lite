@@ -469,11 +469,14 @@ def matmul(x1, x2) -> LazyTensor:
         if a.shape[-1] != b.shape[-2]:
             raise ValueError("Dimensions mismatch for matrix multiplication")
         # check all preceeding dimensions match
-        if a.shape[-len(b.shape) : -2] != b.shape[-len(a.shape) : -2]:
-            raise ValueError(
-                "Preceeding dimensions of the two arrays must",
-                "match for matrix multiplication",
-            )
+        from itertools import zip_longest
+
+        batch_a, batch_b = a.shape[:-2], b.shape[:-2]
+        for da, db in zip_longest(reversed(batch_a), reversed(batch_b), fillvalue=1):
+            if da != db and da != 1 and db != 1:
+                raise ValueError(
+                    "Batch dimensions are not broadcastable for matrix multiplication"
+                )
         return reduce(
             operator.add,
             multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
@@ -509,7 +512,7 @@ def matrix_transpose(x) -> LazyTensor:
     Parameters
     ----------
     x: LazyTensor
-        The input tensor to be transposed. If 'x' is a vector, it is returned as is.
+        The input tensor to be transposed. Must have at least 2 dimensions.
 
     Returns
     -------
@@ -517,12 +520,11 @@ def matrix_transpose(x) -> LazyTensor:
         A new LazyTensor with the axes of `x` transposed.
     """
     x = defer(x)
-    if x.ndim == 1:
+    if x.ndim < 2:
         # this is following numpy's behavior.
         # data-apis specification assumes that input is atleast 2D
         raise ValueError(
-            "Cannot transpose a vector. ",
-            "Use `expand_dims` to convert it to a matrix first.",
+            "Input tensor must have at least 2 dimensions for transposition"
         )
     # swap the last two axes
     return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
