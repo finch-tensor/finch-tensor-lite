@@ -61,7 +61,7 @@ def create_shared_lib(filename, c_code, cc, cflags):
                 f"\nError message: {e}",
                 file=sys.stderr,
             )
-            raise RuntimeError("C Compilation failed")
+            raise RuntimeError("C Compilation failed") from e
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
 
 
