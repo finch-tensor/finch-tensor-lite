@@ -78,10 +78,10 @@ class LazyTensor(AbstractOverrideTensor):
         return bitwise_and(defer(other), self)
 
     def __lshift__(self, other):
-        return bitwise_lshift(self, defer(other))
+        return bitwise_left_shift(self, defer(other))
 
     def __rlshift__(self, other):
-        return bitwise_lshift(defer(other), self)
+        return bitwise_left_shift(defer(other), self)
 
     def __or__(self, other):
         return bitwise_or(self, defer(other))
@@ -90,10 +90,10 @@ class LazyTensor(AbstractOverrideTensor):
         return bitwise_or(defer(other), self)
 
     def __rshift__(self, other):
-        return bitwise_rshift(self, defer(other))
+        return bitwise_right_shift(self, defer(other))
 
     def __rrshift__(self, other):
-        return bitwise_rshift(defer(other), self)
+        return bitwise_right_shift(defer(other), self)
 
     def __xor__(self, other):
         return bitwise_xor(self, defer(other))
@@ -532,7 +532,7 @@ def bitwise_and(x1, x2) -> LazyTensor:
     return elementwise(operator.and_, defer(x1), defer(x2))
 
 
-def bitwise_lshift(x1, x2) -> LazyTensor:
+def bitwise_left_shift(x1, x2) -> LazyTensor:
     return elementwise(operator.lshift, defer(x1), defer(x2))
 
 
@@ -540,7 +540,7 @@ def bitwise_or(x1, x2) -> LazyTensor:
     return elementwise(operator.or_, defer(x1), defer(x2))
 
 
-def bitwise_rshift(x1, x2) -> LazyTensor:
+def bitwise_right_shift(x1, x2) -> LazyTensor:
     return elementwise(operator.rshift, defer(x1), defer(x2))
 
 
