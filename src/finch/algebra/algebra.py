@@ -152,6 +152,7 @@ register_property(
     lambda x: x.dtype.type,
 )
 
+
 def length_type(arg: Any) -> type:
     """The length type of the given argument. The length type is the type of
     the value returned by len(arg).

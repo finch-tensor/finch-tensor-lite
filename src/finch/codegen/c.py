@@ -2,13 +2,13 @@ import ctypes
 import operator
 import shutil
 import subprocess
+import sys
 import tempfile
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
 from typing import Any
-import sys
 
 import numpy as np
 
@@ -59,7 +59,7 @@ def create_shared_lib(filename, c_code, cc, cflags):
                 f"    {compile_command}\n"
                 f"on the following code:\n{c_code}"
                 f"\nError message: {e}",
-                file=sys.stderr
+                file=sys.stderr,
             )
             raise RuntimeError("C Compilation failed")
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
@@ -162,7 +162,9 @@ class CCompiler:
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None, verbose=False):
+    def __init__(
+        self, ctx=None, cc=None, cflags=None, shared_cflags=None, verbose=False
+    ):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -335,24 +337,34 @@ register_property(
     np.generic,
     "__self__",
     "c_literal",
-    lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x))
+    lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
 )
-for t in (ctypes.c_bool, ctypes.c_uint8, ctypes.c_uint16, ctypes.c_uint32, ctypes.c_uint64, 
-          ctypes.c_int8, ctypes.c_int16, ctypes.c_int32, ctypes.c_int64):
+for t in (
+    ctypes.c_bool,
+    ctypes.c_uint8,
+    ctypes.c_uint16,
+    ctypes.c_uint32,
+    ctypes.c_uint64,
+    ctypes.c_int8,
+    ctypes.c_int16,
+    ctypes.c_int32,
+    ctypes.c_int64,
+):
     register_property(
         t,
         "__self__",
         "c_literal",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}"
+        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
     )
 
-for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):
+for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore[assignment]
     register_property(
         t,
         "__self__",
         "c_literal",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}"
+        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
     )
+
 
 def c_type(t):
     """
