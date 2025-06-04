@@ -135,5 +135,10 @@ class AbstractSymbolic(ABC):
     symbolic computation context.
     """
 
+    @abstractmethod
     def foo(x):
-        x + 1
+        """
+        Abstract method to be implemented by subclasses.
+        Perform an operation on the input `x`.
+        """
+        pass
