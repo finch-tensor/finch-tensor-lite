@@ -128,17 +128,9 @@ class AbstractContext(ABC):
         """
 
 
-class AbstractSymbolic(ABC):
+class AbstractSymbolic:
     """
     Abstract base class for symbolic objects. Symbolic objects are used to
     represent objects that are defined with respect to the state inside a
     symbolic computation context.
     """
-
-    @abstractmethod
-    def foo(x):
-        """
-        Abstract method to be implemented by subclasses.
-        Perform an operation on the input `x`.
-        """
-        pass
