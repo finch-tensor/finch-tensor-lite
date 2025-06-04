@@ -285,6 +285,7 @@ class Function(AssemblyTree):
         """Returns the children of the node."""
         return [self.name, *self.args, self.body]
 
+    @classmethod
     def from_children(cls, name, *args, body):
         """Creates a term with the given head and arguments."""
         return cls(name, args, body)
