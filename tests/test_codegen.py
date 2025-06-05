@@ -190,3 +190,83 @@ def test_dot_product(compiler, buffer):
     expected = interp.dot_product(a_buf, b_buf)
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ],
+)
+def test_if_statement(compiler, buffer):
+    var = asm.Variable("a", np.int64)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("if_else", np.int64),
+                (),
+                asm.Block(
+                    (
+                        asm.Assign(var, asm.Immediate(np.int64(5))),
+                        asm.If(
+                            asm.Call(
+                                asm.Immediate(operator.eq),
+                                (var, asm.Immediate(np.int64(5))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Immediate(operator.add),
+                                            (var, asm.Immediate(np.int64(10))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.IfElse(
+                            asm.Call(
+                                asm.Immediate(operator.lt),
+                                (var, asm.Immediate(np.int64(15))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Immediate(operator.sub),
+                                            (var, asm.Immediate(np.int64(3))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Immediate(operator.mul),
+                                            (var, asm.Immediate(np.int64(2))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(var),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.if_else()
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.if_else()
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
