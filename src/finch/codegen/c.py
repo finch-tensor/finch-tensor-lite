@@ -520,11 +520,8 @@ class CContext(AbstractContext):
         return blk
 
     def subblock(self):
-        blk = super().block()
+        blk = self.block()
         blk.indent = self.indent + 1
-        blk.tab = self.tab
-        blk.headers = self.headers
-        blk._headerset = self._headerset
         blk.bindings = self.bindings.scope()
         return blk
 
