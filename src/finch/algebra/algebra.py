@@ -119,6 +119,8 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
             msg += f"finch.register_property({repr(obj)}, '{attr}', '{prop}'"
             ", lambda ...) or "
         msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
+    msg += " See https://github.com/finch-tensor/finch-tensor-lite/blob/main/src/finch/"
+    "algebra/algebra.py for more information."
     raise AttributeError(msg)
 
 
