@@ -272,6 +272,27 @@ _unary_operators: dict[Callable, str] = {
 }
 
 
+_comparison_operators: dict[Callable, str] = {
+    operator.eq: "__eq__",
+    operator.ne: "__ne__",
+    operator.gt: "__gt__",
+    operator.lt: "__lt__",
+    operator.ge: "__ge__",
+    operator.le: "__le__",
+}
+
+
+for op, meth in _comparison_operators.items():
+    (
+        register_property(
+            op,
+            "__call__",
+            "return_type",
+            lambda op, a, b, meth=meth: bool,
+        ),
+    )
+
+
 def _return_type_unary(meth):
     def _return_type_closure(a):
         return type(getattr(a(True), meth)())

@@ -266,6 +266,45 @@ class WhileLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
+class If(AssemblyTree):
+    """
+    Represents an if statement that executes the body if the condition is true.
+
+    Attributes:
+        condition: The condition to evaluate for the if to execute the body.
+        body: The body of the if statement to execute.
+    """
+
+    condition: AssemblyExpression
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.condition, self.body]
+
+
+@dataclass(eq=True, frozen=True)
+class IfElse(AssemblyTree):
+    """
+    Represents an if-else statement that executes the body if the condition
+    is true, otherwise executes else_body.
+
+    Attributes:
+        condition: The condition to evaluate for the if to execute the body.
+        body: The body of the if statement to execute.
+        else_body: An alternative body to execute if the condition is false.
+    """
+
+    condition: AssemblyExpression
+    body: AssemblyNode
+    else_body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.condition, self.body, self.else_body]
+
+
+@dataclass(eq=True, frozen=True)
 class Function(AssemblyTree):
     """
     Represents a logical AST statement that defines a function `fun` on the

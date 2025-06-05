@@ -197,6 +197,17 @@ class AssemblyInterpreter:
                         break
                     ctx_3(body)
                 return None
+            case asm.If(cond, body):
+                if self(cond):
+                    ctx_2 = self.scope()
+                    ctx_2(body)
+                return None
+            case asm.IfElse(cond, body, else_body):
+                if not self(cond):
+                    body = else_body
+                ctx_2 = self.scope()
+                ctx_2(body)
+                return None
             case asm.Function(asm.Variable(func_n, ret_t), args, body):
 
                 def my_func(*args_e):

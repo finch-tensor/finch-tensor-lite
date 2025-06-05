@@ -78,3 +78,71 @@ def test_dot_product(a, b):
     result = mod.dot_product(ab, bb)
     expected = np.dot(a, b)
     assert np.allclose(result, expected)
+
+
+def test_if_statement():
+    var = asm.Variable("a", np.int64)
+    mod = AssemblyInterpreter()(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("if_else", np.int64),
+                    (),
+                    asm.Block(
+                        (
+                            asm.Assign(var, asm.Immediate(np.int64(5))),
+                            asm.If(
+                                asm.Call(
+                                    asm.Immediate(operator.eq),
+                                    (var, asm.Immediate(np.int64(5))),
+                                ),
+                                asm.Block(
+                                    (
+                                        asm.Assign(
+                                            var,
+                                            asm.Call(
+                                                asm.Immediate(operator.add),
+                                                (var, asm.Immediate(np.int64(10))),
+                                            ),
+                                        ),
+                                    )
+                                ),
+                            ),
+                            asm.IfElse(
+                                asm.Call(
+                                    asm.Immediate(operator.lt),
+                                    (var, asm.Immediate(np.int64(15))),
+                                ),
+                                asm.Block(
+                                    (
+                                        asm.Assign(
+                                            var,
+                                            asm.Call(
+                                                asm.Immediate(operator.sub),
+                                                (var, asm.Immediate(np.int64(3))),
+                                            ),
+                                        ),
+                                    )
+                                ),
+                                asm.Block(
+                                    (
+                                        asm.Assign(
+                                            var,
+                                            asm.Call(
+                                                asm.Immediate(operator.mul),
+                                                (var, asm.Immediate(np.int64(2))),
+                                            ),
+                                        ),
+                                    )
+                                ),
+                            ),
+                            asm.Return(var),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+
+    result = mod.if_else()
+    assert result == 30
