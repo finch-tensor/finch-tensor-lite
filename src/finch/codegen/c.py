@@ -97,6 +97,7 @@ class AbstractCArgument(ABC):
         Return a ctypes-compatible struct to be used in place of this argument
         for the c backend.
         """
+        ...
 
     @abstractmethod
     def deserialize_from_c(self, obj):
@@ -104,6 +105,7 @@ class AbstractCArgument(ABC):
         Update this argument based on how the c call modified `obj`, the result
         of `serialize_to_c`.
         """
+        ...
 
 
 class CKernel:
@@ -671,21 +673,25 @@ class AbstractCFormat(AbstractFormat, ABC):
         """
         Return C code which loads a named buffer at the given index.
         """
+        ...
 
     @abstractmethod
     def c_load(self, ctx, buffer, index):
         """
         Return C code which loads a named buffer at the given index.
         """
+        ...
 
     @abstractmethod
     def c_store(self, ctx, buffer, index, value):
         """
         Return C code which stores a named buffer to the given index.
         """
+        ...
 
     @abstractmethod
     def c_resize(self, ctx, buffer, new_length):
         """
         Return C code which resizes a named buffer to the given length.
         """
+        ...

@@ -5,24 +5,19 @@ from ..algebra import StableNumber
 
 class AbstractTensor(ABC):
     @abstractmethod
-    def shape(self):
-        pass
+    def shape(self): ...
 
     @abstractmethod
-    def dtype(self):
-        pass
+    def dtype(self): ...
 
     @abstractmethod
-    def to_numpy(self):
-        pass
+    def to_numpy(self): ...
 
     @abstractmethod
-    def __add__(self, other):
-        pass
+    def __add__(self, other): ...
 
     @abstractmethod
-    def __mul__(self, other):
-        pass
+    def __mul__(self, other): ...
 
 
 def fill_value(arg):
