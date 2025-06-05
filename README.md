@@ -80,7 +80,8 @@ poetry run pytest
 
 #### Optional Static Type Checking
 
-The CI/CD pipeline will run mypy to check for type errors, so you don't need to run it locally, but if you want to check types locally, you can run:
+The pytest will run mypy to check for type errors, so you shouldn't need to run it manually.
+In case you do need to run mypy manually, you can do so with:
 
 ```bash
 poetry run mypy ./src/
