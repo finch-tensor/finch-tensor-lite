@@ -12,6 +12,10 @@ from .algebra import (
     register_property,
     return_type,
 )
+from .operator import (
+    promote_max,
+    promote_min,
+)
 
 __all__ = [
     "StableNumber",
@@ -26,4 +30,6 @@ __all__ = [
     "is_identity",
     "query_property",
     "register_property",
+    "promote_min",
+    "promote_max",
 ]

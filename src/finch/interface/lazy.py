@@ -8,7 +8,15 @@ from typing import Any
 
 from numpy.core.numeric import normalize_axis_tuple
 
-from ..algebra import element_type, fill_value, fixpoint_type, init_value, return_type
+from ..algebra import (
+    element_type,
+    fill_value,
+    fixpoint_type,
+    init_value,
+    promote_max,
+    promote_min,
+    return_type,
+)
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -423,6 +431,78 @@ def prod(
 ):
     x = defer(x)
     return reduce(operator.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
+
+
+def any(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Test whether any element of input array ``x`` along given axis is True.
+    """
+    x = defer(x)
+    return reduce(
+        operator.or_,
+        elementwise(operator.truth, x),
+        axis=axis,
+        keepdims=keepdims,
+        init=init,
+    )
+
+
+def all(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Test whether all elements of input array ``x`` along given axis are True.
+    """
+    x = defer(x)
+    return reduce(
+        operator.and_,
+        elementwise(operator.truth, x),
+        axis=axis,
+        keepdims=keepdims,
+        init=init,
+    )
+
+
+def min(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Return the minimum of input array ``arr`` along given axis.
+    """
+    x = defer(x)
+    return reduce(promote_min, x, axis=axis, keepdims=keepdims, init=init)
+
+
+def max(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Return the maximum of input array ``arr`` along given axis.
+    """
+    x = defer(x)
+    return reduce(promote_max, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def add(x1, x2) -> LazyTensor:
