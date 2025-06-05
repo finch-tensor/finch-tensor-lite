@@ -622,6 +622,26 @@ class CContext(AbstractContext):
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}while ({cond_code}) {{\n{body_code}\n{feed}}}")
                 return None
+            case asm.If(cond, body):
+                cond_code = self(cond)
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                self.exec(f"{feed}if ({cond_code}) {{\n{body_code}\n{feed}}}")
+                return None
+            case asm.IfElse(cond, body, else_body):
+                cond_code = self(cond)
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                ctx_3 = self.subblock()
+                ctx_3(else_body)
+                else_body_code = ctx_3.emit()
+                self.exec(
+                    f"{feed}if ({cond_code}) {{\n{body_code}\n{feed}}} "
+                    f"else {{\n{else_body_code}\n{feed}}}"
+                )
+                return None
             case asm.Function(asm.Variable(func_name, return_t), args, body):
                 ctx_2 = self.subblock()
                 arg_decls = []
