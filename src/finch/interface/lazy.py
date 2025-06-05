@@ -45,22 +45,22 @@ class LazyTensor(AbstractOverrideTensor):
         return len(self.shape)
 
     def __add__(self, other):
-        return add(self, defer(other))
+        return add(self, other)
 
     def __radd__(self, other):
-        return add(defer(other), self)
+        return add(other, self)
 
     def __sub__(self, other):
-        return subtract(self, defer(other))
+        return subtract(self, other)
 
     def __rsub__(self, other):
-        return subtract(defer(other), self)
+        return subtract(other, self)
 
     def __mul__(self, other):
-        return multiply(self, defer(other))
+        return multiply(self, other)
 
     def __rmul__(self, other):
-        return multiply(defer(other), self)
+        return multiply(other, self)
 
     def __abs__(self):
         return abs(self)
@@ -72,58 +72,58 @@ class LazyTensor(AbstractOverrideTensor):
         return negative(self)
 
     def __and__(self, other):
-        return bitwise_and(self, defer(other))
+        return bitwise_and(self, other)
 
     def __rand__(self, other):
-        return bitwise_and(defer(other), self)
+        return bitwise_and(other, self)
 
     def __lshift__(self, other):
-        return bitwise_left_shift(self, defer(other))
+        return bitwise_left_shift(self, other)
 
     def __rlshift__(self, other):
-        return bitwise_left_shift(defer(other), self)
+        return bitwise_left_shift(other, self)
 
     def __or__(self, other):
-        return bitwise_or(self, defer(other))
+        return bitwise_or(self, other)
 
     def __ror__(self, other):
-        return bitwise_or(defer(other), self)
+        return bitwise_or(other, self)
 
     def __rshift__(self, other):
-        return bitwise_right_shift(self, defer(other))
+        return bitwise_right_shift(self, other)
 
     def __rrshift__(self, other):
-        return bitwise_right_shift(defer(other), self)
+        return bitwise_right_shift(other, self)
 
     def __xor__(self, other):
-        return bitwise_xor(self, defer(other))
+        return bitwise_xor(self, other)
 
     def __rxor__(self, other):
-        return bitwise_xor(defer(other), self)
+        return bitwise_xor(other, self)
 
     def __truediv__(self, other):
-        return truediv(self, defer(other))
+        return truediv(self, other)
 
     def __rtruediv__(self, other):
-        return truediv(defer(other), self)
+        return truediv(other, self)
 
     def __floordiv__(self, other):
-        return floordiv(self, defer(other))
+        return floordiv(self, other)
 
     def __rfloordiv__(self, other):
-        return floordiv(defer(other), self)
+        return floordiv(other, self)
 
     def __mod__(self, other):
-        return mod(self, defer(other))
+        return mod(self, other)
 
     def __rmod__(self, other):
-        return mod(defer(other), self)
+        return mod(other, self)
 
     def __pow__(self, other):
-        return pow(self, defer(other))
+        return pow(self, other)
 
     def __rpow__(self, other):
-        return pow(defer(other), self)
+        return pow(other, self)
 
 
 def defer(arr) -> LazyTensor:

@@ -1,7 +1,7 @@
 import math
 import operator
 
-from finch.algebra import is_annihilator, is_associative, is_distributive, is_identity
+from finch.algebra import is_annihilator, is_associative, is_distributive, is_identity # type: ignore[import]
 
 
 def test_algebra_selected():
@@ -12,12 +12,12 @@ def test_algebra_selected():
     assert is_distributive(operator.or_, operator.and_)
     assert is_annihilator(operator.add, math.inf)
     assert is_annihilator(operator.mul, 0)
-    assert is_annihilator(operator.or_, 1)
-    assert is_annihilator(operator.and_, 0)
+    assert is_annihilator(operator.or_, True)
+    assert is_annihilator(operator.and_, False)
     assert is_identity(operator.add, 0)
     assert is_identity(operator.mul, 1)
-    assert is_identity(operator.or_, 0)
-    assert is_identity(operator.and_, 1)
+    assert is_identity(operator.or_, False)
+    assert is_identity(operator.and_, True)
     assert is_identity(operator.truediv, 1)
     assert is_identity(operator.floordiv, 1)
     assert is_identity(operator.lshift, 0)
