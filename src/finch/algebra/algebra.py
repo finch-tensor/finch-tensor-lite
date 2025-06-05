@@ -79,7 +79,7 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
                 return query_fn(obj, *args)
         except TypeError:
             pass
-        T = type(obj)
+        t = type(obj)
     else:
         t = obj
 
@@ -203,6 +203,8 @@ register_property(
     "shape_type",
     lambda x: tuple,
 )
+
+
 def promote_type(a: Any, b: Any) -> type:
     """Returns the data type with the smallest size and smallest scalar kind to
     which both type1 and type2 may be safely cast.
