@@ -93,10 +93,7 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
             return query_fn(obj, *args)
 
     msg = ""
-    if isinstance(obj, type):
-        obj_name = obj.__name__
-    else:
-        obj_name = type(obj).__name__
+    obj_name = obj.__name__ if isinstance(obj, type) else type(obj).__name__
     if attr == "__self__":
         if isinstance(obj, type):
             msg += f"type object '{obj_name}' has no attribute or property '{prop}'. "
