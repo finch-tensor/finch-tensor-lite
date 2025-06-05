@@ -101,20 +101,23 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
             msg += f"'{obj_name}' object has no attribute or property '{prop}'. "
         msg += "Hint: You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
-            msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', lambda ...)` or "
+            msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', "
+            "lambda ...)` or "
         msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`"
         msg += f"or you may define `{obj_name}.{prop}(...)`. "
     elif attr == "__call__":
         msg += f"function '{repr(obj)}' has no property '{prop}'. "
         msg += "Hint: You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
-            msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', lambda ...)` or "
+            msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}',"
+            ", lambda ...)` or "
         msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
     else:
         msg += f"attribute '{obj_name}.{attr}' has no property '{prop}'. "
         msg += "You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
-            msg += f"finch.register_property({repr(obj)}, '{attr}', '{prop}', lambda ...) or "
+            msg += f"finch.register_property({repr(obj)}, '{attr}', '{prop}'"
+            ", lambda ...) or "
         msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
     raise AttributeError(msg)
 
