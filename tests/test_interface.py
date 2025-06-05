@@ -168,8 +168,12 @@ def test_unary_operations(a, a_wrap, ops, np_op):
 @pytest.mark.parametrize(
     "a",
     [
+        (np.array([[True, False, True, False], [False, False, False, False]])),
         (np.array([[1, 2], [3, 4]])),
         (np.array([[2, 0], [1, 3]])),
+        (np.array([[1.00002, -12.618, 0, 0.001], [-1.414, -5.01, 0, 0]])),
+        (np.array([[0, 0.618, 0, 0.001], [0, 0.01, 0, 0]])),
+        (np.array([[10000.0, 1.0, -89.0, 78], [401.0, 3, 5, 10.2]])),
     ],
 )
 @pytest.mark.parametrize(
@@ -183,8 +187,12 @@ def test_unary_operations(a, a_wrap, ops, np_op):
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((finch.sum, np.sum), np.sum),
         ((finch.prod, np.prod), np.prod),
+        ((finch.sum, np.sum), np.sum),
+        ((finch.any, np.any), np.any),
+        ((finch.all, np.all), np.all),
+        ((finch.min, np.min), np.min),
+        ((finch.max, np.max), np.max),
     ],
 )
 @pytest.mark.parametrize(
