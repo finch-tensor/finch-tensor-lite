@@ -36,11 +36,19 @@ is_associative(add, complex, complex)
 ```
 
 Properties can be inherited in the same way as methods. First we check whether
-properties have been defined for the object itself (in the case of functions), then we
-check For example, if you register a property for a class, all subclasses of that class
-will inherit that property. This allows you to define properties for a class and have
-them automatically apply to all subclasses, without having to register the
-property for each subclass individually.
+properties have been defined for the object itself (in the case of functions),
+then we check ancestors of that class. For example, if you register a property
+for a class, all subclasses of that class will inherit that property. This
+allows you to define properties for a class and have them automatically apply to
+all subclasses, without having to register the property for each subclass
+individually.
+
+
+Only use the '__self__' attribute for properties which may be overridden by
+the user defining an attribute or method of an object or class.  For example, the
+`fill_value` property of a tensor is defined on the `__self__` attribute, so that
+if a user defines a custom tensor class, they can override the `fill_value`
+property by defining a `fill_value` attribute in the class itself.
 """
 
 import operator
@@ -68,7 +76,7 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
         The value of the queried property.
 
     Raises:
-        NotImplementedError: If the property is not implemented for the given type.
+        AttributeError: If the property is not implemented for the given type.
     """
     if not isinstance(obj, type):
         if isinstance(obj, Hashable):
@@ -84,7 +92,34 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
         if query_fn is not None:
             return query_fn(obj, *args)
 
-    raise NotImplementedError(f"Property {prop} not implemented for {obj}")
+    msg = ""
+    if isinstance(obj, type):
+        obj_name = obj.__name__
+    else:
+        obj_name = type(obj).__name__
+    if attr == "__self__":
+        if isinstance(obj, type):
+            msg += f"type object '{obj_name}' has no attribute or property '{prop}'. "
+        else:
+            msg += f"'{obj_name}' object has no attribute or property '{prop}'. "
+        msg += "Hint: You may need to register the property by calling "
+        if isinstance(obj, Hashable) and not isinstance(obj, type):
+            msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', lambda ...)` or "
+        msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`"
+        msg += f"or you may define `{obj_name}.{prop}(...)`. "
+    elif attr == "__call__":
+        msg += f"function '{repr(obj)}' has no property '{prop}'. "
+        msg += "Hint: You may need to register the property by calling "
+        if isinstance(obj, Hashable) and not isinstance(obj, type):
+            msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', lambda ...)` or "
+        msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
+    else:
+        msg += f"attribute '{obj_name}.{attr}' has no property '{prop}'. "
+        msg += "You may need to register the property by calling "
+        if isinstance(obj, Hashable) and not isinstance(obj, type):
+            msg += f"finch.register_property({repr(obj)}, '{attr}', '{prop}', lambda ...) or "
+        msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
+    raise AttributeError(msg)
 
 
 def register_property(cls, attr, prop, f):
