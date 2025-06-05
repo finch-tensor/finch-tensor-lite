@@ -273,7 +273,7 @@ class Function(AssemblyTree):
 
     Attributes:
         name: The name of the function to define as a variable typed with the
-        return type of this function.
+            return type of this function.
         args: The arguments to the function.
         body: The body of the function. If it does not contain a return statement,
             the function returns the value of `body`.
