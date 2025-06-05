@@ -43,8 +43,8 @@ algebra.register_property(
 )
 
 algebra.register_property(
-    algebra.promote_min, "__call__", "init_value", lambda op, arg: algebra.type_max(arg)
+    promote_min, "__call__", "init_value", lambda op, arg: algebra.type_max(arg)
 )
 algebra.register_property(
-    algebra.promote_max, "__call__", "init_value", lambda op, arg: algebra.type_min(arg)
+    promote_max, "__call__", "init_value", lambda op, arg: algebra.type_min(arg)
 )

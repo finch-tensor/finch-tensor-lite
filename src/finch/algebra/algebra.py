@@ -500,5 +500,5 @@ for T in StableNumber.__args__:
     register_property(T, "__xor__", "init_value", lambda a: a(False))
     register_property(T, "__or__", "init_value", lambda a: a(False))
 
-register_property(operator.min, "__call__", "init_value", lambda op, arg: type_max(arg))
-register_property(operator.max, "__call__", "init_value", lambda op, arg: type_min(arg))
+register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
+register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
