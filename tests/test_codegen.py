@@ -121,7 +121,7 @@ print(test_codegen())
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(verbose=True), NumpyBuffer),
+        (CCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )

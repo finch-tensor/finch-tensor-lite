@@ -126,6 +126,7 @@ class AbstractContext(ABC):
         """
         Emit the code in this context.
         """
+        ...
 
 
 class AbstractSymbolic:

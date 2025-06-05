@@ -9,8 +9,7 @@ class AbstractBuffer(ABC):
     """
 
     @abstractmethod
-    def __init__(self, length: int, dtype: type):
-        pass
+    def __init__(self, length: int, dtype: type): ...
 
     @abstractmethod
     def get_format(self):
@@ -18,12 +17,14 @@ class AbstractBuffer(ABC):
         Return the format of the buffer. The format defines how the data is
         organized and accessed.
         """
+        ...
 
     @abstractmethod
     def length(self):
         """
         Return the length of the buffer.
         """
+        ...
 
     @property
     def element_type(self):
@@ -42,18 +43,17 @@ class AbstractBuffer(ABC):
         return self.get_format().length_type()
 
     @abstractmethod
-    def load(self, idx: int):
-        pass
+    def load(self, idx: int): ...
 
     @abstractmethod
-    def store(self, idx: int, val):
-        pass
+    def store(self, idx: int, val): ...
 
     @abstractmethod
     def resize(self, len: int):
         """
         Resize the buffer to the new length.
         """
+        ...
 
 
 class AbstractFormat(ABC):
@@ -67,6 +67,7 @@ class AbstractFormat(ABC):
         """
         Create an instance of an object in this format with the given arguments.
         """
+        ...
 
     @property
     @abstractmethod
@@ -75,6 +76,7 @@ class AbstractFormat(ABC):
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
         """
+        ...
 
     @property
     def length_type(self):

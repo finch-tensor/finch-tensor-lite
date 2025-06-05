@@ -1,8 +1,8 @@
 import ctypes
+import logging
 import operator
 import shutil
 import subprocess
-import sys
 import tempfile
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -18,6 +18,8 @@ from ..finch_assembly.abstract_buffer import AbstractFormat, isinstanceorformat
 from ..symbolic import AbstractContext, ScopedDict
 from ..util import config
 from ..util.cache import file_cache
+
+logger = logging.getLogger(__name__)
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -54,12 +56,11 @@ def create_shared_lib(filename, c_code, cc, cflags):
         try:
             subprocess.run(compile_command, check=True)
         except subprocess.CalledProcessError as e:
-            print(
-                f"Compilation failed with command:\n"
+            logger.error(
+                "Compilation failed with command:\n"
                 f"    {compile_command}\n"
                 f"on the following code:\n{c_code}"
-                f"\nError message: {e}",
-                file=sys.stderr,
+                f"\nError message: {e}"
             )
             raise RuntimeError("C Compilation failed") from e
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
@@ -96,6 +97,7 @@ class AbstractCArgument(ABC):
         Return a ctypes-compatible struct to be used in place of this argument
         for the c backend.
         """
+        ...
 
     @abstractmethod
     def deserialize_from_c(self, obj):
@@ -103,6 +105,7 @@ class AbstractCArgument(ABC):
         Update this argument based on how the c call modified `obj`, the result
         of `serialize_to_c`.
         """
+        ...
 
 
 class CKernel:
@@ -162,9 +165,7 @@ class CCompiler:
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(
-        self, ctx=None, cc=None, cflags=None, shared_cflags=None, verbose=False
-    ):
+    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -174,14 +175,12 @@ class CCompiler:
         self.cc = cc
         self.cflags = cflags
         self.shared_cflags = shared_cflags
-        self.verbose = verbose
 
     def __call__(self, prgm):
         ctx = CContext()
         ctx(prgm)
         c_code = ctx.emit_global()
-        if self.verbose:
-            print(f"Compiling C code:\n{c_code}", file=sys.stderr)
+        logger.info(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
             cc=self.cc,
@@ -520,11 +519,8 @@ class CContext(AbstractContext):
         return blk
 
     def subblock(self):
-        blk = super().block()
+        blk = self.block()
         blk.indent = self.indent + 1
-        blk.tab = self.tab
-        blk.headers = self.headers
-        blk._headerset = self._headerset
         blk.bindings = self.bindings.scope()
         return blk
 
@@ -697,21 +693,25 @@ class AbstractCFormat(AbstractFormat, ABC):
         """
         Return C code which loads a named buffer at the given index.
         """
+        ...
 
     @abstractmethod
     def c_load(self, ctx, buffer, index):
         """
         Return C code which loads a named buffer at the given index.
         """
+        ...
 
     @abstractmethod
     def c_store(self, ctx, buffer, index, value):
         """
         Return C code which stores a named buffer to the given index.
         """
+        ...
 
     @abstractmethod
     def c_resize(self, ctx, buffer, new_length):
         """
         Return C code which resizes a named buffer to the given length.
         """
+        ...

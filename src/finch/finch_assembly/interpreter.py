@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
 from ..symbolic import ScopedDict
 from . import nodes as asm
 from .abstract_buffer import isinstanceorformat
@@ -38,26 +41,34 @@ class AssemblyInterpreterModule:
         )
 
 
+@dataclass(eq=True)
+class HaltState:
+    """
+    A class to represent the halt state of an assembly program.
+    This is used to indicate whether we should break or return, and
+    what the return value is if applicable.
+    """
+
+    should_halt: bool = False
+    return_value: Any = None
+
+
 class AssemblyInterpreter:
     """
     An interpreter for FinchAssembly.
     """
 
-    def __init__(self, bindings=None, types=None, loop=None, ret=None):
+    def __init__(self, bindings=None, types=None, loop_state=None, function_state=None):
         if bindings is None:
             bindings = ScopedDict()
         if types is None:
             types = ScopedDict()
-        if loop is None:
-            loop = []
-        if ret is None:
-            ret = []
         self.bindings = bindings
         self.types = types
-        self.loop = loop
-        self.ret = ret
+        self.loop_state = loop_state
+        self.function_state = function_state
 
-    def scope(self, bindings=None, types=None, loop=None, ret=None):
+    def scope(self, bindings=None, types=None, loop_state=None, function_state=None):
         """
         Create a new scope for the interpreter.
         This allows for nested scopes and variable shadowing.
@@ -66,15 +77,15 @@ class AssemblyInterpreter:
             bindings = self.bindings.scope()
         if types is None:
             types = self.types.scope()
-        if loop is None:
-            loop = self.loop
-        if ret is None:
-            ret = self.ret
+        if loop_state is None:
+            loop_state = self.loop_state
+        if function_state is None:
+            function_state = self.function_state
         return AssemblyInterpreter(
             bindings=bindings,
             types=types,
-            loop=loop,
-            ret=ret,
+            loop_state=loop_state,
+            function_state=function_state,
         )
 
     def should_halt(self):
@@ -83,7 +94,12 @@ class AssemblyInterpreter:
         This is used to stop execution in loops or when a return
         statement is encountered.
         """
-        return self.loop or self.ret
+        return (
+            self.loop_state
+            and self.loop_state.should_halt
+            or self.function_state
+            and self.function_state.should_halt
+        )
 
     def __call__(self, prgm: asm.AssemblyNode):
         """
@@ -151,7 +167,7 @@ class AssemblyInterpreter:
                         f"Start value {start_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
                     )
-                ctx_2 = self.scope(loop=[])
+                ctx_2 = self.scope(loop_state=HaltState())
                 var_e = start_e
                 while var_e < end_e:
                     if ctx_2.should_halt():
@@ -161,7 +177,7 @@ class AssemblyInterpreter:
                     var_e = type(var_e)(var_e + 1)  # type: ignore[call-arg,operator]
                 return None
             case asm.BufferLoop(buf, var, body):
-                ctx_2 = self.scope(loop=[])
+                ctx_2 = self.scope(loop_state=HaltState())
                 buf_e = self(buf)
                 for i in range(buf_e.length()):
                     if ctx_2.should_halt():
@@ -174,7 +190,7 @@ class AssemblyInterpreter:
                     )
                 return None
             case asm.WhileLoop(cond, body):
-                ctx_2 = self.scope(loop=[])
+                ctx_2 = self.scope(loop_state=HaltState())
                 while self(cond):
                     ctx_3 = ctx_2.scope()
                     if ctx_3.should_halt():
@@ -195,7 +211,7 @@ class AssemblyInterpreter:
             case asm.Function(asm.Variable(func_n, ret_t), args, body):
 
                 def my_func(*args_e):
-                    ctx_2 = self.scope(ret=[])
+                    ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):
                         raise ValueError(
                             f"Function '{func_n}' expects {len(args)} arguments, "
@@ -215,8 +231,8 @@ class AssemblyInterpreter:
                                     f"Unrecognized argument type: {arg}"
                                 )
                     ctx_2(body)
-                    if len(ctx_2.ret) > 0:
-                        ret_e = ctx_2.ret[0]
+                    if ctx_2.function_state.should_halt:
+                        ret_e = ctx_2.function_state.return_value
                         if not isinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
@@ -231,10 +247,11 @@ class AssemblyInterpreter:
                 self.bindings[func_n] = my_func
                 return None
             case asm.Return(value):
-                self.ret.append(self(value))
+                self.function_state.return_value = self(value)
+                self.function_state.should_halt = True
                 return None
             case asm.Break():
-                self.loop.append([])
+                self.loop_state.should_halt = True
                 return None
             case asm.Module(funcs):
                 for func in funcs:

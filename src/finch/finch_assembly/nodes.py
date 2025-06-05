@@ -45,6 +45,7 @@ class AssemblyExpression(AssemblyNode):
     @abstractmethod
     def get_type(self):
         """Returns the type of the expression."""
+        ...
 
 
 @dataclass(eq=True, frozen=True)
@@ -66,10 +67,12 @@ class Immediate(AssemblyExpression):
 @dataclass(eq=True, frozen=True)
 class Variable(AssemblyExpression):
     """
-    Represents a logical AST expression for a variable named `name`.
+    Represents a logical AST expression for a variable named `name`, which
+    will hold a value of type `type`.
 
     Attributes:
         name: The name of the variable.
+        type: The type of the variable.
     """
 
     name: str
@@ -87,7 +90,6 @@ class Assign(AssemblyTree):
     to `lhs`.
 
     Attributes:
-        type: The type of the new binding.
         lhs: The left-hand side of the binding.
         rhs: The right-hand side to evaluate.
     """
@@ -310,7 +312,7 @@ class Function(AssemblyTree):
 
     Attributes:
         name: The name of the function to define as a variable typed with the
-        return type of this function.
+            return type of this function.
         args: The arguments to the function.
         body: The body of the function. If it does not contain a return statement,
             the function returns the value of `body`.
