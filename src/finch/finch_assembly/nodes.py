@@ -1,0 +1,401 @@
+from abc import abstractmethod
+from dataclasses import dataclass
+from typing import Any
+
+from ..algebra import element_type, length_type, return_type
+from ..symbolic import Term, TermTree
+
+
+class AssemblyNode(Term):
+    """
+    AssemblyNode
+
+    Represents a FinchAssembly IR node. FinchAssembly is the final intermediate
+    representation before code generation (translation to the output language).
+    It is a low-level imperative description of the program, with control flow,
+    linear memory regions called "buffers", and explicit memory management.
+    """
+
+    @classmethod
+    def head(cls):
+        """Returns the head of the node."""
+        return cls
+
+    @classmethod
+    def make_term(cls, head, *args):
+        """Creates a term with the given head and arguments."""
+        return head.from_children(*args)
+
+    @classmethod
+    def from_children(cls, *children):
+        """
+        Creates a term from the given children. This is used to create terms
+        from the children of a node.
+        """
+        return cls(*children)
+
+
+class AssemblyTree(AssemblyNode, TermTree):
+    def children(self):
+        """Returns the children of the node."""
+        raise Exception(f"`children` isn't supported for {self.__class__}.")
+
+
+class AssemblyExpression(AssemblyNode):
+    @abstractmethod
+    def get_type(self):
+        """Returns the type of the expression."""
+        ...
+
+
+@dataclass(eq=True, frozen=True)
+class Immediate(AssemblyExpression):
+    """
+    Represents the literal value `val`.
+
+    Attributes:
+        val: The literal value.
+    """
+
+    val: Any
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return type(self.val)
+
+
+@dataclass(eq=True, frozen=True)
+class Variable(AssemblyExpression):
+    """
+    Represents a logical AST expression for a variable named `name`, which
+    will hold a value of type `type`.
+
+    Attributes:
+        name: The name of the variable.
+        type: The type of the variable.
+    """
+
+    name: str
+    type: Any
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Assign(AssemblyTree):
+    """
+    Represents a logical AST statement that evaluates `rhs`, binding the result
+    to `lhs`.
+
+    Attributes:
+        lhs: The left-hand side of the binding.
+        rhs: The right-hand side to evaluate.
+    """
+
+    lhs: Variable
+    rhs: AssemblyExpression
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Call(AssemblyExpression, AssemblyTree):
+    """
+    Represents an expression for calling the function `op` on `args...`.
+
+    Attributes:
+        op: The function to call.
+        args: The arguments to call on the function.
+    """
+
+    op: Immediate
+    args: tuple[AssemblyNode, ...]
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.op, *self.args]
+
+    @classmethod
+    def from_children(cls, op, *args):
+        return cls(op, args)
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        arg_types = [arg.get_type() for arg in self.args]
+        return return_type(self.op.val, *arg_types)
+
+
+@dataclass(eq=True, frozen=True)
+class Load(AssemblyExpression, AssemblyTree):
+    """
+    Represents loading a value from a buffer at a given index.
+
+    Attributes:
+        buffer: The buffer to load from.
+        index: The index to load at.
+    """
+
+    buffer: AssemblyExpression
+    index: AssemblyExpression
+
+    def children(self):
+        return [self.buffer, self.index]
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return element_type(self.buffer.get_type())
+
+
+@dataclass(eq=True, frozen=True)
+class Store(AssemblyTree):
+    """
+    Represents storing a value into a buffer at a given index.
+
+    Attributes:
+        buffer: The buffer to store into.
+        index: The index to store at.
+        value: The value to store.
+    """
+
+    buffer: AssemblyExpression
+    index: AssemblyExpression
+    value: AssemblyExpression
+
+    def children(self):
+        return [self.buffer, self.index, self.value]
+
+
+@dataclass(eq=True, frozen=True)
+class Resize(AssemblyTree):
+    """
+    Represents resizing a buffer to a new size.
+
+    Attributes:
+        buffer: The buffer to resize.
+        new_size: The new size for the buffer.
+    """
+
+    buffer: AssemblyExpression
+    new_size: AssemblyExpression
+
+    def children(self):
+        return [self.buffer, self.new_size]
+
+
+@dataclass(eq=True, frozen=True)
+class Length(AssemblyExpression, AssemblyTree):
+    """
+    Represents getting the length of a buffer.
+
+    Attributes:
+        buffer: The buffer whose length is queried.
+    """
+
+    buffer: AssemblyExpression
+
+    def children(self):
+        return [self.buffer]
+
+    def get_type(self):
+        """Returns the type of the expression."""
+        return length_type(self.buffer.get_type())
+
+
+@dataclass(eq=True, frozen=True)
+class ForLoop(AssemblyTree):
+    """
+    Represents a for loop that iterates over a range of values.
+
+    Attributes:
+        var: The loop variable.
+        start: The starting value of the range.
+        end: The ending value of the range.
+        body: The body of the loop to execute.
+    """
+
+    var: Variable
+    start: AssemblyExpression
+    end: AssemblyExpression
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.var, self.start, self.end, self.body]
+
+
+@dataclass(eq=True, frozen=True)
+class BufferLoop(AssemblyTree):
+    """
+    Represents a loop that iterates over the elements of a buffer.
+
+    Attributes:
+        buffer: The buffer to iterate over.
+        var: The loop variable for each element in the buffer.
+        body: The body of the loop to execute for each element.
+    """
+
+    buffer: AssemblyExpression
+    var: Variable
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.buffer, self.var, self.body]
+
+
+@dataclass(eq=True, frozen=True)
+class WhileLoop(AssemblyTree):
+    """
+    Represents a while loop that executes as long as the condition is true.
+
+    Attributes:
+        condition: The condition to evaluate for the loop to continue.
+        body: The body of the loop to execute.
+    """
+
+    condition: AssemblyExpression
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.condition, self.body]
+
+
+@dataclass(eq=True, frozen=True)
+class If(AssemblyTree):
+    """
+    Represents an if statement that executes the body if the condition is true.
+
+    Attributes:
+        condition: The condition to evaluate for the if to execute the body.
+        body: The body of the if statement to execute.
+    """
+
+    condition: AssemblyExpression
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.condition, self.body]
+
+
+@dataclass(eq=True, frozen=True)
+class IfElse(AssemblyTree):
+    """
+    Represents an if-else statement that executes the body if the condition
+    is true, otherwise executes else_body.
+
+    Attributes:
+        condition: The condition to evaluate for the if to execute the body.
+        body: The body of the if statement to execute.
+        else_body: An alternative body to execute if the condition is false.
+    """
+
+    condition: AssemblyExpression
+    body: AssemblyNode
+    else_body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.condition, self.body, self.else_body]
+
+
+@dataclass(eq=True, frozen=True)
+class Function(AssemblyTree):
+    """
+    Represents a logical AST statement that defines a function `fun` on the
+    arguments `args...`.
+
+    Attributes:
+        name: The name of the function to define as a variable typed with the
+            return type of this function.
+        args: The arguments to the function.
+        body: The body of the function. If it does not contain a return statement,
+            the function returns the value of `body`.
+    """
+
+    name: Variable
+    args: tuple[Variable, ...]
+    body: AssemblyNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.name, *self.args, self.body]
+
+    @classmethod
+    def from_children(cls, name, *args, body):
+        """Creates a term with the given head and arguments."""
+        return cls(name, args, body)
+
+
+@dataclass(eq=True, frozen=True)
+class Return(AssemblyTree):
+    """
+    Represents a return statement that returns `arg` from the current function.
+    Halts execution of the function body.
+
+    Attributes:
+        arg: The argument to return.
+    """
+
+    arg: AssemblyExpression
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.arg]
+
+
+@dataclass(eq=True, frozen=True)
+class Break(AssemblyTree):
+    """
+    Represents a break statement that exits the current loop.
+    """
+
+    def children(self):
+        """Returns the children of the node."""
+        return []
+
+
+@dataclass(eq=True, frozen=True)
+class Block(AssemblyTree):
+    """
+    Represents a statement that executes a sequence of statements `bodies...`.
+
+    Attributes:
+        bodies: The sequence of statements to execute.
+    """
+
+    bodies: tuple[AssemblyNode, ...] = ()
+
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.bodies]
+
+    @classmethod
+    def from_children(cls, *bodies):
+        return cls(bodies)
+
+
+@dataclass(eq=True, frozen=True)
+class Module(AssemblyTree):
+    """
+    Represents a group of functions. This is the toplevel translation unit for
+    FinchAssembly.
+
+    Attributes:
+        funcs: The functions defined in the module.
+    """
+
+    funcs: tuple[AssemblyNode, ...]
+
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.funcs]
+
+    @classmethod
+    def from_children(cls, *funcs):
+        return cls(funcs)

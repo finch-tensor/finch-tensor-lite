@@ -1,5 +1,9 @@
 from .algebra import element_type, fill_value
-from .codegen import CKernel, get_c_function
+from .codegen import (
+    CKernel,
+    NumpyBuffer,
+    NumpyBufferFormat,
+)
 from .interface import (
     AbstractEagerTensor,
     LazyTensor,
@@ -53,12 +57,6 @@ __all__ = [
     "abs",
     "positive",
     "negative",
-    "AbstractEagerTensor",
-    "LazyTensor",
-    "fill_value",
-    "element_type",
-    "get_c_function",
-    "CKernel",
     "bitwise_and",
     "bitwise_or",
     "bitwise_xor",
@@ -68,6 +66,14 @@ __all__ = [
     "floordiv",
     "mod",
     "pow",
+    "AbstractEagerTensor",
+    "LazyTensor",
+    "fill_value",
+    "element_type",
+    "CKernel",
+    "AbstractBuffer",
+    "NumpyBuffer",
+    "NumpyBufferFormat",
     "min",
     "max",
     "any",

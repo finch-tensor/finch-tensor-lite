@@ -80,10 +80,13 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
         AttributeError: If the property is not implemented for the given type.
     """
     if not isinstance(obj, type):
-        if isinstance(obj, Hashable):
+        try:
+            hash(obj)
             query_fn = _properties.get((obj, attr, prop))
             if query_fn is not None:
                 return query_fn(obj, *args)
+        except TypeError:
+            pass
         t = type(obj)
     else:
         t = obj
@@ -185,6 +188,57 @@ register_property(
     "__self__",
     "element_type",
     lambda x: x.dtype.type,
+)
+
+
+def length_type(arg: Any) -> type:
+    """The length type of the given argument. The length type is the type of
+    the value returned by len(arg).
+
+    Args:
+        arg: The object to determine the length type for.
+
+    Returns:
+        The length type of the given object.
+
+    Raises:
+        NotImplementedError: If the length type is not implemented for the given type.
+    """
+    if hasattr(arg, "length_type"):
+        return arg.length_type
+    return query_property(arg, "__self__", "length_type")
+
+
+def shape_type(arg: Any) -> type:
+    """The shape type of the given argument. The shape type is the type of
+    the value returned by arg.shape.
+
+    Args:
+        arg: The object to determine the shape type for.
+
+    Returns:
+        The shape type of the given object.
+
+    Raises:
+        NotImplementedError: If the shape type is not implemented for the given type.
+    """
+    if hasattr(arg, "shape_type"):
+        return arg.shape_type
+    return query_property(arg, "__self__", "shape_type")
+
+
+register_property(
+    np.ndarray,
+    "__self__",
+    "length_type",
+    lambda x: int,
+)
+
+register_property(
+    np.ndarray,
+    "__self__",
+    "shape_type",
+    lambda x: tuple,
 )
 
 
@@ -291,6 +345,27 @@ _unary_operators: dict[Callable, str] = {
     operator.pos: "__pos__",
     operator.neg: "__neg__",
 }
+
+
+_comparison_operators: dict[Callable, str] = {
+    operator.eq: "__eq__",
+    operator.ne: "__ne__",
+    operator.gt: "__gt__",
+    operator.lt: "__lt__",
+    operator.ge: "__ge__",
+    operator.le: "__le__",
+}
+
+
+for op, meth in _comparison_operators.items():
+    (
+        register_property(
+            op,
+            "__call__",
+            "return_type",
+            lambda op, a, b, meth=meth: bool,
+        ),
+    )
 
 
 def _return_type_unary(meth):
