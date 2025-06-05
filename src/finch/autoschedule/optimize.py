@@ -66,7 +66,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
     # prgm = set_loop_order(prgm)
     prgm = push_fields(prgm)
 
-    prgm = flatten_plans(prgm)  # concordize(prgm)
+    prgm = concordize(prgm)
 
     prgm = materialize_squeeze_expand_productions(prgm)
     prgm = propagate_copy_queries(prgm)
@@ -564,6 +564,58 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
 
 def propagate_transpose_queries(root):
     return _propagate_transpose_queries(root, bindings={})
+
+
+def concordize(root):
+    needed_swizzles: dict[Alias, dict[tuple[Field, ...], Alias]] = {}
+    namespace = Namespace()
+    # update namespace
+    unique_leaves: set[Alias | Field] = set()
+    for node in PostOrderDFS(root):
+        match node:
+            case Alias(_) | Field(_):
+                unique_leaves.add(node)
+    for leaf in unique_leaves:
+        namespace.freshen(leaf.name)
+
+    def rule_0(ex):
+        match ex:
+            case Reorder(Relabel(Alias(_) as alias, idxs_1), idxs_2):
+                if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
+                    idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
+                    perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
+                    return Reorder(
+                        Relabel(
+                            needed_swizzles.setdefault(alias, {}).setdefault(
+                                perm, Alias(namespace.freshen(alias.name))
+                            ),
+                            idxs_subseq,
+                        ),
+                        idxs_2,
+                    )
+                return None
+
+    def rule_1(ex):
+        match ex:
+            case Query(lhs, rhs) as q if lhs in needed_swizzles:
+                idxs = tuple(rhs.get_fields())
+                swizzle_queries = tuple(
+                    Query(
+                        alias, Reorder(Relabel(lhs, idxs), tuple(idxs[p] for p in perm))
+                    )
+                    for perm, alias in needed_swizzles[lhs].items()
+                )
+
+                return Plan((q, *swizzle_queries))
+
+    root = flatten_plans(root)
+    match root:
+        case Plan((*bodies, Produces(_) as prod)):
+            root = Plan(tuple(bodies))
+            root = Rewrite(PostWalk(rule_0))(root)
+            root = Rewrite(PostWalk(rule_1))(root)
+            return flatten_plans(Plan((root, prod)))
+    return None
 
 
 def normalize_names(root):
