@@ -64,6 +64,12 @@ class Immediate(LogicNode):
         val = self.val
         return id(val) if isinstance(val, np.ndarray) else hash(val)
 
+    def __eq__(self, other):
+        if not isinstance(other, Immediate):
+            return False
+        res = self.val == other.val
+        return res.all() if isinstance(res, np.ndarray) else res
+
 
 @dataclass(eq=True, frozen=True)
 class Deferred(LogicNode):

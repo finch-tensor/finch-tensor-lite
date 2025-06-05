@@ -713,6 +713,90 @@ def test_scheduler_e2e_matmul(a, b):
     np.testing.assert_equal(result, expected)
 
 
+def test_scheduler_e2e_sddmm():
+    s = np.array([[2, 4], [6, 0]])
+    a = np.array([[1, 2], [3, 2]])
+    b = np.array([[9, 8], [6, 5]])
+    i, j, k = Field("i"), Field("j"), Field("k")
+
+    plan = Plan(
+        (
+            Query(Alias("S"), Table(Immediate(s), (i, j))),
+            Query(Alias("A"), Table(Immediate(a), (i, k))),
+            Query(Alias("B"), Table(Immediate(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
+            # matmul
+            Query(
+                Alias("C"), Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,))
+            ),
+            # elemwise
+            Query(Alias("RES"), MapJoin(Immediate(mul), (Alias("C"), Alias("S")))),
+            Produces((Alias("RES"),)),
+        )
+    )
+
+    expected_plan = Plan(
+        (
+            Query(Alias(":A0"), Table(Immediate(a), (Field(":i0"), Field(":i1")))),
+            Query(Alias(":A1"), Table(Immediate(b), (Field(":i1"), Field(":i2")))),
+            Query(Alias(":A2"), Table(Immediate(s), (Field(":i0"), Field(":i2")))),
+            Query(
+                Alias(":A3"),
+                Aggregate(
+                    Immediate(add),
+                    Immediate(0),
+                    Reorder(
+                        MapJoin(
+                            Immediate(mul),
+                            (
+                                Reorder(
+                                    MapJoin(
+                                        Immediate(mul),
+                                        (
+                                            Reorder(
+                                                Relabel(
+                                                    Alias(":A0"),
+                                                    (Field(":i0"), Field(":i1")),
+                                                ),
+                                                (Field(":i0"), Field(":i1")),
+                                            ),
+                                            Reorder(
+                                                Relabel(
+                                                    Alias(":A1"),
+                                                    (Field(":i1"), Field(":i2")),
+                                                ),
+                                                (Field(":i1"), Field(":i2")),
+                                            ),
+                                        ),
+                                    ),
+                                    (Field(":i0"), Field(":i1"), Field(":i2")),
+                                ),
+                                Reorder(
+                                    Relabel(Alias(":A2"), (Field(":i0"), Field(":i2"))),
+                                    (Field(":i0"), Field(":i2")),
+                                ),
+                            ),
+                        ),
+                        (Field(":i0"), Field(":i1"), Field(":i2")),
+                    ),
+                    (Field(":i1"),),
+                ),
+            ),
+            Plan((Produces((Relabel(Alias(":A3"), (Field(":i0"), Field(":i2"))),)),)),
+        )
+    )
+
+    plan_opt = optimize(plan)
+
+    assert plan_opt == expected_plan
+
+    result = FinchLogicInterpreter()(plan_opt)[0]
+
+    expected = s * np.matmul(a, b)
+
+    np.testing.assert_equal(result, expected)
+
+
 def test_materialize_squeeze_expand_productions():
     plan = Plan(
         (
