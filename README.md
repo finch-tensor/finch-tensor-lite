@@ -25,6 +25,9 @@ For those who are new to the process of contributing code, welcome! We value you
 
 Please follow the [SciML Collaborative Practices](https://docs.sciml.ai/ColPrac/stable/) and [Github Collaborative Practices](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/helping-others-review-your-changes) guides to help make your PR easier to review.
 
+In this repo, please use the convention <initials>/<branch-name> for pull request branch names, e.g. ms/scheduler-pass.
+This way in bash when you type your initials git checkout ms/ and <tab> you can see all your branches. We will use other names for special purposes.
+
 ### Packaging
 
 Finch uses [poetry](https://python-poetry.org/) for packaging.
