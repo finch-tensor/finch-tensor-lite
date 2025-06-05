@@ -46,11 +46,9 @@ property for each subclass individually.
 import math
 import operator
 from collections.abc import Callable, Hashable
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
-
-from .operator import promote_max, promote_min
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
@@ -153,6 +151,41 @@ register_property(
 )
 
 
+def promote_type(a: Any, b: Any) -> type:
+    """Returns the data type with the smallest size and smallest scalar kind to
+    which both type1 and type2 may be safely cast.
+
+    Args:
+        *args: The types to promote.
+
+    Returns:
+        The common type of the given arguments.
+    """
+    if hasattr(a, "promote_type"):
+        return a.promote_type(b)
+    if hasattr(b, "promote_type"):
+        return b.promote_type(a)
+    try:
+        query_property(a, "__self__", "promote_type", b)
+    except AttributeError:
+        return query_property(b, "__self__", "promote_type", a)
+
+
+def promote_type_stable(a, b) -> type:
+    if issubclass(a, np.generic) or issubclass(b, np.generic):
+        return np.promote_types(a, b).type
+    type(a(False) + b(False))
+    return None
+
+
+register_property(
+    StableNumber,
+    "__self__",
+    "promote_type",
+    lambda a, b: promote_type_stable(a, b),
+)
+
+
 def return_type(op: Any, *args: Any) -> Any:
     """The return type of the given function on the given argument types.
 
@@ -212,20 +245,6 @@ for op, (meth, rmeth) in _reflexive_operators.items():
     for T in StableNumber.__args__:
         register_property(T, meth, "return_type", _return_type_reflexive(meth))
         register_property(T, rmeth, "return_type", _return_type_reflexive(rmeth))
-
-
-register_property(
-    promote_min,
-    "__call__",
-    "return_type",
-    lambda op, a, b: return_type(operator.add, a, b),
-)
-register_property(
-    promote_max,
-    "__call__",
-    "return_type",
-    lambda op, a, b: return_type(operator.add, a, b),
-)
 
 
 _unary_operators: dict[Callable, str] = {
@@ -388,6 +407,55 @@ def fixpoint_type(op: Any, z: Any, T: type) -> type:
     return R
 
 
+T = TypeVar("T")
+
+
+def type_min(type: type[T]) -> T:
+    """
+    Returns the minimum value of the given type.
+
+    Args:
+        type: The type to determine the minimum value for.
+
+    Returns:
+        The minimum value of the given type.
+
+    Raises:
+        NotImplementedError: If the minimum value is not implemented for the given type.
+    """
+    if hasattr(type, "type_min"):
+        return type.type_min()
+    return query_property(type, "__self__", "type_min")
+
+
+def type_max(type: type[T]) -> T:
+    """
+    Returns the maximum value of the given type.
+
+    Args:
+        type: The type to determine the maximum value for.
+
+    Returns:
+        The maximum value of the given type.
+
+    Raises:
+        NotImplementedError: If the maximum value is not implemented for the given type.
+    """
+    if hasattr(type, "type_max"):
+        return type.type_max()
+    return query_property(type, "__self__", "type_max")
+
+
+for T in [bool, int, float]:
+    register_property(T, "__self__", "type_min", lambda x: -math.inf)
+    register_property(T, "__self__", "type_max", lambda x: +math.inf)
+
+register_property(np.integer, "__self__", "type_min", lambda x: np.iinfo(x.dtype).min)
+register_property(np.integer, "__self__", "type_max", lambda x: np.iinfo(x.dtype).max)
+register_property(np.floating, "__self__", "type_min", lambda x: np.finfo(x.dtype).min)
+register_property(np.floating, "__self__", "type_max", lambda x: np.finfo(x.dtype).max)
+
+
 def init_value(op, arg) -> Any:
     """Returns the initial value for a reduction operation on the given type.
 
@@ -411,17 +479,26 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
         op,
         "__call__",
         "init_value",
-        lambda op, arg, meth=meth: query_property(arg, meth, "init_value", arg),
+        lambda op, arg, meth=meth: query_property(arg, meth, "init_value"),
     )
 
+
+def sum_init_value(t):
+    if t is bool:
+        return 0
+    if issubclass(t, np.integer):
+        if t.is_signed():
+            return np.int_(0)
+        return np.uint(0)
+    return t(0)
+
+
 for T in StableNumber.__args__:
-    register_property(T, "__add__", "init_value", lambda a, b: a(False))
-    register_property(T, "__mul__", "init_value", lambda a, b: a(True))
-    register_property(T, "__and__", "init_value", lambda a, b: a(True))
-    register_property(T, "__xor__", "init_value", lambda a, b: a(False))
-    register_property(T, "__or__", "init_value", lambda a, b: a(False))
+    register_property(T, "__add__", "init_value", sum_init_value)
+    register_property(T, "__mul__", "init_value", lambda a: a(True))
+    register_property(T, "__and__", "init_value", lambda a: a(True))
+    register_property(T, "__xor__", "init_value", lambda a: a(False))
+    register_property(T, "__or__", "init_value", lambda a: a(False))
 
-
-register_property(promote_min, "__call__", "init_value", lambda op, arg: math.inf)
-register_property(promote_max, "__call__", "init_value", lambda op, arg: -math.inf)
-register_property(operator.truth, "__call__", "init_value", lambda op, arg: True)
+register_property(operator.min, "__call__", "init_value", lambda op, arg: type_max(arg))
+register_property(operator.max, "__call__", "init_value", lambda op, arg: type_min(arg))
