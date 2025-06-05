@@ -166,24 +166,26 @@ def promote_type(a: Any, b: Any) -> type:
     if hasattr(b, "promote_type"):
         return b.promote_type(a)
     try:
-        query_property(a, "__self__", "promote_type", b)
+        return query_property(a, "__self__", "promote_type", b)
     except AttributeError:
         return query_property(b, "__self__", "promote_type", a)
 
 
 def promote_type_stable(a, b) -> type:
+    a = type(a) if not isinstance(a, type) else a
+    b = type(b) if not isinstance(b, type) else b
     if issubclass(a, np.generic) or issubclass(b, np.generic):
         return np.promote_types(a, b).type
-    type(a(False) + b(False))
-    return None
+    return type(a(False) + b(False))
 
 
-register_property(
-    StableNumber,
-    "__self__",
-    "promote_type",
-    lambda a, b: promote_type_stable(a, b),
-)
+for T in StableNumber.__args__:
+    register_property(
+        T,
+        "__self__",
+        "promote_type",
+        lambda a, b: promote_type_stable(a, b),
+    )
 
 
 def return_type(op: Any, *args: Any) -> Any:
@@ -450,10 +452,12 @@ for T in [bool, int, float]:
     register_property(T, "__self__", "type_min", lambda x: -math.inf)
     register_property(T, "__self__", "type_max", lambda x: +math.inf)
 
-register_property(np.integer, "__self__", "type_min", lambda x: np.iinfo(x.dtype).min)
-register_property(np.integer, "__self__", "type_max", lambda x: np.iinfo(x.dtype).max)
-register_property(np.floating, "__self__", "type_min", lambda x: np.finfo(x.dtype).min)
-register_property(np.floating, "__self__", "type_max", lambda x: np.finfo(x.dtype).max)
+register_property(np.bool, "__self__", "type_min", lambda x: x(False))
+register_property(np.bool, "__self__", "type_max", lambda x: x(True))
+register_property(np.integer, "__self__", "type_min", lambda x: np.iinfo(x).min)
+register_property(np.integer, "__self__", "type_max", lambda x: np.iinfo(x).max)
+register_property(np.floating, "__self__", "type_min", lambda x: np.finfo(x).min)
+register_property(np.floating, "__self__", "type_max", lambda x: np.finfo(x).max)
 
 
 def init_value(op, arg) -> Any:
@@ -487,7 +491,7 @@ def sum_init_value(t):
     if t is bool:
         return 0
     if issubclass(t, np.integer):
-        if t.is_signed():
+        if issubclass(t, np.signedinteger):
             return np.int_(0)
         return np.uint(0)
     return t(0)
