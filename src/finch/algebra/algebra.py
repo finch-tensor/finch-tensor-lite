@@ -104,7 +104,7 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
             msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', "
             "lambda ...)` or "
         msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`"
-        msg += f"or you may define `{obj_name}.{prop}(...)`. "
+        msg += f"or you may define `{obj_name}.{prop}`. "
     elif attr == "__call__":
         msg += f"function '{repr(obj)}' has no property '{prop}'. "
         msg += "Hint: You may need to register the property by calling "
