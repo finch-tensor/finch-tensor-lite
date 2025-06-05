@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 
 from finch.autoschedule import (
+    concordize,
     flatten_plans,
     isolate_aggregates,
     isolate_reformats,
@@ -507,6 +508,67 @@ def test_normalize_names():
     assert result == expected
 
 
+def test_concordize():
+    plan = Plan(
+        (
+            Query(Alias("A0"), Table(Immediate(0), (Field("i0"), Field("i1")))),
+            Query(
+                Alias("A1"),
+                Reorder(
+                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
+                    (Field("i1"), Field("i0")),
+                ),
+            ),
+            Query(
+                Alias("A2"),
+                Reorder(
+                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
+                    (Field("i1"), Field("i1")),
+                ),
+            ),
+            Produces((Alias("A1"), Alias("A2"))),
+        )
+    )
+
+    expected = Plan(
+        (
+            Query(Alias("A0"), Table(Immediate(0), (Field("i0"), Field("i1")))),
+            Query(
+                Alias("A0_2"),
+                Reorder(
+                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
+                    (Field("i1"), Field("i0")),
+                ),
+            ),
+            Query(
+                Alias("A0_3"),
+                Reorder(
+                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
+                    (Field("i0"), Field("i1")),
+                ),
+            ),
+            Query(
+                Alias("A1"),
+                Reorder(
+                    Relabel(Alias("A0_2"), (Field("i1"), Field("i0"))),
+                    (Field("i1"), Field("i0")),
+                ),
+            ),
+            Query(
+                Alias("A2"),
+                Reorder(
+                    Relabel(Alias("A0_3"), (Field("i0"), Field("i1"))),
+                    (Field("i1"), Field("i1")),
+                ),
+            ),
+            Produces((Alias("A1"), Alias("A2"))),
+        )
+    )
+
+    result = concordize(plan)
+    assert result == expected
+
+
 def test_flatten_plans():
     plan = Plan(
         (
@@ -624,7 +686,7 @@ def test_propagate_map_queries_backward():
         (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
     ],
 )
-def test_scheduler_E2E(a, b):
+def test_scheduler_e2e_matmul(a, b):
     i, j, k = Field("i"), Field("j"), Field("k")
 
     plan = Plan(
