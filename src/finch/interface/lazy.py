@@ -228,9 +228,17 @@ def expand_dims(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
-    assert not isinstance(axis, int)
-    assert len(axis) == len(set(axis)), "axis must be unique"
-    assert set(axis).issubset(range(x.ndim + len(axis))), "Invalid axis"
+    try:
+        assert not isinstance(axis, int)
+        assert len(axis) == len(set(axis)), "axis must be unique"
+        assert set(axis).issubset(range(x.ndim + len(axis))), "Invalid axis"
+    except AssertionError as e:
+        assert not isinstance(axis, int)
+        raise IndexError(
+            f"Invalid axis: {axis}. Axis must be unique and must be in the range "
+            f"[-{x.ndim + len(axis) - 1}, {x.ndim + len(axis) - 1}]."
+        ) from e
+
     offset = [0] * (x.ndim + len(axis))
     for d in axis:
         offset[d] = 1

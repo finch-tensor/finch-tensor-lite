@@ -533,3 +533,37 @@ def test_squeeze_valid(x, axis, expected):
 def test_squeeze_invalid(x, axis):
     with pytest.raises(ValueError):
         finch.squeeze(x, axis=axis)
+
+
+@pytest.mark.parametrize(
+    "x, axis",
+    [
+        (np.array([1, 2, 3]), 0),
+        (np.array([1, 2, 3]), 1),
+        (np.array([[1, 2], [3, 4]]), 0),
+        (np.array([[1, 2], [3, 4]]), 1),
+        (np.array([[1, 2], [3, 4]]), 2),
+        (np.array([1, 2, 3]), -1),
+        (np.array([1, 2, 3]), -2),
+        (np.array([[1, 2], [3, 4]]), -1),
+        (np.array([[1, 2], [3, 4]]), -3),
+    ],
+)
+def test_expand_dims_valid(x, axis):
+    expected = np.expand_dims(x, axis=axis)
+    result = finch.expand_dims(x, axis=axis)
+    np.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x, axis",
+    [
+        (np.array([1, 2, 3]), 3),  # out of bounds
+        (np.array([1, 2, 3]), -4),  # out of bounds
+        (np.array([[1, 2], [3, 4]]), 4),
+        (np.array([[1, 2], [3, 4]]), -4),
+    ],
+)
+def test_expand_dims_invalid(x, axis):
+    with pytest.raises(IndexError):
+        finch.expand_dims(x, axis=axis)
