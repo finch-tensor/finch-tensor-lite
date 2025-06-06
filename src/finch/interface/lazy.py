@@ -228,17 +228,17 @@ def expand_dims(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
-    try:
-        assert not isinstance(axis, int)
-        assert len(axis) == len(set(axis)), "axis must be unique"
-        assert set(axis).issubset(range(x.ndim + len(axis))), "Invalid axis"
-    except AssertionError as e:
-        assert not isinstance(axis, int)
+    if isinstance(axis, int):
+        raise IndexError(
+            f"Invalid axis: {axis}. Axis must be an integer or a tuple of integers."
+        )
+    if not len(axis) == len(set(axis)):
+        raise IndexError("axis must be unique")
+    if not set(axis).issubset(range(x.ndim + len(axis))):
         raise IndexError(
             f"Invalid axis: {axis}. Axis must be unique and must be in the range "
             f"[-{x.ndim + len(axis) - 1}, {x.ndim + len(axis) - 1}]."
-        ) from e
-
+        )
     offset = [0] * (x.ndim + len(axis))
     for d in axis:
         offset[d] = 1
@@ -285,17 +285,14 @@ def squeeze(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
-    try:
-        assert not isinstance(axis, int)
-        assert len(axis) == len(set(axis)), "axis must be unique"
-        assert set(axis).issubset(range(x.ndim)), "Invalid axis"
-        assert builtins.all(x.shape[d] == 1 for d in axis), (
-            "axis to drop must have size 1"
-        )
-    except AssertionError as e:
-        raise ValueError(
-            f"Invalid axis: {axis}. Axis must be unique and must have size 1."
-        ) from e
+    if isinstance(axis, int):
+        raise ValueError(f"Invalid axis: {axis}. Axis must be a tuple of integers.")
+    if len(axis) != len(set(axis)):
+        raise ValueError(f"Invalid axis: {axis}. Axis must be unique.")
+    if not set(axis).issubset(range(x.ndim)):
+        raise ValueError(f"Invalid axis: {axis}. Axis must be within bounds.")
+    if not builtins.all(x.shape[d] == 1 for d in axis):
+        raise ValueError(f"Invalid axis: {axis}. Axis to drop must have size 1.")
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
@@ -681,7 +678,7 @@ register_property(
     conjugate_op,
     "__call__",
     "return_type",
-    lambda obj, x: complex if hasattr(x, "conjugate") else type(x),
+    lambda obj, x: x,
 )
 
 
