@@ -277,10 +277,17 @@ def squeeze(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
-    assert not isinstance(axis, int)
-    assert len(axis) == len(set(axis)), "axis must be unique"
-    assert set(axis).issubset(range(x.ndim)), "Invalid axis"
-    assert builtins.all(x.shape[d] == 1 for d in axis), "axis to drop must have size 1"
+    try:
+        assert not isinstance(axis, int)
+        assert len(axis) == len(set(axis)), "axis must be unique"
+        assert set(axis).issubset(range(x.ndim)), "Invalid axis"
+        assert builtins.all(x.shape[d] == 1 for d in axis), (
+            "axis to drop must have size 1"
+        )
+    except AssertionError as e:
+        raise ValueError(
+            f"Invalid axis: {axis}. Axis must be unique and must have size 1."
+        ) from e
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)

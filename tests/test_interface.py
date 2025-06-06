@@ -503,3 +503,33 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
 
     assert isinstance(result, np.ndarray), "Result should be a NumPy array"
     assert_allclose(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x, axis, expected",
+    [
+        (np.array([[1], [2]]), 1, np.array([1, 2])),
+        (np.array([[[3]]]), (0, 1), np.array([3])),
+        (np.zeros((1, 2, 1, 3)), (0, 2), np.zeros((2, 3))),
+        (np.array([[[1, 2, 3]]]), 0, np.array([[1, 2, 3]])),
+    ],
+)
+def test_squeeze_valid(x, axis, expected):
+    """
+    Tests for squeeze operation
+    """
+    result = finch.squeeze(x, axis=axis)
+    np.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x, axis",
+    [
+        (np.array([[1, 2], [3, 4]]), 0),  # axis 0 is not singleton
+        (np.zeros((2, 1, 3)), (0, 2)),  # axis 0 and 2 not both singleton
+        (np.ones((1, 2, 1)), (1,)),  # axis 1 is not singleton
+    ],
+)
+def test_squeeze_invalid(x, axis):
+    with pytest.raises(ValueError):
+        finch.squeeze(x, axis=axis)
