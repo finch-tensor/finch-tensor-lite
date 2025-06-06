@@ -1,10 +1,16 @@
 from .algebra import element_type, fill_value
-from .codegen import CKernel, get_c_function
+from .codegen import (
+    CKernel,
+    NumpyBuffer,
+    NumpyBufferFormat,
+)
 from .interface import (
     AbstractEagerTensor,
     LazyTensor,
     abs,
     add,
+    all,
+    any,
     bitwise_and,
     bitwise_left_shift,
     bitwise_or,
@@ -19,6 +25,8 @@ from .interface import (
     fused,
     matmul,
     matrix_transpose,
+    max,
+    min,
     mod,
     multiply,
     negative,
@@ -57,7 +65,6 @@ __all__ = [
     "LazyTensor",
     "fill_value",
     "element_type",
-    "get_c_function",
     "CKernel",
     "matmul",
     "matrix_transpose",
@@ -72,4 +79,11 @@ __all__ = [
     "pow",
     "tensordot",
     "vecdot",
+    "AbstractBuffer",
+    "NumpyBuffer",
+    "NumpyBufferFormat",
+    "min",
+    "max",
+    "any",
+    "all",
 ]

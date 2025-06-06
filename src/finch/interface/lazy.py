@@ -8,9 +8,16 @@ from typing import Any
 
 from numpy.core.numeric import normalize_axis_tuple
 
-from finch import algebra
-
-from ..algebra import element_type, fill_value, fixpoint_type, init_value, return_type
+from ..algebra import (
+    element_type,
+    fill_value,
+    fixpoint_type,
+    init_value,
+    promote_max,
+    promote_min,
+    register_property,
+    return_type,
+)
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -273,7 +280,7 @@ def squeeze(
     assert not isinstance(axis, int)
     assert len(axis) == len(set(axis)), "axis must be unique"
     assert set(axis).issubset(range(x.ndim)), "Invalid axis"
-    assert all(x.shape[d] == 1 for d in axis), "axis to drop must have size 1"
+    assert builtins.all(x.shape[d] == 1 for d in axis), "axis to drop must have size 1"
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
@@ -433,6 +440,78 @@ def prod(
     return reduce(operator.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
+def any(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Test whether any element of input array ``x`` along given axis is True.
+    """
+    x = defer(x)
+    return reduce(
+        operator.or_,
+        elementwise(operator.truth, x),
+        axis=axis,
+        keepdims=keepdims,
+        init=init,
+    )
+
+
+def all(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Test whether all elements of input array ``x`` along given axis are True.
+    """
+    x = defer(x)
+    return reduce(
+        operator.and_,
+        elementwise(operator.truth, x),
+        axis=axis,
+        keepdims=keepdims,
+        init=init,
+    )
+
+
+def min(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Return the minimum of input array ``arr`` along given axis.
+    """
+    x = defer(x)
+    return reduce(promote_min, x, axis=axis, keepdims=keepdims, init=init)
+
+
+def max(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+    init=None,
+):
+    """
+    Return the maximum of input array ``arr`` along given axis.
+    """
+    x = defer(x)
+    return reduce(promote_max, x, axis=axis, keepdims=keepdims, init=init)
+
+
 def add(x1, x2) -> LazyTensor:
     return elementwise(operator.add, defer(x1), defer(x2))
 
@@ -583,7 +662,7 @@ def conjugate_op(x):
 
 # register the conjugate operation return type. The conjugate operation
 # preserves the element type of the input tensor.
-algebra.register_property(
+register_property(
     conjugate_op,
     "__call__",
     "return_type",

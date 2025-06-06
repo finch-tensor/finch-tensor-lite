@@ -1,3 +1,4 @@
+import builtins
 import sys
 from abc import ABC
 from collections.abc import Callable, Sequence
@@ -163,7 +164,7 @@ def prod(
 
 
 def elementwise(f: Callable, *args):
-    if any(isinstance(arg, lazy.LazyTensor) for arg in args):
+    if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
     return compute(lazy.elementwise(f, *args))
 
@@ -312,3 +313,27 @@ def vecdot(x1, x2, /, *, axis=-1):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.vecdot(x1, x2, axis=axis)
     return compute(lazy.vecdot(x1, x2, axis=axis))
+
+
+def any(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.any(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.any(x, axis=axis, keepdims=keepdims))
+
+
+def all(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.all(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.all(x, axis=axis, keepdims=keepdims))
+
+
+def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.min(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.min(x, axis=axis, keepdims=keepdims))
+
+
+def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.max(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.max(x, axis=axis, keepdims=keepdims))

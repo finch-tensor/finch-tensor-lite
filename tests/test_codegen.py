@@ -1,4 +1,13 @@
+import operator
+
+import pytest
+
+import numpy as np
+from numpy.testing import assert_equal
+
 import finch
+import finch.finch_assembly as asm
+from finch.codegen import CCompiler, NumpyBuffer
 
 
 def test_add_function():
@@ -9,6 +18,255 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finch.codegen.c.get_c_function("add", c_code)
+    f = finch.codegen.c.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
+
+
+def test_buffer_function():
+    c_code = """
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <stdint.h>
+    #include <string.h>
+
+    typedef struct CNumpyBuffer {
+        void* arr;
+        void* data;
+        size_t length;
+        void* (*resize)(void**, size_t);
+    } CNumpyBuffer;
+
+    void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
+        // Get the original data pointer and length
+        double* data = (double*)(buffer->data);
+        size_t length = buffer->length;
+
+        // Resize the buffer to double its length
+        buffer->data = buffer->resize(&(buffer->arr), length * 2);
+        buffer->length *= 2;
+
+        // Update the data pointer after resizing
+        data = (double*)(buffer->data);
+
+        // Copy the original data to the second half of the new buffer
+        for (size_t i = 0; i < length; ++i) {
+            data[length + i] = data[i] + 1;
+        }
+    }
+    """
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = finch.NumpyBuffer(a)
+    f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
+    k = finch.codegen.c.CKernel(f, type(None), [finch.NumpyBufferFormat(np.float64)])
+    k(b)
+    result = b.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    assert_equal(result, expected)
+
+
+def test_codegen():
+    a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
+    i = asm.Variable("i", int)
+    length_var = asm.Variable("l", int)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("test_function", int),
+                (a,),
+                asm.Block(
+                    (
+                        asm.Assign(length_var, asm.Length(a)),
+                        asm.Resize(
+                            a,
+                            asm.Call(
+                                asm.Immediate(operator.mul),
+                                (asm.Length(a), asm.Immediate(2)),
+                            ),
+                        ),
+                        asm.ForLoop(
+                            i,
+                            asm.Immediate(0),
+                            length_var,
+                            asm.Store(
+                                a,
+                                asm.Call(asm.Immediate(operator.add), (i, length_var)),
+                                asm.Call(
+                                    asm.Immediate(operator.add),
+                                    (asm.Load(a, i), asm.Immediate(1)),
+                                ),
+                            ),
+                        ),
+                        asm.Return(asm.Immediate(0)),
+                    )
+                ),
+            ),
+        )
+    )
+    ctx = CCompiler()
+    mod = ctx(prgm)
+    f = mod.test_function
+
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = finch.NumpyBuffer(a)
+    f(b)
+    result = b.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    assert_equal(result, expected)
+
+
+print(test_codegen())
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ],
+)
+def test_dot_product(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    a_buf = buffer(a)
+    b_buf = buffer(b)
+
+    c = asm.Variable("c", np.float64)
+    i = asm.Variable("i", np.int64)
+    ab = NumpyBuffer(a)
+    bb = NumpyBuffer(b)
+    ab_v = asm.Variable("a", ab.get_format())
+    bb_v = asm.Variable("b", bb.get_format())
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("dot_product", np.float64),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Immediate(np.float64(0.0))),
+                        asm.ForLoop(
+                            i,
+                            asm.Immediate(np.int64(0)),
+                            asm.Length(ab_v),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Immediate(operator.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Immediate(operator.mul),
+                                                    (
+                                                        asm.Load(ab_v, i),
+                                                        asm.Load(bb_v, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.dot_product(a_buf, b_buf)
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.dot_product(a_buf, b_buf)
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ],
+)
+def test_if_statement(compiler, buffer):
+    var = asm.Variable("a", np.int64)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("if_else", np.int64),
+                (),
+                asm.Block(
+                    (
+                        asm.Assign(var, asm.Immediate(np.int64(5))),
+                        asm.If(
+                            asm.Call(
+                                asm.Immediate(operator.eq),
+                                (var, asm.Immediate(np.int64(5))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Immediate(operator.add),
+                                            (var, asm.Immediate(np.int64(10))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.IfElse(
+                            asm.Call(
+                                asm.Immediate(operator.lt),
+                                (var, asm.Immediate(np.int64(15))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Immediate(operator.sub),
+                                            (var, asm.Immediate(np.int64(3))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Immediate(operator.mul),
+                                            (var, asm.Immediate(np.int64(2))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(var),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.if_else()
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.if_else()
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
