@@ -1,7 +1,7 @@
 import builtins
 import sys
 from abc import ABC
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from . import lazy
 from .fuse import compute
@@ -205,6 +205,27 @@ def negative(x):
     return compute(lazy.negative(x))
 
 
+def matmul(x1, x2, /):
+    """
+    Computes the matrix product.
+
+    Returns a LazyTensor if either x1 or x2 is a LazyTensor.
+    Otherwise, computes the result eagerly.
+    """
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.matmul(x1, x2)
+    return compute(lazy.matmul(x1, x2))
+
+
+def matrix_transpose(x, /):
+    """
+    Computes the transpose of a matrix or stack of matrices.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.matrix_transpose(x)
+    return compute(lazy.matrix_transpose(x))
+
+
 def bitwise_and(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_and(x1, x2)
@@ -257,6 +278,41 @@ def pow(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.pow(x1, x2)
     return compute(lazy.pow(x1, x2))
+
+
+def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
+    """
+    Computes the tensordot operation.
+
+    Returns a LazyTensor if either x1 or x2 is a LazyTensor.
+    Otherwise, computes the result eagerly.
+    """
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.tensordot(x1, x2, axes=axes)
+    return compute(lazy.tensordot(x1, x2, axes=axes))
+
+
+def vecdot(x1, x2, /, *, axis=-1):
+    """
+    Computes the (vector) dot product of two arrays.
+
+    Parameters
+    ----------
+    x1: array
+        The first input tensor.
+    x2: array
+        The second input tensor.
+    axis: int, optional
+        The axis along which to compute the dot product. Default is -1 (last axis).
+
+    Returns
+    -------
+    out: array
+        A tensor containing the dot product of `x1` and `x2` along the specified axis.
+    """
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.vecdot(x1, x2, axis=axis)
+    return compute(lazy.vecdot(x1, x2, axis=axis))
 
 
 def any(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
