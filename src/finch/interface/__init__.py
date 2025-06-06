@@ -23,7 +23,9 @@ from .eager import (
     squeeze,
     subtract,
     sum,
+    tensordot,
     truediv,
+    vecdot,
 )
 
 # from .tensor import *
@@ -61,4 +63,6 @@ __all__ = [
     "floordiv",
     "mod",
     "pow",
+    "tensordot",
+    "vecdot",
 ]

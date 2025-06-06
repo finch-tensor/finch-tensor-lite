@@ -30,7 +30,9 @@ from .interface import (
     squeeze,
     subtract,
     sum,
+    tensordot,
     truediv,
+    vecdot,
 )
 
 __all__ = [
@@ -68,4 +70,6 @@ __all__ = [
     "floordiv",
     "mod",
     "pow",
+    "tensordot",
+    "vecdot",
 ]

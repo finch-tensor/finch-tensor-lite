@@ -1,12 +1,14 @@
 import builtins
 import operator
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
 from numpy.core.numeric import normalize_axis_tuple
+
+from finch import algebra
 
 from ..algebra import element_type, fill_value, fixpoint_type, init_value, return_type
 from ..finch_logic import (
@@ -455,6 +457,16 @@ def negative(x) -> LazyTensor:
     return elementwise(operator.neg, defer(x))
 
 
+def is_broadcastable(shape_a, shape_b):
+    """
+    Returns True if shape_a and shape_b are broadcastable according to numpy rules.
+    """
+    for a, b in zip_longest(reversed(shape_a), reversed(shape_b), fillvalue=1):
+        if a != b and a != 1 and b != 1:
+            return False
+    return True
+
+
 def matmul(x1, x2) -> LazyTensor:
     """
     Performs matrix multiplication between two tensors.
@@ -470,11 +482,10 @@ def matmul(x1, x2) -> LazyTensor:
             raise ValueError("Dimensions mismatch for matrix multiplication")
         # check all preceeding dimensions match
         batch_a, batch_b = a.shape[:-2], b.shape[:-2]
-        for da, db in zip_longest(reversed(batch_a), reversed(batch_b), fillvalue=1):
-            if da != db and da != 1 and db != 1:
-                raise ValueError(
-                    "Batch dimensions are not broadcastable for matrix multiplication"
-                )
+        if not is_broadcastable(batch_a, batch_b):
+            raise ValueError(
+                "Batch dimensions are not broadcastable for matrix multiplication"
+            )
         return reduce(
             operator.add,
             multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
@@ -562,3 +573,124 @@ def mod(x1, x2) -> LazyTensor:
 
 def pow(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
+
+
+def conjugate_op(x):
+    if hasattr(x, "conjugate"):
+        return x.conjugate()
+    return x
+
+
+# register the conjugate operation return type. The conjugate operation
+# preserves the element type of the input tensor.
+algebra.register_property(
+    conjugate_op,
+    "__call__",
+    "return_type",
+    lambda obj, x: complex if hasattr(x, "conjugate") else type(x),
+)
+
+
+def conjugate(x) -> LazyTensor:
+    """
+    Computes the complex conjugate of the input tensor `x`.
+
+    Parameters
+    ----------
+    x: LazyTensor
+        The input tensor to compute the complex conjugate of.
+
+    Returns
+    -------
+    LazyTensor
+        A new LazyTensor with the complex conjugate of `x`.
+    """
+    return elementwise(conjugate_op, defer(x))
+
+
+def tensordot(
+    x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]
+) -> LazyTensor:
+    """
+    Computes the tensordot operation.
+
+    Returns a LazyTensor if either x1 or x2 is a LazyTensor.
+    Otherwise, computes the result eagerly.
+    """
+    x1 = defer(x1)
+    x2 = defer(x2)
+
+    # Parse axes
+    if not isinstance(axes, tuple):
+        N = int(axes)
+        if N < 0:
+            raise ValueError("axes must be non-negative")
+        axes_a = list(range(x1.ndim - N, x1.ndim))
+        axes_b = list(range(N))
+    else:
+        axes_a, axes_b = (list(ax) for ax in axes)
+        axes_a = [axes_a] if isinstance(axes_a, int) else list(axes_a)
+        axes_b = [axes_b] if isinstance(axes_b, int) else list(axes_b)
+
+    # Normalize negative axes
+    axes_a = [(a if a >= 0 else x1.ndim + a) for a in axes_a]
+    axes_b = [(b if b >= 0 else x2.ndim + b) for b in axes_b]
+
+    # Check axes lengths and shapes
+    if len(axes_a) != len(axes_b):
+        raise ValueError("shape-mismatch for sum")
+    for a, b in zip(axes_a, axes_b, strict=True):
+        if x1.shape[a] != x2.shape[b]:
+            raise ValueError("shape-mismatch for sum")
+
+    # Move axes to contract to the end of x1 and to the front of x2
+    notin_a = [k for k in range(x1.ndim) if k not in axes_a]
+    notin_b = [k for k in range(x2.ndim) if k not in axes_b]
+    newaxes_a = notin_a + axes_a
+    newaxes_b = axes_b + notin_b
+
+    # Permute
+    x1p = permute_dims(x1, tuple(newaxes_a))
+    x2p = permute_dims(x2, tuple(newaxes_b))
+
+    # Expand x1p and x2p so that their contracted axes align for broadcasting
+    # x1p: shape (..., K1, K2, ..., Kn)
+    # x2p: shape (K1, K2, ..., Kn, ...)
+    # We want to multiply so that contracted axes are aligned
+
+    # For x1p, add len(notin_b) singleton dims at the end
+    for _ in range(len(notin_b)):
+        x1p = expand_dims(x1p, axis=-1)
+    # For x2p, add len(notin_a) singleton dims at the front
+    for _ in range(len(notin_a)):
+        x2p = expand_dims(x2p, axis=0)
+
+    # Multiply (broadcasted)
+    expanded_product = multiply(x1p, x2p)
+
+    sum_axes = tuple(range(len(notin_a), len(notin_a) + len(axes_a)))
+    return sum(expanded_product, axis=sum_axes)
+
+
+def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
+    """
+    Computes the vector dot product along the specified axis.
+    """
+    x1 = defer(x1)
+    x2 = defer(x2)
+
+    # check broadcastability
+    if not is_broadcastable(x1.shape, x2.shape):
+        raise ValueError("Shapes are not broadcastable for vector dot product")
+
+    # check if dims of axis are the same
+    if x1.shape[axis] != x2.shape[axis]:
+        raise ValueError(
+            "Shapes are not compatible for vector dot product along the specified axis"
+        )
+
+    return reduce(
+        operator.add,
+        multiply(conjugate(x1), x2),
+        axis=axis,
+    )
