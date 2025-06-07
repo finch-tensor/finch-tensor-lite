@@ -8,10 +8,11 @@ from ..symbolic import Term, TermTree
 
 
 # Base class for all Finch Notation nodes
-class FinchNode(Term):
+class NotationNode(Term):
     pass
 
-class FinchTree(FinchNode, TermTree):
+
+class NotationTree(NotationNode, TermTree):
     @classmethod
     def make_term(cls, head, *children):
         return head.from_children(*children)
@@ -20,9 +21,10 @@ class FinchTree(FinchNode, TermTree):
     def from_children(cls, *children):
         return cls(*children)
 
-class FinchExpression:
+
+class NotationExpression:
     """
-    Finch AST expression base class.
+    Notation AST expression base class.
     """
 
     def get_type(self) -> Any:
@@ -32,9 +34,9 @@ class FinchExpression:
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(FinchNode, FinchExpression):
+class Literal(NotationNode, NotationExpression):
     """
-    Finch AST expression for the literal value `val`.
+    Notation AST expression for the literal value `val`.
     """
 
     val: Any
@@ -44,9 +46,9 @@ class Literal(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Value(FinchNode, FinchExpression):
+class Value(NotationNode, NotationExpression):
     """
-    Finch AST expression for host code `val` expected to evaluate to a value of
+    Notation AST expression for host code `val` expected to evaluate to a value of
     type `type_`.
     """
 
@@ -58,22 +60,9 @@ class Value(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Index(FinchNode, FinchExpression):
+class Index(NotationNode, NotationExpression):
     """
-    Finch AST expression for an index named `name`.
-    """
-
-    name: str
-    type_: Any = None
-
-    def get_type(self):
-        return self.type_
-
-
-@dataclass(eq=True, frozen=True)
-class Variable(FinchNode, FinchExpression):
-    """
-    Finch AST expression for a variable named `name`.
+    Notation AST expression for an index named `name`.
     """
 
     name: str
@@ -84,14 +73,27 @@ class Variable(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(FinchTree, FinchExpression):
+class Variable(NotationNode, NotationExpression):
     """
-    Finch AST expression for the result of calling the function `op` on
+    Notation AST expression for a variable named `name`.
+    """
+
+    name: str
+    type_: Any = None
+
+    def get_type(self):
+        return self.type_
+
+
+@dataclass(eq=True, frozen=True)
+class Call(NotationTree, NotationExpression):
+    """
+    Notation AST expression for the result of calling the function `op` on
     `args...`.
     """
 
     op: Literal
-    args: tuple[FinchNode, ...]
+    args: tuple[NotationNode, ...]
 
     def get_type(self):
         arg_types = [a.get_type() for a in self.args]
@@ -106,15 +108,15 @@ class Call(FinchTree, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Access(FinchTree, FinchExpression):
+class Access(NotationTree, NotationExpression):
     """
-    Finch AST expression representing the value of tensor `tns` at the indices
+    Notation AST expression representing the value of tensor `tns` at the indices
     `idx...`.
     """
 
-    tns: FinchNode
-    mode: FinchNode
-    idxs: tuple[FinchNode, ...]
+    tns: NotationNode
+    mode: NotationNode
+    idxs: tuple[NotationNode, ...]
 
     def get_type(self):
         # Placeholder: in a real system, would use tns/type system
@@ -129,13 +131,52 @@ class Access(FinchTree, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Cached(FinchTree, FinchExpression):
+class Read(NotationNode):
+    def children(self):
+        return []
+
+
+@dataclass(eq=True, frozen=True)
+class Update(NotationNode):
+    def children(self):
+        return []
+
+
+@dataclass(eq=True, frozen=True)
+class Increment(NotationTree):
     """
-    Finch AST expression `val`, equivalent to the quoted expression `ref`.
+    Notation AST statement that updates the value of `lhs` to `op(lhs, rhs)`.
     """
 
-    arg: FinchNode
-    ref: FinchNode
+    lhs: NotationNode
+    op: NotationNode
+    rhs: NotationNode
+
+    def children(self):
+        return [self.lhs, self.op, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Unwrap(NotationTree):
+    """
+    Notation AST statement that unwraps the scalar value from a 0-dimensional
+    tensor `arg`.
+    """
+
+    arg: NotationNode
+
+    def children(self):
+        return [self.arg]
+
+
+@dataclass(eq=True, frozen=True)
+class Cached(NotationTree, NotationExpression):
+    """
+    Notation AST expression `val`, equivalent to the quoted expression `ref`.
+    """
+
+    arg: NotationNode
+    ref: NotationNode
 
     def get_type(self):
         return self.arg.get_type()
@@ -145,125 +186,111 @@ class Cached(FinchTree, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Loop(FinchTree):
+class Loop(NotationTree):
     """
-    Finch AST statement that runs `body` for each value of `idx` in `ext`.
+    Notation AST statement that runs `body` for each value of `idx` in `ext`.
     """
 
-    idx: FinchNode
-    ext: FinchNode
-    body: FinchNode
+    idx: NotationNode
+    ext: NotationNode
+    body: NotationNode
 
     def children(self):
         return [self.idx, self.ext, self.body]
 
 
 @dataclass(eq=True, frozen=True)
-class If(FinchTree):
+class If(NotationTree):
     """
-    Finch AST statement that only executes `body` if `cond` is true.
+    Notation AST statement that only executes `body` if `cond` is true.
     """
 
-    cond: FinchNode
-    body: FinchNode
+    cond: NotationNode
+    body: NotationNode
 
     def children(self):
         return [self.cond, self.body]
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(FinchTree):
+class IfElse(NotationTree):
     """
-    Finch AST statement that executes `then_body` if `cond` is true, otherwise
+    Notation AST statement that executes `then_body` if `cond` is true, otherwise
     executes `else_body`.
     """
 
-    cond: FinchNode
-    then_body: FinchNode
-    else_body: FinchNode
+    cond: NotationNode
+    then_body: NotationNode
+    else_body: NotationNode
 
     def children(self):
         return [self.cond, self.then_body, self.else_body]
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(FinchTree):
+class Define(NotationTree):
     """
-    Finch AST statement that updates the value of `lhs` to `op(lhs, rhs)`.
-    """
-
-    lhs: FinchNode
-    op: FinchNode
-    rhs: FinchNode
-
-    def children(self):
-        return [self.lhs, self.op, self.rhs]
-
-
-@dataclass(eq=True, frozen=True)
-class Define(FinchTree):
-    """
-    Finch AST statement that defines `lhs` as having the value `rhs` in `body`.
+    Notation AST statement that defines `lhs` as having the value `rhs` in `body`.
     """
 
-    lhs: FinchNode
-    rhs: FinchNode
-    body: FinchNode
+    lhs: NotationNode
+    rhs: NotationNode
+    body: NotationNode
 
     def children(self):
         return [self.lhs, self.rhs, self.body]
 
 
 @dataclass(eq=True, frozen=True)
-class Declare(FinchTree):
+class Declare(NotationTree):
     """
-    Finch AST statement that declares `tns` with an initial value `init` reduced
+    Notation AST statement that declares `tns` with an initial value `init` reduced
     with `op` in the current scope.
     """
 
-    tns: FinchNode
-    init: FinchNode
-    op: FinchNode
+    tns: NotationNode
+    init: NotationNode
+    op: NotationNode
 
     def children(self):
         return [self.tns, self.init, self.op]
 
 
 @dataclass(eq=True, frozen=True)
-class Freeze(FinchTree):
+class Freeze(NotationTree):
     """
-    Finch AST statement that freezes `tns` in the current scope after
+    Notation AST statement that freezes `tns` in the current scope after
     modifications with `op`.
     """
 
-    tns: FinchNode
-    op: FinchNode
+    tns: NotationNode
+    op: NotationNode
 
     def children(self):
         return [self.tns, self.op]
 
 
 @dataclass(eq=True, frozen=True)
-class Thaw(FinchTree):
+class Thaw(NotationTree):
     """
-    Finch AST statement that thaws `tns` in the current scope, moving the tensor
+    Notation AST statement that thaws `tns` in the current scope, moving the tensor
     from read-only mode to update-only mode with a reduction operator `op`.
     """
 
-    tns: FinchNode
-    op: FinchNode
+    tns: NotationNode
+    op: NotationNode
 
     def children(self):
         return [self.tns, self.op]
 
 
 @dataclass(eq=True, frozen=True)
-class Block(FinchTree):
+class Block(NotationTree):
     """
-    Finch AST statement that executes each of its arguments in turn.
+    Notation AST statement that executes each of its arguments in turn.
     """
 
-    bodies: tuple[FinchNode, ...]
+    bodies: tuple[NotationNode, ...]
 
     @classmethod
     def from_children(cls, *bodies):
@@ -271,3 +298,52 @@ class Block(FinchTree):
 
     def children(self):
         return list(self.bodies)
+
+
+@dataclass(eq=True, frozen=True)
+class Function(NotationTree):
+    """
+    Represents a logical AST statement that defines a function `fun` on the
+    arguments `args...`.
+
+    Attributes:
+        name: The name of the function to define as a variable typed with the
+            return type of this function.
+        args: The arguments to the function.
+        body: The body of the function. If it does not contain a return statement,
+            the function returns the value of `body`.
+    """
+
+    name: Variable
+    args: tuple[Variable, ...]
+    body: NotationNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.name, *self.args, self.body]
+
+    @classmethod
+    def from_children(cls, name, *args, body):
+        """Creates a term with the given head and arguments."""
+        return cls(name, args, body)
+
+
+@dataclass(eq=True, frozen=True)
+class Module(NotationTree):
+    """
+    Represents a group of functions. This is the toplevel translation unit for
+    NotationNotation.
+
+    Attributes:
+        funcs: The functions defined in the module.
+    """
+
+    funcs: tuple[NotationNode, ...]
+
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.funcs]
+
+    @classmethod
+    def from_children(cls, *funcs):
+        return cls(funcs)
