@@ -60,19 +60,6 @@ class Value(NotationNode, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Index(NotationNode, NotationExpression):
-    """
-    Notation AST expression for an index named `name`.
-    """
-
-    name: str
-    type_: Any = None
-
-    def get_type(self):
-        return self.type_
-
-
-@dataclass(eq=True, frozen=True)
 class Variable(NotationNode, NotationExpression):
     """
     Notation AST expression for a variable named `name`.
@@ -137,9 +124,11 @@ class Read(NotationNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Update(NotationNode):
+class Update(NotationTree):
+    op: NotationNode
+
     def children(self):
-        return []
+        return [self.op]
 
 
 @dataclass(eq=True, frozen=True)
@@ -251,9 +240,16 @@ class Declare(NotationTree):
     tns: NotationNode
     init: NotationNode
     op: NotationNode
+    shape: NotationNode
 
     def children(self):
-        return [self.tns, self.init, self.op]
+        return [self.tns, self.init, self.op, *self.shape]
+
+    def from_children(cls, tns, init, op, *shape):
+        """
+        Creates a Declare node from its children.
+        """
+        return cls(tns, init, op, shape)
 
 
 @dataclass(eq=True, frozen=True)

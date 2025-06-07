@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, query_property
+import numpy as np
+
+from ..algebra import element_type, query_property, register_property
 from ..codegen import isinstanceorformat
 from ..symbolic import ScopedDict
 from . import nodes as ntn
@@ -106,6 +109,47 @@ def increment(tns, op, val):
         return tns + op(tns, val)
 
 
+def declare(tns, init, op, shape):
+    """
+    Declare a tensor.
+    """
+    if hasattr(tns, "declare"):
+        return tns.declare(init, op, shape)
+    return query_property(tns, "__self__", "declare", init, op, shape)
+
+
+def np_declare(tns, init, op, shape):
+    np.resize(tns, shape)
+    tns.fill(init)
+
+
+register_property(np.ndarray, "__self__", "declare", np_declare)
+
+
+def freeze(tns, op):
+    """
+    Freeze a tensor.
+    """
+    if hasattr(tns, "freeze"):
+        return tns.freeze(op)
+    try:
+        query_property(tns, "__self__", "freeze", op)
+    except AttributeError:
+        contextlib.suppress(AttributeError)
+
+
+def thaw(tns, op):
+    """
+    Thaw a tensor.
+    """
+    if hasattr(tns, "freeze"):
+        return tns.freeze(op)
+    try:
+        query_property(tns, "__self__", "freeze", op)
+    except AttributeError:
+        contextlib.suppress(AttributeError)
+
+
 @dataclass(eq=True, frozen=True)
 class ExtentValue:
     """
@@ -121,7 +165,7 @@ class ExtentValue:
             # Create a new scope for each iteration
             ctx_2 = ctx.scope(loop_state=HaltState())
             # Assign the loop variable
-            ctx_2.bindings[idx] = idx.type_(idx_e)
+            ctx_2.bindings[idx.name] = idx.type_(idx_e)
             # Execute the body of the loop
             ctx_2(body)
             if ctx_2.should_halt():
@@ -164,12 +208,11 @@ class NotationInterpreterModule:
 @dataclass(eq=True)
 class HaltState:
     """
-    A class to represent the halt state of an assembly program.
-    This is used to indicate whether we should break or return, and
-    what the return value is if applicable.
+    A class to represent the halt state of a notation program.
+    These programs can't break, but calling return sets a special return value.
     """
 
-    should_halt: bool = False
+    has_returned: bool = False
     return_value: Any = None
 
 
@@ -206,19 +249,6 @@ class NotationInterpreter:
             types=types,
             loop_state=loop_state,
             function_state=function_state,
-        )
-
-    def should_halt(self):
-        """
-        Check if the interpreter should halt execution.
-        This is used to stop execution in loops or when a return
-        statement is encountered.
-        """
-        return (
-            self.loop_state
-            and self.loop_state.should_halt
-            or self.function_state
-            and self.function_state.should_halt
         )
 
     def __call__(self, prgm: ntn.NotationNode):
@@ -259,13 +289,28 @@ class NotationInterpreter:
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
-                    if self.should_halt():
-                        break
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
                 ext_e = self(ext)
                 ext_e.loop(self, idx, body)
+                return None
+            case ntn.Declare(tns, init, op, shape):
+                tns_e = self(tns)
+                init_e = self(init)
+                op_e = self(op)
+                shape_e = [self(s) for s in shape]
+                declare(tns_e, init_e, op_e, shape_e)
+                return None
+            case ntn.Freeze(tns, op):
+                tns_e = self(tns)
+                op_e = self(op)
+                freeze(tns_e, op_e)
+                return None
+            case ntn.Thaw(tns, op):
+                tns_e = self(tns)
+                op_e = self(op)
+                thaw(tns_e, op_e)
                 return None
             case ntn.If(cond, body):
                 if self(cond):
@@ -301,7 +346,7 @@ class NotationInterpreter:
                                     f"Unrecognized argument type: {arg}"
                                 )
                     ctx_2(body)
-                    if ctx_2.function_state.should_halt:
+                    if ctx_2.function_state.has_returned:
                         ret_e = ctx_2.function_state.return_value
                         if not isinstance(ret_e, ret_t):
                             raise TypeError(
@@ -317,11 +362,8 @@ class NotationInterpreter:
                 self.bindings[func_n] = my_func
                 return None
             case ntn.Return(value):
+                self.function_state.has_returned = True
                 self.function_state.return_value = self(value)
-                self.function_state.should_halt = True
-                return None
-            case ntn.Break():
-                self.loop_state.should_halt = True
                 return None
             case ntn.Module(funcs):
                 for func in funcs:
