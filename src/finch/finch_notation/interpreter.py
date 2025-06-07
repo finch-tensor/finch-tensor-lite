@@ -7,7 +7,6 @@ from typing import Any
 import numpy as np
 
 from ..algebra import element_type, query_property, register_property
-from ..codegen import isinstanceorformat
 from ..symbolic import ScopedDict
 from . import nodes as ntn
 
@@ -60,14 +59,14 @@ class TensorView:
         Unwrap the tensor view to get the underlying tensor.
         This returns the original tensor from which the view was created.
         """
-        return self.tns[self.idxs]
+        return self.tns[*self.idxs]
 
     def increment(self, op, val):
         """
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        return self.tns[self.idxs] + op(self.tns[self.idxs], val)
+        return self.tns[*self.idxs] + op(self.tns[*self.idxs], val)
 
 
 def access(tns, mode, idxs):
@@ -79,7 +78,7 @@ def access(tns, mode, idxs):
         return tns.access(idxs)
     try:
         return query_property(tns, "__self__", "access", mode, idxs)
-    except AttributeError:
+    except NotImplementedError:
         return TensorView(idxs=idxs, tns=tns)
 
 
@@ -92,7 +91,7 @@ def unwrap(tns):
         return tns.unwrap()
     try:
         return query_property(tns, "__self__", "unwrap")
-    except AttributeError:
+    except NotImplementedError:
         return tns[()]
 
 
@@ -105,7 +104,7 @@ def increment(tns, op, val):
         return tns.increment(op, val)
     try:
         return query_property(tns, "__self__", "increment", op, val)
-    except AttributeError:
+    except NotImplementedError:
         return tns + op(tns, val)
 
 
@@ -119,7 +118,12 @@ def declare(tns, init, op, shape):
 
 
 def np_declare(tns, init, op, shape):
-    np.resize(tns, shape)
+    for dim in shape:
+        if dim.start != 0:
+            raise ValueError(
+                f"Invalid dimension start value {dim.start} for ndarray declaration."
+            )
+    np.resize(tns, [dim.end for dim in shape])
     tns.fill(init)
 
 
@@ -170,6 +174,18 @@ class ExtentValue:
             ctx_2(body)
             if ctx_2.should_halt():
                 break
+
+
+def extent(start, end):
+    """
+    Create an extent value for a loop.
+    """
+    return ExtentValue(start, end)
+
+
+def dimension(tns, mode):
+    end = tns.shape[mode]
+    return extent(type(end)(0), end)
 
 
 class NotationInterpreterKernel:
@@ -277,15 +293,29 @@ class NotationInterpreter:
                 return f_e(*args_e)
             case ntn.Unwrap(tns):
                 return unwrap(self(tns))
+            case ntn.Assign(var, val):
+                val_e = self(val)
+                if isinstance(var, ntn.Variable):
+                    var_n = var.name
+                    #if var_n in self.types:
+                    #    def_t = self.types[var_n]
+                    #    if def_t != type(val_e):
+                    #        raise TypeError(
+                    #            f"Variable '{var_n}' is declared as type {def_t}, "
+                    #            f"but assigned value of type {type(val_e)}."
+                    #        )
+                    self.bindings[var_n] = val_e
+                    return None
+                raise NotImplementedError(f"Unrecognized assignment target: {var}")
             case ntn.Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
-                return access(tns_e, mode, idxs)
+                return access(tns_e, mode, idxs_e)
             case ntn.Increment(tns, op, val):
                 tns_e = self(tns)
-                val_e = self(val)
                 op_e = self(op)
-                tns_e[idxs_e] = op_e(tns_e[idxs_e], val_e)
+                val_e = self(val)
+                increment(tns_e, op_e, val_e)
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
@@ -324,7 +354,6 @@ class NotationInterpreter:
                 ctx_2(body)
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
-
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):
@@ -334,12 +363,12 @@ class NotationInterpreter:
                         )
                     for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
-                            case ntn.Variable(arg_n, arg_t):
-                                if not isinstanceorformat(arg_e, arg_t):
-                                    raise TypeError(
-                                        f"Argument '{arg_n}' is expected to be of type "
-                                        f"{arg_t}, but got {type(arg_e)}."
-                                    )
+                            case ntn.Variable(arg_n, _):
+                                # if not isinstanceorformat(arg_e, arg_t):
+                                #    raise TypeError(
+                                #        f"Argument '{arg_n}' is expected to be of "
+                                #        f"type {arg_t}, but got {type(arg_e)}."
+                                #    )
                                 ctx_2.bindings[arg_n] = arg_e
                             case _:
                                 raise NotImplementedError(
@@ -358,7 +387,6 @@ class NotationInterpreter:
                         f"Function '{func_n}' did not return a value, "
                         f"but expected type {ret_t}."
                     )
-
                 self.bindings[func_n] = my_func
                 return None
             case ntn.Return(value):

@@ -217,17 +217,16 @@ class IfElse(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Define(NotationTree):
+class Assign(NotationTree):
     """
-    Notation AST statement that defines `lhs` as having the value `rhs` in `body`.
+    Notation AST statement that defines `lhs` as having the value `rhs`.
     """
 
     lhs: NotationNode
     rhs: NotationNode
-    body: NotationNode
 
     def children(self):
-        return [self.lhs, self.rhs, self.body]
+        return [self.lhs, self.rhs]
 
 
 @dataclass(eq=True, frozen=True)
@@ -322,6 +321,24 @@ class Function(NotationTree):
     def from_children(cls, name, *args, body):
         """Creates a term with the given head and arguments."""
         return cls(name, args, body)
+
+
+@dataclass(eq=True, frozen=True)
+class Return(NotationTree):
+    """
+    Notation AST statement that returns the value of `val` from the current
+    function.
+    """
+
+    val: NotationNode
+
+    def children(self):
+        """Returns the children of the node."""
+        return [self.val]
+
+    @classmethod
+    def from_children(cls, val):
+        return cls(val)
 
 
 @dataclass(eq=True, frozen=True)
