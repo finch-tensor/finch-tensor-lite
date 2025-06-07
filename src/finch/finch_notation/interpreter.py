@@ -66,7 +66,7 @@ class TensorView:
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        return self.tns[*self.idxs] + op(self.tns[*self.idxs], val)
+        return self.tns[*self.idxs] = op(self.tns[*self.idxs], val)
 
 
 def access(tns, mode, idxs):
@@ -89,10 +89,7 @@ def unwrap(tns):
     """
     if hasattr(tns, "unwrap"):
         return tns.unwrap()
-    try:
-        return query_property(tns, "__self__", "unwrap")
-    except NotImplementedError:
-        return tns[()]
+    return query_property(tns, "__self__", "unwrap")
 
 
 def increment(tns, op, val):
@@ -102,10 +99,7 @@ def increment(tns, op, val):
     """
     if hasattr(tns, "increment"):
         return tns.increment(op, val)
-    try:
-        return query_property(tns, "__self__", "increment", op, val)
-    except NotImplementedError:
-        return tns + op(tns, val)
+    return query_property(tns, "__self__", "increment", op, val)
 
 
 def declare(tns, init, op, shape):
@@ -123,8 +117,9 @@ def np_declare(tns, init, op, shape):
             raise ValueError(
                 f"Invalid dimension start value {dim.start} for ndarray declaration."
             )
-    np.resize(tns, [dim.end for dim in shape])
+    tns = np.resize(tns, [dim.end for dim in shape])
     tns.fill(init)
+    return tns
 
 
 register_property(np.ndarray, "__self__", "declare", np_declare)
@@ -138,8 +133,8 @@ def freeze(tns, op):
         return tns.freeze(op)
     try:
         query_property(tns, "__self__", "freeze", op)
-    except AttributeError:
-        contextlib.suppress(AttributeError)
+    except NotImplementedError:
+        return tns
 
 
 def thaw(tns, op):
@@ -149,9 +144,9 @@ def thaw(tns, op):
     if hasattr(tns, "freeze"):
         return tns.freeze(op)
     try:
-        query_property(tns, "__self__", "freeze", op)
-    except AttributeError:
-        contextlib.suppress(AttributeError)
+        return query_property(tns, "__self__", "freeze", op)
+    except NotImplementedError:
+        return tns
 
 
 @dataclass(eq=True, frozen=True)
@@ -172,8 +167,6 @@ class ExtentValue:
             ctx_2.bindings[idx.name] = idx.type_(idx_e)
             # Execute the body of the loop
             ctx_2(body)
-            if ctx_2.should_halt():
-                break
 
 
 def extent(start, end):
@@ -326,21 +319,33 @@ class NotationInterpreter:
                 ext_e.loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
+                if not isinstance(tns, ntn.Variable):
+                    raise TypeError(
+                        f"Declaration target must be a variable, got {type(tns)}."
+                    )
                 tns_e = self(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
-                declare(tns_e, init_e, op_e, shape_e)
+                self.bindings[tns.name] = declare(tns_e, init_e, op_e, shape_e)
                 return None
             case ntn.Freeze(tns, op):
+                if not isinstance(tns, ntn.Variable):
+                    raise TypeError(
+                        f"Freeze target must be a variable, got {type(tns)}."
+                    )
                 tns_e = self(tns)
                 op_e = self(op)
-                freeze(tns_e, op_e)
+                self.bindings[tns.name] = freeze(tns_e, op_e)
                 return None
             case ntn.Thaw(tns, op):
+                if not isinstance(tns, ntn.Variable):
+                    raise TypeError(
+                        f"Thaw target must be a variable, got {type(tns)}."
+                    )
                 tns_e = self(tns)
                 op_e = self(op)
-                thaw(tns_e, op_e)
+                self.bindings[tns.name] = thaw(tns_e, op_e)
                 return None
             case ntn.If(cond, body):
                 if self(cond):

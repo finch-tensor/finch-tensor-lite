@@ -12,8 +12,8 @@ import finch.finch_notation as ntn
 @pytest.mark.parametrize(
     "a, b",
     [
-        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
-        (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
+        (np.array([[1, 2], [3, 4]], dtype=np.float64), np.array([[5, 6], [7, 8]], dtype=np.float64)),
+        (np.array([[2, 0], [1, 3]], dtype=np.float64), np.array([[4, 1], [2, 2]], dtype=np.float64)),
     ],
 )
 def test_matrix_multiplication(a, b):
@@ -35,7 +35,7 @@ def test_matrix_multiplication(a, b):
 
     prgm = ntn.Module((
         ntn.Function(
-            ntn.Variable("matmul", np.int64),
+            ntn.Variable("matmul", np.ndarray),
             (C, A, B),
             ntn.Block((
                 ntn.Assign(m, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(0)))),
@@ -75,6 +75,6 @@ def test_matrix_multiplication(a, b):
     c = np.zeros(dtype=np.float64, shape=())
     result = mod.matmul(c, a, b)
 
-    expected = np.matmul(c, a, b)
+    expected = np.matmul(a, b)
 
     assert_equal(result, expected)
