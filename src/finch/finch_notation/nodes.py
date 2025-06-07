@@ -239,7 +239,7 @@ class Declare(NotationTree):
     tns: NotationNode
     init: NotationNode
     op: NotationNode
-    shape: NotationNode
+    shape: tuple[NotationNode, ...]
 
     def children(self):
         return [self.tns, self.init, self.op, *self.shape]

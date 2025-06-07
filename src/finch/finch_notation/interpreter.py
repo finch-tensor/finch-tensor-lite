@@ -66,7 +66,8 @@ class TensorView:
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        return self.tns[*self.idxs] = op(self.tns[*self.idxs], val)
+        self.tns[*self.idxs] = op(self.tns[*self.idxs], val)
+        return None
 
 
 def access(tns, mode, idxs):
