@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ..algebra import element_type, query_property
+from ..codegen import isinstanceorformat
 from ..symbolic import ScopedDict
 from . import nodes as ntn
-from .abstract_buffer import isinstanceorformat
 
 
 @dataclass(eq=True, frozen=True)
@@ -19,15 +20,15 @@ class TensorView:
         Get the shape of the tensor view.
         This is the shape of the tensor at the specified indices.
         """
-        return self.tns.shape[len(self.idxs):-1]
-    
+        return self.tns.shape[len(self.idxs) : -1]
+
     @property
     def ndims(self):
         """
         Get the number of dimensions of the tensor view.
         """
         return len(self.shape)
-    
+
     @property
     def element_type(self):
         """
@@ -35,7 +36,7 @@ class TensorView:
         This is the type of the elements in the tensor at the specified indices.
         """
         return element_type(self.tns)
-    
+
     @property
     def fill_value(self):
         """
@@ -44,20 +45,87 @@ class TensorView:
         """
         return self.tns.fill_value
 
-    def load(self):
+    def access(self, idxs):
         """
-        Load the value from the tensor at the specified indices.
+        Unfurl the tensor view along a specific index.
+        This creates a new tensor view with the specified index unfurled.
         """
-        self.tns[self.idxs]
-    
-    def store(self, value):
+        return TensorView(idxs=self.idxs + idxs, tns=self.tns)
+
+    def unwrap(self):
         """
-        Store a value in the tensor view at the specified indices.
+        Unwrap the tensor view to get the underlying tensor.
+        This returns the original tensor from which the view was created.
         """
-        self.tns[self.idxs] = value
+        return self.tns[self.idxs]
+
+    def increment(self, op, val):
+        """
+        Increment the value in the tensor view.
+        This updates the tensor at the specified index with the operation and value.
+        """
+        return self.tns[self.idxs] + op(self.tns[self.idxs], val)
 
 
+def access(tns, mode, idxs):
+    """
+    Unfurl a tensor along an index.
+    This is used to create a tensor view for a specific slice of the tensor.
+    """
+    if hasattr(tns, "access"):
+        return tns.access(idxs)
+    try:
+        return query_property(tns, "__self__", "access", mode, idxs)
+    except AttributeError:
+        return TensorView(idxs=idxs, tns=tns)
 
+
+def unwrap(tns):
+    """
+    Unwrap a tensor view to get the underlying tensor.
+    This is used to get the original tensor from a tensor view.
+    """
+    if hasattr(tns, "unwrap"):
+        return tns.unwrap()
+    try:
+        return query_property(tns, "__self__", "unwrap")
+    except AttributeError:
+        return tns[()]
+
+
+def increment(tns, op, val):
+    """
+    Increment a tensor view with an operation and value.
+    This updates the tensor at the specified index with the operation and value.
+    """
+    if hasattr(tns, "increment"):
+        return tns.increment(op, val)
+    try:
+        return query_property(tns, "__self__", "increment", op, val)
+    except AttributeError:
+        return tns + op(tns, val)
+
+
+@dataclass(eq=True, frozen=True)
+class ExtentValue:
+    """
+    A class to represent the extent of a loop variable.
+    This is used to define the start and end values of a loop.
+    """
+
+    start: Any
+    end: Any
+
+    def loop(self, ctx, idx, body):
+        for idx_e in range(self.start, self.end):
+            # Create a new scope for each iteration
+            ctx_2 = ctx.scope(loop_state=HaltState())
+            # Assign the loop variable
+            ctx_2.bindings[idx] = idx.type_(idx_e)
+            # Execute the body of the loop
+            ctx_2(body)
+            if ctx_2.should_halt():
+                break
 
 
 class NotationInterpreterKernel:
@@ -173,27 +241,18 @@ class NotationInterpreter:
                 raise KeyError(
                     f"Variable '{var_n}' is not defined in the current context."
                 )
-            case ntn.Assign(ntn.Variable(var_n, var_t), val):
-                val_e = self(val)
-                if not isinstance(val_e, var_t):
-                    raise TypeError(
-                        f"Assigned value {val_e} is not of type {var_t} for "
-                        f"variable '{var_n}'."
-                    )
-                self.bindings[var_n] = val_e
-                self.types[var_n] = var_t
-                return None
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
-            case ntn.Load(tns, *idxs):
-                tns_e = self(tns)
-                idxs_e = self(idxs)
-                return tns_e[idxs_e]
-            case ntn.Update(tns, *idxs, op, val):
+            case ntn.Unwrap(tns):
+                return unwrap(self(tns))
+            case ntn.Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
+                return access(tns_e, mode, idxs)
+            case ntn.Increment(tns, op, val):
+                tns_e = self(tns)
                 val_e = self(val)
                 op_e = self(op)
                 tns_e[idxs_e] = op_e(tns_e[idxs_e], val_e)
@@ -204,22 +263,9 @@ class NotationInterpreter:
                         break
                     self(body)
                 return None
-            case ntn.ForLoop(ntn.Variable(var_n, var_t) as var, start, end, body):
-                start_e = self(start)
-                end_e = self(end)
-                if not isinstance(start_e, var_t):
-                    raise TypeError(
-                        f"Start value {start_e} is not of type {var_t} for "
-                        f"variable '{var_n}'."
-                    )
-                ctx_2 = self.scope(loop_state=HaltState())
-                var_e = start_e
-                while var_e < end_e:
-                    if ctx_2.should_halt():
-                        break
-                    ctx_3 = self.scope()
-                    ctx_3(ntn.Block((ntn.Assign(var, ntn.Literal(var_e)), body)))
-                    var_e = type(var_e)(var_e + 1)  # type: ignore[call-arg,operator]
+            case ntn.Loop(idx, ext, body):
+                ext_e = self(ext)
+                ext_e.loop(self, idx, body)
                 return None
             case ntn.If(cond, body):
                 if self(cond):
