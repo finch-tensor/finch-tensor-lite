@@ -84,7 +84,7 @@ class Variable(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(FinchNode, FinchExpression):
+class Call(FinchTree, FinchExpression):
     """
     Finch AST expression for the result of calling the function `op` on
     `args...`.
@@ -106,7 +106,7 @@ class Call(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Access(FinchNode, FinchExpression):
+class Access(FinchTree, FinchExpression):
     """
     Finch AST expression representing the value of tensor `tns` at the indices
     `idx...`.
@@ -129,7 +129,7 @@ class Access(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Cached(FinchNode, FinchExpression):
+class Cached(FinchTree, FinchExpression):
     """
     Finch AST expression `val`, equivalent to the quoted expression `ref`.
     """
@@ -145,7 +145,7 @@ class Cached(FinchNode, FinchExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Loop(FinchNode):
+class Loop(FinchTree):
     """
     Finch AST statement that runs `body` for each value of `idx` in `ext`.
     """
@@ -159,7 +159,7 @@ class Loop(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class If(FinchNode):
+class If(FinchTree):
     """
     Finch AST statement that only executes `body` if `cond` is true.
     """
@@ -172,7 +172,7 @@ class If(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(FinchNode):
+class IfElse(FinchTree):
     """
     Finch AST statement that executes `then_body` if `cond` is true, otherwise
     executes `else_body`.
@@ -187,7 +187,7 @@ class IfElse(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(FinchNode):
+class Assign(FinchTree):
     """
     Finch AST statement that updates the value of `lhs` to `op(lhs, rhs)`.
     """
@@ -201,7 +201,7 @@ class Assign(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Define(FinchNode):
+class Define(FinchTree):
     """
     Finch AST statement that defines `lhs` as having the value `rhs` in `body`.
     """
@@ -215,7 +215,7 @@ class Define(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Declare(FinchNode):
+class Declare(FinchTree):
     """
     Finch AST statement that declares `tns` with an initial value `init` reduced
     with `op` in the current scope.
@@ -230,7 +230,7 @@ class Declare(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Freeze(FinchNode):
+class Freeze(FinchTree):
     """
     Finch AST statement that freezes `tns` in the current scope after
     modifications with `op`.
@@ -244,7 +244,7 @@ class Freeze(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Thaw(FinchNode):
+class Thaw(FinchTree):
     """
     Finch AST statement that thaws `tns` in the current scope, moving the tensor
     from read-only mode to update-only mode with a reduction operator `op`.
@@ -258,7 +258,7 @@ class Thaw(FinchNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Block(FinchNode):
+class Block(FinchTree):
     """
     Finch AST statement that executes each of its arguments in turn.
     """
