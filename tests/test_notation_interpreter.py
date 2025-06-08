@@ -1,10 +1,9 @@
-from operator import add, mul
+import operator
 
 import pytest
 
 import numpy as np
 from numpy.testing import assert_equal
-import operator
 
 import finch.finch_notation as ntn
 
@@ -12,8 +11,14 @@ import finch.finch_notation as ntn
 @pytest.mark.parametrize(
     "a, b",
     [
-        (np.array([[1, 2], [3, 4]], dtype=np.float64), np.array([[5, 6], [7, 8]], dtype=np.float64)),
-        (np.array([[2, 0], [1, 3]], dtype=np.float64), np.array([[4, 1], [2, 2]], dtype=np.float64)),
+        (
+            np.array([[1, 2], [3, 4]], dtype=np.float64),
+            np.array([[5, 6], [7, 8]], dtype=np.float64),
+        ),
+        (
+            np.array([[2, 0], [1, 3]], dtype=np.float64),
+            np.array([[4, 1], [2, 2]], dtype=np.float64),
+        ),
     ],
 )
 def test_matrix_multiplication(a, b):
@@ -33,42 +38,78 @@ def test_matrix_multiplication(a, b):
     n = ntn.Variable("n", np.int64)
     p = ntn.Variable("p", np.int64)
 
-    prgm = ntn.Module((
-        ntn.Function(
-            ntn.Variable("matmul", np.ndarray),
-            (C, A, B),
-            ntn.Block((
-                ntn.Assign(m, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(0)))),
-                ntn.Assign(n, ntn.Call(ntn.Literal(ntn.dimension), (B, ntn.Literal(1)))),
-                ntn.Assign(p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))),
-                ntn.Declare(C, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)),
-                ntn.Loop(
-                    i,
-                    m,
-                    ntn.Loop(
-                        j,
-                        n,
-                        ntn.Loop(
-                            k,
-                            p,
-                            ntn.Block((
-                                ntn.Assign(a_ik, ntn.Unwrap(ntn.Access(A, ntn.Read(), (i, k)))),
-                                ntn.Assign(b_kj, ntn.Unwrap(ntn.Access(B, ntn.Read(), (k, j)))),
-                                ntn.Assign(c_ij, ntn.Call(ntn.Literal(operator.mul), (a_ik, b_kj))),
-                                ntn.Increment(
-                                    ntn.Access(C, ntn.Update(ntn.Literal(operator.add)), (i, j)),
-                                    ntn.Literal(operator.add),
-                                    c_ij
-                                )
-                            )),
+    prgm = ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable("matmul", np.ndarray),
+                (C, A, B),
+                ntn.Block(
+                    (
+                        ntn.Assign(
+                            m, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(0)))
                         ),
-                    ),
+                        ntn.Assign(
+                            n, ntn.Call(ntn.Literal(ntn.dimension), (B, ntn.Literal(1)))
+                        ),
+                        ntn.Assign(
+                            p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))
+                        ),
+                        ntn.Declare(
+                            C, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                        ),
+                        ntn.Loop(
+                            i,
+                            m,
+                            ntn.Loop(
+                                j,
+                                n,
+                                ntn.Loop(
+                                    k,
+                                    p,
+                                    ntn.Block(
+                                        (
+                                            ntn.Assign(
+                                                a_ik,
+                                                ntn.Unwrap(
+                                                    ntn.Access(A, ntn.Read(), (i, k))
+                                                ),
+                                            ),
+                                            ntn.Assign(
+                                                b_kj,
+                                                ntn.Unwrap(
+                                                    ntn.Access(B, ntn.Read(), (k, j))
+                                                ),
+                                            ),
+                                            ntn.Assign(
+                                                c_ij,
+                                                ntn.Call(
+                                                    ntn.Literal(operator.mul),
+                                                    (a_ik, b_kj),
+                                                ),
+                                            ),
+                                            ntn.Increment(
+                                                ntn.Access(
+                                                    C,
+                                                    ntn.Update(
+                                                        ntn.Literal(operator.add)
+                                                    ),
+                                                    (i, j),
+                                                ),
+                                                ntn.Literal(operator.add),
+                                                c_ij,
+                                            ),
+                                        )
+                                    ),
+                                ),
+                            ),
+                        ),
+                        ntn.Freeze(C, ntn.Literal(operator.add)),
+                        ntn.Return(C),
+                    )
                 ),
-                ntn.Freeze(C, ntn.Literal(operator.add)),
-                ntn.Return(C),
-            )),
-        ),
-    ))
+            ),
+        )
+    )
 
     mod = ntn.NotationInterpreter()(prgm)
 

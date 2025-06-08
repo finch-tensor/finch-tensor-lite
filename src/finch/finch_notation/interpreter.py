@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -67,7 +66,7 @@ class TensorView:
         This updates the tensor at the specified index with the operation and value.
         """
         self.tns[*self.idxs] = op(self.tns[*self.idxs], val)
-        return None
+        return
 
 
 def access(tns, mode, idxs):
@@ -291,7 +290,7 @@ class NotationInterpreter:
                 val_e = self(val)
                 if isinstance(var, ntn.Variable):
                     var_n = var.name
-                    #if var_n in self.types:
+                    # if var_n in self.types:
                     #    def_t = self.types[var_n]
                     #    if def_t != type(val_e):
                     #        raise TypeError(
@@ -341,9 +340,7 @@ class NotationInterpreter:
                 return None
             case ntn.Thaw(tns, op):
                 if not isinstance(tns, ntn.Variable):
-                    raise TypeError(
-                        f"Thaw target must be a variable, got {type(tns)}."
-                    )
+                    raise TypeError(f"Thaw target must be a variable, got {type(tns)}.")
                 tns_e = self(tns)
                 op_e = self(op)
                 self.bindings[tns.name] = thaw(tns_e, op_e)
@@ -360,6 +357,7 @@ class NotationInterpreter:
                 ctx_2(body)
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
+
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):
@@ -393,6 +391,7 @@ class NotationInterpreter:
                         f"Function '{func_n}' did not return a value, "
                         f"but expected type {ret_t}."
                     )
+
                 self.bindings[func_n] = my_func
                 return None
             case ntn.Return(value):
