@@ -2,8 +2,8 @@ import ctypes
 
 import numpy as np
 
-from ..finch_assembly.abstract_buffer import AbstractBuffer
-from .c import AbstractCArgument, AbstractCFormat, c_type
+from ..finch_assembly.abstract_buffer import Buffer
+from .c import CArgument, CBufferFormat, c_type
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -25,10 +25,10 @@ class NumpyCBuffer(ctypes.Structure):
     ]
 
 
-class NumpyBuffer(AbstractBuffer, AbstractCArgument):
+class NumpyBuffer(Buffer, CArgument):
     """
     A buffer that uses NumPy arrays to store data. This is a concrete implementation
-    of the AbstractBuffer class.
+    of the Buffer class.
     """
 
     def __init__(self, arr: np.ndarray):
@@ -71,10 +71,10 @@ class NumpyBuffer(AbstractBuffer, AbstractCArgument):
         """
 
 
-class NumpyBufferFormat(AbstractCFormat):
+class NumpyBufferFormat(CBufferFormat):
     """
     A format for buffers that uses NumPy arrays. This is a concrete implementation
-    of the AbstractBufferFormat class.
+    of the BufferFormat class.
     """
 
     def __init__(self, dtype: type):

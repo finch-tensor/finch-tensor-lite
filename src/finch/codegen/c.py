@@ -14,8 +14,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly.abstract_buffer import AbstractFormat, isinstanceorformat
-from ..symbolic import AbstractContext, ScopedDict
+from ..finch_assembly.abstract_buffer import BufferFormat
+from ..symbolic import AbstractContext, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -90,7 +90,7 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-class AbstractCArgument(ABC):
+class CArgument(ABC):
     @abstractmethod
     def serialize_to_c(self, name):
         """
@@ -129,13 +129,13 @@ class CKernel:
                 f"Expected {len(self.argtypes)} arguments, got {len(args)}"
             )
         for argtype, arg in zip(self.argtypes, args, strict=False):
-            if not isinstanceorformat(arg, argtype):
+            if not has_format(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
         serial_args = list(map(methodcaller("serialize_to_c"), args))
         res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
-        if isinstanceorformat(res, self.ret_type):
+        if has_format(res, self.ret_type):
             return res
         if self.ret_type is type(None):
             return None
@@ -682,10 +682,10 @@ class CContext(AbstractContext):
                 )
 
 
-class AbstractCFormat(AbstractFormat, ABC):
+class CBufferFormat(BufferFormat, ABC):
     """
     Abstract base class for the format of datastructures. The format defines how
-    the data in an AbstractBuffer is organized and accessed.
+    the data in an Buffer is organized and accessed.
     """
 
     @abstractmethod

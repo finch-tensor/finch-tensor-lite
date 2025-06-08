@@ -71,7 +71,7 @@ __all__ = [
     "fill_value",
     "element_type",
     "CKernel",
-    "AbstractBuffer",
+    "Buffer",
     "NumpyBuffer",
     "NumpyBufferFormat",
     "min",

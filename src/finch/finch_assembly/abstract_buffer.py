@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 
+from ..symbolic import Format, Formattable
 
-class AbstractBuffer(ABC):
+
+class Buffer(Formattable, ABC):
     """
     Abstract base class for buffer-like data structures. Buffers support random access,
     and can be resized. They are used to store data in a way that allows for efficient
@@ -56,7 +58,7 @@ class AbstractBuffer(ABC):
         ...
 
 
-class AbstractFormat(ABC):
+class BufferFormat(Format):
     """
     Abstract base class for the format of arguments. The format defines how the
     data structures store data, and can construct a data structure with the call method.
@@ -84,12 +86,3 @@ class AbstractFormat(ABC):
         Returns the type used for the length of the buffer.
         """
         return int
-
-
-def isinstanceorformat(x, format_or_type):
-    """
-    Check if x is an instance of the given format or type.
-    """
-    if isinstance(format_or_type, AbstractFormat):
-        return hasattr(x, "get_format") and x.get_format() == format_or_type
-    return isinstance(x, format_or_type)
