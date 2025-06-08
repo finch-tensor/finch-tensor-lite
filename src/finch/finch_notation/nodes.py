@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, return_type
+from ..algebra import element_type, query_property, return_type
 from ..symbolic import Term, TermTree
 
 
@@ -230,7 +230,7 @@ class Assign(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Declare(NotationTree):
+class Declare(NotationTree, NotationExpression):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
     with `op` in the current scope.
@@ -250,9 +250,21 @@ class Declare(NotationTree):
         """
         return cls(tns, init, op, shape)
 
+    def get_type(self):
+        """
+        Returns the type of the declared tensor.
+        """
+        return query_property(
+            self.tns.get_type(),
+            "declare",
+            "return_type",
+            self.op.get_type(),
+            *[s.get_type() for s in self.shape],
+        )
+
 
 @dataclass(eq=True, frozen=True)
-class Freeze(NotationTree):
+class Freeze(NotationTree, NotationExpression):
     """
     Notation AST statement that freezes `tns` in the current scope after
     modifications with `op`.
@@ -264,9 +276,20 @@ class Freeze(NotationTree):
     def children(self):
         return [self.tns, self.op]
 
+    def get_type(self):
+        """
+        Returns the type of the frozen tensor.
+        """
+        return query_property(
+            self.tns.get_type(),
+            "freeze",
+            "return_type",
+            self.op.get_type,
+        )
+
 
 @dataclass(eq=True, frozen=True)
-class Thaw(NotationTree):
+class Thaw(NotationTree, NotationExpression):
     """
     Notation AST statement that thaws `tns` in the current scope, moving the tensor
     from read-only mode to update-only mode with a reduction operator `op`.
@@ -277,6 +300,17 @@ class Thaw(NotationTree):
 
     def children(self):
         return [self.tns, self.op]
+
+    def get_type(self):
+        """
+        Returns the type of the thawed tensor.
+        """
+        return query_property(
+            self.tns.get_type(),
+            "thaw",
+            "return_type",
+            self.op,
+        )
 
 
 @dataclass(eq=True, frozen=True)

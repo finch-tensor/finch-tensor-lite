@@ -327,8 +327,7 @@ class NotationInterpreter:
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
-                self.bindings[tns.name] = declare(tns_e, init_e, op_e, shape_e)
-                return None
+                return declare(tns_e, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
                 if not isinstance(tns, ntn.Variable):
                     raise TypeError(
@@ -336,15 +335,13 @@ class NotationInterpreter:
                     )
                 tns_e = self(tns)
                 op_e = self(op)
-                self.bindings[tns.name] = freeze(tns_e, op_e)
-                return None
+                return freeze(tns_e, op_e)
             case ntn.Thaw(tns, op):
                 if not isinstance(tns, ntn.Variable):
                     raise TypeError(f"Thaw target must be a variable, got {type(tns)}.")
                 tns_e = self(tns)
                 op_e = self(op)
-                self.bindings[tns.name] = thaw(tns_e, op_e)
-                return None
+                return thaw(tns_e, op_e)
             case ntn.If(cond, body):
                 if self(cond):
                     ctx_2 = self.scope()

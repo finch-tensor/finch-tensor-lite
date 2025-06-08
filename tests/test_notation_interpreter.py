@@ -54,8 +54,11 @@ def test_matrix_multiplication(a, b):
                         ntn.Assign(
                             p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))
                         ),
-                        ntn.Declare(
-                            C, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                        ntn.Assign(
+                            C,
+                            ntn.Declare(
+                                C, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                            ),
                         ),
                         ntn.Loop(
                             i,
@@ -103,7 +106,10 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C, ntn.Literal(operator.add)),
+                        ntn.Assign(
+                            C,
+                            ntn.Freeze(C, ntn.Literal(operator.add)),
+                        ),
                         ntn.Return(C),
                     )
                 ),
