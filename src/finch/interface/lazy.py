@@ -30,7 +30,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import gensym
-from .overrides import AbstractOverrideTensor
+from .overrides import OverrideTensor
 
 
 def identify(data):
@@ -39,7 +39,7 @@ def identify(data):
 
 
 @dataclass
-class LazyTensor(AbstractOverrideTensor):
+class LazyTensor(OverrideTensor):
     data: LogicNode
     shape: tuple
     fill_value: Any

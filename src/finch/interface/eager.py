@@ -5,10 +5,10 @@ from collections.abc import Callable
 
 from . import lazy
 from .fuse import compute
-from .overrides import AbstractOverrideTensor
+from .overrides import OverrideTensor
 
 
-class AbstractEagerTensor(AbstractOverrideTensor, ABC):
+class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
 

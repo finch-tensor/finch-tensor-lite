@@ -86,14 +86,14 @@ class ScopedDict(Generic[T]):
 
 
 """
-    AbstractContext
+    Context
 
 A context for compiling code, managing side effects, and
 variable names in the generated code of the executing environment.
 """
 
 
-class AbstractContext(ABC):
+class Context(ABC):
     def __init__(self, namespace=None, preamble=None, epilogue=None):
         self.namespace = namespace if namespace is not None else Namespace()
         self.preamble = preamble if preamble is not None else []
@@ -127,11 +127,3 @@ class AbstractContext(ABC):
         Emit the code in this context.
         """
         ...
-
-
-class AbstractSymbolic:
-    """
-    Abstract base class for symbolic objects. Symbolic objects are used to
-    represent objects that are defined with respect to the state inside a
-    symbolic computation context.
-    """

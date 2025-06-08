@@ -24,7 +24,7 @@ ufunc_map = {
 }
 
 
-class AbstractOverrideTensor(ABC):
+class OverrideTensor(ABC):
     @abstractmethod
     def override_module(self):
         """Return the module that implements the override logic."""

@@ -15,7 +15,7 @@ import numpy as np
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly.abstract_buffer import BufferFormat
-from ..symbolic import AbstractContext, ScopedDict, has_format
+from ..symbolic import Context, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -422,7 +422,7 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CContext(AbstractContext):
+class CContext(Context):
     """
     A class to represent a C environment.
     """
