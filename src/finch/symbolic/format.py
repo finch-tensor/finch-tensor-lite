@@ -1,13 +1,12 @@
 from abc import ABC, abstractmethod
 
+
 class Format(ABC):
     @abstractmethod
-    def __eq__(self, other):
-        ...
+    def __eq__(self, other): ...
 
     @abstractmethod
-    def __hash__(self):
-        ...
+    def __hash__(self): ...
 
     def has_format(self, other):
         """
@@ -23,6 +22,7 @@ class Formattable(ABC):
         Get the format of the object.
         """
         ...
+
 
 def has_format(x, f):
     """
