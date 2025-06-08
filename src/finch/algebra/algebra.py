@@ -6,7 +6,7 @@ users can define their own properties and behaviors for objects and functions in
 their own code or in third-party libraries.
 
 Finch tracks properties of attributes/methods of objects or classes. Properties
-of the object/class itself are properties of the `__self__` attribute.
+of the object/class itself are accessed with the `__attr__` property.
 Properties of functions are properties of their `__call__` method.
 
 You can query a property with `query_property(obj, attr, prop, *args)`. You can
@@ -44,11 +44,12 @@ all subclasses, without having to register the property for each subclass
 individually.
 
 
-Only use the '__self__' attribute for properties which may be overridden by
-the user defining an attribute or method of an object or class.  For example, the
-`fill_value` property of a tensor is defined on the `__self__` attribute, so that
-if a user defines a custom tensor class, they can override the `fill_value`
-property by defining a `fill_value` attribute in the class itself.
+Only use the '__attr__' property for attributes which may be overridden by the
+user defining an attribute or method of an object or class.  For example, the
+`fill_value` attribute of a tensor is defined with the `__attr__` property, so
+that if a user defines a custom tensor class, they can override the `__attr__`
+property of the `fill_value` attribute by defining a `fill_value` in the class
+itself.
 """
 
 import math
@@ -98,17 +99,17 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
 
     msg = ""
     obj_name = obj.__name__ if isinstance(obj, type) else type(obj).__name__
-    if attr == "__self__":
+    if prop == "__attr__":
         if isinstance(obj, type):
-            msg += f"type object '{obj_name}' has no attribute or property '{prop}'. "
+            msg += f"type object '{obj_name}' has no attribute or property '{attr}'. "
         else:
-            msg += f"'{obj_name}' object has no attribute or property '{prop}'. "
+            msg += f"'{obj_name}' object has no attribute or property '{attr}'. "
         msg += "Hint: You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
             msg += f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', "
             "lambda ...)` or "
         msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`"
-        msg += f"or you may define `{obj_name}.{prop}`. "
+        msg += f"or you may define `{obj_name}.{attr}`. "
     elif attr == "__call__":
         msg += f"function '{repr(obj)}' has no property '{prop}'. "
         msg += "Hint: You may need to register the property by calling "
@@ -156,11 +157,11 @@ def fill_value(arg: Any) -> Any:
     """
     if hasattr(arg, "fill_value"):
         return arg.fill_value
-    return query_property(arg, "__self__", "fill_value")
+    return query_property(arg, "fill_value", "__attr__")
 
 
 register_property(
-    np.ndarray, "__self__", "fill_value", lambda x: np.zeros((), dtype=x.dtype)[()]
+    np.ndarray, "fill_value", "__attr__", lambda x: np.zeros((), dtype=x.dtype)[()]
 )
 
 
@@ -180,13 +181,13 @@ def element_type(arg: Any) -> type:
     """
     if hasattr(arg, "element_type"):
         return arg.element_type
-    return query_property(arg, "__self__", "element_type")
+    return query_property(arg, "element_type", "__attr__")
 
 
 register_property(
     np.ndarray,
-    "__self__",
     "element_type",
+    "__attr__",
     lambda x: x.dtype.type,
 )
 
@@ -206,7 +207,7 @@ def length_type(arg: Any) -> type:
     """
     if hasattr(arg, "length_type"):
         return arg.length_type
-    return query_property(arg, "__self__", "length_type")
+    return query_property(arg, "length_type", "__attr__")
 
 
 def shape_type(arg: Any) -> type:
@@ -224,20 +225,20 @@ def shape_type(arg: Any) -> type:
     """
     if hasattr(arg, "shape_type"):
         return arg.shape_type
-    return query_property(arg, "__self__", "shape_type")
+    return query_property(arg, "shape_type", "__attr__")
 
 
 register_property(
     np.ndarray,
-    "__self__",
     "length_type",
+    "__attr__",
     lambda x: int,
 )
 
 register_property(
     np.ndarray,
-    "__self__",
     "shape_type",
+    "__attr__",
     lambda x: tuple,
 )
 
@@ -257,9 +258,9 @@ def promote_type(a: Any, b: Any) -> type:
     if hasattr(b, "promote_type"):
         return b.promote_type(a)
     try:
-        return query_property(a, "__self__", "promote_type", b)
+        return query_property(a, "promote_type", "__attr__", b)
     except AttributeError:
-        return query_property(b, "__self__", "promote_type", a)
+        return query_property(b, "promote_type", "__attr__", a)
 
 
 def promote_type_stable(a, b) -> type:
@@ -273,8 +274,8 @@ def promote_type_stable(a, b) -> type:
 for t in StableNumber.__args__:
     register_property(
         t,
-        "__self__",
         "promote_type",
+        "__attr__",
         lambda a, b: promote_type_stable(a, b),
     )
 
@@ -539,7 +540,7 @@ def type_min(t: type[T]) -> T:
     """
     if hasattr(t, "type_min"):
         return t.type_min()  # type: ignore[attr-defined]
-    return query_property(t, "__self__", "type_min")
+    return query_property(t, "type_min", "__attr__")
 
 
 def type_max(t: type[T]) -> T:
@@ -557,19 +558,19 @@ def type_max(t: type[T]) -> T:
     """
     if hasattr(t, "type_max"):
         return t.type_max()  # type: ignore[attr-defined]
-    return query_property(t, "__self__", "type_max")
+    return query_property(t, "type_max", "__attr__")
 
 
 for t in [bool, int, float]:
-    register_property(t, "__self__", "type_min", lambda x: -math.inf)
-    register_property(t, "__self__", "type_max", lambda x: +math.inf)
+    register_property(t, "type_min", "__attr__", lambda x: -math.inf)
+    register_property(t, "type_max", "__attr__", lambda x: +math.inf)
 
-register_property(np.bool_, "__self__", "type_min", lambda x: x(False))
-register_property(np.bool_, "__self__", "type_max", lambda x: x(True))
-register_property(np.integer, "__self__", "type_min", lambda x: np.iinfo(x).min)
-register_property(np.integer, "__self__", "type_max", lambda x: np.iinfo(x).max)
-register_property(np.floating, "__self__", "type_min", lambda x: np.finfo(x).min)
-register_property(np.floating, "__self__", "type_max", lambda x: np.finfo(x).max)
+register_property(np.bool_, "type_min", "__attr__", lambda x: x(False))
+register_property(np.bool_, "type_max", "__attr__", lambda x: x(True))
+register_property(np.integer, "type_min", "__attr__", lambda x: np.iinfo(x).min)
+register_property(np.integer, "type_max", "__attr__", lambda x: np.iinfo(x).max)
+register_property(np.floating, "type_min", "__attr__", lambda x: np.finfo(x).min)
+register_property(np.floating, "type_max", "__attr__", lambda x: np.finfo(x).max)
 
 
 def init_value(op, arg) -> Any:
