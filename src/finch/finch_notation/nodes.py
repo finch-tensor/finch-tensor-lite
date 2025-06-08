@@ -379,7 +379,7 @@ class Return(NotationTree):
 class Module(NotationTree):
     """
     Represents a group of functions. This is the toplevel translation unit for
-    NotationNotation.
+    FinchNotation.
 
     Attributes:
         funcs: The functions defined in the module.
