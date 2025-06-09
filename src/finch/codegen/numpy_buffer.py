@@ -35,8 +35,7 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
     def __init__(self, arr: np.ndarray):
         if not arr.flags["C_CONTIGUOUS"]:
             raise ValueError("NumPy array must be C-contiguous")
-        self.arr = arr
-        self.arr_ref = [self.arr]
+        self.arr_ref = [arr]
 
     def get_format(self):
         """
