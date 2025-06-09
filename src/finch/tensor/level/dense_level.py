@@ -1,11 +1,11 @@
-from ..tensor import Level, LevelFormat
-from ...codegen import NumpyBufferFormat
+from abc import ABC
+
 import numpy as np
-from abc import ABC, abstractmethod
+
+from ..tensor import Level, LevelFormat
 
 
 class DenseLevelFormat(LevelFormat, ABC):
-
     def __init__(self, lvl, dimension_type=None):
         """
         Initializes the DenseLevelFormat with an optional fill value.
@@ -17,7 +17,7 @@ class DenseLevelFormat(LevelFormat, ABC):
         if dimension_type is None:
             dimension_type = np.intp
         self.dimension_type = dimension_type
-    
+
     def __call__(self, shape):
         """
         Creates an instance of DenseLevel with the given format.
@@ -27,7 +27,9 @@ class DenseLevelFormat(LevelFormat, ABC):
             An instance of DenseLevel.
         """
         if not isinstance(shape[0], self.dimension_type):
-            raise TypeError(f"Dimension must be of type {self.dimension_type}, got {type(dimension)}")
+            raise TypeError(
+                f"Dimension must be of type {self.dimension_type}, got {type(shape[0])}"
+            )
         lvl = self.lvl(shape[1:])
         return DenseLevel(lvl, shape[0], fmt=self)
 
