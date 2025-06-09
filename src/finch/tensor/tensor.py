@@ -10,6 +10,7 @@ class LevelFormat(Format, ABC):
     An abstract base class representing the format of levels.
     """
 
+    @property
     @abstractmethod
     def ndims(self):
         """
@@ -17,6 +18,7 @@ class LevelFormat(Format, ABC):
         """
         ...
 
+    @property
     @abstractmethod
     def fill_value(self):
         """
@@ -24,6 +26,7 @@ class LevelFormat(Format, ABC):
         """
         ...
 
+    @property
     @abstractmethod
     def element_type(self):
         """
@@ -31,6 +34,7 @@ class LevelFormat(Format, ABC):
         """
         ...
 
+    @property
     @abstractmethod
     def shape_type(self):
         """
@@ -38,6 +42,7 @@ class LevelFormat(Format, ABC):
         """
         ...
 
+    @property
     @abstractmethod
     def position_type(self):
         """
@@ -45,6 +50,7 @@ class LevelFormat(Format, ABC):
         """
         ...
 
+    @property
     @abstractmethod
     def buffer_format(self):
         """
@@ -60,6 +66,7 @@ class Level(Formattable, ABC):
     a tensor.
     """
 
+    @property
     @abstractmethod
     def shape(self):
         """
@@ -67,23 +74,29 @@ class Level(Formattable, ABC):
         """
         ...
 
+    @property
     def ndims(self):
-        return self.get_format().ndims()
+        return self.get_format().ndims
 
+    @property
     def fill_value(self):
-        return self.get_format().fill_value()
+        return self.get_format().fill_value
 
+    @property
     def element_type(self):
-        return self.get_format().element_type()
+        return self.get_format().element_type
 
+    @property
     def shape_type(self):
-        return self.get_format().shape_type()
+        return self.get_format().shape_type
 
+    @property
     def position_type(self):
-        return self.get_format().position_type()
+        return self.get_format().position_type
 
+    @property
     def buffer_format(self):
-        return self.get_format().buffer_format()
+        return self.get_format().buffer_format
 
 
 Tp = TypeVar("Tp")
@@ -116,27 +129,27 @@ class FiberTensor(Generic[Tp], Formattable):
 
     @property
     def shape(self):
-        return self.lvl.shape()
+        return self.lvl.shape
 
     @property
     def ndims(self):
-        return self.lvl.ndims()
+        return self.lvl.ndims
 
     @property
     def shape_type(self):
-        return self.lvl.shape_type()
+        return self.lvl.shape_type
 
     @property
     def element_type(self):
-        return self.lvl.element_type()
+        return self.lvl.element_type
 
     @property
     def fill_value(self):
-        return self.lvl.fill_value()
+        return self.lvl.fill_value
 
     @property
     def position_type(self):
-        return self.lvl.position_type()
+        return self.lvl.position_type
 
     @property
     def buffer_format(self):
@@ -144,7 +157,7 @@ class FiberTensor(Generic[Tp], Formattable):
         Returns the format of the buffer used for the fibers.
         This is typically a NumpyBufferFormat or similar.
         """
-        return self.lvl.buffer_format()
+        return self.lvl.buffer_format
 
 
 @dataclass
@@ -161,37 +174,37 @@ class FiberTensorFormat(Format, ABC):
 
     def __post_init__(self):
         if self.pos is None:
-            self.pos = self.lvl.position_type()
+            self.pos = self.lvl.position_type
 
     def __call__(self, shape):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl(shape), self.lvl.position_type()(1))
+        return FiberTensor(self.lvl(shape), self.lvl.position_type(1))
 
     @property
     def shape(self):
-        return self.lvl.shape()
+        return self.lvl.shape
 
     @property
     def ndims(self):
-        return self.lvl.ndims()
+        return self.lvl.ndims
 
     @property
     def shape_type(self):
-        return self.lvl.shape_type()
+        return self.lvl.shape_type
 
     @property
     def element_type(self):
-        return self.lvl.element_type()
+        return self.lvl.element_type
 
     @property
     def fill_value(self):
-        return self.lvl.fill_value()
+        return self.lvl.fill_value
 
     @property
     def position_type(self):
-        return self.lvl.position_type()
+        return self.lvl.position_type
 
     @property
     def buffer_format(self):
@@ -199,4 +212,4 @@ class FiberTensorFormat(Format, ABC):
         Returns the format of the buffer used for the fibers.
         This is typically a NumpyBufferFormat or similar.
         """
-        return self.lvl.buffer_format()
+        return self.lvl.buffer_format

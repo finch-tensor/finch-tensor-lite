@@ -27,35 +27,41 @@ class DenseLevelFormat(LevelFormat, ABC):
         lvl = self.lvl(shape[1:])
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
+    @property
     def ndims(self):
-        return 1 + self.lvl.ndims()
+        return 1 + self.lvl.ndims
 
+    @property
     def fill_value(self):
-        return self.lvl.fill_value()
+        return self.lvl.fill_value
 
+    @property
     def element_type(self):
         """
         Returns the type of elements stored in the fibers.
         """
-        return self.lvl.element_type()
-
+        return self.lvl.element_type
+    
+    @property
     def shape_type(self):
         """
         Returns the type of the shape of the fibers.
         """
-        return (self.dimension_type, *self.lvl.shape_type())
+        return (self.dimension_type, *self.lvl.shape_type)
 
+    @property 
     def position_type(self):
         """
         Returns the type of positions within the levels.
         """
-        return self.lvl.position_type()
+        return self.lvl.position_type
 
+    @property
     def buffer_format(self):
         """
         Returns the format of the buffer used for the fibers.
         """
-        return self.lvl.buffer_format()
+        return self.lvl.buffer_format
 
 
 class DenseLevel(Level):
@@ -74,8 +80,9 @@ class DenseLevel(Level):
         self.lvl = lvl
         self.dimension = dimension
 
+    @property
     def shape(self):
-        return (self.dimension, *self.lvl.shape())
+        return (self.dimension, *self.lvl.shape)
 
     def get_format(self):
         return self.fmt
