@@ -4,7 +4,7 @@ from .codegen import (
     NumpyBufferFormat,
 )
 from .interface import (
-    AbstractEagerTensor,
+    EagerTensor,
     LazyTensor,
     abs,
     add,
@@ -60,7 +60,7 @@ __all__ = [
     "abs",
     "positive",
     "negative",
-    "AbstractEagerTensor",
+    "EagerTensor",
     "LazyTensor",
     "fill_value",
     "element_type",
@@ -77,7 +77,7 @@ __all__ = [
     "pow",
     "tensordot",
     "vecdot",
-    "AbstractBuffer",
+    "LazyTensor",
     "NumpyBuffer",
     "NumpyBufferFormat",
     "min",

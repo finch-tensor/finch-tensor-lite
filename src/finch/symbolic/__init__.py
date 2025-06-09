@@ -1,4 +1,5 @@
-from .environment import AbstractContext, AbstractSymbolic, Namespace, ScopedDict
+from .environment import Context, Namespace, ScopedDict
+from .format import Format, Formattable, has_format
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -26,7 +27,9 @@ __all__ = [
     "Fixpoint",
     "gensym",
     "Namespace",
-    "AbstractContext",
-    "AbstractSymbolic",
+    "Context",
     "ScopedDict",
+    "Format",
+    "Formattable",
+    "has_format",
 ]

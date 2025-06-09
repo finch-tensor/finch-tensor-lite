@@ -46,7 +46,7 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
 
-class TestEagerTensor(finch.AbstractEagerTensor):
+class TestEagerTensor(finch.EagerTensor):
     def __init__(self, array):
         self.array = np.array(array)
 

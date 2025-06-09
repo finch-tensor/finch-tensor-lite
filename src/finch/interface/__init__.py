@@ -1,5 +1,5 @@
 from .eager import (
-    AbstractEagerTensor,
+    EagerTensor,
     abs,
     add,
     all,
@@ -56,7 +56,7 @@ __all__ = [
     "negative",
     "min",
     "max",
-    "AbstractEagerTensor",
+    "EagerTensor",
     "LazyTensor",
     "matmul",
     "matrix_transpose",

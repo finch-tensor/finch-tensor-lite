@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..symbolic import ScopedDict
+from ..symbolic import ScopedDict, has_format
 from . import nodes as asm
-from .abstract_buffer import isinstanceorformat
 
 
 class AssemblyInterpreterKernel:
@@ -220,7 +219,7 @@ class AssemblyInterpreter:
                     for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
                             case asm.Variable(arg_n, arg_t):
-                                if not isinstanceorformat(arg_e, arg_t):
+                                if not has_format(arg_e, arg_t):
                                     raise TypeError(
                                         f"Argument '{arg_n}' is expected to be of type "
                                         f"{arg_t}, but got {type(arg_e)}."
