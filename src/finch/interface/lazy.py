@@ -8,6 +8,7 @@ from typing import Any
 
 from numpy.core.numeric import normalize_axis_tuple
 
+from ..algebra import conjugate as conj
 from ..algebra import (
     element_type,
     fill_value,
@@ -15,7 +16,6 @@ from ..algebra import (
     init_value,
     promote_max,
     promote_min,
-    register_property,
     return_type,
 )
 from ..finch_logic import (
@@ -666,22 +666,6 @@ def pow(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
 
 
-def conjugate_op(x):
-    if hasattr(x, "conjugate"):
-        return x.conjugate()
-    return x
-
-
-# register the conjugate operation return type. The conjugate operation
-# preserves the element type of the input tensor.
-register_property(
-    conjugate_op,
-    "__call__",
-    "return_type",
-    lambda obj, x: x,
-)
-
-
 def conjugate(x) -> LazyTensor:
     """
     Computes the complex conjugate of the input tensor `x`.
@@ -696,7 +680,7 @@ def conjugate(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the complex conjugate of `x`.
     """
-    return elementwise(conjugate_op, defer(x))
+    return elementwise(conj, defer(x))
 
 
 def tensordot(
@@ -745,16 +729,15 @@ def tensordot(
     x2p = permute_dims(x2, tuple(newaxes_b))
 
     # Expand x1p and x2p so that their contracted axes align for broadcasting
-    # x1p: shape (..., K1, K2, ..., Kn)
-    # x2p: shape (K1, K2, ..., Kn, ...)
-    # We want to multiply so that contracted axes are aligned
+    # so we can multiply them
 
     # For x1p, add len(notin_b) singleton dims at the end
-    for _ in range(len(notin_b)):
-        x1p = expand_dims(x1p, axis=-1)
+    added_dims = tuple(-(i + 1) for i in range(len(notin_b)))
+    x1p = expand_dims(x1p, axis=added_dims)
+
     # For x2p, add len(notin_a) singleton dims at the front
-    for _ in range(len(notin_a)):
-        x2p = expand_dims(x2p, axis=0)
+    added_dims = tuple(i for i in range(len(notin_a)))
+    x2p = expand_dims(x2p, axis=added_dims)
 
     # Multiply (broadcasted)
     expanded_product = multiply(x1p, x2p)

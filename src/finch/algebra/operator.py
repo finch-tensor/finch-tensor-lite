@@ -27,6 +27,35 @@ def promote_max(a, b):
     return max(cast(a), cast(b))
 
 
+def conjugate(x):
+    """
+    Computes the complex conjugate of the input number
+
+    Parameters
+    ----------
+    x: Any
+        The input number to compute the complex conjugate of.
+
+    Returns
+    ----------
+    Any
+        The complex conjugate of the input number. If the input is not a complex number,
+        it returns the input unchanged.
+    """
+    if hasattr(x, "conjugate"):
+        return x.conjugate()
+    return x
+
+
+# register the conjugate operation return type. The conjugate operation
+# preserves the element type of the input tensor.
+algebra.register_property(
+    conjugate,
+    "__call__",
+    "return_type",
+    lambda obj, x: x,
+)
+
 algebra.register_property(
     promote_min,
     "__call__",

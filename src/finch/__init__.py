@@ -1,6 +1,5 @@
 from .algebra import element_type, fill_value
 from .codegen import (
-    CKernel,
     NumpyBuffer,
     NumpyBufferFormat,
 )
@@ -65,7 +64,6 @@ __all__ = [
     "LazyTensor",
     "fill_value",
     "element_type",
-    "CKernel",
     "matmul",
     "matrix_transpose",
     "bitwise_and",
