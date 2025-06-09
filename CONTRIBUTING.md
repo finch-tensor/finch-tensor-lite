@@ -65,6 +65,13 @@ Type checks are run with mypy as part of pytest, but you can run it manually:
 poetry run mypy ./src/
 ```
 
+### Assertions and Validation
+
+- **Do not use `assert` statements for user-facing validation.**
+    - `assert` statements are removed when Python is run with the `-O` (optimize) flag.
+    - Use explicit error handling (e.g., `if ...: raise ValueError(...)`) for all user-facing checks, following the [array API specification](https://data-apis.org/array-api/latest/).
+- `assert` statements may be used for internal debugging, invariants, and sanity checks that are not critical for production correctness.
+
 ## Codebase Overview
 
 ### Directory Structure
@@ -80,13 +87,6 @@ poetry run mypy ./src/
 - `util/` — Utility modules for configuration, caching, and other shared infrastructure.
 - `interface/overrides.py` — Mechanisms for user and library overrides, including NumPy ufunc compatibility and array API support.
 - `__init__.py` — Module initialization and exports for the Finch package.
-
-## Assertions and Validation
-
-- **Do not use `assert` statements for user-facing validation.**
-    - `assert` statements are removed when Python is run with the `-O` (optimize) flag.
-    - Use explicit error handling (e.g., `if ...: raise ValueError(...)`) for all user-facing checks, following the [array API specification](https://data-apis.org/array-api/latest/).
-- `assert` statements may be used for internal debugging, invariants, and sanity checks that are not critical for production correctness.
 
 ## Testing
 
