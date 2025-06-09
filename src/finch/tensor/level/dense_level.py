@@ -3,20 +3,16 @@ from abc import ABC
 import numpy as np
 
 from ..tensor import Level, LevelFormat
+from dataclasses import dataclass, field
 
-
+@dataclass
 class DenseLevelFormat(LevelFormat, ABC):
-    def __init__(self, lvl, dimension_type=None):
-        """
-        Initializes the DenseLevelFormat with an optional fill value.
-        Args:
-            fill_value: The value used to fill the fibers, or `None` if dynamic.
-            position_type: The type of positions within the fibers.
-        """
-        self.lvl = lvl
-        if dimension_type is None:
-            dimension_type = np.intp
-        self.dimension_type = dimension_type
+    lvl: any
+    dimension_type: any = None
+
+    def __post_init__(self):
+        if self.dimension_type is None:
+            self.dimension_type = np.intp
 
     def __call__(self, shape):
         """
@@ -26,12 +22,8 @@ class DenseLevelFormat(LevelFormat, ABC):
         Returns:
             An instance of DenseLevel.
         """
-        if not isinstance(shape[0], self.dimension_type):
-            raise TypeError(
-                f"Dimension must be of type {self.dimension_type}, got {type(shape[0])}"
-            )
         lvl = self.lvl(shape[1:])
-        return DenseLevel(lvl, shape[0], fmt=self)
+        return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     def ndims(self):
         return 1 + self.lvl.ndims()
@@ -69,16 +61,19 @@ class DenseLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    def __init__(self, fmt, val=None):
+    def __init__(self, fmt, lvl, dimension):
         """
         Initializes the DenseLevel with a format.
         Args:
             fmt: The format to be used for the level.
+            lvl: The underlying level that this dense level wraps.
         """
         self.fmt = fmt
-        if val is None:
-            val = fmt.buffer_format()(len=0, dtype=fmt.element_type())
-        self.val = val
+        self.lvl = lvl
+        self.dimension = dimension
+
+    def shape(self):
+        return (self.dimension, *self.lvl.shape())
 
     def get_format(self):
         return self.fmt

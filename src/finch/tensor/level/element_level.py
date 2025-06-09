@@ -4,29 +4,23 @@ import numpy as np
 
 from ...codegen import NumpyBufferFormat
 from ..tensor import Level, LevelFormat
+from dataclasses import dataclass, field
+@dataclass
+class ElementLevelFormat(LevelFormat):
+    fill_value_: any
+    element_type_: type = None
+    position_type_: type = None
+    buffer_format_: any = None
 
+    def __post_init__(self):
+        if self.element_type_ is None:
+            self.element_type_ = type(self.fill_value_)
+        if self.position_type_ is None:
+            self.position_type_ = np.intp
+        if self.buffer_format_ is None:
+            self.buffer_format_ = NumpyBufferFormat(self.element_type_)
 
-class ElementLevelFormat(LevelFormat, ABC):
-    def __init__(
-        self, fill_value, element_type=None, position_type=None, buffer_format=None
-    ):
-        """
-        Initializes the ElementLevelFormat with an optional fill value.
-        Args:
-            fill_value: The value used to fill the fibers, or `None` if dynamic.
-            position_type: The type of positions within the fibers.
-        """
-        self.fill_value = fill_value
-        if element_type is None:
-            element_type = type(fill_value)
-        if position_type is None:
-            position_type = np.intp
-        self.position_type = position_type
-        if buffer_format is None:
-            buffer_format = NumpyBufferFormat(element_type)
-        self.buffer_format = buffer_format
-
-    def __call__(self, fmt):
+    def __call__(self, shape):
         """
         Creates an instance of ElementLevel with the given format.
         Args:
@@ -34,19 +28,19 @@ class ElementLevelFormat(LevelFormat, ABC):
         Returns:
             An instance of ElementLevel.
         """
-        return ElementLevel(fmt)
+        return ElementLevel(self)
 
     def ndims(self):
         return 0
 
     def fill_value(self):
-        return self.fill_value
+        return self.fill_value_
 
     def element_type(self):
         """
         Returns the type of elements stored in the fibers.
         """
-        return self.element_type
+        return self.element_type_
 
     def shape_type(self):
         """
@@ -58,13 +52,13 @@ class ElementLevelFormat(LevelFormat, ABC):
         """
         Returns the type of positions within the levels.
         """
-        return self.position_type
+        return self.position_type_
 
     def buffer_format(self):
         """
         Returns the format of the buffer used for the fibers.
         """
-        return self.buffer_format
+        return self.buffer_format_
 
 
 class ElementLevel(Level):
@@ -82,6 +76,9 @@ class ElementLevel(Level):
         if val is None:
             val = fmt.buffer_format()(len=0, dtype=fmt.element_type())
         self.val = val
+    
+    def shape(self):
+        return ()
 
     def get_format(self):
         return self.fmt

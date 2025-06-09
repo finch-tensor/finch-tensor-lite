@@ -101,23 +101,21 @@ class FiberTensor[Tp](Formattable):
     lvl: Level
     pos: Tp | None = None
 
-    def __init__(self, lvl, pos=None):
-        """
-        Initializes the FiberTensor with a level object `lvl`.
-        Args:
-            lvl: a fiber allocator that manages the fibers in the tensor.
-        """
-        self.lvl = lvl
-        self.pos = pos
-
     def __repr__(self):
         res = f"FiberTensor(lvl={self.lvl}"
         if self.pos is not None:
             res += f", pos={self.pos}"
         res += ")"
         return res
+    
+    def get_format(self):
+        """
+        Returns the format of the fiber tensor, which is a FiberTensorFormat.
+        """
+        return FiberTensorFormat(self.lvl.get_format(), type(self.pos))
 
 
+@dataclass
 class FiberTensorFormat(Format, ABC):
     """
     An abstract base class representing the format of a fiber tensor.
@@ -127,17 +125,10 @@ class FiberTensorFormat(Format, ABC):
     """
 
     lvl: LevelFormat
-
-    def __init__(self, lvl):
-        """
-        Initializes the FiberTensorFormat with a level object `lvl`.
-        Args:
-            lvl: a fiber allocator that manages the fibers in the tensor.
-        """
-        self.lvl = lvl
+    pos: type
 
     def __call__(self, shape):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl, shape)
+        return FiberTensor(self.lvl(shape), self.lvl.position_type()(1))
