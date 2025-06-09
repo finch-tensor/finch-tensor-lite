@@ -103,8 +103,10 @@ class NumpyBufferFormat(CBufferFormat):
     def __hash__(self):
         return hash(self._dtype)
 
-    def __call__(self, len_: int):
-        return NumpyBuffer(np.zeros(len_, dtype=self._dtype))
+    def __call__(self, len: int = 0, dtype: type = None):
+        if dtype is None:
+            dtype = self._dtype
+        return NumpyBuffer(np.zeros(len, dtype=dtype))
 
     def c_type(self):
         return ctypes.POINTER(NumpyCBuffer)

@@ -65,7 +65,7 @@ class BufferFormat(Format):
     """
 
     @abstractmethod
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         """
         Create an instance of an object in this format with the given arguments.
         """
