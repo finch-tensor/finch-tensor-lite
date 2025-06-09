@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from operator import methodcaller
 from typing import Any
 
+import numpy as np
+
 from .. import finch_assembly as asm
 from ..symbolic.environment import Context, ScopedDict
 
@@ -18,11 +20,19 @@ class NumbaArgument(ABC):
         """
         ...
 
+    @classmethod
+    @abstractmethod
+    def deserialize_from_numba(cls, numba_buffer):
+        """
+        Return an object from Numba returned value.
+        """
+        ...
+
 
 class NumbaBufferFormat:
     @staticmethod
     def numba_name():
-        return "numpy.ndarray"
+        return "list[numpy.ndarray]"
 
 
 class NumbaModule:
@@ -48,7 +58,16 @@ class NumbaKernel:
 
     def __call__(self, *args):
         serial_args = list(map(methodcaller("serialize_to_numba"), args))
-        return self.numba_func(*serial_args)
+        results = self.numba_func(*serial_args)
+        if np.isscalar(results):
+            return results
+        if len(results) == 0:
+            return ()
+        from .numpy_buffer import NumpyBuffer
+
+        if not isinstance(results, tuple):
+            return NumpyBuffer.deserialize_from_numba(results)
+        return tuple(map(NumpyBuffer.deserialize_from_numba, results))
 
 
 class NumbaCompiler:
@@ -144,18 +163,18 @@ class NumbaContext(Context):
             case asm.Call(asm.Immediate(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Load(buffer, idx):
-                return f"{self(buffer)}[{self(idx)}]"
+                return f"{self(buffer)}[0][{self(idx)}]"
             case asm.Store(buffer, idx, val):
-                self.exec(f"{self.feed}{self(buffer)}[{self(idx)}] = {self(val)}")
+                self.exec(f"{self.feed}{self(buffer)}[0][{self(idx)}] = {self(val)}")
                 return None
             case asm.Resize(buffer, size):
                 self.exec(
-                    f"{self.feed}{self(buffer)} = numpy.resize({self(buffer)}, "
+                    f"{self.feed}{self(buffer)}[0] = numpy.resize({self(buffer)}[0], "
                     f"{self(size)})"
                 )
                 return None
             case asm.Length(buffer):
-                return f"len({self(buffer)})"
+                return f"len({self(buffer)}[0])"
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:

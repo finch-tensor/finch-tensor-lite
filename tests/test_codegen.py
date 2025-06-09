@@ -31,7 +31,7 @@ def test_buffer_function():
     #include <string.h>
 
     typedef struct CNumpyBuffer {
-        void* arr;
+        void* arr_ref;
         void* data;
         size_t length;
         void* (*resize)(void**, size_t);
@@ -43,7 +43,7 @@ def test_buffer_function():
         size_t length = buffer->length;
 
         // Resize the buffer to double its length
-        buffer->data = buffer->resize(&(buffer->arr), length * 2);
+        buffer->data = buffer->resize(&(buffer->arr_ref), length * 2);
         buffer->length *= 2;
 
         // Update the data pointer after resizing
@@ -60,7 +60,7 @@ def test_buffer_function():
     f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
     k = finch.codegen.c.CKernel(f, type(None), [NumpyBufferFormat(np.float64)])
     k(b)
-    result = b.arr
+    result = b.arr_ref[0]
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
 
@@ -109,11 +109,7 @@ def test_codegen(compiler, buffer):
                                 ),
                             ),
                         ),
-                        asm.Return(
-                            asm.Immediate(0)
-                            if not isinstance(compiler, NumbaCompiler)
-                            else a_var
-                        ),
+                        asm.Return(asm.Immediate(0)),
                     )
                 ),
             ),
@@ -123,7 +119,7 @@ def test_codegen(compiler, buffer):
     f = mod.test_function
 
     result = f(buf)
-    result = buf.arr if not isinstance(compiler, NumbaCompiler) else result
+    result = buf.arr_ref[0]
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
 

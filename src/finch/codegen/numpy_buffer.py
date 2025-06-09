@@ -13,13 +13,13 @@ def numpy_buffer_resize_callback(buf_ptr, new_length):
     A Python callback function that resizes the NumPy array.
     """
     buf = buf_ptr.contents.value
-    buf.arr = np.resize(buf.arr, new_length)
-    return buf.arr.ctypes.data
+    buf.arr_ref[0] = np.resize(buf.arr_ref[0], new_length)
+    return buf.arr_ref[0].ctypes.data
 
 
 class NumpyCBuffer(ctypes.Structure):
     _fields_ = [
-        ("arr", ctypes.py_object),
+        ("arr_ref", ctypes.py_object),
         ("data", ctypes.c_void_p),
         ("length", ctypes.c_size_t),
         ("resize", type(numpy_buffer_resize_callback)),
@@ -36,31 +36,32 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         if not arr.flags["C_CONTIGUOUS"]:
             raise ValueError("NumPy array must be C-contiguous")
         self.arr = arr
+        self.arr_ref = [self.arr]
 
     def get_format(self):
         """
         Returns the format of the buffer, which is a NumpyBufferFormat.
         """
-        return NumpyBufferFormat(self.arr.dtype.type)
+        return NumpyBufferFormat(self.arr_ref[0].dtype.type)
 
     def length(self):
-        return self.arr.size
+        return self.arr_ref[0].size
 
     def load(self, index: int):
-        return self.arr[index]
+        return self.arr_ref[0][index]
 
     def store(self, index: int, value):
-        self.arr[index] = value
+        self.arr_ref[0][index] = value
 
     def resize(self, new_length: int):
-        self.arr = np.resize(self.arr, new_length)
+        self.arr_ref[0] = np.resize(self.arr_ref[0], new_length)
 
     def serialize_to_c(self):
         """
         Serialize the NumPy buffer to a C-compatible structure.
         """
-        data = ctypes.c_void_p(self.arr.ctypes.data)
-        length = self.arr.size
+        data = ctypes.c_void_p(self.arr_ref[0].ctypes.data)
+        length = self.arr_ref[0].size
         self._self_obj = ctypes.py_object(self)
         self._c_callback = numpy_buffer_resize_callback
         self._c_buffer = NumpyCBuffer(self._self_obj, data, length, self._c_callback)
@@ -72,7 +73,11 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         """
 
     def serialize_to_numba(self):
-        return self.arr
+        return self.arr_ref
+
+    @classmethod
+    def deserialize_from_numba(cls, numba_buffer):
+        return cls(numba_buffer[0])
 
 
 class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
@@ -127,7 +132,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
 
     def c_resize(self, ctx, buf, new_len):
         data = f"{ctx(buf)}->data"
-        arr = f"{ctx(buf)}->arr"
+        arr = f"{ctx(buf)}->arr_ref"
         length = f"{ctx(buf)}->length"
         ctx.exec(
             f"{ctx.feed}{data} = {ctx(buf)}->resize(&{arr}, {ctx(new_len)});\n"
