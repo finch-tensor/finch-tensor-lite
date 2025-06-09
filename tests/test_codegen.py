@@ -7,7 +7,13 @@ from numpy.testing import assert_equal
 
 import finch
 import finch.finch_assembly as asm
-from finch.codegen import CCompiler, NumbaCompiler, NumpyBuffer, NumpyBufferFormat
+from finch.codegen import (
+    CCompiler,
+    NumbaBuffer,
+    NumbaCompiler,
+    NumpyBuffer,
+    NumpyBufferFormat,
+)
 
 
 def test_add_function():
@@ -31,7 +37,7 @@ def test_buffer_function():
     #include <string.h>
 
     typedef struct CNumpyBuffer {
-        void* arr_ref;
+        void* arr;
         void* data;
         size_t length;
         void* (*resize)(void**, size_t);
@@ -43,7 +49,7 @@ def test_buffer_function():
         size_t length = buffer->length;
 
         // Resize the buffer to double its length
-        buffer->data = buffer->resize(&(buffer->arr_ref), length * 2);
+        buffer->data = buffer->resize(&(buffer->arr), length * 2);
         buffer->length *= 2;
 
         // Update the data pointer after resizing
@@ -60,7 +66,7 @@ def test_buffer_function():
     f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
     k = finch.codegen.c.CKernel(f, type(None), [NumpyBufferFormat(np.float64)])
     k(b)
-    result = b.arr_ref[0]
+    result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
 
@@ -69,7 +75,7 @@ def test_buffer_function():
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumbaBuffer),
     ],
 )
 def test_codegen(compiler, buffer):
@@ -119,7 +125,7 @@ def test_codegen(compiler, buffer):
     f = mod.test_function
 
     result = f(buf)
-    result = buf.arr_ref[0]
+    result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
 
@@ -128,7 +134,7 @@ def test_codegen(compiler, buffer):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumbaBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )
@@ -203,7 +209,7 @@ def test_dot_product(compiler, buffer):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumbaBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )

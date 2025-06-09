@@ -4,7 +4,6 @@ import numpy as np
 
 from ..finch_assembly.abstract_buffer import Buffer
 from .c import CArgument, CBufferFormat, c_type
-from .numba_backend import NumbaArgument, NumbaBufferFormat
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -13,20 +12,20 @@ def numpy_buffer_resize_callback(buf_ptr, new_length):
     A Python callback function that resizes the NumPy array.
     """
     buf = buf_ptr.contents.value
-    buf.arr_ref[0] = np.resize(buf.arr_ref[0], new_length)
-    return buf.arr_ref[0].ctypes.data
+    buf.arr = np.resize(buf.arr, new_length)
+    return buf.arr.ctypes.data
 
 
 class NumpyCBuffer(ctypes.Structure):
     _fields_ = [
-        ("arr_ref", ctypes.py_object),
+        ("arr", ctypes.py_object),
         ("data", ctypes.c_void_p),
         ("length", ctypes.c_size_t),
         ("resize", type(numpy_buffer_resize_callback)),
     ]
 
 
-class NumpyBuffer(Buffer, CArgument, NumbaArgument):
+class NumpyBuffer(Buffer, CArgument):
     """
     A buffer that uses NumPy arrays to store data. This is a concrete implementation
     of the Buffer class.
@@ -35,32 +34,32 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
     def __init__(self, arr: np.ndarray):
         if not arr.flags["C_CONTIGUOUS"]:
             raise ValueError("NumPy array must be C-contiguous")
-        self.arr_ref = [arr]
+        self.arr = arr
 
     def get_format(self):
         """
         Returns the format of the buffer, which is a NumpyBufferFormat.
         """
-        return NumpyBufferFormat(self.arr_ref[0].dtype.type)
+        return NumpyBufferFormat(self.arr.dtype.type)
 
     def length(self):
-        return self.arr_ref[0].size
+        return self.arr.size
 
     def load(self, index: int):
-        return self.arr_ref[0][index]
+        return self.arr[index]
 
     def store(self, index: int, value):
-        self.arr_ref[0][index] = value
+        self.arr[index] = value
 
     def resize(self, new_length: int):
-        self.arr_ref[0] = np.resize(self.arr_ref[0], new_length)
+        self.arr = np.resize(self.arr, new_length)
 
     def serialize_to_c(self):
         """
         Serialize the NumPy buffer to a C-compatible structure.
         """
-        data = ctypes.c_void_p(self.arr_ref[0].ctypes.data)
-        length = self.arr_ref[0].size
+        data = ctypes.c_void_p(self.arr.ctypes.data)
+        length = self.arr.size
         self._self_obj = ctypes.py_object(self)
         self._c_callback = numpy_buffer_resize_callback
         self._c_buffer = NumpyCBuffer(self._self_obj, data, length, self._c_callback)
@@ -71,15 +70,8 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         Update this buffer based on how the C call modified the NumpyCBuffer structure.
         """
 
-    def serialize_to_numba(self):
-        return self.arr_ref
 
-    @classmethod
-    def deserialize_from_numba(cls, numba_buffer):
-        return cls(numba_buffer[0])
-
-
-class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
+class NumpyBufferFormat(CBufferFormat):
     """
     A format for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFormat class.
@@ -89,7 +81,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
         self._dtype = dtype
 
     def __eq__(self, other):
-        if not isinstance(other, NumpyBufferFormat):
+        if not isinstance(other, type(self)):
             return False
         return self._dtype == other._dtype
 
@@ -131,7 +123,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
 
     def c_resize(self, ctx, buf, new_len):
         data = f"{ctx(buf)}->data"
-        arr = f"{ctx(buf)}->arr_ref"
+        arr = f"{ctx(buf)}->arr"
         length = f"{ctx(buf)}->length"
         ctx.exec(
             f"{ctx.feed}{data} = {ctx(buf)}->resize(&{arr}, {ctx(new_len)});\n"

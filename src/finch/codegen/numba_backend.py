@@ -7,6 +7,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..symbolic.environment import Context, ScopedDict
+from .numpy_buffer import NumpyBuffer, NumpyBufferFormat
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,34 @@ class NumbaArgument(ABC):
         ...
 
 
-class NumbaBufferFormat:
+class NumbaBuffer(NumpyBuffer, NumbaArgument):
+    def __init__(self, arr: np.ndarray):
+        if not arr.flags["C_CONTIGUOUS"]:
+            raise ValueError("NumPy array must be C-contiguous")
+        self.arr_ref = [arr]
+
+    @property
+    def arr(self):
+        return self.arr_ref[0]
+
+    def get_format(self):
+        return NumbaBufferFormat(self.arr.dtype.type)
+
+    def serialize_to_numba(self):
+        return self.arr_ref
+
+    @classmethod
+    def deserialize_from_numba(cls, numba_buffer):
+        return cls(numba_buffer[0])
+
+
+class NumbaBufferFormat(NumpyBufferFormat):
     @staticmethod
     def numba_name():
         return "list[numpy.ndarray]"
+
+    def __call__(self, len_: int):
+        return NumbaBuffer(np.zeros(len_, dtype=self._dtype))
 
 
 class NumbaModule:
