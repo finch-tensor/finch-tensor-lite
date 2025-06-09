@@ -34,5 +34,4 @@ import finch_tensor_lite as finch
 ```
 
 ## Contributing
-
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, development setup, and best practices.
