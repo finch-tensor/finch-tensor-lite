@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -13,24 +12,30 @@ class ElementLevelFormat(LevelFormat):
     position_type_: type | None = None
     val_format: Any = None
 
-    def __init__(self, fill_value, element_type=None, position_type=None, val_format=None):
+    def __init__(
+        self, fill_value, element_type=None, position_type=None, val_format=None
+    ):
         self.fill_value_ = fill_value
         self.element_type_ = element_type or type(fill_value)
         self.position_type_ = position_type or np.intp
         self.val_format = val_format or NumpyBufferFormat(self.element_type_)
         self.element_type_ = self.val_format.element_type
         self.fill_value_ = self.element_type_(self.fill_value_)
-    
+
     def __eq__(self, other):
         if not isinstance(other, ElementLevelFormat):
             return False
-        return (self.fill_value_ == other.fill_value_ and
-                self.element_type_ == other.element_type_ and
-                self.position_type_ == other.position_type_ and
-                self.val_format == other.val_format)
-    
+        return (
+            self.fill_value_ == other.fill_value_
+            and self.element_type_ == other.element_type_
+            and self.position_type_ == other.position_type_
+            and self.val_format == other.val_format
+        )
+
     def __hash__(self):
-        return hash((self.fill_value_, self.element_type_, self.position_type_, self.val_format))
+        return hash(
+            (self.fill_value_, self.element_type_, self.position_type_, self.val_format)
+        )
 
     def __call__(self, shape):
         """

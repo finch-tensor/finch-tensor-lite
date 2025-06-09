@@ -41,7 +41,7 @@ class DenseLevelFormat(LevelFormat, ABC):
         Returns the type of elements stored in the fibers.
         """
         return self.lvl.element_type
-    
+
     @property
     def shape_type(self):
         """
@@ -49,7 +49,7 @@ class DenseLevelFormat(LevelFormat, ABC):
         """
         return (self.dimension_type, *self.lvl.shape_type)
 
-    @property 
+    @property
     def position_type(self):
         """
         Returns the type of positions within the levels.
