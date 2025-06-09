@@ -5,9 +5,12 @@ import pytest
 import numpy as np
 from numpy.testing import assert_equal
 
-import finch
 import finch.finch_assembly as asm
-from finch.codegen import CCompiler, NumpyBuffer
+from finch.codegen.c_backend import CCompiler, CKernel, load_shared_lib
+from finch.codegen.c_backend import NumpyBuffer as CNumpyBuffer
+from finch.codegen.c_backend import NumpyBufferFormat as CNumpyBufferFormat
+from finch.codegen.numba_backend import NumbaCompiler
+from finch.codegen.numba_backend import NumpyBuffer as NumbaNumpyBuffer
 
 
 def test_add_function():
@@ -18,7 +21,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finch.codegen.c.load_shared_lib(c_code).add
+    f = load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -56,73 +59,84 @@ def test_buffer_function():
     }
     """
     a = np.array([1, 2, 3], dtype=np.float64)
-    b = finch.NumpyBuffer(a)
-    f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finch.codegen.c.CKernel(f, type(None), [finch.NumpyBufferFormat(np.float64)])
+    b = CNumpyBuffer(a)
+    f = load_shared_lib(c_code).concat_buffer_with_self
+    k = CKernel(f, type(None), [CNumpyBufferFormat(np.float64)])
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
 
 
-def test_codegen():
-    a = asm.Variable("a", finch.NumpyBufferFormat(np.float64))
-    i = asm.Variable("i", int)
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), CNumpyBuffer),
+        (NumbaCompiler(), NumbaNumpyBuffer),
+    ],
+)
+def test_codegen(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    buf = buffer(a)
+
+    a_var = asm.Variable("a", buf.get_format())
+    i_var = asm.Variable("i", int)
     length_var = asm.Variable("l", int)
     prgm = asm.Module(
         (
             asm.Function(
                 asm.Variable("test_function", int),
-                (a,),
+                (a_var,),
                 asm.Block(
                     (
-                        asm.Assign(length_var, asm.Length(a)),
+                        asm.Assign(length_var, asm.Length(a_var)),
                         asm.Resize(
-                            a,
+                            a_var,
                             asm.Call(
                                 asm.Immediate(operator.mul),
-                                (asm.Length(a), asm.Immediate(2)),
+                                (asm.Length(a_var), asm.Immediate(2)),
                             ),
                         ),
                         asm.ForLoop(
-                            i,
+                            i_var,
                             asm.Immediate(0),
                             length_var,
                             asm.Store(
-                                a,
-                                asm.Call(asm.Immediate(operator.add), (i, length_var)),
+                                a_var,
+                                asm.Call(
+                                    asm.Immediate(operator.add), (i_var, length_var)
+                                ),
                                 asm.Call(
                                     asm.Immediate(operator.add),
-                                    (asm.Load(a, i), asm.Immediate(1)),
+                                    (asm.Load(a_var, i_var), asm.Immediate(1)),
                                 ),
                             ),
                         ),
-                        asm.Return(asm.Immediate(0)),
+                        asm.Return(
+                            asm.Immediate(0)
+                            if not isinstance(compiler, NumbaCompiler)
+                            else a_var
+                        ),
                     )
                 ),
             ),
         )
     )
-    ctx = CCompiler()
-    mod = ctx(prgm)
+    mod = compiler(prgm)
     f = mod.test_function
 
-    a = np.array([1, 2, 3], dtype=np.float64)
-    b = finch.NumpyBuffer(a)
-    f(b)
-    result = b.arr
+    result = f(buf.finalize())
+    result = buf.arr if not isinstance(compiler, NumbaCompiler) else result
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
-
-
-print(test_codegen())
 
 
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
-        (asm.AssemblyInterpreter(), NumpyBuffer),
+        (CCompiler(), CNumpyBuffer),
+        (NumbaCompiler(), NumbaNumpyBuffer),
+        (asm.AssemblyInterpreter(), CNumpyBuffer),
     ],
 )
 def test_dot_product(compiler, buffer):
@@ -134,8 +148,8 @@ def test_dot_product(compiler, buffer):
 
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
-    ab = NumpyBuffer(a)
-    bb = NumpyBuffer(b)
+    ab = buffer(a)
+    bb = buffer(b)
     ab_v = asm.Variable("a", ab.get_format())
     bb_v = asm.Variable("b", bb.get_format())
     prgm = asm.Module(
@@ -183,7 +197,7 @@ def test_dot_product(compiler, buffer):
 
     mod = compiler(prgm)
 
-    result = mod.dot_product(a_buf, b_buf)
+    result = mod.dot_product(a_buf.finalize(), b_buf.finalize())
 
     interp = asm.AssemblyInterpreter()(prgm)
 
@@ -195,8 +209,9 @@ def test_dot_product(compiler, buffer):
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
-        (asm.AssemblyInterpreter(), NumpyBuffer),
+        (CCompiler(), CNumpyBuffer),
+        (NumbaCompiler(), NumbaNumpyBuffer),
+        (asm.AssemblyInterpreter(), CNumpyBuffer),
     ],
 )
 def test_if_statement(compiler, buffer):

@@ -1,12 +1,6 @@
-from .c import CArgument, CBufferFormat, CCompiler, CKernel, CModule
-from .numpy_buffer import NumpyBuffer, NumpyBufferFormat
+from . import c_backend, numba_backend
 
 __all__ = [
-    "CKernel",
-    "CModule",
-    "CCompiler",
-    "CArgument",
-    "CBufferFormat",
-    "NumpyBuffer",
-    "NumpyBufferFormat",
+    "c_backend",
+    "numba_backend",
 ]

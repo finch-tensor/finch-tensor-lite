@@ -57,6 +57,13 @@ class Buffer(Formattable, ABC):
         """
         ...
 
+    @abstractmethod
+    def finalize(self):
+        """
+        Return a buffer that can be passed to a kernel.
+        """
+        ...
+
 
 class BufferFormat(Format):
     """
