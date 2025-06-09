@@ -83,7 +83,8 @@ poetry run mypy ./src/
 
 - **Do not use `assert` statements for user-facing validation.**
     - `assert` statements are removed when Python is run with the `-O` (optimize) flag.
-    - Use explicit error handling (e.g., `if ...: raise ValueError(...)`) for all user-facing checks, following the [array API specification](https://data-apis.org/array-api/latest/).
+    - Use explicit error handling (e.g., `if ...: raise ValueError(...)`) for all user-facing functions, following the [array API specification](https://data-apis.org/array-api/latest/).
+    - user-facing functions are anything exposed from `__all__` in the toplevel `__init__.py`
 - `assert` statements may be used for internal debugging, invariants, and sanity checks that are not critical to production behavior.
 
 ---
