@@ -42,9 +42,9 @@ from .interface import (
     vecdot,
 )
 from .tensor import (
-    FiberTensorFormat,
     DenseLevelFormat,
     ElementLevelFormat,
+    FiberTensorFormat,
 )
 
 __all__ = [

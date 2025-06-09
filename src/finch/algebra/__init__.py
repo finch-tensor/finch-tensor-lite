@@ -15,6 +15,7 @@ from .algebra import (
     shape_type,
 )
 from .operator import (
+    cast,
     conjugate,
     promote_max,
     promote_min,
@@ -38,4 +39,5 @@ __all__ = [
     "promote_min",
     "promote_max",
     "conjugate",
+    "cast",
 ]

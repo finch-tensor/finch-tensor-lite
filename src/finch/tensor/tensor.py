@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 from finch.symbolic import Format, Formattable
 
@@ -90,7 +90,7 @@ Tp = TypeVar("Tp")
 
 
 @dataclass
-class FiberTensor[Tp](Formattable):
+class FiberTensor(Generic[Tp], Formattable):
     """
     A class representing a tensor with fiber structure.
 
@@ -99,7 +99,7 @@ class FiberTensor[Tp](Formattable):
     """
 
     lvl: Level
-    pos: Tp | None = None
+    pos: Tp
 
     def __repr__(self):
         res = f"FiberTensor(lvl={self.lvl}"
@@ -107,12 +107,44 @@ class FiberTensor[Tp](Formattable):
             res += f", pos={self.pos}"
         res += ")"
         return res
-    
+
     def get_format(self):
         """
         Returns the format of the fiber tensor, which is a FiberTensorFormat.
         """
         return FiberTensorFormat(self.lvl.get_format(), type(self.pos))
+
+    @property
+    def shape(self):
+        return self.lvl.shape()
+
+    @property
+    def ndims(self):
+        return self.lvl.ndims()
+
+    @property
+    def shape_type(self):
+        return self.lvl.shape_type()
+
+    @property
+    def element_type(self):
+        return self.lvl.element_type()
+
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value()
+
+    @property
+    def position_type(self):
+        return self.lvl.position_type()
+
+    @property
+    def buffer_format(self):
+        """
+        Returns the format of the buffer used for the fibers.
+        This is typically a NumpyBufferFormat or similar.
+        """
+        return self.lvl.buffer_format()
 
 
 @dataclass
@@ -125,10 +157,46 @@ class FiberTensorFormat(Format, ABC):
     """
 
     lvl: LevelFormat
-    pos: type
+    pos: type | None = None
+
+    def __post_init__(self):
+        if self.pos is None:
+            self.pos = self.lvl.position_type()
 
     def __call__(self, shape):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
         return FiberTensor(self.lvl(shape), self.lvl.position_type()(1))
+
+    @property
+    def shape(self):
+        return self.lvl.shape()
+
+    @property
+    def ndims(self):
+        return self.lvl.ndims()
+
+    @property
+    def shape_type(self):
+        return self.lvl.shape_type()
+
+    @property
+    def element_type(self):
+        return self.lvl.element_type()
+
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value()
+
+    @property
+    def position_type(self):
+        return self.lvl.position_type()
+
+    @property
+    def buffer_format(self):
+        """
+        Returns the format of the buffer used for the fibers.
+        This is typically a NumpyBufferFormat or similar.
+        """
+        return self.lvl.buffer_format()

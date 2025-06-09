@@ -1,14 +1,16 @@
 from abc import ABC
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from ..tensor import Level, LevelFormat
-from dataclasses import dataclass, field
+
 
 @dataclass
 class DenseLevelFormat(LevelFormat, ABC):
-    lvl: any
-    dimension_type: any = None
+    lvl: Any
+    dimension_type: Any = None
 
     def __post_init__(self):
         if self.dimension_type is None:

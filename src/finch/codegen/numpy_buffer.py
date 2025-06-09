@@ -78,7 +78,7 @@ class NumpyBufferFormat(CBufferFormat):
     """
 
     def __init__(self, dtype: type):
-        self._dtype = dtype
+        self._dtype = np.dtype(dtype).type
 
     def __eq__(self, other):
         if not isinstance(other, NumpyBufferFormat):
@@ -103,7 +103,7 @@ class NumpyBufferFormat(CBufferFormat):
     def __hash__(self):
         return hash(self._dtype)
 
-    def __call__(self, len: int = 0, dtype: type = None):
+    def __call__(self, len: int = 0, dtype: type | None = None):
         if dtype is None:
             dtype = self._dtype
         return NumpyBuffer(np.zeros(len, dtype=dtype))

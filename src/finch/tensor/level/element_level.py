@@ -1,24 +1,28 @@
-from abc import ABC
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from ...codegen import NumpyBufferFormat
 from ..tensor import Level, LevelFormat
-from dataclasses import dataclass, field
+
+
 @dataclass
 class ElementLevelFormat(LevelFormat):
-    fill_value_: any
-    element_type_: type = None
-    position_type_: type = None
-    buffer_format_: any = None
+    fill_value_: Any
+    element_type_: type | None = None
+    position_type_: type | None = None
+    val_format: Any = None
 
     def __post_init__(self):
         if self.element_type_ is None:
             self.element_type_ = type(self.fill_value_)
+        if self.val_format is None:
+            self.val_format = NumpyBufferFormat(self.element_type_)
         if self.position_type_ is None:
             self.position_type_ = np.intp
-        if self.buffer_format_ is None:
-            self.buffer_format_ = NumpyBufferFormat(self.element_type_)
+        self.element_type_ = self.val_format.element_type
+        self.fill_value_ = self.element_type_(self.fill_value_)
 
     def __call__(self, shape):
         """
@@ -58,7 +62,7 @@ class ElementLevelFormat(LevelFormat):
         """
         Returns the format of the buffer used for the fibers.
         """
-        return self.buffer_format_
+        return self.val_format
 
 
 class ElementLevel(Level):
@@ -76,7 +80,7 @@ class ElementLevel(Level):
         if val is None:
             val = fmt.buffer_format()(len=0, dtype=fmt.element_type())
         self.val = val
-    
+
     def shape(self):
         return ()
 
