@@ -122,8 +122,7 @@ def test_codegen(compiler, buffer):
     )
     mod = compiler(prgm)
     f = mod.test_function
-
-    result = f(buf)
+    f(buf)
     result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
