@@ -327,15 +327,15 @@ def c_literal(ctx, val):
     """
     if hasattr(val, "c_literal"):
         return val.c_literal(ctx)
-    return query_property(val, "__self__", "c_literal", ctx)
+    return query_property(val, "c_literal", "__attr__", ctx)
 
 
-register_property(int, "__self__", "c_literal", lambda x, ctx: str(x))
-register_property(float, "__self__", "c_literal", lambda x, ctx: str(x))
+register_property(int, "c_literal", "__attr__", lambda x, ctx: str(x))
+register_property(float, "c_literal", "__attr__", lambda x, ctx: str(x))
 register_property(
     np.generic,
-    "__self__",
     "c_literal",
+    "__attr__",
     lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
 )
 for t in (
@@ -351,16 +351,16 @@ for t in (
 ):
     register_property(
         t,
-        "__self__",
         "c_literal",
+        "__attr__",
         lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
     )
 
 for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore[assignment]
     register_property(
         t,
-        "__self__",
         "c_literal",
+        "__attr__",
         lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
     )
 
@@ -378,15 +378,15 @@ def c_type(t):
     """
     if hasattr(t, "c_type"):
         return t.c_type()
-    return query_property(t, "__self__", "c_type")
+    return query_property(t, "c_type", "__attr__")
 
 
-register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
+register_property(int, "c_type", "__attr__", lambda x: ctypes.c_int)
 register_property(
-    np.generic, "__self__", "c_type", lambda x: np.ctypeslib.as_ctypes_type(x)
+    np.generic, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
-register_property(ctypes._SimpleCData, "__self__", "c_type", lambda x: x)
-register_property(type(None), "__self__", "c_type", lambda x: None)
+register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
+register_property(type(None), "c_type", "__attr__", lambda x: None)
 
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
