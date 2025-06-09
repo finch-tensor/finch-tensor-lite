@@ -354,7 +354,9 @@ def reduce(
     if axis is None:
         axis = tuple(range(x.ndim))
     axis = normalize_axis_tuple(axis, x.ndim)
-    assert axis is not None and not isinstance(axis, int)
+    if axis is None or isinstance(axis, int):
+        raise ValueError("axis must be a tuple")
+
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
     data: LogicNode = Aggregate(
