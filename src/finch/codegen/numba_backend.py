@@ -110,7 +110,6 @@ class NumbaCompiler:
         ctx(prgm)
         numba_code = ctx.emit_global()
         logger.info(f"Executing Numba code:\n{numba_code}")
-        print(f"Executing Numba code:\n{numba_code}")
         exec(numba_code, globals(), None)
 
         kernels = {}
