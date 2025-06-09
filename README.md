@@ -12,19 +12,5 @@ The source code for `finch-tensor-lite` is available on GitHub at [https://githu
 pip install finch-tensor-lite
 ```
 
-## Usage
-
-```python
-import finch
-import numpy as np
-
-a = np.arange(...).reshape(...)  # A large NumPy array
-b = np.arange(...).reshape(...)  # Another large NumPy array
-c = finch.defer(a) @ finch.defer(b)  # Deferred tensor operation
-c = c + np.ones_like(c)  # Another operation on the deferred tensor
-# c is still deferred; no computation yet
-finch.compute(c)  # Trigger computation
-```
-
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, development setup, and best practices.
