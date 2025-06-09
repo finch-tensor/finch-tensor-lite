@@ -221,9 +221,12 @@ def expand_dims(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
-    assert not isinstance(axis, int)
-    assert len(axis) == len(set(axis)), "axis must be unique"
-    assert set(axis).issubset(range(x.ndim + len(axis))), "Invalid axis"
+    if isinstance(axis, int):
+        raise ValueError("axis must be a tuple")
+    if len(axis) != len(set(axis)):
+        raise ValueError("axis must be unique")
+    if not set(axis).issubset(range(x.ndim + len(axis))):
+        raise ValueError("Invalid axis")
     offset = [0] * (x.ndim + len(axis))
     for d in axis:
         offset[d] = 1
@@ -270,10 +273,14 @@ def squeeze(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
-    assert not isinstance(axis, int)
-    assert len(axis) == len(set(axis)), "axis must be unique"
-    assert set(axis).issubset(range(x.ndim)), "Invalid axis"
-    assert all(x.shape[d] == 1 for d in axis), "axis to drop must have size 1"
+    if isinstance(axis, int):
+        raise ValueError("axis must be a tuple")
+    if len(axis) != len(set(axis)):
+        raise ValueError("axis must be unique")
+    if not set(axis).issubset(range(x.ndim)):
+        raise ValueError("Invalid axis")
+    if not all(x.shape[d] == 1 for d in axis):
+        raise ValueError("axis to drop must have size 1")
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
@@ -335,7 +342,9 @@ def reduce(
     if axis is None:
         axis = tuple(range(x.ndim))
     axis = normalize_axis_tuple(axis, x.ndim)
-    assert axis is not None and not isinstance(axis, int)
+    if axis is None or isinstance(axis, int):
+        raise ValueError("axis must be a tuple")
+
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
     data: LogicNode = Aggregate(
