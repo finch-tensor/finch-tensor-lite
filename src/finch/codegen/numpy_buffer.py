@@ -1,10 +1,10 @@
 import ctypes
-from abc import ABC, abstractmethod
 
 import numpy as np
 
 from ..finch_assembly.abstract_buffer import Buffer
 from .c import CArgument, CBufferFormat, c_type
+from .numba_backend import NumbaArgument, NumbaBufferFormat
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -24,16 +24,6 @@ class NumpyCBuffer(ctypes.Structure):
         ("length", ctypes.c_size_t),
         ("resize", type(numpy_buffer_resize_callback)),
     ]
-
-
-class NumbaArgument(ABC):
-    @abstractmethod
-    def serialize_to_numba(self):
-        """
-        Return a Numba-compatible object to be used in place of this argument
-        for the Numba backend.
-        """
-        ...
 
 
 class NumpyBuffer(Buffer, CArgument, NumbaArgument):
@@ -83,12 +73,6 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
 
     def serialize_to_numba(self):
         return self.arr
-
-
-class NumbaBufferFormat:
-    @staticmethod
-    def full_name():
-        return "numpy.ndarray"
 
 
 class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):

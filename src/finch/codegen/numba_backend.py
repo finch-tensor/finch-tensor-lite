@@ -1,4 +1,5 @@
 import logging
+from abc import ABC, abstractmethod
 from operator import methodcaller
 from typing import Any
 
@@ -6,6 +7,22 @@ from .. import finch_assembly as asm
 from ..symbolic.environment import Context, ScopedDict
 
 logger = logging.getLogger(__name__)
+
+
+class NumbaArgument(ABC):
+    @abstractmethod
+    def serialize_to_numba(self):
+        """
+        Return a Numba-compatible object to be used in place of this argument
+        for the Numba backend.
+        """
+        ...
+
+
+class NumbaBufferFormat:
+    @staticmethod
+    def numba_name():
+        return "numpy.ndarray"
 
 
 class NumbaModule:
@@ -102,8 +119,8 @@ class NumbaContext(Context):
 
     @staticmethod
     def full_name(val: Any) -> str:
-        if hasattr(val, "full_name"):
-            return val.full_name()
+        if hasattr(val, "numba_name"):
+            return val.numba_name()
         return f"{val.__module__}.{val.__name__}"
 
     def __call__(self, prgm: asm.AssemblyNode):
