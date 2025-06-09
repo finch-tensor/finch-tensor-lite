@@ -3,11 +3,9 @@ from abc import ABC, abstractmethod
 from operator import methodcaller
 from typing import Any
 
-import numpy as np
-
 from .. import finch_assembly as asm
-from ..symbolic import Context, ScopedDict
 from ..finch_assembly import BufferFormat
+from ..symbolic import Context, ScopedDict, has_format
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +25,7 @@ class NumbaArgument(ABC):
         Return an object from Numba returned value.
         """
         ...
+
 
 class NumbaBufferFormat(BufferFormat, ABC):
     @abstractmethod
@@ -50,7 +49,7 @@ class NumbaBufferFormat(BufferFormat, ABC):
         at the given index.
         """
         ...
-    
+
     @abstractmethod
     def numba_store(self, ctx: "NumbaContext", buffer, idx, value=None):
         """
@@ -83,17 +82,19 @@ class NumbaModule:
 
 
 class NumbaKernel:
-    def __init__(self, numba_func):
+    def __init__(self, numba_func, ret_type: type, arg_types):
         self.numba_func = numba_func
+        self.ret_type = ret_type
+        self.arg_types = arg_types
 
     def __call__(self, *args):
+        for arg_type, arg in zip(self.arg_types, args, strict=False):
+            if not has_format(arg, arg_type):
+                raise TypeError(
+                    f"Expected argument of type {arg_type}, got {type(arg)}"
+                )
         serial_args = list(map(methodcaller("serialize_to_numba"), args))
-        results = self.numba_func(*serial_args)
-        if np.isscalar(results):
-            return results
-        if len(results) == 0:
-            return ()
-        from .numpy_buffer import NumpyBuffer
+        res = self.numba_func(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_numba(serial_arg)
         if hasattr(self.ret_type, "construct_from_numba"):
@@ -109,21 +110,23 @@ class NumbaCompiler:
         ctx(prgm)
         numba_code = ctx.emit_global()
         logger.info(f"Executing Numba code:\n{numba_code}")
+        print(f"Executing Numba code:\n{numba_code}")
         exec(numba_code, globals(), None)
 
         kernels = {}
         for func in prgm.funcs:
             match func:
-                case asm.Function(asm.Variable(func_name, _), _, _):
+                case asm.Function(asm.Variable(func_name, ret_type), args, _):
                     kern = globals()[func_name]
-                    kernels[func_name] = NumbaKernel(kern)
+                    arg_ts = [arg.get_type() for arg in args]
+                    kernels[func_name] = NumbaKernel(kern, ret_type, arg_ts)
                 case _:
                     raise NotImplementedError(
                         f"Unrecognized function type: {type(func)}"
                     )
 
         return NumbaModule(kernels)
-    
+
 
 class NumbaContext(Context):
     def __init__(self, tab="    ", indent=0, bindings=None):

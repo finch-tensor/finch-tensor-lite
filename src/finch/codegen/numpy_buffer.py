@@ -4,7 +4,7 @@ import numpy as np
 
 from ..finch_assembly import Buffer
 from .c import CArgument, CBufferFormat, c_type
-from .numba_backend import NumbaBufferFormat, NumbaArgument
+from .numba_backend import NumbaArgument, NumbaBufferFormat
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -70,19 +70,18 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         """
         Update this buffer based on how the C call modified the CNumpyBuffer structure.
         """
-        #this is handled by the resize callback
-        pass
-    
+        # this is handled by the resize callback
+
     def serialize_to_numba(self):
         """
         Serialize the NumPy buffer to a Numba-compatible object.
         """
         return [self.arr]
-    
+
     def deserialize_from_numba(self, numba_buffer):
         self.arr = numba_buffer[0]
-        print(self.arr)
-        return nothing
+        return
+
 
 class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
     """
@@ -152,17 +151,16 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
 
     def numba_length(self, ctx, buf):
         return f"len({ctx(buf)}[0])"
-    
+
     def numba_load(self, ctx, buf, idx):
         return f"{ctx(buf)}[0][{ctx(idx)}]"
-    
+
     def numba_store(self, ctx, buf, idx, val):
         ctx.exec(f"{ctx.feed}{ctx(buf)}[0][{ctx(idx)}] = {ctx(val)}")
-    
+
     def numba_resize(self, ctx, buf, new_len):
         ctx.exec(
-            f"{ctx.feed}{ctx(buf)}[0] = numpy.resize({ctx(buf)}[0], "
-            f"{ctx(new_len)})"
+            f"{ctx.feed}{ctx(buf)}[0] = numpy.resize({ctx(buf)}[0], {ctx(new_len)})"
         )
 
     def construct_from_numba(self, numba_buffer):
