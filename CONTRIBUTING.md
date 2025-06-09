@@ -8,59 +8,73 @@ We adhere to the [Python Code of Conduct](https://policies.python.org/python.org
 
 ## Collaboration Practices
 
-- New to contributing? Welcome! See GitHub’s [pull request guide](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
-- Please follow the [SciML Collaborative Practices](https://docs.sciml.ai/ColPrac/stable/) and [GitHub Collaborative Practices](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/helping-others-review-your-changes).
-- Use the convention `<initials>/<branch-name>` for pull request branches (e.g., `ms/scheduler-pass`). This makes branch management easier.
+For those who are new to the process of contributing code, welcome! We value your contribution, and are excited to work with you. GitHub's [pull request guide](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) will walk you through how to file a PR.
 
-## Packaging
+Please follow the [SciML Collaborative Practices](https://docs.sciml.ai/ColPrac/stable/) and [Github Collaborative Practices](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/helping-others-review-your-changes) guides to help make your PR easier to review.
 
-We use [poetry](https://python-poetry.org/) for packaging.
+In this repo, please use the convention <initials>/<branch-name> for pull request branch names, e.g. ms/scheduler-pass.
+This way in bash when you type your initials git checkout ms/ and <tab> you can see all your branches. We will use other names for special purposes.
 
-To install for development:
+### Packaging
+
+Finch uses [poetry](https://python-poetry.org/) for packaging.
+
+To install for development, clone the repository and run:
 ```bash
 poetry install --extras test
 ```
-This installs the project and development dependencies.
+to install the current project and dev dependencies.
 
-## Publishing
+### Publishing
 
-Publishing to PyPI is handled by a manual GitHub Action workflow using Poetry. The workflow uses the version in `pyproject.toml` and automates tagging and GitHub releases.
+The "Publish" GitHub Action is a manual workflow for publishing Python packages to PyPI using Poetry. It handles the version management based on the `pyproject.toml` file and automates tagging and creating GitHub releases.
 
-**Before publishing:**
-- Update the version in `pyproject.toml` following semantic versioning.
+#### Version Update
 
-**To publish:**
-- Manually trigger the "Publish" action from the GitHub Actions tab after updating the version.
+Before initiating the "Publish" action, update the package's version number in `pyproject.toml`. Follow semantic versioning guidelines for this update.
 
-**Notes:**
-- If the version is not updated, publishing will fail.
-- Check action logs for completion or errors.
+#### Triggering the Action
 
-## Pre-commit Hooks
+The action is triggered manually. Once the version in `pyproject.toml` is updated, manually start the "Publish" action from the GitHub repository's Actions tab.
 
-We use [pre-commit](https://pre-commit.com/) for formatting, linting, and typing checks.
+#### Process and Outcomes
 
-To install hooks:
+On successful execution, the action publishes the package to PyPI and tags the release in the GitHub repository. If the version number is not updated, the action fails to publish to PyPI, and no tagging or release is done. In case of failure, correct the version number and rerun the action.
+
+#### Best Practices
+
+- Ensure the version number in `pyproject.toml` is updated before triggering the action.
+- Regularly check action logs for successful completion or to identify issues.
+
+### Pre-commit hooks
+
+Pull requests must pass some formatting, linting, and typing checks before we can merge them. These checks can be run automatically before you make commits, which is why they are sometimes called "pre-commit hooks". We use [pre-commit](https://pre-commit.com/) to run these checks.
+
+To install pre-commit hooks to run before committing, run:
 ```bash
 poetry run pre-commit install
 ```
-To run hooks manually:
+If you prefer to instead run pre-commit hooks manually, run:
 ```bash
 poetry run pre-commit run -a
 ```
 
-## Testing
+### Testing
+Finch uses [pytest](https://docs.pytest.org/en/latest/) for testing. To run the
+tests:
 
-We use [pytest](https://docs.pytest.org/en/latest/) for testing.
-
-To run tests:
 ```bash
 poetry run pytest
 ```
 
-### Static Type Checking
+- Tests are located in the `tests/` directory at the project root.
+- Write thorough tests for your new features and bug fixes.
 
-Type checks are run with mypy as part of pytest, but you can run it manually:
+#### Optional Static Type Checking
+
+The pytest will run mypy to check for type errors, so you shouldn't need to run it manually.
+In case you do need to run mypy manually, you can do so with:
+
 ```bash
 poetry run mypy ./src/
 ```
@@ -70,33 +84,7 @@ poetry run mypy ./src/
 - **Do not use `assert` statements for user-facing validation.**
     - `assert` statements are removed when Python is run with the `-O` (optimize) flag.
     - Use explicit error handling (e.g., `if ...: raise ValueError(...)`) for all user-facing checks, following the [array API specification](https://data-apis.org/array-api/latest/).
-- `assert` statements may be used for internal debugging, invariants, and sanity checks that are not critical for production correctness.
-
-## Codebase Overview
-
-### Directory Structure
-`src/finch/`:
-
-- `algebra/` — Core algebraic logic: defines algebraic properties, type promotion, operator logic, and utilities for querying and registering algebraic properties.
-- `autoschedule/` — Automatic scheduling and optimization passes for tensor computations, including logic graph transformations and compiler passes.
-- `codegen/` — Code generation backends, including C and NumPy buffer support, for compiling and running tensor computations.
-- `finch_assembly/` — Intermediate representation for low-level tensor operations, including assembly nodes, interpreters, and buffer abstractions.
-- `finch_logic/` — Internal logic node representations for symbolic tensor computation, including logic trees, expressions, and interpreters.
-- `interface/` — User-facing tensor APIs, including lazy and eager tensor implementations, array API overrides, and computation fusion.
-- `symbolic/` — Symbolic utilities for manipulating computation graphs, including term rewriting, symbolic environments, and unique name generation.
-- `util/` — Utility modules for configuration, caching, and other shared infrastructure.
-- `interface/overrides.py` — Mechanisms for user and library overrides, including NumPy ufunc compatibility and array API support.
-- `__init__.py` — Module initialization and exports for the Finch package.
-
-## Testing
-
-- Tests are located in the `tests/` directory at the project root.
-- Add tests for all new features and bug fixes. Write thorough tests for new features and bug fixes in the `tests/` directory.
-
-## Documentation
-
-- All public APIs should have clear docstrings following the NumPy style.
-- Update this file as the codebase evolves.
+- `assert` statements may be used for internal debugging, invariants, and sanity checks that are not critical to production behavior.
 
 ---
 **If you find an error or unclear section, please fix it or open an issue.**
