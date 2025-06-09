@@ -46,7 +46,7 @@ class TensorView:
         """
         return self.tns.fill_value
 
-    def access(self, idxs):
+    def access(self, mode, idxs):
         """
         Unfurl the tensor view along a specific index.
         This creates a new tensor view with the specified index unfurled.
@@ -75,10 +75,10 @@ def access(tns, mode, idxs):
     This is used to create a tensor view for a specific slice of the tensor.
     """
     if hasattr(tns, "access"):
-        return tns.access(idxs)
+        return tns.access(mode, idxs)
     try:
-        return query_property(tns, "__self__", "access", mode, idxs)
-    except NotImplementedError:
+        return query_property(tns, "access", "__attr__", mode, idxs)
+    except AttributeError:
         return TensorView(idxs=idxs, tns=tns)
 
 
@@ -89,7 +89,7 @@ def unwrap(tns):
     """
     if hasattr(tns, "unwrap"):
         return tns.unwrap()
-    return query_property(tns, "__self__", "unwrap")
+    return query_property(tns, "unwrap", "__attr__")
 
 
 def increment(tns, op, val):
@@ -99,7 +99,7 @@ def increment(tns, op, val):
     """
     if hasattr(tns, "increment"):
         return tns.increment(op, val)
-    return query_property(tns, "__self__", "increment", op, val)
+    return query_property(tns, "increment", "__attr__", op, val)
 
 
 def declare(tns, init, op, shape):
@@ -108,7 +108,7 @@ def declare(tns, init, op, shape):
     """
     if hasattr(tns, "declare"):
         return tns.declare(init, op, shape)
-    return query_property(tns, "__self__", "declare", init, op, shape)
+    return query_property(tns, "declare", "__attr__", init, op, shape)
 
 
 def np_declare(tns, init, op, shape):
@@ -122,7 +122,7 @@ def np_declare(tns, init, op, shape):
     return tns
 
 
-register_property(np.ndarray, "__self__", "declare", np_declare)
+register_property(np.ndarray, "declare", "__attr__", np_declare)
 
 
 def freeze(tns, op):
@@ -132,8 +132,8 @@ def freeze(tns, op):
     if hasattr(tns, "freeze"):
         return tns.freeze(op)
     try:
-        query_property(tns, "__self__", "freeze", op)
-    except NotImplementedError:
+        query_property(tns, "freeze", "__attr__", op)
+    except AttributeError:
         return tns
 
 
@@ -144,8 +144,8 @@ def thaw(tns, op):
     if hasattr(tns, "freeze"):
         return tns.freeze(op)
     try:
-        return query_property(tns, "__self__", "freeze", op)
-    except NotImplementedError:
+        return query_property(tns, "freeze", "__attr__", op)
+    except AttributeError:
         return tns
 
 
