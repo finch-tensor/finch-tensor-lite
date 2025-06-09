@@ -41,6 +41,11 @@ from .interface import (
     truediv,
     vecdot,
 )
+from .tensor import (
+    FiberTensorFormat,
+    DenseLevelFormat,
+    ElementLevelFormat,
+)
 
 __all__ = [
     "defer",
@@ -84,4 +89,7 @@ __all__ = [
     "max",
     "any",
     "all",
+    "FiberTensorFormat",
+    "DenseLevelFormat",
+    "ElementLevelFormat",
 ]
