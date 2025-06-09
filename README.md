@@ -80,3 +80,12 @@ tests:
 ```bash
 poetry run pytest
 ```
+
+#### Optional Static Type Checking
+
+The pytest will run mypy to check for type errors, so you shouldn't need to run it manually.
+In case you do need to run mypy manually, you can do so with:
+
+```bash
+poetry run mypy ./src/
+```
