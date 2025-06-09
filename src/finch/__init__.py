@@ -1,7 +1,8 @@
 from .algebra import element_type, fill_value
 from .codegen import (
-    c_backend,
-    numba_backend,
+    CKernel,
+    NumpyBuffer,
+    NumpyBufferFormat,
 )
 from .interface import (
     EagerTensor,
@@ -69,8 +70,10 @@ __all__ = [
     "LazyTensor",
     "fill_value",
     "element_type",
-    "c_backend",
-    "numba_backend",
+    "CKernel",
+    "Buffer",
+    "NumpyBuffer",
+    "NumpyBufferFormat",
     "min",
     "max",
     "any",

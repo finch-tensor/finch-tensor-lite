@@ -5,10 +5,8 @@ import pytest
 import numpy as np
 
 from finch import finch_assembly as asm
-from finch.codegen.c_backend import NumpyBuffer
-from finch.finch_assembly import (
-    AssemblyInterpreter,
-)
+from finch.codegen import NumpyBuffer
+from finch.finch_assembly import AssemblyInterpreter
 
 
 @pytest.mark.parametrize(

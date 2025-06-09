@@ -12,12 +12,12 @@ from typing import Any
 
 import numpy as np
 
-from ... import finch_assembly as asm
-from ...algebra import query_property, register_property
-from ...finch_assembly.abstract_buffer import BufferFormat
-from ...symbolic import Context, ScopedDict, has_format
-from ...util import config
-from ...util.cache import file_cache
+from .. import finch_assembly as asm
+from ..algebra import query_property, register_property
+from ..finch_assembly.abstract_buffer import BufferFormat
+from ..symbolic import Context, ScopedDict, has_format
+from ..util import config
+from ..util.cache import file_cache
 
 logger = logging.getLogger(__name__)
 

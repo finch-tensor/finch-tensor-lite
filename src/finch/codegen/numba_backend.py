@@ -1,44 +1,11 @@
 import logging
+from operator import methodcaller
 from typing import Any
 
-import numpy as np
-
-from ... import finch_assembly as asm
-from ...codegen.numpy_buffer import AbstractNumpyBuffer, AbstractNumpyBufferFormat
-from ...symbolic.environment import Context, ScopedDict
+from .. import finch_assembly as asm
+from ..symbolic.environment import Context, ScopedDict
 
 logger = logging.getLogger(__name__)
-
-
-class NumpyBufferFormat(AbstractNumpyBufferFormat):
-    @property
-    def __module__(self):
-        return "numpy"
-
-    @property
-    def __name__(self):
-        return "ndarray"
-
-    def __call__(self, len_: int):
-        return NumpyBuffer(np.zeros(len_, dtype=self._dtype))
-
-    def __eq__(self, other):
-        if not isinstance(other, NumpyBufferFormat):
-            return False
-        return self._dtype == other._dtype
-
-
-class NumpyBuffer(AbstractNumpyBuffer):
-    """
-    A buffer that uses NumPy arrays to store data. This is a concrete implementation
-    of the AbstractBuffer class.
-    """
-
-    def get_format(self):
-        return NumpyBufferFormat(self.arr.dtype.type)
-
-    def finalize(self):
-        return self.arr
 
 
 class NumbaModule:
@@ -58,6 +25,15 @@ class NumbaModule:
         )
 
 
+class NumbaKernel:
+    def __init__(self, numba_func):
+        self.numba_func = numba_func
+
+    def __call__(self, *args):
+        serial_args = list(map(methodcaller("serialize_to_numba"), args))
+        return self.numba_func(*serial_args)
+
+
 class NumbaCompiler:
     def __call__(self, prgm: asm.Module):
         ctx = NumbaContext()
@@ -71,7 +47,7 @@ class NumbaCompiler:
             match func:
                 case asm.Function(asm.Variable(func_name, _), _, _):
                     kern = globals()[func_name]
-                    kernels[func_name] = kern
+                    kernels[func_name] = NumbaKernel(kern)
                 case _:
                     raise NotImplementedError(
                         f"Unrecognized function type: {type(func)}"
@@ -126,6 +102,8 @@ class NumbaContext(Context):
 
     @staticmethod
     def full_name(val: Any) -> str:
+        if hasattr(val, "full_name"):
+            return val.full_name()
         return f"{val.__module__}.{val.__name__}"
 
     def __call__(self, prgm: asm.AssemblyNode):

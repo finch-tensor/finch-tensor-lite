@@ -5,12 +5,9 @@ import pytest
 import numpy as np
 from numpy.testing import assert_equal
 
+import finch
 import finch.finch_assembly as asm
-from finch.codegen.c_backend import CCompiler, CKernel, load_shared_lib
-from finch.codegen.c_backend import NumpyBuffer as CNumpyBuffer
-from finch.codegen.c_backend import NumpyBufferFormat as CNumpyBufferFormat
-from finch.codegen.numba_backend import NumbaCompiler
-from finch.codegen.numba_backend import NumpyBuffer as NumbaNumpyBuffer
+from finch.codegen import CCompiler, NumbaCompiler, NumpyBuffer, NumpyBufferFormat
 
 
 def test_add_function():
@@ -21,7 +18,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = load_shared_lib(c_code).add
+    f = finch.codegen.c.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -59,9 +56,9 @@ def test_buffer_function():
     }
     """
     a = np.array([1, 2, 3], dtype=np.float64)
-    b = CNumpyBuffer(a)
-    f = load_shared_lib(c_code).concat_buffer_with_self
-    k = CKernel(f, type(None), [CNumpyBufferFormat(np.float64)])
+    b = NumpyBuffer(a)
+    f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
+    k = finch.codegen.c.CKernel(f, type(None), [NumpyBufferFormat(np.float64)])
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
@@ -71,8 +68,8 @@ def test_buffer_function():
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), CNumpyBuffer),
-        (NumbaCompiler(), NumbaNumpyBuffer),
+        (CCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumpyBuffer),
     ],
 )
 def test_codegen(compiler, buffer):
@@ -125,7 +122,7 @@ def test_codegen(compiler, buffer):
     mod = compiler(prgm)
     f = mod.test_function
 
-    result = f(buf.finalize())
+    result = f(buf)
     result = buf.arr if not isinstance(compiler, NumbaCompiler) else result
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     assert_equal(result, expected)
@@ -134,9 +131,9 @@ def test_codegen(compiler, buffer):
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), CNumpyBuffer),
-        (NumbaCompiler(), NumbaNumpyBuffer),
-        (asm.AssemblyInterpreter(), CNumpyBuffer),
+        (CCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )
 def test_dot_product(compiler, buffer):
@@ -197,7 +194,7 @@ def test_dot_product(compiler, buffer):
 
     mod = compiler(prgm)
 
-    result = mod.dot_product(a_buf.finalize(), b_buf.finalize())
+    result = mod.dot_product(a_buf, b_buf)
 
     interp = asm.AssemblyInterpreter()(prgm)
 
@@ -209,9 +206,9 @@ def test_dot_product(compiler, buffer):
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), CNumpyBuffer),
-        (NumbaCompiler(), NumbaNumpyBuffer),
-        (asm.AssemblyInterpreter(), CNumpyBuffer),
+        (CCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )
 def test_if_statement(compiler, buffer):
