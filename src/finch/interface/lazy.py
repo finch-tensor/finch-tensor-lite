@@ -1,13 +1,14 @@
 import builtins
 import operator
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from itertools import accumulate
+from itertools import accumulate, zip_longest
 from typing import Any
 
 from numpy.core.numeric import normalize_axis_tuple
 
+from ..algebra import conjugate as conj
 from ..algebra import (
     element_type,
     fill_value,
@@ -133,6 +134,12 @@ class LazyTensor(OverrideTensor):
     def __rpow__(self, other):
         return pow(defer(other), self)
 
+    def __matmul__(self, other):
+        return matmul(self, defer(other))
+
+    def __rmatmul__(self, other):
+        return matmul(defer(other), self)
+
 
 def defer(arr) -> LazyTensor:
     """
@@ -221,9 +228,17 @@ def expand_dims(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
-    assert not isinstance(axis, int)
-    assert len(axis) == len(set(axis)), "axis must be unique"
-    assert set(axis).issubset(range(x.ndim + len(axis))), "Invalid axis"
+    if isinstance(axis, int):
+        raise IndexError(
+            f"Invalid axis: {axis}. Axis must be an integer or a tuple of integers."
+        )
+    if not len(axis) == len(set(axis)):
+        raise IndexError("axis must be unique")
+    if not set(axis).issubset(range(x.ndim + len(axis))):
+        raise IndexError(
+            f"Invalid axis: {axis}. Axis must be unique and must be in the range "
+            f"[-{x.ndim + len(axis) - 1}, {x.ndim + len(axis) - 1}]."
+        )
     offset = [0] * (x.ndim + len(axis))
     for d in axis:
         offset[d] = 1
@@ -270,10 +285,14 @@ def squeeze(
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
-    assert not isinstance(axis, int)
-    assert len(axis) == len(set(axis)), "axis must be unique"
-    assert set(axis).issubset(range(x.ndim)), "Invalid axis"
-    assert all(x.shape[d] == 1 for d in axis), "axis to drop must have size 1"
+    if isinstance(axis, int):
+        raise ValueError(f"Invalid axis: {axis}. Axis must be a tuple of integers.")
+    if len(axis) != len(set(axis)):
+        raise ValueError(f"Invalid axis: {axis}. Axis must be unique.")
+    if not set(axis).issubset(range(x.ndim)):
+        raise ValueError(f"Invalid axis: {axis}. Axis must be within bounds.")
+    if not builtins.all(x.shape[d] == 1 for d in axis):
+        raise ValueError(f"Invalid axis: {axis}. Axis to drop must have size 1.")
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
@@ -529,6 +548,88 @@ def negative(x) -> LazyTensor:
     return elementwise(operator.neg, defer(x))
 
 
+def is_broadcastable(shape_a, shape_b):
+    """
+    Returns True if shape_a and shape_b are broadcastable according to numpy rules.
+    """
+    for a, b in zip_longest(reversed(shape_a), reversed(shape_b), fillvalue=1):
+        if a != b and a != 1 and b != 1:
+            return False
+    return True
+
+
+def matmul(x1, x2) -> LazyTensor:
+    """
+    Performs matrix multiplication between two tensors.
+    """
+
+    def _matmul_helper(a, b) -> LazyTensor:
+        """
+        For arrays greater than 1D
+        """
+        if a.ndim < 2 or b.ndim < 2:
+            raise ValueError("Both inputs must be at least 2D arrays")
+        if a.shape[-1] != b.shape[-2]:
+            raise ValueError("Dimensions mismatch for matrix multiplication")
+        # check all preceeding dimensions match
+        batch_a, batch_b = a.shape[:-2], b.shape[:-2]
+        if not is_broadcastable(batch_a, batch_b):
+            raise ValueError(
+                "Batch dimensions are not broadcastable for matrix multiplication"
+            )
+        return reduce(
+            operator.add,
+            multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
+            axis=-2,
+        )
+
+    x1 = defer(x1)
+    x2 = defer(x2)
+
+    if x1.ndim < 1 or x2.ndim < 1:
+        raise ValueError("Both inputs must be at least 1D arrays")
+
+    if x1.ndim == 1 and x2.ndim == 1:
+        return reduce(operator.add, multiply(x1, x2), axis=0)
+
+    if x1.ndim == 1:
+        x1 = expand_dims(x1, axis=0)  # make it a row vector
+        result = _matmul_helper(x1, x2)
+        return squeeze(result, axis=-2)  # remove the prepended singleton dimension
+
+    if x2.ndim == 1:
+        x2 = expand_dims(x2, axis=1)  # make it a column vector
+        result = _matmul_helper(x1, x2)
+        return squeeze(result, axis=-1)  # remove the appended singleton dimension
+
+    return _matmul_helper(x1, x2)
+
+
+def matrix_transpose(x) -> LazyTensor:
+    """
+    Transposes the input tensor `x`.
+
+    Parameters
+    ----------
+    x: LazyTensor
+        The input tensor to be transposed. Must have at least 2 dimensions.
+
+    Returns
+    -------
+    LazyTensor
+        A new LazyTensor with the axes of `x` transposed.
+    """
+    x = defer(x)
+    if x.ndim < 2:
+        # this is following numpy's behavior.
+        # data-apis specification assumes that input is atleast 2D
+        raise ValueError(
+            "Input tensor must have at least 2 dimensions for transposition"
+        )
+    # swap the last two axes
+    return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
+
+
 def bitwise_and(x1, x2) -> LazyTensor:
     return elementwise(operator.and_, defer(x1), defer(x2))
 
@@ -563,3 +664,107 @@ def mod(x1, x2) -> LazyTensor:
 
 def pow(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
+
+
+def conjugate(x) -> LazyTensor:
+    """
+    Computes the complex conjugate of the input tensor `x`.
+
+    Parameters
+    ----------
+    x: LazyTensor
+        The input tensor to compute the complex conjugate of.
+
+    Returns
+    -------
+    LazyTensor
+        A new LazyTensor with the complex conjugate of `x`.
+    """
+    return elementwise(conj, defer(x))
+
+
+def tensordot(
+    x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]
+) -> LazyTensor:
+    """
+    Computes the tensordot operation.
+
+    Returns a LazyTensor if either x1 or x2 is a LazyTensor.
+    Otherwise, computes the result eagerly.
+    """
+    x1 = defer(x1)
+    x2 = defer(x2)
+
+    # Parse axes
+    if not isinstance(axes, tuple):
+        N = int(axes)
+        if N < 0:
+            raise ValueError("axes must be non-negative")
+        axes_a = list(range(x1.ndim - N, x1.ndim))
+        axes_b = list(range(N))
+    else:
+        axes_a, axes_b = (list(ax) for ax in axes)
+        axes_a = [axes_a] if isinstance(axes_a, int) else list(axes_a)
+        axes_b = [axes_b] if isinstance(axes_b, int) else list(axes_b)
+
+    # Normalize negative axes
+    axes_a = [(a if a >= 0 else x1.ndim + a) for a in axes_a]
+    axes_b = [(b if b >= 0 else x2.ndim + b) for b in axes_b]
+
+    # Check axes lengths and shapes
+    if len(axes_a) != len(axes_b):
+        raise ValueError("shape-mismatch for sum")
+    for a, b in zip(axes_a, axes_b, strict=True):
+        if x1.shape[a] != x2.shape[b]:
+            raise ValueError("shape-mismatch for sum")
+
+    # Move axes to contract to the end of x1 and to the front of x2
+    notin_a = [k for k in range(x1.ndim) if k not in axes_a]
+    notin_b = [k for k in range(x2.ndim) if k not in axes_b]
+    newaxes_a = notin_a + axes_a
+    newaxes_b = axes_b + notin_b
+
+    # Permute
+    x1p = permute_dims(x1, tuple(newaxes_a))
+    x2p = permute_dims(x2, tuple(newaxes_b))
+
+    # Expand x1p and x2p so that their contracted axes align for broadcasting
+    # so we can multiply them
+
+    # For x1p, add len(notin_b) singleton dims at the end
+    added_dims = tuple(-(i + 1) for i in range(len(notin_b)))
+    x1p = expand_dims(x1p, axis=added_dims)
+
+    # For x2p, add len(notin_a) singleton dims at the front
+    added_dims = tuple(i for i in range(len(notin_a)))
+    x2p = expand_dims(x2p, axis=added_dims)
+
+    # Multiply (broadcasted)
+    expanded_product = multiply(x1p, x2p)
+
+    sum_axes = tuple(range(len(notin_a), len(notin_a) + len(axes_a)))
+    return sum(expanded_product, axis=sum_axes)
+
+
+def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
+    """
+    Computes the vector dot product along the specified axis.
+    """
+    x1 = defer(x1)
+    x2 = defer(x2)
+
+    # check broadcastability
+    if not is_broadcastable(x1.shape, x2.shape):
+        raise ValueError("Shapes are not broadcastable for vector dot product")
+
+    # check if dims of axis are the same
+    if x1.shape[axis] != x2.shape[axis]:
+        raise ValueError(
+            "Shapes are not compatible for vector dot product along the specified axis"
+        )
+
+    return reduce(
+        operator.add,
+        multiply(conjugate(x1), x2),
+        axis=axis,
+    )

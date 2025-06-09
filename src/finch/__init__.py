@@ -1,6 +1,5 @@
 from .algebra import element_type, fill_value
 from .codegen import (
-    CKernel,
     NumpyBuffer,
     NumpyBufferFormat,
 )
@@ -23,6 +22,8 @@ from .interface import (
     floordiv,
     fuse,
     fused,
+    matmul,
+    matrix_transpose,
     max,
     min,
     mod,
@@ -36,7 +37,9 @@ from .interface import (
     squeeze,
     subtract,
     sum,
+    tensordot,
     truediv,
+    vecdot,
 )
 
 __all__ = [
@@ -57,6 +60,12 @@ __all__ = [
     "abs",
     "positive",
     "negative",
+    "EagerTensor",
+    "LazyTensor",
+    "fill_value",
+    "element_type",
+    "matmul",
+    "matrix_transpose",
     "bitwise_and",
     "bitwise_or",
     "bitwise_xor",
@@ -66,12 +75,9 @@ __all__ = [
     "floordiv",
     "mod",
     "pow",
-    "EagerTensor",
+    "tensordot",
+    "vecdot",
     "LazyTensor",
-    "fill_value",
-    "element_type",
-    "CKernel",
-    "Buffer",
     "NumpyBuffer",
     "NumpyBufferFormat",
     "min",

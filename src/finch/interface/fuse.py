@@ -1,13 +1,3 @@
-from ..finch_logic import (
-    Alias,
-    FinchLogicInterpreter,
-    Plan,
-    Produces,
-    Query,
-)
-from ..symbolic import gensym
-from .lazy import defer
-
 """
 This module provides functionality for array fusion and computation using lazy
 evaluation.
@@ -59,6 +49,16 @@ Performance:
 - The optimizer can be set using the `ctx` argument in `compute`, or via `set_scheduler`
   or `with_scheduler`.
 """
+
+from ..finch_logic import (
+    Alias,
+    FinchLogicInterpreter,
+    Plan,
+    Produces,
+    Query,
+)
+from ..symbolic import gensym
+from .lazy import defer
 
 
 def get_default_scheduler():
