@@ -3,9 +3,26 @@ import operator
 import pytest
 
 import numpy as np
-from numpy.testing import assert_equal
+from numpy.testing import assert_allclose, assert_equal
 
 import finch
+
+
+# Utility function to generate random complex numpy tensors
+def random_complex_array(shape):
+    """Generates a random complex array. Uses integers for both real
+    and imaginary parts to avoid floating-point issues in tests.
+
+    Args:
+        shape: A tuple specifying the shape of the array.
+
+    Returns:
+        A NumPy array of complex numbers with the given shape.
+    """
+    rng = np.random.default_rng()
+    real_part = rng.integers(0, 10, shape)
+    imag_part = rng.integers(0, 10, shape)
+    return real_part + 1j * imag_part
 
 
 @pytest.mark.parametrize(
@@ -218,3 +235,340 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
             result = finch.compute(result)
 
         assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        # 1D x 1D (dot product)
+        (np.array([1, 2, 3]), np.array([4, 5, 6])),
+        # 2D x 2D
+        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
+        # 2D x 1D
+        (np.array([[1, 2], [3, 4]]), np.array([5, 6])),
+        # 1D x 2D
+        (np.array([1, 2]), np.array([[3, 4], [5, 6]])),
+        # 3D x 3D (batched matmul)
+        (
+            np.arange(2 * 3 * 4).reshape(2, 3, 4),
+            np.arange(2 * 4 * 5).reshape(2, 4, 5),
+        ),
+        # Broadcasting cases
+        # 1D x 2D (broadcasting)
+        (np.array([1, 2]), np.arange(2 * 4).reshape(2, 4)),
+        # 1D x 3D (broadcasting)
+        (np.array([1, 2]), np.arange(3 * 2 * 5).reshape(3, 2, 5)),
+        #  4D x 3D (broadcasting)
+        (
+            np.arange(7 * 2 * 4 * 3).reshape(7, 2, 4, 3),
+            np.arange(2 * 3 * 4).reshape(2, 3, 4),
+        ),
+        # 3D x 1D (broadcasting)
+        (np.arange(3 * 2 * 4).reshape(3, 2, 4), np.arange(4)),
+        # (1, 3, 2) x (5, 2, 3)
+        (np.arange(1 * 3 * 2).reshape(1, 3, 2), np.arange(5 * 2 * 3).reshape(5, 2, 3)),
+        # Complex numbers, 4D x 5D
+        (
+            random_complex_array((2, 3, 4, 5)),
+            random_complex_array((3, 5, 6)),
+        ),
+        # mismatch dimensions
+        (
+            np.arange(7 * 2 * 3 * 4).reshape(7, 2, 3, 4),
+            np.arange(2 * 3 * 4).reshape(2, 3, 4),
+        ),
+        (np.arange(5), np.arange(4)),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_matmul(a, b, a_wrap, b_wrap):
+    """
+    Tests for matrix multiplication using finch's matmul function.
+    """
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+
+    try:
+        expected = np.linalg.matmul(a, b)
+    except ValueError:
+        with pytest.raises(ValueError):
+            finch.matmul(wa, wb)  # make sure matmul raises error too
+        return
+
+    result = finch.matmul(wa, wb)
+
+    if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
+        assert isinstance(result, finch.LazyTensor)
+        result = finch.compute(result)
+
+    assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.arange(6).reshape(2, 3),
+        np.arange(12).reshape(1, 12),
+        np.arange(24).reshape(2, 3, 4),  # 3D array
+        # Complex
+        random_complex_array((5, 1, 4)),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_matrix_transpose(a, a_wrap):
+    """
+    Tests for matrix transpose
+    """
+    a = np.array(a)
+    wa = a_wrap(a)
+    expected = np.linalg.matrix_transpose(a)
+
+    result = finch.matrix_transpose(wa)
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+    assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a, b, axes",
+    [
+        # 1D x 1D (dot product)
+        (np.array([1, 2, 3]), np.array([4, 5, 6]), 0),
+        # axes as int
+        (np.arange(6).reshape(2, 3), np.arange(12).reshape(3, 4), 1),
+        (np.arange(24).reshape(2, 3, 4), np.arange(12).reshape(4, 3), 1),
+        (np.arange(24).reshape(2, 4, 3), np.arange(24).reshape(4, 3, 2), 2),
+        # axes as tuple of sequences
+        (
+            np.arange(24).reshape(2, 3, 4),
+            np.arange(24).reshape(4, 3, 2),
+            ([1, 2], [1, 0]),
+        ),
+        (
+            np.arange(60).reshape(3, 4, 5),
+            np.arange(24).reshape(4, 3, 2),
+            ([0, 1], [1, 0]),
+        ),
+        # axes=0 (outer product)
+        (np.arange(3), np.arange(4), 0),
+        (np.arange(8 * 7 * 5).reshape(8, 7, 5), np.arange(12).reshape(3, 4, 1), 0),
+        # complex
+        (random_complex_array((2, 3)), random_complex_array((3, 4)), 1),
+        (
+            random_complex_array((3, 5, 4, 6)),
+            random_complex_array((6, 4, 5, 3)),
+            ([2, 1, 3], [1, 2, 0]),
+        ),
+        # mismatched axes (should raise)
+        (np.arange(6).reshape(2, 3), np.arange(8).reshape(2, 4), 1),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_tensordot(a, b, axes, a_wrap, b_wrap):
+    """
+    Tests for tensordot operation according to the Array API specification.
+    See: https://data-apis.org/array-api/2024.12/API_specification/generated/array_api.tensordot.html
+    """
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+    try:
+        expected = np.tensordot(a, b, axes=axes)
+    except ValueError:
+        # tensordot should raise a ValueError
+        with pytest.raises(ValueError):
+            finch.tensordot(wa, wb, axes=axes)
+        return
+    result = finch.tensordot(wa, wb, axes=axes)
+
+    if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
+        assert isinstance(result, finch.LazyTensor)
+        result = finch.compute(result)
+
+    assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x1, x2, axis",
+    [
+        # 1D x 1D (scalar result)
+        (np.array([1.0, 2.0, 3.0]), np.array([4.0, 5.0, 6.0]), -1),
+        # 2D x 2D (vector result)
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), np.array([[5.0, 6.0], [7.0, 8.0]]), -1),
+        # 3D x 3D, axis=-1
+        (
+            np.arange(2 * 3 * 4, dtype=float).reshape(2, 3, 4),
+            np.arange(2 * 3 * 4, dtype=float).reshape(2, 3, 4),
+            -1,
+        ),
+        # 3D x 3D, axis=-2
+        (
+            np.arange(2 * 3 * 4, dtype=float).reshape(2, 3, 4),
+            np.arange(2 * 3 * 4, dtype=float).reshape(2, 3, 4),
+            -2,
+        ),
+        # Broadcasting: (2, 3, 4) x (4,)
+        (
+            np.arange(2 * 3 * 4, dtype=float).reshape(2, 3, 4),
+            np.arange(4, dtype=float),
+            -1,
+        ),
+        # Broadcasting: (3, 4) x (1, 4)
+        (
+            np.arange(3 * 4, dtype=float).reshape(3, 4),
+            np.arange(4, dtype=float).reshape(1, 4),
+            -1,
+        ),
+        # Complex numbers
+        (np.array([1 + 2j, 3 + 4j]), np.array([5 - 1j, 2 + 2j]), -1),
+        # axis=0
+        (
+            np.arange(2 * 3, dtype=float).reshape(2, 3),
+            np.arange(2 * 3, dtype=float).reshape(2, 3),
+            0,
+        ),
+        # Mismatched contracted axis
+        (np.ones((2, 3)), np.ones((2, 4)), -1),
+        (np.ones((5,)), np.ones((6,)), -1),
+        # Broadcasting not allowed on contracted axis
+        (np.ones((2, 3)), np.ones((1, 3)), 0),
+    ],
+)
+@pytest.mark.parametrize(
+    "x1_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "x2_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
+    """
+    Tests for vector dot product operation according to the Array API specification.
+    See: https://data-apis.org/array-api/2024.12/API_specification/generated/array_api.vecdot.html
+    """
+    wx1 = x1_wrap(x1)
+    wx2 = x2_wrap(x2)
+
+    try:
+        expected = np.linalg.vecdot(x1, x2, axis=axis)
+    except ValueError:
+        with pytest.raises(ValueError):
+            finch.vecdot(wx1, wx2, axis=axis)
+        return
+
+    result = finch.vecdot(wx1, wx2, axis=axis)
+    if isinstance(wx1, finch.LazyTensor) or isinstance(wx2, finch.LazyTensor):
+        assert isinstance(result, finch.LazyTensor)
+        result = finch.compute(result)
+
+    assert isinstance(result, np.ndarray), "Result should be a NumPy array"
+    assert_allclose(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x, axis, expected",
+    [
+        (np.array([[1], [2]]), 1, np.array([1, 2])),
+        (np.array([[[3]]]), (0, 1), np.array([3])),
+        (np.zeros((1, 2, 1, 3)), (0, 2), np.zeros((2, 3))),
+        (np.array([[[1, 2, 3]]]), 0, np.array([[1, 2, 3]])),
+    ],
+)
+def test_squeeze_valid(x, axis, expected):
+    """
+    Tests for squeeze operation
+    """
+    result = finch.squeeze(x, axis=axis)
+    np.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x, axis",
+    [
+        (np.array([[1, 2], [3, 4]]), 0),  # axis 0 is not singleton
+        (np.zeros((2, 1, 3)), (0, 2)),  # axis 0 and 2 not both singleton
+        (np.ones((1, 2, 1)), (1,)),  # axis 1 is not singleton
+    ],
+)
+def test_squeeze_invalid(x, axis):
+    with pytest.raises(ValueError):
+        finch.squeeze(x, axis=axis)
+
+
+@pytest.mark.parametrize(
+    "x, axis",
+    [
+        (np.array([1, 2, 3]), 0),
+        (np.array([1, 2, 3]), 1),
+        (np.array([[1, 2], [3, 4]]), 0),
+        (np.array([[1, 2], [3, 4]]), 1),
+        (np.array([[1, 2], [3, 4]]), 2),
+        (np.array([1, 2, 3]), -1),
+        (np.array([1, 2, 3]), -2),
+        (np.array([[1, 2], [3, 4]]), -1),
+        (np.array([[1, 2], [3, 4]]), -3),
+    ],
+)
+def test_expand_dims_valid(x, axis):
+    expected = np.expand_dims(x, axis=axis)
+    result = finch.expand_dims(x, axis=axis)
+    np.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x, axis",
+    [
+        (np.array([1, 2, 3]), 3),  # out of bounds
+        (np.array([1, 2, 3]), -4),  # out of bounds
+        (np.array([[1, 2], [3, 4]]), 4),
+        (np.array([[1, 2], [3, 4]]), -4),
+    ],
+)
+def test_expand_dims_invalid(x, axis):
+    with pytest.raises(IndexError):
+        finch.expand_dims(x, axis=axis)
