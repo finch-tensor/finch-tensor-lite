@@ -1,4 +1,4 @@
-from .abstract_buffer import AbstractBuffer, AbstractFormat, isinstanceorformat
+from .abstract_buffer import Buffer, BufferFormat
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -42,9 +42,9 @@ __all__ = [
     "Module",
     "If",
     "IfElse",
-    "AbstractBuffer",
-    "AbstractFormat",
+    "Buffer",
+    "BufferFormat",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
-    "isinstanceorformat",
+    "has_format",
 ]

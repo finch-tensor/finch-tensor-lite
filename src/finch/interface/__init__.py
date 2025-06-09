@@ -1,5 +1,5 @@
 from .eager import (
-    AbstractEagerTensor,
+    EagerTensor,
     abs,
     add,
     all,
@@ -52,7 +52,7 @@ __all__ = [
     "negative",
     "min",
     "max",
-    "AbstractEagerTensor",
+    "EagerTensor",
     "LazyTensor",
     "bitwise_and",
     "bitwise_or",

@@ -5,7 +5,7 @@ from .codegen import (
     NumpyBufferFormat,
 )
 from .interface import (
-    AbstractEagerTensor,
+    EagerTensor,
     LazyTensor,
     abs,
     add,
@@ -66,12 +66,12 @@ __all__ = [
     "floordiv",
     "mod",
     "pow",
-    "AbstractEagerTensor",
+    "EagerTensor",
     "LazyTensor",
     "fill_value",
     "element_type",
     "CKernel",
-    "AbstractBuffer",
+    "Buffer",
     "NumpyBuffer",
     "NumpyBufferFormat",
     "min",

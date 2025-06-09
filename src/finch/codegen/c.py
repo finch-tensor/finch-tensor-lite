@@ -14,8 +14,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly.abstract_buffer import AbstractFormat, isinstanceorformat
-from ..symbolic import AbstractContext, ScopedDict
+from ..finch_assembly.abstract_buffer import BufferFormat
+from ..symbolic import Context, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -90,7 +90,7 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-class AbstractCArgument(ABC):
+class CArgument(ABC):
     @abstractmethod
     def serialize_to_c(self, name):
         """
@@ -129,13 +129,13 @@ class CKernel:
                 f"Expected {len(self.argtypes)} arguments, got {len(args)}"
             )
         for argtype, arg in zip(self.argtypes, args, strict=False):
-            if not isinstanceorformat(arg, argtype):
+            if not has_format(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
         serial_args = list(map(methodcaller("serialize_to_c"), args))
         res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
-        if isinstanceorformat(res, self.ret_type):
+        if has_format(res, self.ret_type):
             return res
         if self.ret_type is type(None):
             return None
@@ -327,15 +327,15 @@ def c_literal(ctx, val):
     """
     if hasattr(val, "c_literal"):
         return val.c_literal(ctx)
-    return query_property(val, "__self__", "c_literal", ctx)
+    return query_property(val, "c_literal", "__attr__", ctx)
 
 
-register_property(int, "__self__", "c_literal", lambda x, ctx: str(x))
-register_property(float, "__self__", "c_literal", lambda x, ctx: str(x))
+register_property(int, "c_literal", "__attr__", lambda x, ctx: str(x))
+register_property(float, "c_literal", "__attr__", lambda x, ctx: str(x))
 register_property(
     np.generic,
-    "__self__",
     "c_literal",
+    "__attr__",
     lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
 )
 for t in (
@@ -351,16 +351,16 @@ for t in (
 ):
     register_property(
         t,
-        "__self__",
         "c_literal",
+        "__attr__",
         lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
     )
 
 for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore[assignment]
     register_property(
         t,
-        "__self__",
         "c_literal",
+        "__attr__",
         lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
     )
 
@@ -378,15 +378,15 @@ def c_type(t):
     """
     if hasattr(t, "c_type"):
         return t.c_type()
-    return query_property(t, "__self__", "c_type")
+    return query_property(t, "c_type", "__attr__")
 
 
-register_property(int, "__self__", "c_type", lambda x: ctypes.c_int)
+register_property(int, "c_type", "__attr__", lambda x: ctypes.c_int)
 register_property(
-    np.generic, "__self__", "c_type", lambda x: np.ctypeslib.as_ctypes_type(x)
+    np.generic, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
-register_property(ctypes._SimpleCData, "__self__", "c_type", lambda x: x)
-register_property(type(None), "__self__", "c_type", lambda x: None)
+register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
+register_property(type(None), "c_type", "__attr__", lambda x: None)
 
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
@@ -422,7 +422,7 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CContext(AbstractContext):
+class CContext(Context):
     """
     A class to represent a C environment.
     """
@@ -682,10 +682,10 @@ class CContext(AbstractContext):
                 )
 
 
-class AbstractCFormat(AbstractFormat, ABC):
+class CBufferFormat(BufferFormat, ABC):
     """
     Abstract base class for the format of datastructures. The format defines how
-    the data in an AbstractBuffer is organized and accessed.
+    the data in an Buffer is organized and accessed.
     """
 
     @abstractmethod
