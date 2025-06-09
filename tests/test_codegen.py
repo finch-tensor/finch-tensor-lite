@@ -9,7 +9,6 @@ import finch
 import finch.finch_assembly as asm
 from finch.codegen import (
     CCompiler,
-    NumbaBuffer,
     NumbaCompiler,
     NumpyBuffer,
     NumpyBufferFormat,
@@ -75,7 +74,7 @@ def test_buffer_function():
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumbaBuffer),
+        (NumbaCompiler(), NumpyBuffer),
     ],
 )
 def test_codegen(compiler, buffer):
@@ -134,7 +133,7 @@ def test_codegen(compiler, buffer):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumbaBuffer),
+        (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )
@@ -209,7 +208,7 @@ def test_dot_product(compiler, buffer):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumbaBuffer),
+        (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )

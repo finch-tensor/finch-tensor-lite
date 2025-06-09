@@ -1,7 +1,5 @@
 from .c import CArgument, CBufferFormat, CCompiler, CKernel, CModule
 from .numba_backend import (
-    NumbaBuffer,
-    NumbaBufferFormat,
     NumbaCompiler,
     NumbaKernel,
     NumbaModule,
@@ -17,8 +15,6 @@ __all__ = [
     "NumbaCompiler",
     "NumbaKernel",
     "NumbaModule",
-    "NumbaBuffer",
-    "NumbaBufferFormat",
     "NumpyBuffer",
     "NumpyBufferFormat",
 ]

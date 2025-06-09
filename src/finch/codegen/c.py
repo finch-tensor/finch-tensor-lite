@@ -14,7 +14,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly.abstract_buffer import BufferFormat
+from ..finch_assembly import BufferFormat
 from ..symbolic import Context, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
@@ -135,8 +135,8 @@ class CKernel:
         res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
             arg.deserialize_from_c(serial_arg)
-        if has_format(res, self.ret_type):
-            return res
+        if hasattr(self.ret_type, "construct_from_c"):
+            return res.construct_from_c(res)
         if self.ret_type is type(None):
             return None
         return self.ret_type(res)

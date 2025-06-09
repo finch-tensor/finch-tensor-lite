@@ -6,8 +6,8 @@ from typing import Any
 import numpy as np
 
 from .. import finch_assembly as asm
-from ..symbolic.environment import Context, ScopedDict
-from .numpy_buffer import NumpyBuffer, NumpyBufferFormat
+from ..symbolic import Context, ScopedDict
+from ..finch_assembly import BufferFormat
 
 logger = logging.getLogger(__name__)
 
@@ -21,43 +21,48 @@ class NumbaArgument(ABC):
         """
         ...
 
-    @classmethod
     @abstractmethod
-    def deserialize_from_numba(cls, numba_buffer):
+    def deserialize_from_numba(self, numba_buffer):
         """
         Return an object from Numba returned value.
         """
         ...
 
+class NumbaBufferFormat(BufferFormat, ABC):
+    @abstractmethod
+    def numba_length(self, ctx: "NumbaContext", buffer):
+        """
+        Return a Numba-compatible expression to get the length of the buffer.
+        """
+        ...
 
-class NumbaBuffer(NumpyBuffer, NumbaArgument):
-    def __init__(self, arr: np.ndarray):
-        if not arr.flags["C_CONTIGUOUS"]:
-            raise ValueError("NumPy array must be C-contiguous")
-        self.arr_ref = [arr]
+    @abstractmethod
+    def numba_resize(self, ctx: "NumbaContext", buffer, size):
+        """
+        Return a Numba-compatible expression to resize the buffer to the given size.
+        """
+        ...
 
-    @property
-    def arr(self):
-        return self.arr_ref[0]
+    @abstractmethod
+    def numba_load(self, ctx: "NumbaContext", buffer, idx):
+        """
+        Return a Numba-compatible expression to load an element from the buffer
+        at the given index.
+        """
+        ...
+    
+    @abstractmethod
+    def numba_store(self, ctx: "NumbaContext", buffer, idx, value=None):
+        """
+        Return a Numba-compatible expression to store an element in the buffer
+        at the given index. If value is None, it should store the length of the
+        buffer.
+        """
+        ...
 
-    def get_format(self):
-        return NumbaBufferFormat(self.arr.dtype.type)
-
-    def serialize_to_numba(self):
-        return self.arr_ref
-
-    @classmethod
-    def deserialize_from_numba(cls, numba_buffer):
-        return cls(numba_buffer[0])
-
-
-class NumbaBufferFormat(NumpyBufferFormat):
     @staticmethod
     def numba_name():
         return "list[numpy.ndarray]"
-
-    def __call__(self, len_: int):
-        return NumbaBuffer(np.zeros(len_, dtype=self._dtype))
 
 
 class NumbaModule:
@@ -89,10 +94,13 @@ class NumbaKernel:
         if len(results) == 0:
             return ()
         from .numpy_buffer import NumpyBuffer
-
-        if not isinstance(results, tuple):
-            return NumpyBuffer.deserialize_from_numba(results)
-        return tuple(map(NumpyBuffer.deserialize_from_numba, results))
+        for arg, serial_arg in zip(args, serial_args, strict=False):
+            arg.deserialize_from_numba(serial_arg)
+        if hasattr(self.ret_type, "construct_from_numba"):
+            return res.construct_from_numba(res)
+        if self.ret_type is type(None):
+            return None
+        return self.ret_type(res)
 
 
 class NumbaCompiler:
@@ -115,7 +123,7 @@ class NumbaCompiler:
                     )
 
         return NumbaModule(kernels)
-
+    
 
 class NumbaContext(Context):
     def __init__(self, tab="    ", indent=0, bindings=None):
@@ -188,18 +196,15 @@ class NumbaContext(Context):
             case asm.Call(asm.Immediate(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Load(buffer, idx):
-                return f"{self(buffer)}[0][{self(idx)}]"
+                return buffer.get_type().numba_load(self, buffer, idx)
             case asm.Store(buffer, idx, val):
-                self.exec(f"{self.feed}{self(buffer)}[0][{self(idx)}] = {self(val)}")
+                buffer.get_type().numba_store(self, buffer, idx, val)
                 return None
             case asm.Resize(buffer, size):
-                self.exec(
-                    f"{self.feed}{self(buffer)}[0] = numpy.resize({self(buffer)}[0], "
-                    f"{self(size)})"
-                )
+                buffer.get_type().numba_resize(self, buffer, size)
                 return None
             case asm.Length(buffer):
-                return f"len({self(buffer)}[0])"
+                return buffer.get_type().numba_length(self, buffer)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
