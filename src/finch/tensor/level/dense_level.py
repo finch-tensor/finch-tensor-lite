@@ -1,80 +1,75 @@
-from abc import ABC
-
-import numpy as np
-
-from ...codegen import NumpyBufferFormat
 from ..tensor import Level, LevelFormat
+from ...codegen import NumpyBufferFormat
+import numpy as np
+from abc import ABC, abstractmethod
 
 
-class ElementLevelFormat(LevelFormat, ABC):
-    def __init__(
-        self, fill_value, element_type=None, position_type=None, buffer_format=None
-    ):
+class DenseLevelFormat(LevelFormat, ABC):
+
+    def __init__(self, lvl, dimension_type=None):
         """
-        Initializes the ElementLevelFormat with an optional fill value.
+        Initializes the DenseLevelFormat with an optional fill value.
         Args:
             fill_value: The value used to fill the fibers, or `None` if dynamic.
             position_type: The type of positions within the fibers.
         """
-        self.fill_value = fill_value
-        if element_type is None:
-            element_type = type(fill_value)
-        if position_type is None:
-            position_type = np.intp
-        self.position_type = position_type
-        if buffer_format is None:
-            buffer_format = NumpyBufferFormat(element_type)
-        self.buffer_format = buffer_format
-
-    def __call__(self, fmt):
+        self.lvl = lvl
+        if dimension_type is None:
+            dimension_type = np.intp
+        self.dimension_type = dimension_type
+    
+    def __call__(self, shape):
         """
-        Creates an instance of ElementLevel with the given format.
+        Creates an instance of DenseLevel with the given format.
         Args:
             fmt: The format to be used for the level.
         Returns:
-            An instance of ElementLevel.
+            An instance of DenseLevel.
         """
-        return ElementLevel(fmt)
+        if not isinstance(shape[0], self.dimension_type):
+            raise TypeError(f"Dimension must be of type {self.dimension_type}, got {type(dimension)}")
+        lvl = self.lvl(shape[1:])
+        return DenseLevel(lvl, shape[0], fmt=self)
 
     def ndims(self):
-        return 0
+        return 1 + self.lvl.ndims()
 
     def fill_value(self):
-        return self.fill_value
+        return self.lvl.fill_value()
 
     def element_type(self):
         """
         Returns the type of elements stored in the fibers.
         """
-        return self.element_type
+        return self.lvl.element_type()
 
     def shape_type(self):
         """
         Returns the type of the shape of the fibers.
         """
-        return ()
+        return (self.dimension_type, *self.lvl.shape_type())
 
     def position_type(self):
         """
         Returns the type of positions within the levels.
         """
-        return self.position_type
+        return self.lvl.position_type()
 
     def buffer_format(self):
         """
         Returns the format of the buffer used for the fibers.
         """
-        return self.buffer_format
+        return self.lvl.buffer_format()
 
 
-class ElementLevel(Level):
+class DenseLevel(Level):
     """
     A class representing the leaf level of Finch tensors.
     """
 
     def __init__(self, fmt, val=None):
         """
-        Initializes the ElementLevel with a format.
+        Initializes the DenseLevel with a format.
         Args:
             fmt: The format to be used for the level.
         """
