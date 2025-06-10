@@ -308,15 +308,19 @@ def test_matmul(a, b, a_wrap, b_wrap):
     except ValueError:
         with pytest.raises(ValueError):
             finch.matmul(wa, wb)  # make sure matmul raises error too
+            _ = wa @ wb
         return
 
     result = finch.matmul(wa, wb)
+    result_with_op = wa @ wb  # make sure the operator overload works too
 
     if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
         assert isinstance(result, finch.LazyTensor)
         result = finch.compute(result)
+        result_with_op = finch.compute(result_with_op)
 
     assert_equal(result, expected)
+    assert_equal(result_with_op, expected)
 
 
 @pytest.mark.parametrize(
