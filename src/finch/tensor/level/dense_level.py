@@ -64,25 +64,19 @@ class DenseLevelFormat(LevelFormat, ABC):
         return self.lvl.buffer_factory
 
 
+@dataclass
 class DenseLevel(Level):
     """
     A class representing the leaf level of Finch tensors.
     """
 
-    def __init__(self, fmt, lvl, dimension):
-        """
-        Initializes the DenseLevel with a format.
-        Args:
-            fmt: The format to be used for the level.
-            lvl: The underlying level that this dense level wraps.
-        """
-        self.fmt = fmt
-        self.lvl = lvl
-        self.dimension = dimension
+    format: DenseLevelFormat
+    lvl: Any
+    dimension: Any
 
     @property
     def shape(self):
         return (self.dimension, *self.lvl.shape)
 
     def get_format(self):
-        return self.fmt
+        return self.format

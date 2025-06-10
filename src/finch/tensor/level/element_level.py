@@ -47,25 +47,22 @@ class ElementLevelFormat(LevelFormat):
     def shape_type(self):
         return ()
 
+@dataclass
 class ElementLevel(Level):
     """
     A class representing the leaf level of Finch tensors.
     """
 
-    def __init__(self, fmt, val=None):
-        """
-        Initializes the ElementLevel with a format.
-        Args:
-            fmt: The format to be used for the level.
-        """
-        self.fmt = fmt
-        if val is None:
-            val = fmt.val_format(len=0, dtype=fmt.element_type())
-        self.val = val
+    format: ElementLevelFormat
+    val: Optional[Any] = None
+
+    def __post_init__(self):
+        if self.val is None:
+            self.val = self.format.val_format(len=0, dtype=self.format.element_type())
 
     @property
     def shape(self):
         return ()
 
     def get_format(self):
-        return self.fmt
+        return self.format
