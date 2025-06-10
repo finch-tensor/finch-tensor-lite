@@ -15,7 +15,9 @@ from .algebra import (
     shape_type,
 )
 from .operator import (
+    InitWrite,
     conjugate,
+    overwrite,
     promote_max,
     promote_min,
 )
@@ -38,4 +40,6 @@ __all__ = [
     "promote_min",
     "promote_max",
     "conjugate",
+    "overwrite",
+    "InitWrite",
 ]

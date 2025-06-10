@@ -77,3 +77,42 @@ algebra.register_property(
 algebra.register_property(
     promote_max, "__call__", "init_value", lambda op, arg: algebra.type_min(arg)
 )
+
+
+class InitWrite:
+    """
+    InitWrite may assert that its first argument is
+    equal to z, and returns its second argument. This is useful when you want to
+    communicate to the compiler that the tensor has already been initialized to
+    a specific value.
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __call__(self, x, y):
+        assert x == self.value, f"Expected {self.value}, got {x}"
+        return y
+
+
+algebra.register_property(
+    InitWrite,
+    "__call__",
+    "return_type",
+    lambda op, x, y: y,
+)
+
+
+def overwrite(x, y):
+    """
+    overwrite(x, y) returns y always.
+    """
+    return y
+
+
+algebra.register_property(
+    overwrite,
+    "__call__",
+    "return_type",
+    lambda op, x, y: y,
+)
