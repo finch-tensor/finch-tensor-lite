@@ -131,11 +131,11 @@ class FiberTensorFormat(Format, ABC):
         if self.pos is None:
             self.pos = self.lvl.position_type
 
-    def __call__(self, shape):
+    def __call__(self, *args, **kwargs):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl(shape), self.lvl.position_type(1))
+        return FiberTensor(self.lvl(*args, **kwargs), self.lvl.position_type(1))
 
     @property
     def shape(self):
