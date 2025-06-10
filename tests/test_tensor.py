@@ -32,4 +32,4 @@ def test_fiber_tensor_attributes():
     assert a.position_type == np.intp
 
     # Check buffer_format exists
-    assert a.buffer_format == NumpyBufferFormat(np.float64)
+    assert a.buffer_factory == NumpyBufferFormat

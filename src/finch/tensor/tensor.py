@@ -8,71 +8,26 @@ from finch.symbolic import Format, Formattable
 class LevelFormat(Format, ABC):
     """
     An abstract base class representing the format of levels.
+
+    Subclasses must define the following properties:
+    - `ndims`: Number of dimensions of the fibers in the structure.
+    - `fill_value`: Fill value of the fibers, or `None` if dynamic.
+    - `element_type`: Type of elements stored in the fibers.
+    - `shape_type`: Type of the shape of the fibers.
+    - `position_type`: Type of positions within the levels.
+    - `buffer_factory`: Function to create default buffers for the fibers.
     """
-
-    @property
-    @abstractmethod
-    def ndims(self):
-        """
-        Returns the number of dimensions of the fibers in the structure.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def fill_value(self):
-        """
-        Returns the fill value of the fibers, or `None` if the fill_value is dynamic.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def element_type(self):
-        """
-        Returns the type of elements stored in the fibers.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def shape_type(self):
-        """
-        Returns the type of the shape of the fibers.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def position_type(self):
-        """
-        Returns the type of positions within the levels.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def buffer_format(self):
-        """
-        Returns the format of the buffer used for the fibers.
-        This is typically a NumpyBufferFormat or similar.
-        """
-        ...
 
 
 class Level(Formattable, ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
-    """
 
-    @property
-    @abstractmethod
-    def shape(self):
-        """
-        Returns the shape of the fibers in the structure.
-        """
-        ...
+    Subclasses must define the following properties:
+    - `shape`: The shape of the fibers in the structure.
+    - `get_format`: Method to return the `LevelFormat` of the level.
+    """
 
     @property
     def ndims(self):
@@ -95,8 +50,8 @@ class Level(Formattable, ABC):
         return self.get_format().position_type
 
     @property
-    def buffer_format(self):
-        return self.get_format().buffer_format
+    def buffer_factory(self):
+        return self.get_format().buffer_factory
 
 
 Tp = TypeVar("Tp")
@@ -152,12 +107,12 @@ class FiberTensor(Generic[Tp], Formattable):
         return self.lvl.position_type
 
     @property
-    def buffer_format(self):
+    def buffer_factory(self):
         """
         Returns the format of the buffer used for the fibers.
         This is typically a NumpyBufferFormat or similar.
         """
-        return self.lvl.buffer_format
+        return self.lvl.buffer_factory
 
 
 @dataclass
@@ -207,9 +162,9 @@ class FiberTensorFormat(Format, ABC):
         return self.lvl.position_type
 
     @property
-    def buffer_format(self):
+    def buffer_factory(self):
         """
         Returns the format of the buffer used for the fibers.
         This is typically a NumpyBufferFormat or similar.
         """
-        return self.lvl.buffer_format
+        return self.lvl.buffer_factory

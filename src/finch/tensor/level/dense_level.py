@@ -57,11 +57,11 @@ class DenseLevelFormat(LevelFormat, ABC):
         return self.lvl.position_type
 
     @property
-    def buffer_format(self):
+    def buffer_factory(self):
         """
         Returns the format of the buffer used for the fibers.
         """
-        return self.lvl.buffer_format
+        return self.lvl.buffer_factory
 
 
 class DenseLevel(Level):
