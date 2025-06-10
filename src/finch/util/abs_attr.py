@@ -46,17 +46,17 @@ class AbsAttr():
                     # Only set if not already set, so the most base class wins
                     if attr not in attrs:
                         attrs[attr] = base
-        cls.__init__ = make_validate_attrs_init(cls, cls.__init__, attrs)
+        cls.__init__ = make_validate_attrs_init(cls.__init__, attrs)
 
     
-def make_validate_attrs_init(cls, init, attrs):
+def make_validate_attrs_init(init, attrs):
     def __validate_attrs_init__(self, *args, **kwargs):
-        init(self, *args, **kwargs)
         """
         Validates the attributes of the class. This method should be implemented
         by subclasses to ensure that the required attributes are present and valid.
         If not implemented, a custom error message will be shown.
         """
+        init(self, *args, **kwargs)
         for (attr, base) in attrs.items():
             if not hasattr(self, attr):
                 raise AttributeError(
