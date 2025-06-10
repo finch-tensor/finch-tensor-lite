@@ -1,21 +1,18 @@
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
 from ...codegen import NumpyBufferFormat
-from ..tensor import Level, LevelFormat
-
-from dataclasses import dataclass, field
 from ...symbolic import Format, get_format
-from typing import Optional
-from ... import algebra
+from ..tensor import Level, LevelFormat
 
 
 @dataclass
 class ElementLevelFormat(LevelFormat):
     fill_value: Any
-    element_type: Optional[type | Format] = None
-    position_type: Optional[type | Format] = None
+    element_type: type | Format | None = None
+    position_type: type | Format | None = None
     buffer_factory: Any = NumpyBufferFormat
     val_format: Any = None
 
@@ -47,6 +44,7 @@ class ElementLevelFormat(LevelFormat):
     def shape_type(self):
         return ()
 
+
 @dataclass
 class ElementLevel(Level):
     """
@@ -54,7 +52,7 @@ class ElementLevel(Level):
     """
 
     format: ElementLevelFormat
-    val: Optional[Any] = None
+    val: Any | None = None
 
     def __post_init__(self):
         if self.val is None:

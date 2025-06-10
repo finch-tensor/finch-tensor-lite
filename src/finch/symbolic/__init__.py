@@ -1,5 +1,5 @@
 from .environment import Context, Namespace, ScopedDict
-from .format import Format, Formattable, has_format, get_format
+from .format import Format, Formattable, get_format, has_format
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -32,4 +32,5 @@ __all__ = [
     "Format",
     "Formattable",
     "has_format",
+    "get_format",
 ]

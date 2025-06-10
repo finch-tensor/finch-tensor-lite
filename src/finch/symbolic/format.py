@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from ..algebra import query_property
 
 
@@ -24,6 +25,7 @@ class Formattable(ABC):
         """
         ...
 
+
 def has_format(x, f):
     """
     Check if `x` is an instance of `f`.
@@ -32,17 +34,18 @@ def has_format(x, f):
         return isinstance(x, f)
     return f.has_format(x)
 
+
 def get_format(x):
     """
     Get the format of `x`.
     """
-    if hasattr(x, 'get_format'):
+    if hasattr(x, "get_format"):
         return x.get_format()
     try:
         return query_property(
             x,
-            'get_format',
-            '__attr__',
+            "get_format",
+            "__attr__",
         )
     except AttributeError:
         return type(x)
