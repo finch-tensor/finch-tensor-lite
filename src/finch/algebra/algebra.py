@@ -153,7 +153,7 @@ def fill_value(arg: Any) -> Any:
         The fill value for the given argument.
 
     Raises:
-        NotImplementedError: If the fill value is not implemented for the given type.
+        AttributeError: If the fill value is not implemented for the given type.
     """
     if hasattr(arg, "fill_value"):
         return arg.fill_value
@@ -177,7 +177,7 @@ def element_type(arg: Any) -> type:
         The element type of the given tensor.
 
     Raises:
-        NotImplementedError: If the element type is not implemented for the given type.
+        AttributeError: If the element type is not implemented for the given type.
     """
     if hasattr(arg, "element_type"):
         return arg.element_type
@@ -203,7 +203,7 @@ def length_type(arg: Any) -> type:
         The length type of the given object.
 
     Raises:
-        NotImplementedError: If the length type is not implemented for the given type.
+        AttributeError: If the length type is not implemented for the given type.
     """
     if hasattr(arg, "length_type"):
         return arg.length_type
@@ -221,7 +221,7 @@ def shape_type(arg: Any) -> type:
         The shape type of the given object.
 
     Raises:
-        NotImplementedError: If the shape type is not implemented for the given type.
+        AttributeError: If the shape type is not implemented for the given type.
     """
     if hasattr(arg, "shape_type"):
         return arg.shape_type
@@ -254,9 +254,13 @@ def promote_type(a: Any, b: Any) -> type:
         The common type of the given arguments.
     """
     if hasattr(a, "promote_type"):
-        return a.promote_type(b)
+        res = a.promote_type(b)
+        if res is not NotImplemented:
+            return res
     if hasattr(b, "promote_type"):
-        return b.promote_type(a)
+        res = b.promote_type(a)
+        if res is not NotImplemented:
+            return res
     try:
         return query_property(a, "promote_type", "__attr__", b)
     except AttributeError:
@@ -311,7 +315,7 @@ _reflexive_operators = {
 }
 
 
-def _return_type_reflexive(meth):
+def _return_type_reflexive_method(meth):
     def _return_type_closure(a, b):
         if issubclass(b, StableNumber):
             return type(getattr(a(True), meth)(b(True)))
@@ -320,7 +324,22 @@ def _return_type_reflexive(meth):
     return _return_type_closure
 
 
+def _return_type_reflexive_operator(meth, rmeth):
+    def _return_type_closure(op, a, b):
+        if hasattr(a, meth):
+            try:
+                res = query_property(a, meth, "return_type", b)
+                if res is not type(NotImplemented):
+                    return res
+            except AttributeError:
+                pass
+        return query_property(b, rmeth, "return_type", a)
+
+    return _return_type_closure
+
+
 op: Callable
+
 
 for op, (meth, rmeth) in _reflexive_operators.items():
     (
@@ -328,17 +347,13 @@ for op, (meth, rmeth) in _reflexive_operators.items():
             op,
             "__call__",
             "return_type",
-            lambda op, a, b, meth=meth, rmeth=rmeth: query_property(
-                a, meth, "return_type", b
-            )
-            if hasattr(a, meth)
-            else query_property(b, rmeth, "return_type", a),
+            _return_type_reflexive_operator(meth, rmeth),
         ),
     )
 
     for t in StableNumber.__args__:
-        register_property(t, meth, "return_type", _return_type_reflexive(meth))
-        register_property(t, rmeth, "return_type", _return_type_reflexive(rmeth))
+        register_property(t, meth, "return_type", _return_type_reflexive_method(meth))
+        register_property(t, rmeth, "return_type", _return_type_reflexive_method(rmeth))
 
 
 _unary_operators: dict[Callable, str] = {
@@ -536,7 +551,7 @@ def type_min(t: type[T]) -> T:
         The minimum value of the given type.
 
     Raises:
-        NotImplementedError: If the minimum value is not implemented for the given type.
+        AttributeError: If the minimum value is not implemented for the given type.
     """
     if hasattr(t, "type_min"):
         return t.type_min()  # type: ignore[attr-defined]
@@ -554,7 +569,7 @@ def type_max(t: type[T]) -> T:
         The maximum value of the given type.
 
     Raises:
-        NotImplementedError: If the maximum value is not implemented for the given type.
+        AttributeError: If the maximum value is not implemented for the given type.
     """
     if hasattr(t, "type_max"):
         return t.type_max()  # type: ignore[attr-defined]
@@ -584,7 +599,7 @@ def init_value(op, arg) -> Any:
         The initial value for the given operation and type.
 
     Raises:
-        NotImplementedError: If the initial value is not implemented for the given type
+        AttributeError: If the initial value is not implemented for the given type
         and operation.
     """
     return query_property(op, "__call__", "init_value", arg)
