@@ -14,6 +14,7 @@ from . import nodes as ntn
 class TensorView:
     idxs: tuple[Any, ...]
     tns: ntn.NotationNode
+    op: Any = None
 
     @property
     def shape(self):
@@ -46,12 +47,12 @@ class TensorView:
         """
         return self.tns.fill_value
 
-    def access(self, mode, idxs):
+    def access(self, idxs, op=None):
         """
         Unfurl the tensor view along a specific index.
         This creates a new tensor view with the specified index unfurled.
         """
-        return TensorView(idxs=self.idxs + idxs, tns=self.tns)
+        return TensorView(idxs=self.idxs + idxs, tns=self.tns, op=op)
 
     def unwrap(self):
         """
@@ -60,26 +61,26 @@ class TensorView:
         """
         return self.tns[*self.idxs]
 
-    def increment(self, op, val):
+    def increment(self, val):
         """
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        self.tns[*self.idxs] = op(self.tns[*self.idxs], val)
+        self.tns[*self.idxs] = self.op(self.tns[*self.idxs], val)
         return
 
 
-def access(tns, mode, idxs):
+def access(tns, idxs, op=None):
     """
     Unfurl a tensor along an index.
     This is used to create a tensor view for a specific slice of the tensor.
     """
     if hasattr(tns, "access"):
-        return tns.access(mode, idxs)
+        return tns.access(idxs, op)
     try:
-        return query_property(tns, "access", "__attr__", mode, idxs)
+        return query_property(tns, "access", "__attr__", idxs, op)
     except AttributeError:
-        return TensorView(idxs=idxs, tns=tns)
+        return TensorView(idxs=idxs, tns=tns, op=op)
 
 
 def unwrap(tns):
@@ -92,14 +93,14 @@ def unwrap(tns):
     return query_property(tns, "unwrap", "__attr__")
 
 
-def increment(tns, op, val):
+def increment(tns, val):
     """
     Increment a tensor view with an operation and value.
     This updates the tensor at the specified index with the operation and value.
     """
     if hasattr(tns, "increment"):
-        return tns.increment(op, val)
-    return query_property(tns, "increment", "__attr__", op, val)
+        return tns.increment(val)
+    return query_property(tns, "increment", "__attr__", val)
 
 
 def declare(tns, init, op, shape):
@@ -290,25 +291,24 @@ class NotationInterpreter:
                 val_e = self(val)
                 if isinstance(var, ntn.Variable):
                     var_n = var.name
-                    # if var_n in self.types:
-                    #    def_t = self.types[var_n]
-                    #    if def_t != type(val_e):
-                    #        raise TypeError(
-                    #            f"Variable '{var_n}' is declared as type {def_t}, "
-                    #            f"but assigned value of type {type(val_e)}."
-                    #        )
                     self.bindings[var_n] = val_e
                     return None
                 raise NotImplementedError(f"Unrecognized assignment target: {var}")
             case ntn.Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
-                return access(tns_e, mode, idxs_e)
-            case ntn.Increment(tns, op, val):
+                match mode:
+                    case ntn.Read():
+                        return access(tns_e, idxs_e)
+                    case ntn.Update(op):
+                        op_e = self(op)
+                        return access(tns_e, idxs_e, op=op_e)
+                    case _:
+                        raise NotImplementedError(f"Unrecognized access mode: {mode}")
+            case ntn.Increment(tns, val):
                 tns_e = self(tns)
-                op_e = self(op)
                 val_e = self(val)
-                increment(tns_e, op_e, val_e)
+                increment(tns_e, val_e)
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
@@ -365,11 +365,6 @@ class NotationInterpreter:
                     for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
                             case ntn.Variable(arg_n, _):
-                                # if not isinstanceorformat(arg_e, arg_t):
-                                #    raise TypeError(
-                                #        f"Argument '{arg_n}' is expected to be of "
-                                #        f"type {arg_t}, but got {type(arg_e)}."
-                                #    )
                                 ctx_2.bindings[arg_n] = arg_e
                             case _:
                                 raise NotImplementedError(

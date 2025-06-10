@@ -98,7 +98,6 @@ def test_matrix_multiplication(a, b):
                                                     ),
                                                     (i, j),
                                                 ),
-                                                ntn.Literal(operator.add),
                                                 c_ij,
                                             ),
                                         )

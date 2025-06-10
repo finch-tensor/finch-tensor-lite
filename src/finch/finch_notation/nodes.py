@@ -94,6 +94,12 @@ class Call(NotationTree, NotationExpression):
         return [self.op, *self.args]
 
 
+class AccessMode(NotationNode):
+    """
+    Notation AST node representing the access mode of a tensor.
+    """
+
+
 @dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
@@ -102,7 +108,7 @@ class Access(NotationTree, NotationExpression):
     """
 
     tns: NotationNode
-    mode: NotationNode
+    mode: AccessMode
     idxs: tuple[NotationNode, ...]
 
     def get_type(self):
@@ -118,13 +124,27 @@ class Access(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Read(NotationNode):
+class Read(AccessMode):
+    """
+    Notation AST node representing a read-only access mode for a tensor.
+    This mode allows reading the value of a tensor without modifying it.
+    """
+
     def children(self):
         return []
 
 
 @dataclass(eq=True, frozen=True)
-class Update(NotationTree):
+class Update(AccessMode, NotationTree):
+    """
+    Notation AST node representing an update access mode for a tensor.  This
+    mode allows reading and modifying the value of a tensor.  Increment
+    operations are allowed in this mode, and will use the update operation `op`
+    to increment `ref` with `val` as `ref = op(ref, val)`.
+    Attributes:
+        op: The operation used to update the value of the tensor.
+    """
+
     op: NotationNode
 
     def children(self):
@@ -134,15 +154,14 @@ class Update(NotationTree):
 @dataclass(eq=True, frozen=True)
 class Increment(NotationTree):
     """
-    Notation AST statement that updates the value of `lhs` to `op(lhs, rhs)`.
+    Notation AST statement that updates the value `lhs` using `rhs`.
     """
 
     lhs: NotationNode
-    op: NotationNode
     rhs: NotationNode
 
     def children(self):
-        return [self.lhs, self.op, self.rhs]
+        return [self.lhs, self.rhs]
 
 
 @dataclass(eq=True, frozen=True)
@@ -161,7 +180,11 @@ class Unwrap(NotationTree):
 @dataclass(eq=True, frozen=True)
 class Cached(NotationTree, NotationExpression):
     """
-    Notation AST expression `val`, equivalent to the quoted expression `ref`.
+    Notation AST expression `arg`, equivalent to the quoted expression `ref`.
+
+    Often used after the compiler caches the computation `ref` into a variable
+    `arg`, but we still wish to refer to the original expression to prove
+    properties about it.
     """
 
     arg: NotationNode
