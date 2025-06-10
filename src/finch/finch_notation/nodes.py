@@ -141,6 +141,7 @@ class Update(AccessMode, NotationTree):
     mode allows reading and modifying the value of a tensor.  Increment
     operations are allowed in this mode, and will use the update operation `op`
     to increment `ref` with `val` as `ref = op(ref, val)`.
+    To overwrite the value of a tensor, use the ops `algebra.overwrite` or `algebra.InitWrite`.
     Attributes:
         op: The operation used to update the value of the tensor.
     """
