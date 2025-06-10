@@ -16,15 +16,15 @@ class DenseLevelFormat(LevelFormat, ABC):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, shape):
+    def __call__(self, *, shape):
         """
         Creates an instance of DenseLevel with the given format.
         Args:
-            fmt: The format to be used for the level.
+            shape: The shape to be used for the level.
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl(shape[1:])
+        lvl = self.lvl(shape=shape[1:])
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     @property

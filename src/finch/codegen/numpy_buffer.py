@@ -93,7 +93,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
         self._dtype = np.dtype(dtype).type
 
     def __eq__(self, other):
-        if not isinstance(other, type(self)):
+        if not isinstance(other, NumpyBufferFormat):
             return False
         return self._dtype == other._dtype
 
