@@ -140,6 +140,15 @@ class LazyTensor(OverrideTensor):
     def __rmatmul__(self, other):
         return matmul(defer(other), self)
 
+    def __complex__(self) -> complex:
+        """
+        Converts the LazyTensor to a complex number.
+        This is a no-op for LazyTensors, as they are symbolic representations.
+        """
+        raise ValueError(
+            "Cannot convert LazyTensor to complex. Use compute() to evaluate it first."
+        )
+
 
 def defer(arr) -> LazyTensor:
     """
