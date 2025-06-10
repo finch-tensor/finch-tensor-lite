@@ -308,6 +308,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     except ValueError:
         with pytest.raises(ValueError):
             finch.matmul(wa, wb)  # make sure matmul raises error too
+            _ = wa @ wb
         return
 
     result = finch.matmul(wa, wb)
