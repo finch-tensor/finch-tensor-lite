@@ -1,9 +1,10 @@
 import operator
 from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 
-ufunc_map = {
+element_wise_ufunc_map = {
     np.add: operator.add,
     np.subtract: operator.sub,
     np.multiply: operator.mul,
@@ -23,6 +24,10 @@ ufunc_map = {
     # Add more ufuncs as needed
 }
 
+ufunc_map: dict[Any, Any] = {
+    np.matmul: "matmul",
+}
+
 
 class OverrideTensor(ABC):
     @abstractmethod
@@ -38,7 +43,7 @@ class OverrideTensor(ABC):
             return NotImplemented
         return func(*args, **kwargs)
 
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+    def __array_ufunc__(self, ufunc: np.ufunc, method, *inputs, **kwargs):
         """Override NumPy ufuncs using the __array_ufunc__ protocol."""
         # https://numpy.org/devdocs/user/basics.ufuncs.html#ufuncs-basics
         # https://numpy.org/devdocs/reference/ufuncs.html#ufuncs-methods
@@ -52,13 +57,17 @@ class OverrideTensor(ABC):
             raise NotImplementedError("order parameter is not supported")
         if kwargs.get("axes") is not None:
             kwargs["axis"] = kwargs.pop("axes")
-        if ufunc in ufunc_map:
+        if ufunc in element_wise_ufunc_map:
             if method == "__call__":
                 return self.override_module().elementwise(
-                    ufunc_map[ufunc], *inputs, **kwargs
+                    element_wise_ufunc_map[ufunc], *inputs, **kwargs
                 )
             if method == "reduce":
                 return self.override_module().reduce(ufunc, *inputs, **kwargs)
+        if ufunc in ufunc_map:
+            func_name = ufunc_map[ufunc]
+            if method == "__call__":
+                return getattr(self.override_module(), func_name)(*inputs, **kwargs)
         return NotImplemented
 
     def __array_namespace__(self, *, api_version=None):
