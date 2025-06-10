@@ -100,13 +100,13 @@ class EagerTensor(OverrideTensor, ABC):
 
     def __rpow__(self, other):
         return pow(other, self)
-      
+
     def __matmul__(self, other):
         return matmul(self, other)
 
     def __rmatmul__(self, other):
         return matmul(other, self)
-      
+
     def __complex__(self):
         """
         Converts a zero-dimensional array to a Python `complex` object.
