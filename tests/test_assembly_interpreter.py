@@ -26,8 +26,8 @@ def test_dot_product(a, b):
     i = asm.Variable("i", np.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
-    ab_v = asm.Variable("a", ab.get_format())
-    bb_v = asm.Variable("b", bb.get_format())
+    ab_v = asm.Variable("a", ab.format)
+    bb_v = asm.Variable("b", bb.format)
     mod = AssemblyInterpreter()(
         asm.Module(
             (

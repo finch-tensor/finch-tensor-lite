@@ -14,16 +14,16 @@ class Format(ABC):
         """
         Check if `other` is an instance of this format.
         """
-        return other.get_format() == self
+        return other.format == self
 
 
-class Formattable(ABC):
-    @abstractmethod
-    def get_format(self):
-        """
-        Get the format of the object.
-        """
-        ...
+class Formattable:
+    """
+    Abstract base class for objects that can be formatted.
+
+    Required attributes:
+    - format: The format of the object.
+    """
 
 
 def has_format(x, f):
@@ -35,16 +35,16 @@ def has_format(x, f):
     return f.has_format(x)
 
 
-def get_format(x):
+def format(x):
     """
     Get the format of `x`.
     """
-    if hasattr(x, "get_format"):
-        return x.get_format()
+    if hasattr(x, "format"):
+        return x.format
     try:
         return query_property(
             x,
-            "get_format",
+            "format",
             "__attr__",
         )
     except AttributeError:

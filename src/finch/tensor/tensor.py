@@ -26,32 +26,31 @@ class Level(Formattable, ABC):
 
     Subclasses must define the following properties:
     - `shape`: The shape of the fibers in the structure.
-    - `get_format`: Method to return the `LevelFormat` of the level.
     """
 
     @property
     def ndims(self):
-        return self.get_format().ndims
+        return self.format.ndims
 
     @property
     def fill_value(self):
-        return self.get_format().fill_value
+        return self.format.fill_value
 
     @property
     def element_type(self):
-        return self.get_format().element_type
+        return self.format.element_type
 
     @property
     def shape_type(self):
-        return self.get_format().shape_type
+        return self.format.shape_type
 
     @property
     def position_type(self):
-        return self.get_format().position_type
+        return self.format.position_type
 
     @property
     def buffer_factory(self):
-        return self.get_format().buffer_factory
+        return self.format.buffer_factory
 
 
 Tp = TypeVar("Tp")
@@ -76,11 +75,12 @@ class FiberTensor(Generic[Tp], Formattable):
         res += ")"
         return res
 
-    def get_format(self):
+    @property
+    def format(self):
         """
         Returns the format of the fiber tensor, which is a FiberTensorFormat.
         """
-        return FiberTensorFormat(self.lvl.get_format(), type(self.pos))
+        return FiberTensorFormat(self.lvl.format, type(self.pos))
 
     @property
     def shape(self):

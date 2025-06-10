@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 
 from ...codegen import NumpyBufferFormat
-from ...symbolic import Format, get_format
+from ...symbolic import Format, format
 from ..tensor import Level, LevelFormat
 
 
@@ -18,7 +18,7 @@ class ElementLevelFormat(LevelFormat):
 
     def __post_init__(self):
         if self.element_type is None:
-            self.element_type = get_format(self.fill_value)
+            self.element_type = format(self.fill_value)
         if self.val_format is None:
             self.val_format = self.buffer_factory(self.element_type)
         if self.position_type is None:
@@ -63,6 +63,3 @@ class ElementLevel(Level):
     @property
     def shape(self):
         return ()
-
-    def get_format(self):
-        return self.format

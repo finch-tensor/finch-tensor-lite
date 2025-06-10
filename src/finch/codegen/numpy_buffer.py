@@ -37,7 +37,8 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
             raise ValueError("NumPy array must be C-contiguous")
         self.arr = arr
 
-    def get_format(self):
+    @property
+    def format(self):
         """
         Returns the format of the buffer, which is a NumpyBufferFormat.
         """

@@ -81,7 +81,7 @@ def test_codegen(compiler, buffer):
     a = np.array([1, 2, 3], dtype=np.float64)
     buf = buffer(a)
 
-    a_var = asm.Variable("a", buf.get_format())
+    a_var = asm.Variable("a", buf.format)
     i_var = asm.Variable("i", int)
     length_var = asm.Variable("l", int)
     prgm = asm.Module(
@@ -147,8 +147,8 @@ def test_dot_product(compiler, buffer):
     i = asm.Variable("i", np.int64)
     ab = buffer(a)
     bb = buffer(b)
-    ab_v = asm.Variable("a", ab.get_format())
-    bb_v = asm.Variable("b", bb.get_format())
+    ab_v = asm.Variable("a", ab.format)
+    bb_v = asm.Variable("b", bb.format)
     prgm = asm.Module(
         (
             asm.Function(

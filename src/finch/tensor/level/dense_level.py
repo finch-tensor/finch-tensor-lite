@@ -77,6 +77,3 @@ class DenseLevel(Level):
     @property
     def shape(self):
         return (self.dimension, *self.lvl.shape)
-
-    def get_format(self):
-        return self.format

@@ -14,14 +14,6 @@ class Buffer(Formattable, ABC):
     def __init__(self, length: int, dtype: type): ...
 
     @abstractmethod
-    def get_format(self):
-        """
-        Return the format of the buffer. The format defines how the data is
-        organized and accessed.
-        """
-        ...
-
-    @abstractmethod
     def length(self):
         """
         Return the length of the buffer.
@@ -34,7 +26,7 @@ class Buffer(Formattable, ABC):
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
         """
-        return self.get_format().element_type()
+        return self.format.element_type()
 
     @property
     def length_type(self):
@@ -42,7 +34,7 @@ class Buffer(Formattable, ABC):
         Return the type of indices used to access elements in the buffer.
         This is typically an integer type.
         """
-        return self.get_format().length_type()
+        return self.format.length_type()
 
     @abstractmethod
     def load(self, idx: int): ...
