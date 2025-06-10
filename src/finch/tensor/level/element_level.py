@@ -26,7 +26,7 @@ class ElementLevelFormat(LevelFormat):
         self.element_type = self.val_format.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape = (), *args, **kwargs):
+    def __call__(self, shape=()):
         """
         Creates an instance of ElementLevel with the given format.
         Args:
