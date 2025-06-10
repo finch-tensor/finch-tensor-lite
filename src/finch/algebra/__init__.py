@@ -15,11 +15,11 @@ from .algebra import (
     shape_type,
 )
 from .operator import (
+    InitWrite,
     conjugate,
+    overwrite,
     promote_max,
     promote_min,
-    overwrite,
-    InitWrite,
 )
 
 __all__ = [
