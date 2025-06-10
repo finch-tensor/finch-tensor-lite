@@ -100,7 +100,13 @@ class EagerTensor(OverrideTensor, ABC):
 
     def __rpow__(self, other):
         return pow(other, self)
+      
+    def __matmul__(self, other):
+        return matmul(self, other)
 
+    def __rmatmul__(self, other):
+        return matmul(other, self)
+      
     def __complex__(self):
         """
         Converts a zero-dimensional array to a Python `complex` object.
@@ -258,7 +264,8 @@ def matmul(x1, x2, /):
     """
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.matmul(x1, x2)
-    return compute(lazy.matmul(x1, x2))
+    c = lazy.matmul(x1, x2)
+    return compute(c)
 
 
 def matrix_transpose(x, /):
