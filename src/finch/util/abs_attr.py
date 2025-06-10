@@ -1,4 +1,4 @@
-class AbsAttr():
+class AbsAttr:
     """
     A class to represent abstract required attributes.
 
@@ -41,14 +41,14 @@ class AbsAttr():
         super().__init_subclass__(**kwargs)
         attrs = {}
         for base in reversed(cls.__mro__):
-            if hasattr(base, '__attrs__'):
+            if hasattr(base, "__attrs__"):
                 for attr in base.__attrs__():
                     # Only set if not already set, so the most base class wins
                     if attr not in attrs:
                         attrs[attr] = base
         cls.__init__ = make_validate_attrs_init(cls.__init__, attrs)
 
-    
+
 def make_validate_attrs_init(init, attrs):
     def __validate_attrs_init__(self, *args, **kwargs):
         """
@@ -57,10 +57,11 @@ def make_validate_attrs_init(init, attrs):
         If not implemented, a custom error message will be shown.
         """
         init(self, *args, **kwargs)
-        for (attr, base) in attrs.items():
+        for attr, base in attrs.items():
             if not hasattr(self, attr):
                 raise AttributeError(
                     f"Subclass '{self.__class__.__name__}' of base class"
                     f" '{base.__name__}' is missing required attribute '{attr}'."
                 )
+
     return __validate_attrs_init__
