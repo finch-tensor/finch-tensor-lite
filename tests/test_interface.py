@@ -576,3 +576,42 @@ def test_expand_dims_valid(x, axis):
 def test_expand_dims_invalid(x, axis):
     with pytest.raises(IndexError):
         finch.expand_dims(x, axis=axis)
+
+
+@pytest.mark.parametrize(
+    "x",
+    [
+        0,
+        0.0,
+        -4,
+        1,
+        2.4,
+        -1.54,
+        True,
+        False,
+        float("inf"),
+        float("-inf"),
+        float("nan"),
+        complex(1, 2),
+        complex(0, 0),
+    ],
+)
+@pytest.mark.parametrize("func", [complex, int, float, bool])
+def test_scalar_coerce(x, func):
+    """
+    Tests for scalar coercion to different types.
+    """
+    if isinstance(x, complex) and func in [int, float]:
+        # no defined behavior in spec
+        return
+
+    try:
+        expected = func(x)
+    except (ValueError, TypeError, OverflowError):
+        with pytest.raises((ValueError, TypeError, OverflowError)):
+            print(func(TestEagerTensor(np.array(x))))
+        return
+    result = func(TestEagerTensor(np.array(x)))
+    assert isinstance(result, func), f"Result should be of type {func.__name__}"
+    works = result == expected or np.isnan(result) and np.isnan(expected)
+    assert works, f"Expected {expected}, got {result}"
