@@ -11,3 +11,15 @@ def test_issue_64():
     result = finch.compute(c).shape
     expected = (4, 2, 3)
     assert result == expected, f"Expected shape {expected}, got {result}"
+
+
+def test_issue_50():
+    x = finch.defer(np.array([[2, 4, 6, 8], [1, 3, 5, 7]]))
+    m = finch.defer(np.array([[1, 1, 1, 1], [1, 1, 1, 1]]))
+    n = finch.defer(
+        np.array([[2.0, 2.0, 2.0, 2.0], [2.0, 2.0, 2.0, 2.0]])
+    )  # Int -> Float caused return_type error
+    # If replaced above with below line, no error
+    # n = finch.defer(np.array([[2, 2, 2, 2], [2, 2, 2, 2]]))
+    o = finch.defer(np.array([[3, 3, 3, 3], [3, 3, 3, 3]]))
+    return finch.add(finch.add(finch.subtract(x, m), n), o)

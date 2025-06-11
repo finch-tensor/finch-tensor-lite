@@ -1,6 +1,6 @@
 import builtins
 import sys
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
 from . import lazy
@@ -11,6 +11,14 @@ from .overrides import OverrideTensor
 class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
+
+    @property
+    @abstractmethod
+    def ndim(self):
+        """Number of dimensions of the tensor."""
+        raise NotImplementedError(
+            "EagerTensor subclasses must implement the 'ndim' property."
+        )
 
     def __add__(self, other):
         return add(self, other)
@@ -92,6 +100,48 @@ class EagerTensor(OverrideTensor, ABC):
 
     def __rpow__(self, other):
         return pow(other, self)
+
+    def __matmul__(self, other):
+        return matmul(self, other)
+
+    def __rmatmul__(self, other):
+        return matmul(other, self)
+
+    def __complex__(self):
+        """
+        Converts a zero-dimensional array to a Python `complex` object.
+        """
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to complex.")
+        # dispatch to the scalar value's `__complex__` method
+        return complex(self[()])
+
+    def __float__(self):
+        """
+        Converts a zero-dimensional array to a Python `float` object.
+        """
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to float.")
+        # dispatch to the scalar value's `__float__` method
+        return float(self[()])
+
+    def __int__(self):
+        """
+        Converts a zero-dimensional array to a Python `int` object.
+        """
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to int.")
+        # dispatch to the scalar value's `__int__` method
+        return int(self[()])
+
+    def __bool__(self):
+        """
+        Converts a zero-dimensional array to a Python `bool` object.
+        """
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to bool.")
+        # dispatch to the scalar value's `__bool__` method
+        return bool(self[()])
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
@@ -214,7 +264,8 @@ def matmul(x1, x2, /):
     """
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.matmul(x1, x2)
-    return compute(lazy.matmul(x1, x2))
+    c = lazy.matmul(x1, x2)
+    return compute(c)
 
 
 def matrix_transpose(x, /):

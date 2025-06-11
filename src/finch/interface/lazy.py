@@ -140,6 +140,44 @@ class LazyTensor(OverrideTensor):
     def __rmatmul__(self, other):
         return matmul(defer(other), self)
 
+    # raise ValueError for unsupported operations according to the data-apis spec.
+    # NOT tested, since this isn't necessary as it will throw an error anyways.
+    def __complex__(self) -> complex:
+        """
+        Converts the LazyTensor to a complex number.
+        This is a no-op for LazyTensors, as they are symbolic representations.
+        """
+        raise ValueError(
+            "Cannot convert LazyTensor to complex. Use compute() to evaluate it first."
+        )
+
+    def __float__(self) -> float:
+        """
+        Converts the LazyTensor to a float.
+        This is a no-op for LazyTensors, as they are symbolic representations.
+        """
+        raise ValueError(
+            "Cannot convert LazyTensor to float. Use compute() to evaluate it first."
+        )
+
+    def __int__(self) -> int:
+        """
+        Converts the LazyTensor to an int.
+        This is a no-op for LazyTensors, as they are symbolic representations.
+        """
+        raise ValueError(
+            "Cannot convert LazyTensor to int. Use compute() to evaluate it first."
+        )
+
+    def __bool__(self) -> bool:
+        """
+        Converts the LazyTensor to a bool.
+        This is a no-op for LazyTensors, as they are symbolic representations.
+        """
+        raise ValueError(
+            "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
+        )
+
 
 def defer(arr) -> LazyTensor:
     """
