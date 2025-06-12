@@ -264,8 +264,8 @@ def propagate_map_queries_backward(root):
                         ) if (
                             is_distributive(f.val, g.val)
                             and is_annihilator(f.val, init.val)
-                            and len(agg.get_fields())
-                            == len(MapJoin(f, (*before_item, *after_item)).get_fields())
+                            and len(agg.fields)
+                            == len(MapJoin(f, (*before_item, *after_item)).fields)
                         ):
                             return Aggregate(
                                 g,
@@ -384,7 +384,7 @@ def _propagate_fields(
         case Query(lhs, rhs):
             rhs_2 = _propagate_fields(rhs, fields)
             assert isinstance(rhs_2, LogicExpression)
-            fields[lhs] = rhs_2.get_fields()
+            fields[lhs] = rhs_2.fields
             return Query(lhs, rhs_2)
         case Alias(_) as a:
             return Relabel(a, tuple(fields[a]))
@@ -408,11 +408,11 @@ def push_fields(root):
         #     )
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
-                reidx = dict(zip(mj.get_fields(), idxs, strict=True))
+                reidx = dict(zip(mj.fields, idxs, strict=True))
                 return MapJoin(
                     op,
                     tuple(
-                        Relabel(arg, tuple(reidx[f] for f in arg.get_fields()))
+                        Relabel(arg, tuple(reidx[f] for f in arg.fields))
                         for arg in args
                     ),
                 )
@@ -422,10 +422,10 @@ def push_fields(root):
         #     agg(..., relabel([1,2,3], [11,22,3]), 3)
         match ex:
             case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
-                diff_idxs = setdiff(arg.get_fields(), agg_idxs)
+                diff_idxs = setdiff(arg.fields, agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
                 relabeled_idxs = tuple(
-                    reidx_dict.get(idx, idx) for idx in arg.get_fields()
+                    reidx_dict.get(idx, idx) for idx in arg.fields
                 )
                 return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
 
@@ -438,7 +438,7 @@ def push_fields(root):
         # relabel(reorder(_, [2,1]), [11,22]) => reorder(relabel(_, [22,11]), [11,22])
         match ex:
             case Relabel(Reorder(arg, idxs_1), idxs_2):
-                idxs_3 = arg.get_fields()
+                idxs_3 = arg.fields
                 reidx_dict = dict(zip(idxs_1, idxs_2, strict=True))
                 idxs_4 = tuple(reidx_dict.get(idx, idx) for idx in idxs_3)
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
@@ -469,7 +469,7 @@ def push_fields(root):
                     MapJoin(
                         op,
                         tuple(
-                            Reorder(arg, intersect(idxs, arg.get_fields()))
+                            Reorder(arg, intersect(idxs, arg.fields))
                             for arg in args
                         ),
                     ),
@@ -479,13 +479,13 @@ def push_fields(root):
     def rule_8(ex):
         match ex:
             case Reorder(Aggregate(op, init, arg, idxs_1), idxs_2) if (
-                not is_subsequence(intersect(arg.get_fields(), idxs_2), idxs_2)
+                not is_subsequence(intersect(arg.fields, idxs_2), idxs_2)
             ):
                 return Reorder(
                     Aggregate(
                         op,
                         init,
-                        Reorder(arg, with_subsequence(idxs_2, arg.get_fields())),
+                        Reorder(arg, with_subsequence(idxs_2, arg.fields)),
                         idxs_1,
                     ),
                     idxs_2,
@@ -498,17 +498,17 @@ def lift_fields(root):
     def rule_0(ex):
         match ex:
             case Aggregate(op, init, arg, idxs):
-                return Aggregate(op, init, Reorder(arg, tuple(arg.get_fields())), idxs)
+                return Aggregate(op, init, Reorder(arg, tuple(arg.fields)), idxs)
 
     def rule_1(ex):
         match ex:
             case Query(lhs, MapJoin() as rhs):
-                return Query(lhs, Reorder(rhs, tuple(rhs.get_fields())))
+                return Query(lhs, Reorder(rhs, tuple(rhs.fields)))
 
     def rule_2(ex):
         match ex:
             case Query(lhs, Reformat(tns, MapJoin() as arg)):
-                return Query(lhs, Reformat(tns, Reorder(arg, tuple(arg.get_fields()))))
+                return Query(lhs, Reformat(tns, Reorder(arg, tuple(arg.fields))))
 
     return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
 
@@ -598,7 +598,7 @@ def concordize(root):
     def rule_1(ex):
         match ex:
             case Query(lhs, rhs) as q if lhs in needed_swizzles:
-                idxs = tuple(rhs.get_fields())
+                idxs = tuple(rhs.fields)
                 swizzle_queries = tuple(
                     Query(
                         alias, Reorder(Relabel(lhs, idxs), tuple(idxs[p] for p in perm))
