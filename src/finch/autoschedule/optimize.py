@@ -154,7 +154,7 @@ def _lift_subqueries_expr(
         case LogicTree() as tree:
             return tree.make_term(
                 tree.head(),
-                *(_lift_subqueries_expr(x, bindings) for x in tree.children()),
+                *(_lift_subqueries_expr(x, bindings) for x in tree.children),
             )
         case _:
             return node
@@ -390,7 +390,7 @@ def _propagate_fields(
             return Relabel(a, tuple(fields[a]))
         case LogicTree() as tree:
             return tree.make_term(
-                tree.head(), *(_propagate_fields(c, fields) for c in tree.children())
+                tree.head(), *(_propagate_fields(c, fields) for c in tree.children)
             )
         case node:
             return node

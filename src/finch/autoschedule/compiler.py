@@ -88,7 +88,7 @@ def get_structure(
         case LogicTree() as tree:
             return tree.make_term(
                 tree.head(),
-                *(get_structure(arg, fields, aliases) for arg in tree.children()),
+                *(get_structure(arg, fields, aliases) for arg in tree.children),
             )
         case _:
             return node

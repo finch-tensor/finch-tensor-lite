@@ -37,6 +37,7 @@ class LogicNode(Term, ABC):
 
 @dataclass(eq=True, frozen=True)
 class LogicTree(LogicNode, TermTree, ABC):
+    @property
     @abstractmethod
     def children(self) -> list[LogicNode]:  # type: ignore[override]
         ...
@@ -127,6 +128,7 @@ class Table(LogicTree, LogicExpression):
     tns: Immediate | Deferred
     idxs: tuple[Field, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
@@ -156,6 +158,7 @@ class MapJoin(LogicTree, LogicExpression):
     op: LogicNode
     args: tuple[LogicExpression, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.op, *self.args]
@@ -191,6 +194,7 @@ class Aggregate(LogicTree, LogicExpression):
     arg: LogicExpression
     idxs: tuple[LogicNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
@@ -220,6 +224,7 @@ class Reorder(LogicTree, LogicExpression):
     arg: LogicNode
     idxs: tuple[Field, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
@@ -247,6 +252,7 @@ class Relabel(LogicTree, LogicExpression):
     arg: LogicNode
     idxs: tuple[Field, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
@@ -273,6 +279,7 @@ class Reformat(LogicTree, LogicExpression):
     tns: LogicNode
     arg: LogicExpression
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.tns, self.arg]
@@ -297,6 +304,7 @@ class Subquery(LogicTree, LogicExpression):
     lhs: LogicNode
     arg: LogicNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.arg]
@@ -321,6 +329,7 @@ class Query(LogicTree):
     lhs: LogicNode
     rhs: LogicNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
@@ -338,6 +347,7 @@ class Produces(LogicTree):
 
     args: tuple[LogicNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.args]
@@ -359,6 +369,7 @@ class Plan(LogicTree):
 
     bodies: tuple[LogicNode, ...] = ()
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.bodies]

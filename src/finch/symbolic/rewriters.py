@@ -66,13 +66,13 @@ class PreWalk:
         y = self.rw(x)
         if y is not None:
             if isinstance(y, TermTree):
-                args = y.children()
+                args = y.children
                 return y.make_term(  # type: ignore[return-value]
                     y.head(), *[default_rewrite(self(arg), arg) for arg in args]
                 )
             return y
         if isinstance(x, TermTree):
-            args = x.children()
+            args = x.children
             new_args = list(map(self, args))
             if not all(arg is None for arg in new_args):
                 return x.make_term(  # type: ignore[return-value]
@@ -97,7 +97,7 @@ class PostWalk:
 
     def __call__(self, x: T) -> T | None:
         if isinstance(x, TermTree):
-            args = x.children()
+            args = x.children
             new_args = list(map(self, args))
             if all(arg is None for arg in new_args):
                 return self.rw(x)
@@ -169,7 +169,7 @@ class Prestep:
     def __call__(self, x: T) -> T | None:
         y = self.rw(x)
         if y is not None and isinstance(y, TermTree):
-            y_args = y.children()
+            y_args = y.children
             return y.make_term(
                 y.head(), *[default_rewrite(self(arg), arg) for arg in y_args]
             )

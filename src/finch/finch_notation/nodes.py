@@ -90,6 +90,7 @@ class Call(NotationTree, NotationExpression):
     def from_children(cls, op, *args):
         return cls(op, args)
 
+    @property
     def children(self):
         return [self.op, *self.args]
 
@@ -119,6 +120,7 @@ class Access(NotationTree, NotationExpression):
     def from_children(cls, tns, mode, *idxs):
         return cls(tns, mode, idxs)
 
+    @property
     def children(self):
         return [self.tns, self.mode, *self.idxs]
 
@@ -130,6 +132,7 @@ class Read(AccessMode):
     This mode allows reading the value of a tensor without modifying it.
     """
 
+    @property
     def children(self):
         return []
 
@@ -148,6 +151,7 @@ class Update(AccessMode, NotationTree):
 
     op: NotationNode
 
+    @property
     def children(self):
         return [self.op]
 
@@ -161,6 +165,7 @@ class Increment(NotationTree):
     lhs: NotationNode
     rhs: NotationNode
 
+    @property
     def children(self):
         return [self.lhs, self.rhs]
 
@@ -174,6 +179,7 @@ class Unwrap(NotationTree):
 
     arg: NotationNode
 
+    @property
     def children(self):
         return [self.arg]
 
@@ -194,6 +200,7 @@ class Cached(NotationTree, NotationExpression):
     def get_type(self):
         return self.arg.get_type()
 
+    @property
     def children(self):
         return [self.arg, self.ref]
 
@@ -208,6 +215,7 @@ class Loop(NotationTree):
     ext: NotationNode
     body: NotationNode
 
+    @property
     def children(self):
         return [self.idx, self.ext, self.body]
 
@@ -221,6 +229,7 @@ class If(NotationTree):
     cond: NotationNode
     body: NotationNode
 
+    @property
     def children(self):
         return [self.cond, self.body]
 
@@ -236,6 +245,7 @@ class IfElse(NotationTree):
     then_body: NotationNode
     else_body: NotationNode
 
+    @property
     def children(self):
         return [self.cond, self.then_body, self.else_body]
 
@@ -249,6 +259,7 @@ class Assign(NotationTree):
     lhs: NotationNode
     rhs: NotationNode
 
+    @property
     def children(self):
         return [self.lhs, self.rhs]
 
@@ -265,6 +276,7 @@ class Declare(NotationTree, NotationExpression):
     op: NotationNode
     shape: tuple[NotationNode, ...]
 
+    @property
     def children(self):
         return [self.tns, self.init, self.op, *self.shape]
 
@@ -297,6 +309,7 @@ class Freeze(NotationTree, NotationExpression):
     tns: NotationNode
     op: NotationNode
 
+    @property
     def children(self):
         return [self.tns, self.op]
 
@@ -322,6 +335,7 @@ class Thaw(NotationTree, NotationExpression):
     tns: NotationNode
     op: NotationNode
 
+    @property
     def children(self):
         return [self.tns, self.op]
 
@@ -349,6 +363,7 @@ class Block(NotationTree):
     def from_children(cls, *bodies):
         return cls(bodies)
 
+    @property
     def children(self):
         return list(self.bodies)
 
@@ -371,6 +386,7 @@ class Function(NotationTree):
     args: tuple[Variable, ...]
     body: NotationNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.name, *self.args, self.body]
@@ -390,6 +406,7 @@ class Return(NotationTree):
 
     val: NotationNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.val]
@@ -411,6 +428,7 @@ class Module(NotationTree):
 
     funcs: tuple[NotationNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.funcs]
