@@ -43,8 +43,9 @@ class AssemblyTree(AssemblyNode, TermTree):
 
 
 class AssemblyExpression(AssemblyNode):
+    @property
     @abstractmethod
-    def get_type(self):
+    def result_format(self):
         """Returns the type of the expression."""
         ...
 
@@ -60,7 +61,8 @@ class Immediate(AssemblyExpression):
 
     val: Any
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
         return type(self.val)
 
@@ -79,7 +81,8 @@ class Variable(AssemblyExpression):
     name: str
     type: Any
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
         return self.type
 
@@ -126,9 +129,10 @@ class Call(AssemblyExpression, AssemblyTree):
     def from_children(cls, op, *args):
         return cls(op, args)
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
-        arg_types = [arg.get_type() for arg in self.args]
+        arg_types = [arg.result_format for arg in self.args]
         return return_type(self.op.val, *arg_types)
 
 
@@ -149,9 +153,10 @@ class Load(AssemblyExpression, AssemblyTree):
     def children(self):
         return [self.buffer, self.index]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
-        return element_type(self.buffer.get_type())
+        return element_type(self.buffer.result_format)
 
 
 @dataclass(eq=True, frozen=True)
@@ -207,9 +212,10 @@ class Length(AssemblyExpression, AssemblyTree):
     def children(self):
         return [self.buffer]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
-        return length_type(self.buffer.get_type())
+        return length_type(self.buffer.result_format)
 
 
 @dataclass(eq=True, frozen=True)

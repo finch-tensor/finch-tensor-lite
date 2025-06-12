@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from abc import abstractmethod
 
 from ..algebra import element_type, query_property, return_type
 from ..symbolic import Term, TermTree
@@ -22,31 +23,35 @@ class NotationTree(NotationNode, TermTree):
         return cls(*children)
 
 
-class NotationExpression:
+class NotationExpression(NotationNode):
     """
     Notation AST expression base class.
     """
 
-    def get_type(self) -> Any:
+    @property
+    @abstractmethod
+    def result_format(self) -> Any:
         """
         Get the type of the expression.
         """
+        ...
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(NotationNode, NotationExpression):
+class Literal(NotationExpression):
     """
     Notation AST expression for the literal value `val`.
     """
 
     val: Any
 
-    def get_type(self):
+    @property
+    def result_format(self):
         return type(self.val)
 
 
 @dataclass(eq=True, frozen=True)
-class Value(NotationNode, NotationExpression):
+class Value(NotationExpression):
     """
     Notation AST expression for host code `val` expected to evaluate to a value of
     type `type_`.
@@ -55,12 +60,13 @@ class Value(NotationNode, NotationExpression):
     val: Any
     type_: Any
 
-    def get_type(self):
+    @property
+    def result_format(self):
         return self.type_
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(NotationNode, NotationExpression):
+class Variable(NotationExpression):
     """
     Notation AST expression for a variable named `name`.
     """
@@ -68,7 +74,8 @@ class Variable(NotationNode, NotationExpression):
     name: str
     type_: Any = None
 
-    def get_type(self):
+    @property
+    def result_format(self):
         return self.type_
 
 
@@ -82,8 +89,9 @@ class Call(NotationTree, NotationExpression):
     op: Literal
     args: tuple[NotationNode, ...]
 
-    def get_type(self):
-        arg_types = [a.get_type() for a in self.args]
+    @property
+    def result_format(self):
+        arg_types = [a.result_format for a in self.args]
         return return_type(self.op.val, *arg_types)
 
     @classmethod
@@ -112,9 +120,10 @@ class Access(NotationTree, NotationExpression):
     mode: AccessMode
     idxs: tuple[NotationNode, ...]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         # Placeholder: in a real system, would use tns/type system
-        return element_type(self.tns.get_type())
+        return element_type(self.tns.result_format)
 
     @classmethod
     def from_children(cls, tns, mode, *idxs):
@@ -197,8 +206,9 @@ class Cached(NotationTree, NotationExpression):
     arg: NotationNode
     ref: NotationNode
 
-    def get_type(self):
-        return self.arg.get_type()
+    @property
+    def result_format(self):
+        return self.arg.result_format
 
     @property
     def children(self):
@@ -286,16 +296,17 @@ class Declare(NotationTree, NotationExpression):
         """
         return cls(tns, init, op, shape)
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """
         Returns the type of the declared tensor.
         """
         return query_property(
-            self.tns.get_type(),
+            self.tns.result_format,
             "declare",
             "return_type",
-            self.op.get_type(),
-            *[s.get_type() for s in self.shape],
+            self.op.result_format,
+            *[s.result_format for s in self.shape],
         )
 
 
@@ -313,12 +324,13 @@ class Freeze(NotationTree, NotationExpression):
     def children(self):
         return [self.tns, self.op]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """
         Returns the type of the frozen tensor.
         """
         return query_property(
-            self.tns.get_type(),
+            self.tns.result_format,
             "freeze",
             "return_type",
             self.op.get_type,
@@ -339,12 +351,13 @@ class Thaw(NotationTree, NotationExpression):
     def children(self):
         return [self.tns, self.op]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """
         Returns the type of the thawed tensor.
         """
         return query_property(
-            self.tns.get_type(),
+            self.tns.result_format,
             "thaw",
             "return_type",
             self.op,
