@@ -16,9 +16,7 @@ class EagerTensor(OverrideTensor, ABC):
     @abstractmethod
     def ndim(self):
         """Number of dimensions of the tensor."""
-        raise NotImplementedError(
-            "EagerTensor subclasses must implement the 'ndim' property."
-        )
+        ...
 
     def __add__(self, other):
         return add(self, other)

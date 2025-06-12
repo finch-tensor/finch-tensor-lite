@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
@@ -8,29 +8,75 @@ from finch.symbolic import Format, Formattable
 class LevelFormat(Format, ABC):
     """
     An abstract base class representing the format of levels.
-
-    Subclasses must define the following properties:
-    - `ndims`: Number of dimensions of the fibers in the structure.
-    - `fill_value`: Fill value of the fibers, or `None` if dynamic.
-    - `element_type`: Type of elements stored in the fibers.
-    - `shape_type`: Type of the shape of the fibers.
-    - `position_type`: Type of positions within the levels.
-    - `buffer_factory`: Function to create default buffers for the fibers.
     """
+
+    @property
+    @abstractmethod
+    def ndim(self):
+        """
+        Number of dimensions of the fibers in the structure.
+        """
+        ...
+    
+    @property
+    @abstractmethod
+    def fill_value(self):
+        """
+        Fill value of the fibers, or `None` if dynamic.
+        """
+        ...
+    
+    @property
+    @abstractmethod
+    def element_type(self):
+        """
+        Type of elements stored in the fibers.
+        """
+        ...
+    
+    @property
+    @abstractmethod
+    def shape_type(self):
+        """
+        Tuple of types of the dimensions in the shape
+        """
+        ...
+    
+    @property
+    @abstractmethod
+    def position_type(self):
+        """
+        Type of positions within the levels.
+        """
+        ...
+    
+    @property
+    @abstractmethod
+    def buffer_factory(self):
+        """
+        Function to create default buffers for the fibers.
+        """
+        ...
+
 
 
 class Level(Formattable, ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
-
-    Subclasses must define the following properties:
-    - `shape`: The shape of the fibers in the structure.
     """
 
     @property
-    def ndims(self):
-        return self.format.ndims
+    @abstractmethod
+    def shape(self):
+        """
+        Shape of the fibers in the structure.
+        """
+        ...
+
+    @property
+    def ndim(self):
+        return self.format.ndim
 
     @property
     def fill_value(self):
@@ -87,8 +133,8 @@ class FiberTensor(Generic[Tp], Formattable):
         return self.lvl.shape
 
     @property
-    def ndims(self):
-        return self.lvl.ndims
+    def ndim(self):
+        return self.lvl.ndim
 
     @property
     def shape_type(self):
@@ -116,7 +162,7 @@ class FiberTensor(Generic[Tp], Formattable):
 
 
 @dataclass
-class FiberTensorFormat(Format, ABC):
+class FiberTensorFormat(Format):
     """
     An abstract base class representing the format of a fiber tensor.
 
@@ -142,8 +188,8 @@ class FiberTensorFormat(Format, ABC):
         return self.lvl.shape
 
     @property
-    def ndims(self):
-        return self.lvl.ndims
+    def ndim(self):
+        return self.lvl.ndim
 
     @property
     def shape_type(self):
@@ -168,3 +214,16 @@ class FiberTensorFormat(Format, ABC):
         This is typically a NumpyBufferFormat or similar.
         """
         return self.lvl.buffer_factory
+
+def tensor(lvl: LevelFormat, pos_type: type | None = None):
+    """
+    Creates a FiberTensorFormat with the given level format and position type.
+    
+    Args:
+        lvl: The level format to be used for the tensor.
+        pos_type: The type of positions within the tensor. Defaults to None.
+    
+    Returns:
+        An instance of FiberTensorFormat.
+    """
+    return FiberTensorFormat(lvl, pos_type)

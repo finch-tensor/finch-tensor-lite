@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from ..tensor import Level, LevelFormat
+from ..fiber_tensor import Level, LevelFormat
 
 
 @dataclass
@@ -28,8 +28,8 @@ class DenseLevelFormat(LevelFormat, ABC):
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     @property
-    def ndims(self):
-        return 1 + self.lvl.ndims
+    def ndim(self):
+        return 1 + self.lvl.ndim
 
     @property
     def fill_value(self):
@@ -64,16 +64,24 @@ class DenseLevelFormat(LevelFormat, ABC):
         return self.lvl.buffer_factory
 
 
+def dense(lvl, dimension_type=None):
+    return DenseLevelFormat(lvl, dimension_type=dimension_type)
+
+
 @dataclass
 class DenseLevel(Level):
     """
     A class representing the leaf level of Finch tensors.
     """
 
-    format: DenseLevelFormat
+    _format: DenseLevelFormat
     lvl: Any
     dimension: Any
 
     @property
     def shape(self):
         return (self.dimension, *self.lvl.shape)
+
+    @property
+    def format(self):
+        return self._format

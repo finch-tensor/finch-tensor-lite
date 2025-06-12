@@ -20,10 +20,15 @@ class Format(ABC):
 class Formattable:
     """
     Abstract base class for objects that can be formatted.
-
-    Required attributes:
-    - format: The format of the object.
     """
+
+    @property
+    @abstractmethod
+    def format(self):
+        """
+        The format of the object.
+        """
+        ...
 
 
 def has_format(x, f):

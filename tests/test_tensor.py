@@ -16,8 +16,8 @@ def test_fiber_tensor_attributes():
     # Check shape attribute
     assert a.shape == shape
 
-    # Check ndims
-    assert a.ndims == 1
+    # Check ndim
+    assert a.ndim == 1
 
     # Check shape_type
     assert a.shape_type == (np.intp,)
