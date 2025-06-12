@@ -8,7 +8,7 @@ from ...symbolic import Format, format
 from ..fiber_tensor import Level, LevelFormat
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class ElementLevelFormat(LevelFormat):
     _fill_value: Any
     _element_type: type | Format | None = None

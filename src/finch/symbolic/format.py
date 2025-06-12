@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 from ..algebra import query_property
 
-
 class Format(ABC):
     @abstractmethod
     def __eq__(self, other): ...

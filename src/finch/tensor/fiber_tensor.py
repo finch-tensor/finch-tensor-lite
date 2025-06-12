@@ -161,7 +161,7 @@ class FiberTensor(Generic[Tp], Formattable):
         return self.lvl.buffer_factory
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class FiberTensorFormat(Format):
     """
     An abstract base class representing the format of a fiber tensor.
@@ -171,11 +171,11 @@ class FiberTensorFormat(Format):
     """
 
     lvl: LevelFormat
-    pos: type | None = None
+    _position_type: type | None = None
 
     def __post_init__(self):
-        if self.pos is None:
-            self.pos = self.lvl.position_type
+        if self._position_type is None:
+            self._position_type = self.lvl.position_type
 
     def __call__(self, shape):
         """
@@ -205,7 +205,7 @@ class FiberTensorFormat(Format):
 
     @property
     def position_type(self):
-        return self.lvl.position_type
+        return self._position_type
 
     @property
     def buffer_factory(self):
@@ -215,7 +215,7 @@ class FiberTensorFormat(Format):
         """
         return self.lvl.buffer_factory
 
-def tensor(lvl: LevelFormat, pos_type: type | None = None):
+def tensor(lvl: LevelFormat, position_type: type | None = None):
     """
     Creates a FiberTensorFormat with the given level format and position type.
     
@@ -226,4 +226,5 @@ def tensor(lvl: LevelFormat, pos_type: type | None = None):
     Returns:
         An instance of FiberTensorFormat.
     """
-    return FiberTensorFormat(lvl, pos_type)
+    #mypy does not understand that dataclasses generate __hash__ and __eq__
+    return FiberTensorFormat(lvl, position_type) # type: ignore[abstract]

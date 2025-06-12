@@ -7,7 +7,7 @@ import numpy as np
 from ..fiber_tensor import Level, LevelFormat
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class DenseLevelFormat(LevelFormat, ABC):
     lvl: Any
     dimension_type: Any = None
