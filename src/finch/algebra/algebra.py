@@ -417,21 +417,21 @@ for op, meth in _unary_operators.items():
     for t in StableNumber.__args__:
         register_property(t, meth, "return_type", _return_type_unary(meth))
 
-
-register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
-register_property(math.sin, "__call__", "return_type", lambda op, a: type(np.sin(a(True))),)
-register_property(math.sinh, "__call__", "return_type", lambda op, a: type(np.sinh(a(True))),)
-register_property(math.cos, "__call__", "return_type", lambda op, a: type(np.cos(a(True))),)
-register_property(math.cosh, "__call__", "return_type", lambda op, a: type(np.cosh(a(True))),)
-register_property(math.tan, "__call__", "return_type", lambda op, a: type(np.tan(a(True))),)
-register_property(math.tanh, "__call__", "return_type", lambda op, a: type(np.tanh(a(True))),)
-register_property(math.asin, "__call__", "return_type", lambda op, a: type(np.asin(a(True))),)
-register_property(math.asinh, "__call__", "return_type", lambda op, a: type(np.asinh(a(True))),)
-register_property(math.acos, "__call__", "return_type", lambda op, a: type(np.acos(a(True))),)
-register_property(math.acosh, "__call__", "return_type", lambda op, a: type(np.acosh(a(True))),)
-register_property(math.atan, "__call__", "return_type", lambda op, a: type(np.atan(a(True))),)
-register_property(math.atanh, "__call__", "return_type", lambda op, a: type(np.atanh(a(True))),)
+for meth in (
+    math.sin, math.cos, math.tan,
+    math.sinh, math.cosh, math.tanh,
+    math.asin, math.acos, math.atan,
+    math.asinh, math.acosh, math.atanh
+):
+    register_property(
+        meth,
+        "__call__",
+        "return_type",
+        lambda op, a, _meth=meth: type(getattr(np, _meth.__name__)(a(False)))
+    )
+register_property(math.acosh, "__call__", "return_type", lambda op, a: type(np.acosh(a(True))))
 register_property(math.atan2, "__call__", "return_type", lambda op, a, b: type(np.atan2(a(True), b(True))),)
+register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
 
 def is_associative(op: Any) -> bool:
     """
