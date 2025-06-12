@@ -1,6 +1,7 @@
 import operator
 
 import pytest
+import math
 
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal
@@ -164,6 +165,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((operator.abs, finch.abs, np.abs), np.abs),
         ((operator.pos, finch.positive, np.positive), np.positive),
         ((operator.neg, finch.negative, np.negative), np.negative),
+        ((math.sin, finch.sin, np.sin), np.sin),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):

@@ -312,6 +312,7 @@ _reflexive_operators = {
     operator.and_: ("__and__", "__rand__"),
     operator.xor: ("__xor__", "__rxor__"),
     operator.or_: ("__or__", "__ror__"),
+
 }
 
 
@@ -360,6 +361,18 @@ _unary_operators: dict[Callable, str] = {
     operator.abs: "__abs__",
     operator.pos: "__pos__",
     operator.neg: "__neg__",
+    math.sin: "__sin__",
+    math.sinh: "__sinh__",
+    math.cos: "__cos__",
+    math.cosh: "__cosh__",
+    math.tan: "__tan__",
+    math.tanh: "__tanh__",
+    math.asin: "__asin__",
+    math.asinh: "__asinh__",
+    math.acos: "__acos__",
+    math.acosh: "__acosh__",
+    math.atan: "__atan__",
+    math.atanh: "__atanh__",
 }
 
 
@@ -406,7 +419,19 @@ for op, meth in _unary_operators.items():
 
 
 register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
-
+register_property(math.sin, "__call__", "return_type", lambda op, a: type(np.sin(a(True))),)
+register_property(math.sinh, "__call__", "return_type", lambda op, a: type(np.sinh(a(True))),)
+register_property(math.cos, "__call__", "return_type", lambda op, a: type(np.cos(a(True))),)
+register_property(math.cosh, "__call__", "return_type", lambda op, a: type(np.cosh(a(True))),)
+register_property(math.tan, "__call__", "return_type", lambda op, a: type(np.tan(a(True))),)
+register_property(math.tanh, "__call__", "return_type", lambda op, a: type(np.tanh(a(True))),)
+register_property(math.asin, "__call__", "return_type", lambda op, a: type(np.asin(a(True))),)
+register_property(math.asinh, "__call__", "return_type", lambda op, a: type(np.asinh(a(True))),)
+register_property(math.acos, "__call__", "return_type", lambda op, a: type(np.acos(a(True))),)
+register_property(math.acosh, "__call__", "return_type", lambda op, a: type(np.acosh(a(True))),)
+register_property(math.atan, "__call__", "return_type", lambda op, a: type(np.atan(a(True))),)
+register_property(math.atanh, "__call__", "return_type", lambda op, a: type(np.atanh(a(True))),)
+register_property(math.atan2, "__call__", "return_type", lambda op, a, b: type(np.atan2(a(True), b(True))),)
 
 def is_associative(op: Any) -> bool:
     """

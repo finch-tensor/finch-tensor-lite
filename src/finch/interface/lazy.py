@@ -1,6 +1,7 @@
 import builtins
 import operator
 import sys
+import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
@@ -139,6 +140,45 @@ class LazyTensor(OverrideTensor):
 
     def __rmatmul__(self, other):
         return matmul(defer(other), self)
+
+    def __sin__(self):
+        return sin(self)
+
+    def __sinh__(self):
+        return sinh(self)
+
+    def __cos__(self):
+        return cos(self)
+
+    def __cosh__(self):
+        return cosh(self)
+
+    def __tan__(self):
+        return tan(self)
+
+    def __tanh__(self):
+        return tanh(self)
+
+    def __asin__(self):
+        return asin(self)
+
+    def __asinh__(self):
+        return asinh(self)
+
+    def __acos__(self):
+        return acos(self)
+
+    def __acosh__(self):
+        return acosh(self)
+
+    def __atan__(self):
+        return atan(self)
+
+    def __atanh__(self):
+        return atanh(self)
+
+    def __atan2__(self, other):
+        return atan2(defer(other), self)
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -808,3 +848,56 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         multiply(conjugate(x1), x2),
         axis=axis,
     )
+
+def sin(x) -> LazyTensor:
+    return elementwise(math.sin, defer(x))
+
+
+def sinh(x) -> LazyTensor:
+    return elementwise(math.sinh, defer(x))
+
+
+def cos(x) -> LazyTensor:
+    return elementwise(math.cos, defer(x))
+
+
+def cosh(x) -> LazyTensor:
+    return elementwise(math.cosh, defer(x))
+
+
+def tan(x) -> LazyTensor:
+    return elementwise(math.tan, defer(x))
+
+
+def tanh(x) -> LazyTensor:
+    return elementwise(math.tanh, defer(x))
+
+
+def asin(x) -> LazyTensor:
+    return elementwise(math.asin, defer(x))
+
+
+def asinh(x) -> LazyTensor:
+    return elementwise(math.asinh, defer(x))
+
+
+def acos(x) -> LazyTensor:
+    return elementwise(math.acos, defer(x))
+
+
+def acosh(x) -> LazyTensor:
+    return elementwise(math.acosh, defer(x))
+
+
+def atan(x) -> LazyTensor:
+    return elementwise(math.atan, defer(x))
+
+
+def atanh(x) -> LazyTensor:
+    return elementwise(math.atanh, defer(x))
+
+
+def atan2(x1, x2) -> LazyTensor:
+    return elementwise(math.atan2, defer(x1), defer(x2))
+
+

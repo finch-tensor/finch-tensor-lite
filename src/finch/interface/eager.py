@@ -107,6 +107,46 @@ class EagerTensor(OverrideTensor, ABC):
     def __rmatmul__(self, other):
         return matmul(other, self)
 
+    def __sin__(self):
+        return sin(self)
+
+    def __sinh__(self):
+        return sinh(self)
+
+    def __cos__(self):
+        return cos(self)
+
+    def __cosh__(self):
+        return cosh(self)
+
+    def __tan__(self):
+        return tan(self)
+
+    def __tanh__(self):
+        return tanh(self)
+
+    def __asin__(self):
+        return asin(self)
+
+    def __asinh__(self):
+        return asinh(self)
+
+    def __acos__(self):
+        return acos(self)
+
+    def __acosh__(self):
+        return acosh(self)
+
+    def __atan__(self):
+        return atan(self)
+
+    def __atanh__(self):
+        return atanh(self)
+
+    def __atan2__(self, other):
+        return atan2(self, other)
+
+
     def __complex__(self):
         """
         Converts a zero-dimensional array to a Python `complex` object.
@@ -388,3 +428,70 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     if isinstance(x, lazy.LazyTensor):
         return lazy.max(x, axis=axis, keepdims=keepdims)
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
+
+def sin(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sin(x)
+    return compute(lazy.sin(x))
+
+def sinh(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sinh(x)
+    return compute(lazy.sinh(x))
+
+def cos(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.cos(x)
+    return compute(lazy.cos(x))
+
+def cosh(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.cosh(x)
+    return compute(lazy.cosh(x))
+
+def tan(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tan(x)
+    return compute(lazy.tan(x))
+
+def tanh(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tanh(x)
+    return compute(lazy.tanh(x))
+
+def asin(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.asin(x)
+    return compute(lazy.asin(x))
+
+def asinh(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.asinh(x)
+    return compute(lazy.asinh(x))
+
+def acos(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.acos(x)
+    return compute(lazy.acos(x))
+
+def acosh(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.acosh(x)
+    return compute(lazy.acosh(x))
+
+def atan(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.atan(x)
+    return compute(lazy.atan(x))
+
+def atanh(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.atanh(x)
+    return compute(lazy.atanh(x))
+
+
+def atan2(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.atan2(x1, x2)
+    return compute(lazy.atan2(x1, x2))
+

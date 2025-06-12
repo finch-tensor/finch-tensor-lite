@@ -40,6 +40,19 @@ from .interface import (
     tensordot,
     truediv,
     vecdot,
+    sin,
+    sinh,
+    cos,
+    cosh,
+    tan,
+    tanh,
+    asin,
+    asinh,
+    acos,
+    acosh,
+    atan,
+    atanh,
+    atan2,
 )
 from .tensor import (
     DenseLevelFormat,
@@ -92,4 +105,17 @@ __all__ = [
     "FiberTensorFormat",
     "DenseLevelFormat",
     "ElementLevelFormat",
+    "sin"
+    "sinh",
+    "cos",
+    "cosh",
+    "tan",
+    "tanh",
+    "asin"
+    "asinh",
+    "acos",
+    "acosh",
+    "atan",
+    "atanh",
+    "atan2",
 ]
