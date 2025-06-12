@@ -176,7 +176,7 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
             raise Exception(f"Invalid node: {node} in lift_subqueries")
 
 
-def _get_productions(root: LogicNode) -> list[LogicNode]:
+def _collect_productions(root: LogicNode) -> list[LogicNode]:
     for node in PostOrderDFS(root):
         if isinstance(node, Produces):
             return [arg for arg in PostOrderDFS(node) if isinstance(arg, Alias)]
@@ -191,7 +191,7 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
 
     root = Rewrite(PostWalk(rule_agg_to_mapjoin))(root)
     assert isinstance(root, LogicNode)
-    rets = _get_productions(root)
+    rets = _collect_productions(root)
     props = {}
     for node in PostOrderDFS(root):
         match node:
@@ -225,7 +225,7 @@ def propagate_map_queries_backward(root):
 
     uses: dict[LogicNode, int] = {}
     defs: dict[LogicNode, LogicNode] = {}
-    rets = _get_productions(root)
+    rets = _collect_productions(root)
     for node in PostOrderDFS(root):
         match node:
             case Alias() as a:
