@@ -25,6 +25,7 @@ from .interface import (
     matmul,
     matrix_transpose,
     max,
+    mean,
     min,
     mod,
     multiply,
@@ -35,10 +36,12 @@ from .interface import (
     prod,
     reduce,
     squeeze,
+    std,
     subtract,
     sum,
     tensordot,
     truediv,
+    var,
     vecdot,
 )
 from .tensor import (
@@ -92,4 +95,7 @@ __all__ = [
     "FiberTensorFormat",
     "DenseLevelFormat",
     "ElementLevelFormat",
+    "mean",
+    "var",
+    "std",
 ]

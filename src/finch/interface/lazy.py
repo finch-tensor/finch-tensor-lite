@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
+import numpy as np
 from numpy.core.numeric import normalize_axis_tuple
 
 from ..algebra import conjugate as conj
@@ -408,7 +409,7 @@ def reduce(
             fields[i] if i in axis else Field(gensym("j")) for i in range(x.ndim)
         )
         data = Reorder(data, keeps)
-        shape = tuple(shape[i] if i in axis else 1 for i in range(x.ndim))
+        shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
     return LazyTensor(identify(data), shape, init, dtype)
@@ -808,3 +809,55 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         multiply(conjugate(x1), x2),
         axis=axis,
     )
+
+
+def _fill_array(value, shape: tuple[int, ...]):
+    if not shape:
+        return value
+    size, *rest = shape
+    return np.array([_fill_array(value, tuple(rest)) for _ in range(size)])
+
+
+def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    """
+    Calculates the arithmetic mean of the input array ``x``.
+    """
+    x = defer(x)
+    s = sum(x, axis=axis, keepdims=keepdims)
+    n = defer(_fill_array(x.shape[axis], s.shape))
+    return truediv(s, n)
+
+
+def var(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    """
+    Calculates the variance of the input array ``x``.
+    """
+    x = defer(x)
+    m = mean(x, axis=axis, keepdims=False)
+    d = subtract(x, m)
+    n = defer(_fill_array((x.shape[axis] - correction), x.shape))
+    v = truediv(pow(d, defer(_fill_array(2.0, d.shape))), n)
+    return sum(v, axis=axis, keepdims=keepdims)
+
+
+def std(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    """
+    Calculates the standard deviation of the input array ``x``.
+    """
+    x = defer(x)
+    d = var(x, axis=axis, correction=correction, keepdims=keepdims)
+    return pow(d, _fill_array(0.5, d.shape))
