@@ -333,7 +333,7 @@ class Freeze(NotationTree, NotationExpression):
             self.tns.result_format,
             "freeze",
             "return_type",
-            self.op.get_type,
+            self.op.result_format,
         )
 
 
@@ -360,7 +360,7 @@ class Thaw(NotationTree, NotationExpression):
             self.tns.result_format,
             "thaw",
             "return_type",
-            self.op,
+            self.op.result_format,
         )
 
 
