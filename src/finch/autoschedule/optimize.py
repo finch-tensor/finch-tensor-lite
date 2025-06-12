@@ -424,9 +424,7 @@ def push_fields(root):
             case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
                 diff_idxs = setdiff(arg.fields, agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
-                relabeled_idxs = tuple(
-                    reidx_dict.get(idx, idx) for idx in arg.fields
-                )
+                relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields)
                 return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
 
     def rule_2(ex):
@@ -469,8 +467,7 @@ def push_fields(root):
                     MapJoin(
                         op,
                         tuple(
-                            Reorder(arg, intersect(idxs, arg.fields))
-                            for arg in args
+                            Reorder(arg, intersect(idxs, arg.fields)) for arg in args
                         ),
                     ),
                     idxs,

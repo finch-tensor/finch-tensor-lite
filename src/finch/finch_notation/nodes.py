@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any
-from abc import abstractmethod
 
 from ..algebra import element_type, query_property, return_type
 from ..symbolic import Term, TermTree

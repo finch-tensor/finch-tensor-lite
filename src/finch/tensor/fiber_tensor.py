@@ -17,7 +17,7 @@ class LevelFormat(Format, ABC):
         Number of dimensions of the fibers in the structure.
         """
         ...
-    
+
     @property
     @abstractmethod
     def fill_value(self):
@@ -25,7 +25,7 @@ class LevelFormat(Format, ABC):
         Fill value of the fibers, or `None` if dynamic.
         """
         ...
-    
+
     @property
     @abstractmethod
     def element_type(self):
@@ -33,7 +33,7 @@ class LevelFormat(Format, ABC):
         Type of elements stored in the fibers.
         """
         ...
-    
+
     @property
     @abstractmethod
     def shape_type(self):
@@ -41,7 +41,7 @@ class LevelFormat(Format, ABC):
         Tuple of types of the dimensions in the shape
         """
         ...
-    
+
     @property
     @abstractmethod
     def position_type(self):
@@ -49,7 +49,7 @@ class LevelFormat(Format, ABC):
         Type of positions within the levels.
         """
         ...
-    
+
     @property
     @abstractmethod
     def buffer_factory(self):
@@ -57,7 +57,6 @@ class LevelFormat(Format, ABC):
         Function to create default buffers for the fibers.
         """
         ...
-
 
 
 class Level(Formattable, ABC):
@@ -215,16 +214,17 @@ class FiberTensorFormat(Format):
         """
         return self.lvl.buffer_factory
 
+
 def tensor(lvl: LevelFormat, position_type: type | None = None):
     """
     Creates a FiberTensorFormat with the given level format and position type.
-    
+
     Args:
         lvl: The level format to be used for the tensor.
         pos_type: The type of positions within the tensor. Defaults to None.
-    
+
     Returns:
         An instance of FiberTensorFormat.
     """
-    #mypy does not understand that dataclasses generate __hash__ and __eq__
-    return FiberTensorFormat(lvl, position_type) # type: ignore[abstract]
+    # mypy does not understand that dataclasses generate __hash__ and __eq__
+    return FiberTensorFormat(lvl, position_type)  # type: ignore[abstract]
