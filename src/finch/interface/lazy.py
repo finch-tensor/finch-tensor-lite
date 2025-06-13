@@ -16,6 +16,7 @@ from ..algebra import (
     init_value,
     promote_max,
     promote_min,
+    register_property,
     return_type,
 )
 from ..finch_logic import (
@@ -808,3 +809,65 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         multiply(conjugate(x1), x2),
         axis=axis,
     )
+
+
+# Manipulation functions
+def first(*args):
+    """
+    Returns the first argument passed to it.
+    """
+    return args[0] if args else None
+
+
+register_property(
+    first,
+    "__call__",
+    "return_type",
+    lambda *args: args[1],
+)
+
+
+def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
+    """
+    Broadcasts a lazy tensor to a specified shape.
+
+    Args:
+        tensor: The lazy tensor to broadcast.
+        shape: The target shape to broadcast to.
+
+    Returns:
+        A new lazy tensor with the specified shape.
+    """
+    from .eager import EagerTensor
+
+    class NoneArray(EagerTensor):
+        def __init__(self, shape):
+            self.shape = shape
+            self.fill_value = None
+            self.element_type = None
+            self.dtype = None
+
+        @property
+        def ndim(self):
+            return len(self.shape)
+
+        def __getitem__(self, idxs):
+            return None
+
+    if not is_broadcastable(tensor.shape, shape):
+        # If the tensor is already broadcastable to the shape, return it as is
+        raise ValueError(
+            f"Shape {shape} is not broadcastable to tensor shape {tensor.shape}"
+        )
+    # elementwise does not support zero-dimensional tensors, so we
+    # handle that case separately
+    if builtins.any(dim == 0 for dim in shape):
+        # If any dimension is zero, return an empty tensor
+        return LazyTensor(
+            identify(Immediate(None)),
+            shape,
+            None,
+            element_type(tensor),
+        )
+
+    return elementwise(first, tensor, NoneArray(shape))

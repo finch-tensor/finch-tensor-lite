@@ -388,3 +388,28 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     if isinstance(x, lazy.LazyTensor):
         return lazy.max(x, axis=axis, keepdims=keepdims)
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
+
+
+# manipulation functions:
+# https://data-apis.org/array-api/2024.12/API_specification/manipulation_functions.html
+
+
+def broadcast_to(x, /, shape: Sequence[int]):
+    """
+    Broadcasts an array to a new shape.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to be broadcasted.
+    shape: Sequence[int]
+        The target shape to which the input tensor should be broadcasted.
+
+    Returns
+    -------
+    out: array
+        A tensor with the same data as `x`, but with the specified shape.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.broadcast_to(x, shape=shape)
+    return compute(lazy.broadcast_to(x, shape=shape))
