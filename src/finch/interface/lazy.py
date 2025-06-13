@@ -599,6 +599,17 @@ def is_broadcastable(shape_a, shape_b):
     return True
 
 
+def is_broadcastable_directional(shape_a, shape_b):
+    """
+    Returns True if shape_a is broadcastable to shape_b according to numpy rules.
+    This is a directional check, so it allows only shape_a to be changed
+    """
+    for a, b in zip_longest(reversed(shape_a), reversed(shape_b), fillvalue=1):
+        if a != b and a != 1:
+            return False
+    return True
+
+
 def matmul(x1, x2) -> LazyTensor:
     """
     Performs matrix multiplication between two tensors.
@@ -854,7 +865,7 @@ def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
         def __getitem__(self, idxs):
             return None
 
-    if not is_broadcastable(tensor.shape, shape):
+    if not is_broadcastable_directional(tensor.shape, shape):
         # If the tensor is already broadcastable to the shape, return it as is
         raise ValueError(
             f"Shape {shape} is not broadcastable to tensor shape {tensor.shape}"
