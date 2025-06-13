@@ -182,7 +182,7 @@ class LazyTensor(OverrideTensor):
         return atanh(self)
 
     def __atan2__(self, other):
-        return atan2(other, self)
+        return atan2(self, other)
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
