@@ -404,8 +404,8 @@ for op, meth in _unary_operators.items():
 
     for t in StableNumber.__args__:
         register_property(t, meth, "return_type", _return_type_unary(meth))
-
 register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
+
 
 def is_associative(op: Any) -> bool:
     """
@@ -637,16 +637,21 @@ register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
 for trig_op in (
-    math.sin, math.cos, math.tan,
-    math.sinh, math.cosh, math.tanh,
-    np.atan, np.asinh, np.asin,
-    np.acos, np.acosh, np.atanh,
+    math.sin,
+    math.cos,
+    math.tan,
+    math.sinh,
+    math.cosh,
+    math.tanh,
+    np.atan,
+    np.asinh,
+    np.asin,
+    np.acos,
+    np.acosh,
+    np.atanh,
 ):
     register_property(
-        trig_op,
-        "__call__",
-        "return_type",
-        lambda op, a, _trig_op=trig_op: float
+        trig_op, "__call__", "return_type", lambda op, a, _trig_op=trig_op: float
     )
 
 register_property(np.atan2, "__call__", "return_type", lambda op, a, b: float)

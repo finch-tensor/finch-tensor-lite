@@ -1,8 +1,8 @@
+import math
 import operator
 from abc import ABC, abstractmethod
 from typing import Any
 
-import math
 import numpy as np
 
 element_wise_ufunc_map = {

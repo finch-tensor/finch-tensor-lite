@@ -14,6 +14,7 @@ from finch.codegen import (
     NumpyBufferFormat,
 )
 
+
 def test_add_function():
     c_code = """
     #include <stdio.h>

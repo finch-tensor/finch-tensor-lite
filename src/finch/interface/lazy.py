@@ -1,13 +1,13 @@
 import builtins
+import math
 import operator
 import sys
-import math
-import numpy as np
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
+import numpy as np
 from numpy.core.numeric import normalize_axis_tuple
 
 from ..algebra import conjugate as conj
@@ -714,7 +714,6 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
-
 def bitwise_inverse(x) -> LazyTensor:
     return elementwise(operator.invert, defer(x))
 
@@ -858,6 +857,7 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         axis=axis,
     )
 
+
 def sin(x) -> LazyTensor:
     return elementwise(math.sin, defer(x))
 
@@ -908,5 +908,3 @@ def atanh(x) -> LazyTensor:
 
 def atan2(x1, x2) -> LazyTensor:
     return elementwise(np.atan2, defer(x1), defer(x2))
-
-

@@ -1,6 +1,4 @@
 from . import algebra
-import math
-from math import nan
 
 
 def and_test(a, b):
