@@ -24,48 +24,48 @@ T = TypeVar("T", bound="LogicNode")
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: Field, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Field: ...
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: Alias, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Alias: ...
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: Subquery, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Subquery: ...
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: Table, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Table: ...
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: LogicTree, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicTree: ...
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: LogicExpression, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicExpression: ...
 
 
 @overload
-def get_structure(
+def compute_structure(
     node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicNode: ...
 
 
-def get_structure(
+def compute_structure(
     node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicNode:
     match node:
@@ -76,19 +76,19 @@ def get_structure(
         case Subquery(Alias(name) as lhs, arg):
             if name in aliases:
                 return aliases[name]
-            arg_2 = get_structure(arg, fields, aliases)
-            lhs_2 = get_structure(lhs, fields, aliases)
+            arg_2 = compute_structure(arg, fields, aliases)
+            lhs_2 = compute_structure(lhs, fields, aliases)
             return Subquery(lhs_2, arg_2)
         case Table(tns, idxs):
             assert isinstance(tns, Immediate), "tns must be an Immediate"
             return Table(
                 Immediate(type(tns.val)),
-                tuple(get_structure(idx, fields, aliases) for idx in idxs),
+                tuple(compute_structure(idx, fields, aliases) for idx in idxs),
             )
         case LogicTree() as tree:
             return tree.make_term(
                 tree.head(),
-                *(get_structure(arg, fields, aliases) for arg in tree.children()),
+                *(compute_structure(arg, fields, aliases) for arg in tree.children),
             )
         case _:
             return node

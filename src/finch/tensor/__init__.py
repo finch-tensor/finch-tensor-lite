@@ -1,14 +1,23 @@
-from .level.dense_level import DenseLevel, DenseLevelFormat
-from .level.element_level import ElementLevel, ElementLevelFormat
-from .tensor import FiberTensor, FiberTensorFormat, Level, LevelFormat
+from .fiber_tensor import FiberTensor, FiberTensorFormat, Level, LevelFormat, tensor
+from .level import (
+    DenseLevel,
+    DenseLevelFormat,
+    ElementLevel,
+    ElementLevelFormat,
+    dense,
+    element,
+)
 
 __all__ = [
     "FiberTensor",
     "FiberTensorFormat",
+    "tensor",
     "Level",
     "LevelFormat",
-    "ElementLevel",
-    "ElementLevelFormat",
     "DenseLevel",
     "DenseLevelFormat",
+    "dense",
+    "ElementLevel",
+    "ElementLevelFormat",
+    "element",
 ]

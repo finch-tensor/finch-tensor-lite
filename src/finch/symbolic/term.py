@@ -31,7 +31,7 @@ Notes:
                 def recurse(node: Term) -> Term:
                     return insert_wrapper(node, pattern, wrap_head)
                 return node.make_term(node.head(), *(
-                    recurse(child) for child in node.children()
+                    recurse(child) for child in node.children
                 ))
             else:
                 return node
@@ -57,13 +57,14 @@ class Term:
         """
         Construct a new term in the same family of terms with the given head type and
         children. This function should satisfy
-        `x == x.make_term(x.head(), *x.children())`
+        `x == x.make_term(x.head(), *x.children)`
         """
         ...
 
 
 @dataclass(frozen=True, eq=True)
 class TermTree(Term, ABC):
+    @property
     @abstractmethod
     def children(self) -> list[Term]:
         """Return the children (AKA tail) of the S-expression."""
@@ -72,7 +73,7 @@ class TermTree(Term, ABC):
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
     if isinstance(node, TermTree):
-        for arg in node.children():
+        for arg in node.children:
             yield from PostOrderDFS(arg)
     yield node
 
@@ -80,5 +81,5 @@ def PostOrderDFS(node: Term) -> Iterator[Term]:
 def PreOrderDFS(node: Term) -> Iterator[Term]:
     yield node
     if isinstance(node, TermTree):
-        for arg in node.children():
+        for arg in node.children:
             yield from PreOrderDFS(arg)

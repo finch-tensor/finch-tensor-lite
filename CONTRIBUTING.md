@@ -79,6 +79,7 @@ In case you do need to run mypy manually, you can do so with:
 poetry run mypy ./src/
 ```
 
+## Code Style
 ### Assertions and Validation
 
 - **Do not use `assert` statements for user-facing validation.**
@@ -86,6 +87,12 @@ poetry run mypy ./src/
     - Use explicit error handling (e.g., `if ...: raise ValueError(...)`) for all user-facing functions, following the [array API specification](https://data-apis.org/array-api/latest/).
     - user-facing functions are anything exposed from `__all__` in the toplevel `__init__.py`
 - `assert` statements may be used for internal debugging, invariants, and sanity checks that are not critical to production behavior.
+
+### Getters and Setters
+- Use `@property` decorators for getters and setters.
+- This means you may need to define a private `_foo` attribute in your dataclass to implement the `foo` property.
+- Avoid using `get_` and `set_` prefixes in method names.
+- `get_` and `set_` prefixes are allowed for global getters and setters, such as `util.get_version()`.
 
 ---
 **If you find an error or unclear section, please fix it or open an issue.**
