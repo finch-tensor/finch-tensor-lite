@@ -165,7 +165,14 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((operator.abs, finch.abs, np.abs), np.abs),
         ((operator.pos, finch.positive, np.positive), np.positive),
         ((operator.neg, finch.negative, np.negative), np.negative),
-        ((math.sin, finch.sin, np.sin), np.sin),
+        ((finch.sin, np.sin), np.sin),
+        ((finch.sinh, np.sinh), np.sinh),
+        ((finch.cos, np.cos), np.cos),
+        ((finch.cosh, np.cosh), np.cosh),
+        ((finch.tan, np.tan), np.tan),
+        ((finch.tanh, np.tanh), np.tanh),
+        ((finch.asinh, np.asinh), np.asinh),
+        ((finch.atan, np.atan), np.atan),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):

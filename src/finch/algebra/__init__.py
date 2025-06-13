@@ -20,6 +20,7 @@ from .operator import (
     overwrite,
     promote_max,
     promote_min,
+    scalar_acosh_nothrow,
 )
 
 __all__ = [
@@ -42,4 +43,7 @@ __all__ = [
     "conjugate",
     "overwrite",
     "InitWrite",
+    "scalar_acosh_nothrow",
+    "scalar_acos_nothrow",
+
 ]

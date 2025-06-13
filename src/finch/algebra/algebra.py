@@ -312,7 +312,6 @@ _reflexive_operators = {
     operator.and_: ("__and__", "__rand__"),
     operator.xor: ("__xor__", "__rxor__"),
     operator.or_: ("__or__", "__ror__"),
-
 }
 
 
@@ -361,18 +360,6 @@ _unary_operators: dict[Callable, str] = {
     operator.abs: "__abs__",
     operator.pos: "__pos__",
     operator.neg: "__neg__",
-    math.sin: "__sin__",
-    math.sinh: "__sinh__",
-    math.cos: "__cos__",
-    math.cosh: "__cosh__",
-    math.tan: "__tan__",
-    math.tanh: "__tanh__",
-    math.asin: "__asin__",
-    math.asinh: "__asinh__",
-    math.acos: "__acos__",
-    math.acosh: "__acosh__",
-    math.atan: "__atan__",
-    math.atanh: "__atanh__",
 }
 
 
@@ -417,20 +404,6 @@ for op, meth in _unary_operators.items():
     for t in StableNumber.__args__:
         register_property(t, meth, "return_type", _return_type_unary(meth))
 
-for meth in (
-    math.sin, math.cos, math.tan,
-    math.sinh, math.cosh, math.tanh,
-    math.asin, math.acos, math.atan,
-    math.asinh, math.acosh, math.atanh
-):
-    register_property(
-        meth,
-        "__call__",
-        "return_type",
-        lambda op, a, _meth=meth: type(getattr(np, _meth.__name__)(a(False)))
-    )
-register_property(math.acosh, "__call__", "return_type", lambda op, a: type(np.acosh(a(True))))
-register_property(math.atan2, "__call__", "return_type", lambda op, a, b: type(np.atan2(a(True), b(True))),)
 register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
 
 def is_associative(op: Any) -> bool:
@@ -661,3 +634,21 @@ for t in StableNumber.__args__:
 
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
+
+
+for trig_op in (
+    math.sin, math.cos, math.tan,
+    math.sinh, math.cosh, math.tanh,
+    math.asin, math.acos, math.atan,
+    math.asinh, math.acosh, math.atanh,
+):
+    register_property(
+        trig_op,
+        "__call__",
+        "return_type",
+        lambda op, a, _meth=meth: float
+    )
+
+register_property(math.atan2, "__call__", "return_type", lambda op, a, b: float)
+
+register_property(math.acosh, "__call__", "fill_value", lambda op, x: math.acosh(x) if x >= 1 else float("nan"))

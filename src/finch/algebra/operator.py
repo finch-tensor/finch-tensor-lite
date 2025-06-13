@@ -1,4 +1,6 @@
 from . import algebra
+import math
+from math import nan
 
 
 def and_test(a, b):
@@ -115,4 +117,17 @@ algebra.register_property(
     "__call__",
     "return_type",
     lambda op, x, y: y,
+)
+
+def scalar_acosh_nothrow(x: float) -> float:
+    if x >= 1:
+        return math.acosh(x)
+    else:
+        return nan
+
+algebra.register_property(
+    scalar_acosh_nothrow,
+    "__call__",
+    "return_type",
+    lambda op, a: float,
 )
