@@ -117,7 +117,7 @@ class NumbaCompiler:
             match func:
                 case asm.Function(asm.Variable(func_name, ret_type), args, _):
                     kern = globals()[func_name]
-                    arg_ts = [arg.get_type() for arg in args]
+                    arg_ts = [arg.result_format for arg in args]
                     kernels[func_name] = NumbaKernel(kern, ret_type, arg_ts)
                 case _:
                     raise NotImplementedError(
@@ -186,8 +186,8 @@ class NumbaContext(Context):
                 return name
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
-                if val.get_type() != var_t:
-                    raise TypeError(f"Type mismatch: {val.get_type()} != {var_t}")
+                if val.result_format != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.bindings:
                     assert var_t == self.bindings[var_n]
                     self.exec(f"{feed}{var_n} = {val_code}")
@@ -198,15 +198,15 @@ class NumbaContext(Context):
             case asm.Call(asm.Immediate(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Load(buffer, idx):
-                return buffer.get_type().numba_load(self, buffer, idx)
+                return buffer.result_format.numba_load(self, buffer, idx)
             case asm.Store(buffer, idx, val):
-                buffer.get_type().numba_store(self, buffer, idx, val)
+                buffer.result_format.numba_store(self, buffer, idx, val)
                 return None
             case asm.Resize(buffer, size):
-                buffer.get_type().numba_resize(self, buffer, size)
+                buffer.result_format.numba_resize(self, buffer, size)
                 return None
             case asm.Length(buffer):
-                return buffer.get_type().numba_length(self, buffer)
+                return buffer.result_format.numba_length(self, buffer)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -219,7 +219,7 @@ class NumbaContext(Context):
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
-                ctx_2.bindings[var.name] = var.get_type()
+                ctx_2.bindings[var.name] = var.result_format
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}\n")
                 return None

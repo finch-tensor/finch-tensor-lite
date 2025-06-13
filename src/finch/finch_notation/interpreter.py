@@ -25,7 +25,7 @@ class TensorView:
         return self.tns.shape[len(self.idxs) : -1]
 
     @property
-    def ndims(self):
+    def ndim(self):
         """
         Get the number of dimensions of the tensor view.
         """

@@ -37,14 +37,16 @@ class LogicNode(Term, ABC):
 
 @dataclass(eq=True, frozen=True)
 class LogicTree(LogicNode, TermTree, ABC):
+    @property
     @abstractmethod
     def children(self) -> list[LogicNode]:  # type: ignore[override]
         ...
 
 
 class LogicExpression(LogicNode):
+    @property
     @abstractmethod
-    def get_fields(self) -> list[Field]:
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         ...
 
@@ -127,11 +129,13 @@ class Table(LogicTree, LogicExpression):
     tns: Immediate | Deferred
     idxs: tuple[Field, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         return [*self.idxs]
 
@@ -156,16 +160,18 @@ class MapJoin(LogicTree, LogicExpression):
     op: LogicNode
     args: tuple[LogicExpression, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         # (mtsokol) I'm not sure if this comment still applies - the order is preserved.
         # TODO: this is wrong here: the overall order should at least be concordant with
         # the args if the args are concordant
-        fields = [f for fs in (x.get_fields() for x in self.args) for f in fs]
+        fields = [f for fs in (x.fields for x in self.args) for f in fs]
         return list(dict.fromkeys(fields))
 
     @classmethod
@@ -191,14 +197,16 @@ class Aggregate(LogicTree, LogicExpression):
     arg: LogicExpression
     idxs: tuple[LogicNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         assert isinstance(self.arg, LogicExpression)
-        return [field for field in self.arg.get_fields() if field not in self.idxs]
+        return [field for field in self.arg.fields if field not in self.idxs]
 
     @classmethod
     def from_children(cls, op, init, arg, *idxs):
@@ -220,11 +228,13 @@ class Reorder(LogicTree, LogicExpression):
     arg: LogicNode
     idxs: tuple[Field, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         return [*self.idxs]
 
@@ -247,11 +257,13 @@ class Relabel(LogicTree, LogicExpression):
     arg: LogicNode
     idxs: tuple[Field, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         return [*self.idxs]
 
@@ -273,14 +285,16 @@ class Reformat(LogicTree, LogicExpression):
     tns: LogicNode
     arg: LogicExpression
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.tns, self.arg]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         assert isinstance(self.arg, LogicExpression)
-        return self.arg.get_fields()
+        return self.arg.fields
 
 
 @dataclass(eq=True, frozen=True)
@@ -297,14 +311,16 @@ class Subquery(LogicTree, LogicExpression):
     lhs: LogicNode
     arg: LogicNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.arg]
 
-    def get_fields(self) -> list[Field]:
+    @property
+    def fields(self) -> list[Field]:
         """Returns fields of the node."""
         assert isinstance(self.arg, LogicExpression)
-        return self.arg.get_fields()
+        return self.arg.fields
 
 
 @dataclass(eq=True, frozen=True)
@@ -321,6 +337,7 @@ class Query(LogicTree):
     lhs: LogicNode
     rhs: LogicNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
@@ -338,6 +355,7 @@ class Produces(LogicTree):
 
     args: tuple[LogicNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.args]
@@ -359,6 +377,7 @@ class Plan(LogicTree):
 
     bodies: tuple[LogicNode, ...] = ()
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.bodies]

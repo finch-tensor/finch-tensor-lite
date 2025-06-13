@@ -196,7 +196,7 @@ class CCompiler:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
                     return_t = c_type(return_t)
-                    arg_ts = [arg.get_type() for arg in args]
+                    arg_ts = [arg.result_format for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
                 case _:
@@ -541,8 +541,8 @@ class CContext(Context):
                 return name
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
-                if val.get_type() != var_t:
-                    raise TypeError(f"Type mismatch: {val.get_type()} != {var_t}")
+                if val.result_format != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.bindings:
                     assert var_t == self.bindings[var_n]
                     self.exec(f"{feed}{var_n} = {val_code};")
@@ -555,13 +555,13 @@ class CContext(Context):
                 assert isinstance(f, asm.Immediate)
                 return c_function_call(f.val, self, *args)
             case asm.Load(buf, idx):
-                return buf.get_type().c_load(self, buf, idx)
+                return buf.result_format.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                return buf.get_type().c_store(self, buf, idx, val)
+                return buf.result_format.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
-                return buf.get_type().c_resize(self, buf, len)
+                return buf.result_format.c_resize(self, buf, len)
             case asm.Length(buf):
-                return buf.get_type().c_length(self, buf)
+                return buf.result_format.c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -569,13 +569,13 @@ class CContext(Context):
                 self.exec(ctx_2.emit())
                 return None
             case asm.ForLoop(var, start, end, body):
-                var_t = self.ctype_name(c_type(var.get_type()))
+                var_t = self.ctype_name(c_type(var.result_format))
                 var_2 = self(var)
                 start = self(start)
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
-                ctx_2.bindings[var.name] = var.get_type()
+                ctx_2.bindings[var.name] = var.result_format
                 body_code = ctx_2.emit()
                 self.exec(
                     f"{feed}for ({var_t} {var_2} = {start}; "
@@ -586,7 +586,7 @@ class CContext(Context):
                 return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(
-                    self.freshen(var.name + "_i"), buf.get_type().index_type()
+                    self.freshen(var.name + "_i"), buf.result_format.index_type()
                 )
                 start = asm.Immediate(0)
                 stop = asm.Call(
@@ -596,7 +596,7 @@ class CContext(Context):
                 return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
                 if not isinstance(cond, asm.Immediate | asm.Variable):
-                    cond_var = asm.Variable(self.freshen("cond"), cond.get_type())
+                    cond_var = asm.Variable(self.freshen("cond"), cond.result_format)
                     new_prgm = asm.Block(
                         (
                             asm.Assign(cond_var, cond),

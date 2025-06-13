@@ -36,14 +36,16 @@ class AssemblyNode(Term):
 
 
 class AssemblyTree(AssemblyNode, TermTree):
+    @property
     def children(self):
         """Returns the children of the node."""
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
 
 class AssemblyExpression(AssemblyNode):
+    @property
     @abstractmethod
-    def get_type(self):
+    def result_format(self):
         """Returns the type of the expression."""
         ...
 
@@ -59,7 +61,8 @@ class Immediate(AssemblyExpression):
 
     val: Any
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
         return type(self.val)
 
@@ -78,7 +81,8 @@ class Variable(AssemblyExpression):
     name: str
     type: Any
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
         return self.type
 
@@ -97,6 +101,7 @@ class Assign(AssemblyTree):
     lhs: Variable
     rhs: AssemblyExpression
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
@@ -115,6 +120,7 @@ class Call(AssemblyExpression, AssemblyTree):
     op: Immediate
     args: tuple[AssemblyNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.op, *self.args]
@@ -123,9 +129,10 @@ class Call(AssemblyExpression, AssemblyTree):
     def from_children(cls, op, *args):
         return cls(op, args)
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
-        arg_types = [arg.get_type() for arg in self.args]
+        arg_types = [arg.result_format for arg in self.args]
         return return_type(self.op.val, *arg_types)
 
 
@@ -142,12 +149,14 @@ class Load(AssemblyExpression, AssemblyTree):
     buffer: AssemblyExpression
     index: AssemblyExpression
 
+    @property
     def children(self):
         return [self.buffer, self.index]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
-        return element_type(self.buffer.get_type())
+        return element_type(self.buffer.result_format)
 
 
 @dataclass(eq=True, frozen=True)
@@ -165,6 +174,7 @@ class Store(AssemblyTree):
     index: AssemblyExpression
     value: AssemblyExpression
 
+    @property
     def children(self):
         return [self.buffer, self.index, self.value]
 
@@ -182,6 +192,7 @@ class Resize(AssemblyTree):
     buffer: AssemblyExpression
     new_size: AssemblyExpression
 
+    @property
     def children(self):
         return [self.buffer, self.new_size]
 
@@ -197,12 +208,14 @@ class Length(AssemblyExpression, AssemblyTree):
 
     buffer: AssemblyExpression
 
+    @property
     def children(self):
         return [self.buffer]
 
-    def get_type(self):
+    @property
+    def result_format(self):
         """Returns the type of the expression."""
-        return length_type(self.buffer.get_type())
+        return length_type(self.buffer.result_format)
 
 
 @dataclass(eq=True, frozen=True)
@@ -222,6 +235,7 @@ class ForLoop(AssemblyTree):
     end: AssemblyExpression
     body: AssemblyNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.var, self.start, self.end, self.body]
@@ -242,6 +256,7 @@ class BufferLoop(AssemblyTree):
     var: Variable
     body: AssemblyNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.buffer, self.var, self.body]
@@ -260,6 +275,7 @@ class WhileLoop(AssemblyTree):
     condition: AssemblyExpression
     body: AssemblyNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.condition, self.body]
@@ -278,6 +294,7 @@ class If(AssemblyTree):
     condition: AssemblyExpression
     body: AssemblyNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.condition, self.body]
@@ -299,6 +316,7 @@ class IfElse(AssemblyTree):
     body: AssemblyNode
     else_body: AssemblyNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.condition, self.body, self.else_body]
@@ -322,6 +340,7 @@ class Function(AssemblyTree):
     args: tuple[Variable, ...]
     body: AssemblyNode
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.name, *self.args, self.body]
@@ -344,6 +363,7 @@ class Return(AssemblyTree):
 
     arg: AssemblyExpression
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg]
@@ -355,6 +375,7 @@ class Break(AssemblyTree):
     Represents a break statement that exits the current loop.
     """
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return []
@@ -371,6 +392,7 @@ class Block(AssemblyTree):
 
     bodies: tuple[AssemblyNode, ...] = ()
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.bodies]
@@ -392,6 +414,7 @@ class Module(AssemblyTree):
 
     funcs: tuple[AssemblyNode, ...]
 
+    @property
     def children(self):
         """Returns the children of the node."""
         return [*self.funcs]
