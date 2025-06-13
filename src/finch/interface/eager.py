@@ -47,6 +47,9 @@ class EagerTensor(OverrideTensor, ABC):
     def __neg__(self):
         return negative(self)
 
+    def __invert__(self):
+        return bitwise_inverse(self)
+
     def __and__(self, other):
         return bitwise_and(self, other)
 
@@ -317,6 +320,12 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
+def bitwise_inverse(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.bitwise_inverse(x)
+    return compute(lazy.bitwise_inverse(x))
+
+
 def bitwise_and(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_and(x1, x2)
@@ -488,7 +497,6 @@ def atanh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.atanh(x)
     return compute(lazy.atanh(x))
-
 
 def atan2(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):

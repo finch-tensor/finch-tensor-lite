@@ -19,7 +19,6 @@ from ..algebra import (
     promote_max,
     promote_min,
     return_type,
-    scalar_acosh_nothrow,
 )
 from ..finch_logic import (
     Aggregate,
@@ -112,6 +111,9 @@ class LazyTensor(OverrideTensor):
 
     def __rxor__(self, other):
         return bitwise_xor(other, self)
+
+    def __invert__(self):
+        return bitwise_inverse(self)
 
     def __truediv__(self, other):
         return truediv(self, other)
@@ -712,6 +714,11 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
+
+def bitwise_inverse(x) -> LazyTensor:
+    return elementwise(operator.invert, defer(x))
+
+
 def bitwise_and(x1, x2) -> LazyTensor:
     return elementwise(operator.and_, defer(x1), defer(x2))
 
@@ -876,30 +883,30 @@ def tanh(x) -> LazyTensor:
 
 
 def asin(x) -> LazyTensor:
-    return elementwise(math.asin, defer(x))
+    return elementwise(np.asin, defer(x))
 
 
 def asinh(x) -> LazyTensor:
-    return elementwise(math.asinh, defer(x))
+    return elementwise(np.asinh, defer(x))
 
 
 def acos(x) -> LazyTensor:
-    return elementwise(math.acos, defer(x))
+    return elementwise(np.acos, defer(x))
 
 
 def acosh(x) -> LazyTensor:
-    return elementwise(scalar_acosh_nothrow, defer(x))
+    return elementwise(np.acosh, defer(x))
 
 
 def atan(x) -> LazyTensor:
-    return elementwise(math.atan, defer(x))
+    return elementwise(np.atan, defer(x))
 
 
 def atanh(x) -> LazyTensor:
-    return elementwise(math.atanh, defer(x))
+    return elementwise(np.atanh, defer(x))
 
 
 def atan2(x1, x2) -> LazyTensor:
-    return elementwise(math.atan2, defer(x1), defer(x2))
+    return elementwise(np.atan2, defer(x1), defer(x2))
 
 

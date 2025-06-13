@@ -360,6 +360,7 @@ _unary_operators: dict[Callable, str] = {
     operator.abs: "__abs__",
     operator.pos: "__pos__",
     operator.neg: "__neg__",
+    operator.invert: "__invert__",
 }
 
 
@@ -635,20 +636,17 @@ for t in StableNumber.__args__:
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
-
 for trig_op in (
     math.sin, math.cos, math.tan,
     math.sinh, math.cosh, math.tanh,
-    math.asin, math.acos, math.atan,
-    math.asinh, math.acosh, math.atanh,
+    np.atan, np.asinh, np.asin,
+    np.acos, np.acosh, np.atanh,
 ):
     register_property(
         trig_op,
         "__call__",
         "return_type",
-        lambda op, a, _meth=meth: float
+        lambda op, a, _trig_op=trig_op: float
     )
 
-register_property(math.atan2, "__call__", "return_type", lambda op, a, b: float)
-
-register_property(math.acosh, "__call__", "fill_value", lambda op, x: math.acosh(x) if x >= 1 else float("nan"))
+register_property(np.atan2, "__call__", "return_type", lambda op, a, b: float)
