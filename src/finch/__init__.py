@@ -15,6 +15,7 @@ from .interface import (
     bitwise_or,
     bitwise_right_shift,
     bitwise_xor,
+    broadcast_to,
     compute,
     defer,
     elementwise,
@@ -92,4 +93,5 @@ __all__ = [
     "FiberTensorFormat",
     "DenseLevelFormat",
     "ElementLevelFormat",
+    "broadcast_to",
 ]

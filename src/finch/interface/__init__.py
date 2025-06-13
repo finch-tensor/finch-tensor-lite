@@ -9,6 +9,7 @@ from .eager import (
     bitwise_or,
     bitwise_right_shift,
     bitwise_xor,
+    broadcast_to,
     elementwise,
     expand_dims,
     floordiv,
@@ -73,4 +74,5 @@ __all__ = [
     "vecdot",
     "any",
     "all",
+    "broadcast_to",
 ]
