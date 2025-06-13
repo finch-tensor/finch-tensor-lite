@@ -85,6 +85,9 @@ class TestEagerTensor(finch.EagerTensor):
     [
         (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
         (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
+        (np.array([[2, 0], [1, 3]]), 2),
+        (3, np.array([[2, 0], [1, 3]])),
+        (np.array([[2, 0], [1, 3]]), True),
     ],
 )
 @pytest.mark.parametrize(

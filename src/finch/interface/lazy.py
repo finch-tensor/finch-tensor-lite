@@ -4,8 +4,10 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
+from numbers import Number
 from typing import Any
 
+import numpy as np
 from numpy.core.numeric import normalize_axis_tuple
 
 from ..algebra import conjugate as conj
@@ -179,6 +181,25 @@ class LazyTensor(OverrideTensor):
         )
 
 
+def asarray(arr):
+    """
+    Return np.ndarray if arr is a scalar type value, otherwise return unchanged arr.
+
+    Parameters:
+    ------------
+    - arr: The input array to be converted into a LazyTensor.
+
+    Returns:
+    ------------
+    out: array
+        an output array converted from input parameter ``arr``.
+    """
+    if isinstance(arr, Number | str | bytes | bytearray | memoryview):
+        return np.asarray(arr)
+
+    return arr
+
+
 def defer(arr) -> LazyTensor:
     """
     - defer(arr) -> LazyTensor:
@@ -194,6 +215,7 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
+    arr = asarray(arr)
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

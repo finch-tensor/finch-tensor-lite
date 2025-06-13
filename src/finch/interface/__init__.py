@@ -34,9 +34,10 @@ from .eager import (
 
 # from .tensor import *
 from .fuse import compute, fuse, fused
-from .lazy import LazyTensor, defer
+from .lazy import LazyTensor, asarray, defer
 
 __all__ = [
+    "asarray",
     "defer",
     "compute",
     "fuse",

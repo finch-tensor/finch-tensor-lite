@@ -10,6 +10,7 @@ from .interface import (
     add,
     all,
     any,
+    asarray,
     bitwise_and,
     bitwise_left_shift,
     bitwise_or,
@@ -48,6 +49,7 @@ from .tensor import (
 )
 
 __all__ = [
+    "asarray",
     "defer",
     "compute",
     "fuse",
