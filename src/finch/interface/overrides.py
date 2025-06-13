@@ -1,3 +1,4 @@
+import math
 import operator
 from abc import ABC, abstractmethod
 from typing import Any
@@ -12,6 +13,7 @@ element_wise_ufunc_map = {
     np.positive: operator.pos,
     np.absolute: operator.abs,
     np.abs: operator.abs,
+    np.bitwise_invert: operator.invert,
     np.bitwise_and: operator.and_,
     np.bitwise_or: operator.or_,
     np.bitwise_xor: operator.xor,
@@ -21,6 +23,19 @@ element_wise_ufunc_map = {
     np.floor_divide: operator.floordiv,
     np.mod: operator.mod,
     np.pow: operator.pow,
+    np.sin: math.sin,
+    np.sinh: math.sinh,
+    np.cos: math.cos,
+    np.cosh: math.cosh,
+    np.tan: math.tan,
+    np.tanh: math.tanh,
+    np.asin: np.asin,
+    np.asinh: np.asinh,
+    np.acos: np.acos,
+    np.acosh: np.acosh,
+    np.atan: np.atan,
+    np.atanh: np.atanh,
+    np.atan2: np.atan2,
     # Add more ufuncs as needed
 }
 
