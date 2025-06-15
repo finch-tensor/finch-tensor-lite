@@ -1,4 +1,3 @@
-import math
 import operator
 from abc import ABC, abstractmethod
 from typing import Any
@@ -23,12 +22,12 @@ element_wise_ufunc_map = {
     np.floor_divide: operator.floordiv,
     np.mod: operator.mod,
     np.pow: operator.pow,
-    np.sin: math.sin,
-    np.sinh: math.sinh,
-    np.cos: math.cos,
-    np.cosh: math.cosh,
-    np.tan: math.tan,
-    np.tanh: math.tanh,
+    np.sin: np.sin,
+    np.sinh: np.sinh,
+    np.cos: np.cos,
+    np.cosh: np.cosh,
+    np.tan: np.tan,
+    np.tanh: np.tanh,
     np.asin: np.asin,
     np.asinh: np.asinh,
     np.acos: np.acos,

@@ -1,5 +1,4 @@
 import builtins
-import math
 import operator
 import sys
 from collections.abc import Callable, Sequence
@@ -859,27 +858,27 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
 
 def sin(x) -> LazyTensor:
-    return elementwise(math.sin, defer(x))
+    return elementwise(np.sin, defer(x))
 
 
 def sinh(x) -> LazyTensor:
-    return elementwise(math.sinh, defer(x))
+    return elementwise(np.sinh, defer(x))
 
 
 def cos(x) -> LazyTensor:
-    return elementwise(math.cos, defer(x))
+    return elementwise(np.cos, defer(x))
 
 
 def cosh(x) -> LazyTensor:
-    return elementwise(math.cosh, defer(x))
+    return elementwise(np.cosh, defer(x))
 
 
 def tan(x) -> LazyTensor:
-    return elementwise(math.tan, defer(x))
+    return elementwise(np.tan, defer(x))
 
 
 def tanh(x) -> LazyTensor:
-    return elementwise(math.tanh, defer(x))
+    return elementwise(np.tanh, defer(x))
 
 
 def asin(x) -> LazyTensor:

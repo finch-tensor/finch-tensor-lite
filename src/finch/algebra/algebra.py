@@ -637,12 +637,12 @@ register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
 for trig_op in (
-    math.sin,
-    math.cos,
-    math.tan,
-    math.sinh,
-    math.cosh,
-    math.tanh,
+    np.sin,
+    np.cos,
+    np.tan,
+    np.sinh,
+    np.cosh,
+    np.tanh,
     np.atan,
     np.asinh,
     np.asin,
