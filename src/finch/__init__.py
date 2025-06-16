@@ -23,6 +23,7 @@ from .interface import (
     bitwise_or,
     bitwise_right_shift,
     bitwise_xor,
+    broadcast_arrays,
     broadcast_to,
     compute,
     cos,
@@ -108,7 +109,6 @@ __all__ = [
     "FiberTensorFormat",
     "DenseLevelFormat",
     "ElementLevelFormat",
-    "broadcast_to",
     "sin",
     "sinh",
     "cos",
@@ -122,4 +122,6 @@ __all__ = [
     "atan",
     "atanh",
     "atan2",
+    "broadcast_to",
+    "broadcast_arrays",
 ]

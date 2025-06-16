@@ -461,9 +461,28 @@ def broadcast_to(x, /, shape: Sequence[int]):
     return compute(lazy.broadcast_to(x, shape=shape))
 
 
+def broadcast_arrays(*args):
+    """
+    Broadcasts one or more arrays against one another.
+
+    Parameters
+    ----------
+    *args: array
+        an arbitrary number of to-be broadcasted arrays.
+
+    Returns
+    -------
+    out: List[array]
+        a list of broadcasted arrays. Each array has the same shape.
+        Element types are preserved.
+    """
+    if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
+        return lazy.broadcast_arrays(*args)
+    # compute can take in a list of LazyTensors
+    return compute(lazy.broadcast_arrays(*args))
+
+
 # trigonometric functions:
-
-
 def sin(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.sin(x)

@@ -696,5 +696,54 @@ def test_broadcast_to(x, shape, x_wrap):
         out = finch.broadcast_to(wx, shape)
         if isinstance(wx, finch.LazyTensor):
             out = finch.compute(out)
-        np.testing.assert_equal(out, expected), "values mismatch"
+        assert_equal(out, expected, "values mismatch")
         assert out.shape == shape, f"shape mismatch: got {out.shape}"
+
+
+@pytest.mark.parametrize(
+    "shapes",
+    [
+        ((1, 2, 3), (4, 2, 3), (3,), (9, 4, 2, 3), (9, 1, 1, 3)),
+        ((7, 2, 3, 4), (2, 3, 1), (2, 1, 1), (1, 2, 1, 1), (1,)),
+        ((1,), (1,)),
+        ((2, 3), (3, 2)),  # error
+        ((1,), (4, 0)),
+        ((0,), (1, 0)),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_broadcast_arrays(shapes, wrapper):
+    """
+    Tests for broadcasting multiple arrays to a common shape.
+    The wrapper is randomly applied to each shape to ensure
+    """
+    import random
+
+    # Generate random arrays for each shape
+    generator = np.random.default_rng()
+    arrays = [generator.random(shape) for shape in shapes]
+    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
+    try:
+        expected = np.broadcast_arrays(*arrays)
+    except ValueError:
+        with pytest.raises(ValueError):
+            finch.broadcast_arrays(*wrapped_arrays)
+        return
+    result = finch.broadcast_arrays(*wrapped_arrays)
+    if isinstance(result[0], finch.LazyTensor):
+        assert all(isinstance(r, finch.LazyTensor) for r in result)
+        result = finch.compute(result)  # compute all lazy tensors
+
+    assert len(result) == len(expected), "Number of results does not match expected"
+    for i, (res, exp) in enumerate(zip(result, expected, strict=True)):
+        assert res.shape == exp.shape, (
+            f"Shape mismatch: got {res.shape}, expected {exp.shape} at index {i}"
+        )
+        assert_equal(res, exp, "Values mismatch in broadcasted arrays")

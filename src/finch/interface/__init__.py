@@ -17,6 +17,7 @@ from .eager import (
     bitwise_or,
     bitwise_right_shift,
     bitwise_xor,
+    broadcast_arrays,
     broadcast_to,
     cos,
     cosh,
@@ -89,7 +90,6 @@ __all__ = [
     "vecdot",
     "any",
     "all",
-    "broadcast_to",
     "sin",
     "sinh",
     "cos",
@@ -103,4 +103,6 @@ __all__ = [
     "atan",
     "atanh",
     "atan2",
+    "broadcast_to",
+    "broadcast_arrays",
 ]

@@ -4,6 +4,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -458,6 +459,42 @@ def reduce(
     return LazyTensor(identify(data), shape, init, dtype)
 
 
+def _broadcast_shape(*args) -> tuple[int, ...]:
+    """
+    Computes the broadcasted shape for the given LazyTensor arguments,
+    following arrray_api broadcasting rules.
+    Raises ValueError if shapes are not broadcastable.
+    """
+    # Only support two arguments for now, as in the algorithm
+    if len(args) < 2:
+        return args[0].shape if args else ()
+    shape1 = args[0].shape
+    shape2 = args[1].shape
+    N1 = len(shape1)
+    N2 = len(shape2)
+    N = builtins.max(N1, N2)
+    _shape = [0] * N
+    for i in range(N - 1, -1, -1):
+        n1 = N1 - N + i
+        d1 = shape1[n1] if n1 >= 0 else 1
+        n2 = N2 - N + i
+        d2 = shape2[n2] if n2 >= 0 else 1
+        if d1 == 1:
+            _shape[i] = d2
+        elif d2 == 1 or d1 == d2:
+            _shape[i] = d1
+        else:
+            raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
+    shape = tuple(_shape)
+    # If more than two args, reduce the args using broadcast
+    if len(args) > 2:
+        for arg in args[2:]:
+            shape = _broadcast_shape(
+                SimpleNamespace(shape=tuple(shape), ndim=len(shape)), arg
+            )
+    return shape
+
+
 def elementwise(f: Callable, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
@@ -483,15 +520,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     """
     args = tuple(defer(a) for a in args)
     ndim = builtins.max([arg.ndim for arg in args])
-    shape = tuple(
-        builtins.max(
-            [
-                arg.shape[i - ndim + arg.ndim] if i - ndim + arg.ndim >= 0 else 1
-                for arg in args
-            ]
-        )
-        for i in range(ndim)
-    )
+    shape = _broadcast_shape(*args)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs = []
     for arg in args:
@@ -931,6 +960,14 @@ def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
         )
 
     return elementwise(first, tensor, NoneArray(shape))
+
+
+def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
+    """
+    Broadcasts one or more arrays against one another.
+    """
+    shape = _broadcast_shape(*arrays)
+    return tuple(broadcast_to(arr, shape) for arr in arrays)
 
 
 def sin(x) -> LazyTensor:
