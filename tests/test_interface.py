@@ -684,17 +684,17 @@ def test_broadcast_to(x, shape, x_wrap):
     Tests for broadcasting an array to a specified shape.
     """
     wx = x_wrap(x)
-    print(f"Testing broadcast_to for {x} to {shape}")
     # try NumPy’s broadcast_to first
     try:
         expected = np.broadcast_to(x, shape)
     except ValueError:
-        print(f"Skipping test for {x} to {shape} due to ValueError")
         # if NumPy cannot broadcast, we expect finch to raise
         with pytest.raises(ValueError):
             finch.broadcast_to(wx, shape)
 
     else:
         out = finch.broadcast_to(wx, shape)
+        if isinstance(wx, finch.LazyTensor):
+            out = finch.compute(out)
         np.testing.assert_equal(out, expected), "values mismatch"
         assert out.shape == shape, f"shape mismatch: got {out.shape}"

@@ -922,7 +922,9 @@ def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
     if builtins.any(dim == 0 for dim in shape):
         # If any dimension is zero, return an empty tensor
         return LazyTensor(
-            identify(Immediate(None)),
+            # We need a better way to represent an empty tensor, for now we use
+            # an empty numpy array
+            Table(Immediate(np.empty(shape, dtype=element_type(tensor))), idxs=()),
             shape,
             None,
             element_type(tensor),
