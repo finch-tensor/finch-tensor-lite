@@ -369,6 +369,7 @@ _unary_operators: dict[Callable, str] = {
     operator.abs: "__abs__",
     operator.pos: "__pos__",
     operator.neg: "__neg__",
+    operator.invert: "__invert__",
 }
 
 
@@ -412,8 +413,6 @@ for op, meth in _unary_operators.items():
 
     for t in StableNumber.__args__:
         register_property(t, meth, "return_type", _return_type_unary(meth))
-
-
 register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
 
 
@@ -645,3 +644,23 @@ for t in StableNumber.__args__:
 
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
+
+for trig_op in (
+    np.sin,
+    np.cos,
+    np.tan,
+    np.sinh,
+    np.cosh,
+    np.tanh,
+    np.atan,
+    np.asinh,
+    np.asin,
+    np.acos,
+    np.acosh,
+    np.atanh,
+):
+    register_property(
+        trig_op, "__call__", "return_type", lambda op, a, _trig_op=trig_op: float
+    )
+
+register_property(np.atan2, "__call__", "return_type", lambda op, a, b: float)

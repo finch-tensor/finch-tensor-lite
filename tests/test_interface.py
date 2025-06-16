@@ -124,6 +124,7 @@ class TestEagerTensor(finch.EagerTensor):
         ((operator.floordiv, finch.floordiv, np.floor_divide), np.floor_divide),
         ((operator.mod, finch.mod, np.mod), np.mod),
         ((operator.pow, finch.pow, np.pow), np.pow),
+        ((finch.atan2, np.atan2), np.atan2),
     ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -164,6 +165,22 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((operator.abs, finch.abs, np.abs), np.abs),
         ((operator.pos, finch.positive, np.positive), np.positive),
         ((operator.neg, finch.negative, np.negative), np.negative),
+        (
+            (operator.invert, finch.bitwise_inverse, np.bitwise_invert),
+            np.bitwise_invert,
+        ),
+        ((finch.sin, np.sin), np.sin),
+        ((finch.sinh, np.sinh), np.sinh),
+        ((finch.cos, np.cos), np.cos),
+        ((finch.cosh, np.cosh), np.cosh),
+        ((finch.tan, np.tan), np.tan),
+        ((finch.tanh, np.tanh), np.tanh),
+        ((finch.asin, np.asin), np.asin),
+        ((finch.asinh, np.asinh), np.asinh),
+        ((finch.acos, np.acos), np.acos),
+        ((finch.acosh, np.acosh), np.acosh),
+        ((finch.atan, np.atan), np.atan),
+        ((finch.atanh, np.atanh), np.atanh),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):

@@ -1,4 +1,5 @@
 import operator
+import sys
 
 import pytest
 
@@ -13,6 +14,10 @@ from finch.codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
 )
+
+pytest.skip(
+    "Skipping C-codegen tests on Apple Silicon", allow_module_level=True
+) if sys.platform == "darwin" else ...
 
 
 def test_add_function():

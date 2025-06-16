@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
+import numpy as np
 from numpy.core.numeric import normalize_axis_tuple
 
 from ..algebra import conjugate as conj
@@ -55,22 +56,22 @@ class LazyTensor(OverrideTensor):
         return len(self.shape)
 
     def __add__(self, other):
-        return add(self, defer(other))
+        return add(self, other)
 
     def __radd__(self, other):
-        return add(defer(other), self)
+        return add(other, self)
 
     def __sub__(self, other):
-        return subtract(self, defer(other))
+        return subtract(self, other)
 
     def __rsub__(self, other):
-        return subtract(defer(other), self)
+        return subtract(other, self)
 
     def __mul__(self, other):
-        return multiply(self, defer(other))
+        return multiply(self, other)
 
     def __rmul__(self, other):
-        return multiply(defer(other), self)
+        return multiply(other, self)
 
     def __abs__(self):
         return abs(self)
@@ -82,64 +83,106 @@ class LazyTensor(OverrideTensor):
         return negative(self)
 
     def __and__(self, other):
-        return bitwise_and(self, defer(other))
+        return bitwise_and(self, other)
 
     def __rand__(self, other):
-        return bitwise_and(defer(other), self)
+        return bitwise_and(other, self)
 
     def __lshift__(self, other):
-        return bitwise_left_shift(self, defer(other))
+        return bitwise_left_shift(self, other)
 
     def __rlshift__(self, other):
-        return bitwise_left_shift(defer(other), self)
+        return bitwise_left_shift(other, self)
 
     def __or__(self, other):
-        return bitwise_or(self, defer(other))
+        return bitwise_or(self, other)
 
     def __ror__(self, other):
-        return bitwise_or(defer(other), self)
+        return bitwise_or(other, self)
 
     def __rshift__(self, other):
-        return bitwise_right_shift(self, defer(other))
+        return bitwise_right_shift(self, other)
 
     def __rrshift__(self, other):
-        return bitwise_right_shift(defer(other), self)
+        return bitwise_right_shift(other, self)
 
     def __xor__(self, other):
-        return bitwise_xor(self, defer(other))
+        return bitwise_xor(self, other)
 
     def __rxor__(self, other):
-        return bitwise_xor(defer(other), self)
+        return bitwise_xor(other, self)
+
+    def __invert__(self):
+        return bitwise_inverse(self)
 
     def __truediv__(self, other):
-        return truediv(self, defer(other))
+        return truediv(self, other)
 
     def __rtruediv__(self, other):
-        return truediv(defer(other), self)
+        return truediv(other, self)
 
     def __floordiv__(self, other):
-        return floordiv(self, defer(other))
+        return floordiv(self, other)
 
     def __rfloordiv__(self, other):
-        return floordiv(defer(other), self)
+        return floordiv(other, self)
 
     def __mod__(self, other):
-        return mod(self, defer(other))
+        return mod(self, other)
 
     def __rmod__(self, other):
-        return mod(defer(other), self)
+        return mod(other, self)
 
     def __pow__(self, other):
-        return pow(self, defer(other))
+        return pow(self, other)
 
     def __rpow__(self, other):
-        return pow(defer(other), self)
+        return pow(other, self)
 
     def __matmul__(self, other):
-        return matmul(self, defer(other))
+        return matmul(self, other)
 
     def __rmatmul__(self, other):
-        return matmul(defer(other), self)
+        return matmul(other, self)
+
+    def __sin__(self):
+        return sin(self)
+
+    def __sinh__(self):
+        return sinh(self)
+
+    def __cos__(self):
+        return cos(self)
+
+    def __cosh__(self):
+        return cosh(self)
+
+    def __tan__(self):
+        return tan(self)
+
+    def __tanh__(self):
+        return tanh(self)
+
+    def __asin__(self):
+        return asin(self)
+
+    def __asinh__(self):
+        return asinh(self)
+
+    def __acos__(self):
+        return acos(self)
+
+    def __acosh__(self):
+        return acosh(self)
+
+    def __atan__(self):
+        return atan(self)
+
+    def __atanh__(self):
+        return atanh(self)
+
+    def __atan2__(self, other):
+        return atan2(self, other)
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -682,6 +725,10 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
+def bitwise_inverse(x) -> LazyTensor:
+    return elementwise(operator.invert, defer(x))
+
+
 def bitwise_and(x1, x2) -> LazyTensor:
     return elementwise(operator.and_, defer(x1), defer(x2))
 
@@ -882,3 +929,55 @@ def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
         )
 
     return elementwise(first, tensor, NoneArray(shape))
+
+
+def sin(x) -> LazyTensor:
+    return elementwise(np.sin, defer(x))
+
+
+def sinh(x) -> LazyTensor:
+    return elementwise(np.sinh, defer(x))
+
+
+def cos(x) -> LazyTensor:
+    return elementwise(np.cos, defer(x))
+
+
+def cosh(x) -> LazyTensor:
+    return elementwise(np.cosh, defer(x))
+
+
+def tan(x) -> LazyTensor:
+    return elementwise(np.tan, defer(x))
+
+
+def tanh(x) -> LazyTensor:
+    return elementwise(np.tanh, defer(x))
+
+
+def asin(x) -> LazyTensor:
+    return elementwise(np.asin, defer(x))
+
+
+def asinh(x) -> LazyTensor:
+    return elementwise(np.asinh, defer(x))
+
+
+def acos(x) -> LazyTensor:
+    return elementwise(np.acos, defer(x))
+
+
+def acosh(x) -> LazyTensor:
+    return elementwise(np.acosh, defer(x))
+
+
+def atan(x) -> LazyTensor:
+    return elementwise(np.atan, defer(x))
+
+
+def atanh(x) -> LazyTensor:
+    return elementwise(np.atanh, defer(x))
+
+
+def atan2(x1, x2) -> LazyTensor:
+    return elementwise(np.atan2, defer(x1), defer(x2))
