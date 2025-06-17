@@ -88,28 +88,6 @@ class Variable(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolic(AssemblyExpression):
-    """
-    Represents a logical AST expression for a symbolic value `val`, which may
-    hold references to variables defined in the current scope. Converting the
-    symbolic value to a normal value always creates a copy of the value, which
-    must be done explicitly before assigning the symbolic value to a variable or
-    passing it as an argument to a function.
-
-    Attributes:
-        val: The symbolic value.
-    """
-
-    name: str
-    val: Any
-
-    @property
-    def result_format(self):
-        """Returns the type of the expression."""
-        return type(self.val)
-
-
-@dataclass(eq=True, frozen=True)
 class Assign(AssemblyTree):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
