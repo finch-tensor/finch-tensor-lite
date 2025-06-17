@@ -14,9 +14,9 @@ class EagerTensor(OverrideTensor, ABC):
 
     @property
     @abstractmethod
-    def ndim(self):
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        ...
+        raise NotImplementedError("Subclasses must implement ndim.")
 
     def __add__(self, other):
         return add(self, other)
@@ -456,6 +456,7 @@ def broadcast_to(x, /, shape: Sequence[int]):
     out: array
         A tensor with the same data as `x`, but with the specified shape.
     """
+    shape = tuple(shape)  # Ensure shape is a tuple for consistency
     if isinstance(x, lazy.LazyTensor):
         return lazy.broadcast_to(x, shape=shape)
     return compute(lazy.broadcast_to(x, shape=shape))

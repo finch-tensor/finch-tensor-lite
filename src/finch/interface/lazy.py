@@ -519,8 +519,8 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
     args = tuple(defer(a) for a in args)
-    ndim = builtins.max([arg.ndim for arg in args])
     shape = _broadcast_shape(*args)
+    ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs = []
     for arg in args:
@@ -910,11 +910,12 @@ register_property(
     first,
     "__call__",
     "return_type",
+    # args[0] is the function name
     lambda *args: args[1],
 )
 
 
-def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
+def broadcast_to(tensor: LazyTensor, /, shape: tuple[int, ...]) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.
 
@@ -944,7 +945,8 @@ def broadcast_to(tensor: LazyTensor, /, shape) -> LazyTensor:
     if not is_broadcastable_directional(tensor.shape, shape):
         # If the tensor is already broadcastable to the shape, return it as is
         raise ValueError(
-            f"Shape {shape} is not broadcastable to tensor shape {tensor.shape}"
+            f"Tensor with shape {tensor.shape} is not broadcastable "
+            f"to the shape {shape}"
         )
     # elementwise does not support zero-dimensional tensors, so we
     # handle that case separately
