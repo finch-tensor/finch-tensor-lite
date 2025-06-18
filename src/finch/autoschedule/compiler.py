@@ -4,9 +4,8 @@ from typing import TypeVar, overload
 from ..algebra import fill_value
 from ..finch_logic import (
     Alias,
-    Deferred,
     Field,
-    Immediate,
+    Literal,
     LogicExpression,
     LogicNode,
     LogicTree,
@@ -17,6 +16,7 @@ from ..finch_logic import (
     Reorder,
     Subquery,
     Table,
+    Value,
 )
 from ._utils import intersect, with_subsequence
 
@@ -80,9 +80,9 @@ def compute_structure(
             lhs_2 = compute_structure(lhs, fields, aliases)
             return Subquery(lhs_2, arg_2)
         case Table(tns, idxs):
-            assert isinstance(tns, Immediate), "tns must be an Immediate"
+            assert isinstance(tns, Literal), "tns must be an Literal"
             return Table(
-                Immediate(type(tns.val)),
+                Literal(type(tns.val)),
                 tuple(compute_structure(idx, fields, aliases) for idx in idxs),
             )
         case LogicTree() as tree:
@@ -100,7 +100,7 @@ class PointwiseLowerer:
 
     def __call__(self, ex):
         match ex:
-            case MapJoin(Immediate(val), args):
+            case MapJoin(Literal(val), args):
                 return f":({val}({','.join([self(arg) for arg in args])}))"
             case Reorder(Relabel(Alias(name), idxs_1), idxs_2):
                 self.bound_idxs.append(idxs_1)
@@ -108,9 +108,9 @@ class PointwiseLowerer:
                     [idx.name if idx in idxs_2 else 1 for idx in idxs_1]
                 )
                 return f":({name}[{idxs_str}])"
-            case Reorder(Immediate(val), _):
+            case Reorder(Literal(val), _):
                 return val
-            case Immediate(val):
+            case Literal(val):
                 return val
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
@@ -124,9 +124,9 @@ def compile_pointwise_logic(ex: LogicNode) -> tuple:
 
 def compile_logic_constant(ex: LogicNode) -> str:
     match ex:
-        case Immediate(val):
+        case Literal(val):
             return val
-        case Deferred(ex, type_):
+        case Value(ex, type_):
             return f":({ex}::{type_})"
         case _:
             raise Exception(f"Invalid constant: {ex}")

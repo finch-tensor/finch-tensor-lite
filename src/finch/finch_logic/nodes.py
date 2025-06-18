@@ -52,7 +52,7 @@ class LogicExpression(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Immediate(LogicNode):
+class Literal(LogicNode):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -67,14 +67,14 @@ class Immediate(LogicNode):
         return id(val) if isinstance(val, np.ndarray) else hash(val)
 
     def __eq__(self, other):
-        if not isinstance(other, Immediate):
+        if not isinstance(other, Literal):
             return False
         res = self.val == other.val
         return res.all() if isinstance(res, np.ndarray) else res
 
 
 @dataclass(eq=True, frozen=True)
-class Deferred(LogicNode):
+class Value(LogicNode):
     """
     Represents a logical AST expression for an expression `ex` of type `type`,
     yet to be evaluated.
@@ -126,7 +126,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Immediate | Deferred
+    tns: Literal | Value
     idxs: tuple[Field, ...]
 
     @property

@@ -23,7 +23,7 @@ from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Immediate,
+    Literal,
     LogicNode,
     MapJoin,
     Relabel,
@@ -240,7 +240,7 @@ def defer(arr) -> LazyTensor:
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    tns = Subquery(name, Table(Immediate(arr), idxs))
+    tns = Subquery(name, Table(Literal(arr), idxs))
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
 
 
@@ -441,8 +441,8 @@ def reduce(
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
     data: LogicNode = Aggregate(
-        Immediate(op),
-        Immediate(init),
+        Literal(op),
+        Literal(init),
         Relabel(x.data, fields),
         tuple(fields[i] for i in axis),
     )
@@ -505,7 +505,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Immediate(f), tuple(bargs)), idxs)
+    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)

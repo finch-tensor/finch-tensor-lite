@@ -2,9 +2,8 @@ from .interpreter import FinchLogicInterpreter
 from .nodes import (
     Aggregate,
     Alias,
-    Deferred,
     Field,
-    Immediate,
+    Literal,
     LogicExpression,
     LogicNode,
     LogicTree,
@@ -17,6 +16,7 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    Value,
 )
 
 __all__ = [
@@ -24,11 +24,11 @@ __all__ = [
     "LogicExpression",
     "LogicNode",
     "LogicTree",
-    "Deferred",
+    "Value",
     "Aggregate",
     "Alias",
     "Field",
-    "Immediate",
+    "Literal",
     "MapJoin",
     "Plan",
     "Produces",

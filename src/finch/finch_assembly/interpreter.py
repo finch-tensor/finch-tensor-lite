@@ -18,7 +18,7 @@ class AssemblyInterpreterKernel:
         self.func = asm.Variable(func_n, ret_t)
 
     def __call__(self, *args):
-        args_i = (asm.Immediate(arg) for arg in args)
+        args_i = (asm.Literal(arg) for arg in args)
         return self.ctx(asm.Call(self.func, args_i))
 
 
@@ -105,7 +105,7 @@ class AssemblyInterpreter:
         Run the program.
         """
         match prgm:
-            case asm.Immediate(value):
+            case asm.Literal(value):
                 return value
             case asm.Variable(var_n, var_t):
                 if var_n in self.types:
@@ -172,7 +172,7 @@ class AssemblyInterpreter:
                     if ctx_2.should_halt():
                         break
                     ctx_3 = self.scope()
-                    ctx_3(asm.Block((asm.Assign(var, asm.Immediate(var_e)), body)))
+                    ctx_3(asm.Block((asm.Assign(var, asm.Literal(var_e)), body)))
                     var_e = type(var_e)(var_e + 1)  # type: ignore[call-arg,operator]
                 return None
             case asm.BufferLoop(buf, var, body):
@@ -184,7 +184,7 @@ class AssemblyInterpreter:
                     ctx_3 = ctx_2.scope()
                     ctx_3(
                         asm.Block(
-                            (asm.Assign(var, asm.Load(buf, asm.Immediate(i))), body)
+                            (asm.Assign(var, asm.Load(buf, asm.Literal(i))), body)
                         )
                     )
                 return None

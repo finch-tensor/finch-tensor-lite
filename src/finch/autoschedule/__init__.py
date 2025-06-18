@@ -1,9 +1,8 @@
 from ..finch_logic import (
     Aggregate,
     Alias,
-    Deferred,
     Field,
-    Immediate,
+    Literal,
     MapJoin,
     Plan,
     Produces,
@@ -13,6 +12,7 @@ from ..finch_logic import (
     Reorder,
     Subquery,
     Table,
+    Value,
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .optimize import (
@@ -39,9 +39,9 @@ from .optimize import (
 __all__ = [
     "Aggregate",
     "Alias",
-    "Deferred",
+    "Value",
     "Field",
-    "Immediate",
+    "Literal",
     "MapJoin",
     "Plan",
     "PostOrderDFS",
