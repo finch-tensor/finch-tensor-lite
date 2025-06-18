@@ -18,6 +18,8 @@ from .nodes import (
     Resize,
     Return,
     Store,
+    Symbolic,
+    Symbolify,
     Variable,
     WhileLoop,
 )
@@ -42,6 +44,8 @@ __all__ = [
     "Module",
     "If",
     "IfElse",
+    "Symbolic",
+    "Symbolify",
     "Buffer",
     "BufferFormat",
     "AssemblyInterpreter",
