@@ -319,26 +319,16 @@ class NotationInterpreter:
                 ext_e.loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
-                if not isinstance(tns, ntn.Variable):
-                    raise TypeError(
-                        f"Declaration target must be a variable, got {type(tns)}."
-                    )
                 tns_e = self(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
                 return declare(tns_e, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
-                if not isinstance(tns, ntn.Variable):
-                    raise TypeError(
-                        f"Freeze target must be a variable, got {type(tns)}."
-                    )
                 tns_e = self(tns)
                 op_e = self(op)
                 return freeze(tns_e, op_e)
             case ntn.Thaw(tns, op):
-                if not isinstance(tns, ntn.Variable):
-                    raise TypeError(f"Thaw target must be a variable, got {type(tns)}.")
                 tns_e = self(tns)
                 op_e = self(op)
                 return thaw(tns_e, op_e)

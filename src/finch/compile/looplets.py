@@ -1,0 +1,75 @@
+from dataclasses import dataclass, field
+from typing import Any, Callable, List, Optional
+
+@dataclass
+class Thunk:
+    preamble: Any = None
+    body: Any = None
+    epilogue: Any = None
+
+@dataclass
+class Switch:
+    cases: Any
+
+@dataclass
+class Case:
+    cond: Any
+    body: Any
+
+@dataclass
+class Stepper:
+    preamble: Any = None
+    stop: Callable = lambda ctx, ext: None
+    chunk: Any = None
+    next: Callable = lambda ctx, ext: None
+    body: Callable = lambda ctx, ext: None
+    seek: Callable = lambda ctx, start: (_ for _ in ()).throw(NotImplementedError("seek not implemented error"))
+
+@dataclass
+class Spike:
+    body: Any
+    tail: Any
+
+@dataclass
+class Sequence:
+    phases: Any
+
+@dataclass
+class Run:
+    body: Any
+
+@dataclass
+class AcceptRun:
+    body: Any
+
+@dataclass
+class Phase:
+    body: Any
+    start: Callable = lambda ctx, ext: None
+    stop: Callable = lambda ctx, ext: None
+    range: Callable = lambda ctx, ext: None
+
+@dataclass
+class Null:
+    pass
+
+@dataclass
+class Lookup:
+    body: Any
+
+@dataclass
+class Jumper:
+    preamble: Any = None
+    stop: Callable = lambda ctx, ext: None
+    chunk: Any = None
+    next: Callable = lambda ctx, ext: None
+    body: Callable = lambda ctx, ext: None
+    seek: Callable = lambda ctx, start: (_ for _ in ()).throw(NotImplementedError("seek not implemented error"))
+
+@dataclass
+class FillLeaf:
+    body: Any
+
+@dataclass
+class ShortCircuitVisitor:
+    ctx: Any

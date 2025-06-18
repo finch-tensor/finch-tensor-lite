@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
+from ..finch_assembly import AssemblyNode
 from ..symbolic import Term, TermTree
 
 
@@ -57,7 +58,7 @@ class Value(NotationExpression):
     type `type_`.
     """
 
-    val: Any
+    ex: AssemblyNode
     type_: Any
 
     @property
