@@ -107,27 +107,43 @@ class Symbolic(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolify(AssemblyExpression):
+class Reference(AssemblyExpression):
     """
-    Marks an assembly expression as worth converting into a symbolic. This node
-    returns a copy of the object, so modifications to the copy may not modify
-    the original.
+    Represents a reference to a symbolic object. Using a reference in an
+    expression creates a copy of the object.
+
+    Attributes:
+        name: The name of the symbolic object to reference.
+        type: The type of the symbolic object.
+    """
+
+    name: str
+    type: Any
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Symbolify(AssemblyTree):
+    """
+    Marks an assembly expression `rhs` as worth converting into a symbolic,
+    which can be referenced with `lhs`. This node returns a copy of the object,
+    so modifications to the copy may not modify the original.
 
     Attributes:
         arg: AssemblyExpression
     """
 
+    lhs: Reference
     arg: AssemblyExpression
-
-    @property
-    def result_format(self):
-        """Returns the type of the expression."""
-        return self.arg.result_format
 
     @property
     def children(self):
         """Returns the children of the node."""
-        return [self.arg]
+        return [self.lhs, self.rhs]
 
 
 @dataclass(eq=True, frozen=True)
