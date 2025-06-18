@@ -557,9 +557,11 @@ class CContext(Context):
             case asm.Load(buf, idx):
                 return buf.result_format.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                return buf.result_format.c_store(self, buf, idx, val)
+                buf.result_format.c_store(self, buf, idx, val)
+                return None
             case asm.Resize(buf, len):
-                return buf.result_format.c_resize(self, buf, len)
+                buf.result_format.c_resize(self, buf, len)
+                return None
             case asm.Length(buf):
                 return buf.result_format.c_length(self, buf)
             case asm.Block(bodies):
