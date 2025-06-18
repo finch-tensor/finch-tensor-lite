@@ -99,10 +99,12 @@ class Symbolic(AssemblyExpression):
         obj: The object referencing symbolic variables defined in the target language.
     """
 
+    obj: Any
+
     @property
     def result_format(self):
         """Returns the type of the expression."""
-        return type(self.val)
+        return self.obj.format
 
 
 @dataclass(eq=True, frozen=True)
