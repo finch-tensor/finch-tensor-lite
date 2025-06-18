@@ -28,7 +28,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Immediate,
+    Literal,
     MapJoin,
     Plan,
     Produces,
@@ -48,7 +48,7 @@ def test_propagate_map_queries():
         (
             Query(
                 Alias("A10"),
-                Aggregate(Immediate("+"), Immediate(0), Immediate("[1,2,3]"), ()),
+                Aggregate(Literal("+"), Literal(0), Literal("[1,2,3]"), ()),
             ),
             Query(Alias("A11"), Alias("A10")),
             Produces((Alias("A11"),)),
@@ -58,7 +58,7 @@ def test_propagate_map_queries():
         (
             Query(
                 Alias("A11"),
-                MapJoin(Immediate("+"), (Immediate(0), Immediate("[1,2,3]"))),
+                MapJoin(Literal("+"), (Literal(0), Literal("[1,2,3]"))),
             ),
             Produces((Alias("A11"),)),
         )
@@ -75,18 +75,18 @@ def test_lift_subqueries():
                 Alias("A10"),
                 Plan(
                     (
-                        Subquery(Alias("C10"), Immediate(0)),
+                        Subquery(Alias("C10"), Literal(0)),
                         Subquery(
                             Alias("B10"),
                             MapJoin(
-                                Immediate("+"),
+                                Literal("+"),
                                 (
-                                    Subquery(Alias("C10"), Immediate(0)),
-                                    Immediate("[1,2,3]"),
+                                    Subquery(Alias("C10"), Literal(0)),
+                                    Literal("[1,2,3]"),
                                 ),
                             ),
                         ),
-                        Subquery(Alias("B10"), Immediate(0)),
+                        Subquery(Alias("B10"), Literal(0)),
                         Produces((Alias("B10"),)),
                     )
                 ),
@@ -99,10 +99,10 @@ def test_lift_subqueries():
         (
             Plan(
                 (
-                    Query(Alias("C10"), Immediate(0)),
+                    Query(Alias("C10"), Literal(0)),
                     Query(
                         Alias("B10"),
-                        MapJoin(Immediate("+"), (Alias("C10"), Immediate("[1,2,3]"))),
+                        MapJoin(Literal("+"), (Alias("C10"), Literal("[1,2,3]"))),
                     ),
                     Query(
                         Alias("A10"),
@@ -131,10 +131,10 @@ def test_propagate_fields():
             Query(
                 Alias("A10"),
                 MapJoin(
-                    Immediate("op"),
+                    Literal("op"),
                     (
-                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Literal("tbl2"), (Field("A2"), Field("A3"))),
                     ),
                 ),
             ),
@@ -147,10 +147,10 @@ def test_propagate_fields():
             Query(
                 Alias("A10"),
                 MapJoin(
-                    Immediate("op"),
+                    Literal("op"),
                     (
-                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Immediate("tbl2"), (Field("A2"), Field("A3"))),
+                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Literal("tbl2"), (Field("A2"), Field("A3"))),
                     ),
                 ),
             ),
@@ -166,11 +166,11 @@ def test_propagate_fields():
     "node,pass_fn",
     [
         (
-            Aggregate(Immediate(""), Immediate(""), Reorder(Immediate(""), ()), ()),
+            Aggregate(Literal(""), Literal(""), Reorder(Literal(""), ()), ()),
             isolate_aggregates,
         ),
-        (Reformat(Immediate(""), Reorder(Immediate(""), ())), isolate_reformats),
-        (Table(Immediate(""), ()), isolate_tables),
+        (Reformat(Literal(""), Reorder(Literal(""), ())), isolate_reformats),
+        (Table(Literal(""), ()), isolate_tables),
     ],
 )
 def test_isolate_passes(node, pass_fn):
@@ -216,28 +216,28 @@ def test_push_fields():
         (
             Relabel(
                 MapJoin(
-                    Immediate("+"),
+                    Literal("+"),
                     (
-                        Table(Immediate("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Immediate("tbl2"), (Field("A2"), Field("A1"))),
+                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
+                        Table(Literal("tbl2"), (Field("A2"), Field("A1"))),
                     ),
                 ),
                 (Field("B1"), Field("B2")),
             ),
             Relabel(
                 Aggregate(
-                    Immediate("+"),
-                    Immediate(0),
-                    Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                    Literal("+"),
+                    Literal(0),
+                    Table(Literal(""), (Field("A1"), Field("A2"), Field("A3"))),
                     (Field("A2"),),
                 ),
                 (Field("B1"), Field("B3")),
             ),
             Reorder(
                 Aggregate(
-                    Immediate("+"),
-                    Immediate(0),
-                    Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                    Literal("+"),
+                    Literal(0),
+                    Table(Literal(""), (Field("A1"), Field("A2"), Field("A3"))),
                     (Field("A2"),),
                 ),
                 (Field("A3"), Field("A1")),
@@ -248,33 +248,33 @@ def test_push_fields():
     expected = Plan(
         (
             MapJoin(
-                op=Immediate(val="+"),
+                op=Literal(val="+"),
                 args=(
                     Table(
-                        tns=Immediate(val="tbl1"),
+                        tns=Literal(val="tbl1"),
                         idxs=(Field(name="B1"), Field(name="B2")),
                     ),
                     Table(
-                        tns=Immediate(val="tbl2"),
+                        tns=Literal(val="tbl2"),
                         idxs=(Field(name="B2"), Field(name="B1")),
                     ),
                 ),
             ),
             Aggregate(
-                op=Immediate(val="+"),
-                init=Immediate(val=0),
+                op=Literal(val="+"),
+                init=Literal(val=0),
                 arg=Table(
-                    tns=Immediate(val=""),
+                    tns=Literal(val=""),
                     idxs=(Field(name="B1"), Field(name="A2"), Field(name="B3")),
                 ),
                 idxs=(Field(name="A2"),),
             ),
             Reorder(
                 Aggregate(
-                    Immediate("+"),
-                    Immediate(0),
+                    Literal("+"),
+                    Literal(0),
                     Reorder(
-                        Table(Immediate(""), (Field("A1"), Field("A2"), Field("A3"))),
+                        Table(Literal(""), (Field("A1"), Field("A2"), Field("A3"))),
                         (Field("A3"), Field("A2"), Field("A1")),
                     ),
                     (Field("A2"),),
@@ -293,7 +293,7 @@ def test_propagate_copy_queries():
         (
             Query(Alias("A0"), Alias("A0")),
             Query(Alias("A1"), Alias("A2")),
-            Query(Alias("A1"), Immediate(0)),
+            Query(Alias("A1"), Literal(0)),
         )
     )
 
@@ -301,7 +301,7 @@ def test_propagate_copy_queries():
         (
             Plan(),
             Plan(),
-            Query(Alias("A2"), Immediate(0)),
+            Query(Alias("A2"), Literal(0)),
         )
     )
 
@@ -315,16 +315,16 @@ def test_propagate_into_reformats():
             Query(Alias("A1"), Alias("A0")),
             Query(
                 Alias("D0"),
-                Aggregate(Immediate("*"), Immediate(1), Alias("A1"), (Field("i2"),)),
+                Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
             ),
             Query(
                 Alias("B0"),
-                Aggregate(Immediate("+"), Immediate(0), Alias("A1"), (Field("i1"),)),
+                Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
             ),
-            Immediate(1),
-            Query(Alias("C0"), Reformat(Immediate(3), Alias("B0"))),
-            Query(Alias("E0"), Reformat(Immediate(4), Alias("D0"))),
-            Immediate(2),
+            Literal(1),
+            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
+            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
+            Literal(2),
         )
     )
 
@@ -334,23 +334,19 @@ def test_propagate_into_reformats():
             Query(
                 Alias("E0"),
                 Reformat(
-                    Immediate(4),
-                    Aggregate(
-                        Immediate("*"), Immediate(1), Alias("A1"), (Field("i2"),)
-                    ),
+                    Literal(4),
+                    Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
                 ),
             ),
             Query(
                 Alias("C0"),
                 Reformat(
-                    Immediate(3),
-                    Aggregate(
-                        Immediate("+"), Immediate(0), Alias("A1"), (Field("i1"),)
-                    ),
+                    Literal(3),
+                    Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
                 ),
             ),
-            Immediate(1),
-            Immediate(2),
+            Literal(1),
+            Literal(2),
         )
     )
 
@@ -399,30 +395,30 @@ def test_lift_fields():
     plan = Plan(
         (
             Aggregate(
-                Immediate("*"),
-                Immediate(1),
-                Table(Immediate(2), (Field("i1"), Field("i2"))),
+                Literal("*"),
+                Literal(1),
+                Table(Literal(2), (Field("i1"), Field("i2"))),
                 (Field("i2"),),
             ),
             Query(
                 Alias("A0"),
                 MapJoin(
-                    Immediate("*"),
+                    Literal("*"),
                     (
-                        Table(Immediate(2), (Field("i1"), Field("i2"))),
-                        Table(Immediate(4), (Field("i1"), Field("i2"))),
+                        Table(Literal(2), (Field("i1"), Field("i2"))),
+                        Table(Literal(4), (Field("i1"), Field("i2"))),
                     ),
                 ),
             ),
             Query(
                 Alias("A0"),
                 Reformat(
-                    Immediate(0),
+                    Literal(0),
                     MapJoin(
-                        Immediate("*"),
+                        Literal("*"),
                         (
-                            Table(Immediate(2), (Field("i1"), Field("i2"))),
-                            Table(Immediate(4), (Field("i1"), Field("i2"))),
+                            Table(Literal(2), (Field("i1"), Field("i2"))),
+                            Table(Literal(4), (Field("i1"), Field("i2"))),
                         ),
                     ),
                 ),
@@ -433,10 +429,10 @@ def test_lift_fields():
     expected = Plan(
         (
             Aggregate(
-                Immediate("*"),
-                Immediate(1),
+                Literal("*"),
+                Literal(1),
                 Reorder(
-                    Table(Immediate(2), (Field("i1"), Field("i2"))),
+                    Table(Literal(2), (Field("i1"), Field("i2"))),
                     (Field("i1"), Field("i2")),
                 ),
                 (Field("i2"),),
@@ -445,10 +441,10 @@ def test_lift_fields():
                 Alias("A0"),
                 Reorder(
                     MapJoin(
-                        Immediate("*"),
+                        Literal("*"),
                         (
-                            Table(Immediate(2), (Field("i1"), Field("i2"))),
-                            Table(Immediate(4), (Field("i1"), Field("i2"))),
+                            Table(Literal(2), (Field("i1"), Field("i2"))),
+                            Table(Literal(4), (Field("i1"), Field("i2"))),
                         ),
                     ),
                     (Field("i1"), Field("i2")),
@@ -457,13 +453,13 @@ def test_lift_fields():
             Query(
                 Alias("A0"),
                 Reformat(
-                    Immediate(0),
+                    Literal(0),
                     Reorder(
                         MapJoin(
-                            Immediate("*"),
+                            Literal("*"),
                             (
-                                Table(Immediate(2), (Field("i1"), Field("i2"))),
-                                Table(Immediate(4), (Field("i1"), Field("i2"))),
+                                Table(Literal(2), (Field("i1"), Field("i2"))),
+                                Table(Literal(4), (Field("i1"), Field("i2"))),
                             ),
                         ),
                         (Field("i1"), Field("i2")),
@@ -511,7 +507,7 @@ def test_normalize_names():
 def test_concordize():
     plan = Plan(
         (
-            Query(Alias("A0"), Table(Immediate(0), (Field("i0"), Field("i1")))),
+            Query(Alias("A0"), Table(Literal(0), (Field("i0"), Field("i1")))),
             Query(
                 Alias("A1"),
                 Reorder(
@@ -532,7 +528,7 @@ def test_concordize():
 
     expected = Plan(
         (
-            Query(Alias("A0"), Table(Immediate(0), (Field("i0"), Field("i1")))),
+            Query(Alias("A0"), Table(Literal(0), (Field("i0"), Field("i1")))),
             Query(
                 Alias("A0_2"),
                 Reorder(
@@ -614,29 +610,29 @@ def test_propagate_map_queries_backward():
             Query(Alias("A0"), Alias("A1")),
             Alias("A0"),
             MapJoin(
-                Immediate(mul),
+                Literal(mul),
                 (
-                    Table(Immediate(10), (Field("i1"),)),
+                    Table(Literal(10), (Field("i1"),)),
                     Aggregate(
-                        Immediate(add),
-                        Immediate(0),
-                        Table(Immediate(10), (Field("i1"), Field("i2"), Field("i3"))),
+                        Literal(add),
+                        Literal(0),
+                        Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                         (Field("i2"),),
                     ),
-                    Table(Immediate(10), (Field("i3"),)),
+                    Table(Literal(10), (Field("i3"),)),
                 ),
             ),
             Aggregate(
-                Immediate(add),
-                Immediate(10),
-                Aggregate(Immediate(add), Immediate(0), Alias("A2"), (Field("i4"),)),
+                Literal(add),
+                Literal(10),
+                Aggregate(Literal(add), Literal(0), Alias("A2"), (Field("i4"),)),
                 (Field("i5"),),
             ),
             Reorder(
                 Aggregate(
-                    Immediate(mul),
-                    Immediate(1),
-                    Table(Immediate(10), (Field("i7"),)),
+                    Literal(mul),
+                    Literal(1),
+                    Table(Literal(10), (Field("i7"),)),
                     (Field("i6"),),
                 ),
                 (Field("i5"),),
@@ -649,27 +645,25 @@ def test_propagate_map_queries_backward():
             Plan(bodies=()),
             Alias("A1"),
             Aggregate(
-                Immediate(add),
-                Immediate(0),
+                Literal(add),
+                Literal(0),
                 MapJoin(
-                    Immediate(mul),
+                    Literal(mul),
                     (
-                        Table(Immediate(10), (Field("i1"),)),
-                        Table(Immediate(10), (Field("i1"), Field("i2"), Field("i3"))),
-                        Table(Immediate(10), (Field("i3"),)),
+                        Table(Literal(10), (Field("i1"),)),
+                        Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                        Table(Literal(10), (Field("i3"),)),
                     ),
                 ),
                 (Field("i2"),),
             ),
             Aggregate(
-                Immediate(add), Immediate(10), Alias("A2"), (Field("i4"), Field("i5"))
+                Literal(add), Literal(10), Alias("A2"), (Field("i4"), Field("i5"))
             ),
             Aggregate(
-                Immediate(mul),
-                Immediate(1),
-                Reorder(
-                    Table(Immediate(10), (Field("i7"),)), (Field("i5"), Field("i6"))
-                ),
+                Literal(mul),
+                Literal(1),
+                Reorder(Table(Literal(10), (Field("i7"),)), (Field("i5"), Field("i6"))),
                 (Field("i6"),),
             ),
         )
@@ -691,14 +685,12 @@ def test_scheduler_e2e_matmul(a, b):
 
     plan = Plan(
         [
-            Query(Alias("A"), Table(Immediate(a), (i, k))),
-            Query(Alias("B"), Table(Immediate(b), (k, j))),
-            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
+            Query(Alias("A"), Table(Literal(a), (i, k))),
+            Query(Alias("B"), Table(Literal(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
             Query(
                 Alias("C"),
-                Reorder(
-                    Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,)), (i, j)
-                ),
+                Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
             ),
             Produces((Alias("C"),)),
         ]
@@ -721,37 +713,35 @@ def test_scheduler_e2e_sddmm():
 
     plan = Plan(
         (
-            Query(Alias("S"), Table(Immediate(s), (i, j))),
-            Query(Alias("A"), Table(Immediate(a), (i, k))),
-            Query(Alias("B"), Table(Immediate(b), (k, j))),
-            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
+            Query(Alias("S"), Table(Literal(s), (i, j))),
+            Query(Alias("A"), Table(Literal(a), (i, k))),
+            Query(Alias("B"), Table(Literal(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
             # matmul
-            Query(
-                Alias("C"), Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,))
-            ),
+            Query(Alias("C"), Aggregate(Literal(add), Literal(0), Alias("AB"), (k,))),
             # elemwise
-            Query(Alias("RES"), MapJoin(Immediate(mul), (Alias("C"), Alias("S")))),
+            Query(Alias("RES"), MapJoin(Literal(mul), (Alias("C"), Alias("S")))),
             Produces((Alias("RES"),)),
         )
     )
 
     expected_plan = Plan(
         (
-            Query(Alias(":A0"), Table(Immediate(a), (Field(":i0"), Field(":i1")))),
-            Query(Alias(":A1"), Table(Immediate(b), (Field(":i1"), Field(":i2")))),
-            Query(Alias(":A2"), Table(Immediate(s), (Field(":i0"), Field(":i2")))),
+            Query(Alias(":A0"), Table(Literal(a), (Field(":i0"), Field(":i1")))),
+            Query(Alias(":A1"), Table(Literal(b), (Field(":i1"), Field(":i2")))),
+            Query(Alias(":A2"), Table(Literal(s), (Field(":i0"), Field(":i2")))),
             Query(
                 Alias(":A3"),
                 Aggregate(
-                    Immediate(add),
-                    Immediate(0),
+                    Literal(add),
+                    Literal(0),
                     Reorder(
                         MapJoin(
-                            Immediate(mul),
+                            Literal(mul),
                             (
                                 Reorder(
                                     MapJoin(
-                                        Immediate(mul),
+                                        Literal(mul),
                                         (
                                             Reorder(
                                                 Relabel(

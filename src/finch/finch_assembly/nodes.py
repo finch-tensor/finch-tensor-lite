@@ -51,7 +51,7 @@ class AssemblyExpression(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Immediate(AssemblyExpression):
+class Literal(AssemblyExpression):
     """
     Represents the literal value `val`.
 
@@ -90,18 +90,14 @@ class Variable(AssemblyExpression):
 @dataclass(eq=True, frozen=True)
 class Symbolic(AssemblyExpression):
     """
-    Represents a logical AST expression for a symbolic value `val`, which may
-    hold references to variables defined in the current scope. Converting the
-    symbolic value to a normal value always creates a copy of the value, which
-    must be done explicitly before assigning the symbolic value to a variable or
-    passing it as an argument to a function.
+    Represents a logical AST expression for a symbolic variable. Instead of
+    holding an expression like Value does, symbolic variables hold a custom
+    object `obj`, which represents a set of expressions, variables, and
+    literals in the target language.
 
     Attributes:
-        val: The symbolic value.
+        obj: The object referencing symbolic variables defined in the target language.
     """
-
-    name: str
-    val: Any
 
     @property
     def result_format(self):
@@ -120,7 +116,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable
+    lhs: Variable | Symbolic
     rhs: AssemblyExpression
 
     @property
@@ -139,7 +135,7 @@ class Call(AssemblyExpression, AssemblyTree):
         args: The arguments to call on the function.
     """
 
-    op: Immediate
+    op: Literal
     args: tuple[AssemblyNode, ...]
 
     @property

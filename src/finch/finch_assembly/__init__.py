@@ -11,8 +11,8 @@ from .nodes import (
     Function,
     If,
     IfElse,
-    Immediate,
     Length,
+    Literal,
     Load,
     Module,
     Resize,
@@ -24,7 +24,7 @@ from .nodes import (
 
 __all__ = [
     "AssemblyNode",
-    "Immediate",
+    "Literal",
     "Variable",
     "Load",
     "Store",

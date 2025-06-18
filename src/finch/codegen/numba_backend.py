@@ -180,7 +180,7 @@ class NumbaContext(Context):
     def __call__(self, prgm: asm.AssemblyNode):
         feed = self.feed
         match prgm:
-            case asm.Immediate(value):
+            case asm.Literal(value):
                 return str(value)
             case asm.Variable(name, _):
                 return name
@@ -195,7 +195,7 @@ class NumbaContext(Context):
                     self.bindings[var_n] = var_t
                     self.exec(f"{feed}{var_n}: {self.full_name(var_t)} = {val_code}")
                 return None
-            case asm.Call(asm.Immediate(val), args):
+            case asm.Call(asm.Literal(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Load(buffer, idx):
                 return buffer.result_format.numba_load(self, buffer, idx)
