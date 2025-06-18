@@ -428,12 +428,21 @@ class CContext(Context):
     """
 
     def __init__(
-        self, tab="    ", indent=0, headers=None, bindings=None, fptr=None, **kwargs
+        self,
+        tab="    ",
+        indent=0,
+        headers=None,
+        bindings=None,
+        references=None,
+        fptr=None,
+        **kwargs,
     ):
         if headers is None:
             headers = []
         if bindings is None:
             bindings = ScopedDict()
+        if references is None:
+            references = ScopedDict()
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
@@ -516,13 +525,27 @@ class CContext(Context):
         blk.headers = self.headers
         blk._headerset = self._headerset
         blk.bindings = self.bindings
+        blk.references = self.references
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
         blk.bindings = self.bindings.scope()
+        blk.references = self.references.scope()
         return blk
+
+    def deref(self, node):
+        match node:
+            case asm.Reference(var_n, _):
+                var_o = self.references.get(var_n)
+                if var_o is None:
+                    raise ValueError(f"Reference {var_n} not found in context")
+                return var_o
+            case asm.Symbolic(val):
+                return val
+            case _:
+                return None
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
@@ -554,16 +577,47 @@ class CContext(Context):
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
+            case asm.Reference(var_n, _) as ref:
+                val = self.deref(ref)
+                if val is None:
+                    raise ValueError(f"Reference {var_n} not found in context")
+                return val.c_lower(self)
+            case asm.Symbolic(obj) as ref:
+                return obj.c_lower(self)
+            case asm.Symbolify(asm.Variable(var_n, _), val):
+                val_code = self(val)
+                if val.result_format != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if var_n in self.references or var_n in self.bindings:
+                    raise KeyError(
+                        f"Variable {var_n} already exists in context, cannot symbolify"
+                    )
+                self.references[var_n] = var_t.c_to_symbolic(self, val)
+                return None
             case asm.Load(buf, idx):
-                return buf.result_format.c_load(self, buf, idx)
+                buf_s = self.deref(buf)
+                if buf_s is None:
+                    return buf.result_format.c_load(self, buf, idx)
+                return buf_s.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                buf.result_format.c_store(self, buf, idx, val)
+                buf_s = self.deref(buf)
+                if buf_s is None:
+                    buf.result_format.c_store(self, buf, idx, val)
+                else:
+                    buf_s.c_store(self, buf, idx, val)
                 return None
             case asm.Resize(buf, len):
-                buf.result_format.c_resize(self, buf, len)
+                buf_s = self.deref(buf)
+                if buf_s is None:
+                    buf.result_format.c_resize(self, buf, len)
+                else:
+                    buf_s.c_resize(self, buf, len)
                 return None
             case asm.Length(buf):
-                return buf.result_format.c_length(self, buf)
+                buf_s = self.deref(buf)
+                if buf_s is None:
+                    return buf.result_format.c_length(self, buf)
+                return buf_s.c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:

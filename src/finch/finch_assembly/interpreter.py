@@ -325,7 +325,7 @@ class AssemblyInterpreter:
                 return AssemblyInterpreterModule(self, kernels)
             case asm.Symbolic(val):
                 raise NotImplementedError(
-                    "Interpreter does not support symbolic, no target language"
+                    "AssemblyInterpreter does not support symbolic, no target language"
                 )
             case _:
                 raise NotImplementedError(
