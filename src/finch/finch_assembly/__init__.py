@@ -22,6 +22,7 @@ from .nodes import (
     Symbolify,
     Variable,
     WhileLoop,
+    Reference,
 )
 
 __all__ = [
@@ -51,4 +52,5 @@ __all__ = [
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "has_format",
+    "Reference",
 ]

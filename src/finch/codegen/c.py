@@ -450,6 +450,7 @@ class CContext(Context):
         self._headerset = set(headers)
         self.fptr = {}
         self.bindings = bindings
+        self.references = references
 
     def add_header(self, header):
         if header not in self._headerset:
@@ -578,13 +579,13 @@ class CContext(Context):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
             case asm.Reference(var_n, _) as ref:
-                val = self.deref(ref)
-                if val is None:
+                obj = self.deref(ref)
+                if obj is None:
                     raise ValueError(f"Reference {var_n} not found in context")
-                return val.c_lower(self)
+                return obj.c_lower(self)
             case asm.Symbolic(obj) as ref:
                 return obj.c_lower(self)
-            case asm.Symbolify(asm.Variable(var_n, _), val):
+            case asm.Symbolify(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
