@@ -14,9 +14,9 @@ class EagerTensor(OverrideTensor, ABC):
 
     @property
     @abstractmethod
-    def ndim(self):
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        ...
+        raise NotImplementedError("Subclasses must implement ndim.")
 
     def __add__(self, other):
         return add(self, other)
@@ -436,6 +436,54 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
 
 
+# manipulation functions:
+# https://data-apis.org/array-api/2024.12/API_specification/manipulation_functions.html
+
+
+def broadcast_to(x, /, shape: Sequence[int]):
+    """
+    Broadcasts an array to a new shape.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to be broadcasted.
+    shape: Sequence[int]
+        The target shape to which the input tensor should be broadcasted.
+
+    Returns
+    -------
+    out: array
+        A tensor with the same data as `x`, but with the specified shape.
+    """
+    shape = tuple(shape)  # Ensure shape is a tuple for consistency
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.broadcast_to(x, shape=shape)
+    return compute(lazy.broadcast_to(x, shape=shape))
+
+
+def broadcast_arrays(*args):
+    """
+    Broadcasts one or more arrays against one another.
+
+    Parameters
+    ----------
+    *args: array
+        an arbitrary number of to-be broadcasted arrays.
+
+    Returns
+    -------
+    out: List[array]
+        a list of broadcasted arrays. Each array has the same shape.
+        Element types are preserved.
+    """
+    if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
+        return lazy.broadcast_arrays(*args)
+    # compute can take in a list of LazyTensors
+    return compute(lazy.broadcast_arrays(*args))
+
+
+# trigonometric functions:
 def sin(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.sin(x)

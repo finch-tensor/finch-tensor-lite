@@ -330,14 +330,17 @@ def test_matmul(a, b, a_wrap, b_wrap):
 
     result = finch.matmul(wa, wb)
     result_with_op = wa @ wb  # make sure the operator overload works too
+    result_with_np = np.matmul(wa, wb)
 
     if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
         assert isinstance(result, finch.LazyTensor)
         result = finch.compute(result)
         result_with_op = finch.compute(result_with_op)
+        result_with_np = finch.compute(result_with_np)
 
     assert_equal(result, expected)
     assert_equal(result_with_op, expected)
+    assert_equal(result_with_np, expected)
 
 
 @pytest.mark.parametrize(
@@ -632,3 +635,115 @@ def test_scalar_coerce(x, func):
     assert isinstance(result, func), f"Result should be of type {func.__name__}"
     works = result == expected or np.isnan(result) and np.isnan(expected)
     assert works, f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    "x, shape",
+    [
+        # ——— VALID CASES ———
+        # scalar → 2×3
+        (np.array(5), (2, 3)),
+        # 1D int → 2×3
+        (np.array([1, 2, 3]), (2, 3)),
+        # 1D float → 1×3×2 (prepend one axis)
+        (np.array([0.5, 1.5]), (1, 2, 2)),
+        # 2D bool → 2×2×3 (prepend one axis)
+        (np.array([[True, False, True]]), (2, 1, 3)),
+        # 1-element → 2×1×3
+        (np.array([7.0 + 4.2j]), (2, 1, 3)),
+        # already matching shape (no change)
+        (np.arange(6).reshape(2, 3), (2, 3)),
+        # zero-length axis: (0,) → (4, 0)
+        (np.empty((0,)), (4, 0)),
+        # broadcast in middle: (1,4 +1j,1) → (3,4,2)
+        (np.ones((1, 4, 1)), (3, 4, 2)),
+        (np.arange(4).reshape(2, 2), (2, 2, 2)),
+        # 1-dim can be broadcast to 0-dim: (3,1) → (3, 0)
+        (np.array([1, 2, 3]).reshape(-1, 1), (3, 0)),
+        # 0-dim can be prepended: (3, 2) → (0, 3, 2)
+        (np.arange(6).reshape(3, 2), (0, 3, 2)),
+        # ——— INVALID CASES ———
+        # mismatched non-1 dim at end
+        (np.array([1, 2, 3]), (2, 2)),
+        # mismatched non-1 dim in middle
+        (np.ones((2, 3, 4)), (2, 5, 4)),
+        # boradcast on right side
+        (np.arange(3).reshape(3, 1), (2, 3, 1, 5)),
+    ],
+)
+@pytest.mark.parametrize(
+    "x_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_broadcast_to(x, shape, x_wrap):
+    """
+    Tests for broadcasting an array to a specified shape.
+    """
+    wx = x_wrap(x)
+    # try NumPy’s broadcast_to first
+    try:
+        expected = np.broadcast_to(x, shape)
+    except ValueError:
+        # if NumPy cannot broadcast, we expect finch to raise
+        with pytest.raises(ValueError):
+            finch.broadcast_to(wx, shape)
+
+    else:
+        out = finch.broadcast_to(wx, shape)
+        if isinstance(wx, finch.LazyTensor):
+            out = finch.compute(out)
+        assert_equal(out, expected, "values mismatch")
+        assert out.shape == shape, f"shape mismatch: got {out.shape}"
+
+
+@pytest.mark.parametrize(
+    "shapes",
+    [
+        ((1, 2, 3), (4, 2, 3), (3,), (9, 4, 2, 3), (9, 1, 1, 3)),
+        ((7, 2, 3, 4), (2, 3, 1), (2, 1, 1), (1, 2, 1, 1), (1,)),
+        ((1,), (1,)),
+        ((2, 3), (3, 2)),  # error
+        ((1,), (4, 0)),
+        ((0,), (1, 0)),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_broadcast_arrays(shapes, wrapper):
+    """
+    Tests for broadcasting multiple arrays to a common shape.
+    The wrapper is randomly applied to each shape to ensure
+    """
+    import random
+
+    # Generate random arrays for each shape
+    generator = np.random.default_rng()
+    arrays = [generator.random(shape) for shape in shapes]
+    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
+    try:
+        expected = np.broadcast_arrays(*arrays)
+    except ValueError:
+        with pytest.raises(ValueError):
+            finch.broadcast_arrays(*wrapped_arrays)
+        return
+    result = finch.broadcast_arrays(*wrapped_arrays)
+    if isinstance(result[0], finch.LazyTensor):
+        assert all(isinstance(r, finch.LazyTensor) for r in result)
+        result = finch.compute(result)  # compute all lazy tensors
+
+    assert len(result) == len(expected), "Number of results does not match expected"
+    for i, (res, exp) in enumerate(zip(result, expected, strict=True)):
+        assert res.shape == exp.shape, (
+            f"Shape mismatch: got {res.shape}, expected {exp.shape} at index {i}"
+        )
+        assert_equal(res, exp, "Values mismatch in broadcasted arrays")

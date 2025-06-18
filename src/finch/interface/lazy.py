@@ -4,6 +4,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -17,6 +18,7 @@ from ..algebra import (
     init_value,
     promote_max,
     promote_min,
+    register_property,
     return_type,
 )
 from ..finch_logic import (
@@ -457,6 +459,42 @@ def reduce(
     return LazyTensor(identify(data), shape, init, dtype)
 
 
+def _broadcast_shape(*args) -> tuple[int, ...]:
+    """
+    Computes the broadcasted shape for the given LazyTensor arguments,
+    following arrray_api broadcasting rules.
+    Raises ValueError if shapes are not broadcastable.
+    """
+    # Only support two arguments for now, as in the algorithm
+    if len(args) < 2:
+        return args[0].shape if args else ()
+    shape1 = args[0].shape
+    shape2 = args[1].shape
+    N1 = len(shape1)
+    N2 = len(shape2)
+    N = builtins.max(N1, N2)
+    _shape = [0] * N
+    for i in range(N - 1, -1, -1):
+        n1 = N1 - N + i
+        d1 = shape1[n1] if n1 >= 0 else 1
+        n2 = N2 - N + i
+        d2 = shape2[n2] if n2 >= 0 else 1
+        if d1 == 1:
+            _shape[i] = d2
+        elif d2 == 1 or d1 == d2:
+            _shape[i] = d1
+        else:
+            raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
+    shape = tuple(_shape)
+    # If more than two args, reduce the args using broadcast
+    if len(args) > 2:
+        for arg in args[2:]:
+            shape = _broadcast_shape(
+                SimpleNamespace(shape=tuple(shape), ndim=len(shape)), arg
+            )
+    return shape
+
+
 def elementwise(f: Callable, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
@@ -481,16 +519,8 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
     args = tuple(defer(a) for a in args)
-    ndim = builtins.max([arg.ndim for arg in args])
-    shape = tuple(
-        builtins.max(
-            [
-                arg.shape[i - ndim + arg.ndim] if i - ndim + arg.ndim >= 0 else 1
-                for arg in args
-            ]
-        )
-        for i in range(ndim)
-    )
+    shape = _broadcast_shape(*args)
+    ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs = []
     for arg in args:
@@ -637,6 +667,17 @@ def is_broadcastable(shape_a, shape_b):
     """
     for a, b in zip_longest(reversed(shape_a), reversed(shape_b), fillvalue=1):
         if a != b and a != 1 and b != 1:
+            return False
+    return True
+
+
+def is_broadcastable_directional(shape_a, shape_b):
+    """
+    Returns True if shape_a is broadcastable to shape_b according to numpy rules.
+    This is a directional check, so it allows only shape_a to be changed
+    """
+    for a, b in zip_longest(reversed(shape_a), reversed(shape_b), fillvalue=1):
+        if a != b and a != 1:
             return False
     return True
 
@@ -855,6 +896,80 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         multiply(conjugate(x1), x2),
         axis=axis,
     )
+
+
+# Manipulation functions
+def first(*args):
+    """
+    Returns the first argument passed to it.
+    """
+    return args[0] if args else None
+
+
+register_property(
+    first,
+    "__call__",
+    "return_type",
+    # args[0] is the function name
+    lambda *args: args[1],
+)
+
+
+def broadcast_to(tensor: LazyTensor, /, shape: tuple[int, ...]) -> LazyTensor:
+    """
+    Broadcasts a lazy tensor to a specified shape.
+
+    Args:
+        tensor: The lazy tensor to broadcast.
+        shape: The target shape to broadcast to.
+
+    Returns:
+        A new lazy tensor with the specified shape.
+    """
+    from .eager import EagerTensor
+
+    class NoneArray(EagerTensor):
+        def __init__(self, shape):
+            self.shape = shape
+            self.fill_value = None
+            self.element_type = None
+            self.dtype = None
+
+        @property
+        def ndim(self):
+            return len(self.shape)
+
+        def __getitem__(self, idxs):
+            return None
+
+    if not is_broadcastable_directional(tensor.shape, shape):
+        # If the tensor is already broadcastable to the shape, return it as is
+        raise ValueError(
+            f"Tensor with shape {tensor.shape} is not broadcastable "
+            f"to the shape {shape}"
+        )
+    # elementwise does not support zero-dimensional tensors, so we
+    # handle that case separately
+    if builtins.any(dim == 0 for dim in shape):
+        # If any dimension is zero, return an empty tensor
+        return LazyTensor(
+            # We need a better way to represent an empty tensor, for now we use
+            # an empty numpy array
+            Table(Immediate(np.empty(shape, dtype=element_type(tensor))), idxs=()),
+            shape,
+            None,
+            element_type(tensor),
+        )
+
+    return elementwise(first, tensor, NoneArray(shape))
+
+
+def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
+    """
+    Broadcasts one or more arrays against one another.
+    """
+    shape = _broadcast_shape(*arrays)
+    return tuple(broadcast_to(arr, shape) for arr in arrays)
 
 
 def sin(x) -> LazyTensor:
