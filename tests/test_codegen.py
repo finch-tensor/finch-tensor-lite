@@ -282,3 +282,64 @@ def test_if_statement(compiler, buffer):
     expected = interp.if_else()
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), NumpyBuffer),
+    ],
+)
+def test_codegen_symbolic(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    buf = buffer(a)
+
+    a_var = asm.Variable("a", buf.format)
+    i_var = asm.Variable("i", int)
+    length_var = asm.Variable("l", int)
+    a_ref = asm.Reference("ar", buf.format)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("test_function", int),
+                (a_var,),
+                asm.Block(
+                    (
+                        asm.Symbolify(
+                            a_ref, a_var
+                        ),
+                        asm.Assign(length_var, asm.Length(a_ref)),
+                        asm.Resize(
+                            a_ref,
+                            asm.Call(
+                                asm.Literal(operator.mul),
+                                (asm.Length(a_ref), asm.Literal(2)),
+                            ),
+                        ),
+                        asm.ForLoop(
+                            i_var,
+                            asm.Literal(0),
+                            length_var,
+                            asm.Store(
+                                a_ref,
+                                asm.Call(
+                                    asm.Literal(operator.add), (i_var, length_var)
+                                ),
+                                asm.Call(
+                                    asm.Literal(operator.add),
+                                    (asm.Load(a_ref, i_var), asm.Literal(1)),
+                                ),
+                            ),
+                        ),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+    mod = compiler(prgm)
+    f = mod.test_function
+    f(buf)
+    result = buf.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    assert_equal(result, expected)

@@ -585,7 +585,7 @@ class CContext(Context):
                 return obj.c_lower(self)
             case asm.Symbolic(obj) as ref:
                 return obj.c_lower(self)
-            case asm.Symbolify(asm.Variable(var_n, var_t), val):
+            case asm.Symbolify(asm.Reference(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
