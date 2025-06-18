@@ -92,8 +92,8 @@ class Symbolic(AssemblyExpression):
     """
     Represents a logical AST expression for a symbolic variable. Instead of
     holding an expression like Value does, symbolic variables hold a custom
-    object `obj`, which represents a set of expressions, variables, and
-    literals in the target language.
+    object `obj`, which represents a set of expressions, variables, and literals
+    in the target language.
 
     Attributes:
         obj: The object referencing symbolic variables defined in the target language.
@@ -105,6 +105,31 @@ class Symbolic(AssemblyExpression):
     def result_format(self):
         """Returns the type of the expression."""
         return self.obj.format
+
+
+
+@dataclass(eq=True, frozen=True)
+class Symbolify(AssemblyExpression):
+    """
+    Marks an assembly expression as worth converting into a symbolic. This node
+    returns a copy of the object, so modifications to the copy may not modify
+    the original.
+
+    Attributes:
+        arg: AssemblyExpression
+    """
+
+    arg: AssemblyExpression
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.arg.result_format
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.arg]
 
 
 @dataclass(eq=True, frozen=True)
