@@ -1,11 +1,13 @@
 from .eager import (
     EagerTensor,
+    Scalar,
     abs,
     acos,
     acosh,
     add,
     all,
     any,
+    asarray,
     asin,
     asinh,
     atan,
@@ -72,6 +74,7 @@ __all__ = [
     "max",
     "EagerTensor",
     "LazyTensor",
+    "Scalar",
     "matmul",
     "matrix_transpose",
     "bitwise_inverse",
@@ -101,4 +104,5 @@ __all__ = [
     "atan",
     "atanh",
     "atan2",
+    "asarray",
 ]

@@ -2,7 +2,12 @@ import builtins
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import Any
 
+import numpy as np
+
+from ..algebra import register_property
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
@@ -182,6 +187,42 @@ class EagerTensor(OverrideTensor, ABC):
             raise ValueError("Cannot convert non-scalar tensor to bool.")
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
+
+
+@dataclass
+class Scalar(EagerTensor):
+    val: Any
+
+    def __init__(self, val: Any):
+        self.val = val
+
+    @property
+    def shape(self):
+        return ()
+
+    @property
+    def ndim(self):
+        return 0
+
+    @property
+    def element_type(self):
+        return type(self.val)
+
+    def __getitem__(self, idx):
+        return self.val
+
+
+register_property(Scalar, "asarray", "__attr__", lambda x: np.asarray(x))
+register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
+register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
+register_property(lazy.LazyTensor, "asarray", "__attr__", lambda x: x)
+
+
+def asarray(arg):
+    try:
+        return lazy.asarray(arg)
+    except AttributeError:
+        return lazy.asarray(Scalar(arg))
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
