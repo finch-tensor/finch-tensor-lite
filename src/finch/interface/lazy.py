@@ -17,6 +17,8 @@ from ..algebra import (
     init_value,
     promote_max,
     promote_min,
+    query_property,
+    register_property,
     return_type,
 )
 from ..finch_logic import (
@@ -222,6 +224,29 @@ class LazyTensor(OverrideTensor):
         )
 
 
+register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
+register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
+
+
+def asarray(arg: Any) -> Any:
+    """Convert given argument and return np.asarray(arg) for the scalar type input.
+    If input argument is already array type, return unchanged.
+
+    Args:
+        arg: The object to be converted.
+
+    Returns:
+        The array type result of the given object.
+    """
+    if hasattr(arg, "asarray"):
+        return arg.asarray()
+
+    try:
+        return query_property(arg, "asarray", "__attr__")
+    except AttributeError:
+        return np.asarray(arg)
+
+
 def defer(arr) -> LazyTensor:
     """
     - defer(arr) -> LazyTensor:
@@ -237,6 +262,7 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
+    arr = asarray(arr)
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

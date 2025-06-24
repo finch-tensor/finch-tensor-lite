@@ -6,12 +6,14 @@ from .codegen import (
 from .interface import (
     EagerTensor,
     LazyTensor,
+    Scalar,
     abs,
     acos,
     acosh,
     add,
     all,
     any,
+    asarray,
     asin,
     asinh,
     atan,
@@ -81,6 +83,7 @@ __all__ = [
     "negative",
     "EagerTensor",
     "LazyTensor",
+    "Scalar",
     "fill_value",
     "element_type",
     "matmul",
@@ -120,4 +123,5 @@ __all__ = [
     "atan",
     "atanh",
     "atan2",
+    "asarray",
 ]
