@@ -107,7 +107,7 @@ class Symbolic(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Register(AssemblyExpression):
+class Slot(AssemblyExpression):
     """
     Represents a register to a symbolic object. Using a register in an
     expression creates a copy of the object.
@@ -127,18 +127,18 @@ class Register(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class ToSymbolic(AssemblyTree):
+class Unpack(AssemblyTree):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
-    corresponding `FromSymbolic` node is reached.
+    corresponding `Repack` node is reached.
 
     Attributes:
         lhs: The symbolic object to write to.
         rhs: The original object to read from.
     """
 
-    lhs: Register
+    lhs: Slot
     rhs: AssemblyExpression
 
     @property
@@ -148,7 +148,7 @@ class ToSymbolic(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class FromSymbolic(AssemblyTree):
+class Repack(AssemblyTree):
     """
     Registers updates from a symbolic object `rhs` with the original
     object `lhs`. The original object may now be accessed and modified.
@@ -159,7 +159,7 @@ class FromSymbolic(AssemblyTree):
     """
 
     lhs: AssemblyExpression
-    rhs: Register
+    rhs: Slot
 
     @property
     def children(self):

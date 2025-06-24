@@ -433,7 +433,7 @@ class CContext(Context):
         indent=0,
         headers=None,
         bindings=None,
-        registers=None,
+        slots=None,
         fptr=None,
         **kwargs,
     ):
@@ -441,16 +441,18 @@ class CContext(Context):
             headers = []
         if bindings is None:
             bindings = ScopedDict()
-        if registers is None:
-            registers = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
         self.headers = headers
         self._headerset = set(headers)
-        self.fptr = {}
+        if fptr is None:
+            fptr = {}
+        self.fptr = fptr
         self.bindings = bindings
-        self.registers = registers
+        self.slots = slots
 
     def add_header(self, header):
         if header not in self._headerset:
@@ -526,22 +528,22 @@ class CContext(Context):
         blk.headers = self.headers
         blk._headerset = self._headerset
         blk.bindings = self.bindings
-        blk.registers = self.registers
+        blk.slots = self.slots
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
         blk.bindings = self.bindings.scope()
-        blk.registers = self.registers.scope()
+        blk.slots = self.slots.scope()
         return blk
 
     def deref(self, node):
         match node:
-            case asm.Register(var_n, _):
-                var_o = self.registers.get(var_n)
+            case asm.Slot(var_n, _):
+                var_o = self.slots.get(var_n)
                 if var_o is None:
-                    raise ValueError(f"Register {var_n} not found in context")
+                    raise ValueError(f"Slot {var_n} not found in context")
                 return var_o
             case asm.Symbolic(val):
                 return val
@@ -578,23 +580,31 @@ class CContext(Context):
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
-            case asm.Register(var_n, _) as ref:
+            case asm.Slot(var_n, var_t) as ref:
                 obj = self.deref(ref)
                 if obj is None:
-                    raise ValueError(f"Register {var_n} not found in context")
-                return obj.c_lower(self)
-            case asm.Symbolic(obj) as ref:
-                return obj.c_lower(self)
-            case asm.ToSymbolic(asm.Register(var_n, var_t), val):
+                    raise ValueError(f"Slot {var_n} not found in context")
+                return var_t.c_lower(self, obj)
+            case asm.Symbolic(obj, var_t) as ref:
+                return var_t.c_lower(self, obj)
+            case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
-                if var_n in self.registers or var_n in self.bindings:
+                if var_n in self.slots or var_n in self.bindings:
                     raise KeyError(
-                        f"Variable {var_n} already exists in context, cannot ToSymbolic"
+                        f"Variable {var_n} already exists in context, cannot Unpack"
                     )
-                self.registers[var_n] = var_t.c_to_symbolic(self, val)
+                self.slots[var_n] = var_t.c_unpack(self, val)
                 return None
+            case asm.Repack(asm.Slot(var_n, var_t), val):
+                val_code = self(val)
+                if val.result_format != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if var_n not in self.slots:
+                    raise KeyError(
+                        f"Variable {var_n} not found in context, cannot Repack"
+                    )
             case asm.Load(buf, idx):
                 buf_s = self.deref(buf)
                 if buf_s is None:
@@ -781,7 +791,7 @@ class CSymbolicFormat(ABC):
     """
 
     @abstractmethod
-    def c_to_symbolic(self, ctx, lhs, rhs):
+    def c_unpack(self, ctx, lhs, rhs):
         """
         Convert a value to a symbolic representation in C. Returns a NamedTuple
         of unpacked variable names, etc. The `lhs` is the variable namespace to 
@@ -791,7 +801,7 @@ class CSymbolicFormat(ABC):
 
 
     @abstractmethod
-    def c_from_symbolic(self, ctx, lhs, rhs):
+    def c_repack(self, ctx, lhs, rhs):
         """
         Update an object based on a symbolic representation. The `rhs` is the
         symbolic representation to update from, and `lhs` is the object to update.

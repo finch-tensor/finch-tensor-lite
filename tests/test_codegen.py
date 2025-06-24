@@ -297,7 +297,7 @@ def test_codegen_symbolic(compiler, buffer):
     a_var = asm.Variable("a", buf.format)
     i_var = asm.Variable("i", int)
     length_var = asm.Variable("l", int)
-    a_ref = asm.Register("ar", buf.format)
+    a_ref = asm.Slot("ar", buf.format)
     prgm = asm.Module(
         (
             asm.Function(
@@ -305,7 +305,7 @@ def test_codegen_symbolic(compiler, buffer):
                 (a_var,),
                 asm.Block(
                     (
-                        asm.ToSymbolic(a_ref, a_var),
+                        asm.Unpack(a_ref, a_var),
                         asm.Assign(length_var, asm.Length(a_ref)),
                         asm.Resize(
                             a_ref,
@@ -329,7 +329,7 @@ def test_codegen_symbolic(compiler, buffer):
                                 ),
                             ),
                         ),
-                        asm.FromSymbolic(a_var, a_ref),
+                        asm.Repack(a_var, a_ref),
                         asm.Return(asm.Literal(0)),
                     )
                 ),
