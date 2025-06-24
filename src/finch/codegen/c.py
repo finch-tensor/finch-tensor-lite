@@ -781,15 +781,19 @@ class CSymbolicFormat(ABC):
     """
 
     @abstractmethod
-    def c_to_symbolic(self, ctx, value):
+    def c_to_symbolic(self, ctx, lhs, rhs):
         """
-        Convert a value to a symbolic representation in C.
+        Convert a value to a symbolic representation in C. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to 
+        assign to.
         """
         ...
 
+
     @abstractmethod
-    def c_from_symbolic(self, ctx, value, obj):
+    def c_from_symbolic(self, ctx, lhs, rhs):
         """
-        Convert a value to a symbolic representation in C.
+        Update an object based on a symbolic representation. The `rhs` is the
+        symbolic representation to update from, and `lhs` is the object to update.
         """
         ...
