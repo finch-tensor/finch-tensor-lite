@@ -433,7 +433,7 @@ class CContext(Context):
         indent=0,
         headers=None,
         bindings=None,
-        references=None,
+        registers=None,
         fptr=None,
         **kwargs,
     ):
@@ -441,8 +441,8 @@ class CContext(Context):
             headers = []
         if bindings is None:
             bindings = ScopedDict()
-        if references is None:
-            references = ScopedDict()
+        if registers is None:
+            registers = ScopedDict()
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
@@ -450,7 +450,7 @@ class CContext(Context):
         self._headerset = set(headers)
         self.fptr = {}
         self.bindings = bindings
-        self.references = references
+        self.registers = registers
 
     def add_header(self, header):
         if header not in self._headerset:
@@ -526,22 +526,22 @@ class CContext(Context):
         blk.headers = self.headers
         blk._headerset = self._headerset
         blk.bindings = self.bindings
-        blk.references = self.references
+        blk.registers = self.registers
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
         blk.bindings = self.bindings.scope()
-        blk.references = self.references.scope()
+        blk.registers = self.registers.scope()
         return blk
 
     def deref(self, node):
         match node:
-            case asm.Reference(var_n, _):
-                var_o = self.references.get(var_n)
+            case asm.Register(var_n, _):
+                var_o = self.registers.get(var_n)
                 if var_o is None:
-                    raise ValueError(f"Reference {var_n} not found in context")
+                    raise ValueError(f"Register {var_n} not found in context")
                 return var_o
             case asm.Symbolic(val):
                 return val
@@ -578,22 +578,22 @@ class CContext(Context):
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
-            case asm.Reference(var_n, _) as ref:
+            case asm.Register(var_n, _) as ref:
                 obj = self.deref(ref)
                 if obj is None:
-                    raise ValueError(f"Reference {var_n} not found in context")
+                    raise ValueError(f"Register {var_n} not found in context")
                 return obj.c_lower(self)
             case asm.Symbolic(obj) as ref:
                 return obj.c_lower(self)
-            case asm.ToSymbolic(asm.Reference(var_n, var_t), val):
+            case asm.ToSymbolic(asm.Register(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
-                if var_n in self.references or var_n in self.bindings:
+                if var_n in self.registers or var_n in self.bindings:
                     raise KeyError(
                         f"Variable {var_n} already exists in context, cannot ToSymbolic"
                     )
-                self.references[var_n] = var_t.c_to_symbolic(self, val)
+                self.registers[var_n] = var_t.c_to_symbolic(self, val)
                 return None
             case asm.Load(buf, idx):
                 buf_s = self.deref(buf)

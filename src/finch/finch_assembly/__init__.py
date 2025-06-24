@@ -16,7 +16,7 @@ from .nodes import (
     Literal,
     Load,
     Module,
-    Reference,
+    Register,
     Resize,
     Return,
     Store,
@@ -54,5 +54,5 @@ __all__ = [
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "has_format",
-    "Reference",
+    "Register",
 ]

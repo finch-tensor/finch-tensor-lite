@@ -107,13 +107,13 @@ class Symbolic(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Reference(AssemblyExpression):
+class Register(AssemblyExpression):
     """
-    Represents a reference to a symbolic object. Using a reference in an
+    Represents a register to a symbolic object. Using a register in an
     expression creates a copy of the object.
 
     Attributes:
-        name: The name of the symbolic object to reference.
+        name: The name of the symbolic object to register.
         type: The type of the symbolic object.
     """
 
@@ -129,7 +129,7 @@ class Reference(AssemblyExpression):
 @dataclass(eq=True, frozen=True)
 class ToSymbolic(AssemblyTree):
     """
-    Attempts to convert `rhs` into a symbolic, which can be referenced with
+    Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
     corresponding `FromSymbolic` node is reached.
 
@@ -138,7 +138,7 @@ class ToSymbolic(AssemblyTree):
         rhs: The original object to read from.
     """
 
-    lhs: Reference
+    lhs: Register
     rhs: AssemblyExpression
 
     @property
@@ -159,7 +159,7 @@ class FromSymbolic(AssemblyTree):
     """
 
     lhs: AssemblyExpression
-    rhs: Reference
+    rhs: Register
 
     @property
     def children(self):

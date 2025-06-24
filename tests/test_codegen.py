@@ -297,7 +297,7 @@ def test_codegen_symbolic(compiler, buffer):
     a_var = asm.Variable("a", buf.format)
     i_var = asm.Variable("i", int)
     length_var = asm.Variable("l", int)
-    a_ref = asm.Reference("ar", buf.format)
+    a_ref = asm.Register("ar", buf.format)
     prgm = asm.Module(
         (
             asm.Function(

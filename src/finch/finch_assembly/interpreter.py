@@ -60,19 +60,19 @@ class AssemblyInterpreter:
     def __init__(
         self,
         bindings=None,
-        references=None,
+        registers=None,
         types=None,
         loop_state=None,
         function_state=None,
     ):
         if bindings is None:
             bindings = ScopedDict()
-        if references is None:
-            references = ScopedDict()
+        if registers is None:
+            registers = ScopedDict()
         if types is None:
             types = ScopedDict()
         self.bindings = bindings
-        self.references = references
+        self.registers = registers
         self.types = types
         self.loop_state = loop_state
         self.function_state = function_state
@@ -80,7 +80,7 @@ class AssemblyInterpreter:
     def scope(
         self,
         bindings=None,
-        references=None,
+        registers=None,
         types=None,
         loop_state=None,
         function_state=None,
@@ -91,8 +91,8 @@ class AssemblyInterpreter:
         """
         if bindings is None:
             bindings = self.bindings.scope()
-        if references is None:
-            references = self.references.scope()
+        if registers is None:
+            registers = self.registers.scope()
         if types is None:
             types = self.types.scope()
         if loop_state is None:
@@ -101,7 +101,7 @@ class AssemblyInterpreter:
             function_state = self.function_state
         return AssemblyInterpreter(
             bindings=bindings,
-            references=references,
+            registers=registers,
             types=types,
             loop_state=loop_state,
             function_state=function_state,
@@ -125,11 +125,11 @@ class AssemblyInterpreter:
             def_t = self.types[var_n]
             if def_t != var_t:
                 raise TypeError(
-                    f"Reference '{var_n}' is declared as type {def_t}, "
+                    f"Register '{var_n}' is declared as type {def_t}, "
                     f"but used as type {var_t}."
                 )
-        if var_n in self.references:
-            return self.references[var_n]
+        if var_n in self.registers:
+            return self.registers[var_n]
         raise KeyError(f"Variable '{var_n}' is not defined in the current context.")
 
     def __call__(self, prgm: asm.AssemblyNode):
@@ -152,7 +152,7 @@ class AssemblyInterpreter:
                 raise KeyError(
                     f"Variable '{var_n}' is not defined in the current context."
                 )
-            case asm.Reference(var_n, var_t):
+            case asm.Register(var_n, var_t):
                 return self.deref(var_n, var_t).copy()
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_e = self(val)
@@ -164,7 +164,7 @@ class AssemblyInterpreter:
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
                 return None
-            case asm.ToSymbolic(asm.Reference(var_n, var_t), val):
+            case asm.ToSymbolic(asm.Register(var_n, var_t), val):
                 val_e = self(val)
                 if not has_format(val_e, var_t):
                     raise TypeError(
@@ -173,13 +173,13 @@ class AssemblyInterpreter:
                     )
                 assert var_n not in self.types, (
                     f"Variable '{var_n}' is already defined in the current"
-                    f" context, cannot overwrite with reference."
+                    f" context, cannot overwrite with register."
                 )
                 self.types[var_n] = var_t
-                self.references[var_n] = val_e.copy()
+                self.registers[var_n] = val_e.copy()
                 val_e = self(val)
                 return None
-            case asm.FromSymbolic(val, asm.Reference(var_n, var_t)):
+            case asm.FromSymbolic(val, asm.Register(var_n, var_t)):
                 val_e = self(val)
                 if not has_format(val_e, var_t):
                     raise TypeError(
@@ -198,7 +198,7 @@ class AssemblyInterpreter:
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
                 match buf:
-                    case asm.Reference(buf_n, buf_t):
+                    case asm.Register(buf_n, buf_t):
                         buf_e = self.deref(buf_n, buf_t)
                     case _:
                         buf_e = self(buf)
@@ -208,7 +208,7 @@ class AssemblyInterpreter:
                 return None
             case asm.Resize(buf, len_):
                 match buf:
-                    case asm.Reference(buf_n, buf_t):
+                    case asm.Register(buf_n, buf_t):
                         buf_e = self.deref(buf_n, buf_t)
                     case _:
                         buf_e = self(buf)
