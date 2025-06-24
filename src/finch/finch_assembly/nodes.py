@@ -127,18 +127,39 @@ class Reference(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolify(AssemblyTree):
+class ToSymbolic(AssemblyTree):
     """
-    Marks an assembly expression `rhs` as worth converting into a symbolic,
-    which can be referenced with `lhs`. This node returns a copy of the object,
-    so modifications to the copy may not modify the original.
+    Attempts to convert `rhs` into a symbolic, which can be referenced with
+    `lhs`. The original object must not be accessed or modified until the
+    corresponding `FromSymbolic` node is reached.
 
     Attributes:
-        arg: AssemblyExpression
+        lhs: The symbolic object to write to.
+        rhs: The original object to read from.
     """
 
     lhs: Reference
-    arg: AssemblyExpression
+    rhs: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class FromSymbolic(AssemblyTree):
+    """
+    Registers updates from a symbolic object `rhs` with the original
+    object `lhs`. The original object may now be accessed and modified.
+
+    Attributes:
+        lhs: The original object to update.
+        rhs: The symbolic object to read from.
+    """
+
+    lhs: AssemblyExpression
+    rhs: Reference
 
     @property
     def children(self):

@@ -305,7 +305,7 @@ def test_codegen_symbolic(compiler, buffer):
                 (a_var,),
                 asm.Block(
                     (
-                        asm.Symbolify(a_ref, a_var),
+                        asm.ToSymbolic(a_ref, a_var),
                         asm.Assign(length_var, asm.Length(a_ref)),
                         asm.Resize(
                             a_ref,
@@ -329,6 +329,7 @@ def test_codegen_symbolic(compiler, buffer):
                                 ),
                             ),
                         ),
+                        asm.FromSymbolic(a_var, a_ref),
                         asm.Return(asm.Literal(0)),
                     )
                 ),

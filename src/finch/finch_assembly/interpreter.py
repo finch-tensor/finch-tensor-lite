@@ -164,9 +164,9 @@ class AssemblyInterpreter:
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
                 return None
-            case asm.Symbolify(asm.Reference(var_n, var_t), val):
+            case asm.ToSymbolic(asm.Reference(var_n, var_t), val):
                 val_e = self(val)
-                if not isinstance(val_e, var_t):
+                if not has_format(val_e, var_t):
                     raise TypeError(
                         f"Assigned value {val_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
@@ -178,6 +178,15 @@ class AssemblyInterpreter:
                 self.types[var_n] = var_t
                 self.references[var_n] = val_e.copy()
                 val_e = self(val)
+                return None
+            case asm.FromSymbolic(val, asm.Reference(var_n, var_t)):
+                val_e = self(val)
+                if not has_format(val_e, var_t):
+                    raise TypeError(
+                        f"Assigned value {val_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
+                    )
+                self.bindings[var_n] = val_e
                 return None
             case asm.Call(f, args):
                 f_e = self(f)
