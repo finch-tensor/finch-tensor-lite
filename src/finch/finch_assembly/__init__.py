@@ -15,6 +15,7 @@ from .nodes import (
     Literal,
     Load,
     Module,
+    Reference,
     Resize,
     Return,
     Store,
@@ -22,7 +23,6 @@ from .nodes import (
     Symbolify,
     Variable,
     WhileLoop,
-    Reference,
 )
 
 __all__ = [
