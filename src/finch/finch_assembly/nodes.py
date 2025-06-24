@@ -51,7 +51,7 @@ class AssemblyExpression(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Immediate(AssemblyExpression):
+class Literal(AssemblyExpression):
     """
     Represents the literal value `val`.
 
@@ -117,7 +117,7 @@ class Call(AssemblyExpression, AssemblyTree):
         args: The arguments to call on the function.
     """
 
-    op: Immediate
+    op: Literal
     args: tuple[AssemblyNode, ...]
 
     @property

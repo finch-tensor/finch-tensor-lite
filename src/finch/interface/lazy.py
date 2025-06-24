@@ -17,13 +17,15 @@ from ..algebra import (
     init_value,
     promote_max,
     promote_min,
+    query_property,
+    register_property,
     return_type,
 )
 from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Immediate,
+    Literal,
     LogicNode,
     MapJoin,
     Relabel,
@@ -222,6 +224,29 @@ class LazyTensor(OverrideTensor):
         )
 
 
+register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
+register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
+
+
+def asarray(arg: Any) -> Any:
+    """Convert given argument and return np.asarray(arg) for the scalar type input.
+    If input argument is already array type, return unchanged.
+
+    Args:
+        arg: The object to be converted.
+
+    Returns:
+        The array type result of the given object.
+    """
+    if hasattr(arg, "asarray"):
+        return arg.asarray()
+
+    try:
+        return query_property(arg, "asarray", "__attr__")
+    except AttributeError:
+        return np.asarray(arg)
+
+
 def defer(arr) -> LazyTensor:
     """
     - defer(arr) -> LazyTensor:
@@ -237,10 +262,11 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
+    arr = asarray(arr)
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    tns = Subquery(name, Table(Immediate(arr), idxs))
+    tns = Subquery(name, Table(Literal(arr), idxs))
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
 
 
@@ -441,8 +467,8 @@ def reduce(
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
     data: LogicNode = Aggregate(
-        Immediate(op),
-        Immediate(init),
+        Literal(op),
+        Literal(init),
         Relabel(x.data, fields),
         tuple(fields[i] for i in axis),
     )
@@ -505,7 +531,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Immediate(f), tuple(bargs)), idxs)
+    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)

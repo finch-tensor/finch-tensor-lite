@@ -1,5 +1,6 @@
 from .eager import (
     EagerTensor,
+    Scalar,
     abs,
     acos,
     acosh,
@@ -48,7 +49,7 @@ from .eager import (
 
 # from .tensor import *
 from .fuse import compute, fuse, fused
-from .lazy import LazyTensor, defer
+from .lazy import LazyTensor, asarray, defer
 
 __all__ = [
     "defer",
@@ -72,6 +73,7 @@ __all__ = [
     "max",
     "EagerTensor",
     "LazyTensor",
+    "Scalar",
     "matmul",
     "matrix_transpose",
     "bitwise_inverse",
@@ -101,4 +103,5 @@ __all__ = [
     "atan",
     "atanh",
     "atan2",
+    "asarray",
 ]

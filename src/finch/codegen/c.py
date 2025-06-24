@@ -533,7 +533,7 @@ class CContext(Context):
         lower the program to C code.
         """
         match prgm:
-            case asm.Immediate(value):
+            case asm.Literal(value):
                 # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
@@ -552,7 +552,7 @@ class CContext(Context):
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.Call(f, args):
-                assert isinstance(f, asm.Immediate)
+                assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
             case asm.Load(buf, idx):
                 return buf.result_format.c_load(self, buf, idx)
@@ -588,14 +588,14 @@ class CContext(Context):
                 idx = asm.Variable(
                     self.freshen(var.name + "_i"), buf.result_format.index_type()
                 )
-                start = asm.Immediate(0)
+                start = asm.Literal(0)
                 stop = asm.Call(
-                    asm.Immediate(operator.sub), (asm.Length(buf), asm.Immediate(1))
+                    asm.Literal(operator.sub), (asm.Length(buf), asm.Literal(1))
                 )
                 body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
-                if not isinstance(cond, asm.Immediate | asm.Variable):
+                if not isinstance(cond, asm.Literal | asm.Variable):
                     cond_var = asm.Variable(self.freshen("cond"), cond.result_format)
                     new_prgm = asm.Block(
                         (

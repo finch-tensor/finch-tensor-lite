@@ -10,7 +10,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     FinchLogicInterpreter,
-    Immediate,
+    Literal,
     MapJoin,
     Plan,
     Produces,
@@ -34,14 +34,12 @@ def test_matrix_multiplication(a, b):
 
     p = Plan(
         [
-            Query(Alias("A"), Table(Immediate(a), (i, k))),
-            Query(Alias("B"), Table(Immediate(b), (k, j))),
-            Query(Alias("AB"), MapJoin(Immediate(mul), (Alias("A"), Alias("B")))),
+            Query(Alias("A"), Table(Literal(a), (i, k))),
+            Query(Alias("B"), Table(Literal(b), (k, j))),
+            Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
             Query(
                 Alias("C"),
-                Reorder(
-                    Aggregate(Immediate(add), Immediate(0), Alias("AB"), (k,)), (i, j)
-                ),
+                Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
             ),
             Produces((Alias("C"),)),
         ]
