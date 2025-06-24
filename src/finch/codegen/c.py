@@ -772,3 +772,24 @@ class CBufferFormat(BufferFormat, ABC):
         Return C code which resizes a named buffer to the given length.
         """
         ...
+
+
+class CSymbolicFormat(ABC):
+    """
+    Abstract base class for symbolic formats in C. Symbolic formats must also
+    support other functions with symbolic inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def c_to_symbolic(self, ctx, value):
+        """
+        Convert a value to a symbolic representation in C.
+        """
+        ...
+
+    @abstractmethod
+    def c_from_symbolic(self, ctx, value, obj):
+        """
+        Convert a value to a symbolic representation in C.
+        """
+        ...
