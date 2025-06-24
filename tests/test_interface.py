@@ -1,8 +1,7 @@
 import operator
+import warnings
 
 import pytest
-
-import warnings
 
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal
