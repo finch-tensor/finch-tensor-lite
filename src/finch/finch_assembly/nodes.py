@@ -150,21 +150,19 @@ class Unpack(AssemblyTree):
 @dataclass(eq=True, frozen=True)
 class Repack(AssemblyTree):
     """
-    Registers updates from a symbolic object `rhs` with the original
-    object `lhs`. The original object may now be accessed and modified.
+    Registers updates from a symbolic object `val` with the original
+    object. The original object may now be accessed and modified.
 
     Attributes:
-        lhs: The original object to update.
-        rhs: The symbolic object to read from.
+        slot: The symbolic object to read from.
     """
 
-    lhs: AssemblyExpression
-    rhs: Slot
+    val: Slot
 
     @property
     def children(self):
         """Returns the children of the node."""
-        return [self.lhs, self.rhs]
+        return [self.val]
 
 
 @dataclass(eq=True, frozen=True)

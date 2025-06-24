@@ -545,7 +545,7 @@ class CContext(Context):
                 if var_o is None:
                     raise ValueError(f"Slot {var_n} not found in context")
                 return var_o
-            case asm.Symbolic(val):
+            case asm.Symbolic(val, _):
                 return val
             case _:
                 return None
@@ -583,7 +583,10 @@ class CContext(Context):
             case asm.Slot(var_n, var_t) as ref:
                 obj = self.deref(ref)
                 if obj is None:
-                    raise ValueError(f"Slot {var_n} not found in context")
+                    raise ValueError(
+                        f"Slot {var_n} not found in context, you must unpack into"
+                        f" a slot before using it"
+                    )
                 return var_t.c_lower(self, obj)
             case asm.Symbolic(obj, var_t) as ref:
                 return var_t.c_lower(self, obj)
@@ -591,44 +594,36 @@ class CContext(Context):
                 val_code = self(val)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
-                if var_n in self.slots or var_n in self.bindings:
+                if var_n in self.slots:
                     raise KeyError(
-                        f"Variable {var_n} already exists in context, cannot Unpack"
+                        f"Slot {var_n} already exists in context, cannot unpack"
                     )
-                self.slots[var_n] = var_t.c_unpack(self, val)
+                if var_n in self.bindings:
+                    raise KeyError(
+                        f"Variable '{var_n}' is already defined in the current"
+                        f" context, cannot overwrite with slot."
+                    )
+                var_t_code = self.ctype_name(c_type(var_t))
+                self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
+                self.bindings[var_n] = var_t
+                self.slots[var_n] = var_t.c_unpack(self, var_n)
                 return None
-            case asm.Repack(asm.Slot(var_n, var_t), val):
-                val_code = self(val)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
-                if var_n not in self.slots:
-                    raise KeyError(
-                        f"Variable {var_n} not found in context, cannot Repack"
-                    )
+            case asm.Repack(asm.Slot(var_n, var_t)):
+                if var_n not in self.slots or var_n not in self.bindings:
+                    raise KeyError(f"Slot {var_n} not found in context, cannot repack")
+                if var_t != self.bindings[var_n]:
+                    raise TypeError(f"Type mismatch: {var_t} != {self.bindings[var_n]}")
+                obj = self.slots[var_n]
+                var_t.c_repack(self, obj, var_n)
+                return None
             case asm.Load(buf, idx):
-                buf_s = self.deref(buf)
-                if buf_s is None:
-                    return buf.result_format.c_load(self, buf, idx)
-                return buf_s.c_load(self, buf, idx)
+                return buf.result_format.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                buf_s = self.deref(buf)
-                if buf_s is None:
-                    buf.result_format.c_store(self, buf, idx, val)
-                else:
-                    buf_s.c_store(self, buf, idx, val)
-                return None
+                return buf.result_format.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
-                buf_s = self.deref(buf)
-                if buf_s is None:
-                    buf.result_format.c_resize(self, buf, len)
-                else:
-                    buf_s.c_resize(self, buf, len)
-                return None
+                return buf.result_format.c_resize(self, buf, len)
             case asm.Length(buf):
-                buf_s = self.deref(buf)
-                if buf_s is None:
-                    return buf.result_format.c_length(self, buf)
-                return buf_s.c_length(self, buf)
+                return buf.result_format.c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -794,16 +789,23 @@ class CSymbolicFormat(ABC):
     def c_unpack(self, ctx, lhs, rhs):
         """
         Convert a value to a symbolic representation in C. Returns a NamedTuple
-        of unpacked variable names, etc. The `lhs` is the variable namespace to 
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
         assign to.
         """
         ...
-
 
     @abstractmethod
     def c_repack(self, ctx, lhs, rhs):
         """
         Update an object based on a symbolic representation. The `rhs` is the
         symbolic representation to update from, and `lhs` is the object to update.
+        """
+        ...
+
+    @abstractmethod
+    def c_lower(self, ctx, obj):
+        """
+        Convert an symbolic object to a normal C object. May create a copy of the
+        object.
         """
         ...

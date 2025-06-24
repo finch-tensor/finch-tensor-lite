@@ -120,18 +120,6 @@ class AssemblyInterpreter:
             and self.function_state.should_halt
         )
 
-    def deref(self, var_n: str, var_t: type):
-        if var_n in self.types:
-            def_t = self.types[var_n]
-            if def_t != var_t:
-                raise TypeError(
-                    f"Slot '{var_n}' is declared as type {def_t}, "
-                    f"but used as type {var_t}."
-                )
-        if var_n in self.slots:
-            return self.slots[var_n]
-        raise KeyError(f"Variable '{var_n}' is not defined in the current context.")
-
     def __call__(self, prgm: asm.AssemblyNode):
         """
         Run the program.
@@ -152,8 +140,6 @@ class AssemblyInterpreter:
                 raise KeyError(
                     f"Variable '{var_n}' is not defined in the current context."
                 )
-            case asm.Slot(var_n, var_t):
-                return self.deref(var_n, var_t).copy()
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_e = self(val)
                 if not isinstance(val_e, var_t):
@@ -164,6 +150,17 @@ class AssemblyInterpreter:
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
                 return None
+            case asm.Slot(var_n, var_t):
+                if var_n in self.types:
+                    def_t = self.types[var_n]
+                    if def_t != var_t:
+                        raise TypeError(
+                            f"Slot '{var_n}' is declared as type {def_t}, "
+                            f"but used as type {var_t}."
+                        )
+                if var_n in self.slots:
+                    return self.slots[var_n]
+                raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_e = self(val)
                 if not has_format(val_e, var_t):
@@ -173,20 +170,14 @@ class AssemblyInterpreter:
                     )
                 assert var_n not in self.types, (
                     f"Variable '{var_n}' is already defined in the current"
-                    f" context, cannot overwrite with register."
+                    f" context, cannot overwrite with slot."
                 )
                 self.types[var_n] = var_t
-                self.slots[var_n] = val_e.copy()
+                self.slots[var_n] = val_e
                 val_e = self(val)
                 return None
-            case asm.Repack(val, asm.Slot(var_n, var_t)):
-                val_e = self(val)
-                if not has_format(val_e, var_t):
-                    raise TypeError(
-                        f"Assigned value {val_e} is not of type {var_t} for "
-                        f"variable '{var_n}'."
-                    )
-                self.bindings[var_n] = val_e
+            case asm.Repack(slot):
+                self(slot)
                 return None
             case asm.Call(f, args):
                 f_e = self(f)
@@ -197,21 +188,13 @@ class AssemblyInterpreter:
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
-                match buf:
-                    case asm.Slot(buf_n, buf_t):
-                        buf_e = self.deref(buf_n, buf_t)
-                    case _:
-                        buf_e = self(buf)
+                buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
             case asm.Resize(buf, len_):
-                match buf:
-                    case asm.Slot(buf_n, buf_t):
-                        buf_e = self.deref(buf_n, buf_t)
-                    case _:
-                        buf_e = self(buf)
+                buf_e = self(buf)
                 len_e = self(len_)
                 buf_e.resize(len_e)
                 return None

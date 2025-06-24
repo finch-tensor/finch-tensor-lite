@@ -329,7 +329,7 @@ def test_codegen_symbolic(compiler, buffer):
                                 ),
                             ),
                         ),
-                        asm.Repack(a_var, a_ref),
+                        asm.Repack(a_ref),
                         asm.Return(asm.Literal(0)),
                     )
                 ),
