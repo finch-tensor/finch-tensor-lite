@@ -529,6 +529,7 @@ class CContext(Context):
         blk._headerset = self._headerset
         blk.bindings = self.bindings
         blk.slots = self.slots
+        blk.fptr = self.fptr
         return blk
 
     def subblock(self):
