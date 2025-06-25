@@ -588,9 +588,9 @@ class CContext(Context):
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
-            #case asm.Slot(var_n, var_t) as ref:
+            # case asm.Slot(var_n, var_t) as ref:
             #    return self(self.deref(ref))
-            #case asm.Symbolic(obj, var_t) as ref:
+            # case asm.Symbolic(obj, var_t) as ref:
             #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)

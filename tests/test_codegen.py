@@ -288,6 +288,7 @@ def test_if_statement(compiler, buffer):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumpyBuffer),
     ],
 )
 def test_codegen_symbolic(compiler, buffer):

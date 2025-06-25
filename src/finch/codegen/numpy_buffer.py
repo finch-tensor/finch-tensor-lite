@@ -175,17 +175,17 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
         t = ctx.ctype_name(c_type(self._dtype))
         ctx.exec(
             f"{ctx.feed}{t}* {data} = ({t}*){var_n}->data;\n"
-            f"{ctx.feed}size_t {length} = {var_n}->length;\n"
+            f"{ctx.feed}size_t {length} = {var_n}->length;"
         )
         return {"data": data, "length": length, "obj": var_n}
-    
+
     def c_repack(self, ctx, var_n, obj):
         """
         Repack the buffer from C context.
         """
         ctx.exec(
             f"{ctx.feed}{var_n}->data = (void*){obj['data']};\n"
-            f"{ctx.feed}{var_n}->length = {obj['length']};\n"
+            f"{ctx.feed}{var_n}->length = {obj['length']};"
         )
         return
 
@@ -197,18 +197,35 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
         return NumpyBuffer(self.arr)
 
     def numba_length(self, ctx, buf):
-        return f"len({ctx(buf)}[0])"
+        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        return f"len({arr})"
 
     def numba_load(self, ctx, buf, idx):
-        return f"{ctx(buf)}[0][{ctx(idx)}]"
+        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        return f"{arr}[{ctx(idx)}]"
 
     def numba_store(self, ctx, buf, idx, val):
-        ctx.exec(f"{ctx.feed}{ctx(buf)}[0][{ctx(idx)}] = {ctx(val)}")
+        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
 
     def numba_resize(self, ctx, buf, new_len):
-        ctx.exec(
-            f"{ctx.feed}{ctx(buf)}[0] = numpy.resize({ctx(buf)}[0], {ctx(new_len)})"
-        )
+        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
+
+    def numba_unpack(self, ctx, var_n):
+        """
+        Unpack the buffer into Numba context.
+        """
+        arr = ctx.freshen(var_n, "arr")
+        ctx.exec(f"{ctx.feed}{arr} = {var_n}[0]")
+        return {"arr": arr, "obj": var_n}
+
+    def numba_repack(self, ctx, var_n, obj):
+        """
+        Repack the buffer from Numba context.
+        """
+        ctx.exec(f"{ctx.feed}{var_n}[0] = {obj['arr']}")
+        return
 
     def construct_from_numba(self, numba_buffer):
         """
