@@ -90,20 +90,21 @@ class Variable(AssemblyExpression):
 @dataclass(eq=True, frozen=True)
 class Symbolic(AssemblyExpression):
     """
-    A logical AST expression representing an object using a custom
-    class `val`, which represents a set of expressions, variables, and literals
-    in the target language.
+    A logical AST expression representing an object using a set `obj` of
+    expressions, variables, and literals in the target language.
 
     Attributes:
-        val: The object referencing symbolic variables defined in the target language.
+        obj: The object referencing symbolic variables defined in the target language.
+        type: The type of the symbolic object.
     """
 
-    val: Any
+    obj: Any
+    type: Any
 
     @property
     def result_format(self):
         """Returns the type of the expression."""
-        return self.val.format
+        return self.type
 
 
 @dataclass(eq=True, frozen=True)

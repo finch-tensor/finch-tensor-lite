@@ -138,13 +138,13 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
         return f"({t}*){ctx(buf)}->data"
 
     def c_load(self, ctx, buf, idx):
-        return f"({self.c_data(buf)})[{ctx(idx)}]"
+        return f"({self.c_data(ctx, buf)})[{ctx(idx)}]"
 
     def c_store(self, ctx, buf, idx, value):
-        ctx.exec(f"{ctx.feed}({self.c_data(buf)})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({self.c_data(ctx, buf)})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf, new_len):
-        new_len = ctx(ctx.cache(new_len))
+        new_len = ctx(ctx.cache("len", new_len))
         if isinstance(buf, Symbolic):
             data = buf.obj["data"]
             length = buf.obj["length"]
@@ -178,7 +178,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
             f"{ctx.feed}size_t {length} = {var_n}->length;\n"
         )
         return {"data": data, "length": length, "obj": var_n}
-
+    
     def c_repack(self, ctx, var_n, obj):
         """
         Repack the buffer from C context.

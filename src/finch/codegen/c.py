@@ -541,9 +541,9 @@ class CContext(Context):
     def deref(self, node):
         match node:
             case asm.Slot(var_n, var_t):
-                var_o = self.slots.get(var_n)
-                if var_o is None:
+                if var_n not in self.slots:
                     raise ValueError(f"Slot {var_n} not found in context")
+                var_o = self.slots[var_n]
                 return asm.Symbolic(var_o, var_t)
             case _:
                 return node
@@ -555,9 +555,9 @@ class CContext(Context):
         if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
             return val
         var_n = self.freshen(name)
-        var_t = val.result_type
+        var_t = val.result_format
         var_t_code = self.ctype_name(c_type(var_t))
-        self.exec(f"{self.feed}{var_t_code} {var_n} = {self(val)}")
+        self.exec(f"{self.feed}{var_t_code} {var_n} = {self(val)};")
         return asm.Variable(var_n, var_t)
 
     def __call__(self, prgm: asm.AssemblyNode):
@@ -587,10 +587,10 @@ class CContext(Context):
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
-            case asm.Slot(var_n, var_t) as ref:
-                return self(self.deref(ref))
-            case asm.Symbolic(obj, var_t) as ref:
-                return var_t.c_lower(self, obj)
+            #case asm.Slot(var_n, var_t) as ref:
+            #    return self(self.deref(ref))
+            #case asm.Symbolic(obj, var_t) as ref:
+            #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
@@ -804,13 +804,5 @@ class CSymbolicFormat(ABC):
         """
         Update an object based on a symbolic representation. The `rhs` is the
         symbolic representation to update from, and `lhs` is the object to update.
-        """
-        ...
-
-    @abstractmethod
-    def c_lower(self, ctx, obj):
-        """
-        Convert an symbolic object to a normal C object. May create a copy of the
-        object.
         """
         ...
