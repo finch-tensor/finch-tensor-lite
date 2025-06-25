@@ -232,3 +232,5 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         Construct a NumpyBuffer from a Numba-compatible object.
         """
         return NumpyBuffer(numba_buffer[0])
+
+class NumpyBufferOnCStack(asm.OnStack, 
