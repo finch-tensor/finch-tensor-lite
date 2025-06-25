@@ -110,7 +110,15 @@ class NumbaCompiler:
         ctx(prgm)
         numba_code = ctx.emit_global()
         logger.info(f"Executing Numba code:\n{numba_code}")
-        exec(numba_code, globals(), None)
+        try:
+            exec(numba_code, globals(), None)
+        except Exception as e:
+            logger.error(
+                f"Numba compilation failed on the following code:\n"
+                f"{numba_code}\n"
+                f"Error message: {e}"
+            )
+            raise e
 
         kernels = {}
         for func in prgm.funcs:
@@ -128,15 +136,18 @@ class NumbaCompiler:
 
 
 class NumbaContext(Context):
-    def __init__(self, tab="    ", indent=0, bindings=None):
+    def __init__(self, tab="    ", indent=0, bindings=None, slots=None):
         if bindings is None:
             bindings = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
 
         super().__init__()
 
         self.tab = tab
         self.indent = indent
         self.bindings = bindings
+        self.slots = slots
 
         self.imports = [
             "import _operator, builtins",
@@ -163,13 +174,33 @@ class NumbaContext(Context):
         blk.indent = self.indent
         blk.tab = self.tab
         blk.bindings = self.bindings
+        blk.slots = self.slots
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
         blk.bindings = self.bindings.scope()
+        blk.slots = self.slots.scope()
         return blk
+
+    def cache(self, name, val):
+        if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
+            return val
+        var_n = self.freshen(name)
+        var_t = val.result_format
+        self.exec(f"{self.feed}{var_n} = {self(val)}")
+        return asm.Variable(var_n, var_t)
+
+    def deref(self, node):
+        match node:
+            case asm.Slot(var_n, var_t):
+                if var_n not in self.slots:
+                    raise ValueError(f"Slot {var_n} not found in context")
+                var_o = self.slots[var_n]
+                return asm.Symbolic(var_o, var_t)
+            case _:
+                return node
 
     @staticmethod
     def full_name(val: Any) -> str:
@@ -197,16 +228,44 @@ class NumbaContext(Context):
                 return None
             case asm.Call(asm.Literal(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
-            case asm.Load(buffer, idx):
-                return buffer.result_format.numba_load(self, buffer, idx)
-            case asm.Store(buffer, idx, val):
-                buffer.result_format.numba_store(self, buffer, idx, val)
+            case asm.Unpack(asm.Slot(var_n, var_t), val):
+                if val.result_format != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if var_n in self.slots:
+                    raise KeyError(
+                        f"Slot {var_n} already exists in context, cannot unpack"
+                    )
+                if var_n in self.bindings:
+                    raise KeyError(
+                        f"Variable '{var_n}' is already defined in the current"
+                        f" context, cannot overwrite with slot."
+                    )
+                self.exec(f"{feed}{var_n} = {self(val)}")
+                self.bindings[var_n] = var_t
+                self.slots[var_n] = var_t.numba_unpack(self, var_n)
                 return None
-            case asm.Resize(buffer, size):
-                buffer.result_format.numba_resize(self, buffer, size)
+            case asm.Repack(asm.Slot(var_n, var_t)):
+                if var_n not in self.slots or var_n not in self.bindings:
+                    raise KeyError(f"Slot {var_n} not found in context, cannot repack")
+                if var_t != self.bindings[var_n]:
+                    raise TypeError(f"Type mismatch: {var_t} != {self.bindings[var_n]}")
+                obj = self.slots[var_n]
+                var_t.numba_repack(self, var_n, obj)
                 return None
-            case asm.Length(buffer):
-                return buffer.result_format.numba_length(self, buffer)
+            case asm.Load(buf, idx):
+                buf = self.cache("buf", self.deref(buf))
+                return buf.result_format.numba_load(self, buf, idx)
+            case asm.Store(buf, idx, val):
+                buf = self.cache("buf", self.deref(buf))
+                buf.result_format.numba_store(self, buf, idx, val)
+                return None
+            case asm.Resize(buf, size):
+                buf = self.cache("buf", self.deref(buf))
+                buf.result_format.numba_resize(self, buf, size)
+                return None
+            case asm.Length(buf):
+                buf = self.cache("buf", self.deref(buf))
+                return buf.result_format.numba_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -223,7 +282,7 @@ class NumbaContext(Context):
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}\n")
                 return None
-            case asm.BufferLoop(buffer, var, body):
+            case asm.BufferLoop(buf, var, body):
                 raise NotImplementedError
             case asm.WhileLoop(cond, body):
                 cond_code = self(cond)
@@ -291,3 +350,27 @@ class NumbaContext(Context):
                 return None
             case _:
                 raise NotImplementedError
+
+
+class NumbaSymbolicFormat(ABC):
+    """
+    Abstract base class for symbolic formats in Numba. Symbolic formats must also
+    support other functions with symbolic inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def numba_unpack(self, ctx, lhs, rhs):
+        """
+        Convert a value to a symbolic representation in Numba. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
+        """
+        ...
+
+    @abstractmethod
+    def numba_repack(self, ctx, lhs, rhs):
+        """
+        Update an object based on a symbolic representation. The `rhs` is the
+        symbolic representation to update from, and `lhs` is the object to update.
+        """
+        ...

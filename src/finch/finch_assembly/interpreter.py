@@ -57,23 +57,42 @@ class AssemblyInterpreter:
     An interpreter for FinchAssembly.
     """
 
-    def __init__(self, bindings=None, types=None, loop_state=None, function_state=None):
+    def __init__(
+        self,
+        bindings=None,
+        slots=None,
+        types=None,
+        loop_state=None,
+        function_state=None,
+    ):
         if bindings is None:
             bindings = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
         if types is None:
             types = ScopedDict()
         self.bindings = bindings
+        self.slots = slots
         self.types = types
         self.loop_state = loop_state
         self.function_state = function_state
 
-    def scope(self, bindings=None, types=None, loop_state=None, function_state=None):
+    def scope(
+        self,
+        bindings=None,
+        slots=None,
+        types=None,
+        loop_state=None,
+        function_state=None,
+    ):
         """
         Create a new scope for the interpreter.
         This allows for nested scopes and variable shadowing.
         """
         if bindings is None:
             bindings = self.bindings.scope()
+        if slots is None:
+            slots = self.slots.scope()
         if types is None:
             types = self.types.scope()
         if loop_state is None:
@@ -82,6 +101,7 @@ class AssemblyInterpreter:
             function_state = self.function_state
         return AssemblyInterpreter(
             bindings=bindings,
+            slots=slots,
             types=types,
             loop_state=loop_state,
             function_state=function_state,
@@ -129,6 +149,35 @@ class AssemblyInterpreter:
                     )
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
+                return None
+            case asm.Slot(var_n, var_t):
+                if var_n in self.types:
+                    def_t = self.types[var_n]
+                    if def_t != var_t:
+                        raise TypeError(
+                            f"Slot '{var_n}' is declared as type {def_t}, "
+                            f"but used as type {var_t}."
+                        )
+                if var_n in self.slots:
+                    return self.slots[var_n]
+                raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
+            case asm.Unpack(asm.Slot(var_n, var_t), val):
+                val_e = self(val)
+                if not has_format(val_e, var_t):
+                    raise TypeError(
+                        f"Assigned value {val_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
+                    )
+                assert var_n not in self.types, (
+                    f"Variable '{var_n}' is already defined in the current"
+                    f" context, cannot overwrite with slot."
+                )
+                self.types[var_n] = var_t
+                self.slots[var_n] = val_e
+                val_e = self(val)
+                return None
+            case asm.Repack(slot):
+                self(slot)
                 return None
             case asm.Call(f, args):
                 f_e = self(f)
@@ -266,6 +315,10 @@ class AssemblyInterpreter:
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterModule(self, kernels)
+            case asm.Symbolic(val):
+                raise NotImplementedError(
+                    "AssemblyInterpreter does not support symbolic, no target language"
+                )
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"
