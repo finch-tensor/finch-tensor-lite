@@ -7,7 +7,7 @@ from itertools import accumulate, zip_longest
 from typing import Any
 
 import numpy as np
-from numpy.core.numeric import normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_tuple
 
 from ..algebra import conjugate as conj
 from ..algebra import (
