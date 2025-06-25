@@ -540,18 +540,25 @@ class CContext(Context):
 
     def deref(self, node):
         match node:
-            case asm.Slot(var_n, _):
+            case asm.Slot(var_n, var_t):
                 var_o = self.slots.get(var_n)
                 if var_o is None:
                     raise ValueError(f"Slot {var_n} not found in context")
-                return var_o
-            case asm.Symbolic(val, _):
-                return val
+                return asm.Symbolic(var_o, var_t)
             case _:
-                return None
+                return node
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
+
+    def cache(self, name, val):
+        if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
+            return val
+        var_n = self.freshen(name)
+        var_t = val.result_type
+        var_t_code = self.ctype_name(c_type(var_t))
+        self.exec(f"{self.feed}{var_t_code} {var_n} = {self(val)}")
+        return asm.Variable(var_n, var_t)
 
     def __call__(self, prgm: asm.AssemblyNode):
         feed = self.feed
@@ -581,13 +588,7 @@ class CContext(Context):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
             case asm.Slot(var_n, var_t) as ref:
-                obj = self.deref(ref)
-                if obj is None:
-                    raise ValueError(
-                        f"Slot {var_n} not found in context, you must unpack into"
-                        f" a slot before using it"
-                    )
-                return var_t.c_lower(self, obj)
+                return self(self.deref(ref))
             case asm.Symbolic(obj, var_t) as ref:
                 return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
@@ -614,15 +615,19 @@ class CContext(Context):
                 if var_t != self.bindings[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.bindings[var_n]}")
                 obj = self.slots[var_n]
-                var_t.c_repack(self, obj, var_n)
+                var_t.c_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
+                buf = self.cache("buf", self.deref(buf))
                 return buf.result_format.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
+                buf = self.cache("buf", self.deref(buf))
                 return buf.result_format.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
+                buf = self.cache("buf", self.deref(buf))
                 return buf.result_format.c_resize(self, buf, len)
             case asm.Length(buf):
+                buf = self.cache("buf", self.deref(buf))
                 return buf.result_format.c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()

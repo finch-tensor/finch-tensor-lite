@@ -2,8 +2,10 @@ import ctypes
 
 import numpy as np
 
+from finch.finch_assembly.nodes import Symbolic
+
 from ..finch_assembly import Buffer
-from .c import CArgument, CBufferFormat, c_type
+from .c import CArgument, CBufferFormat, CSymbolicFormat, c_type
 from .numba_backend import NumbaArgument, NumbaBufferFormat
 
 
@@ -84,7 +86,7 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         return
 
 
-class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
+class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
     """
     A format for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFormat class.
@@ -125,25 +127,67 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
         return ctypes.POINTER(CNumpyBuffer)
 
     def c_length(self, ctx, buf):
+        if isinstance(buf, Symbolic):
+            return buf.obj["length"]
         return f"{ctx(buf)}->length"
 
-    def c_load(self, ctx, buf, idx):
+    def c_data(self, ctx, buf):
+        if isinstance(buf, Symbolic):
+            return buf.obj["data"]
         t = ctx.ctype_name(c_type(self._dtype))
-        return f"(({t}*){ctx(buf)}->data)[{ctx(idx)}]"
+        return f"({t}*){ctx(buf)}->data"
+
+    def c_load(self, ctx, buf, idx):
+        return f"({self.c_data(buf)})[{ctx(idx)}]"
 
     def c_store(self, ctx, buf, idx, value):
-        data = f"{ctx(buf)}->data"
-        t = ctx.ctype_name(c_type(self._dtype))
-        ctx.exec(f"{ctx.feed}(({t}*){data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({self.c_data(buf)})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf, new_len):
-        data = f"{ctx(buf)}->data"
-        arr = f"{ctx(buf)}->arr"
-        length = f"{ctx(buf)}->length"
+        new_len = ctx(ctx.cache(new_len))
+        if isinstance(buf, Symbolic):
+            data = buf.obj["data"]
+            length = buf.obj["length"]
+            obj = buf.obj["obj"]
+            t = ctx.ctype_name(c_type(self._dtype))
+            ctx.exec(
+                f"{ctx.feed}{data} = ({t}*){obj}->resize(&{obj}->arr, {new_len});\n"
+                f"{ctx.feed}{length} = {new_len};"
+            )
+        else:
+            # If buf is not symbolic, we can directly access its attributes
+            data = f"{ctx(buf)}->data"
+            length = f"{ctx(buf)}->length"
+            resize = f"{ctx(buf)}->resize"
+            arr = f"{ctx(buf)}->arr"
+            ctx.exec(
+                f"{ctx.feed}{data} = {resize}(&{arr}, {new_len});\n"
+                f"{ctx.feed}{length} = {new_len};"
+            )
+        return
+
+    def c_unpack(self, ctx, var_n):
+        """
+        Unpack the buffer into C context.
+        """
+        data = ctx.freshen(var_n, "data")
+        length = ctx.freshen(var_n, "length")
+        t = ctx.ctype_name(c_type(self._dtype))
         ctx.exec(
-            f"{ctx.feed}{data} = {ctx(buf)}->resize(&{arr}, {ctx(new_len)});\n"
-            f"{ctx.feed}{length} = {ctx(new_len)};"
+            f"{ctx.feed}{t}* {data} = ({t}*){var_n}->data;\n"
+            f"{ctx.feed}size_t {length} = {var_n}->length;\n"
         )
+        return {"data": data, "length": length, "obj": var_n}
+
+    def c_repack(self, ctx, var_n, obj):
+        """
+        Repack the buffer from C context.
+        """
+        ctx.exec(
+            f"{ctx.feed}{var_n}->data = (void*){obj['data']};\n"
+            f"{ctx.feed}{var_n}->length = {obj['length']};\n"
+        )
+        return
 
     def construct_from_c(self, c_buffer):
         """
