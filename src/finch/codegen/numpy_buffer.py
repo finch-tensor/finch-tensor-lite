@@ -2,10 +2,10 @@ import ctypes
 
 import numpy as np
 
-from finch.finch_assembly.nodes import Symbolic
+from finch.finch_assembly.nodes import Stack
 
 from ..finch_assembly import Buffer
-from .c import CArgument, CBufferFormat, CSymbolicFormat, c_type
+from .c import CArgument, CBufferFormat, CStackFormat, c_type
 from .numba_backend import NumbaArgument, NumbaBufferFormat
 
 
@@ -86,7 +86,7 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         return
 
 
-class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
+class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
     """
     A format for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFormat class.
@@ -127,12 +127,12 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
         return ctypes.POINTER(CNumpyBuffer)
 
     def c_length(self, ctx, buf):
-        if isinstance(buf, Symbolic):
+        if isinstance(buf, Stack):
             return buf.obj["length"]
         return f"{ctx(buf)}->length"
 
     def c_data(self, ctx, buf):
-        if isinstance(buf, Symbolic):
+        if isinstance(buf, Stack):
             return buf.obj["data"]
         t = ctx.ctype_name(c_type(self._dtype))
         return f"({t}*){ctx(buf)}->data"
@@ -145,7 +145,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
 
     def c_resize(self, ctx, buf, new_len):
         new_len = ctx(ctx.cache("len", new_len))
-        if isinstance(buf, Symbolic):
+        if isinstance(buf, Stack):
             data = buf.obj["data"]
             length = buf.obj["length"]
             obj = buf.obj["obj"]
@@ -197,19 +197,19 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CSymbolicFormat):
         return NumpyBuffer(self.arr)
 
     def numba_length(self, ctx, buf):
-        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        arr = buf.obj["arr"] if isinstance(buf, Stack) else f"{ctx(buf)}[0]"
         return f"len({arr})"
 
     def numba_load(self, ctx, buf, idx):
-        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        arr = buf.obj["arr"] if isinstance(buf, Stack) else f"{ctx(buf)}[0]"
         return f"{arr}[{ctx(idx)}]"
 
     def numba_store(self, ctx, buf, idx, val):
-        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        arr = buf.obj["arr"] if isinstance(buf, Stack) else f"{ctx(buf)}[0]"
         ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
 
     def numba_resize(self, ctx, buf, new_len):
-        arr = buf.obj["arr"] if isinstance(buf, Symbolic) else f"{ctx(buf)}[0]"
+        arr = buf.obj["arr"] if isinstance(buf, Stack) else f"{ctx(buf)}[0]"
         ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
 
     def numba_unpack(self, ctx, var_n):

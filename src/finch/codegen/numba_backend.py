@@ -185,7 +185,7 @@ class NumbaContext(Context):
         return blk
 
     def cache(self, name, val):
-        if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
+        if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
         var_t = val.result_format
@@ -198,7 +198,7 @@ class NumbaContext(Context):
                 if var_n not in self.slots:
                     raise ValueError(f"Slot {var_n} not found in context")
                 var_o = self.slots[var_n]
-                return asm.Symbolic(var_o, var_t)
+                return asm.Stack(var_o, var_t)
             case _:
                 return node
 
@@ -352,9 +352,9 @@ class NumbaContext(Context):
                 raise NotImplementedError
 
 
-class NumbaSymbolicFormat(ABC):
+class NumbaStackFormat(ABC):
     """
-    Abstract base class for symbolic formats in Numba. Symbolic formats must also
+    Abstract base class for symbolic formats in Numba. Stack formats must also
     support other functions with symbolic inputs in addition to variable ones.
     """
 

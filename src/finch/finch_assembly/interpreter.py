@@ -315,7 +315,7 @@ class AssemblyInterpreter:
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterModule(self, kernels)
-            case asm.Symbolic(val):
+            case asm.Stack(val):
                 raise NotImplementedError(
                     "AssemblyInterpreter does not support symbolic, no target language"
                 )

@@ -545,7 +545,7 @@ class CContext(Context):
                 if var_n not in self.slots:
                     raise ValueError(f"Slot {var_n} not found in context")
                 var_o = self.slots[var_n]
-                return asm.Symbolic(var_o, var_t)
+                return asm.Stack(var_o, var_t)
             case _:
                 return node
 
@@ -553,7 +553,7 @@ class CContext(Context):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def cache(self, name, val):
-        if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
+        if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
         var_t = val.result_format
@@ -590,7 +590,7 @@ class CContext(Context):
                 return c_function_call(f.val, self, *args)
             # case asm.Slot(var_n, var_t) as ref:
             #    return self(self.deref(ref))
-            # case asm.Symbolic(obj, var_t) as ref:
+            # case asm.Stack(obj, var_t) as ref:
             #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
@@ -785,9 +785,9 @@ class CBufferFormat(BufferFormat, ABC):
         ...
 
 
-class CSymbolicFormat(ABC):
+class CStackFormat(ABC):
     """
-    Abstract base class for symbolic formats in C. Symbolic formats must also
+    Abstract base class for symbolic formats in C. Stack formats must also
     support other functions with symbolic inputs in addition to variable ones.
     """
 
