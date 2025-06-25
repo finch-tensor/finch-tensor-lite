@@ -1,5 +1,7 @@
-from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
 
 @dataclass
 class Thunk:
@@ -7,14 +9,17 @@ class Thunk:
     body: Any = None
     epilogue: Any = None
 
+
 @dataclass
 class Switch:
     cases: Any
+
 
 @dataclass
 class Case:
     cond: Any
     body: Any
+
 
 @dataclass
 class Stepper:
@@ -23,24 +28,31 @@ class Stepper:
     chunk: Any = None
     next: Callable = lambda ctx, ext: None
     body: Callable = lambda ctx, ext: None
-    seek: Callable = lambda ctx, start: (_ for _ in ()).throw(NotImplementedError("seek not implemented error"))
+    seek: Callable = lambda ctx, start: (_ for _ in ()).throw(
+        NotImplementedError("seek not implemented error")
+    )
+
 
 @dataclass
 class Spike:
     body: Any
     tail: Any
 
+
 @dataclass
 class Sequence:
     phases: Any
+
 
 @dataclass
 class Run:
     body: Any
 
+
 @dataclass
 class AcceptRun:
     body: Any
+
 
 @dataclass
 class Phase:
@@ -49,13 +61,16 @@ class Phase:
     stop: Callable = lambda ctx, ext: None
     range: Callable = lambda ctx, ext: None
 
+
 @dataclass
 class Null:
     pass
 
+
 @dataclass
 class Lookup:
     body: Any
+
 
 @dataclass
 class Jumper:
@@ -64,11 +79,15 @@ class Jumper:
     chunk: Any = None
     next: Callable = lambda ctx, ext: None
     body: Callable = lambda ctx, ext: None
-    seek: Callable = lambda ctx, start: (_ for _ in ()).throw(NotImplementedError("seek not implemented error"))
+    seek: Callable = lambda ctx, start: (_ for _ in ()).throw(
+        NotImplementedError("seek not implemented error")
+    )
+
 
 @dataclass
 class FillLeaf:
     body: Any
+
 
 @dataclass
 class ShortCircuitVisitor:

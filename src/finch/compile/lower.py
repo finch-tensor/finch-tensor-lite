@@ -1,9 +1,11 @@
-from ..symbolic import Context, ScopedDict, Rewrite, Fixpoint, PostWalk
-from ..import finch_notation as ntn
-from .. import finch_assembly as asm
-from ..algebra import query_property
-from . import looplets as lpl
 from typing import Any
+
+from .. import finch_assembly as asm
+from .. import finch_notation as ntn
+from ..algebra import query_property
+from ..symbolic import Context, ScopedDict
+from . import looplets as lpl
+
 
 def lower_unwrap(tns):
     """
@@ -95,17 +97,16 @@ class TensorViewFormat:
                         asm.Literal(TensorView),
                         tns,
                         asm.Immediate(op_2),
-                        asm.Call(asm.Immediate(tuple), idx)),
-                    TensorViewFormat(
-                        self.tns,
-                        (*self.idxs, idx.format),
-                        self.op
-                    )
+                        asm.Call(asm.Immediate(tuple), idx),
+                    ),
+                    TensorViewFormat(self.tns, (*self.idxs, idx.format), self.op),
                 )
             ),
         )
 
+
 from dataclasses import dataclass
+
 
 @dataclass(eq=True, frozen=True)
 class ExtentFormat:
@@ -117,17 +118,14 @@ class ExtentFormat:
         Lower a loop with the given index and body.
         This is used to compile the loop into assembly.
         """
+
         def rewrite(node):
             match node:
                 case ntn.Access(idx, ext, body):
-                    return asm.Loop(
-                        ctx(idx),
-                        ctx(ext.start),
-                        ctx(ext.end),
-                        ctx(body)
-                    )
+                    return asm.Loop(ctx(idx), ctx(ext.start), ctx(ext.end), ctx(body))
                 case _:
                     return node
+
 
 @dataclass(eq=True)
 class HaltState:
@@ -135,6 +133,7 @@ class HaltState:
     A class to represent the halt state of a notation program.
     These programs can't break, but calling return sets a special return value.
     """
+
     has_returned: bool = False
     return_var: Any = None
 
@@ -145,7 +144,14 @@ class NotationContext(Context):
     compilation process.
     """
 
-    def __init__(self, namespace=None, preamble=None, epilogue=None, bindings=None, func_state=None):
+    def __init__(
+        self,
+        namespace=None,
+        preamble=None,
+        epilogue=None,
+        bindings=None,
+        func_state=None,
+    ):
         super().__init__(namespace=namespace, preamble=preamble, epilogue=epilogue)
         if bindings is None:
             bindings = ScopedDict()
@@ -169,7 +175,7 @@ class NotationContext(Context):
         This is used to determine if the function has returned.
         """
         return self.func_state.has_returned
-    
+
     def __call__(self, prgm):
         """
         Lower Finch Notation to Finch Assembly. First we check for early
@@ -182,71 +188,75 @@ class NotationContext(Context):
             case ntn.Value(expr, type_):
                 return expr
             case ntn.Call(f, args):
-                f_e = ctx(f)
-                args_e = [ctx(arg) for arg in args]
+                f_e = self(f)
+                args_e = [self(arg) for arg in args]
                 return asm.Call(f_e, *args_e)
             case ntn.Assign(var, val):
-                ctx.exec(
-                    asm.Assign(
-                        ctx(var), ctx(val)
-                    )
-                )
+                self.exec(asm.Assign(self(var), self(val)))
+                return None
             case ntn.Variable(var_n, var_t):
                 return asm.Variable(var_n, var_t)
-            case ntn.Access(*_):
+            case ntn.Access(_):
                 raise NotImplementedError("Access should have been lowered already.")
             case ntn.Unwrap(tns):
-                return tns.format.lower_unwrap(ctx)
+                return tns.format.lower_unwrap(self)
             case ntn.Increment(tns, val):
-                val_e = ctx(val)
-                return tns.format.lower_increment(ctx, val_e)
+                val_e = self(val)
+                return tns.format.lower_increment(self, val_e)
             case ntn.Block(bodies):
                 for body in bodies:
-                    ctx(body)
+                    self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                ext.format.lower_loop(ctx, idx, body)
+                ext.format.lower_loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
-                init_e = ctx(init)
-                op_e = ctx(op)
-                shape_e = [ctx(s) for s in shape]
+                init_e = self(init)
+                op_e = self(op)
+                shape_e = [self(s) for s in shape]
                 return tns.format.lower_declare(init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
                 tns.format.lower_op
-                op_e = ctx(op)
+                op_e = self(op)
                 return tns.format.lower_freeze(op_e)
             case ntn.Thaw(tns, op):
-                tns_e = ctx(tns)
-                op_e = ctx(op)
+                tns_e = self(tns)
+                op_e = self(op)
                 return tns.format.lower_thaw(op_e)
             case ntn.If(cond, body):
-                ctx = ctx.block()
+                ctx = self.block()
                 ctx_2 = ctx.scope()
                 ctx_2(body)
                 ctx.exec(asm.If(ctx(cond), ctx_2.emit()))
+                return None
             case ntn.IfElse(cond, body, else_body):
-                ctx = ctx.block()
+                ctx = self.block()
                 ctx_2 = ctx.scope()
                 ctx_2(body)
                 ctx_3 = ctx.scope()
                 ctx_3(else_body)
                 ctx.exec(asm.IfElse(ctx(cond), ctx_2.emit(), ctx_3.emit()))
+                return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
-                ctx = ctx.scope()
+                ctx = self.scope()
                 ctx.func_state = HaltState()
                 ctx(body)
-                exec(asm.Function(
-                    asm.Variable(func_n, ret_t),
-                    [ctx(arg) for arg in args],
-                    ctx.scope()(body),
-                ))
+                exec(
+                    asm.Function(
+                        asm.Variable(func_n, ret_t),
+                        [ctx(arg) for arg in args],
+                        ctx.scope()(body),
+                    )
+                )
+                return None
             case ntn.Return(value):
-                if ctx.func_state is None:
+                if self.func_state is None:
                     raise ValueError("Return statement outside of function.")
-                ctx.exec(asm.Assign(ctx.func_state.return_var, ctx(value)))
+                self.exec(asm.Assign(self.func_state.return_var, self(value)))
+                return None
             case ntn.Module(funcs):
-                ctx = ctx.scope
+                ctx = self.scope()
                 for func in funcs:
                     ctx(func)
                 ctx.exec(asm.Module(ctx.emit()))
+                return None
