@@ -1,3 +1,5 @@
 from .compile import NotationContext
 
-__all__ = [NotationContext]
+__all__ = [
+    NotationContext,
+]
