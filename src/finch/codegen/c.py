@@ -539,15 +539,17 @@ class CContext(Context):
         blk.slots = self.slots.scope()
         return blk
 
-    def deref(self, node):
+    def resolve(self, node):
         match node:
             case asm.Slot(var_n, var_t):
-                if var_n not in self.slots:
-                    raise ValueError(f"Slot {var_n} not found in context")
-                var_o = self.slots[var_n]
-                return asm.Stack(var_o, var_t)
-            case _:
+                if var_n in self.slots:
+                    var_o = self.slots[var_n]
+                    return asm.Stack(var_o, var_t)
+                raise KeyError(f"Slot {var_n} not found in context")
+            case asm.Stack(_, _):
                 return node
+            case _:
+                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
@@ -619,16 +621,16 @@ class CContext(Context):
                 var_t.c_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_resize(self, buf, len)
             case asm.Length(buf):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()

@@ -184,21 +184,25 @@ class AssemblyInterpreter:
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
             case asm.Load(buf, idx):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
             case asm.Resize(buf, len_):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 len_e = self(len_)
                 buf_e.resize(len_e)
                 return None
             case asm.Length(buf):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 return buf_e.length()
             case asm.Block(bodies):

@@ -27,7 +27,10 @@ def test_dot_product(a, b):
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
     ab_v = asm.Variable("a", ab.format)
+    ab_slt = asm.Slot("a_", ab.format)
     bb_v = asm.Variable("b", bb.format)
+    bb_slt = asm.Slot("b_", bb.format)
+
     mod = AssemblyInterpreter()(
         asm.Module(
             (
@@ -40,10 +43,12 @@ def test_dot_product(a, b):
                     asm.Block(
                         (
                             asm.Assign(c, asm.Literal(np.float64(0.0))),
+                            asm.Unpack(ab_slt, ab_v),
+                            asm.Unpack(bb_slt, bb_v),
                             asm.ForLoop(
                                 i,
                                 asm.Literal(np.int64(0)),
-                                asm.Length(ab_v),
+                                asm.Length(ab_slt),
                                 asm.Block(
                                     (
                                         asm.Assign(
@@ -55,8 +60,8 @@ def test_dot_product(a, b):
                                                     asm.Call(
                                                         asm.Literal(operator.mul),
                                                         (
-                                                            asm.Load(ab_v, i),
-                                                            asm.Load(bb_v, i),
+                                                            asm.Load(ab_slt, i),
+                                                            asm.Load(bb_slt, i),
                                                         ),
                                                     ),
                                                 ),
@@ -65,6 +70,8 @@ def test_dot_product(a, b):
                                     )
                                 ),
                             ),
+                            asm.Repack(ab_slt),
+                            asm.Repack(bb_slt),
                             asm.Return(c),
                         )
                     ),

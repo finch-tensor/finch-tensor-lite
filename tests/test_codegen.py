@@ -84,16 +84,16 @@ def test_codegen(compiler, buffer):
     a_var = asm.Variable("a", buf.format)
     i_var = asm.Variable("i", int)
     length_var = asm.Variable("l", int)
-    a_slt = asm.Slot("as", buf.format)
+    a_slt = asm.Slot("a_", buf.format)
     prgm = asm.Module(
         (
             asm.Function(
                 asm.Variable("test_function", int),
                 (a_var,),
-                asm.Unpack(a_slt, a_var),
                 asm.Block(
                     (
-                        asm.Assign(length_var, asm.Length(a_var)),
+                        asm.Unpack(a_slt, a_var),
+                        asm.Assign(length_var, asm.Length(a_slt)),
                         asm.Resize(
                             a_slt,
                             asm.Call(
@@ -117,7 +117,6 @@ def test_codegen(compiler, buffer):
                             ),
                         ),
                         asm.Repack(a_slt),
-                        asm.Repack(b_slt),
                         asm.Return(asm.Literal(0)),
                     )
                 ),
@@ -171,7 +170,7 @@ def test_dot_product(compiler, buffer):
                         asm.ForLoop(
                             i,
                             asm.Literal(np.int64(0)),
-                            asm.Length(ab_v),
+                            asm.Length(ab_slt),
                             asm.Block(
                                 (
                                     asm.Assign(
