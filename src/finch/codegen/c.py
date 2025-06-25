@@ -539,21 +539,23 @@ class CContext(Context):
         blk.slots = self.slots.scope()
         return blk
 
-    def deref(self, node):
+    def resolve(self, node):
         match node:
             case asm.Slot(var_n, var_t):
-                if var_n not in self.slots:
-                    raise ValueError(f"Slot {var_n} not found in context")
-                var_o = self.slots[var_n]
-                return asm.Symbolic(var_o, var_t)
-            case _:
+                if var_n in self.slots:
+                    var_o = self.slots[var_n]
+                    return asm.Stack(var_o, var_t)
+                raise KeyError(f"Slot {var_n} not found in context")
+            case asm.Stack(_, _):
                 return node
+            case _:
+                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def cache(self, name, val):
-        if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
+        if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
         var_t = val.result_format
@@ -590,7 +592,7 @@ class CContext(Context):
                 return c_function_call(f.val, self, *args)
             # case asm.Slot(var_n, var_t) as ref:
             #    return self(self.deref(ref))
-            # case asm.Symbolic(obj, var_t) as ref:
+            # case asm.Stack(obj, var_t) as ref:
             #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
@@ -619,16 +621,16 @@ class CContext(Context):
                 var_t.c_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_resize(self, buf, len)
             case asm.Length(buf):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.c_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
@@ -785,9 +787,9 @@ class CBufferFormat(BufferFormat, ABC):
         ...
 
 
-class CSymbolicFormat(ABC):
+class CStackFormat(ABC):
     """
-    Abstract base class for symbolic formats in C. Symbolic formats must also
+    Abstract base class for symbolic formats in C. Stack formats must also
     support other functions with symbolic inputs in addition to variable ones.
     """
 

@@ -88,7 +88,7 @@ class Variable(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolic(AssemblyExpression):
+class Stack(AssemblyExpression):
     """
     A logical AST expression representing an object using a set `obj` of
     expressions, variables, and literals in the target language.
@@ -177,7 +177,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable | Symbolic
+    lhs: Variable | Stack
     rhs: AssemblyExpression
 
     @property

@@ -185,22 +185,24 @@ class NumbaContext(Context):
         return blk
 
     def cache(self, name, val):
-        if isinstance(val, asm.Literal | asm.Variable | asm.Symbolic):
+        if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
         var_t = val.result_format
         self.exec(f"{self.feed}{var_n} = {self(val)}")
         return asm.Variable(var_n, var_t)
 
-    def deref(self, node):
+    def resolve(self, node):
         match node:
             case asm.Slot(var_n, var_t):
-                if var_n not in self.slots:
-                    raise ValueError(f"Slot {var_n} not found in context")
-                var_o = self.slots[var_n]
-                return asm.Symbolic(var_o, var_t)
-            case _:
+                if var_n in self.slots:
+                    var_o = self.slots[var_n]
+                    return asm.Stack(var_o, var_t)
+                raise KeyError(f"Slot {var_n} not found in context")
+            case asm.Stack(_, _):
                 return node
+            case _:
+                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
 
     @staticmethod
     def full_name(val: Any) -> str:
@@ -253,18 +255,18 @@ class NumbaContext(Context):
                 var_t.numba_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.numba_load(self, buf, idx)
             case asm.Store(buf, idx, val):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 buf.result_format.numba_store(self, buf, idx, val)
                 return None
             case asm.Resize(buf, size):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 buf.result_format.numba_resize(self, buf, size)
                 return None
             case asm.Length(buf):
-                buf = self.cache("buf", self.deref(buf))
+                buf = self.resolve(buf)
                 return buf.result_format.numba_length(self, buf)
             case asm.Block(bodies):
                 ctx_2 = self.block()
@@ -280,7 +282,7 @@ class NumbaContext(Context):
                 ctx_2(body)
                 ctx_2.bindings[var.name] = var.result_format
                 body_code = ctx_2.emit()
-                self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}\n")
+                self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}")
                 return None
             case asm.BufferLoop(buf, var, body):
                 raise NotImplementedError
@@ -289,14 +291,14 @@ class NumbaContext(Context):
                 ctx_2 = self.subblock()
                 ctx_2(body)
                 body_code = ctx_2.emit()
-                self.exec(f"{feed}while {cond_code}:\n{body_code}\n")
+                self.exec(f"{feed}while {cond_code}:\n{body_code}")
                 return None
             case asm.If(cond, body):
                 cond_code = self(cond)
                 ctx_2 = self.subblock()
                 ctx_2(body)
                 body_code = ctx_2.emit()
-                self.exec(f"{feed}if {cond_code}:\n{body_code}\n")
+                self.exec(f"{feed}if {cond_code}:\n{body_code}")
                 return None
             case asm.IfElse(cond, body, else_body):
                 cond_code = self(cond)
@@ -307,8 +309,7 @@ class NumbaContext(Context):
                 ctx_3(else_body)
                 else_body_code = ctx_3.emit()
                 self.exec(
-                    f"{feed}if {cond_code}:\n{body_code}\n"
-                    f"{feed}else:\n{else_body_code}\n"
+                    f"{feed}if {cond_code}:\n{body_code}\n{feed}else:\n{else_body_code}"
                 )
                 return None
             case asm.Function(asm.Variable(func_name, return_t), args, body):
@@ -352,9 +353,9 @@ class NumbaContext(Context):
                 raise NotImplementedError
 
 
-class NumbaSymbolicFormat(ABC):
+class NumbaStackFormat(ABC):
     """
-    Abstract base class for symbolic formats in Numba. Symbolic formats must also
+    Abstract base class for symbolic formats in Numba. Stack formats must also
     support other functions with symbolic inputs in addition to variable ones.
     """
 

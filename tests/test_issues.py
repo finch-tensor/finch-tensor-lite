@@ -22,4 +22,4 @@ def test_issue_50():
     # If replaced above with below line, no error
     # n = finch.defer(np.array([[2, 2, 2, 2], [2, 2, 2, 2]]))
     o = finch.defer(np.array([[3, 3, 3, 3], [3, 3, 3, 3]]))
-    return finch.add(finch.add(finch.subtract(x, m), n), o)
+    finch.add(finch.add(finch.subtract(x, m), n), o)
