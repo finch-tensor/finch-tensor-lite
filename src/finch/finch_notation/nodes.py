@@ -276,7 +276,7 @@ class Assign(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Symbolic(NotationExpression):
+class Stack(NotationExpression):
     """
     A logical AST expression representing an object using a set `obj` of
     expressions, variables, and literals in the target language.

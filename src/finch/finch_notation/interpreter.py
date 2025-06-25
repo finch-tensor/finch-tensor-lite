@@ -443,7 +443,7 @@ class NotationInterpreter:
                                 f"Unrecognized function definition: {func}"
                             )
                 return NotationInterpreterModule(self, kernels)
-            case ntn.Symbolic(val):
+            case ntn.Stack(val):
                 raise NotImplementedError(
                     "NotationInterpreter does not support symbolic, no target language"
                 )
