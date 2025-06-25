@@ -1,8 +1,10 @@
+from dataclasses import dataclass
 from typing import Any
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import query_property
+from ..finch_notation import TensorView
 from ..symbolic import Context, ScopedDict
 from . import looplets as lpl
 
@@ -105,9 +107,6 @@ class TensorViewFormat:
         )
 
 
-from dataclasses import dataclass
-
-
 @dataclass(eq=True, frozen=True)
 class ExtentFormat:
     start: Any
@@ -185,7 +184,7 @@ class NotationContext(Context):
         match prgm:
             case ntn.Literal(value):
                 return asm.Literal(value)
-            case ntn.Value(expr, type_):
+            case ntn.Value(expr, _):
                 return expr
             case ntn.Call(f, args):
                 f_e = self(f)
@@ -216,11 +215,9 @@ class NotationContext(Context):
                 shape_e = [self(s) for s in shape]
                 return tns.format.lower_declare(init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
-                tns.format.lower_op
                 op_e = self(op)
                 return tns.format.lower_freeze(op_e)
             case ntn.Thaw(tns, op):
-                tns_e = self(tns)
                 op_e = self(op)
                 return tns.format.lower_thaw(op_e)
             case ntn.If(cond, body):
