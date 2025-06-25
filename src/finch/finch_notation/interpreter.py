@@ -306,8 +306,10 @@ class NotationInterpreter:
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
             case ntn.Unwrap(tns):
+                assert isinstance(tns, ntn.Slot)
                 return unwrap(self(tns))
             case ntn.Assign(var, val):
+                assert isinstance(tns, ntn.Slot)
                 val_e = self(val)
                 if isinstance(var, ntn.Variable):
                     var_n = var.name
@@ -344,6 +346,7 @@ class NotationInterpreter:
                 self(slot)
                 return None
             case ntn.Access(tns, mode, idxs):
+                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
                 match mode:
@@ -368,16 +371,19 @@ class NotationInterpreter:
                 ext_e.loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
+                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
                 return declare(tns_e, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
+                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 op_e = self(op)
                 return freeze(tns_e, op_e)
             case ntn.Thaw(tns, op):
+                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 op_e = self(op)
                 return thaw(tns_e, op_e)
