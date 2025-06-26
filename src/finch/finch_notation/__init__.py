@@ -23,6 +23,10 @@ from .nodes import (
     Update,
     Value,
     Variable,
+    Slot,
+    Stack,
+    Unpack,
+    Repack,
 )
 
 __all__ = [
@@ -53,4 +57,8 @@ __all__ = [
     "dimension",
     "extent",
     "TensorView",
+    "Slot",
+    "Stack",
+    "Unpack",
+    "Repack",
 ]

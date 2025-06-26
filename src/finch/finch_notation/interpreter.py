@@ -306,7 +306,6 @@ class NotationInterpreter:
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
             case ntn.Unwrap(tns):
-                assert isinstance(tns, ntn.Slot)
                 return unwrap(self(tns))
             case ntn.Assign(var, val):
                 val_e = self(val)
@@ -357,7 +356,6 @@ class NotationInterpreter:
                     case _:
                         raise NotImplementedError(f"Unrecognized access mode: {mode}")
             case ntn.Increment(tns, val):
-                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 val_e = self(val)
                 increment(tns_e, val_e)

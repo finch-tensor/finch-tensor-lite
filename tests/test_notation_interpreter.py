@@ -29,6 +29,9 @@ def test_matrix_multiplication(a, b):
     A = ntn.Variable("A", np.ndarray)
     B = ntn.Variable("B", np.ndarray)
     C = ntn.Variable("C", np.ndarray)
+    A_ = ntn.Slot("A_", np.ndarray)
+    B_ = ntn.Slot("B_", np.ndarray)
+    C_ = ntn.Slot("C_", np.ndarray)
 
     a_ik = ntn.Variable("a_ik", np.float64)
     b_kj = ntn.Variable("b_kj", np.float64)
@@ -54,11 +57,11 @@ def test_matrix_multiplication(a, b):
                         ntn.Assign(
                             p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))
                         ),
-                        ntn.Assign(
-                            C,
-                            ntn.Declare(
-                                C, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
-                            ),
+                        ntn.Unpack(A_, A),
+                        ntn.Unpack(B_, B),
+                        ntn.Unpack(C_, C),
+                        ntn.Declare(
+                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
@@ -74,13 +77,13 @@ def test_matrix_multiplication(a, b):
                                             ntn.Assign(
                                                 a_ik,
                                                 ntn.Unwrap(
-                                                    ntn.Access(A, ntn.Read(), (i, k))
+                                                    ntn.Access(A_, ntn.Read(), (i, k))
                                                 ),
                                             ),
                                             ntn.Assign(
                                                 b_kj,
                                                 ntn.Unwrap(
-                                                    ntn.Access(B, ntn.Read(), (k, j))
+                                                    ntn.Access(B_, ntn.Read(), (k, j))
                                                 ),
                                             ),
                                             ntn.Assign(
@@ -92,7 +95,7 @@ def test_matrix_multiplication(a, b):
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
-                                                    C,
+                                                    C_,
                                                     ntn.Update(
                                                         ntn.Literal(operator.add)
                                                     ),
@@ -105,10 +108,8 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Assign(
-                            C,
-                            ntn.Freeze(C, ntn.Literal(operator.add)),
-                        ),
+                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Repack(C_),
                         ntn.Return(C),
                     )
                 ),
