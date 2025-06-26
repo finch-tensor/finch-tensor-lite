@@ -119,7 +119,7 @@ def test_matrix_multiplication(a, b):
 
     mod = ntn.NotationInterpreter()(prgm)
 
-    c = np.zeros(dtype=np.float64, shape=())
+    c = np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     result = mod.matmul(c, a, b)
 
     expected = np.matmul(a, b)

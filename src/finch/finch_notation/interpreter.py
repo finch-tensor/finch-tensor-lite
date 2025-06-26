@@ -118,7 +118,11 @@ def np_declare(tns, init, op, shape):
             raise ValueError(
                 f"Invalid dimension start value {dim.start} for ndarray declaration."
             )
-    tns = np.resize(tns, [dim.end for dim in shape])
+    shape = tuple(dim.end for dim in shape)
+    if tns.shape != shape:
+        raise ValueError(
+            f"Shape mismatch: cannot resize numpy array. Expected {shape}, got {tns.shape} for ndarray declaration."
+        )
     tns.fill(init)
     return tns
 
@@ -340,8 +344,8 @@ class NotationInterpreter:
                 self.slots[var_n] = val_e
                 val_e = self(val)
                 return None
-            case ntn.Repack(slot):
-                self(slot)
+            case ntn.Repack(ntn.Slot(var_n, var_t)):
+                self.bindings[var_n] = self.slots[var_n]
                 return None
             case ntn.Access(tns, mode, idxs):
                 assert isinstance(tns, ntn.Slot)
@@ -374,17 +378,20 @@ class NotationInterpreter:
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
-                return declare(tns_e, init_e, op_e, shape_e)
+                self.slots[tns.name] = declare(tns_e, init_e, op_e, shape_e)
+                return None
             case ntn.Freeze(tns, op):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 op_e = self(op)
-                return freeze(tns_e, op_e)
+                self.slots[tns.name] = freeze(tns_e, op_e)
+                return None
             case ntn.Thaw(tns, op):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 op_e = self(op)
-                return thaw(tns_e, op_e)
+                self.slots[tns.name] = thaw(tns_e, op_e)
+                return None
             case ntn.If(cond, body):
                 if self(cond):
                     ctx_2 = self.scope()
@@ -397,7 +404,6 @@ class NotationInterpreter:
                 ctx_2(body)
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
-
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):
