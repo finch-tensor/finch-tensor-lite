@@ -5,6 +5,7 @@ import numpy as np
 from ..finch_assembly import Buffer
 from .c import CArgument, CBufferFormat, CStackFormat, c_type
 from .numba_backend import NumbaArgument, NumbaBufferFormat
+from collections import namedtuple
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -125,22 +126,22 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         return ctypes.POINTER(CNumpyBuffer)
 
     def c_length(self, ctx, buf):
-        return buf.obj["length"]
+        return buf.obj.length
 
     def c_data(self, ctx, buf):
-        return buf.obj["data"]
+        return buf.obj.data
 
     def c_load(self, ctx, buf, idx):
-        return f"({buf.obj['data']})[{ctx(idx)}]"
+        return f"({buf.obj.data})[{ctx(idx)}]"
 
     def c_store(self, ctx, buf, idx, value):
-        ctx.exec(f"{ctx.feed}({buf.obj['data']})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf, new_len):
         new_len = ctx(ctx.cache("len", new_len))
-        data = buf.obj["data"]
-        length = buf.obj["length"]
-        obj = buf.obj["obj"]
+        data = buf.obj.data
+        length = buf.obj.length
+        obj = buf.obj.obj
         t = ctx.ctype_name(c_type(self._dtype))
         ctx.exec(
             f"{ctx.feed}{data} = ({t}*){obj}->resize(&{obj}->arr, {new_len});\n"
@@ -159,15 +160,16 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
             f"{ctx.feed}{t}* {data} = ({t}*){var_n}->data;\n"
             f"{ctx.feed}size_t {length} = {var_n}->length;"
         )
-        return {"data": data, "length": length, "obj": var_n}
+        BufferFields = namedtuple("BufferFields", ["data", "length", "obj"])
+        return BufferFields(data, length, var_n)
 
     def c_repack(self, ctx, var_n, obj):
         """
         Repack the buffer from C context.
         """
         ctx.exec(
-            f"{ctx.feed}{var_n}->data = (void*){obj['data']};\n"
-            f"{ctx.feed}{var_n}->length = {obj['length']};"
+            f"{ctx.feed}{var_n}->data = (void*){obj.data};\n"
+            f"{ctx.feed}{var_n}->length = {obj.length};"
         )
         return
 
@@ -179,19 +181,19 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         return NumpyBuffer(self.arr)
 
     def numba_length(self, ctx, buf):
-        arr = buf.obj["arr"]
+        arr = buf.obj.arr
         return f"len({arr})"
 
     def numba_load(self, ctx, buf, idx):
-        arr = buf.obj["arr"]
+        arr = buf.obj.arr
         return f"{arr}[{ctx(idx)}]"
 
     def numba_store(self, ctx, buf, idx, val):
-        arr = buf.obj["arr"]
+        arr = buf.obj.arr
         ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
 
     def numba_resize(self, ctx, buf, new_len):
-        arr = buf.obj["arr"]
+        arr = buf.obj.arr
         ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
 
     def numba_unpack(self, ctx, var_n):
@@ -200,13 +202,14 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         """
         arr = ctx.freshen(var_n, "arr")
         ctx.exec(f"{ctx.feed}{arr} = {var_n}[0]")
-        return {"arr": arr, "obj": var_n}
+        BufferFields = namedtuple("BufferFields", ["arr", "obj"])
+        return BufferFields(arr, var_n)
 
     def numba_repack(self, ctx, var_n, obj):
         """
         Repack the buffer from Numba context.
         """
-        ctx.exec(f"{ctx.feed}{var_n}[0] = {obj['arr']}")
+        ctx.exec(f"{ctx.feed}{var_n}[0] = {obj.arr}")
         return
 
     def construct_from_numba(self, numba_buffer):
