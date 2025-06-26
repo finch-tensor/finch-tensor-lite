@@ -10,7 +10,15 @@ from ..symbolic import Term, TermTree
 
 # Base class for all Finch Notation nodes
 class NotationNode(Term):
-    pass
+    """
+    NotationNode
+
+    """
+
+    @classmethod
+    def head(cls):
+        """Returns the head of the node."""
+        return cls
 
 
 class NotationTree(NotationNode, TermTree):
@@ -290,6 +298,7 @@ class Declare(NotationTree, NotationExpression):
     def children(self):
         return [self.tns, self.init, self.op, *self.shape]
 
+    @classmethod
     def from_children(cls, tns, init, op, *shape):
         """
         Creates a Declare node from its children.
