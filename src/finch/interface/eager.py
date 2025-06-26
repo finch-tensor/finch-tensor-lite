@@ -1,12 +1,12 @@
 import builtins
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Callable, Sequence
 
+from ..algebra import register_property
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
-from ..algebra import register_property
 
 
 class EagerTensor(OverrideTensor, ABC):
@@ -178,7 +178,9 @@ class EagerTensor(OverrideTensor, ABC):
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
 
+
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
+
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):

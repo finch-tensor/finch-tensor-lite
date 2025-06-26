@@ -1,4 +1,4 @@
-from .algebra import element_type, fill_value, shape_type, Tensor, TensorFormat
+from .algebra import Tensor, TensorFormat, element_type, fill_value, shape_type
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
@@ -57,15 +57,15 @@ from .interface import (
     truediv,
     vecdot,
 )
+from .symbolic import (
+    Formattable,
+    format,
+    has_format,
+)
 from .tensor import (
     DenseLevelFormat,
     ElementLevelFormat,
     FiberTensorFormat,
-)
-from .symbolic import (
-    format,
-    has_format,
-    Formattable,
 )
 
 __all__ = [
@@ -73,11 +73,14 @@ __all__ = [
     "EagerTensor",
     "ElementLevelFormat",
     "FiberTensorFormat",
+    "Formattable",
     "LazyTensor",
     "LazyTensor",
     "NumpyBuffer",
     "NumpyBufferFormat",
     "Scalar",
+    "Tensor",
+    "TensorFormat",
     "abs",
     "acos",
     "acosh",
@@ -105,8 +108,10 @@ __all__ = [
     "expand_dims",
     "fill_value",
     "floordiv",
+    "format",
     "fuse",
     "fused",
+    "has_format",
     "matmul",
     "matrix_transpose",
     "max",
@@ -119,6 +124,7 @@ __all__ = [
     "pow",
     "prod",
     "reduce",
+    "shape_type",
     "sin",
     "sinh",
     "squeeze",
@@ -129,10 +135,4 @@ __all__ = [
     "tensordot",
     "truediv",
     "vecdot",
-    "shape_type",
-    "Tensor",
-    "TensorFormat",
-    "format",
-    "has_format",
-    "Formattable",
 ]

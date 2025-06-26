@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -132,15 +131,15 @@ def shape_type(arg: Any) -> type:
     return format(arg).shape_type
 
 
-@dataclass(frozen=True)
 class NDArrayFormat(TensorFormat):
     """
     A format for NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
     """
 
-    _dtype: np.dtype
-    _ndim: int
+    def __init__(self, dtype: np.dtype, ndim: int):
+        self._dtype = dtype
+        self._ndim = ndim
 
     def __eq__(self, other):
         if not isinstance(other, NDArrayFormat):
@@ -164,7 +163,9 @@ class NDArrayFormat(TensorFormat):
 
     @property
     def shape_type(self):
-        return tuple(np.int for _ in range(self._ndim))
+        return tuple(np.int_ for _ in range(self._ndim))
 
 
-register_property(np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype, x.ndim))
+register_property(
+    np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype, x.ndim)
+)

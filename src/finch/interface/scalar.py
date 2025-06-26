@@ -1,8 +1,9 @@
 from __future__ import annotations
-from ..algebra import register_property, TensorFormat
-from .eager import EagerTensor
+
 from typing import Any
 
+from ..algebra import TensorFormat, register_property
+from .eager import EagerTensor
 
 
 class ScalarFormat(TensorFormat):
@@ -12,13 +13,16 @@ class ScalarFormat(TensorFormat):
 
     def __eq__(self, other):
         if isinstance(other, ScalarFormat):
-            return self.__element_type == other.__element_type and self._fill_value == other._fill_value
+            return (
+                self.__element_type == other.__element_type
+                and self._fill_value == other._fill_value
+            )
         return False
-    
+
     def __hash__(self):
         return hash((self._element_type, self._fill_value))
 
-    @property 
+    @property
     def fill_value(self):
         return self._fill_value
 
@@ -28,8 +32,8 @@ class ScalarFormat(TensorFormat):
 
     @property
     def shape_type(self):
-        return tuple()
-    
+        return ()
+
 
 class Scalar(EagerTensor):
     def __init__(self, val: Any, fill_value: Any = None):
@@ -44,10 +48,11 @@ class Scalar(EagerTensor):
 
     @property
     def shape(self):
-        return tuple()
+        return ()
 
     def __getitem__(self, idx):
         return self.val
+
 
 register_property(object, "asarray", "__attr__", lambda x: Scalar(x))
 register_property(Scalar, "asarray", "__attr__", lambda x: x)

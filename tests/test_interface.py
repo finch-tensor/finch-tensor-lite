@@ -46,6 +46,7 @@ def test_matrix_multiplication(a, b):
 
     assert_equal(result, expected)
 
+
 class TestEagerTensorFormat(finch.TensorFormat):
     # This class doesn't define any pytests
     __test__ = False
@@ -64,7 +65,7 @@ class TestEagerTensorFormat(finch.TensorFormat):
     @property
     def fill_value(self):
         return finch.fill_value(self.fmt)
-    
+
     @property
     def element_type(self):
         return finch.element_type(self.fmt)
@@ -72,6 +73,7 @@ class TestEagerTensorFormat(finch.TensorFormat):
     @property
     def shape_type(self):
         return finch.shape_type(self.fmt)
+
 
 class TestEagerTensor(finch.EagerTensor):
     # This class doesn't define any pytests
