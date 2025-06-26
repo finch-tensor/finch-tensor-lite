@@ -1,11 +1,11 @@
 import ctypes
+from typing import NamedTuple
 
 import numpy as np
 
 from ..finch_assembly import Buffer
 from .c import CArgument, CBufferFormat, CStackFormat, c_type
 from .numba_backend import NumbaArgument, NumbaBufferFormat
-from collections import namedtuple
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -160,7 +160,12 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
             f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
             f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
         )
-        BufferFields = namedtuple("BufferFields", ["data", "length", "obj"])
+
+        class BufferFields(NamedTuple):
+            data: str
+            length: str
+            obj: str
+
         return BufferFields(data, length, var_n)
 
     def c_repack(self, ctx, lhs, obj):
@@ -202,7 +207,11 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         """
         arr = ctx.freshen(var_n, "arr")
         ctx.exec(f"{ctx.feed}{arr} = {ctx(val)}[0]")
-        BufferFields = namedtuple("BufferFields", ["arr", "obj"])
+
+        class BufferFields(NamedTuple):
+            arr: str
+            obj: str
+
         return BufferFields(arr, var_n)
 
     def numba_repack(self, ctx, lhs, obj):

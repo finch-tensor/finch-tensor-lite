@@ -610,7 +610,9 @@ class CContext(Context):
                 var_t_code = self.ctype_name(c_type(var_t))
                 self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 self.types[var_n] = var_t
-                self.slots[var_n] = var_t.c_unpack(self, var_n, asm.Variable(var_n, var_t))
+                self.slots[var_n] = var_t.c_unpack(
+                    self, var_n, asm.Variable(var_n, var_t)
+                )
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
                 if var_n not in self.slots or var_n not in self.types:

@@ -244,7 +244,9 @@ class NumbaContext(Context):
                     )
                 self.exec(f"{feed}{var_n} = {self(val)}")
                 self.types[var_n] = var_t
-                self.slots[var_n] = var_t.numba_unpack(self, var_n, asm.Variable(var_n, var_t))
+                self.slots[var_n] = var_t.numba_unpack(
+                    self, var_n, asm.Variable(var_n, var_t)
+                )
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
                 if var_n not in self.slots or var_n not in self.types:
