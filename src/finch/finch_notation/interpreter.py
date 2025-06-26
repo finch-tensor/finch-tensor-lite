@@ -5,16 +5,76 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import element_type, query_property, register_property
+from ..algebra import (
+    Tensor,
+    TensorFormat,
+    element_type,
+    fill_value,
+    query_property,
+    register_property,
+    shape_type,
+)
 from ..symbolic import ScopedDict
 from . import nodes as ntn
 
 
+@dataclass
+class TensorViewFormat(TensorFormat):
+    """
+    A format for tensor views.
+    This is used to represent the format of a tensor at specific indices.
+    It is a subclass of ntn.Format to allow for custom formatting.
+    """
+
+    idxs: tuple[Any, ...]  # Index types of the tensor view
+    tns: Any  # Format of the underlying tensor
+    op: Any = None  # Operation applied to the tensor view, if any
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, TensorViewFormat)
+            and self.idxs == other.idxs
+            and self.tns == other.tns
+            and self.op == other.op
+        )
+
+    def __hash__(self):
+        return hash((self.idxs, self.tns, self.op))
+
+    @property
+    def element_type(self):
+        return element_type(self.tns)
+
+    @property
+    def fill_value(self):
+        """
+        Get the fill value of the tensor view.
+        This is the value used to fill the tensor at the specified indices.
+        """
+        return fill_value(self.tns)
+
+    @property
+    def shape_type(self):
+        """
+        Get the shape type of the tensor view.
+        This is the shape type of the tensor at the specified indices.
+        """
+        return shape_type(self.tns)[len(self.idxs) : -1]
+
+
 @dataclass(eq=True, frozen=True)
-class TensorView:
+class TensorView(Tensor):
     idxs: tuple[Any, ...]
     tns: ntn.NotationNode
     op: Any = None
+
+    @property
+    def format(self):
+        """
+        Get the format of the tensor view.
+        This is the format of the tensor at the specified indices.
+        """
+        return TensorViewFormat(map(format, self.idxs), self.tns.format, self.op)
 
     @property
     def shape(self):

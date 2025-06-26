@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import query_property, register_property
+from ..algebra import register_property
 from ..symbolic import Format, Formattable, format
 
 
@@ -57,22 +57,19 @@ class Tensor(Formattable, ABC):
         ...
 
     @property
-    @abstractmethod
     def fill_value(self):
         """Default value to fill the tensor."""
-        ...
+        return self.format.fill_value
 
     @property
-    @abstractmethod
     def element_type(self):
         """Data type of the tensor elements."""
-        ...
+        return self.format.element_type
 
     @property
-    @abstractmethod
     def shape_type(self):
         """Shape type of the tensor."""
-        ...
+        return self.format.shape_type
 
 
 def fill_value(arg: Any) -> Any:
@@ -91,7 +88,7 @@ def fill_value(arg: Any) -> Any:
     """
     if hasattr(arg, "fill_value"):
         return arg.fill_value
-    return query_property(arg, "fill_value", "__attr__")
+    return format(arg).fill_value
 
 
 def element_type(arg: Any) -> type:
@@ -110,7 +107,7 @@ def element_type(arg: Any) -> type:
     """
     if hasattr(arg, "element_type"):
         return arg.element_type
-    return query_property(arg, "element_type", "__attr__")
+    return format(arg).element_type
 
 
 def shape_type(arg: Any) -> type:
@@ -128,7 +125,7 @@ def shape_type(arg: Any) -> type:
     """
     if hasattr(arg, "shape_type"):
         return arg.shape_type
-    return query_property(arg, "shape_type", "__attr__")
+    return format(arg).shape_type
 
 
 @dataclass(frozen=True)
@@ -144,7 +141,7 @@ class NDArrayFormat(TensorFormat):
         if not isinstance(other, NDArrayFormat):
             return False
         return self._dtype == other._dtype
-    
+
     def __hash__(self):
         return hash(self._dtype)
 
@@ -162,11 +159,3 @@ class NDArrayFormat(TensorFormat):
 
 
 register_property(np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype))
-
-register_property(np.ndarray, "fill_value", "__attr__", lambda x: format(x).fill_value)
-
-register_property(
-    np.ndarray, "element_type", "__attr__", lambda x: format(x).element_type
-)
-
-register_property(np.ndarray, "shape_type", "__attr__", lambda x: format(x).shape_type)
