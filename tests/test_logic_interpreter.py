@@ -33,7 +33,7 @@ def test_matrix_multiplication(a, b):
     k = Field("k")
 
     p = Plan(
-        [
+        (
             Query(Alias("A"), Table(Literal(a), (i, k))),
             Query(Alias("B"), Table(Literal(b), (k, j))),
             Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
@@ -42,7 +42,7 @@ def test_matrix_multiplication(a, b):
                 Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
             ),
             Produces((Alias("C"),)),
-        ]
+        )
     )
 
     result = FinchLogicInterpreter()(p)[0]
