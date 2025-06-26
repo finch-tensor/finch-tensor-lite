@@ -432,15 +432,15 @@ class CContext(Context):
         tab="    ",
         indent=0,
         headers=None,
-        bindings=None,
+        types=None,
         slots=None,
         fptr=None,
         **kwargs,
     ):
         if headers is None:
             headers = []
-        if bindings is None:
-            bindings = ScopedDict()
+        if types is None:
+            types = ScopedDict()
         if slots is None:
             slots = ScopedDict()
         super().__init__(**kwargs)
@@ -451,7 +451,7 @@ class CContext(Context):
         if fptr is None:
             fptr = {}
         self.fptr = fptr
-        self.bindings = bindings
+        self.types = types
         self.slots = slots
 
     def add_header(self, header):
@@ -527,7 +527,7 @@ class CContext(Context):
         blk.tab = self.tab
         blk.headers = self.headers
         blk._headerset = self._headerset
-        blk.bindings = self.bindings
+        blk.types = self.types
         blk.slots = self.slots
         blk.fptr = self.fptr
         return blk
@@ -535,7 +535,7 @@ class CContext(Context):
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
-        blk.bindings = self.bindings.scope()
+        blk.types = self.types.scope()
         blk.slots = self.slots.scope()
         return blk
 
@@ -579,11 +579,11 @@ class CContext(Context):
                 val_code = self(val)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
-                if var_n in self.bindings:
-                    assert var_t == self.bindings[var_n]
+                if var_n in self.types:
+                    assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_n} = {val_code};")
                 else:
-                    self.bindings[var_n] = var_t
+                    self.types[var_n] = var_t
                     var_t_code = self.ctype_name(c_type(var_t))
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
@@ -602,21 +602,21 @@ class CContext(Context):
                     raise KeyError(
                         f"Slot {var_n} already exists in context, cannot unpack"
                     )
-                if var_n in self.bindings:
+                if var_n in self.types:
                     raise KeyError(
                         f"Variable '{var_n}' is already defined in the current"
                         f" context, cannot overwrite with slot."
                     )
                 var_t_code = self.ctype_name(c_type(var_t))
                 self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
-                self.bindings[var_n] = var_t
-                self.slots[var_n] = var_t.c_unpack(self, var_n)
+                self.types[var_n] = var_t
+                self.slots[var_n] = var_t.c_unpack(self, var_n, asm.Variable(var_n, var_t))
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
-                if var_n not in self.slots or var_n not in self.bindings:
+                if var_n not in self.slots or var_n not in self.types:
                     raise KeyError(f"Slot {var_n} not found in context, cannot repack")
-                if var_t != self.bindings[var_n]:
-                    raise TypeError(f"Type mismatch: {var_t} != {self.bindings[var_n]}")
+                if var_t != self.types[var_n]:
+                    raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
                 var_t.c_repack(self, var_n, obj)
                 return None
@@ -645,7 +645,7 @@ class CContext(Context):
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
-                ctx_2.bindings[var.name] = var.result_format
+                ctx_2.types[var.name] = var.result_format
                 body_code = ctx_2.emit()
                 self.exec(
                     f"{feed}for ({var_t} {var_2} = {start}; "
@@ -716,7 +716,7 @@ class CContext(Context):
                         case asm.Variable(name, t):
                             t_name = self.ctype_name(c_type(t))
                             arg_decls.append(f"{t_name} {name}")
-                            ctx_2.bindings[name] = t
+                            ctx_2.types[name] = t
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -794,11 +794,11 @@ class CStackFormat(ABC):
     """
 
     @abstractmethod
-    def c_unpack(self, ctx, lhs, rhs):
+    def c_unpack(self, ctx, var):
         """
         Convert a value to a symbolic representation in C. Returns a NamedTuple
-        of unpacked variable names, etc. The `lhs` is the variable namespace to
-        assign to.
+        of unpacked variable names, etc. The `var` is the variable namespace to
+        assign to, and a variable containing the object itself.
         """
         ...
 
@@ -806,6 +806,7 @@ class CStackFormat(ABC):
     def c_repack(self, ctx, lhs, rhs):
         """
         Update an object based on a symbolic representation. The `rhs` is the
-        symbolic representation to update from, and `lhs` is the object to update.
+        symbolic representation to update from, and `lhs` is a variable name referring
+        to the original object to update.
         """
         ...

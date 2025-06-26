@@ -149,7 +149,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         )
         return
 
-    def c_unpack(self, ctx, var_n):
+    def c_unpack(self, ctx, var_n, val):
         """
         Unpack the buffer into C context.
         """
@@ -157,19 +157,19 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         length = ctx.freshen(var_n, "length")
         t = ctx.ctype_name(c_type(self._dtype))
         ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){var_n}->data;\n"
-            f"{ctx.feed}size_t {length} = {var_n}->length;"
+            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
+            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
         )
         BufferFields = namedtuple("BufferFields", ["data", "length", "obj"])
         return BufferFields(data, length, var_n)
 
-    def c_repack(self, ctx, var_n, obj):
+    def c_repack(self, ctx, lhs, obj):
         """
         Repack the buffer from C context.
         """
         ctx.exec(
-            f"{ctx.feed}{var_n}->data = (void*){obj.data};\n"
-            f"{ctx.feed}{var_n}->length = {obj.length};"
+            f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
+            f"{ctx.feed}{lhs}->length = {obj.length};"
         )
         return
 
@@ -196,20 +196,20 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         arr = buf.obj.arr
         ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
 
-    def numba_unpack(self, ctx, var_n):
+    def numba_unpack(self, ctx, var_n, val):
         """
         Unpack the buffer into Numba context.
         """
         arr = ctx.freshen(var_n, "arr")
-        ctx.exec(f"{ctx.feed}{arr} = {var_n}[0]")
+        ctx.exec(f"{ctx.feed}{arr} = {ctx(val)}[0]")
         BufferFields = namedtuple("BufferFields", ["arr", "obj"])
         return BufferFields(arr, var_n)
 
-    def numba_repack(self, ctx, var_n, obj):
+    def numba_repack(self, ctx, lhs, obj):
         """
         Repack the buffer from Numba context.
         """
-        ctx.exec(f"{ctx.feed}{var_n}[0] = {obj.arr}")
+        ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.arr}")
         return
 
     def construct_from_numba(self, numba_buffer):
