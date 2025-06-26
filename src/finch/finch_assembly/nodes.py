@@ -2,7 +2,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, length_type, return_type
+from ..algebra import return_type
+from .abstract_buffer import element_type, length_type
 from ..symbolic import Term, TermTree
 
 
