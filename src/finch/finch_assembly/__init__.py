@@ -1,4 +1,4 @@
-from .abstract_buffer import Buffer, BufferFormat, element_type, length_type
+from .buffer import Buffer, BufferFormat, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
