@@ -1,4 +1,4 @@
-from .algebra import element_type, fill_value
+from .algebra import element_type, fill_value, shape_type, Tensor, TensorFormat
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
@@ -62,6 +62,11 @@ from .tensor import (
     ElementLevelFormat,
     FiberTensorFormat,
 )
+from .symbolic import (
+    format,
+    has_format,
+    Formattable,
+)
 
 __all__ = [
     "DenseLevelFormat",
@@ -124,4 +129,10 @@ __all__ = [
     "tensordot",
     "truediv",
     "vecdot",
+    "shape_type",
+    "Tensor",
+    "TensorFormat",
+    "format",
+    "has_format",
+    "Formattable",
 ]

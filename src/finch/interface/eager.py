@@ -2,26 +2,16 @@ import builtins
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from typing import Any
 
-import numpy as np
-
-from ..algebra import register_property
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
+from ..algebra import register_property
 
 
 class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
-
-    @property
-    @abstractmethod
-    def ndim(self):
-        """Number of dimensions of the tensor."""
-        ...
 
     def __add__(self, other):
         return add(self, other)
@@ -188,38 +178,7 @@ class EagerTensor(OverrideTensor, ABC):
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
 
-
-@dataclass
-class Scalar(EagerTensor):
-    val: Any
-    fill_value: Any
-    dtype: Any
-
-    def __init__(self, val: Any):
-        self.val = val
-        self.fill_value = val
-        self.dtype = type(val)
-
-    @property
-    def shape(self):
-        return ()
-
-    @property
-    def ndim(self):
-        return 0
-
-    @property
-    def element_type(self):
-        return type(self.val)
-
-    def __getitem__(self, idx):
-        return self.val
-
-
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
-register_property(object, "asarray", "__attr__", lambda x: Scalar(x))
-register_property(Scalar, "asarray", "__attr__", lambda x: np.asarray(x))
-
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):

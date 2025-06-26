@@ -10,6 +10,11 @@ from ..symbolic import Format, Formattable, format
 
 class TensorFormat(Format, ABC):
     @property
+    def ndim(self):
+        """Number of dimensions of the tensor."""
+        return len(self.shape_type)
+
+    @property
     @abstractmethod
     def fill_value(self):
         """Default value to fill the tensor."""
@@ -39,10 +44,9 @@ class Tensor(Formattable, ABC):
     """
 
     @property
-    @abstractmethod
     def ndim(self):
         """Number of dimensions of the tensor."""
-        ...
+        return self.format.ndim
 
     @property
     @abstractmethod
@@ -136,14 +140,19 @@ class NDArrayFormat(TensorFormat):
     """
 
     _dtype: np.dtype
+    _ndim: int
 
     def __eq__(self, other):
         if not isinstance(other, NDArrayFormat):
             return False
-        return self._dtype == other._dtype
+        return self._dtype == other._dtype and self._ndim == other._ndim
 
     def __hash__(self):
-        return hash(self._dtype)
+        return hash((self._dtype, self._ndim))
+
+    @property
+    def ndim(self):
+        return self._ndim
 
     @property
     def fill_value(self):
@@ -155,7 +164,7 @@ class NDArrayFormat(TensorFormat):
 
     @property
     def shape_type(self):
-        return tuple(type(dim) for dim in self._dtype.shape)
+        return tuple(np.int for _ in range(self._ndim))
 
 
-register_property(np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype))
+register_property(np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype, x.ndim))

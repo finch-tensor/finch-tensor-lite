@@ -1,6 +1,5 @@
 from .eager import (
     EagerTensor,
-    Scalar,
     abs,
     acos,
     acosh,
@@ -50,11 +49,13 @@ from .eager import (
 # from .tensor import *
 from .fuse import compute, fuse, fused
 from .lazy import LazyTensor, asarray, defer
+from .scalar import Scalar, ScalarFormat
 
 __all__ = [
     "EagerTensor",
     "LazyTensor",
     "Scalar",
+    "ScalarFormat",
     "abs",
     "acos",
     "acosh",

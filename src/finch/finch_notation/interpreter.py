@@ -18,7 +18,6 @@ from ..symbolic import ScopedDict
 from . import nodes as ntn
 
 
-@dataclass
 class TensorViewFormat(TensorFormat):
     """
     A format for tensor views.
@@ -26,9 +25,18 @@ class TensorViewFormat(TensorFormat):
     It is a subclass of ntn.Format to allow for custom formatting.
     """
 
-    idxs: tuple[Any, ...]  # Index types of the tensor view
-    tns: Any  # Format of the underlying tensor
-    op: Any = None  # Operation applied to the tensor view, if any
+    def __init__(self, idxs: tuple[Any, ...], tns: Any, op: Any = None):
+        """
+        Initialize the TensorViewFormat with the specified indices, tensor, and
+        operation.
+
+        :param idxs: Tuple of index types for the tensor view.
+        :param tns: The underlying tensor format.
+        :param op: The operation applied to the tensor view, if any.
+        """
+        self.idxs = idxs
+        self.tns = tns
+        self.op = op
 
     def __eq__(self, other):
         return (
@@ -62,11 +70,18 @@ class TensorViewFormat(TensorFormat):
         return shape_type(self.tns)[len(self.idxs) : -1]
 
 
-@dataclass(eq=True, frozen=True)
 class TensorView(Tensor):
-    idxs: tuple[Any, ...]
-    tns: ntn.NotationNode
-    op: Any = None
+    def __init__(self, idxs: tuple[Any, ...], tns: ntn.NotationNode, op: Any = None):
+        """
+        Initialize the TensorView with the specified indices, tensor, and operation.
+
+        :param idxs: Tuple of index types for the tensor view.
+        :param tns: The underlying tensor node.
+        :param op: The operation applied to the tensor view, if any.
+        """
+        self.idxs = idxs
+        self.tns = tns
+        self.op = op
 
     @property
     def format(self):
