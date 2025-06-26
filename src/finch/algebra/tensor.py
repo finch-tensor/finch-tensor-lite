@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any
-from ..algebra import query_property, register_property
-from ..symbolic import Formattable, Format, format
 from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
+
+from ..algebra import query_property, register_property
+from ..symbolic import Format, Formattable, format
 
 
 class TensorFormat(Format, ABC):
@@ -12,24 +14,28 @@ class TensorFormat(Format, ABC):
     def fill_value(self):
         """Default value to fill the tensor."""
         ...
-    
+
     @property
     @abstractmethod
     def element_type(self):
         """Data type of the tensor elements."""
         ...
-    
+
     @property
     @abstractmethod
     def shape_type(self):
         """Shape type of the tensor."""
         ...
 
+
 class Tensor(Formattable, ABC):
     """
-    Abstract base class for tensor-like data structures. Tensors are multi-dimensional
-    arrays that can be used to represent data in various formats. They support operations
-    such as indexing, slicing, and reshaping, and can be used in mathematical computations.
+    Abstract base class for tensor-like data structures. Tensors are
+    multi-dimensional arrays that can be used to represent data in various
+    formats. They support operations such as indexing, slicing, and reshaping,
+    and can be used in mathematical computations. This class provides the basic
+    interface for tensors to be used with lazy ops in Finch, though more
+    advanced interfaces may be required for different backends.
     """
 
     @property
@@ -37,7 +43,7 @@ class Tensor(Formattable, ABC):
     def ndim(self):
         """Number of dimensions of the tensor."""
         ...
-    
+
     @property
     @abstractmethod
     def shape(self):
@@ -49,19 +55,19 @@ class Tensor(Formattable, ABC):
     def format(self) -> TensorFormat:
         """Format of the tensor, which may include metadata about the tensor."""
         ...
-    
+
     @property
     @abstractmethod
     def fill_value(self):
         """Default value to fill the tensor."""
         ...
-    
+
     @property
     @abstractmethod
     def element_type(self):
         """Data type of the tensor elements."""
         ...
-    
+
     @property
     @abstractmethod
     def shape_type(self):
@@ -106,6 +112,7 @@ def element_type(arg: Any) -> type:
         return arg.element_type
     return query_property(arg, "element_type", "__attr__")
 
+
 def shape_type(arg: Any) -> type:
     """The shape type of the given argument. The shape type is the type of
     the value returned by arg.shape.
@@ -124,8 +131,7 @@ def shape_type(arg: Any) -> type:
     return query_property(arg, "shape_type", "__attr__")
 
 
-
-@dataclass
+@dataclass(frozen=True)
 class NDArrayFormat(TensorFormat):
     """
     A format for NumPy arrays that provides metadata about the array.
@@ -133,6 +139,11 @@ class NDArrayFormat(TensorFormat):
     """
 
     _dtype: np.dtype
+
+    def __eq__(self, other):
+        if not isinstance(other, NDArrayFormat):
+            return False
+        return self._dtype == other._dtype
 
     @property
     def fill_value(self):
@@ -147,24 +158,12 @@ class NDArrayFormat(TensorFormat):
         return tuple(type(dim) for dim in self._dtype.shape)
 
 
-register_property(
-    np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype)
-)
+register_property(np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype))
+
+register_property(np.ndarray, "fill_value", "__attr__", lambda x: format(x).fill_value)
 
 register_property(
-    np.ndarray, "fill_value", "__attr__", lambda x: format(x).fill_value
+    np.ndarray, "element_type", "__attr__", lambda x: format(x).element_type
 )
 
-register_property(
-    np.ndarray,
-    "element_type",
-    "__attr__",
-    lambda x: format(x).element_type
-)
-
-register_property(
-    np.ndarray,
-    "shape_type",
-    "__attr__",
-    lambda x: format(x).shape_type
-)
+register_property(np.ndarray, "shape_type", "__attr__", lambda x: format(x).shape_type)

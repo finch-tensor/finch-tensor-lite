@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..algebra import query_property
 from .. import algebra
+from ..algebra import query_property
 from ..symbolic import Format, Formattable
+
 
 class Buffer(Formattable, ABC):
     """
@@ -68,6 +69,7 @@ def length_type(arg: Any) -> type:
     if hasattr(arg, "length_type"):
         return arg.length_type
     return query_property(arg, "length_type", "__attr__")
+
 
 def element_type(arg: Any) -> type:
     algebra.element_type(arg)
