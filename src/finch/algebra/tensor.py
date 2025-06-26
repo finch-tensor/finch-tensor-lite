@@ -144,6 +144,9 @@ class NDArrayFormat(TensorFormat):
         if not isinstance(other, NDArrayFormat):
             return False
         return self._dtype == other._dtype
+    
+    def __hash__(self):
+        return hash(self._dtype)
 
     @property
     def fill_value(self):

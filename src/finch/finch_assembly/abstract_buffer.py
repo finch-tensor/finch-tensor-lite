@@ -53,7 +53,7 @@ class Buffer(Formattable, ABC):
         ...
 
 
-def length_type(arg: Any) -> type:
+def length_type(arg: Any):
     """The length type of the given argument. The length type is the type of
     the value returned by len(arg).
 
@@ -71,8 +71,8 @@ def length_type(arg: Any) -> type:
     return query_property(arg, "length_type", "__attr__")
 
 
-def element_type(arg: Any) -> type:
-    algebra.element_type(arg)
+def element_type(arg: Any):
+    return algebra.element_type(arg)
 
 
 class BufferFormat(Format):
