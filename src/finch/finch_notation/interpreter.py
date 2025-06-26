@@ -5,8 +5,6 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import element_type, query_property, register_property
-from ..symbolic import ScopedDict, has_format
 from ..algebra import (
     Tensor,
     TensorFormat,
@@ -16,7 +14,7 @@ from ..algebra import (
     register_property,
     shape_type,
 )
-from ..symbolic import ScopedDict
+from ..symbolic import ScopedDict, has_format
 from . import nodes as ntn
 
 
@@ -198,7 +196,8 @@ def np_declare(tns, init, op, shape):
     shape = tuple(dim.end for dim in shape)
     if tns.shape != shape:
         raise ValueError(
-            f"Shape mismatch: cannot resize numpy array. Expected {shape}, got {tns.shape} for ndarray declaration."
+            f"Shape mismatch: cannot resize numpy array. Expected {shape},"
+            f" got {tns.shape} for ndarray declaration."
         )
     tns.fill(init)
     return tns
@@ -481,6 +480,7 @@ class NotationInterpreter:
                 ctx_2(body)
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
+
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):
