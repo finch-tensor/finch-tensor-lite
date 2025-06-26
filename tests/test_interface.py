@@ -47,6 +47,34 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
 
+class TestEagerTensorFormat(finch.TensorFormat):
+    # This class doesn't define any pytests
+    __test__ = False
+
+    def __init__(self, fmt):
+        self.fmt = fmt
+
+    def __eq__(self, other):
+        if not isinstance(other, TestEagerTensorFormat):
+            return False
+        return self.fmt == other.fmt
+
+    def __hash__(self):
+        return hash(self.fmt)
+
+    @property
+    def fill_value(self):
+        return finch.fill_value(self.fmt)
+
+    @property
+    def element_type(self):
+        return finch.element_type(self.fmt)
+
+    @property
+    def shape_type(self):
+        return finch.shape_type(self.fmt)
+
+
 class TestEagerTensor(finch.EagerTensor):
     # This class doesn't define any pytests
     __test__ = False
@@ -61,24 +89,12 @@ class TestEagerTensor(finch.EagerTensor):
         return self.array[item]
 
     @property
-    def dtype(self):
-        return self.array.dtype
-
-    @property
     def shape(self):
         return self.array.shape
 
     @property
-    def ndim(self):
-        return self.array.ndim
-
-    @property
-    def fill_value(self):
-        return finch.fill_value(self.array)
-
-    @property
-    def element_type(self):
-        return finch.element_type(self.array)
+    def format(self):
+        return TestEagerTensorFormat(finch.format(self.array))
 
     def to_numpy(self):
         return self.array

@@ -20,15 +20,14 @@ from .nodes import (
 )
 
 __all__ = [
-    "FinchLogicInterpreter",
-    "LogicExpression",
-    "LogicNode",
-    "LogicTree",
-    "Value",
     "Aggregate",
     "Alias",
     "Field",
+    "FinchLogicInterpreter",
     "Literal",
+    "LogicExpression",
+    "LogicNode",
+    "LogicTree",
     "MapJoin",
     "Plan",
     "Produces",
@@ -38,4 +37,5 @@ __all__ = [
     "Reorder",
     "Subquery",
     "Table",
+    "Value",
 ]

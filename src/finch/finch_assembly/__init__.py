@@ -1,4 +1,4 @@
-from .abstract_buffer import Buffer, BufferFormat
+from .buffer import Buffer, BufferFormat, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -53,6 +53,29 @@ __all__ = [
     "BufferFormat",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
+    "AssemblyNode",
+    "Assign",
+    "Block",
+    "Break",
+    "Buffer",
+    "BufferFormat",
+    "BufferLoop",
+    "Call",
+    "ForLoop",
+    "Function",
+    "If",
+    "IfElse",
+    "Length",
+    "Literal",
+    "Load",
+    "Module",
+    "Resize",
+    "Return",
+    "Store",
+    "Variable",
+    "WhileLoop",
+    "element_type",
     "has_format",
     "Slot",
+    "length_type",
 ]

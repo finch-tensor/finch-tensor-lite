@@ -31,11 +31,11 @@ from .nodes import (
 
 __all__ = [
     "Access",
+    "Assign",
     "Block",
     "Cached",
     "Call",
     "Declare",
-    "Assign",
     "Freeze",
     "Function",
     "If",
@@ -45,6 +45,7 @@ __all__ = [
     "Loop",
     "Module",
     "NotationExpression",
+    "NotationInterpreter",
     "NotationNode",
     "Read",
     "Return",
@@ -53,7 +54,6 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
-    "NotationInterpreter",
     "dimension",
     "extent",
     "TensorView",

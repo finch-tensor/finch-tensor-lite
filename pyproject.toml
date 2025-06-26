@@ -31,7 +31,7 @@ build-backend = "poetry.core.masonry.api"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF"]
+select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022"]
 
 [tool.ruff.lint.isort.sections]
 numpy = ["numpy", "numpy.*", "scipy", "scipy.*"]

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from finch.algebra import Tensor, TensorFormat
 from finch.symbolic import Format, Formattable
 
 
@@ -102,7 +103,7 @@ Tp = TypeVar("Tp")
 
 
 @dataclass
-class FiberTensor(Generic[Tp], Formattable):
+class FiberTensor(Generic[Tp], Tensor):
     """
     A class representing a tensor with fiber structure.
 
@@ -161,7 +162,7 @@ class FiberTensor(Generic[Tp], Formattable):
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFormat(Format):
+class FiberTensorFormat(TensorFormat):
     """
     An abstract base class representing the format of a fiber tensor.
 

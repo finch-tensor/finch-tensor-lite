@@ -4,8 +4,8 @@ from .element_level import ElementLevel, ElementLevelFormat, element
 __all__ = [
     "DenseLevel",
     "DenseLevelFormat",
-    "dense",
     "ElementLevel",
     "ElementLevelFormat",
+    "dense",
     "element",
 ]
