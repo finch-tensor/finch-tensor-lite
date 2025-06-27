@@ -15,6 +15,10 @@ from ..finch_logic import (
     Value,
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
+from .compiler import (
+    LogicCompiler,
+    format_queries,
+)
 from .optimize import (
     concordize,
     flatten_plans,
@@ -54,6 +58,7 @@ __all__ = [
     "Reorder",
     "Subquery",
     "Table",
+    "LogicCompiler",
     "concordize",
     "flatten_plans",
     "normalize_names",
@@ -73,4 +78,5 @@ __all__ = [
     "propagate_copy_queries",
     "propagate_transpose_queries",
     "push_fields",
+    "format_queries",
 ]
