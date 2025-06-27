@@ -9,13 +9,13 @@ from ..symbolic import Format, Formattable, format
 
 class TensorFormat(Format, ABC):
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
         return len(self.shape_type)
 
     @property
     @abstractmethod
-    def fill_value(self):
+    def fill_value(self) -> Any:
         """Default value to fill the tensor."""
         ...
 
@@ -27,8 +27,11 @@ class TensorFormat(Format, ABC):
 
     @property
     @abstractmethod
-    def shape_type(self):
-        """Shape type of the tensor."""
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor. The shape type is a tuple of the index
+        types in the tensor. It's the type of each element in tns.shape. It
+        should be an actual tuple, rather than a tuple type, so that it can hold
+        e.g. dtypes, formats, or types, and so that we can easily index it."""
         ...
 
 
@@ -43,7 +46,7 @@ class Tensor(Formattable, ABC):
     """
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
         return self.format.ndim
 
@@ -60,7 +63,7 @@ class Tensor(Formattable, ABC):
         ...
 
     @property
-    def fill_value(self):
+    def fill_value(self) -> Any:
         """Default value to fill the tensor."""
         return self.format.fill_value
 
@@ -70,8 +73,11 @@ class Tensor(Formattable, ABC):
         return self.format.element_type
 
     @property
-    def shape_type(self):
-        """Shape type of the tensor."""
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor. The shape type is a tuple of the index
+        types in the tensor. It's the type of each element in tns.shape. It
+        should be an actual tuple, rather than a tuple type, so that it can hold
+        e.g. dtypes, formats, or types, and so that we can easily index it."""
         return self.format.shape_type
 
 
@@ -94,7 +100,7 @@ def fill_value(arg: Any) -> Any:
     return format(arg).fill_value
 
 
-def element_type(arg: Any) -> type:
+def element_type(arg: Any):
     """The element type of the given argument.  The element type is the scalar type of
     the elements in a tensor, which may be different from the data type of the
     tensor.
@@ -113,9 +119,9 @@ def element_type(arg: Any) -> type:
     return format(arg).element_type
 
 
-def shape_type(arg: Any) -> type:
-    """The shape type of the given argument. The shape type is the type of
-    the value returned by arg.shape.
+def shape_type(arg: Any) -> tuple:
+    """The shape type of the given argument. The shape type is a tuple holding
+    the type of each value returned by arg.shape.
 
     Args:
         arg: The object to determine the shape type for.
@@ -150,11 +156,11 @@ class NDArrayFormat(TensorFormat):
         return hash((self._dtype, self._ndim))
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return self._ndim
 
     @property
-    def fill_value(self):
+    def fill_value(self) -> Any:
         return np.zeros((), dtype=self._dtype)[()]
 
     @property
@@ -162,7 +168,7 @@ class NDArrayFormat(TensorFormat):
         return self._dtype.type
 
     @property
-    def shape_type(self):
+    def shape_type(self) -> tuple:
         return tuple(np.int_ for _ in range(self._ndim))
 
 
