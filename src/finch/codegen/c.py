@@ -796,11 +796,11 @@ class CStackFormat(ABC):
     """
 
     @abstractmethod
-    def c_unpack(self, ctx, var):
+    def c_unpack(self, ctx, lhs, rhs):
         """
         Convert a value to a symbolic representation in C. Returns a NamedTuple
-        of unpacked variable names, etc. The `var` is the variable namespace to
-        assign to, and a variable containing the object itself.
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
         """
         ...
 
