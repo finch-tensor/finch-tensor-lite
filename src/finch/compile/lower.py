@@ -5,71 +5,53 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import query_property
 from ..finch_notation import TensorView
-from ..symbolic import Context, ScopedDict
+from ..symbolic import Context, ScopedDict, has_format
 from . import looplets as lpl
+from abc import ABC, abstractmethod
 
 
-def lower_unwrap(tns):
-    """
-    Unwrap a tensor view to get the underlying tensor.
-    This is used to get the original tensor from a tensor view.
-    """
-    if hasattr(tns, "lower_unwrap"):
-        return tns.unwrap()
-    return query_property(tns, "lower_unwrap", "__attr__")
+class FinchTensorFormat(TensorFormat, ABC):
+    def lower_unwrap(tns):
+        """
+        Unwrap a tensor view to get the underlying tensor.
+        This is used to get the original tensor from a tensor view.
+        """
+        ...
+
+    def lower_increment(tns, val):
+        """
+        Increment a tensor view with an operation and value.
+        This updates the tensor at the specified index with the operation and value.
+        """
+        ...
 
 
-def lower_increment(tns, val):
-    """
-    Increment a tensor view with an operation and value.
-    This updates the tensor at the specified index with the operation and value.
-    """
-    if hasattr(tns, "lower_increment"):
-        return tns.lower_increment(val)
-    return query_property(tns, "lower_increment", "__attr__", val)
+    def lower_declare(tns, init, op, shape):
+        """
+        Declare a tensor.
+        """
+        ...
 
 
-def lower_declare(tns, init, op, shape):
-    """
-    Declare a tensor.
-    """
-    if hasattr(tns, "lower_declare"):
-        return tns.declare(init, op, shape)
-    return query_property(tns, "lower_declare", "__attr__", init, op, shape)
+    def lower_freeze(tns, op):
+        """
+        Freeze a tensor.
+        """
+        ...
 
 
-def lower_freeze(tns, op):
-    """
-    Freeze a tensor.
-    """
-    if hasattr(tns, "lower_freeze"):
-        return tns.lower_freeze(op)
-    try:
-        query_property(tns, "lower_freeze", "__attr__", op)
-    except AttributeError:
-        return tns
+    def lower_thaw(tns, op):
+        """
+        Thaw a tensor.
+        """
+        ...
 
 
-def lower_thaw(tns, op):
-    """
-    Thaw a tensor.
-    """
-    if hasattr(tns, "lower_thaw"):
-        return tns.lower_thaw(op)
-    try:
-        return query_property(tns, "lower_thaw", "__attr__", op)
-    except AttributeError:
-        return tns
+    def unfurl(ctx, tns, ext, proto):
+        ...
 
 
-def unfurl(ctx, tns, ext, proto):
-    fmt = tns.format
-    if hasattr(fmt, "unfurl"):
-        return fmt.unfurl(ctx, tns, ext, proto)
-    return query_property(fmt, "unfurl", "__attr__", ctx, tns, ext, proto)
-
-
-class TensorViewFormat:
+class TensorViewFormat(FinchTensorFormat):
     """
     A format for tensor views that allows unfurling.
     This is used to create a view of a tensor with a specific extent.
@@ -149,11 +131,14 @@ class NotationContext(Context):
         preamble=None,
         epilogue=None,
         bindings=None,
+        slots=None,
         func_state=None,
     ):
         super().__init__(namespace=namespace, preamble=preamble, epilogue=epilogue)
         if bindings is None:
             bindings = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
         self.bindings = bindings
         self.func_state = func_state
 
@@ -166,6 +151,7 @@ class NotationContext(Context):
             preamble=self.preamble,
             epilogue=self.epilogue,
             bindings=self.bindings.scope(),
+            slots=self.slots.scope(),
         )
 
     def should_halt(self):
@@ -195,6 +181,35 @@ class NotationContext(Context):
                 return None
             case ntn.Variable(var_n, var_t):
                 return asm.Variable(var_n, var_t)
+            case ntn.Slot(var_n, var_t):
+                if var_n in self.types:
+                    def_t = self.types[var_n]
+                    if def_t != var_t:
+                        raise TypeError(
+                            f"Slot '{var_n}' is declared as type {def_t}, "
+                            f"but used as type {var_t}."
+                        )
+                if var_n in self.slots:
+                    return self.slots[var_n]
+                raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
+            case ntn.Unpack(ntn.Slot(var_n, var_t), val):
+                val_e = self(val)
+                if not has_format(val_e, var_t):
+                    raise TypeError(
+                        f"Assigned value {val_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
+                    )
+                assert var_n not in self.types, (
+                    f"Variable '{var_n}' is already defined in the current"
+                    f" context, cannot overwrite with slot."
+                )
+                self.types[var_n] = var_t
+                self.slots[var_n] = val_e
+                val_e = self(val)
+                return None
+            case ntn.Repack(ntn.Slot(var_n, var_t)):
+                self.bindings[var_n] = self.slots[var_n]
+                return None
             case ntn.Access(_):
                 raise NotImplementedError("Access should have been lowered already.")
             case ntn.Unwrap(tns):
