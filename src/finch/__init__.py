@@ -34,6 +34,11 @@ from .interface import (
     floordiv,
     fuse,
     fused,
+    log,
+    log1p,
+    log2,
+    log10,
+    logaddexp,
     matmul,
     matrix_transpose,
     max,
@@ -56,7 +61,6 @@ from .interface import (
     tensordot,
     truediv,
     vecdot,
-    log,
 )
 from .symbolic import (
     Formattable,
@@ -113,6 +117,11 @@ __all__ = [
     "fuse",
     "fused",
     "has_format",
+    "log",
+    "log1p",
+    "log2",
+    "log10",
+    "logaddexp",
     "matmul",
     "matrix_transpose",
     "max",
@@ -136,5 +145,4 @@ __all__ = [
     "tensordot",
     "truediv",
     "vecdot",
-    "log",
 ]

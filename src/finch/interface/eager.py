@@ -178,6 +178,21 @@ class EagerTensor(OverrideTensor, ABC):
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
 
+    def __log__(self):
+        return log(self)
+
+    def __log1p__(self):
+        return log1p(self)
+
+    def __log2__(self):
+        return log2(self)
+
+    def __log10__(self):
+        return log10(self)
+
+    def __logaddexp__(self, other):
+        return logaddexp(self, other)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -511,7 +526,32 @@ def atan2(x1, x2):
         return lazy.atan2(x1, x2)
     return compute(lazy.atan2(x1, x2))
 
+
 def log(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.log(x)
     return compute(lazy.log(x))
+
+
+def log1p(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log1p(x)
+    return compute(lazy.log1p(x))
+
+
+def log2(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log2(x)
+    return compute(lazy.log2(x))
+
+
+def log10(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log10(x)
+    return compute(lazy.log10(x))
+
+
+def logaddexp(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logaddexp(x1, x2)
+    return compute(lazy.logaddexp(x1, x2))

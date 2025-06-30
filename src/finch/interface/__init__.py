@@ -22,6 +22,11 @@ from .eager import (
     elementwise,
     expand_dims,
     floordiv,
+    log,
+    log1p,
+    log2,
+    log10,
+    logaddexp,
     matmul,
     matrix_transpose,
     max,
@@ -44,7 +49,6 @@ from .eager import (
     tensordot,
     truediv,
     vecdot,
-    log,
 )
 
 # from .tensor import *
@@ -84,6 +88,11 @@ __all__ = [
     "floordiv",
     "fuse",
     "fused",
+    "log",
+    "log1p",
+    "log2",
+    "log10",
+    "logaddexp",
     "matmul",
     "matrix_transpose",
     "max",
@@ -106,5 +115,4 @@ __all__ = [
     "tensordot",
     "truediv",
     "vecdot",
-    "log",
 ]

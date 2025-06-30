@@ -534,7 +534,7 @@ for t in StableNumber.__args__:
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
-for trig_op in (
+for unary in (
     np.sin,
     np.cos,
     np.tan,
@@ -547,19 +547,19 @@ for trig_op in (
     np.acos,
     np.acosh,
     np.atanh,
+    np.log,
+    np.log1p,
+    np.log2,
+    np.log10,
 ):
     register_property(
-        trig_op, "__call__", "return_type", lambda op, a, _trig_op=trig_op: float
+        unary, "__call__", "return_type", lambda op, a, _unary=unary: float
     )
 
-register_property(np.atan2, "__call__", "return_type", lambda op, a, b: float)
-
-for log in (np.log, np.log1p, np.log2, np.log10):
-    register_property(log, "__call__", "return_type", lambda op, a, _log=log : float)
-
-register_property(np.logaddexp, "__call__", "return_type", lambda op, a, b: float)
-
-for logical in (np.logical_and, np.logical_or, np.logical_xor):
-    register_property(logical, "__call__", "return_type", lambda op, a, b, _logical=logical: bool)
-
-register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
+for binary in (
+    np.atan2,
+    np.logaddexp,
+):
+    register_property(
+        binary, "__call__", "return_type", lambda op, a, b, _binary=binary: float
+    )

@@ -38,6 +38,10 @@ element_wise_ufunc_map = {
     np.atanh: np.atanh,
     np.atan2: np.atan2,
     np.log: np.log,
+    np.log1p: np.log1p,
+    np.log2: np.log2,
+    np.log10: np.log10,
+    np.logaddexp: np.logaddexp,
     # Add more ufuncs as needed
 }
 
