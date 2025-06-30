@@ -138,7 +138,7 @@ def choose_if(a, condition):
     """
     If the condition is falsy, returns the first argument;
     otherwise, returns the default value associated with the type
-    of a, which is typically zero.
+    of a.
 
     This is useful for selecting elements.
 
@@ -161,7 +161,7 @@ algebra.register_property(
 def logical_or(a, b):
     """
     Returns the first truthy value between a and b.
-    If both are falsy, returns the default value associated with the type of a.
+    If both are falsy, returns the default value associated with the type of b.
     """
     return a or b
 

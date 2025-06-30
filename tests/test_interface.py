@@ -1,4 +1,5 @@
 import operator
+import warnings
 
 import pytest
 
@@ -54,7 +55,38 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
 
+class TestEagerTensorFormat(finch.TensorFormat):
+    # This class doesn't define any pytests
+    __test__ = False
+
+    def __init__(self, fmt):
+        self.fmt = fmt
+
+    def __eq__(self, other):
+        if not isinstance(other, TestEagerTensorFormat):
+            return False
+        return self.fmt == other.fmt
+
+    def __hash__(self):
+        return hash(self.fmt)
+
+    @property
+    def fill_value(self):
+        return finch.fill_value(self.fmt)
+
+    @property
+    def element_type(self):
+        return finch.element_type(self.fmt)
+
+    @property
+    def shape_type(self):
+        return finch.shape_type(self.fmt)
+
+
 class TestEagerTensor(finch.EagerTensor):
+    # This class doesn't define any pytests
+    __test__ = False
+
     def __init__(self, array):
         self.array = np.array(array)
 
@@ -65,24 +97,16 @@ class TestEagerTensor(finch.EagerTensor):
         return self.array[item]
 
     @property
-    def dtype(self):
-        return self.array.dtype
+    def ndim(self):
+        return self.array.ndim
 
     @property
     def shape(self):
         return self.array.shape
 
     @property
-    def ndim(self):
-        return self.array.ndim
-
-    @property
-    def fill_value(self):
-        return finch.fill_value(self.array)
-
-    @property
-    def element_type(self):
-        return finch.element_type(self.array)
+    def format(self):
+        return TestEagerTensorFormat(finch.format(self.array))
 
     def to_numpy(self):
         return self.array
@@ -93,6 +117,9 @@ class TestEagerTensor(finch.EagerTensor):
     [
         (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
         (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
+        (np.array([[2, 0], [1, 3]]), 2),
+        (3, np.array([[2, 0], [1, 3]])),
+        (np.array([[2, 0], [1, 3]]), True),
     ],
 )
 @pytest.mark.parametrize(
@@ -139,17 +166,29 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     wa = a_wrap(a)
     wb = b_wrap(b)
 
-    expected = np_op(a, b)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
 
-    for op in ops:
-        result = op(wa, wb)
+        expected = np_op(a, b)
 
-        if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
-            assert isinstance(result, finch.LazyTensor)
+        for op in ops:
+            result = op(wa, wb)
 
-            result = finch.compute(result)
+            if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
+                assert isinstance(result, finch.LazyTensor)
 
-        assert_equal(result, expected)
+                result = finch.compute(result)
+
+            assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -194,17 +233,29 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
 def test_unary_operations(a, a_wrap, ops, np_op):
     wa = a_wrap(a)
 
-    expected = np_op(a)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
 
-    for op in ops:
-        result = op(wa)
+        expected = np_op(a)
 
-        if isinstance(wa, finch.LazyTensor):
-            assert isinstance(result, finch.LazyTensor)
+        for op in ops:
+            result = op(wa)
 
-            result = finch.compute(result)
+            if isinstance(wa, finch.LazyTensor):
+                assert isinstance(result, finch.LazyTensor)
 
-        assert_equal(result, expected)
+                result = finch.compute(result)
+
+            assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -709,7 +760,7 @@ def test_broadcast_to(x, shape, x_wrap):
             out = finch.compute(out)
         assert not isinstance(out, tuple)  # for type checker
         assert_equal(out, expected, "values mismatch")
-        assert out.shape == shape, f"shape mismatch: got {out.shape}"
+        assert out.shape == shape, f"shape mismatch: got {out.shape}, {out, expected}"
 
 
 @pytest.mark.parametrize(

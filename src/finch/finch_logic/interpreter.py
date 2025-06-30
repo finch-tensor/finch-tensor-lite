@@ -9,9 +9,8 @@ from ..algebra import element_type, fill_value, fixpoint_type, return_type
 from .nodes import (
     Aggregate,
     Alias,
-    Deferred,
     Field,
-    Immediate,
+    Literal,
     MapJoin,
     Plan,
     Produces,
@@ -20,6 +19,7 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    Value,
 )
 
 
@@ -45,9 +45,9 @@ class FinchLogicInterpreter:
             print(f"Evaluating: {node}")
         # Placeholder for actual logic
         match node:
-            case Immediate(val):
+            case Literal(val):
                 return val
-            case Deferred(_):
+            case Value(_):
                 raise ValueError(
                     "The interpreter cannot evaluate a deferred node, a compiler might "
                     "generate code for it"
@@ -59,9 +59,9 @@ class FinchLogicInterpreter:
                 if alias is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return alias
-            case Table(Immediate(val), idxs):
+            case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
-            case MapJoin(Immediate(op), args):
+            case MapJoin(Literal(op), args):
                 args = tuple(self(a) for a in args)
                 dims = {}
                 idxs = []
@@ -85,7 +85,7 @@ class FinchLogicInterpreter:
                     ]
                     result[*crds] = op(*vals)
                 return TableValue(result, idxs)
-            case Aggregate(Immediate(op), Immediate(init), arg, idxs):
+            case Aggregate(Literal(op), Literal(init), arg, idxs):
                 arg = self(arg)
                 dtype = fixpoint_type(op, init, element_type(arg.tns))
                 new_shape = tuple(
@@ -117,7 +117,7 @@ class FinchLogicInterpreter:
                 arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
                 result = self.make_tensor(
-                    dims, fill_value(arg.tns), dtype=arg.tns.dtype
+                    dims, fill_value(arg.tns), dtype=element_type(arg.tns)
                 )
                 for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(zip(idxs, crds, strict=True))

@@ -2,7 +2,6 @@ import builtins
 import operator
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
@@ -10,6 +9,7 @@ import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from ..algebra import (
+    TensorFormat,
     choose_if,
     element_type,
     fill_value,
@@ -19,6 +19,8 @@ from ..algebra import (
     logical_or,
     promote_max,
     promote_min,
+    query_property,
+    register_property,
     return_type,
 )
 from ..algebra import conjugate as conj
@@ -26,7 +28,7 @@ from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Immediate,
+    Literal,
     LogicNode,
     MapJoin,
     Relabel,
@@ -43,19 +45,68 @@ def identify(data):
     return Subquery(lhs, data)
 
 
-@dataclass
+class LazyTensorFormat(TensorFormat):
+    _fill_value: Any
+    _element_type: Any
+    _shape_type: Any
+
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple):
+        self._fill_value = _fill_value
+        self._element_type = _element_type
+        self._shape_type = _shape_type
+
+    def __eq__(self, other):
+        if not isinstance(other, LazyTensorFormat):
+            return False
+        return (
+            self._fill_value == other._fill_value
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash((self._fill_value, self._element_type, self._shape_type))
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+
 class LazyTensor(OverrideTensor):
-    data: LogicNode
-    shape: tuple
-    fill_value: Any
-    element_type: Any
+    def __init__(
+        self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
+    ):
+        self.data = data
+        self._shape = shape
+        self._fill_value = fill_value
+        self._element_type = element_type
+
+    @property
+    def format(self):
+        return LazyTensorFormat(
+            _fill_value=self._fill_value,
+            _element_type=self._element_type,
+            _shape_type=tuple(type(dim) for dim in self.shape),
+        )
+
+    @property
+    def shape(self) -> tuple:
+        """
+        Returns the shape of the LazyTensor as a tuple.
+        The shape is determined by the data and is a static property.
+        """
+        return self._shape
 
     def override_module(self):
         return sys.modules[__name__]
-
-    @property
-    def ndim(self) -> int:
-        return len(self.shape)
 
     def __add__(self, other):
         return add(self, other)
@@ -225,6 +276,29 @@ class LazyTensor(OverrideTensor):
         )
 
 
+register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
+register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
+
+
+def asarray(arg: Any) -> Any:
+    """Convert given argument and return np.asarray(arg) for the scalar type input.
+    If input argument is already array type, return unchanged.
+
+    Args:
+        arg: The object to be converted.
+
+    Returns:
+        The array type result of the given object.
+    """
+    if hasattr(arg, "asarray"):
+        return arg.asarray()
+
+    try:
+        return query_property(arg, "asarray", "__attr__")
+    except AttributeError:
+        return np.asarray(arg)
+
+
 def defer(arr) -> LazyTensor:
     """
     - defer(arr) -> LazyTensor:
@@ -240,10 +314,13 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
+    arr = asarray(arr)
+
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    tns = Subquery(name, Table(Immediate(arr), idxs))
+    print(0, arr.shape)
+    tns = Subquery(name, Table(Literal(arr), idxs))
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
 
 
@@ -444,8 +521,8 @@ def reduce(
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
     data: LogicNode = Aggregate(
-        Immediate(op),
-        Immediate(init),
+        Literal(op),
+        Literal(init),
         Relabel(x.data, fields),
         tuple(fields[i] for i in axis),
     )
@@ -538,7 +615,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Immediate(f), tuple(bargs)), idxs)
+    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
@@ -905,13 +982,13 @@ class NoneArray:
         self.fill_value = None
         self.element_type = None
         self.dtype = None
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        self.ndim = len(shape)
 
     def __getitem__(self, idxs):
         return None
+
+
+register_property(NoneArray, "asarray", "__attr__", lambda x: x)
 
 
 def broadcast_to(tensor, /, shape: tuple[int, ...]) -> LazyTensor:
@@ -932,6 +1009,7 @@ def broadcast_to(tensor, /, shape: tuple[int, ...]) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
+    print(1, NoneArray(shape).shape)
     return elementwise(first, tensor, NoneArray(shape))
 
 
@@ -993,7 +1071,7 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
         I_i = build_shift_matrix(cumulative_offset, size)
 
         # Do a tensordot but with different operations
-        # premute tensor
+        # permute tensor
         axis_permutation = tuple(i for i in range(tensor.ndim) if i != axis) + (axis,)
         permuted_tensor = permute_dims(tensor, axis_permutation)
         # add 1-dim at the end of permuted_tensor for broadcasting

@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
+from .. import algebra
+from ..algebra import query_property
 from ..symbolic import Format, Formattable
 
 
@@ -48,6 +51,28 @@ class Buffer(Formattable, ABC):
         Resize the buffer to the new length.
         """
         ...
+
+
+def length_type(arg: Any):
+    """The length type of the given argument. The length type is the type of
+    the value returned by len(arg).
+
+    Args:
+        arg: The object to determine the length type for.
+
+    Returns:
+        The length type of the given object.
+
+    Raises:
+        AttributeError: If the length type is not implemented for the given type.
+    """
+    if hasattr(arg, "length_type"):
+        return arg.length_type
+    return query_property(arg, "length_type", "__attr__")
+
+
+def element_type(arg: Any):
+    return algebra.element_type(arg)
 
 
 class BufferFormat(Format):

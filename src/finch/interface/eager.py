@@ -1,8 +1,9 @@
 import builtins
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Callable, Sequence
 
+from ..algebra import register_property
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
@@ -11,20 +12,6 @@ from .overrides import OverrideTensor
 class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
-
-    @property
-    @abstractmethod
-    def ndim(self) -> int:
-        """Number of dimensions of the tensor."""
-        raise NotImplementedError("Subclasses must implement ndim.")
-
-    @abstractmethod
-    def __getitem__(self, key):
-        """
-        Get an item from the tensor using the provided key.
-        The key can be an integer, slice, or tuple of integers/slices.
-        """
-        raise NotImplementedError("Subclasses must implement __getitem__.")
 
     def __add__(self, other):
         return add(self, other)
@@ -190,6 +177,9 @@ class EagerTensor(OverrideTensor, ABC):
             raise ValueError("Cannot convert non-scalar tensor to bool.")
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
+
+
+register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
@@ -522,7 +512,7 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     Args
     ---------
     - x (array) - input array.
-    - sources - Axes to move.
+    - source - Axes to move.
     - destination - indices defining the desired
     positions for each respective source axis index.
 

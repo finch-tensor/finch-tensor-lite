@@ -18,7 +18,7 @@ class AssemblyInterpreterKernel:
         self.func = asm.Variable(func_n, ret_t)
 
     def __call__(self, *args):
-        args_i = (asm.Immediate(arg) for arg in args)
+        args_i = (asm.Literal(arg) for arg in args)
         return self.ctx(asm.Call(self.func, args_i))
 
 
@@ -57,23 +57,42 @@ class AssemblyInterpreter:
     An interpreter for FinchAssembly.
     """
 
-    def __init__(self, bindings=None, types=None, loop_state=None, function_state=None):
+    def __init__(
+        self,
+        bindings=None,
+        slots=None,
+        types=None,
+        loop_state=None,
+        function_state=None,
+    ):
         if bindings is None:
             bindings = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
         if types is None:
             types = ScopedDict()
         self.bindings = bindings
+        self.slots = slots
         self.types = types
         self.loop_state = loop_state
         self.function_state = function_state
 
-    def scope(self, bindings=None, types=None, loop_state=None, function_state=None):
+    def scope(
+        self,
+        bindings=None,
+        slots=None,
+        types=None,
+        loop_state=None,
+        function_state=None,
+    ):
         """
         Create a new scope for the interpreter.
         This allows for nested scopes and variable shadowing.
         """
         if bindings is None:
             bindings = self.bindings.scope()
+        if slots is None:
+            slots = self.slots.scope()
         if types is None:
             types = self.types.scope()
         if loop_state is None:
@@ -82,6 +101,7 @@ class AssemblyInterpreter:
             function_state = self.function_state
         return AssemblyInterpreter(
             bindings=bindings,
+            slots=slots,
             types=types,
             loop_state=loop_state,
             function_state=function_state,
@@ -105,7 +125,7 @@ class AssemblyInterpreter:
         Run the program.
         """
         match prgm:
-            case asm.Immediate(value):
+            case asm.Literal(value):
                 return value
             case asm.Variable(var_n, var_t):
                 if var_n in self.types:
@@ -130,26 +150,59 @@ class AssemblyInterpreter:
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
                 return None
+            case asm.Slot(var_n, var_t):
+                if var_n in self.types:
+                    def_t = self.types[var_n]
+                    if def_t != var_t:
+                        raise TypeError(
+                            f"Slot '{var_n}' is declared as type {def_t}, "
+                            f"but used as type {var_t}."
+                        )
+                if var_n in self.slots:
+                    return self.slots[var_n]
+                raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
+            case asm.Unpack(asm.Slot(var_n, var_t), val):
+                val_e = self(val)
+                if not has_format(val_e, var_t):
+                    raise TypeError(
+                        f"Assigned value {val_e} is not of type {var_t} for "
+                        f"variable '{var_n}'."
+                    )
+                assert var_n not in self.types, (
+                    f"Variable '{var_n}' is already defined in the current"
+                    f" context, cannot overwrite with slot."
+                )
+                self.types[var_n] = var_t
+                self.slots[var_n] = val_e
+                val_e = self(val)
+                return None
+            case asm.Repack(slot):
+                self(slot)
+                return None
             case asm.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
             case asm.Load(buf, idx):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
             case asm.Resize(buf, len_):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 len_e = self(len_)
                 buf_e.resize(len_e)
                 return None
             case asm.Length(buf):
+                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 return buf_e.length()
             case asm.Block(bodies):
@@ -172,7 +225,7 @@ class AssemblyInterpreter:
                     if ctx_2.should_halt():
                         break
                     ctx_3 = self.scope()
-                    ctx_3(asm.Block((asm.Assign(var, asm.Immediate(var_e)), body)))
+                    ctx_3(asm.Block((asm.Assign(var, asm.Literal(var_e)), body)))
                     var_e = type(var_e)(var_e + 1)  # type: ignore[call-arg,operator]
                 return None
             case asm.BufferLoop(buf, var, body):
@@ -184,7 +237,7 @@ class AssemblyInterpreter:
                     ctx_3 = ctx_2.scope()
                     ctx_3(
                         asm.Block(
-                            (asm.Assign(var, asm.Load(buf, asm.Immediate(i))), body)
+                            (asm.Assign(var, asm.Load(buf, asm.Literal(i))), body)
                         )
                     )
                 return None
@@ -266,6 +319,10 @@ class AssemblyInterpreter:
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterModule(self, kernels)
+            case asm.Stack(val):
+                raise NotImplementedError(
+                    "AssemblyInterpreter does not support symbolic, no target language"
+                )
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"

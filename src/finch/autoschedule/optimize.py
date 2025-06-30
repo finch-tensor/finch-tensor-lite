@@ -10,7 +10,7 @@ from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Immediate,
+    Literal,
     LogicExpression,
     LogicNode,
     LogicTree,
@@ -250,7 +250,7 @@ def propagate_map_queries_backward(root):
     def rule_1(ex):
         match ex:
             case MapJoin(
-                Immediate() as f,
+                Literal() as f,
                 args,
             ):
                 for idx, item in reversed(list(enumerate(args))):
@@ -259,7 +259,7 @@ def propagate_map_queries_backward(root):
                     match item:
                         case (
                             Aggregate(
-                                Immediate() as g, Immediate() as init, arg, idxs
+                                Literal() as g, Literal() as init, arg, idxs
                             ) as agg
                         ) if (
                             is_distributive(f.val, g.val)
@@ -278,9 +278,9 @@ def propagate_map_queries_backward(root):
     def rule_2(ex):
         match ex:
             case Aggregate(
-                Immediate() as op_1,
-                Immediate() as init_1,
-                Aggregate(op_2, Immediate() as init_2, arg, idxs_1),
+                Literal() as op_1,
+                Literal() as init_1,
+                Aggregate(op_2, Literal() as init_2, arg, idxs_1),
                 idxs_2,
             ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
                 return Aggregate(op_1, init_1, arg, idxs_1 + idxs_2)
@@ -448,7 +448,7 @@ def push_fields(root):
 
     def rule_5(ex):
         match ex:
-            case Relabel(Immediate() as arg):
+            case Relabel(Literal() as arg):
                 return arg
 
     root = Rewrite(

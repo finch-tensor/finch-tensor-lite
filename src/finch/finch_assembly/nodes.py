@@ -2,8 +2,9 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, length_type, return_type
+from ..algebra import return_type
 from ..symbolic import Term, TermTree
+from .buffer import element_type, length_type
 
 
 class AssemblyNode(Term):
@@ -51,7 +52,7 @@ class AssemblyExpression(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Immediate(AssemblyExpression):
+class Literal(AssemblyExpression):
     """
     Represents the literal value `val`.
 
@@ -88,6 +89,85 @@ class Variable(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class Stack(AssemblyExpression):
+    """
+    A logical AST expression representing an object using a set `obj` of
+    expressions, variables, and literals in the target language.
+
+    Attributes:
+        obj: The object referencing symbolic variables defined in the target language.
+        type: The type of the symbolic object.
+    """
+
+    obj: Any
+    type: Any
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Slot(AssemblyExpression):
+    """
+    Represents a register to a symbolic object. Using a register in an
+    expression creates a copy of the object.
+
+    Attributes:
+        name: The name of the symbolic object to register.
+        type: The type of the symbolic object.
+    """
+
+    name: str
+    type: Any
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Unpack(AssemblyTree):
+    """
+    Attempts to convert `rhs` into a symbolic, which can be registerd with
+    `lhs`. The original object must not be accessed or modified until the
+    corresponding `Repack` node is reached.
+
+    Attributes:
+        lhs: The symbolic object to write to.
+        rhs: The original object to read from.
+    """
+
+    lhs: Slot
+    rhs: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Repack(AssemblyTree):
+    """
+    Registers updates from a symbolic object `val` with the original
+    object. The original object may now be accessed and modified.
+
+    Attributes:
+        slot: The symbolic object to read from.
+    """
+
+    val: Slot
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.val]
+
+
+@dataclass(eq=True, frozen=True)
 class Assign(AssemblyTree):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
@@ -98,7 +178,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable
+    lhs: Variable | Stack
     rhs: AssemblyExpression
 
     @property
@@ -117,7 +197,7 @@ class Call(AssemblyExpression, AssemblyTree):
         args: The arguments to call on the function.
     """
 
-    op: Immediate
+    op: Literal
     args: tuple[AssemblyNode, ...]
 
     @property
