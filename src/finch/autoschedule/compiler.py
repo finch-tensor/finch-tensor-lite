@@ -96,7 +96,7 @@ class LogicLowerer:
                 return ntn.Assign(
                     ntn.Variable(name, type(tns)), compile_logic_constant(tns)
                 )
-            case Query(Alias(a_name), ntn.Variable(v_name, _)) if a_name == v_name:
+            case Query(Alias(_), None):
                 # we already removed tables
                 return ntn.Block(())
             case Query(
@@ -274,7 +274,7 @@ def record_tables(root: LogicNode) -> tuple[LogicNode, dict, dict, dict]:
                             ntn.Literal(ntn.dimension), (table_var, ntn.Literal(idx))
                         )
 
-                return Query(alias, table_var)
+                return Query(alias, None)
 
     processed_root = Rewrite(PostWalk(rule_0))(root)
     return processed_root, table_vars, dim_size_vars, tables
