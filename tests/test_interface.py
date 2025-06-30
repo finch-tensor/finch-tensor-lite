@@ -97,10 +97,6 @@ class TestEagerTensor(finch.EagerTensor):
         return self.array[item]
 
     @property
-    def ndim(self):
-        return self.array.ndim
-
-    @property
     def shape(self):
         return self.array.shape
 
