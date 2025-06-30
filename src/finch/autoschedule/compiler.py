@@ -2,6 +2,8 @@ from typing import TypeVar, overload
 
 import numpy as np
 
+from .. import finch_notation as ntn
+from ..algebra.tensor import TensorFormat
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -21,7 +23,7 @@ from ..finch_logic import (
     Table,
     Value,
 )
-from ..finch_notation import nodes as ntn
+from ..symbolic.rewriters import PostWalk, Rewrite
 from ._utils import intersect, setdiff, with_subsequence
 
 T = TypeVar("T", bound="LogicNode")
@@ -107,31 +109,39 @@ class PointwiseLowerer:
         self.bound_idxs = bound_idxs if bound_idxs is not None else []
         self.loop_idxs = loop_idxs if loop_idxs is not None else []
 
-    def __call__(self, ex) -> ntn.NotationNode:
+    def __call__(self, ex: LogicNode, tables: dict) -> ntn.NotationNode:
         match ex:
-            case MapJoin(Literal(val), args):
-                return ntn.Call(ntn.Literal(val), tuple(self(arg) for arg in args))
+            case MapJoin(Literal(op), args):
+                return ntn.Call(
+                    ntn.Literal(op), tuple(self(arg, tables) for arg in args)
+                )
             case Relabel(Alias(name), idxs_1):
                 self.bound_idxs.extend(idxs_1)
-                return ntn.Access(
-                    ntn.Variable(name),
-                    ntn.Read(),
-                    tuple(
-                        self(idx) if idx in self.loop_idxs else ntn.Value(1, int)
-                        for idx in idxs_1
-                    ),
+                return ntn.Unwrap(
+                    ntn.Access(
+                        tables[Alias(name)],
+                        ntn.Read(),
+                        tuple(
+                            self(idx, tables)
+                            if idx in self.loop_idxs
+                            else ntn.Value(1, int)
+                            for idx in idxs_1
+                        ),
+                    )
                 )
             case Reorder(Value(ex, type_), _) | Value(ex, type_):
                 return ntn.Value(ex, type_)
             case Reorder(arg, _):
-                return self(arg)
+                return self(arg, tables)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
 
-def compile_pointwise_logic(ex: LogicNode, loop_idxs: list[Field]) -> tuple:
+def compile_pointwise_logic(
+    ex: LogicNode, loop_idxs: list[Field], tables: dict
+) -> tuple[ntn.NotationNode, list[Field]]:
     ctx = PointwiseLowerer(loop_idxs=loop_idxs)
-    code = ctx(ex)
+    code = ctx(ex, tables)
     return (code, ctx.bound_idxs)
 
 
@@ -149,7 +159,9 @@ class LogicLowerer:
     def __init__(self, mode: str = "fast"):
         self.mode = mode
 
-    def __call__(self, ex: LogicNode) -> ntn.NotationNode:
+    def __call__(
+        self, ex: LogicNode, tables: dict, dim_sizes: dict
+    ) -> ntn.NotationNode:
         match ex:
             case Query(Alias(name), Table(tns, _)):
                 return ntn.Assign(
@@ -161,48 +173,80 @@ class LogicLowerer:
             ):
                 loop_idxs = with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
                 (rhs, rhs_idxs) = compile_pointwise_logic(
-                    Relabel(arg, idxs_1), list(loop_idxs)
+                    Relabel(arg, idxs_1), list(loop_idxs), tables
                 )
                 lhs_idxs = ...
-
-                body = ntn.Block((ntn.Assign(),))
-
-                for idx in loop_idxs:
-                    if idx in rhs_idxs:
-                        body = ntn.Loop(idx, ext, body)
-                    elif idx in lhs_idxs:
-                        body = ntn.Loop(idx, 1, body)
-
-                const = compile_logic_constant(tns)
-                var = ntn.Variable(name, const.result_format)
-                return ntn.Block(
-                    (
-                        # ntn.Assign(var, const),
-                        ntn.Declare(),
-                        body,
-                        ntn.Return(var),
-                    )
-                )
+                # TODO: mostly the same as aggregate
+                raise NotImplementedError
 
             case Query(
-                Alias(name) as lhs, Reformat(tns, Reorder(MapJoin(op, args), idxs))
+                Alias(name) as lhs,
+                Reformat(tns, Reorder(MapJoin(op, args), _) as reorder),
             ):
-                z = tns.tns.result_type
+                assert isinstance(tns, TensorFormat)
+                fv = tns.fill_value
                 return self(
                     Query(
                         lhs,
-                        Reformat(tns, Aggregate(1, 1, 1, 1)),  # TODO
-                    )
+                        Reformat(
+                            tns, Aggregate(initwrite(fv), Literal(fv), reorder, ())
+                        ),  # TODO: initwrite
+                    ),
+                    tables,
+                    dim_sizes,
                 )
 
             case Query(
                 Alias(name) as lhs,
-                Reformat(tns, Aggregate(op, init, Reorder(arg, idxs_2), idxs_1)),
+                Reformat(
+                    tns,
+                    Aggregate(Literal(op), Literal(init), Reorder(arg, idxs_2), idxs_1),
+                ),
             ):
-                (rhs, rhs_idxs) = compile_pointwise_logic(arg, list(idxs_2))
-                lhs_idxs = [idx for idx in setdiff(idxs_2, idxs_1)]
-                body = ntn.Call(ntn.Literal(val), tuple(self(arg) for arg in args))
-                # TODO
+                (rhs, rhs_idxs) = compile_pointwise_logic(arg, list(idxs_2), tables)
+                lhs_idxs = tuple(idx for idx in setdiff(idxs_2, idxs_1))
+                agg_res = ntn.Variable(name, type(tns))
+                declaration = ntn.Declare(
+                    agg_res,
+                    ntn.Literal(init),
+                    ntn.Literal(op),
+                    tuple(ntn.Variable(f"{idx}_size") for idx in lhs_idxs),
+                )
+
+                body = ntn.Block(
+                    (
+                        ntn.Increment(
+                            ntn.Access(
+                                agg_res,
+                                ntn.Update(ntn.Literal(op)),
+                                lhs_idxs,
+                            ),
+                            rhs,
+                        ),
+                    )
+                )
+                for idx in idxs_2:
+                    if idx in rhs_idxs:
+                        body = ntn.Loop(
+                            ntn.Variable(idx.name),
+                            ntn.Variable(f"{idx.name}_size"),
+                            body,
+                        )
+                    elif idx in lhs_idxs:
+                        body = ntn.Loop(
+                            ntn.Literal(1),
+                            ntn.Literal(1),
+                            body,
+                        )
+
+                return ntn.Block(
+                    (
+                        *[ntn.Assign(k, v) for k, v in dim_sizes.items()],
+                        ntn.Assign(agg_res, declaration),
+                        body,
+                        ntn.Assign(agg_res, ntn.Freeze(agg_res, ntn.Literal(op))),
+                    )
+                )
 
             case Produces(args):
                 assert len(args) == 1, "Only single return object is supported"
@@ -226,8 +270,10 @@ class LogicLowerer:
                     (
                         ntn.Function(
                             ntn.Variable("func", np.ndarray),
-                            (),
-                            ntn.Block(tuple(self(body) for body in bodies)),
+                            tuple(var for var in tables.values()),
+                            ntn.Block(
+                                tuple(self(body, tables, dim_sizes) for body in bodies)
+                            ),
                         ),
                     )
                 )
@@ -241,18 +287,52 @@ def format_queries(node: LogicNode) -> LogicNode:
 
 
 def _format_queries(node: LogicNode, bindings: dict) -> LogicNode:
+    # TODO: rep_construct & SuitableRep
+    def rep_construct(a):
+        return a
+
+    class SuitableRep:
+        def __init__(self, bindings):
+            pass
+
+        def __call__(self, obj):
+            return np.ndarray
+
     match node:
         case Plan(bodies):
             return Plan(tuple(_format_queries(body, bindings) for body in bodies))
         case Query(lhs, rhs) if not isinstance(rhs, Reformat | Table):
             rep = SuitableRep(bindings)(rhs)
             bindings[lhs] = rep
-            return Value(rep, type(rep))
+            tns = rep_construct(rep)
+            return Query(lhs, Reformat(tns, rhs))
         case Query(lhs, rhs) as query:
             bindings[lhs] = SuitableRep(bindings)(rhs)
             return query
         case _:
             return node
+
+
+def record_tables(root: LogicNode) -> tuple[LogicNode, dict, dict]:
+    tables: dict[Alias, ntn.Variable] = {}
+    dim_sizes: dict[ntn.Variable, ntn.Call] = {}
+
+    def rule_0(node):
+        match node:
+            case Query(Alias(a), Table(Literal(val), fields) as tbl):
+                table_var = ntn.Variable(a, type(val))
+                tables[Alias(a)] = table_var
+                for idx, field in enumerate(fields):
+                    assert isinstance(field, Field)
+                    dim_size_var = ntn.Variable(f"{field.name}_size", int)
+                    if dim_size_var not in dim_sizes:
+                        dim_sizes[dim_size_var] = ntn.Call(
+                            ntn.Literal(ntn.dimension), (table_var, ntn.Literal(idx))
+                        )
+
+                return Query(Alias(a), table_var)
+
+    return Rewrite(PostWalk(rule_0))(root), tables, dim_sizes
 
 
 class LogicCompiler:
@@ -261,4 +341,5 @@ class LogicCompiler:
 
     def __call__(self, prgm: LogicNode) -> ntn.NotationNode:
         prgm = format_queries(prgm)
-        return self.ll(prgm)
+        prgm, tables, dim_sizes = record_tables(prgm)
+        return self.ll(prgm, tables, dim_sizes)
