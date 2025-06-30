@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
@@ -8,11 +8,12 @@ from ..algebra import element_type, query_property, return_type
 from ..symbolic import Term, TermTree
 
 
-# Base class for all Finch Notation nodes
-class NotationNode(Term):
+@dataclass(eq=True, frozen=True)
+class NotationNode(Term, ABC):
     """
     NotationNode
 
+    Base class for all Finch Notation nodes
     """
 
     @classmethod
@@ -29,6 +30,7 @@ class NotationNode(Term):
         return cls(*children)
 
 
+@dataclass(eq=True, frozen=True)
 class NotationTree(NotationNode, TermTree):
     @property
     @abstractmethod
@@ -82,6 +84,9 @@ class Value(NotationExpression):
 class Variable(NotationExpression):
     """
     Notation AST expression for a variable named `name`.
+
+    Attributes:
+        name: The name of the variable.
     """
 
     name: str
