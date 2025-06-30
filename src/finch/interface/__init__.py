@@ -44,6 +44,7 @@ from .eager import (
     tensordot,
     truediv,
     vecdot,
+    log,
 )
 
 # from .tensor import *
@@ -105,4 +106,5 @@ __all__ = [
     "tensordot",
     "truediv",
     "vecdot",
+    "log",
 ]

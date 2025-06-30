@@ -510,3 +510,8 @@ def atan2(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.atan2(x1, x2)
     return compute(lazy.atan2(x1, x2))
+
+def log(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log(x)
+    return compute(lazy.log(x))

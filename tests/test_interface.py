@@ -216,6 +216,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((finch.acosh, np.acosh), np.acosh),
         ((finch.atan, np.atan), np.atan),
         ((finch.atanh, np.atanh), np.atanh),
+        ((finch.log, np.log), np.log),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):

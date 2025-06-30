@@ -982,3 +982,6 @@ def atanh(x) -> LazyTensor:
 
 def atan2(x1, x2) -> LazyTensor:
     return elementwise(np.atan2, defer(x1), defer(x2))
+
+def log(x) -> LazyTensor:
+    return elementwise(np.log, defer(x))

@@ -56,6 +56,7 @@ from .interface import (
     tensordot,
     truediv,
     vecdot,
+    log,
 )
 from .symbolic import (
     Formattable,
@@ -135,4 +136,5 @@ __all__ = [
     "tensordot",
     "truediv",
     "vecdot",
+    "log",
 ]
