@@ -750,7 +750,7 @@ def test_scheduler_e2e_matmul(a, b):
             Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
             Query(
                 Alias("C"),
-                Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
+                Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)),
             ),
             Produces((Alias("C"),)),
         )

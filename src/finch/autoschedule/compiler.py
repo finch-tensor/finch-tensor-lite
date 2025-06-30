@@ -1,4 +1,4 @@
-from typing import TypeVar, overload
+from typing import TypeVar
 
 import numpy as np
 
@@ -11,7 +11,6 @@ from ..finch_logic import (
     Literal,
     LogicExpression,
     LogicNode,
-    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -19,85 +18,13 @@ from ..finch_logic import (
     Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
     Value,
 )
-from ..symbolic.rewriters import PostWalk, Rewrite
+from ..symbolic.rewriters import Fixpoint, PostWalk, Rewrite
 from ._utils import intersect, setdiff, with_subsequence
 
 T = TypeVar("T", bound="LogicNode")
-
-
-@overload
-def compute_structure(
-    node: Field, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> Field: ...
-
-
-@overload
-def compute_structure(
-    node: Alias, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> Alias: ...
-
-
-@overload
-def compute_structure(
-    node: Subquery, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> Subquery: ...
-
-
-@overload
-def compute_structure(
-    node: Table, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> Table: ...
-
-
-@overload
-def compute_structure(
-    node: LogicTree, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> LogicTree: ...
-
-
-@overload
-def compute_structure(
-    node: LogicExpression, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> LogicExpression: ...
-
-
-@overload
-def compute_structure(
-    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> LogicNode: ...
-
-
-def compute_structure(
-    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> LogicNode:
-    match node:
-        case Field(name):
-            return fields.setdefault(name, Field(f"{len(fields) + len(aliases)}"))
-        case Alias(name):
-            return aliases.setdefault(name, Alias(f"{len(fields) + len(aliases)}"))
-        case Subquery(Alias(name) as lhs, arg):
-            if name in aliases:
-                return aliases[name]
-            arg_2 = compute_structure(arg, fields, aliases)
-            lhs_2 = compute_structure(lhs, fields, aliases)
-            return Subquery(lhs_2, arg_2)
-        case Table(tns, idxs):
-            assert isinstance(tns, Literal), "tns must be an Literal"
-            return Table(
-                Literal(type(tns.val)),
-                tuple(compute_structure(idx, fields, aliases) for idx in idxs),
-            )
-        case LogicTree() as tree:
-            return tree.make_term(
-                tree.head(),
-                *(compute_structure(arg, fields, aliases) for arg in tree.children),
-            )
-        case _:
-            return node
 
 
 class PointwiseLowerer:
@@ -133,6 +60,8 @@ class PointwiseLowerer:
                 return ntn.Value(ex, type_)
             case Reorder(arg, _):
                 return self(arg, tables)
+            case Field(name):
+                return ntn.Variable(name, int)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -160,23 +89,25 @@ class LogicLowerer:
         self.mode = mode
 
     def __call__(
-        self, ex: LogicNode, tables: dict, dim_sizes: dict
+        self, ex: LogicNode, table_vars: dict[Alias, ntn.Variable], dim_sizes: dict
     ) -> ntn.NotationNode:
         match ex:
             case Query(Alias(name), Table(tns, _)):
                 return ntn.Assign(
                     ntn.Variable(name, type(tns)), compile_logic_constant(tns)
                 )
+            case Query(Alias(a_name), ntn.Variable(v_name, _)) if a_name == v_name:
+                # we already removed tables
+                return ntn.Block(())
             case Query(
                 Alias(name) as lhs,
                 Reformat(tns, Reorder(Relabel(Alias(_) as arg, idxs_1), idxs_2)),
             ):
                 loop_idxs = with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
                 (rhs, rhs_idxs) = compile_pointwise_logic(
-                    Relabel(arg, idxs_1), list(loop_idxs), tables
+                    Relabel(arg, idxs_1), list(loop_idxs), table_vars
                 )
-                lhs_idxs = ...
-                # TODO: mostly the same as aggregate
+                # TODO: mostly the same as aggregate, used for explicit transpose
                 raise NotImplementedError
 
             case Query(
@@ -189,10 +120,11 @@ class LogicLowerer:
                     Query(
                         lhs,
                         Reformat(
-                            tns, Aggregate(initwrite(fv), Literal(fv), reorder, ())
+                            tns,
+                            Aggregate(initwrite(fv), Literal(fv), reorder, ()),
                         ),  # TODO: initwrite
                     ),
-                    tables,
+                    table_vars,
                     dim_sizes,
                 )
 
@@ -203,23 +135,24 @@ class LogicLowerer:
                     Aggregate(Literal(op), Literal(init), Reorder(arg, idxs_2), idxs_1),
                 ),
             ):
-                (rhs, rhs_idxs) = compile_pointwise_logic(arg, list(idxs_2), tables)
-                lhs_idxs = tuple(idx for idx in setdiff(idxs_2, idxs_1))
-                agg_res = ntn.Variable(name, type(tns))
+                (rhs, rhs_idxs) = compile_pointwise_logic(arg, list(idxs_2), table_vars)
+                lhs_idxs = setdiff(idxs_2, idxs_1)
+                agg_res = ntn.Variable(name, tns)
+                table_vars[lhs] = agg_res
                 declaration = ntn.Declare(
                     agg_res,
                     ntn.Literal(init),
                     ntn.Literal(op),
-                    tuple(ntn.Variable(f"{idx}_size") for idx in lhs_idxs),
+                    tuple(ntn.Variable(f"{idx.name}_size", int) for idx in lhs_idxs),
                 )
 
-                body = ntn.Block(
+                body: ntn.Block | ntn.Loop = ntn.Block(
                     (
                         ntn.Increment(
                             ntn.Access(
                                 agg_res,
                                 ntn.Update(ntn.Literal(op)),
-                                lhs_idxs,
+                                tuple(ntn.Variable(idx.name, int) for idx in lhs_idxs),
                             ),
                             rhs,
                         ),
@@ -228,8 +161,8 @@ class LogicLowerer:
                 for idx in idxs_2:
                     if idx in rhs_idxs:
                         body = ntn.Loop(
-                            ntn.Variable(idx.name),
-                            ntn.Variable(f"{idx.name}_size"),
+                            ntn.Variable(idx.name, int),
+                            ntn.Variable(f"{idx.name}_size", int),
                             body,
                         )
                     elif idx in lhs_idxs:
@@ -248,32 +181,33 @@ class LogicLowerer:
                     )
                 )
 
-            case Produces(args):
+            case Plan((Produces(args),)):
                 assert len(args) == 1, "Only single return object is supported"
                 match args[0]:
                     case Reorder(Relabel(Alias(name), idxs_1), idxs_2) if set(
                         idxs_1
                     ) == set(idxs_2):
                         raise Exception("TODO: not supported")
-                    case Reorder(Alias(name) as tns, _) | Relabel(
-                        Alias(name) as tns, _
+                    case Reorder(Alias(name) as alias, _) | Relabel(
+                        Alias(name) as alias, _
                     ):
-                        arg = ntn.Variable(name)
-                    case Alias(name):
-                        arg = ntn.Variable(name)
-                    case arg:
-                        raise Exception(f"Unrecognized logic: {arg}")
-                return ntn.Return(arg)
+                        tbl_var = table_vars[alias]
+                    case Alias(name) as alias:
+                        tbl_var = table_vars[alias]
+                    case any:
+                        raise Exception(f"Unrecognized logic: {any}")
+                return ntn.Return(tbl_var)
 
             case Plan(bodies):
+                func_block = ntn.Block(
+                    tuple(self(body, table_vars, dim_sizes) for body in bodies)
+                )
                 return ntn.Module(
                     (
                         ntn.Function(
                             ntn.Variable("func", np.ndarray),
-                            tuple(var for var in tables.values()),
-                            ntn.Block(
-                                tuple(self(body, tables, dim_sizes) for body in bodies)
-                            ),
+                            tuple(var for var in table_vars.values()),
+                            func_block,
                         ),
                     )
                 )
@@ -302,6 +236,7 @@ def _format_queries(node: LogicNode, bindings: dict) -> LogicNode:
         case Plan(bodies):
             return Plan(tuple(_format_queries(body, bindings) for body in bodies))
         case Query(lhs, rhs) if not isinstance(rhs, Reformat | Table):
+            assert isinstance(rhs, LogicExpression)
             rep = SuitableRep(bindings)(rhs)
             bindings[lhs] = rep
             tns = rep_construct(rep)
@@ -313,33 +248,61 @@ def _format_queries(node: LogicNode, bindings: dict) -> LogicNode:
             return node
 
 
-def record_tables(root: LogicNode) -> tuple[LogicNode, dict, dict]:
-    tables: dict[Alias, ntn.Variable] = {}
-    dim_sizes: dict[ntn.Variable, ntn.Call] = {}
+def initwrite(*args):
+    raise NotImplementedError
+
+
+def record_tables(root: LogicNode) -> tuple[LogicNode, dict, dict, dict]:
+    # alias to notation variable mapping
+    table_vars: dict[Alias, ntn.Variable] = {}
+    # store loop extent variable
+    dim_size_vars: dict[ntn.Variable, ntn.Call] = {}
+    # actual tables
+    tables: dict[Alias, Table] = {}
 
     def rule_0(node):
         match node:
-            case Query(Alias(a), Table(Literal(val), fields) as tbl):
-                table_var = ntn.Variable(a, type(val))
-                tables[Alias(a)] = table_var
+            case Query(Alias(name) as alias, Table(Literal(val), fields)):
+                table_var = ntn.Variable(name, type(val))
+                table_vars[alias] = table_var
+                tables[alias] = val
                 for idx, field in enumerate(fields):
                     assert isinstance(field, Field)
                     dim_size_var = ntn.Variable(f"{field.name}_size", int)
-                    if dim_size_var not in dim_sizes:
-                        dim_sizes[dim_size_var] = ntn.Call(
+                    if dim_size_var not in dim_size_vars:
+                        dim_size_vars[dim_size_var] = ntn.Call(
                             ntn.Literal(ntn.dimension), (table_var, ntn.Literal(idx))
                         )
 
-                return Query(Alias(a), table_var)
+                return Query(alias, table_var)
 
-    return Rewrite(PostWalk(rule_0))(root), tables, dim_sizes
+    processed_root = Rewrite(PostWalk(rule_0))(root)
+    return processed_root, table_vars, dim_size_vars, tables
+
+
+def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:
+    def rule_0(node):
+        match node:
+            case ntn.Block((ntn.Block(bodies), *tail)):
+                return ntn.Block(bodies + tuple(tail))
+
+    return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
 
 class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm: LogicNode) -> ntn.NotationNode:
+    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict]:
         prgm = format_queries(prgm)
-        prgm, tables, dim_sizes = record_tables(prgm)
-        return self.ll(prgm, tables, dim_sizes)
+        prgm, table_vars, dim_size_vars, tables = record_tables(prgm)
+        lowered_prgm = self.ll(prgm, table_vars, dim_size_vars)
+
+        for table_var in table_vars:
+            # include return tables and intermediaries
+            if table_var not in tables:
+                tables[table_var] = np.zeros(
+                    dtype=np.float64, shape=()
+                )  # select correct dtype
+
+        return merge_blocks(lowered_prgm), tables

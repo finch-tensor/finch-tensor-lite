@@ -20,8 +20,6 @@ class NotationNode(Term):
         """Returns the head of the node."""
         return cls
 
-
-class NotationTree(NotationNode, TermTree):
     @classmethod
     def make_term(cls, head, *children):
         return head.from_children(*children)
@@ -29,6 +27,13 @@ class NotationTree(NotationNode, TermTree):
     @classmethod
     def from_children(cls, *children):
         return cls(*children)
+
+
+class NotationTree(NotationNode, TermTree):
+    @property
+    @abstractmethod
+    def children(self) -> list[NotationNode]:  # type: ignore[override]
+        ...
 
 
 class NotationExpression(NotationNode):
@@ -414,9 +419,10 @@ class Function(NotationTree):
         return [self.name, *self.args, self.body]
 
     @classmethod
-    def from_children(cls, name, *args, body):
+    def from_children(cls, name, *args_body):
         """Creates a term with the given head and arguments."""
-        return cls(name, args, body)
+        *args, body = args_body
+        return cls(name, tuple(args), body)
 
 
 @dataclass(eq=True, frozen=True)
