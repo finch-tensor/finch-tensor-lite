@@ -18,6 +18,14 @@ class EagerTensor(OverrideTensor, ABC):
         """Number of dimensions of the tensor."""
         raise NotImplementedError("Subclasses must implement ndim.")
 
+    @abstractmethod
+    def __getitem__(self, key):
+        """
+        Get an item from the tensor using the provided key.
+        The key can be an integer, slice, or tuple of integers/slices.
+        """
+        raise NotImplementedError("Subclasses must implement __getitem__.")
+
     def __add__(self, other):
         return add(self, other)
 
@@ -481,6 +489,71 @@ def broadcast_arrays(*args):
         return lazy.broadcast_arrays(*args)
     # compute can take in a list of LazyTensors
     return compute(lazy.broadcast_arrays(*args))
+
+
+def concat(arrays: tuple | list, /, *, axis: int | None = 0):
+    """
+    Concatenates a sequence of arrays along an existing axis.
+
+    Parameters
+    ----------
+    arrays: tuple or list
+        A sequence of arrays to concatenate. Arrays must have the same shape
+        except in the dimension corresponding to the specified axis.
+    axis: int, optional
+        The axis along which to concatenate the arrays. Default is 0. If None,
+        the arrays are flattened before concatenation.
+
+    Returns
+    -------
+    out: array
+        A new concatenated array.
+    """
+    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
+        return lazy.concat(arrays, axis=axis)
+    return compute(lazy.concat(arrays, axis=axis))
+
+
+def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
+    """
+    Moves array axes (dimensions) to new positions,
+    while leaving other axes in their original positions.
+
+    Args
+    ---------
+    - x (array) - input array.
+    - sources - Axes to move.
+    - destination - indices defining the desired
+    positions for each respective source axis index.
+
+    Returns
+    --------
+    - out (array) - an array containing reordered axes.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.moveaxis(x, source, destination)
+    return compute(lazy.moveaxis(x, source, destination))
+
+
+def stack(arrays: Sequence, /, *, axis: int = 0):
+    """
+    Stacks a sequence of arrays along a new axis.
+
+    Parameters
+    ----------
+    arrays: Sequence
+        A sequence of arrays to stack. All arrays must have the same shape.
+    axis: int, optional
+        The axis along which to stack the arrays. Default is 0.
+
+    Returns
+    -------
+    out: array
+        A new array with the stacked arrays along the specified axis.
+    """
+    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
+        return lazy.stack(arrays, axis=axis)
+    return compute(lazy.stack(arrays, axis=axis))
 
 
 # trigonometric functions:

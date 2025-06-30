@@ -47,7 +47,7 @@ class OverrideTensor(ABC):
     @abstractmethod
     def override_module(self):
         """Return the module that implements the override logic."""
-        ...
+        raise NotImplementedError("No module override defined.")
 
     def __array_function__(self, func, types, args, kwargs):
         """Override NumPy functions using the __array_function__ protocol."""

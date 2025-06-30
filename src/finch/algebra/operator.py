@@ -116,3 +116,66 @@ algebra.register_property(
     "return_type",
     lambda op, x, y: y,
 )
+
+
+def first(*args):
+    """
+    Returns the first argument passed to it.
+    """
+    return args[0] if args else None
+
+
+algebra.register_property(
+    first,
+    "__call__",
+    "return_type",
+    # args[0] is the function name
+    lambda *args: args[1],
+)
+
+
+def choose_if(a, condition):
+    """
+    If the condition is falsy, returns the first argument;
+    otherwise, returns the default value associated with the type
+    of a, which is typically zero.
+
+    This is useful for selecting elements.
+
+    Note: The reason for not making this a general terenary operator is to
+    guarantee that the return type is always the same as the type of a.
+    """
+    if not condition:
+        return a.__class__()
+    return a
+
+
+algebra.register_property(
+    choose_if,
+    "__call__",
+    "return_type",
+    lambda op, a, condition: a,
+)
+
+
+def logical_or(a, b):
+    """
+    Returns the first truthy value between a and b.
+    If both are falsy, returns the default value associated with the type of a.
+    """
+    return a or b
+
+
+algebra.register_property(
+    logical_or,
+    "__call__",
+    "return_type",
+    lambda op, a, b: a or b,
+)
+
+algebra.register_property(
+    logical_or,
+    "__call__",
+    "init_value",
+    lambda op, a: a(False),
+)

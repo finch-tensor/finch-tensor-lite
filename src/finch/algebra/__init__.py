@@ -16,7 +16,10 @@ from .algebra import (
 )
 from .operator import (
     InitWrite,
+    choose_if,
     conjugate,
+    first,
+    logical_or,
     overwrite,
     promote_max,
     promote_min,
@@ -41,5 +44,8 @@ __all__ = [
     "promote_max",
     "conjugate",
     "overwrite",
+    "first",
     "InitWrite",
+    "choose_if",
+    "logical_or",
 ]

@@ -4,23 +4,24 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
-from numpy.core.numeric import normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
-from ..algebra import conjugate as conj
 from ..algebra import (
+    choose_if,
     element_type,
     fill_value,
+    first,
     fixpoint_type,
     init_value,
+    logical_or,
     promote_max,
     promote_min,
-    register_property,
     return_type,
 )
+from ..algebra import conjugate as conj
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -459,25 +460,29 @@ def reduce(
     return LazyTensor(identify(data), shape, init, dtype)
 
 
-def _broadcast_shape(*args) -> tuple[int, ...]:
+def _broadcast_shape(*args: tuple[int, ...]) -> tuple[int, ...]:
     """
     Computes the broadcasted shape for the given LazyTensor arguments,
-    following arrray_api broadcasting rules.
+    following array_api broadcasting rules.
     Raises ValueError if shapes are not broadcastable.
+
+    Parameters:
+    --------------
+    - *args: Variable number of tuples representing shapes of LazyTensors.
+
+    Returns:
+    --------------
+    tuple[int, ...]: The broadcasted shape as a tuple of integers.
     """
-    # Only support two arguments for now, as in the algorithm
     if len(args) < 2:
-        return args[0].shape if args else ()
-    shape1 = args[0].shape
-    shape2 = args[1].shape
-    N1 = len(shape1)
-    N2 = len(shape2)
+        return args[0] if args else ()
+    shape1, shape2 = args[0], args[1]
+    N1, N2 = len(shape1), len(shape2)
     N = builtins.max(N1, N2)
     _shape = [0] * N
     for i in range(N - 1, -1, -1):
-        n1 = N1 - N + i
+        n1, n2 = N1 - N + i, N2 - N + i
         d1 = shape1[n1] if n1 >= 0 else 1
-        n2 = N2 - N + i
         d2 = shape2[n2] if n2 >= 0 else 1
         if d1 == 1:
             _shape[i] = d2
@@ -486,12 +491,10 @@ def _broadcast_shape(*args) -> tuple[int, ...]:
         else:
             raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
     shape = tuple(_shape)
-    # If more than two args, reduce the args using broadcast
+
     if len(args) > 2:
         for arg in args[2:]:
-            shape = _broadcast_shape(
-                SimpleNamespace(shape=tuple(shape), ndim=len(shape)), arg
-            )
+            shape = _broadcast_shape(shape, arg)
     return shape
 
 
@@ -519,7 +522,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
     args = tuple(defer(a) for a in args)
-    shape = _broadcast_shape(*args)
+    shape = _broadcast_shape(*(arg.shape for arg in args))
     ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs = []
@@ -827,15 +830,13 @@ def tensordot(
     if not isinstance(axes, tuple):
         N = int(axes)
         if N < 0:
-            raise ValueError("axes must be non-negative")
+            raise ValueError("expected axes to be a non-negative integer")
         axes_a = list(range(x1.ndim - N, x1.ndim))
         axes_b = list(range(N))
     else:
         axes_a, axes_b = (list(ax) for ax in axes)
-        axes_a = [axes_a] if isinstance(axes_a, int) else list(axes_a)
-        axes_b = [axes_b] if isinstance(axes_b, int) else list(axes_b)
 
-    # Normalize negative axes
+    # Normalize negative axes. We need list
     axes_a = [(a if a >= 0 else x1.ndim + a) for a in axes_a]
     axes_b = [(b if b >= 0 else x2.ndim + b) for b in axes_b]
 
@@ -851,7 +852,6 @@ def tensordot(
     notin_b = [k for k in range(x2.ndim) if k not in axes_b]
     newaxes_a = notin_a + axes_a
     newaxes_b = axes_b + notin_b
-
     # Permute
     x1p = permute_dims(x1, tuple(newaxes_a))
     x2p = permute_dims(x2, tuple(newaxes_b))
@@ -899,23 +899,22 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
 
 # Manipulation functions
-def first(*args):
-    """
-    Returns the first argument passed to it.
-    """
-    return args[0] if args else None
+class NoneArray:
+    def __init__(self, shape):
+        self.shape = shape
+        self.fill_value = None
+        self.element_type = None
+        self.dtype = None
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    def __getitem__(self, idxs):
+        return None
 
 
-register_property(
-    first,
-    "__call__",
-    "return_type",
-    # args[0] is the function name
-    lambda *args: args[1],
-)
-
-
-def broadcast_to(tensor: LazyTensor, /, shape: tuple[int, ...]) -> LazyTensor:
+def broadcast_to(tensor, /, shape: tuple[int, ...]) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.
 
@@ -926,41 +925,13 @@ def broadcast_to(tensor: LazyTensor, /, shape: tuple[int, ...]) -> LazyTensor:
     Returns:
         A new lazy tensor with the specified shape.
     """
-    from .eager import EagerTensor
-
-    class NoneArray(EagerTensor):
-        def __init__(self, shape):
-            self.shape = shape
-            self.fill_value = None
-            self.element_type = None
-            self.dtype = None
-
-        @property
-        def ndim(self):
-            return len(self.shape)
-
-        def __getitem__(self, idxs):
-            return None
+    tensor = defer(tensor)
 
     if not is_broadcastable_directional(tensor.shape, shape):
-        # If the tensor is already broadcastable to the shape, return it as is
         raise ValueError(
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    # elementwise does not support zero-dimensional tensors, so we
-    # handle that case separately
-    if builtins.any(dim == 0 for dim in shape):
-        # If any dimension is zero, return an empty tensor
-        return LazyTensor(
-            # We need a better way to represent an empty tensor, for now we use
-            # an empty numpy array
-            Table(Immediate(np.empty(shape, dtype=element_type(tensor))), idxs=()),
-            shape,
-            None,
-            element_type(tensor),
-        )
-
     return elementwise(first, tensor, NoneArray(shape))
 
 
@@ -968,8 +939,154 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
     """
     Broadcasts one or more arrays against one another.
     """
-    shape = _broadcast_shape(*arrays)
+    shape = _broadcast_shape(*(array.shape for array in arrays))
     return tuple(broadcast_to(arr, shape) for arr in arrays)
+
+
+def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
+    """
+    Concatenates input tensors along the specified axis using identity matrix placement.
+
+    Parameters:
+        arrays: Sequence of tensors to concatenate (tuple or list of LazyTensor)
+        axis: Axis along which to concatenate (default=0)
+
+    Returns:
+        Concatenated tensor as LazyTensor
+    """
+    arrays = [defer(arr) for arr in arrays]
+
+    if axis is None:
+        # flatten all tensors
+        for i, t in enumerate(arrays):
+            arrays[i] = flatten(t)
+        axis = 0
+
+    # Convert axis to positive index and validate
+    ndim = arrays[0].ndim
+    axis = normalize_axis_index(axis, ndim)
+
+    # Validate shapes and compute total size
+    sizes = []  # used to build shift matrices
+    total_size = 0
+
+    for t in arrays:
+        if t.ndim != ndim:
+            raise ValueError("All tensors must have same number of dimensions")
+        sizes.append(t.shape[axis])
+        total_size += t.shape[axis]
+
+    # Helper to create numpy shift matrix
+    def build_shift_matrix(offset: int, size: int) -> LazyTensor:
+        """Creates a lazy shift matrix that positions tensor at given offset"""
+        mat = np.zeros((size, total_size), dtype=np.int8)
+        for j in range(size):
+            mat[j, offset + j] = 1
+        return defer(mat)
+
+    # Build result by summing positioned tensors
+    cumulative_offset = 0
+    result = None
+
+    for i, tensor in enumerate(arrays):
+        size = sizes[i]
+        I_i = build_shift_matrix(cumulative_offset, size)
+
+        # Do a tensordot but with different operations
+        # premute tensor
+        axis_permutation = tuple(i for i in range(tensor.ndim) if i != axis) + (axis,)
+        permuted_tensor = permute_dims(tensor, axis_permutation)
+        # add 1-dim at the end of permuted_tensor for broadcasting
+        permuted_tensor = expand_dims(permuted_tensor, -1)
+
+        # Contract tensor with identity matrix along the concatenation axis
+        placed = reduce(
+            logical_or,
+            elementwise(choose_if, permuted_tensor, I_i),
+            axis=-2,
+        )
+        # permute back
+        placed_perm = moveaxis(placed, -1, axis)
+
+        # Initialize or accumulate result
+        result = placed_perm if result is None else result + placed_perm
+
+        cumulative_offset += size
+    assert result is not None
+    return result
+
+
+def flatten(x):
+    """
+    Flattens the input tensor `x` into a 1D tensor along the specified axis.
+    Parameters
+    ----------
+    x: LazyTensor
+        The input tensor to be flattened.
+    Returns
+    -------
+    LazyTensor
+        A new LazyTensor that is a flattened version of `x`.
+    """
+    # TODO: This is a stub implementation.
+    from finch import compute
+
+    x = defer(x)
+    if x.ndim == 0:
+        # If x is a scalar, return it as is
+        return x
+    computed = compute(x)
+    if isinstance(computed, OverrideTensor):
+        # If the computed tensor is an OverrideTensor, we need to flatten it
+        # using its underlying data.
+        for possible_name in ["data", "value", "array"]:
+            if hasattr(computed, possible_name):
+                computed = getattr(computed, possible_name)
+                break
+
+    assert isinstance(computed, np.ndarray), "Flatten currently supports numpy arrays"
+    # Flatten the computed array
+    flattened = computed.flatten()
+    return defer(flattened)
+
+
+def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
+    """
+    Moves axes of an array to new positions.
+    """
+    # argument validation
+    # handles uniqueness, int -> tuple, and bound check
+    source = normalize_axis_tuple(source, x.ndim, "source")
+    destination = normalize_axis_tuple(destination, x.ndim, "destination")
+
+    if len(source) != len(destination):
+        raise ValueError("Source and Destination indices must have the same length")
+
+    x = defer(x)
+
+    final_order = [i for i in range(x.ndim) if i not in source]
+    for dest, src in sorted(zip(destination, source, strict=True)):
+        final_order.insert(dest, src)
+
+    return permute_dims(x, axis=tuple(final_order))
+
+
+def stack(arrays, /, axis: int = 0) -> LazyTensor:
+    """
+    Stacks input tensors along a new axis using identity matrix placement.
+    Parameters:
+        arrays: Sequence of tensors to stack (tuple or list of LazyTensor)
+        axis: Axis along which to stack (default=0)
+    Returns:
+        Stacked tensor as LazyTensor
+    """
+    if not isinstance(arrays, tuple | list):
+        raise TypeError("arrays must be a tuple or list of LazyTensors")
+    arrays = [defer(arr) for arr in arrays]
+    # add 1-dim at the axis position for stacking
+    arrays = tuple(expand_dims(x, axis=axis) for x in arrays)
+    # concat, this will also do the shape verification
+    return concat(arrays, axis=axis)
 
 
 def sin(x) -> LazyTensor:

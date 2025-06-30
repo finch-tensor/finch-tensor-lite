@@ -9,7 +9,7 @@ import finch
 
 
 # Utility function to generate random complex numpy tensors
-def random_complex_array(shape):
+def random_array(shape, dtype=np.complex128):
     """Generates a random complex array. Uses integers for both real
     and imaginary parts to avoid floating-point issues in tests.
 
@@ -19,10 +19,18 @@ def random_complex_array(shape):
     Returns:
         A NumPy array of complex numbers with the given shape.
     """
-    rng = np.random.default_rng()
-    real_part = rng.integers(0, 10, shape)
-    imag_part = rng.integers(0, 10, shape)
-    return real_part + 1j * imag_part
+    rng = np.random.default_rng(42)  # Use a fixed seed for reproducibility
+    if dtype is bool:
+        arr = rng.integers(0, 2, size=shape).astype(dtype)
+    elif np.issubdtype(dtype, np.integer):
+        arr = rng.integers(-100, 100, size=shape).astype(dtype)
+    elif np.issubdtype(dtype, complex):
+        real = rng.random(size=shape).astype(np.float32)
+        imag = rng.random(size=shape).astype(np.float32)
+        arr = (real + 1j * imag).astype(dtype)
+    else:
+        arr = rng.random(size=shape).astype(dtype)
+    return arr
 
 
 @pytest.mark.parametrize(
@@ -286,8 +294,8 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
         (np.arange(1 * 3 * 2).reshape(1, 3, 2), np.arange(5 * 2 * 3).reshape(5, 2, 3)),
         # Complex numbers, 4D x 5D
         (
-            random_complex_array((2, 3, 4, 5)),
-            random_complex_array((3, 5, 6)),
+            random_array((2, 3, 4, 5)),
+            random_array((3, 5, 6)),
         ),
         # mismatch dimensions
         (
@@ -338,9 +346,13 @@ def test_matmul(a, b, a_wrap, b_wrap):
         result_with_op = finch.compute(result_with_op)
         result_with_np = finch.compute(result_with_np)
 
-    assert_equal(result, expected)
-    assert_equal(result_with_op, expected)
-    assert_equal(result_with_np, expected)
+    assert isinstance(result, np.ndarray)
+    assert expected.dtype == result.dtype, (
+        f"Expected dtype {expected.dtype}, got {result.dtype}"
+    )
+    assert_allclose(result, expected)
+    assert_allclose(result_with_op, expected)
+    assert_allclose(result_with_np, expected)
 
 
 @pytest.mark.parametrize(
@@ -350,7 +362,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
         np.arange(12).reshape(1, 12),
         np.arange(24).reshape(2, 3, 4),  # 3D array
         # Complex
-        random_complex_array((5, 1, 4)),
+        random_array((5, 1, 4)),
     ],
 )
 @pytest.mark.parametrize(
@@ -399,10 +411,10 @@ def test_matrix_transpose(a, a_wrap):
         (np.arange(3), np.arange(4), 0),
         (np.arange(8 * 7 * 5).reshape(8, 7, 5), np.arange(12).reshape(3, 4, 1), 0),
         # complex
-        (random_complex_array((2, 3)), random_complex_array((3, 4)), 1),
+        (random_array((2, 3)), random_array((3, 4)), 1),
         (
-            random_complex_array((3, 5, 4, 6)),
-            random_complex_array((6, 4, 5, 3)),
+            random_array((3, 5, 4, 6)),
+            random_array((6, 4, 5, 3)),
             ([2, 1, 3], [1, 2, 0]),
         ),
         # mismatched axes (should raise)
@@ -444,8 +456,8 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
         assert isinstance(result, finch.LazyTensor)
         result = finch.compute(result)
-
-    assert_equal(result, expected)
+    assert isinstance(result, np.ndarray)  # for type checker
+    assert_allclose(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -517,7 +529,6 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
     """
     wx1 = x1_wrap(x1)
     wx2 = x2_wrap(x2)
-
     try:
         expected = np.linalg.vecdot(x1, x2, axis=axis)
     except ValueError:
@@ -667,7 +678,7 @@ def test_scalar_coerce(x, func):
         (np.array([1, 2, 3]), (2, 2)),
         # mismatched non-1 dim in middle
         (np.ones((2, 3, 4)), (2, 5, 4)),
-        # boradcast on right side
+        # broadcast on right side
         (np.arange(3).reshape(3, 1), (2, 3, 1, 5)),
     ],
 )
@@ -696,6 +707,7 @@ def test_broadcast_to(x, shape, x_wrap):
         out = finch.broadcast_to(wx, shape)
         if isinstance(wx, finch.LazyTensor):
             out = finch.compute(out)
+        assert not isinstance(out, tuple)  # for type checker
         assert_equal(out, expected, "values mismatch")
         assert out.shape == shape, f"shape mismatch: got {out.shape}"
 
@@ -747,3 +759,232 @@ def test_broadcast_arrays(shapes, wrapper):
             f"Shape mismatch: got {res.shape}, expected {exp.shape} at index {i}"
         )
         assert_equal(res, exp, "Values mismatch in broadcasted arrays")
+
+
+@pytest.mark.parametrize(
+    "shapes_and_types, axis",
+    [
+        # Basic concatenation along axis 0 - same types
+        ([(2, 3, np.float32), (2, 3, np.float32), (2, 3, np.float32)], 0),
+        # Different shapes along concat axis
+        ([(2, 3, np.int32), (4, 3, np.int32), (3, 3, np.int32)], 0),
+        # Concatenation along axis 1
+        ([(3, 2, np.float64), (3, 4, np.float64), (3, 1, np.float64)], 1),
+        # Mixed types - int and float promotion
+        ([(2, 3, np.int32), (2, 3, np.float64), (2, 3, np.float32)], 0),
+        # Bool and numeric promotion
+        ([(3, 2, bool), (3, 2, np.int8), (3, 2, np.uint8)], 0),
+        # Concatenation with complex types
+        ([(2, 3, np.complex64), (2, 3, np.float32), (2, 3, np.int32)], 0),
+        # 3D arrays with negative axis
+        ([(2, 3, 4, np.float32), (5, 3, 4, np.float32), (1, 3, 4, np.int64)], -3),
+        # Empty arrays with mixed types
+        ([(0, 3, np.float32), (0, 3, np.float64)], 0),
+        # Single array (no-op) with special type
+        ([(2, 3, np.uint16)], 0),
+        # Flattened concatenation with axis=None - mixed types
+        ([(2, 3, np.int32), (3, 2, np.float32), (1, 1, np.complex64)], None),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_concat(shapes_and_types, axis, wrapper):
+    """
+    Tests for concatenating arrays along specified axis with various types.
+    """
+    # Generate arrays for each shape and type
+    rng = np.random.default_rng(42)  # Fixed seed for reproducibility
+    arrays = []
+
+    for shape_and_type in shapes_and_types:
+        shape, dtype = shape_and_type[:-1], shape_and_type[-1]
+        if dtype == bool:  # noqa: E721
+            arr = rng.integers(0, 2, size=shape).astype(dtype)
+        elif np.issubdtype(dtype, np.integer):
+            arr = rng.integers(-100, 100, size=shape).astype(dtype)
+        elif np.issubdtype(dtype, complex):
+            real = rng.random(size=shape).astype(np.float32)
+            imag = rng.random(size=shape).astype(np.float32)
+            arr = (real + 1j * imag).astype(dtype)
+        else:
+            arr = rng.random(size=shape).astype(dtype)
+        arrays.append(arr)
+
+    # Apply wrapper (randomly to ensure mixed types work)
+    import random
+
+    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
+
+    try:
+        # Get expected result from NumPy
+        expected = np.concatenate(arrays, axis=axis)
+    except (ValueError, TypeError):
+        # Check that finch also raises an error
+        with pytest.raises((ValueError, TypeError)):
+            finch.concat(wrapped_arrays, axis=axis)
+        return
+
+    # Test finch's implementation
+    result = finch.concat(wrapped_arrays, axis=axis)
+
+    # Evaluate lazy tensors if needed
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+
+    assert not isinstance(result, tuple)  # for type checker
+    # Verify results
+    assert result.shape == expected.shape, (
+        f"Shape mismatch: got {result.shape}, expected {expected.shape}"
+    )
+    assert result.dtype == expected.dtype, (
+        f"Type mismatch: got {result.dtype}, expected {expected.dtype}"
+    )
+    assert_equal(result, expected, "Values mismatch in concatenated array")
+
+
+@pytest.mark.parametrize(
+    "shapes",
+    [
+        # Incompatible shapes (not matching in non-concatenation dimensions)
+        [(2, 3), (2, 4)],
+        # Different ndims
+        [(2, 3), (2, 3, 4)],
+        # Mixed types but incompatible shapes
+        [(3, 2), (4, 3)],
+    ],
+)
+def test_concat_invalid(shapes):
+    """
+    Tests error handling for invalid concatenation cases.
+    """
+    rng = np.random.default_rng()
+    arrays = [rng.random(shape) for shape in shapes]
+
+    with pytest.raises(ValueError):
+        finch.concat(arrays, axis=0)
+
+
+@pytest.mark.parametrize(
+    "shape, source, destination",
+    [
+        ((3, 4, 5), 0, -3),
+        ((21, 1, 3, 2, 0), -1, -2),
+        ((2, 3, 4), (0, 1), (2, 0)),
+        ((5, 4, 3), (0, 1, 2), (-1, -2, -3)),
+        ((5, 8, 9, 4, 3), (0, 1), (-1, 4)),  # error case
+        ((5, 8, 9, 4, 3), (-9, 1), (-1, 74)),  # error case
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_moveaxis(shape, source, destination, wrapper):
+    """
+    Tests for moving axes of an array to a new position.
+    """
+    # Generate a random array with the specified shape
+    rng = np.random.default_rng(42)  # Fixed seed for reproducibility
+    x = rng.random(shape)
+    # Apply wrapper to input
+    wrapped_x = wrapper(x)
+    # Compute expected result using NumPy
+    try:
+        expected = np.moveaxis(x, source, destination)
+    except ValueError:
+        # If NumPy raises a ValueError, we expect finch to raise the same
+        with pytest.raises(ValueError):
+            finch.moveaxis(wrapped_x, source, destination)
+        return
+
+    result = finch.moveaxis(wrapped_x, source, destination)
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+    assert not isinstance(result, tuple)  # for type checker
+    assert result.dtype == expected.dtype, (
+        f"Type mismatch: got {result.dtype}, expected {expected.dtype}"
+    )
+    assert_equal(result, expected, "Values mismatch in moved axis array")
+
+
+@pytest.mark.parametrize(
+    "shapes_and_types, axis",
+    [
+        # Basic stacking along axis 0 (default)
+        ([(2, 3, np.float32), (2, 3, np.float32), (2, 3, np.float32)], 0),
+        # Stacking along axis 1
+        ([(2, 3, np.float64), (2, 3, np.float64), (2, 3, np.float64)], 1),
+        # Stacking along axis -1 (last dimension)
+        ([(3, 2, np.int32), (3, 2, np.int32), (3, 2, np.int32)], -1),
+        # Mixed types - should promote
+        ([(2, 3, np.int32), (2, 3, np.float64), (2, 3, np.float32)], 0),
+        # Stacking complex types
+        ([(2, 3, np.complex64), (2, 3, np.float32), (2, 3, np.int32)], 0),
+        # Empty arrays
+        ([(0, 3, np.float32), (0, 3, np.float32)], 0),
+        # Single array case
+        ([(2, 3, np.uint16)], 0),
+        # Invalid cases - Different shapes
+        ([(2, 3, np.float32), (3, 3, np.float32)], 0),
+        # Invalid axis (out of bounds)
+        ([(2, 3, np.float32), (2, 3, np.float32)], 3),
+        ([(2, 3, np.float32), (2, 3, np.float32)], -4),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_stack(shapes_and_types, axis, wrapper):
+    """
+    Tests for stacking arrays along a new axis.
+    """
+    # Generate arrays for each shape and type
+    arrays = []
+
+    for shape_and_type in shapes_and_types:
+        shape, dtype = shape_and_type[:-1], shape_and_type[-1]
+        arrays.append(random_array(shape, dtype=dtype))
+
+    # Apply wrapper (randomly to ensure mixed types work)
+    import random
+
+    random.seed(42)  # Fixed seed for reproducibility
+    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
+
+    try:
+        # Get expected result from NumPy
+        expected = np.stack(arrays, axis=axis)
+    except ValueError:
+        # Check that finch also raises an error
+        with pytest.raises(ValueError):
+            finch.stack(wrapped_arrays, axis=axis)
+        return
+
+    # Test finch's implementation
+    result = finch.stack(wrapped_arrays, axis=axis)
+
+    # Evaluate lazy tensors if needed
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+
+    assert not isinstance(result, tuple)  # for type checker
+    # Verify results
+    assert result.dtype == expected.dtype, (
+        f"Type mismatch: got {result.dtype}, expected {expected.dtype}"
+    )
+    assert_equal(result, expected, "Values mismatch in stacked array")
