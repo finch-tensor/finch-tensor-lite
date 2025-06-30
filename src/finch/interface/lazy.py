@@ -319,7 +319,6 @@ def defer(arr) -> LazyTensor:
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    print(0, arr.shape)
     tns = Subquery(name, Table(Literal(arr), idxs))
     return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
 
@@ -1009,7 +1008,6 @@ def broadcast_to(tensor, /, shape: tuple[int, ...]) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    print(1, NoneArray(shape).shape)
     return elementwise(first, tensor, NoneArray(shape))
 
 
