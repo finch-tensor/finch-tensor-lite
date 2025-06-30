@@ -87,6 +87,7 @@ class Variable(NotationExpression):
 
     Attributes:
         name: The name of the variable.
+        type_: The type of the variable.
     """
 
     name: str
