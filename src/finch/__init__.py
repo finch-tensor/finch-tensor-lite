@@ -80,7 +80,6 @@ __all__ = [
     "FiberTensorFormat",
     "Formattable",
     "LazyTensor",
-    "LazyTensor",
     "NumpyBuffer",
     "NumpyBufferFormat",
     "Scalar",
