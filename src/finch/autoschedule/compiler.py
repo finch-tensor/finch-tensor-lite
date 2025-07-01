@@ -32,20 +32,24 @@ class PointwiseLowerer:
         self.bound_idxs = bound_idxs if bound_idxs is not None else []
         self.loop_idxs = loop_idxs if loop_idxs is not None else []
 
-    def __call__(self, ex: LogicNode, tables: dict) -> ntn.NotationNode:
+    def __call__(
+        self,
+        ex: LogicNode,
+        table_vars: dict[Alias, ntn.Variable],
+    ) -> ntn.NotationNode:
         match ex:
             case MapJoin(Literal(op), args):
                 return ntn.Call(
-                    ntn.Literal(op), tuple(self(arg, tables) for arg in args)
+                    ntn.Literal(op), tuple(self(arg, table_vars) for arg in args)
                 )
             case Relabel(Alias(name), idxs_1):
                 self.bound_idxs.extend(idxs_1)
                 return ntn.Unwrap(
                     ntn.Access(
-                        tables[Alias(name)],
+                        table_vars[Alias(name)],
                         ntn.Read(),
                         tuple(
-                            self(idx, tables)
+                            self(idx, table_vars)
                             if idx in self.loop_idxs
                             else ntn.Value(1, int)
                             for idx in idxs_1
@@ -55,7 +59,7 @@ class PointwiseLowerer:
             case Reorder(Value(ex, type_), _) | Value(ex, type_):
                 return ntn.Value(ex, type_)
             case Reorder(arg, _):
-                return self(arg, tables)
+                return self(arg, table_vars)
             case Field(name):
                 return ntn.Variable(name, int)
             case _:
@@ -186,7 +190,7 @@ class LogicLowerer:
                     case Reorder(Relabel(Alias(name), idxs_1), idxs_2) if set(
                         idxs_1
                     ) == set(idxs_2):
-                        raise Exception("TODO: not supported")
+                        raise NotImplementedError("TODO: not supported")
                     case Reorder(Alias(name) as alias, _) | Relabel(
                         Alias(name) as alias, _
                     ):
@@ -215,11 +219,11 @@ class LogicLowerer:
                 raise Exception(f"Unrecognized logic: {ex}")
 
 
-def format_queries(node: LogicNode) -> LogicNode:
-    return _format_queries(node, bindings={})
+def format_queries(ex: LogicNode) -> LogicNode:
+    return _format_queries(ex, bindings={})
 
 
-def _format_queries(node: LogicNode, bindings: dict) -> LogicNode:
+def _format_queries(ex: LogicNode, bindings: dict) -> LogicNode:
     # TODO: continue rep_construct & SuitableRep implementation
     def rep_construct(a):
         return a
@@ -231,7 +235,7 @@ def _format_queries(node: LogicNode, bindings: dict) -> LogicNode:
         def __call__(self, obj):
             return np.ndarray
 
-    match node:
+    match ex:
         case Plan(bodies):
             return Plan(tuple(_format_queries(body, bindings) for body in bodies))
         case Query(lhs, rhs) if not isinstance(rhs, Reformat | Table):
@@ -244,14 +248,25 @@ def _format_queries(node: LogicNode, bindings: dict) -> LogicNode:
             bindings[lhs] = SuitableRep(bindings)(rhs)
             return query
         case _:
-            return node
+            return ex
 
 
 def initwrite(*args):  # TODO: figure out the implementation
     raise NotImplementedError
 
 
-def record_tables(root: LogicNode) -> tuple[LogicNode, dict, dict, dict]:
+# TODO: replace with appropriate Tensor class
+_TensorType = np.ndarray
+
+
+def record_tables(
+    root: LogicNode,
+) -> tuple[
+    LogicNode,
+    dict[Alias, ntn.Variable],
+    dict[ntn.Variable, ntn.Call],
+    dict[Alias, _TensorType],
+]:
     """
     Transforms plan from Finch Logic to Finch Notation convention. Moves physical
     table out of the plan and memorizes dimension sizes as separate variables to
@@ -262,7 +277,7 @@ def record_tables(root: LogicNode) -> tuple[LogicNode, dict, dict, dict]:
     # store loop extent variable
     dim_size_vars: dict[ntn.Variable, ntn.Call] = {}
     # actual tables
-    tables: dict[Alias, Table] = {}
+    tables: dict[Alias, _TensorType] = {}
 
     def rule_0(node):
         match node:
@@ -302,7 +317,9 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict]:
+    def __call__(
+        self, prgm: LogicNode
+    ) -> tuple[ntn.NotationNode, dict[Alias, _TensorType]]:
         prgm = format_queries(prgm)
         prgm, table_vars, dim_size_vars, tables = record_tables(prgm)
         lowered_prgm = self.ll(prgm, table_vars, dim_size_vars)
