@@ -322,6 +322,8 @@ def is_associative(op: Any) -> bool:
 for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
     register_property(op, "__call__", "is_associative", lambda op: True)
 
+register_property(np.logaddexp, "__call__", "is_associative", lambda op: True)
+
 
 def is_identity(op: Any, val: Any) -> bool:
     """
@@ -351,6 +353,7 @@ register_property(
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
+register_property(np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf)
 
 
 def is_distributive(op, other_op):
@@ -410,6 +413,8 @@ for op, func in [
     (operator.and_, lambda op, val: not bool(val)),
 ]:
     register_property(op, "__call__", "is_annihilator", func)
+
+register_property(np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf)
 
 
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
@@ -510,6 +515,8 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
         "init_value",
         lambda op, arg, meth=meth: query_property(arg, meth, "init_value"),
     )
+
+register_property(np.logaddexp, "__call__", "init_value", lambda op, arg: -math.inf)
 
 
 def sum_init_value(t):

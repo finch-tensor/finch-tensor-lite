@@ -1,7 +1,8 @@
 import math
 import operator
+import numpy as np
 
-from finch.algebra import is_annihilator, is_associative, is_distributive, is_identity
+from finch.algebra import is_annihilator, is_associative, is_distributive, is_identity, init_value
 
 
 def test_algebra_selected():
@@ -14,6 +15,7 @@ def test_algebra_selected():
     assert is_annihilator(operator.mul, 0)
     assert is_annihilator(operator.or_, True)
     assert is_annihilator(operator.and_, False)
+    assert is_annihilator(np.logaddexp, math.inf)
     assert is_identity(operator.add, 0)
     assert is_identity(operator.mul, 1)
     assert is_identity(operator.or_, False)
@@ -23,8 +25,14 @@ def test_algebra_selected():
     assert is_identity(operator.lshift, 0)
     assert is_identity(operator.rshift, 0)
     assert is_identity(operator.pow, 1)
+    assert is_identity(np.logaddexp, -math.inf)
     assert is_associative(operator.add)
     assert is_associative(operator.mul)
     assert is_associative(operator.and_)
     assert is_associative(operator.xor)
     assert is_associative(operator.or_)
+    assert is_associative(np.logaddexp)
+    assert init_value(operator.and_, bool) is True
+    assert init_value(operator.or_, bool) is False
+    assert init_value(operator.xor, bool) is False
+    assert init_value(np.logaddexp, float) == -math.inf
