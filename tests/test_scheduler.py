@@ -632,10 +632,10 @@ def test_propagate_map_queries_backward():
                 Aggregate(
                     Literal(mul),
                     Literal(1),
-                    Table(Literal(10), (Field("i7"),)),
-                    (Field("i6"),),
+                    Table(Literal(10), (Field("i6"), Field("i7"), Field("i8"))),
+                    (Field("i7"),),
                 ),
-                (Field("i5"),),
+                (Field("i6"), Field("i8")),
             ),
         )
     )
@@ -663,8 +663,18 @@ def test_propagate_map_queries_backward():
             Aggregate(
                 Literal(mul),
                 Literal(1),
-                Reorder(Table(Literal(10), (Field("i7"),)), (Field("i5"), Field("i6"))),
-                (Field("i6"),),
+                Reorder(
+                    Table(
+                        Literal(10),
+                        (
+                            Field("i6"),
+                            Field("i7"),
+                            Field("i8"),
+                        ),
+                    ),
+                    (Field("i6"), Field("i7"), Field("i8")),
+                ),
+                (Field("i7"),),
             ),
         )
     )
@@ -684,7 +694,7 @@ def test_scheduler_e2e_matmul(a, b):
     i, j, k = Field("i"), Field("j"), Field("k")
 
     plan = Plan(
-        [
+        (
             Query(Alias("A"), Table(Literal(a), (i, k))),
             Query(Alias("B"), Table(Literal(b), (k, j))),
             Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
@@ -693,7 +703,7 @@ def test_scheduler_e2e_matmul(a, b):
                 Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
             ),
             Produces((Alias("C"),)),
-        ]
+        )
     )
 
     plan_opt = optimize(plan)
