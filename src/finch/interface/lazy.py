@@ -272,6 +272,33 @@ class LazyTensor(OverrideTensor):
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
 
+    def __log__(self):
+        return log(self)
+
+    def __log1p__(self):
+        return log1p(self)
+
+    def __log2__(self):
+        return log2(self)
+
+    def __log10__(self):
+        return log10(self)
+
+    def __logaddexp__(self, other):
+        return logaddexp(self, other)
+
+    def __logical_and__(self, other):
+        return logical_and(self, other)
+
+    def __logical_or__(self, other):
+        return logical_or(self, other)
+
+    def __logical_xor__(self, other):
+        return logical_xor(self, other)
+
+    def __logical_not__(self):
+        return logical_not(self)
+
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
@@ -982,3 +1009,39 @@ def atanh(x) -> LazyTensor:
 
 def atan2(x1, x2) -> LazyTensor:
     return elementwise(np.atan2, defer(x1), defer(x2))
+
+
+def log(x) -> LazyTensor:
+    return elementwise(np.log, defer(x))
+
+
+def log1p(x) -> LazyTensor:
+    return elementwise(np.log1p, defer(x))
+
+
+def log2(x) -> LazyTensor:
+    return elementwise(np.log2, defer(x))
+
+
+def log10(x) -> LazyTensor:
+    return elementwise(np.log10, defer(x))
+
+
+def logaddexp(x1, x2) -> LazyTensor:
+    return elementwise(np.logaddexp, defer(x1), defer(x2))
+
+
+def logical_and(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_and, defer(x1), defer(x2))
+
+
+def logical_or(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_or, defer(x1), defer(x2))
+
+
+def logical_xor(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_xor, defer(x1), defer(x2))
+
+
+def logical_not(x) -> LazyTensor:
+    return elementwise(np.logical_not, defer(x))
