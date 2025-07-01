@@ -523,10 +523,10 @@ def reduce(
     )
     if keepdims:
         keeps = tuple(
-            fields[i] if i in axis else Field(gensym("j")) for i in range(x.ndim)
+            fields[i] if i not in axis else Field(gensym("j")) for i in range(x.ndim)
         )
         data = Reorder(data, keeps)
-        shape = tuple(shape[i] if i in axis else 1 for i in range(x.ndim))
+        shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
     return LazyTensor(identify(data), shape, init, dtype)
@@ -982,3 +982,55 @@ def atanh(x) -> LazyTensor:
 
 def atan2(x1, x2) -> LazyTensor:
     return elementwise(np.atan2, defer(x1), defer(x2))
+
+
+def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    """
+    Calculates the arithmetic mean of the input array ``x``.
+    """
+    x = defer(x)
+    n = (
+        np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
+        if isinstance(axis, tuple)
+        else (np.prod(x.shape) if axis is None else x.shape[axis])
+    )
+    s = sum(x, axis=axis, keepdims=keepdims)
+    return truediv(s, n)
+
+
+def var(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    """
+    Calculates the variance of the input array ``x``.
+    """
+    x = defer(x)
+    n = (
+        np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
+        if isinstance(axis, tuple)
+        else (np.prod(x.shape) if axis is None else x.shape[axis])
+    )
+    m = mean(x, axis=axis, keepdims=True)
+    v = truediv(pow(x - m, 2.0), (n - correction))
+    return sum(v, axis=axis, keepdims=keepdims)
+
+
+def std(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    """
+    Calculates the standard deviation of the input array ``x``.
+    """
+    x = defer(x)
+    d = var(x, axis=axis, correction=correction, keepdims=keepdims)
+    return pow(d, 0.5)

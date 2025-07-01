@@ -274,6 +274,9 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         ((finch.all, np.all), np.all),
         ((finch.min, np.min), np.min),
         ((finch.max, np.max), np.max),
+        ((finch.mean, np.mean), np.mean),
+        ((finch.std, np.std), np.std),
+        ((finch.var, np.var), np.var),
     ],
 )
 @pytest.mark.parametrize(
@@ -298,7 +301,12 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
 
             result = finch.compute(result)
 
-        assert_equal(result, expected)
+        if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
+            expected.dtype, np.complexfloating
+        ):
+            assert_allclose(result, expected, rtol=1e-15, atol=0.0)
+        else:
+            assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
