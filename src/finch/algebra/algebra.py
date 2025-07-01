@@ -323,6 +323,9 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
     register_property(op, "__call__", "is_associative", lambda op: True)
 
 register_property(np.logaddexp, "__call__", "is_associative", lambda op: True)
+register_property(np.logical_and, "__call__", "is_associative", lambda op: True)
+register_property(np.logical_or, "__call__", "is_associative", lambda op: True)
+register_property(np.logical_xor, "__call__", "is_associative", lambda op: True)
 
 
 def is_identity(op: Any, val: Any) -> bool:
@@ -353,7 +356,13 @@ register_property(
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf)
+register_property(
+    np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
+)
+register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
+register_property(
+    np.logical_or, "__call__", "is_identity", lambda op, val: not bool(val)
+)
 
 
 def is_distributive(op, other_op):
@@ -389,6 +398,18 @@ register_property(
     "is_distributive",
     lambda op, other_op: other_op == operator.and_,
 )
+register_property(
+    np.logical_and,
+    "__call__",
+    "is_distributive",
+    lambda op, other_op: other_op in (np.logical_or, np.logical_xor),
+)
+register_property(
+    np.logical_or,
+    "__call__",
+    "is_distributive",
+    lambda op, other_op: other_op == np.logical_and,
+)
 
 
 def is_annihilator(op, val):
@@ -414,7 +435,15 @@ for op, func in [
 ]:
     register_property(op, "__call__", "is_annihilator", func)
 
-register_property(np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf)
+register_property(
+    np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf
+)
+register_property(
+    np.logical_and, "__call__", "is_annihilator", lambda op, val: not bool(val)
+)
+register_property(
+    np.logical_or, "__call__", "is_annihilator", lambda op, val: bool(val)
+)
 
 
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
@@ -517,6 +546,9 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
     )
 
 register_property(np.logaddexp, "__call__", "init_value", lambda op, arg: -math.inf)
+register_property(np.logical_and, "__call__", "init_value", lambda op, arg: True)
+register_property(np.logical_or, "__call__", "init_value", lambda op, arg: False)
+register_property(np.logical_xor, "__call__", "init_value", lambda op, arg: False)
 
 
 def sum_init_value(t):
@@ -558,6 +590,7 @@ for unary in (
     np.log1p,
     np.log2,
     np.log10,
+    np.logical_not,
 ):
     register_property(
         unary, "__call__", "return_type", lambda op, a, _unary=unary: float
@@ -566,6 +599,9 @@ for unary in (
 for binary in (
     np.atan2,
     np.logaddexp,
+    np.logical_and,
+    np.logical_or,
+    np.logical_xor,
 ):
     register_property(
         binary, "__call__", "return_type", lambda op, a, b, _binary=binary: float

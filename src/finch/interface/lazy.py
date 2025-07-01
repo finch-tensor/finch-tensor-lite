@@ -287,6 +287,18 @@ class LazyTensor(OverrideTensor):
     def __logaddexp__(self, other):
         return logaddexp(self, other)
 
+    def logical_and(self, other):
+        return logical_and(self, other)
+
+    def logical_or(self, other):
+        return logical_or(self, other)
+
+    def logical_xor(self, other):
+        return logical_xor(self, other)
+
+    def logical_not(self):
+        return logical_not(self)
+
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
@@ -1017,3 +1029,19 @@ def log10(x) -> LazyTensor:
 
 def logaddexp(x1, x2) -> LazyTensor:
     return elementwise(np.logaddexp, defer(x1), defer(x2))
+
+
+def logical_and(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_and, defer(x1), defer(x2))
+
+
+def logical_or(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_or, defer(x1), defer(x2))
+
+
+def logical_xor(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_xor, defer(x1), defer(x2))
+
+
+def logical_not(x) -> LazyTensor:
+    return elementwise(np.logical_not, defer(x))

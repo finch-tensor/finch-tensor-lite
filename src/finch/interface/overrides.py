@@ -42,6 +42,10 @@ element_wise_ufunc_map = {
     np.log2: np.log2,
     np.log10: np.log10,
     np.logaddexp: np.logaddexp,
+    np.logical_and: np.logical_and,
+    np.logical_or: np.logical_or,
+    np.logical_xor: np.logical_xor,
+    np.logical_not: np.logical_not,
     # Add more ufuncs as needed
 }
 

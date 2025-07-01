@@ -193,6 +193,18 @@ class EagerTensor(OverrideTensor, ABC):
     def __logaddexp__(self, other):
         return logaddexp(self, other)
 
+    def logical_and(self, other):
+        return logical_and(self, other)
+
+    def logical_or(self, other):
+        return logical_or(self, other)
+
+    def logical_xor(self, other):
+        return logical_xor(self, other)
+
+    def logical_not(self):
+        return logical_not(self)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -555,3 +567,27 @@ def logaddexp(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logaddexp(x1, x2)
     return compute(lazy.logaddexp(x1, x2))
+
+
+def logical_and(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logical_and(x1, x2)
+    return compute(lazy.logical_and(x1, x2))
+
+
+def logical_or(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logical_or(x1, x2)
+    return compute(lazy.logical_or(x1, x2))
+
+
+def logical_xor(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logical_xor(x1, x2)
+    return compute(lazy.logical_xor(x1, x2))
+
+
+def logical_not(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.logical_not(x)
+    return compute(lazy.logical_not(x))
