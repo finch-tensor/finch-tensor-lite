@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
@@ -8,12 +8,19 @@ from ..algebra import element_type, query_property, return_type
 from ..symbolic import Term, TermTree
 
 
-# Base class for all Finch Notation nodes
-class NotationNode(Term):
-    pass
+@dataclass(eq=True, frozen=True)
+class NotationNode(Term, ABC):
+    """
+    NotationNode
 
+    Base class for all Finch Notation nodes
+    """
 
-class NotationTree(NotationNode, TermTree):
+    @classmethod
+    def head(cls):
+        """Returns the head of the node."""
+        return cls
+
     @classmethod
     def make_term(cls, head, *children):
         return head.from_children(*children)
@@ -21,6 +28,14 @@ class NotationTree(NotationNode, TermTree):
     @classmethod
     def from_children(cls, *children):
         return cls(*children)
+
+
+@dataclass(eq=True, frozen=True)
+class NotationTree(NotationNode, TermTree):
+    @property
+    @abstractmethod
+    def children(self) -> list[NotationNode]:  # type: ignore[override]
+        ...
 
 
 class NotationExpression(NotationNode):
@@ -69,6 +84,10 @@ class Value(NotationExpression):
 class Variable(NotationExpression):
     """
     Notation AST expression for a variable named `name`.
+
+    Attributes:
+        name: The name of the variable.
+        type_: The type of the variable.
     """
 
     name: str
@@ -290,6 +309,7 @@ class Declare(NotationTree, NotationExpression):
     def children(self):
         return [self.tns, self.init, self.op, *self.shape]
 
+    @classmethod
     def from_children(cls, tns, init, op, *shape):
         """
         Creates a Declare node from its children.
@@ -405,9 +425,10 @@ class Function(NotationTree):
         return [self.name, *self.args, self.body]
 
     @classmethod
-    def from_children(cls, name, *args, body):
+    def from_children(cls, name, *args_body):
         """Creates a term with the given head and arguments."""
-        return cls(name, args, body)
+        *args, body = args_body
+        return cls(name, tuple(args), body)
 
 
 @dataclass(eq=True, frozen=True)
