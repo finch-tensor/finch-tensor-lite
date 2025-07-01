@@ -590,7 +590,6 @@ for unary in (
     np.log1p,
     np.log2,
     np.log10,
-    np.logical_not,
 ):
     register_property(
         unary, "__call__", "return_type", lambda op, a, _unary=unary: float
@@ -599,10 +598,20 @@ for unary in (
 for binary in (
     np.atan2,
     np.logaddexp,
+):
+    register_property(
+        binary, "__call__", "return_type", lambda op, a, b, _binary=binary: float
+    )
+
+for logical in (
     np.logical_and,
     np.logical_or,
     np.logical_xor,
 ):
     register_property(
-        binary, "__call__", "return_type", lambda op, a, b, _binary=binary: float
+        logical,
+        "__call__",
+        "return_type",
+        lambda op, a, b, _logical=logical: bool,
     )
+register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)

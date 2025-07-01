@@ -193,16 +193,16 @@ class EagerTensor(OverrideTensor, ABC):
     def __logaddexp__(self, other):
         return logaddexp(self, other)
 
-    def logical_and(self, other):
+    def __logical_and__(self, other):
         return logical_and(self, other)
 
-    def logical_or(self, other):
+    def __logical_or__(self, other):
         return logical_or(self, other)
 
-    def logical_xor(self, other):
+    def __logical_xor__(self, other):
         return logical_xor(self, other)
 
-    def logical_not(self):
+    def __logical_not__(self):
         return logical_not(self)
 
 
