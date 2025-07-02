@@ -117,7 +117,7 @@ class FinchLogicInterpreter:
                 arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
                 result = self.make_tensor(
-                    dims, fill_value(arg.tns), dtype=arg.tns.dtype
+                    dims, fill_value(arg.tns), dtype=element_type(arg.tns)
                 )
                 for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(zip(idxs, crds, strict=True))

@@ -9,15 +9,15 @@ from .level import (
 )
 
 __all__ = [
-    "FiberTensor",
-    "FiberTensorFormat",
-    "tensor",
-    "Level",
-    "LevelFormat",
     "DenseLevel",
     "DenseLevelFormat",
-    "dense",
     "ElementLevel",
     "ElementLevelFormat",
+    "FiberTensor",
+    "FiberTensorFormat",
+    "Level",
+    "LevelFormat",
+    "dense",
     "element",
+    "tensor",
 ]

@@ -1,8 +1,9 @@
 import builtins
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Callable, Sequence
 
+from ..algebra import register_property
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
@@ -11,12 +12,6 @@ from .overrides import OverrideTensor
 class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
-
-    @property
-    @abstractmethod
-    def ndim(self):
-        """Number of dimensions of the tensor."""
-        ...
 
     def __add__(self, other):
         return add(self, other)
@@ -182,6 +177,9 @@ class EagerTensor(OverrideTensor, ABC):
             raise ValueError("Cannot convert non-scalar tensor to bool.")
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
+
+
+register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):

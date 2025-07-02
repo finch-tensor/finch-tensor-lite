@@ -5,16 +5,91 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import element_type, query_property, register_property
+from ..algebra import (
+    Tensor,
+    TensorFormat,
+    element_type,
+    fill_value,
+    query_property,
+    register_property,
+    shape_type,
+)
 from ..symbolic import ScopedDict
 from . import nodes as ntn
 
 
-@dataclass(eq=True, frozen=True)
-class TensorView:
-    idxs: tuple[Any, ...]
-    tns: ntn.NotationNode
-    op: Any = None
+class TensorViewFormat(TensorFormat):
+    """
+    A format for tensor views.
+    This is used to represent the format of a tensor at specific indices.
+    It is a subclass of ntn.Format to allow for custom formatting.
+    """
+
+    def __init__(self, idxs: tuple[Any, ...], tns: Any, op: Any = None):
+        """
+        Initialize the TensorViewFormat with the specified indices, tensor, and
+        operation.
+
+        :param idxs: Tuple of index types for the tensor view.
+        :param tns: The underlying tensor format.
+        :param op: The operation applied to the tensor view, if any.
+        """
+        self.idxs = idxs
+        self.tns = tns
+        self.op = op
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, TensorViewFormat)
+            and self.idxs == other.idxs
+            and self.tns == other.tns
+            and self.op == other.op
+        )
+
+    def __hash__(self):
+        return hash((self.idxs, self.tns, self.op))
+
+    @property
+    def element_type(self):
+        return element_type(self.tns)
+
+    @property
+    def fill_value(self):
+        """
+        Get the fill value of the tensor view.
+        This is the value used to fill the tensor at the specified indices.
+        """
+        return fill_value(self.tns)
+
+    @property
+    def shape_type(self):
+        """
+        Get the shape type of the tensor view.
+        This is the shape type of the tensor at the specified indices.
+        """
+        return shape_type(self.tns)[len(self.idxs) : -1]
+
+
+class TensorView(Tensor):
+    def __init__(self, idxs: tuple[Any, ...], tns: ntn.NotationNode, op: Any = None):
+        """
+        Initialize the TensorView with the specified indices, tensor, and operation.
+
+        :param idxs: Tuple of index types for the tensor view.
+        :param tns: The underlying tensor node.
+        :param op: The operation applied to the tensor view, if any.
+        """
+        self.idxs = idxs
+        self.tns = tns
+        self.op = op
+
+    @property
+    def format(self):
+        """
+        Get the format of the tensor view.
+        This is the format of the tensor at the specified indices.
+        """
+        return TensorViewFormat(map(format, self.idxs), self.tns.format, self.op)
 
     @property
     def shape(self):

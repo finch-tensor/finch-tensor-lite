@@ -4,6 +4,8 @@ from typing import Any
 
 import numpy as np
 
+from ..algebra.tensor import Tensor
+
 element_wise_ufunc_map = {
     np.add: operator.add,
     np.subtract: operator.sub,
@@ -43,7 +45,7 @@ ufunc_map: dict[Any, Any] = {
 }
 
 
-class OverrideTensor(ABC):
+class OverrideTensor(Tensor, ABC):
     @abstractmethod
     def override_module(self):
         """Return the module that implements the override logic."""

@@ -1,9 +1,10 @@
 import ctypes
+from typing import NamedTuple
 
 import numpy as np
 
 from ..finch_assembly import Buffer
-from .c import CArgument, CBufferFormat, c_type
+from .c import CArgument, CBufferFormat, CStackFormat, c_type
 from .numba_backend import NumbaArgument, NumbaBufferFormat
 
 
@@ -84,7 +85,7 @@ class NumpyBuffer(Buffer, CArgument, NumbaArgument):
         return
 
 
-class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
+class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
     """
     A format for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFormat class.
@@ -125,25 +126,57 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
         return ctypes.POINTER(CNumpyBuffer)
 
     def c_length(self, ctx, buf):
-        return f"{ctx(buf)}->length"
+        return buf.obj.length
+
+    def c_data(self, ctx, buf):
+        return buf.obj.data
 
     def c_load(self, ctx, buf, idx):
-        t = ctx.ctype_name(c_type(self._dtype))
-        return f"(({t}*){ctx(buf)}->data)[{ctx(idx)}]"
+        return f"({buf.obj.data})[{ctx(idx)}]"
 
     def c_store(self, ctx, buf, idx, value):
-        data = f"{ctx(buf)}->data"
-        t = ctx.ctype_name(c_type(self._dtype))
-        ctx.exec(f"{ctx.feed}(({t}*){data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf, new_len):
-        data = f"{ctx(buf)}->data"
-        arr = f"{ctx(buf)}->arr"
-        length = f"{ctx(buf)}->length"
+        new_len = ctx(ctx.cache("len", new_len))
+        data = buf.obj.data
+        length = buf.obj.length
+        obj = buf.obj.obj
+        t = ctx.ctype_name(c_type(self._dtype))
         ctx.exec(
-            f"{ctx.feed}{data} = {ctx(buf)}->resize(&{arr}, {ctx(new_len)});\n"
-            f"{ctx.feed}{length} = {ctx(new_len)};"
+            f"{ctx.feed}{data} = ({t}*){obj}->resize(&{obj}->arr, {new_len});\n"
+            f"{ctx.feed}{length} = {new_len};"
         )
+        return
+
+    def c_unpack(self, ctx, var_n, val):
+        """
+        Unpack the buffer into C context.
+        """
+        data = ctx.freshen(var_n, "data")
+        length = ctx.freshen(var_n, "length")
+        t = ctx.ctype_name(c_type(self._dtype))
+        ctx.exec(
+            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
+            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
+        )
+
+        class BufferFields(NamedTuple):
+            data: str
+            length: str
+            obj: str
+
+        return BufferFields(data, length, var_n)
+
+    def c_repack(self, ctx, lhs, obj):
+        """
+        Repack the buffer from C context.
+        """
+        ctx.exec(
+            f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
+            f"{ctx.feed}{lhs}->length = {obj.length};"
+        )
+        return
 
     def construct_from_c(self, c_buffer):
         """
@@ -153,18 +186,40 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat):
         return NumpyBuffer(self.arr)
 
     def numba_length(self, ctx, buf):
-        return f"len({ctx(buf)}[0])"
+        arr = buf.obj.arr
+        return f"len({arr})"
 
     def numba_load(self, ctx, buf, idx):
-        return f"{ctx(buf)}[0][{ctx(idx)}]"
+        arr = buf.obj.arr
+        return f"{arr}[{ctx(idx)}]"
 
     def numba_store(self, ctx, buf, idx, val):
-        ctx.exec(f"{ctx.feed}{ctx(buf)}[0][{ctx(idx)}] = {ctx(val)}")
+        arr = buf.obj.arr
+        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
 
     def numba_resize(self, ctx, buf, new_len):
-        ctx.exec(
-            f"{ctx.feed}{ctx(buf)}[0] = numpy.resize({ctx(buf)}[0], {ctx(new_len)})"
-        )
+        arr = buf.obj.arr
+        ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
+
+    def numba_unpack(self, ctx, var_n, val):
+        """
+        Unpack the buffer into Numba context.
+        """
+        arr = ctx.freshen(var_n, "arr")
+        ctx.exec(f"{ctx.feed}{arr} = {ctx(val)}[0]")
+
+        class BufferFields(NamedTuple):
+            arr: str
+            obj: str
+
+        return BufferFields(arr, var_n)
+
+    def numba_repack(self, ctx, lhs, obj):
+        """
+        Repack the buffer from Numba context.
+        """
+        ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.arr}")
+        return
 
     def construct_from_numba(self, numba_buffer):
         """

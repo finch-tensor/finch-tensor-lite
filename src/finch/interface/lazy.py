@@ -2,23 +2,25 @@ import builtins
 import operator
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
 import numpy as np
-from numpy.core.numeric import normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_tuple
 
-from ..algebra import conjugate as conj
 from ..algebra import (
+    TensorFormat,
     element_type,
     fill_value,
     fixpoint_type,
     init_value,
     promote_max,
     promote_min,
+    query_property,
+    register_property,
     return_type,
 )
+from ..algebra import conjugate as conj
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -40,19 +42,68 @@ def identify(data):
     return Subquery(lhs, data)
 
 
-@dataclass
+class LazyTensorFormat(TensorFormat):
+    _fill_value: Any
+    _element_type: Any
+    _shape_type: Any
+
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple):
+        self._fill_value = _fill_value
+        self._element_type = _element_type
+        self._shape_type = _shape_type
+
+    def __eq__(self, other):
+        if not isinstance(other, LazyTensorFormat):
+            return False
+        return (
+            self._fill_value == other._fill_value
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash((self._fill_value, self._element_type, self._shape_type))
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+
 class LazyTensor(OverrideTensor):
-    data: LogicNode
-    shape: tuple
-    fill_value: Any
-    element_type: Any
+    def __init__(
+        self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
+    ):
+        self.data = data
+        self._shape = shape
+        self._fill_value = fill_value
+        self._element_type = element_type
+
+    @property
+    def format(self):
+        return LazyTensorFormat(
+            _fill_value=self._fill_value,
+            _element_type=self._element_type,
+            _shape_type=tuple(type(dim) for dim in self.shape),
+        )
+
+    @property
+    def shape(self) -> tuple:
+        """
+        Returns the shape of the LazyTensor as a tuple.
+        The shape is determined by the data and is a static property.
+        """
+        return self._shape
 
     def override_module(self):
         return sys.modules[__name__]
-
-    @property
-    def ndim(self) -> int:
-        return len(self.shape)
 
     def __add__(self, other):
         return add(self, other)
@@ -222,6 +273,29 @@ class LazyTensor(OverrideTensor):
         )
 
 
+register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
+register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
+
+
+def asarray(arg: Any) -> Any:
+    """Convert given argument and return np.asarray(arg) for the scalar type input.
+    If input argument is already array type, return unchanged.
+
+    Args:
+        arg: The object to be converted.
+
+    Returns:
+        The array type result of the given object.
+    """
+    if hasattr(arg, "asarray"):
+        return arg.asarray()
+
+    try:
+        return query_property(arg, "asarray", "__attr__")
+    except AttributeError:
+        return np.asarray(arg)
+
+
 def defer(arr) -> LazyTensor:
     """
     - defer(arr) -> LazyTensor:
@@ -237,6 +311,7 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
+    arr = asarray(arr)
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

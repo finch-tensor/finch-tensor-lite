@@ -7,11 +7,11 @@ from .numba_backend import (
 from .numpy_buffer import NumpyBuffer, NumpyBufferFormat
 
 __all__ = [
-    "CKernel",
-    "CModule",
-    "CCompiler",
     "CArgument",
     "CBufferFormat",
+    "CCompiler",
+    "CKernel",
+    "CModule",
     "NumbaCompiler",
     "NumbaKernel",
     "NumbaModule",
