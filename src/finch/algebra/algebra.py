@@ -81,14 +81,16 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
         AttributeError: If the property is not implemented for the given type.
     """
     if not isinstance(obj, type):
+        # Only catch TypeError for hashability check
         try:
             hash(obj)
+        except TypeError:
+            t = type(obj)
+        else:
             query_fn = _properties.get((obj, attr, prop))
             if query_fn is not None:
                 return query_fn(obj, *args)
-        except TypeError:
-            pass
-        t = type(obj)
+            t = type(obj)
     else:
         t = obj
 
