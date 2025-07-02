@@ -549,28 +549,7 @@ def _broadcast_shape(*args: tuple[int, ...]) -> tuple[int, ...]:
     --------------
     tuple[int, ...]: The broadcasted shape as a tuple of integers.
     """
-    if len(args) < 2:
-        return args[0] if args else ()
-    shape1, shape2 = args[0], args[1]
-    N1, N2 = len(shape1), len(shape2)
-    N = builtins.max(N1, N2)
-    _shape = [0] * N
-    for i in range(N - 1, -1, -1):
-        n1, n2 = N1 - N + i, N2 - N + i
-        d1 = shape1[n1] if n1 >= 0 else 1
-        d2 = shape2[n2] if n2 >= 0 else 1
-        if d1 == 1:
-            _shape[i] = d2
-        elif d2 == 1 or d1 == d2:
-            _shape[i] = d1
-        else:
-            raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
-    shape = tuple(_shape)
-
-    if len(args) > 2:
-        for arg in args[2:]:
-            shape = _broadcast_shape(shape, arg)
-    return shape
+    return np.broadcast_shapes(*args)
 
 
 def elementwise(f: Callable, *args) -> LazyTensor:

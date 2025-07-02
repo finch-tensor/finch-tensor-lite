@@ -10,17 +10,23 @@ import finch
 
 
 # Utility function to generate random complex numpy tensors
-def random_array(shape, dtype=np.complex128):
+def random_array(shape, dtype=np.complex128, rng: np.random.Generator | None = None):
     """Generates a random complex array. Uses integers for both real
     and imaginary parts to avoid floating-point issues in tests.
 
     Args:
-        shape: A tuple specifying the shape of the array.
+        - shape: A tuple specifying the shape of the array.
+        - dtype: The intended dtype of the randomly generated array.
+        If nothing is provided, np.complex128 array is generated
+        - rng: The random number generator to use. Providing one is strongly recommended
+        for reproducibility. If no generator is provided, a new one is instantiated with
+        random seed.
 
     Returns:
         A NumPy array of complex numbers with the given shape.
     """
-    rng = np.random.default_rng(42)  # Use a fixed seed for reproducibility
+    if rng is None:
+        rng = np.random.default_rng()
     if dtype is bool:
         arr = rng.integers(0, 2, size=shape).astype(dtype)
     elif np.issubdtype(dtype, np.integer):
@@ -841,41 +847,21 @@ def test_broadcast_arrays(shapes, wrapper):
         finch.defer,
     ],
 )
-def test_concat(shapes_and_types, axis, wrapper):
+def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
     """
     Tests for concatenating arrays along specified axis with various types.
     """
     # Generate arrays for each shape and type
-    rng = np.random.default_rng(42)  # Fixed seed for reproducibility
     arrays = []
 
     for shape_and_type in shapes_and_types:
-        shape, dtype = shape_and_type[:-1], shape_and_type[-1]
-        if dtype == bool:  # noqa: E721
-            arr = rng.integers(0, 2, size=shape).astype(dtype)
-        elif np.issubdtype(dtype, np.integer):
-            arr = rng.integers(-100, 100, size=shape).astype(dtype)
-        elif np.issubdtype(dtype, complex):
-            real = rng.random(size=shape).astype(np.float32)
-            imag = rng.random(size=shape).astype(np.float32)
-            arr = (real + 1j * imag).astype(dtype)
-        else:
-            arr = rng.random(size=shape).astype(dtype)
-        arrays.append(arr)
+        shape, type = shape_and_type[:-1], shape_and_type[-1]
+        arrays.append(random_array(shape, type, rng))
 
     # Apply wrapper (randomly to ensure mixed types work)
-    import random
+    wrapped_arrays = random_wrapper(arrays, wrapper)
 
-    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
-
-    try:
-        # Get expected result from NumPy
-        expected = np.concatenate(arrays, axis=axis)
-    except (ValueError, TypeError):
-        # Check that finch also raises an error
-        with pytest.raises((ValueError, TypeError)):
-            finch.concat(wrapped_arrays, axis=axis)
-        return
+    expected = np.concatenate(arrays, axis=axis)
 
     # Test finch's implementation
     result = finch.concat(wrapped_arrays, axis=axis)
@@ -906,11 +892,10 @@ def test_concat(shapes_and_types, axis, wrapper):
         [(3, 2), (4, 3)],
     ],
 )
-def test_concat_invalid(shapes):
+def test_concat_invalid(shapes, rng):
     """
     Tests error handling for invalid concatenation cases.
     """
-    rng = np.random.default_rng()
     arrays = [rng.random(shape) for shape in shapes]
 
     with pytest.raises(ValueError):
@@ -936,12 +921,11 @@ def test_concat_invalid(shapes):
         finch.defer,
     ],
 )
-def test_moveaxis(shape, source, destination, wrapper):
+def test_moveaxis(shape, source, destination, wrapper, rng):
     """
     Tests for moving axes of an array to a new position.
     """
     # Generate a random array with the specified shape
-    rng = np.random.default_rng(42)  # Fixed seed for reproducibility
     x = rng.random(shape)
     # Apply wrapper to input
     wrapped_x = wrapper(x)
@@ -996,7 +980,7 @@ def test_moveaxis(shape, source, destination, wrapper):
         finch.defer,
     ],
 )
-def test_stack(shapes_and_types, axis, wrapper):
+def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     """
     Tests for stacking arrays along a new axis.
     """
@@ -1005,13 +989,10 @@ def test_stack(shapes_and_types, axis, wrapper):
 
     for shape_and_type in shapes_and_types:
         shape, dtype = shape_and_type[:-1], shape_and_type[-1]
-        arrays.append(random_array(shape, dtype=dtype))
+        arrays.append(random_array(shape, dtype, rng))
 
     # Apply wrapper (randomly to ensure mixed types work)
-    import random
-
-    random.seed(42)  # Fixed seed for reproducibility
-    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
+    wrapped_arrays = random_wrapper(arrays, wrapper)
 
     try:
         # Get expected result from NumPy
