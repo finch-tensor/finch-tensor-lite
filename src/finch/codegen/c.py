@@ -812,3 +812,56 @@ class CStackFormat(ABC):
         to the original object to update.
         """
         ...
+
+
+c_structs = {}
+c_structnames = Namespace()
+
+class CStruct(CArgument, ABC):
+    """
+    An abstract base class for structures that can be used in C assembly code.
+    Provides methods to convert the structure to C formats and to unpack/repack.
+    """
+
+    def serialize_to_c(self) -> Any:
+        args = [getattr(self, name) for (name, _) in self.fieldnames]
+        return self.c_type(*args)
+    
+    def deserialize_from_c(self, c_struct: Any) -> None:
+        for (name, _) in self.fieldnames:
+            setattr(self, name, getattr(c_struct, name))
+        return
+
+class CStructFormat(AssemblyStructFormat, CStackFormat, ABC):
+    def c_type(self):
+        res = c_structs.get(self)
+        if res:
+            return res
+        else:
+            fields = [(name, c_type(fmt)) for name, fmt in self.struct_fields]
+            new_struct = type(
+                c_structnames.freshen("C", self.struct_name),
+                (ctypes.Structure,),
+                {"_fields_": fields}
+            )
+            c_structs[self] = new_struct
+            return ctypes.POINTER(new_struct)
+
+    def c_unpack(self, ctx, var_n, val):
+        var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
+        for var_name, (name, fmt) in zip(var_names, self.fieldnames):
+            t = ctx.ctype_name(c_type(fmt))
+            ctx.exec(f"{ctx.feed}{t} {var_name} = ({t}){ctx(val)}->{name};")
+
+        StructTuple = namedtuple(f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames])
+        return StructTuple(*var_names)
+
+    def c_repack(self, ctx, lhs, obj):
+        for (name, fmt) in self.fieldnames:
+            t = ctx.ctype_name(c_type(fmt))
+            ctx.exec(f"{ctx.feed}{lhs}->{name} = ({t}){getattr(obj, name)};")
+        return
+
+    def construct_from_c(self, c_struct):
+        args = [getattr(c_struct, name) for (name, _) in self.fieldnames]
+        return self.__class__(*args)

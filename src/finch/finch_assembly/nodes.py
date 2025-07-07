@@ -186,6 +186,57 @@ class Assign(AssemblyTree):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
 
+@dataclass(eq=True, frozen=True)
+class GetAttr(AssemblyExpression, AssemblyTree):
+    """
+    Represents a getter for an attribute `attr` of an object `obj`.
+    Attributes:
+        obj: The object to get the attribute from.
+        attr: The name of the attribute to get.
+    """
+
+    obj: AssemblyExpression
+    attr: Literal
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.obj, self.attr]
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return dict(self.obj.result_format.struct_fields)[self.attr.val]
+
+@dataclass(eq=True, frozen=True)
+class SetAttr(AssemblyTree):
+    """
+    Represents a setter for an attribute `attr` of an object `obj`.
+    Attributes:
+        obj: The object to set the attribute on.
+        attr: The name of the attribute to set.
+        value: The value to set the attribute to.
+    """
+
+    obj: AssemblyExpression
+    attr: Literal
+    value: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.obj, self.attr, self.value]
+
+class AssemblyStructFormat(ABC):
+    @property
+    @abstractmethod
+    def struct_name(self):
+        ...
+
+    @property
+    @abstractmethod
+    def struct_fields(self):
+        ...
 
 @dataclass(eq=True, frozen=True)
 class Call(AssemblyExpression, AssemblyTree):
