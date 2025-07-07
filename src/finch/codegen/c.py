@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
@@ -14,8 +15,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import BufferFormat
-from ..symbolic import Context, ScopedDict, has_format
+from ..finch_assembly import AssemblyStructFormat, BufferFormat
+from ..symbolic import Context, Namespace, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -587,6 +588,21 @@ class CContext(Context):
                     var_t_code = self.ctype_name(c_type(var_t))
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
+            case asm.GetAttr(obj, attr):
+                obj_code = self.cache("obj", obj)
+                if not obj.result_type.struct_hasattr(attr.val):
+                    raise ValueError("trying to get missing attr")
+                return obj.result_type.c_getattr(obj_code, attr.val)
+            case asm.SetAttr(obj, attr, val):
+                obj_code = self.cache("obj", obj)
+                if not has_format(val, obj.result_type.struct_attrtype(attr.val)):
+                    raise TypeError(
+                        f"Type mismatch: {val.result_format} != "
+                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                    )
+                val_code = self(val)
+                obj.result_type.c_setattr(obj_code, attr.val, val_code)
+                return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
@@ -812,3 +828,66 @@ class CStackFormat(ABC):
         to the original object to update.
         """
         ...
+
+
+c_structs = {}
+c_structnames = Namespace()
+
+
+class CStruct(CArgument, ABC):
+    """
+    An abstract base class for structures that can be used in C assembly code.
+    Provides methods to convert the structure to C formats and to unpack/repack.
+    """
+
+    def serialize_to_c(self) -> Any:
+        args = [getattr(self, name) for (name, _) in self.fieldnames]
+        return self.c_type(*args)
+
+    def deserialize_from_c(self, c_struct: Any) -> None:
+        for name, _ in self.fieldnames:
+            setattr(self, name, getattr(c_struct, name))
+        return
+
+
+class CStructFormat(AssemblyStructFormat, CStackFormat, ABC):
+    def c_type(self):
+        res = c_structs.get(self)
+        if res:
+            return res
+        fields = [(name, c_type(fmt)) for name, fmt in self.struct_fields]
+        new_struct = type(
+            c_structnames.freshen("C", self.struct_name),
+            (ctypes.Structure,),
+            {"_fields_": fields},
+        )
+        c_structs[self] = new_struct
+        return ctypes.POINTER(new_struct)
+
+    def c_unpack(self, ctx, var_n, val):
+        var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
+        for var_name, (name, fmt) in zip(var_names, self.fieldnames, strict=False):
+            t = ctx.ctype_name(c_type(fmt))
+            ctx.exec(f"{ctx.feed}{t} {var_name} = ({t}){ctx(val)}->{name};")
+
+        StructTuple = namedtuple(  # noqa: PYI024
+            f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames]
+        )
+        return StructTuple(*var_names)
+
+    def c_getattr(self, ctx, obj, attr):
+        return f"{obj}->{attr}"
+
+    def c_setattr(self, ctx, obj, attr, val):
+        ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+        return
+
+    def c_repack(self, ctx, lhs, obj):
+        for name, fmt in self.fieldnames:
+            t = ctx.ctype_name(c_type(fmt))
+            ctx.exec(f"{ctx.feed}{lhs}->{name} = ({t}){getattr(obj, name)};")
+        return
+
+    def construct_from_c(self, c_struct):
+        args = [getattr(c_struct, name) for (name, _) in self.fieldnames]
+        return self.__class__(*args)

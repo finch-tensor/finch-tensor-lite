@@ -1,13 +1,33 @@
 import logging
 from abc import ABC, abstractmethod
+from collections import namedtuple
+from dataclasses import make_dataclass
 from operator import methodcaller
 from typing import Any
 
+import numba
+
 from .. import finch_assembly as asm
-from ..finch_assembly import BufferFormat
-from ..symbolic import Context, ScopedDict, has_format
+from ..finch_assembly import AssemblyStructFormat, BufferFormat
+from ..symbolic import Context, Namespace, ScopedDict, has_format
 
 logger = logging.getLogger(__name__)
+
+
+def numba_type(t):
+    """
+    Returns the Numba type/format after serialization.
+
+    Args:
+        ctx: The context in which the value is used.
+        t: The Python type.
+
+    Returns:
+        The corresponding Numba type.
+    """
+    if hasattr(t, "numba_type"):
+        return t.numba_type()
+    return format(t)
 
 
 class NumbaArgument(ABC):
@@ -228,6 +248,21 @@ class NumbaContext(Context):
                     self.types[var_n] = var_t
                     self.exec(f"{feed}{var_n}: {self.full_name(var_t)} = {val_code}")
                 return None
+            case asm.GetAttr(obj, attr):
+                obj_code = self.cache("obj", obj)
+                if not obj.result_type.struct_hasattr(attr.val):
+                    raise ValueError("trying to get missing attr")
+                return obj.result_type.c_getattr(obj_code, attr.val)
+            case asm.SetAttr(obj, attr, val):
+                obj_code = self.cache("obj", obj)
+                if not has_format(val, obj.result_type.struct_attrtype(attr.val)):
+                    raise TypeError(
+                        f"Type mismatch: {val.result_format} != "
+                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                    )
+                val_code = self(val)
+                obj.result_type.numba_setattr(obj_code, attr.val, val_code)
+                return None
             case asm.Call(asm.Literal(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Unpack(asm.Slot(var_n, var_t), val):
@@ -378,3 +413,66 @@ class NumbaStackFormat(ABC):
         to the original object to update.
         """
         ...
+
+
+numba_structs = {}
+numba_structnames = Namespace()
+
+
+class NumbaAssemblyStruct(NumbaArgument, ABC):
+    """
+    An abstract base class for structures that can be used in Numba assembly code.
+    Provides methods to convert the structure to Numba formats and to unpack/repack.
+    """
+
+    def serialize_to_numba(self) -> Any:
+        args = [getattr(self, name) for (name, _) in self.fieldnames]
+        return self.numba_type(*args)
+
+    def deserialize_from_numba(self, numba_buffer: Any) -> None:
+        for name, _ in self.fieldnames:
+            setattr(self, name, getattr(numba_buffer, name))
+        return
+
+
+class NumbaStructFormat(AssemblyStructFormat, NumbaStackFormat, ABC):
+    @property
+    @abstractmethod
+    def numba_type(self):
+        res = numba_structs.get(self)
+        if res:
+            return res
+        spec = [(name, numba_type(fmt)) for (name, fmt) in self.struct_fields]
+        new_struct = make_dataclass(
+            numba_structnames.freshen("Numba", self.struct_name),
+            fields=spec,
+        )
+        new_struct = numba.jitclass(spec)(new_struct)
+        numba_structs[self] = new_struct
+        return new_struct
+
+    def numba_unpack(self, ctx, var_n, val):
+        var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
+        for var_name, (name, _) in zip(var_names, self.fieldnames, strict=False):
+            ctx.exec(f"{var_name} = {ctx(val)}.{name}")
+
+        StructTuple = namedtuple(  # noqa: PYI024
+            f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames]
+        )
+        return StructTuple(*var_names)
+
+    def numba_repack(self, ctx, lhs, obj):
+        for name, _ in self.fieldnames:
+            ctx.exec(f"{ctx.feed}{lhs}.{name} = {getattr(obj, name)};")
+        return
+
+    def numba_getattr(self, ctx, obj, attr):
+        return f"{obj}.{attr}"
+
+    def numba_setattr(self, ctx, obj, attr, val):
+        ctx.emit(f"{ctx.feed}{obj}.{attr} = {val}")
+        return
+
+    def construct_from_numba(self, numba_struct):
+        args = [getattr(numba_struct, name) for (name, _) in self.fieldnames]
+        return self.__class__(*args)
