@@ -12,9 +12,13 @@ __all__ = [
     "CCompiler",
     "CKernel",
     "CModule",
+    "CStruct",
+    "CStructFormat"
     "NumbaCompiler",
     "NumbaKernel",
     "NumbaModule",
+    "NumbaStruct",
+    "NumbaStructFormat",
     "NumpyBuffer",
     "NumpyBufferFormat",
 ]

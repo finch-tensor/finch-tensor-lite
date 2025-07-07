@@ -10,6 +10,7 @@ from ..symbolic import Context, ScopedDict, has_format
 from dataclasses import make_dataclass
 from ..symbolic import Namespace
 from ..finch_assembly import AssemblyStructFormat
+from collections import namedtuple
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,21 @@ class NumbaContext(Context):
                     self.types[var_n] = var_t
                     self.exec(f"{feed}{var_n}: {self.full_name(var_t)} = {val_code}")
                 return None
+            case asm.GetAttr(obj, attr):
+                obj_code = self.cache("obj", obj)
+                if not obj.result_type.struct_hasattr(attr.val):
+                    raise ValueError("trying to get missing attr")
+                return obj.result_type.c_getattr(obj_code, attr.val)
+            case asm.SetAttr(obj, attr, val):
+                obj_code = self.cache("obj", obj)
+                if not has_format(val, obj.result_type.struct_attrtype(attr.val)):
+                    raise TypeError(
+                        f"Type mismatch: {val.result_format} != "
+                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                    )
+                val_code = self(val)
+                obj.result_type.numba_setattr(obj_code, attr.val, val_code)
+                return None
             case asm.Call(asm.Literal(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Unpack(asm.Slot(var_n, var_t), val):
@@ -429,6 +445,13 @@ class NumbaStructFormat(AssemblyStructFormat, NumbaStackFormat, ABC):
     def numba_repack(self, ctx, lhs, obj):
         for (name, _) in self.fieldnames:
             ctx.exec(f"{ctx.feed}{lhs}.{name} = {getattr(obj, name)};")
+        return
+
+    def numba_getattr(self, ctx, obj, attr):
+        return f"{obj}.{attr}"
+    
+    def numba_setattr(self, ctx, obj, attr, val):
+        ctx.emit(f"{ctx.feed}{obj}.{attr} = {val}")
         return
 
     def construct_from_numba(self, numba_struct):

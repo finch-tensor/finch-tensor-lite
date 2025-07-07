@@ -587,6 +587,21 @@ class CContext(Context):
                     var_t_code = self.ctype_name(c_type(var_t))
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
+            case asm.GetAttr(obj, attr):
+                obj_code = self.cache("obj", obj)
+                if not obj.result_type.struct_hasattr(attr.val):
+                    raise ValueError("trying to get missing attr")
+                return obj.result_type.c_getattr(obj_code, attr.val)
+            case asm.SetAttr(obj, attr, val):
+                obj_code = self.cache("obj", obj)
+                if not has_format(val, obj.result_type.struct_attrtype(attr.val)):
+                    raise TypeError(
+                        f"Type mismatch: {val.result_format} != "
+                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                    )
+                val_code = self(val)
+                obj.result_type.c_setattr(obj_code, attr.val, val_code)
+                return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
@@ -855,6 +870,13 @@ class CStructFormat(AssemblyStructFormat, CStackFormat, ABC):
 
         StructTuple = namedtuple(f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames])
         return StructTuple(*var_names)
+        
+    def c_getattr(self, ctx, obj, attr):
+        return f"{obj}->{attr}"
+    
+    def c_setattr(self, ctx, obj, attr, val):
+        ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+        return
 
     def c_repack(self, ctx, lhs, obj):
         for (name, fmt) in self.fieldnames:

@@ -238,6 +238,21 @@ class AssemblyStructFormat(ABC):
     def struct_fields(self):
         ...
 
+    @property
+    def struct_names(self):
+        return [name for (name, _) in self.struct_fields]
+    
+    @property
+    def struct_types(self):
+        return [type_ for (_, type_) in self.struct_fields]
+
+    def struct_hasattr(self, attr):
+        return attr in dict(self.struct_fields)
+    
+    def struct_attrtype(self, attr):
+        return dict(self.struct_fields)[attr]
+
+
 @dataclass(eq=True, frozen=True)
 class Call(AssemblyExpression, AssemblyTree):
     """
