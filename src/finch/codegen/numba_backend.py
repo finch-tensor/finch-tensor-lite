@@ -1,18 +1,33 @@
 import logging
 from abc import ABC, abstractmethod
+from collections import namedtuple
+from dataclasses import make_dataclass
 from operator import methodcaller
 from typing import Any
 
-from .. import finch_assembly as asm
-from ..finch_assembly import BufferFormat
-from ..symbolic import Context, ScopedDict, has_format
+import numba
 
-from dataclasses import make_dataclass
-from ..symbolic import Namespace
-from ..finch_assembly import AssemblyStructFormat
-from collections import namedtuple
+from .. import finch_assembly as asm
+from ..finch_assembly import AssemblyStructFormat, BufferFormat
+from ..symbolic import Context, Namespace, ScopedDict, has_format
 
 logger = logging.getLogger(__name__)
+
+
+def numba_type(t):
+    """
+    Returns the Numba type/format after serialization.
+
+    Args:
+        ctx: The context in which the value is used.
+        t: The Python type.
+
+    Returns:
+        The corresponding Numba type.
+    """
+    if hasattr(t, "numba_type"):
+        return t.numba_type()
+    return format(t)
 
 
 class NumbaArgument(ABC):
@@ -399,8 +414,10 @@ class NumbaStackFormat(ABC):
         """
         ...
 
+
 numba_structs = {}
 numba_structnames = Namespace()
+
 
 class NumbaAssemblyStruct(NumbaArgument, ABC):
     """
@@ -411,11 +428,12 @@ class NumbaAssemblyStruct(NumbaArgument, ABC):
     def serialize_to_numba(self) -> Any:
         args = [getattr(self, name) for (name, _) in self.fieldnames]
         return self.numba_type(*args)
-    
+
     def deserialize_from_numba(self, numba_buffer: Any) -> None:
-        for (name, _) in self.fieldnames:
+        for name, _ in self.fieldnames:
             setattr(self, name, getattr(numba_buffer, name))
         return
+
 
 class NumbaStructFormat(AssemblyStructFormat, NumbaStackFormat, ABC):
     @property
@@ -424,32 +442,33 @@ class NumbaStructFormat(AssemblyStructFormat, NumbaStackFormat, ABC):
         res = numba_structs.get(self)
         if res:
             return res
-        else:
-            spec = [(name, numba_type(fmt)) for name, fmt in self.struct_fields]
-            new_struct = make_dataclass(
-                numba_structnames.freshen("Numba", self.struct_name),
-                fields = spec,
-            )
-            new_struct = numba.jitclass(spec)(new_struct)
-            numba_structs[self] = new_struct
-            return new_struct
+        spec = [(name, numba_type(fmt)) for (name, fmt) in self.struct_fields]
+        new_struct = make_dataclass(
+            numba_structnames.freshen("Numba", self.struct_name),
+            fields=spec,
+        )
+        new_struct = numba.jitclass(spec)(new_struct)
+        numba_structs[self] = new_struct
+        return new_struct
 
     def numba_unpack(self, ctx, var_n, val):
         var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
-        for var_name, (name, fmt) in zip(var_names, self.fieldnames):
+        for var_name, (name, _) in zip(var_names, self.fieldnames, strict=False):
             ctx.exec(f"{var_name} = {ctx(val)}.{name}")
 
-        StructTuple = namedtuple(f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames])
+        StructTuple = namedtuple(  # noqa: PYI024
+            f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames]
+        )
         return StructTuple(*var_names)
 
     def numba_repack(self, ctx, lhs, obj):
-        for (name, _) in self.fieldnames:
+        for name, _ in self.fieldnames:
             ctx.exec(f"{ctx.feed}{lhs}.{name} = {getattr(obj, name)};")
         return
 
     def numba_getattr(self, ctx, obj, attr):
         return f"{obj}.{attr}"
-    
+
     def numba_setattr(self, ctx, obj, attr, val):
         ctx.emit(f"{ctx.feed}{obj}.{attr} = {val}")
         return

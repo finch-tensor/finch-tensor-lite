@@ -13,7 +13,7 @@ __all__ = [
     "CKernel",
     "CModule",
     "CStruct",
-    "CStructFormat"
+    "CStructFormatNumbaCompiler",
     "NumbaCompiler",
     "NumbaKernel",
     "NumbaModule",

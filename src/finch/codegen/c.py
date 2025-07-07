@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from functools import lru_cache
 from operator import methodcaller
 from pathlib import Path
@@ -14,8 +15,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import BufferFormat
-from ..symbolic import Context, ScopedDict, has_format
+from ..finch_assembly import AssemblyStructFormat, BufferFormat
+from ..symbolic import Context, Namespace, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -832,6 +833,7 @@ class CStackFormat(ABC):
 c_structs = {}
 c_structnames = Namespace()
 
+
 class CStruct(CArgument, ABC):
     """
     An abstract base class for structures that can be used in C assembly code.
@@ -841,45 +843,47 @@ class CStruct(CArgument, ABC):
     def serialize_to_c(self) -> Any:
         args = [getattr(self, name) for (name, _) in self.fieldnames]
         return self.c_type(*args)
-    
+
     def deserialize_from_c(self, c_struct: Any) -> None:
-        for (name, _) in self.fieldnames:
+        for name, _ in self.fieldnames:
             setattr(self, name, getattr(c_struct, name))
         return
+
 
 class CStructFormat(AssemblyStructFormat, CStackFormat, ABC):
     def c_type(self):
         res = c_structs.get(self)
         if res:
             return res
-        else:
-            fields = [(name, c_type(fmt)) for name, fmt in self.struct_fields]
-            new_struct = type(
-                c_structnames.freshen("C", self.struct_name),
-                (ctypes.Structure,),
-                {"_fields_": fields}
-            )
-            c_structs[self] = new_struct
-            return ctypes.POINTER(new_struct)
+        fields = [(name, c_type(fmt)) for name, fmt in self.struct_fields]
+        new_struct = type(
+            c_structnames.freshen("C", self.struct_name),
+            (ctypes.Structure,),
+            {"_fields_": fields},
+        )
+        c_structs[self] = new_struct
+        return ctypes.POINTER(new_struct)
 
     def c_unpack(self, ctx, var_n, val):
         var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
-        for var_name, (name, fmt) in zip(var_names, self.fieldnames):
+        for var_name, (name, fmt) in zip(var_names, self.fieldnames, strict=False):
             t = ctx.ctype_name(c_type(fmt))
             ctx.exec(f"{ctx.feed}{t} {var_name} = ({t}){ctx(val)}->{name};")
 
-        StructTuple = namedtuple(f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames])
+        StructTuple = namedtuple(  # noqa: PYI024
+            f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames]
+        )
         return StructTuple(*var_names)
-        
+
     def c_getattr(self, ctx, obj, attr):
         return f"{obj}->{attr}"
-    
+
     def c_setattr(self, ctx, obj, attr, val):
         ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
         return
 
     def c_repack(self, ctx, lhs, obj):
-        for (name, fmt) in self.fieldnames:
+        for name, fmt in self.fieldnames:
             t = ctx.ctype_name(c_type(fmt))
             ctx.exec(f"{ctx.feed}{lhs}->{name} = ({t}){getattr(obj, name)};")
         return

@@ -185,6 +185,9 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         self.arr = c_buffer.contents.arr
         return NumpyBuffer(self.arr)
 
+    def numba_type(self):
+        return list[np.ndarray]
+
     def numba_length(self, ctx, buf):
         arr = buf.obj.arr
         return f"len({arr})"

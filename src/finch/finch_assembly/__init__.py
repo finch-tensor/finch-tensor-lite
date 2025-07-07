@@ -2,7 +2,6 @@ from .buffer import Buffer, BufferFormat, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
-    AssemblyStructFormat,
     Assign,
     Block,
     Break,
@@ -10,6 +9,7 @@ from .nodes import (
     Call,
     ForLoop,
     Function,
+    GetAttr,
     If,
     IfElse,
     Length,
@@ -19,6 +19,7 @@ from .nodes import (
     Repack,
     Resize,
     Return,
+    SetAttr,
     Slot,
     Stack,
     Store,
@@ -26,6 +27,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .struct import AssemblyStructFormat
 
 __all__ = [
     "AssemblyInterpreter",
@@ -41,6 +43,7 @@ __all__ = [
     "Call",
     "ForLoop",
     "Function",
+    "GetAttr",
     "If",
     "IfElse",
     "Length",
@@ -50,6 +53,7 @@ __all__ = [
     "Repack",
     "Resize",
     "Return",
+    "SetAttr",
     "Slot",
     "Stack",
     "Store",
