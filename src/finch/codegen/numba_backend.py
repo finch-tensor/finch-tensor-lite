@@ -30,9 +30,9 @@ def numba_type(t):
     return format(t)
 
 
-class NumbaArgument(ABC):
+class NumbaArgumentFormat(ABC):
     @abstractmethod
-    def serialize_to_numba(self):
+    def serialize_to_numba(fmt, obj):
         """
         Return a Numba-compatible object to be used in place of this argument
         for the Numba backend.
@@ -40,43 +40,48 @@ class NumbaArgument(ABC):
         ...
 
     @abstractmethod
-    def deserialize_from_numba(self, numba_buffer):
+    def deserialize_from_numba(fmt, obj, res):
         """
         Return an object from Numba returned value.
         """
         ...
 
+    @abstractmethod
+    def construct_from_numba(fmt, res): ...
 
-def serialize_to_numba(obj):
+
+def serialize_to_numba(fmt, obj):
     """
     Serialize an object to a Numba-compatible format.
 
     Args:
+        fmt: Format of obj
         obj: The object to serialize.
 
     Returns:
         A Numba-compatible object.
     """
-    if hasattr(obj, "serialize_to_numba"):
-        return obj.serialize_to_numba()
-    return query_property(obj, "serialize_to_numba", "__attr__")
+    if hasattr(fmt, "serialize_to_numba"):
+        return fmt.serialize_to_numba(obj)
+    return query_property(fmt, "serialize_to_numba", "__attr__")(obj)
 
 
-def deserialize_from_numba(obj, numba_obj):
+def deserialize_from_numba(fmt, obj, numba_obj):
     """
     Deserialize a Numba-compatible object back to the original format.
 
     Args:
+        fmt: Format of obj
         obj: The original object to update.
         numba_obj: The Numba-compatible object to deserialize from.
 
     Returns:
         None
     """
-    if hasattr(obj, "deserialize_from_numba"):
-        obj.deserialize_from_numba(numba_obj)
+    if hasattr(fmt, "deserialize_from_numba"):
+        fmt.deserialize_from_numba(obj, numba_obj)
     else:
-        query_property(obj, "deserialize_from_numba", "__attr__")(numba_obj)
+        query_property(fmt, "deserialize_from_numba", "__attr__")(obj, numba_obj)
 
 
 def construct_from_numba(fmt, numba_obj):
@@ -503,7 +508,7 @@ register_property(
     deserialize_struct_from_numba,
 )
 
-numba_structs:dict[Any, Any] = {}
+numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 
 

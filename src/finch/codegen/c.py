@@ -91,54 +91,38 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-class CArgument(ABC):
-    @abstractmethod
-    def serialize_to_c(self, name):
-        """
-        Return a ctypes-compatible struct to be used in place of this argument
-        for the c backend.
-        """
-        ...
-
-    @abstractmethod
-    def deserialize_from_c(self, obj):
-        """
-        Update this argument based on how the c call modified `obj`, the result
-        of `serialize_to_c`.
-        """
-        ...
-
-
-def serialize_to_c(obj):
+def serialize_to_c(fmt, obj):
     """
     Serialize an object to a C-compatible format.
 
     Args:
+        fmt: Format of obj
         obj: The object to serialize.
 
     Returns:
         A ctypes-compatible struct.
     """
-    if hasattr(obj, "serialize_to_c"):
-        return obj.serialize_to_c()
-    return query_property(obj, "serialize_to_c", "__attr__")
+    if hasattr(fmt, "serialize_to_c"):
+        return fmt.serialize_to_c(obj)
+    return query_property(fmt, "serialize_to_c", "__attr__")(obj)
 
 
-def deserialize_from_c(obj, c_obj):
+def deserialize_from_c(fmt, obj, c_obj):
     """
     Deserialize a C-compatible object back to the original format.
 
     Args:
+        fmt: Format of obj
         obj: The original object to update.
         c_obj: The C-compatible object to deserialize from.
 
     Returns:
         None
     """
-    if hasattr(obj, "deserialize_from_c"):
-        obj.deserialize_from_c(c_obj)
+    if hasattr(fmt, "deserialize_from_c"):
+        fmt.deserialize_from_c(obj, c_obj)
     else:
-        query_property(obj, "deserialize_from_c", "__attr__")(c_obj)
+        query_property(fmt, "deserialize_from_c", "__attr__")(obj, c_obj)
 
 
 def construct_from_c(fmt, c_obj):
@@ -869,6 +853,30 @@ class CContext(Context):
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"
                 )
+
+
+class CArgumentFormat(ABC):
+    @abstractmethod
+    def serialize_to_c(self, obj):
+        """
+        Return a ctypes-compatible struct to be used in place of `obj`
+        for the c backend.
+        """
+        ...
+
+    @abstractmethod
+    def deserialize_from_c(self, obj, res):
+        """
+        Update this `obj` based on how the c call modified `res`, the result
+        of `serialize_to_c`.
+        """
+        ...
+
+    @abstractmethod
+    def construct_from_c(self, res):
+        """
+        Construct a new object based on the return value from c
+        """
 
 
 class CBufferFormat(BufferFormat, ABC):
