@@ -591,3 +591,35 @@ def logical_not(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.logical_not(x)
     return compute(lazy.logical_not(x))
+
+
+def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.mean(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+
+
+def var(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.var(x, axis=axis, correction=correction, keepdims=keepdims)
+    return compute(lazy.var(x, axis=axis, correction=correction, keepdims=keepdims))
+
+
+def std(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
+    return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))

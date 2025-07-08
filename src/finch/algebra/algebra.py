@@ -362,9 +362,7 @@ register_property(
     np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
 )
 register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
-register_property(
-    np.logical_or, "__call__", "is_identity", lambda op, val: not bool(val)
-)
+register_property(np.logical_or, "__call__", "is_identity", lambda op, val: not val)
 
 
 def is_distributive(op, other_op):
@@ -597,12 +595,15 @@ for unary in (
         unary, "__call__", "return_type", lambda op, a, _unary=unary: float
     )
 
-for binary in (
+for binary_op in (
     np.atan2,
     np.logaddexp,
 ):
     register_property(
-        binary, "__call__", "return_type", lambda op, a, b, _binary=binary: float
+        binary_op,
+        "__call__",
+        "return_type",
+        lambda op, a, b, _binary_op=binary_op: float,
     )
 
 for logical in (
