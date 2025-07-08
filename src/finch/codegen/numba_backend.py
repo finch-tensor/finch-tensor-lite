@@ -179,7 +179,9 @@ class NumbaKernel:
                 )
         serial_args = list(map(serialize_to_numba, self.arg_types, args))
         res = self.numba_func(*serial_args)
-        for arg_type, arg, serial_arg in zip(self.arg_types, args, serial_args, strict=False):
+        for arg_type, arg, serial_arg in zip(
+            self.arg_types, args, serial_args, strict=False
+        ):
             deserialize_from_numba(arg_type, arg, serial_arg)
         if hasattr(self.ret_type, "construct_from_numba"):
             return construct_from_numba(self.ret_type, res)

@@ -217,10 +217,12 @@ class CKernel:
         for argtype, arg in zip(self.argtypes, args, strict=False):
             if not has_format(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        serial_args = list(map(serialize_to_c, args))
+        serial_args = list(map(serialize_to_c, self.arg_types, args))
         res = self.c_function(*serial_args)
-        for arg, serial_arg in zip(args, serial_args, strict=False):
-            deserialize_from_c(arg, serial_arg)
+        for type_, arg, serial_arg in zip(
+            self.arg_types, args, serial_args, strict=False
+        ):
+            deserialize_from_c(type_, arg, serial_arg)
         if hasattr(self.ret_type, "construct_from_c"):
             return construct_from_c(res.format, res)
         if self.ret_type is type(None):
