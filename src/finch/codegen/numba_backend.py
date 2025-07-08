@@ -2,7 +2,6 @@ import logging
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from dataclasses import make_dataclass
-from operator import methodcaller
 from typing import Any
 
 import numba
@@ -320,7 +319,9 @@ class NumbaContext(Context):
                 obj_code = self.cache("obj", obj)
                 if not obj.result_type.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return query_property(obj.result_type, "numba_getattr", "__attr__")(self, obj_code, attr.val)
+                return query_property(obj.result_type, "numba_getattr", "__attr__")(
+                    self, obj_code, attr.val
+                )
             case asm.SetAttr(obj, attr, val):
                 obj_code = self.cache("obj", obj)
                 if not has_format(val, obj.result_type.struct_attrtype(attr.val)):
@@ -329,7 +330,9 @@ class NumbaContext(Context):
                         f"{obj.result_type.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                query_property(obj.result_type, "numba_setattr", "__attr__")(self, obj_code, attr.val, val_code)
+                query_property(obj.result_type, "numba_setattr", "__attr__")(
+                    self, obj_code, attr.val, val_code
+                )
                 return None
             case asm.Call(asm.Literal(val), args):
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
@@ -493,14 +496,19 @@ register_property(
 )
 
 
-def deserialize_struct_from_numba(fmt: AssemblyStructFormat, obj, numba_struct: Any) -> None:
+def deserialize_struct_from_numba(
+    fmt: AssemblyStructFormat, obj, numba_struct: Any
+) -> None:
     for name, _ in obj.fieldnames:
         setattr(obj, name, getattr(numba_struct, name))
     return
 
 
 register_property(
-    AssemblyStructFormat, "deserialize_from_numba", "__attr__", deserialize_struct_from_numba
+    AssemblyStructFormat,
+    "deserialize_from_numba",
+    "__attr__",
+    deserialize_struct_from_numba,
 )
 
 numba_structs = {}
