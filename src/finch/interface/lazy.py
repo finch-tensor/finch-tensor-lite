@@ -1121,9 +1121,7 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     # Convert axis to positive index and validate
     ndim = arrays[0].ndim
     axis = normalize_axis_index(axis, ndim)
-    from finch import compute
-
-    computed_arrays = tuple(compute(arr) for arr in arrays)
+    computed_arrays = tuple(_compute(arr) for arr in arrays)
     concat_tensor = ConcatTensor(*computed_arrays, axis=axis)
     # Create a LazyTensor that represents the concatenation
     return elementwise(identity, defer(concat_tensor))
@@ -1146,11 +1144,12 @@ class SplitDimsTensor:
         self.axis = normalize_axis_index(axis, tensor.ndim)
 
         # Validate that the product of new dimensions equals the original dimension
-        if np.prod(shape) != tensor.shape[self.axis]:
+        shape_product = np.prod(shape)
+        if shape_product != tensor.shape[self.axis]:
             raise ValueError(
                 f"Cannot split dimension of size {tensor.shape[self.axis]} "
                 f"into shape {shape}. Product of new dimensions "
-                f"({np.prod(shape)}) must equal original size."
+                f"({shape_product}) must equal original size."
             )
 
         # Create new shape by replacing the axis dimension with the split dimensions
@@ -1178,8 +1177,7 @@ class SplitDimsTensor:
         linear_idx = 0
         multiplier = 1
         for i in reversed(range(len(self.split_shape))):
-            if i < len(split_idxs):
-                linear_idx += split_idxs[i] * multiplier
+            linear_idx += split_idxs[i] * multiplier
             multiplier *= self.split_shape[i]
 
         # Reconstruct the original indices
@@ -1213,11 +1211,9 @@ class CombineDimsTensor:
         axes = normalize_axis_tuple(axes, tensor.ndim)
         if len(axes) < 2:
             raise ValueError("Must specify at least 2 axes to combine")
-
         # Check that axes are consecutive
-        for i in range(len(axes) - 1):
-            if axes[i + 1] - axes[i] != 1:
-                raise ValueError("Axes to combine must be consecutive")
+        if not all(b - a == 1 for a, b in zip(axes, axes[1:], strict=True)):
+            raise ValueError("Axes to combine must be consecutive")
 
         self.axes = axes
         self.start_axis, self.end_axis = axes[0], axes[-1]
@@ -1254,9 +1250,8 @@ class CombineDimsTensor:
         multi_idxs = []
         remaining = combined_idx
         for dim_size in reversed(self.original_dims):
-            multi_idxs.append(remaining % dim_size)
+            multi_idxs.insert(0, remaining % dim_size)
             remaining //= dim_size
-        multi_idxs.reverse()
 
         # Reconstruct the original indices
         original_idxs = (
@@ -1273,19 +1268,21 @@ class CombineDimsTensor:
         return self
 
 
-# Register the asarray property for both classes
 register_property(SplitDimsTensor, "asarray", "__attr__", lambda x: x)
 register_property(CombineDimsTensor, "asarray", "__attr__", lambda x: x)
+
+
+def _compute(arg, ctx=None):
+    from finch import compute
+
+    return compute(arg, ctx=ctx)
 
 
 def split_dims(x, axis: int, shape: tuple[int, ...]) -> LazyTensor:
     """
     Split a dimension into multiple dimensions using lazy evaluation.
     """
-    x = defer(x)
-    from finch import compute
-
-    computed_x = compute(x)
+    computed_x = _compute(x)
     split_tensor = SplitDimsTensor(computed_x, axis, shape)
     return elementwise(identity, defer(split_tensor))
 
@@ -1296,9 +1293,7 @@ def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
     dimension using lazy evaluation.
     """
     x = defer(x)
-    from finch import compute
-
-    computed_x = compute(x)
+    computed_x = _compute(x)
     combine_tensor = CombineDimsTensor(computed_x, axes)
     return elementwise(identity, defer(combine_tensor))
 
@@ -1321,7 +1316,6 @@ def flatten(x) -> LazyTensor:
         # If x is a scalar, expand to 1D
         return expand_dims(x, axis=0)
     if x.ndim == 1:
-        # Already 1D, return as-is
         return x
     # Combine all dimensions into one
     return combine_dims(x, tuple(range(x.ndim)))
