@@ -1129,9 +1129,184 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     return elementwise(identity, defer(concat_tensor))
 
 
-def flatten(x):
+class SplitDimsTensor:
     """
-    Flattens the input tensor `x` into a 1D tensor along the specified axis.
+    Tensor representing a dimension split operation.
+    Lazily splits one dimension into multiple dimensions when accessed.
+    """
+
+    def __init__(self, tensor, axis: int, shape: tuple[int, ...]):
+        """
+        Args:
+            tensor: The input tensor to split
+            axis: The axis to split
+            shape: The new shape for the split dimensions
+        """
+        self.tensor = tensor
+        self.axis = normalize_axis_index(axis, tensor.ndim)
+
+        # Validate that the product of new dimensions equals the original dimension
+        if np.prod(shape) != tensor.shape[self.axis]:
+            raise ValueError(
+                f"Cannot split dimension of size {tensor.shape[self.axis]} "
+                f"into shape {shape}. Product of new dimensions "
+                f"({np.prod(shape)}) must equal original size."
+            )
+
+        # Create new shape by replacing the axis dimension with the split dimensions
+        self.shape = tensor.shape[: self.axis] + shape + tensor.shape[self.axis + 1 :]
+        self.split_shape = shape
+        self.ndim = len(self.shape)
+        self.element_type = element_type(tensor)
+        self.dtype = self.element_type
+
+    def __getitem__(self, idxs: tuple[int, ...]):
+        """
+        Args:
+            idxs: Indices to access the split tensor
+        Returns the element at the specified indices by mapping back to original tensor
+        """
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+
+        # Extract the indices for the split dimensions
+        split_start = self.axis
+        split_end = self.axis + len(self.split_shape)
+        split_idxs = idxs[split_start:split_end]
+
+        # Convert multi-dimensional split indices back to linear index
+        linear_idx = 0
+        multiplier = 1
+        for i in reversed(range(len(self.split_shape))):
+            if i < len(split_idxs):
+                linear_idx += split_idxs[i] * multiplier
+            multiplier *= self.split_shape[i]
+
+        # Reconstruct the original indices
+        original_idxs = idxs[: self.axis] + (linear_idx,) + idxs[split_end:]
+
+        return self.tensor[original_idxs]
+
+    @property
+    def fill_value(self):
+        return fill_value(self.tensor)
+
+    def asarray(self):
+        return self
+
+
+class CombineDimsTensor:
+    """
+    Tensor representing a dimension combination operation.
+    Lazily combines multiple consecutive dimensions into one when accessed.
+    """
+
+    def __init__(self, tensor, axes: tuple[int, ...]):
+        """
+        Args:
+            tensor: The input tensor
+            axes: Consecutive axes to combine
+        """
+        self.tensor = tensor
+
+        # Normalize and validate axes
+        axes = normalize_axis_tuple(axes, tensor.ndim)
+        if len(axes) < 2:
+            raise ValueError("Must specify at least 2 axes to combine")
+
+        # Check that axes are consecutive
+        for i in range(len(axes) - 1):
+            if axes[i + 1] - axes[i] != 1:
+                raise ValueError("Axes to combine must be consecutive")
+
+        self.axes = axes
+        self.start_axis, self.end_axis = axes[0], axes[-1]
+
+        # Calculate the new combined dimension size
+        combined_size = np.prod([tensor.shape[i] for i in axes])
+
+        # Create new shape
+        self.shape = (
+            tensor.shape[: self.start_axis]
+            + (combined_size,)
+            + tensor.shape[self.end_axis + 1 :]
+        )
+        self.ndim = len(self.shape)
+        self.element_type = element_type(tensor)
+        self.dtype = self.element_type
+
+        # Store original dimensions for reconstruction
+        self.original_dims = [tensor.shape[i] for i in axes]
+
+    def __getitem__(self, idxs: tuple[int, ...]):
+        """
+        Args:
+            idxs: Indices to access the combined tensor
+        Returns the element by mapping to original multi-dimensional indices
+        """
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+
+        # Extract the linear index for the combined dimension
+        combined_idx = idxs[self.start_axis]
+
+        # Convert linear index back to multi-dimensional indices
+        multi_idxs = []
+        remaining = combined_idx
+        for dim_size in reversed(self.original_dims):
+            multi_idxs.append(remaining % dim_size)
+            remaining //= dim_size
+        multi_idxs.reverse()
+
+        # Reconstruct the original indices
+        original_idxs = (
+            idxs[: self.start_axis] + tuple(multi_idxs) + idxs[self.start_axis + 1 :]
+        )
+
+        return self.tensor[original_idxs]
+
+    @property
+    def fill_value(self):
+        return fill_value(self.tensor)
+
+    def asarray(self):
+        return self
+
+
+# Register the asarray property for both classes
+register_property(SplitDimsTensor, "asarray", "__attr__", lambda x: x)
+register_property(CombineDimsTensor, "asarray", "__attr__", lambda x: x)
+
+
+def split_dims(x, axis: int, shape: tuple[int, ...]) -> LazyTensor:
+    """
+    Split a dimension into multiple dimensions using lazy evaluation.
+    """
+    x = defer(x)
+    from finch import compute
+
+    computed_x = compute(x)
+    split_tensor = SplitDimsTensor(computed_x, axis, shape)
+    return elementwise(identity, defer(split_tensor))
+
+
+def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
+    """
+    Combine multiple consecutive dimensions into a single
+    dimension using lazy evaluation.
+    """
+    x = defer(x)
+    from finch import compute
+
+    computed_x = compute(x)
+    combine_tensor = CombineDimsTensor(computed_x, axes)
+    return elementwise(identity, defer(combine_tensor))
+
+
+def flatten(x) -> LazyTensor:
+    """
+    Flattens the input tensor `x` into a 1D tensor using CombineDimsTensor.
+
     Parameters
     ----------
     x: LazyTensor
@@ -1141,26 +1316,15 @@ def flatten(x):
     LazyTensor
         A new LazyTensor that is a flattened version of `x`.
     """
-    # TODO: This is a stub implementation.
-    from finch import compute
-
     x = defer(x)
     if x.ndim == 0:
-        # If x is a scalar, return it as is
+        # If x is a scalar, expand to 1D
+        return expand_dims(x, axis=0)
+    if x.ndim == 1:
+        # Already 1D, return as-is
         return x
-    computed = compute(x)
-    if isinstance(computed, OverrideTensor):
-        # If the computed tensor is an OverrideTensor, we need to flatten it
-        # using its underlying data.
-        for possible_name in ["data", "value", "array"]:
-            if hasattr(computed, possible_name):
-                computed = getattr(computed, possible_name)
-                break
-
-    assert isinstance(computed, np.ndarray), "Flatten currently supports numpy arrays"
-    # Flatten the computed array
-    flattened = computed.flatten()
-    return defer(flattened)
+    # Combine all dimensions into one
+    return combine_dims(x, tuple(range(x.ndim)))
 
 
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
