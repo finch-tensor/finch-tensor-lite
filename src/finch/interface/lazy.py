@@ -1,3 +1,4 @@
+import bisect
 import builtins
 import operator
 import sys
@@ -10,15 +11,15 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from ..algebra import (
     TensorFormat,
-    choose_if,
     element_type,
     fill_value,
     first,
     fixpoint_type,
+    identity,
     init_value,
-    logical_or,
     promote_max,
     promote_min,
+    promote_type,
     query_property,
     register_property,
     return_type,
@@ -549,7 +550,28 @@ def _broadcast_shape(*args: tuple[int, ...]) -> tuple[int, ...]:
     --------------
     tuple[int, ...]: The broadcasted shape as a tuple of integers.
     """
-    return np.broadcast_shapes(*args)
+    if len(args) < 2:
+        return args[0] if args else ()
+    shape1, shape2 = args[0], args[1]
+    N1, N2 = len(shape1), len(shape2)
+    N = builtins.max(N1, N2)
+    _shape = [0] * N
+    for i in range(N - 1, -1, -1):
+        n1, n2 = N1 - N + i, N2 - N + i
+        d1 = shape1[n1] if n1 >= 0 else 1
+        d2 = shape2[n2] if n2 >= 0 else 1
+        if d1 == 1:
+            _shape[i] = d2
+        elif d2 == 1 or d1 == d2:
+            _shape[i] = d1
+        else:
+            raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
+    shape = tuple(_shape)
+
+    if len(args) > 2:
+        for arg in args[2:]:
+            shape = _broadcast_shape(shape, arg)
+    return shape
 
 
 def elementwise(f: Callable, *args) -> LazyTensor:
@@ -997,9 +1019,89 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
     return tuple(broadcast_to(arr, shape) for arr in arrays)
 
 
+class ConcatTensor:
+    """
+    Tensor representing a concatenation of multiple tensors along a specified axis.
+    """
+
+    def __init__(self, tensor, *tensors, axis: int = 0):
+        """
+        Args:
+            tensor (ArrayLike):
+                The first tensor.
+            *tensors (ArrayLike):
+                Tensors to concatenate with the first tensor.
+        All tensors must support `__getitem__` and have a `shape` attribute.
+        `fill_value` is taken from the first tensor.
+        `element_type` is casted according to array_api specification.
+        """
+        self.ndim = len(tensor.shape)
+
+        shape_without_axis = tensor.shape[:axis] + tensor.shape[axis + 1 :]
+        # keep track of partial sums of sizes along the concatenation axis
+        self.ps_sizes = [0, tensor.shape[axis]]
+        for t in tensors:
+            if t.ndim != self.ndim:
+                raise ValueError("All tensors must have same number of dimensions")
+            self.ps_sizes.append(self.ps_sizes[-1] + t.shape[axis])
+            if t.shape[:axis] + t.shape[axis + 1 :] != shape_without_axis:
+                raise ValueError(
+                    "All tensors must have the same shape except "
+                    "along the concatenation axis"
+                )
+        self.shape = (
+            tensor.shape[:axis] + (self.ps_sizes[-1],) + tensor.shape[axis + 1 :]
+        )
+        self.tensors = (tensor,) + tensors
+        self.concat_axis = axis
+        # find the appropriate element type
+        self.element_type = element_type(tensor)
+        for t in tensors:
+            self.element_type = promote_type(element_type(self), element_type(t))
+
+    def __getitem__(self, idxs: tuple[int, ...]):
+        """
+        Args:
+            idxs: tuple[int, ...]
+                Indices to access the concatenated tensor.
+        Returns the element at the specified indices.
+        """
+        # find the tensor to access
+        tn = bisect.bisect(self.ps_sizes, idxs[self.concat_axis]) - 1
+        if tn < 0 or tn >= len(self.tensors):
+            raise IndexError(f"Index {idxs} out of bounds for shape {self.shape}")
+        t = self.tensors[tn]
+        shifted_idx = idxs[self.concat_axis] - self.ps_sizes[tn]
+        result = t[
+            idxs[: self.concat_axis] + (shifted_idx,) + idxs[self.concat_axis + 1 :]
+        ]
+        return self.element_type(result)
+
+    @property
+    def fill_value(self):
+        """
+        Returns the fill value of the first tensor in the concatenation.
+        """
+        return fill_value(self.tensors[0])
+
+    def asarray(self):
+        """
+        Returns the concatenated tensor as a numpy array.
+        """
+        return self
+
+    @property
+    def dtype(self):
+        """
+        Returns the data type of the concatenated tensor.
+        For testing reasons and compatibility with numpy.
+        """
+        return self.element_type
+
+
 def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     """
-    Concatenates input tensors along the specified axis using identity matrix placement.
+    Concatenates input tensors along the specified axis.
 
     Parameters:
         arrays: Sequence of tensors to concatenate (tuple or list of LazyTensor)
@@ -1019,55 +1121,12 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     # Convert axis to positive index and validate
     ndim = arrays[0].ndim
     axis = normalize_axis_index(axis, ndim)
+    from finch import compute
 
-    # Validate shapes and compute total size
-    sizes = []  # used to build shift matrices
-    total_size = 0
-
-    for t in arrays:
-        if t.ndim != ndim:
-            raise ValueError("All tensors must have same number of dimensions")
-        sizes.append(t.shape[axis])
-        total_size += t.shape[axis]
-
-    # Helper to create numpy shift matrix
-    def build_shift_matrix(offset: int, size: int) -> LazyTensor:
-        """Creates a lazy shift matrix that positions tensor at given offset"""
-        mat = np.zeros((size, total_size), dtype=np.int8)
-        for j in range(size):
-            mat[j, offset + j] = 1
-        return defer(mat)
-
-    # Build result by summing positioned tensors
-    cumulative_offset = 0
-    result = None
-
-    for i, tensor in enumerate(arrays):
-        size = sizes[i]
-        I_i = build_shift_matrix(cumulative_offset, size)
-
-        # Do a tensordot but with different operations
-        # permute tensor
-        axis_permutation = tuple(i for i in range(tensor.ndim) if i != axis) + (axis,)
-        permuted_tensor = permute_dims(tensor, axis_permutation)
-        # add 1-dim at the end of permuted_tensor for broadcasting
-        permuted_tensor = expand_dims(permuted_tensor, -1)
-
-        # Contract tensor with identity matrix along the concatenation axis
-        placed = reduce(
-            logical_or,
-            elementwise(choose_if, permuted_tensor, I_i),
-            axis=-2,
-        )
-        # permute back
-        placed_perm = moveaxis(placed, -1, axis)
-
-        # Initialize or accumulate result
-        result = placed_perm if result is None else result + placed_perm
-
-        cumulative_offset += size
-    assert result is not None
-    return result
+    computed_arrays = tuple(compute(arr) for arr in arrays)
+    concat_tensor = ConcatTensor(*computed_arrays, axis=axis)
+    # Create a LazyTensor that represents the concatenation
+    return elementwise(identity, defer(concat_tensor))
 
 
 def flatten(x):
@@ -1127,7 +1186,8 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
 
 def stack(arrays, /, axis: int = 0) -> LazyTensor:
     """
-    Stacks input tensors along a new axis using identity matrix placement.
+    Stacks input tensors along a new axis.
+
     Parameters:
         arrays: Sequence of tensors to stack (tuple or list of LazyTensor)
         axis: Axis along which to stack (default=0)

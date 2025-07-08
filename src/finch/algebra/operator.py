@@ -134,48 +134,16 @@ algebra.register_property(
 )
 
 
-def choose_if(a, condition):
+def identity(x):
     """
-    If the condition is truthy, returns the first argument;
-    otherwise, returns the default value associated with the type
-    of a.
-
-    This is useful for selecting elements.
-
-    Note: The reason for not making this a general terenary operator is to
-    guarantee that the return type is always the same as the type of a.
+    Returns the input value unchanged.
     """
-    if not condition:
-        return a.__class__()
-    return a
+    return x
 
 
 algebra.register_property(
-    choose_if,
+    identity,
     "__call__",
     "return_type",
-    lambda op, a, condition: a,
-)
-
-
-def logical_or(a, b):
-    """
-    Returns the first truthy value between a and b.
-    If both are falsy, returns b.
-    """
-    return a or b
-
-
-algebra.register_property(
-    logical_or,
-    "__call__",
-    "return_type",
-    lambda op, a, b: a or b,
-)
-
-algebra.register_property(
-    logical_or,
-    "__call__",
-    "init_value",
-    lambda op, a: a(False),
+    lambda op, x: x,
 )
