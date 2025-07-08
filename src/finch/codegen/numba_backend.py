@@ -4,7 +4,7 @@ from collections import namedtuple
 from dataclasses import make_dataclass
 from typing import Any
 
-import numba
+import numba  # type: ignore[import-untyped]
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -486,7 +486,7 @@ class NumbaStackFormat(ABC):
 
 
 def serialize_struct_to_numba(fmt: AssemblyStructFormat, obj) -> Any:
-    args = [getattr(obj, name) for (name, _) in obj.fieldnames]
+    args = [getattr(obj, name) for (name, _) in obj.struct_fields]
     return obj.numba_type(*args)
 
 
@@ -562,7 +562,7 @@ register_property(
 
 
 def struct_construct_from_numba(fmt: AssemblyStructFormat, numba_struct):
-    args = [getattr(numba_struct, name) for (name, _) in fmt.fieldnames]
+    args = [getattr(numba_struct, name) for (name, _) in fmt.struct_fields]
     return fmt.__class__(*args)
 
 
