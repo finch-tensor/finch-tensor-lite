@@ -503,7 +503,7 @@ register_property(
     deserialize_struct_from_numba,
 )
 
-numba_structs = {}
+numba_structs:dict[Any, Any] = {}
 numba_structnames = Namespace()
 
 
