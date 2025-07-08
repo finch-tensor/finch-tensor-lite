@@ -217,10 +217,10 @@ class CKernel:
         for argtype, arg in zip(self.argtypes, args, strict=False):
             if not has_format(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        serial_args = list(map(serialize_to_c, self.arg_types, args))
+        serial_args = list(map(serialize_to_c, self.argtypes, args))
         res = self.c_function(*serial_args)
         for type_, arg, serial_arg in zip(
-            self.arg_types, args, serial_args, strict=False
+            self.argtypes, args, serial_args, strict=False
         ):
             deserialize_from_c(type_, arg, serial_arg)
         if hasattr(self.ret_type, "construct_from_c"):
@@ -881,7 +881,7 @@ class CArgumentFormat(ABC):
         """
 
 
-class CBufferFormat(BufferFormat, ABC):
+class CBufferFormat(BufferFormat, CArgumentFormat, ABC):
     """
     Abstract base class for the format of datastructures. The format defines how
     the data in an Buffer is organized and accessed.

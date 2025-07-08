@@ -4,8 +4,8 @@ from typing import NamedTuple
 import numpy as np
 
 from ..finch_assembly import Buffer
-from .c import CArgument, CBufferFormat, CStackFormat, c_type
-from .numba_backend import NumbaArgument, NumbaBufferFormat
+from .c import CBufferFormat, CStackFormat, c_type
+from .numba_backend import NumbaBufferFormat
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -27,7 +27,7 @@ class CNumpyBuffer(ctypes.Structure):
     ]
 
 
-class NumpyBuffer(Buffer, CArgument, NumbaArgument):
+class NumpyBuffer(Buffer):
     """
     A buffer that uses NumPy arrays to store data. This is a concrete implementation
     of the Buffer class.
@@ -155,12 +155,12 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         """
         Serialize the NumPy buffer to a C-compatible structure.
         """
-        data = ctypes.c_void_p(self.arr.ctypes.data)
-        length = self.arr.size
-        self._self_obj = ctypes.py_object(self)
-        self._c_callback = numpy_buffer_resize_callback
-        self._c_buffer = CNumpyBuffer(self._self_obj, data, length, self._c_callback)
-        return ctypes.pointer(self._c_buffer)
+        data = ctypes.c_void_p(obj.arr.ctypes.data)
+        length = obj.arr.size
+        obj._self_obj = ctypes.py_object(obj)
+        obj._c_callback = numpy_buffer_resize_callback
+        obj._c_buffer = CNumpyBuffer(obj._self_obj, data, length, obj._c_callback)
+        return ctypes.pointer(obj._c_buffer)
 
     def deserialize_from_c(self, obj, c_buffer):
         """

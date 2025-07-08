@@ -111,7 +111,7 @@ register_property(
 )
 
 
-class NumbaBufferFormat(BufferFormat, ABC):
+class NumbaBufferFormat(BufferFormat, NumbaArgumentFormat, ABC):
     @abstractmethod
     def numba_length(self, ctx: "NumbaContext", buffer):
         """
