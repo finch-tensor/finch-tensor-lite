@@ -5,10 +5,9 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
-from collections import namedtuple
 from functools import lru_cache
-from operator import methodcaller
 from pathlib import Path
+from types import NoneType
 from typing import Any
 
 import numpy as np
@@ -109,6 +108,107 @@ class CArgument(ABC):
         ...
 
 
+def serialize_to_c(obj):
+    """
+    Serialize an object to a C-compatible format.
+
+    Args:
+        obj: The object to serialize.
+
+    Returns:
+        A ctypes-compatible struct.
+    """
+    if hasattr(obj, "serialize_to_c"):
+        return obj.serialize_to_c()
+    return query_property(obj, "serialize_to_c", "__attr__")
+
+
+def deserialize_from_c(obj, c_obj):
+    """
+    Deserialize a C-compatible object back to the original format.
+
+    Args:
+        obj: The original object to update.
+        c_obj: The C-compatible object to deserialize from.
+
+    Returns:
+        None
+    """
+    if hasattr(obj, "deserialize_from_c"):
+        obj.deserialize_from_c(c_obj)
+    else:
+        query_property(obj, "deserialize_from_c", "__attr__")(c_obj)
+
+
+def construct_from_c(fmt, c_obj):
+    """
+    Construct an object from a C-compatible format.
+
+    Args:
+        fmt: The format of the object.
+        c_obj: The C-compatible object to construct from.
+
+    Returns:
+        An instance of the original object type.
+    """
+    if hasattr(fmt, "construct_from_c"):
+        return fmt.construct_from_c(c_obj)
+    try:
+        query_property(fmt, "construct_from_c", "__attr__")(c_obj)
+    except NotImplementedError:
+        return fmt(c_obj)
+
+
+register_property(
+    tuple,
+    "serialize_to_c",
+    "__attr__",
+    lambda c_obj: None,
+)
+
+
+register_property(
+    NoneType,
+    "construct_from_c",
+    "__attr__",
+    lambda c_obj: None,
+)
+
+for t in (
+    ctypes.c_bool,
+    ctypes.c_char,
+    ctypes.c_wchar,
+    ctypes.c_byte,
+    ctypes.c_ubyte,
+    ctypes.c_short,
+    ctypes.c_ushort,
+    ctypes.c_int,
+    ctypes.c_int8,
+    ctypes.c_int16,
+    ctypes.c_int32,
+    ctypes.c_int64,
+    ctypes.c_uint,
+    ctypes.c_uint8,
+    ctypes.c_uint16,
+    ctypes.c_uint32,
+    ctypes.c_uint64,
+    ctypes.c_long,
+    ctypes.c_ulong,
+    ctypes.c_longlong,
+    ctypes.c_ulonglong,
+    ctypes.c_size_t,
+    ctypes.c_ssize_t,
+    ctypes.c_float,
+    ctypes.c_double,
+):
+    register_property(
+        t,
+        "serialize_to_c",
+        "__attr__",
+        lambda obj: obj,
+    )
+
+
 class CKernel:
     """
     A class to represent a C kernel.
@@ -132,12 +232,12 @@ class CKernel:
         for argtype, arg in zip(self.argtypes, args, strict=False):
             if not has_format(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        serial_args = list(map(methodcaller("serialize_to_c"), args))
+        serial_args = list(map(serialize_to_c, args))
         res = self.c_function(*serial_args)
         for arg, serial_arg in zip(args, serial_args, strict=False):
-            arg.deserialize_from_c(serial_arg)
+            deserialize_from_c(arg, serial_arg)
         if hasattr(self.ret_type, "construct_from_c"):
-            return res.construct_from_c(res)
+            return construct_from_c(res.format, res)
         if self.ret_type is type(None):
             return None
         return self.ret_type(res)
@@ -830,64 +930,85 @@ class CStackFormat(ABC):
         ...
 
 
+def serialize_struct_to_c(fmt: AssemblyStructFormat, obj) -> Any:
+    args = [getattr(obj, name) for (name, _) in obj.fieldnames]
+    return obj.c_type(*args)
+
+
+register_property(
+    AssemblyStructFormat, "serialize_to_c", "__attr__", serialize_struct_to_c
+)
+
+
+def deserialize_struct_from_c(fmt: AssemblyStructFormat, obj, c_struct: Any) -> None:
+    for name, _ in obj.fieldnames:
+        setattr(obj, name, getattr(c_struct, name))
+    return
+
+
+register_property(
+    AssemblyStructFormat, "deserialize_from_c", "__attr__", deserialize_struct_from_c
+)
+
 c_structs = {}
 c_structnames = Namespace()
 
 
-class CStruct(CArgument, ABC):
-    """
-    An abstract base class for structures that can be used in C assembly code.
-    Provides methods to convert the structure to C formats and to unpack/repack.
-    """
-
-    def serialize_to_c(self) -> Any:
-        args = [getattr(self, name) for (name, _) in self.fieldnames]
-        return self.c_type(*args)
-
-    def deserialize_from_c(self, c_struct: Any) -> None:
-        for name, _ in self.fieldnames:
-            setattr(self, name, getattr(c_struct, name))
-        return
+def struct_c_type(fmt: AssemblyStructFormat):
+    res = c_structs.get(fmt)
+    if res:
+        return res
+    fields = [(name, c_type(fmt)) for name, fmt in fmt.struct_fields]
+    new_struct = type(
+        c_structnames.freshen("C", fmt.struct_name),
+        (ctypes.Structure,),
+        {"_fields_": fields},
+    )
+    c_structs[fmt] = new_struct
+    return ctypes.POINTER(new_struct)
 
 
-class CStructFormat(AssemblyStructFormat, CStackFormat, ABC):
-    def c_type(self):
-        res = c_structs.get(self)
-        if res:
-            return res
-        fields = [(name, c_type(fmt)) for name, fmt in self.struct_fields]
-        new_struct = type(
-            c_structnames.freshen("C", self.struct_name),
-            (ctypes.Structure,),
-            {"_fields_": fields},
-        )
-        c_structs[self] = new_struct
-        return ctypes.POINTER(new_struct)
+register_property(
+    AssemblyStructFormat,
+    "c_type",
+    "__attr__",
+    struct_c_type,
+)
 
-    def c_unpack(self, ctx, var_n, val):
-        var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
-        for var_name, (name, fmt) in zip(var_names, self.fieldnames, strict=False):
-            t = ctx.ctype_name(c_type(fmt))
-            ctx.exec(f"{ctx.feed}{t} {var_name} = ({t}){ctx(val)}->{name};")
 
-        StructTuple = namedtuple(  # noqa: PYI024
-            f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames]
-        )
-        return StructTuple(*var_names)
+def struct_c_getattr(fmt: AssemblyStructFormat, ctx, obj, attr):
+    return f"{obj}->{attr}"
 
-    def c_getattr(self, ctx, obj, attr):
-        return f"{obj}->{attr}"
 
-    def c_setattr(self, ctx, obj, attr, val):
-        ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
-        return
+register_property(
+    AssemblyStructFormat,
+    "c_getattr",
+    "__attr__",
+    struct_c_getattr,
+)
 
-    def c_repack(self, ctx, lhs, obj):
-        for name, fmt in self.fieldnames:
-            t = ctx.ctype_name(c_type(fmt))
-            ctx.exec(f"{ctx.feed}{lhs}->{name} = ({t}){getattr(obj, name)};")
-        return
 
-    def construct_from_c(self, c_struct):
-        args = [getattr(c_struct, name) for (name, _) in self.fieldnames]
-        return self.__class__(*args)
+def struct_c_setattr(fmt: AssemblyStructFormat, ctx, obj, attr, val):
+    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+    return
+
+
+register_property(
+    AssemblyStructFormat,
+    "c_setattr",
+    "__attr__",
+    struct_c_setattr,
+)
+
+
+def struct_construct_from_c(fmt: AssemblyStructFormat, c_struct):
+    args = [getattr(c_struct, name) for (name, _) in fmt.fieldnames]
+    return fmt.__class__(*args)
+
+
+register_property(
+    AssemblyStructFormat,
+    "construct_from_c",
+    "__attr__",
+    struct_construct_from_c,
+)
