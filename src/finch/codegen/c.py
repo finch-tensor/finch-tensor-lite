@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
@@ -14,7 +15,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFormat, BufferFormat
+from ..finch_assembly import AssemblyStructFormat, BufferFormat, TupleFormat
 from ..symbolic import Context, Namespace, ScopedDict, has_format
 from ..util import config
 from ..util.cache import file_cache
@@ -1011,4 +1012,23 @@ register_property(
     "construct_from_c",
     "__attr__",
     struct_construct_from_c,
+)
+
+
+def serialize_tuple_to_c(fmt, obj):
+    x = namedtuple("CTuple", fmt.fieldnames)(*obj)  # noqa: PYI024
+    return serialize_to_c(fmt(x), x)
+
+
+register_property(
+    TupleFormat,
+    "serialize_to_c",
+    "__attr__",
+    serialize_tuple_to_c,
+)
+register_property(
+    TupleFormat,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, obj, c_tuple: tuple(c_tuple),
 )

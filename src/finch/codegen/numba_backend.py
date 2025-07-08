@@ -8,7 +8,7 @@ import numba
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFormat, BufferFormat
+from ..finch_assembly import AssemblyStructFormat, BufferFormat, TupleFormat
 from ..symbolic import Context, Namespace, ScopedDict, has_format
 
 logger = logging.getLogger(__name__)
@@ -96,14 +96,6 @@ def construct_from_numba(fmt, numba_obj):
         query_property(fmt, "construct_from_numba", "__attr__")(numba_obj)
     except NotImplementedError:
         return fmt(numba_obj)
-
-
-register_property(
-    tuple,
-    "serialize_to_numba",
-    "__attr__",
-    lambda obj: None,
-)
 
 
 register_property(
@@ -575,18 +567,22 @@ register_property(
 )
 
 
-class NumbaStructFormat(AssemblyStructFormat, NumbaStackFormat, ABC):
-    def numba_unpack(self, ctx, var_n, val):
-        var_names = [ctx.freshen(name) for (name, _) in self.fieldnames]
-        for var_name, (name, _) in zip(var_names, self.fieldnames, strict=False):
-            ctx.exec(f"{var_name} = {ctx(val)}.{name}")
+def serialize_tuple_to_numba(fmt, obj):
+    x = namedtuple("NumbaTuple", fmt.fieldnames)(*obj)  # noqa: PYI024
+    return serialize_to_numba(fmt(x), x)
 
-        StructTuple = namedtuple(  # noqa: PYI024
-            f"{self.struct_name}Tuple", [name for name, _ in self.fieldnames]
-        )
-        return StructTuple(*var_names)
 
-    def numba_repack(self, ctx, lhs, obj):
-        for name, _ in self.fieldnames:
-            ctx.exec(f"{ctx.feed}{lhs}.{name} = {getattr(obj, name)};")
-        return
+register_property(
+    TupleFormat,
+    "serialize_to_numba",
+    "__attr__",
+    serialize_tuple_to_numba,
+)
+
+
+register_property(
+    TupleFormat,
+    "deserialize_from_numba",
+    "__attr__",
+    lambda fmt, obj, numba_tuple: tuple(numba_tuple),
+)
