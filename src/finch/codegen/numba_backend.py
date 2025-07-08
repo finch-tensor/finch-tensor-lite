@@ -177,10 +177,10 @@ class NumbaKernel:
                 raise TypeError(
                     f"Expected argument of type {arg_type}, got {type(arg)}"
                 )
-        serial_args = list(map(serialize_to_numba, args))
+        serial_args = list(map(serialize_to_numba, self.arg_types, args))
         res = self.numba_func(*serial_args)
-        for arg, serial_arg in zip(args, serial_args, strict=False):
-            deserialize_from_numba(arg, serial_arg)
+        for arg_type, arg, serial_arg in zip(self.arg_types, args, serial_args, strict=False):
+            deserialize_from_numba(arg_type, arg, serial_arg)
         if hasattr(self.ret_type, "construct_from_numba"):
             return construct_from_numba(self.ret_type, res)
         if self.ret_type is type(None):
