@@ -14,7 +14,7 @@ class AssemblyStructFormat(ABC):
     def struct_fields(self): ...
 
     @property
-    def struct_names(self):
+    def struct_fieldnames(self):
         return [name for (name, _) in self.struct_fields]
 
     @property

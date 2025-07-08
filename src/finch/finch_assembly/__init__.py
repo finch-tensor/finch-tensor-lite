@@ -27,7 +27,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
-from .struct import AssemblyStructFormat
+from .struct import AssemblyStructFormat, NamedTupleFormat, TupleFormat
 
 __all__ = [
     "AssemblyInterpreter",
@@ -50,6 +50,7 @@ __all__ = [
     "Literal",
     "Load",
     "Module",
+    "NamedTupleFormat",
     "Repack",
     "Resize",
     "Return",
@@ -57,6 +58,7 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
+    "TupleFormat",
     "Unpack",
     "Variable",
     "WhileLoop",

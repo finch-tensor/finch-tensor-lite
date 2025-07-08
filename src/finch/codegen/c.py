@@ -691,18 +691,18 @@ class CContext(Context):
                 return None
             case asm.GetAttr(obj, attr):
                 obj_code = self.cache("obj", obj)
-                if not obj.result_type.struct_hasattr(attr.val):
+                if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return obj.result_type.c_getattr(obj_code, attr.val)
+                return obj.result_format.c_getattr(obj_code, attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj_code = self.cache("obj", obj)
-                if not has_format(val, obj.result_type.struct_attrtype(attr.val)):
+                if not has_format(val, obj.result_format.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_format} != "
-                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                        f"{obj.result_format.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                obj.result_type.c_setattr(obj_code, attr.val, val_code)
+                obj.result_format.c_setattr(obj_code, attr.val, val_code)
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
@@ -951,7 +951,7 @@ register_property(
     AssemblyStructFormat, "deserialize_from_c", "__attr__", deserialize_struct_from_c
 )
 
-c_structs = {}
+c_structs: dict[Any, Any] = {}
 c_structnames = Namespace()
 
 
@@ -1003,7 +1003,7 @@ register_property(
 
 
 def struct_construct_from_c(fmt: AssemblyStructFormat, c_struct):
-    args = [getattr(c_struct, name) for (name, _) in fmt.fieldnames]
+    args = [getattr(c_struct, name) for (name, _) in fmt.struct_fieldnames]
     return fmt.__class__(*args)
 
 
