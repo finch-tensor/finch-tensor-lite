@@ -680,23 +680,23 @@ class CContext(Context):
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
                 if isinstance(attr.val, int):
-                    attr = f"element_{attr.val}"
+                    attr_name = f"element_{attr.val}"
                 else:
-                    attr = attr.val
-                return obj.result_format.c_getattr(obj_code, attr)
+                    attr_name = attr.val
+                return obj.result_format.c_getattr(obj_code, attr_name)
             case asm.SetAttr(obj, attr, val):
                 obj_code = self.cache("obj", obj)
                 if isinstance(attr.val, int):
-                    attr = f"element_{attr.val}"
+                    attr_name = f"element_{attr.val}"
                 else:
-                    attr = attr.val
+                    attr_name = attr.val
                 if not has_format(val, obj.result_format.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_format} != "
                         f"{obj.result_format.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                obj.result_format.c_setattr(obj_code, attr, val_code)
+                obj.result_format.c_setattr(obj_code, attr_name, val_code)
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
