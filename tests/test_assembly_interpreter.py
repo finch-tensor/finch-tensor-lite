@@ -177,7 +177,7 @@ def test_simple_struct():
                                     asm.Literal(operator.mul),
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
-                                        asm.GetAttr(x_var, asm.Literal(0)),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
                                     )
                                 ),
                             ),
@@ -191,7 +191,7 @@ def test_simple_struct():
                                             asm.Literal(operator.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
-                                                asm.GetAttr(x_var, asm.Literal(1))
+                                                asm.GetAttr(x_var, asm.Literal("element_1"))
                                             )
                                         ),
                                     ),

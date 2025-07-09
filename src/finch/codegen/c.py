@@ -472,7 +472,7 @@ def c_type(t):
 
 
 register_property(int, "c_type", "__attr__", lambda x: ctypes.c_int)
-register_property(float, "c_type", "__attr__", lambda x: ctypes.c_doulbe)
+register_property(float, "c_type", "__attr__", lambda x: ctypes.c_double)
 register_property(str, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
 register_property(
     np.generic, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
@@ -683,24 +683,16 @@ class CContext(Context):
                 obj = self.cache("obj", obj)
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                if isinstance(attr.val, int):
-                    attr_name = f"element_{attr.val}"
-                else:
-                    attr_name = attr.val
-                return obj.result_format.c_getattr(self, obj, attr_name)
+                return obj.result_format.c_getattr(self, obj, attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
-                if isinstance(attr.val, int):
-                    attr_name = f"element_{attr.val}"
-                else:
-                    attr_name = attr.val
                 if not has_format(val, obj.result_format.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_format} != "
                         f"{obj.result_format.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                obj.result_format.c_setattr(self, obj, attr_name, val_code)
+                obj.result_format.c_setattr(self, obj, attr.val, val_code)
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
