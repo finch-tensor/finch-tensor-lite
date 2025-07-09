@@ -52,3 +52,6 @@ section-order = [
     "first-party",
     "local-folder",
 ]
+
+[tool.mypy]
+ignore_missing_imports = true

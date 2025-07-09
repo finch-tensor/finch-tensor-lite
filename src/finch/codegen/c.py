@@ -185,6 +185,7 @@ for t in (
     ctypes.c_ssize_t,
     ctypes.c_float,
     ctypes.c_double,
+    ctypes.c_wchar_p,
 ):
     register_property(
         t,
@@ -420,6 +421,7 @@ def c_literal(ctx, val):
 
 register_property(int, "c_literal", "__attr__", lambda x, ctx: str(x))
 register_property(float, "c_literal", "__attr__", lambda x, ctx: str(x))
+register_property(str, "c_literal", "__attr__", lambda x, ctx: f'"{x}"')
 register_property(
     np.generic,
     "c_literal",
@@ -470,6 +472,8 @@ def c_type(t):
 
 
 register_property(int, "c_type", "__attr__", lambda x: ctypes.c_int)
+register_property(float, "c_type", "__attr__", lambda x: ctypes.c_doulbe)
+register_property(str, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
 register_property(
     np.generic, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
@@ -676,16 +680,16 @@ class CContext(Context):
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.GetAttr(obj, attr):
-                obj_code = self.cache("obj", obj)
+                obj = self.cache("obj", obj)
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
                 if isinstance(attr.val, int):
                     attr_name = f"element_{attr.val}"
                 else:
                     attr_name = attr.val
-                return obj.result_format.c_getattr(obj_code, attr_name)
+                return obj.result_format.c_getattr(self, obj, attr_name)
             case asm.SetAttr(obj, attr, val):
-                obj_code = self.cache("obj", obj)
+                obj = self.cache("obj", obj)
                 if isinstance(attr.val, int):
                     attr_name = f"element_{attr.val}"
                 else:
@@ -696,7 +700,7 @@ class CContext(Context):
                         f"{obj.result_format.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                obj.result_format.c_setattr(obj_code, attr_name, val_code)
+                obj.result_format.c_setattr(self, obj, attr_name, val_code)
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
