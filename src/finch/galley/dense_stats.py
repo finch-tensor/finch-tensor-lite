@@ -3,7 +3,7 @@ from .tensor_stats import TensorStats, TensorDef
 
 class DenseStats(TensorStats):
     def __init__(self, tensor: Any, fields: Iterable[str]):
-        self.defn = TensorDef.from_tensor(tensor, fields)
+        return 0
 
     def estimate_non_fill_values(self) -> float:
         return 0
