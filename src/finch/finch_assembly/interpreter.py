@@ -153,12 +153,26 @@ class AssemblyInterpreter:
             case asm.GetAttr(obj, attr):
                 obj_e = self(obj)
                 attr = attr.val
-                return getattr(obj_e, attr)
+                if isinstance(attr, str):
+                    return getattr(obj_e, attr)
+                elif isinstance(attr, int):
+                    return obj_e[attr]  # type: ignore[return-value]
+                else:
+                    raise TypeError(
+                        f"Attribute '{attr}' is not a valid attribute name or index."
+                    )
             case asm.SetAttr(obj, attr, val):
                 obj_e = self(obj)
                 attr = attr.val
                 val_e = self(val)
-                setattr(obj_e, attr, val_e)
+                if isinstance(attr, str):
+                    setattr(obj_e, attr, val_e)
+                elif isinstance(attr, int):
+                    obj_e[attr] = val_e
+                else:
+                    raise TypeError(
+                        f"Attribute '{attr}' is not a valid attribute name or index."
+                    )
                 return None
             case asm.Slot(var_n, var_t):
                 if var_n in self.types:

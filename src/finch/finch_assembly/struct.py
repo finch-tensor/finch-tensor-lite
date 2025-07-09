@@ -59,7 +59,7 @@ class TupleFormat(AssemblyStructFormat):
     @property
     def struct_fields(self):
         return [
-            ("element_" + str(i), fmt) for i, fmt in enumerate(self._struct_formats)
+            (i, fmt) for i, fmt in enumerate(self._struct_formats)
         ]
 
 

@@ -8,6 +8,7 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch.codegen import NumpyBuffer
 from finch.finch_assembly import AssemblyInterpreter
+from finch.symbolic import format
 
 
 @pytest.mark.parametrize(
@@ -86,17 +87,6 @@ def test_dot_product(a, b):
     assert np.allclose(result, expected)
 
 
-@pytest.mark.parametrize(
-    "a, b",
-    [
-        (np.array([1, 2, 3], dtype=np.float64), np.array([4, 5, 6], dtype=np.float64)),
-        (np.array([0], dtype=np.float64), np.array([7], dtype=np.float64)),
-        (
-            np.array([1.5, 2.5], dtype=np.float64),
-            np.array([3.5, 4.5], dtype=np.float64),
-        ),
-    ],
-)
 def test_if_statement():
     var = asm.Variable("a", np.int64)
     mod = AssemblyInterpreter()(
@@ -167,7 +157,7 @@ def test_if_statement():
 
 def test_simple_struct():
     Point = namedtuple("Point", ["x", "y"])
-    p = Point(1, 2.0)
+    p = Point(np.float64(1.0), np.float64(2.0))
     x = (1, 4)
 
     p_var = asm.Variable("p", format(p))
@@ -184,22 +174,27 @@ def test_simple_struct():
                             asm.Assign(
                                 res_var,
                                 asm.Call(
+                                    asm.Literal(operator.mul),
                                     (
-                                        asm.Literal(operator.mul),
                                         asm.GetAttr(p_var, asm.Literal("x")),
-                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                        asm.GetAttr(x_var, asm.Literal(0)),
                                     )
                                 ),
                             ),
                             asm.Assign(
                                 res_var,
                                 asm.Call(
+                                    asm.Literal(operator.add),
                                     (
-                                        asm.Literal(operator.add),
-                                        asm.res_var,
-                                        asm.GetAttr(p_var, asm.Literal("y")),
-                                        asm.GetAttr(x_var, asm.Literal("element_1")),
-                                    )
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(x_var, asm.Literal(1))
+                                            )
+                                        ),
+                                    ),
                                 ),
                             ),
                             asm.Return(res_var),
@@ -211,4 +206,4 @@ def test_simple_struct():
     )
 
     result = mod.simple_struct(p, x)
-    assert result == 30
+    assert result == 9.0

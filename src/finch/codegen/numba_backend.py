@@ -316,13 +316,21 @@ class NumbaContext(Context):
                 return None
             case asm.GetAttr(obj, attr):
                 obj_code = self.cache("obj", obj)
+                if isinstance(attr.val, int):
+                    attr = f"element_{attr.val}"
+                else:
+                    attr = attr.val
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
                 return query_property(obj.result_format, "numba_getattr", "__attr__")(
-                    self, obj_code, attr.val
+                    self, obj_code, attr
                 )
             case asm.SetAttr(obj, attr, val):
                 obj_code = self.cache("obj", obj)
+                if isinstance(attr.val, int):
+                    attr = f"element_{attr.val}"
+                else:
+                    attr = attr.val
                 if not has_format(val, obj.result_format.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_format} != "
@@ -330,7 +338,7 @@ class NumbaContext(Context):
                     )
                 val_code = self(val)
                 query_property(obj.result_format, "numba_setattr", "__attr__")(
-                    self, obj_code, attr.val, val_code
+                    self, obj_code, attr, val_code
                 )
                 return None
             case asm.Call(asm.Literal(val), args):
