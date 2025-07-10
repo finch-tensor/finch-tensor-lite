@@ -546,6 +546,97 @@ def stack(arrays: Sequence, /, *, axis: int = 0):
     return compute(lazy.stack(arrays, axis=axis))
 
 
+def split_dims(x, axis: int, shape: tuple[int, ...]):
+    """
+    Split a dimension into multiple dimensions. The product
+    of the sizes in the `shape` tuple must equal the size
+    of the dimension being split.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to split
+    axis: int
+        The axis to split
+    shape: tuple[int, ...]
+        The new shape for the split dimensions
+
+    Returns
+    -------
+    out: array
+        A tensor with the specified dimension split into multiple dimensions
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(12).reshape(2, 6)  # shape (2, 6)
+    >>> result = split_dims(x, axis=1, shape=(2, 3))
+    >>> result.shape
+    (2, 2, 3)
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.split_dims(x, axis, shape)
+    return compute(lazy.split_dims(x, axis, shape))
+
+
+def combine_dims(x, axes: tuple[int, ...]):
+    """
+    Combine multiple consecutive dimensions into a single dimension.
+    The resulting axis will have a size equal to the product of the
+    sizes of the combined axes.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor
+    axes: tuple[int, ...]
+        Consecutive axes to combine
+
+    Returns
+    -------
+    out: array
+        A tensor with the specified dimensions combined into one
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
+    >>> result = combine_dims(x, axes=(1, 2))
+    >>> result.shape
+    (2, 12)
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.combine_dims(x, axes)
+    return compute(lazy.combine_dims(x, axes))
+
+
+def flatten(x):
+    """
+    Flattens the input tensor into a 1D tensor.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to be flattened.
+
+    Returns
+    -------
+    out: array
+        A new tensor that is a flattened version of the input.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
+    >>> result = flatten(x)
+    >>> result.shape
+    (24,)
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.flatten(x)
+    return compute(lazy.flatten(x))
+
+
 # trigonometric functions:
 def sin(x):
     if isinstance(x, lazy.LazyTensor):

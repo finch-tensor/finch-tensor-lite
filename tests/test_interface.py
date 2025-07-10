@@ -760,9 +760,7 @@ def test_broadcast_to(x, shape, x_wrap):
         out = finch.broadcast_to(wx, shape)
         if isinstance(wx, finch.LazyTensor):
             out = finch.compute(out)
-        assert not isinstance(out, tuple)  # for type checker
-        assert_equal(out, expected, "values mismatch")
-        assert out.shape == shape, f"shape mismatch: got {out.shape}, {out, expected}"
+        assert_equal(out, expected, strict=True)
 
 
 @pytest.mark.parametrize(
@@ -784,17 +782,15 @@ def test_broadcast_to(x, shape, x_wrap):
         finch.defer,
     ],
 )
-def test_broadcast_arrays(shapes, wrapper):
+def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
     """
     Tests for broadcasting multiple arrays to a common shape.
     The wrapper is randomly applied to each shape to ensure
     """
-    import random
 
     # Generate random arrays for each shape
-    generator = np.random.default_rng()
-    arrays = [generator.random(shape) for shape in shapes]
-    wrapped_arrays = [wrapper(arr) if random.random() > 0.5 else arr for arr in arrays]
+    arrays = [rng.random(shape) for shape in shapes]
+    wrapped_arrays = random_wrapper(arrays, wrapper)
     try:
         expected = np.broadcast_arrays(*arrays)
     except ValueError:
@@ -870,15 +866,7 @@ def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
     if isinstance(result, finch.LazyTensor):
         result = finch.compute(result)
 
-    assert not isinstance(result, tuple)  # for type checker
-    # Verify results
-    assert result.shape == expected.shape, (
-        f"Shape mismatch: got {result.shape}, expected {expected.shape}"
-    )
-    assert result.dtype == expected.dtype, (
-        f"Type mismatch: got {result.dtype}, expected {expected.dtype}"
-    )
-    assert_equal(result, expected, "Values mismatch in concatenated array")
+    assert_equal(result, expected, "Values mismatch in concatenated array", strict=True)
 
 
 @pytest.mark.parametrize(
@@ -941,11 +929,8 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     result = finch.moveaxis(wrapped_x, source, destination)
     if isinstance(result, finch.LazyTensor):
         result = finch.compute(result)
-    assert not isinstance(result, tuple)  # for type checker
-    assert result.dtype == expected.dtype, (
-        f"Type mismatch: got {result.dtype}, expected {expected.dtype}"
-    )
-    assert_equal(result, expected, "Values mismatch in moved axis array")
+
+    assert_equal(result, expected, "Values mismatch in moved axis array", strict=True)
 
 
 @pytest.mark.parametrize(
@@ -1010,9 +995,60 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     if isinstance(result, finch.LazyTensor):
         result = finch.compute(result)
 
-    assert not isinstance(result, tuple)  # for type checker
-    # Verify results
-    assert result.dtype == expected.dtype, (
-        f"Type mismatch: got {result.dtype}, expected {expected.dtype}"
-    )
-    assert_equal(result, expected, "Values mismatch in stacked array")
+    assert_equal(result, expected, "Values mismatch in stacked array", strict=True)
+
+
+@pytest.mark.parametrize(
+    "array_shape, axis, split_shape, expected_shape",
+    [
+        ((2, 6), 1, (2, 3), (2, 2, 3)),
+        ((4, 6), -1, (2, 3), (4, 2, 3)),
+        ((2, 24), 1, (2, 3, 4), (2, 2, 3, 4)),
+        ((8, 3), 0, (2, 4), (2, 4, 3)),
+        ((6,), 0, (1, 6), (1, 6)),
+        ((2, 8), 1, (1, 8), (2, 1, 8)),
+        # Edge case: 3D tensor with split in middle dimension
+        ((3, 6, 4), 1, (2, 3), (3, 2, 3, 4)),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
+    """Test splitting a dimension into multiple dimensions."""
+    # Create input tensor with identifiable values
+    x = np.arange(np.prod(array_shape)).reshape(array_shape)
+    wrapped_x = wrapper(x)
+    expected = np.reshape(x, expected_shape)
+    # Apply split_dims operation
+    result = finch.split_dims(wrapped_x, axis, split_shape)
+    # Compute if result is lazy
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+
+    assert_equal(result, expected, strict=True)
+
+
+@pytest.mark.parametrize(
+    "array_shape, axis, split_shape",
+    [
+        # Product of split shape doesn't match original dimension size
+        ((2, 7), 1, (2, 3)),
+        # Axis out of bounds
+        ((2, 6), 2, (2, 3)),
+        # Negative axis out of bounds
+        ((2, 6), -3, (2, 3)),
+        # Empty split shape
+        ((2, 6), 1, ()),
+    ],
+)
+def test_split_dims_errors(array_shape, axis, split_shape):
+    """Test error cases for split_dims."""
+    x = np.arange(np.prod(array_shape)).reshape(array_shape)
+    with pytest.raises(ValueError):
+        finch.split_dims(x, axis, split_shape)
