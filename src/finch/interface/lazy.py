@@ -13,7 +13,7 @@ from ..algebra import (
     TensorFormat,
     element_type,
     fill_value,
-    first,
+    first_arg,
     fixpoint_type,
     identity,
     init_value,
@@ -1008,7 +1008,7 @@ def broadcast_to(tensor, /, shape: tuple[int, ...]) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(first, tensor, NoneArray(shape))
+    return elementwise(first_arg, tensor, NoneArray(shape))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:

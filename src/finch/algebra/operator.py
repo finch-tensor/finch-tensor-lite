@@ -118,7 +118,7 @@ algebra.register_property(
 )
 
 
-def first(*args):
+def first_arg(*args):
     """
     Returns the first argument passed to it.
     """
@@ -126,7 +126,7 @@ def first(*args):
 
 
 algebra.register_property(
-    first,
+    first_arg,
     "__call__",
     "return_type",
     # args[0] is the function name

@@ -14,7 +14,7 @@ from .algebra import (
 from .operator import (
     InitWrite,
     conjugate,
-    first,
+    first_arg,
     identity,
     overwrite,
     promote_max,
@@ -39,7 +39,7 @@ __all__ = [
     "element_type",
     "fill_value",
     "fill_value",
-    "first",
+    "first_arg",
     "fixpoint_type",
     "identity",
     "init_value",
