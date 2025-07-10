@@ -673,6 +673,56 @@ def test_propagate_map_queries_backward():
     assert result == expected
 
 
+def test_materialize_squeeze_expand_productions():
+    plan = Plan(
+        (
+            Produces(
+                (
+                    Reorder(
+                        Relabel(Alias("A0"), (Field("i2"), Field("i1"))),
+                        (Field("i1"), Field("i2"), Field("i3")),
+                    ),
+                    Reorder(
+                        Relabel(Alias("A0"), (Field("i1"), Field("i2"))),
+                        (Field("i1"), Field("i2")),
+                    ),
+                )
+            ),
+        )
+    )
+
+    expected = Plan(
+        (
+            Plan(
+                (
+                    Query(
+                        Alias(f"#A#{_sg.counter}"),
+                        Reorder(
+                            Relabel(Alias("A0"), (Field("i2"), Field("i1"))),
+                            (Field("i2"), Field("i1"), Field("i3")),
+                        ),
+                    ),
+                    Produces(
+                        (
+                            Reorder(
+                                Relabel(
+                                    Alias(f"#A#{_sg.counter}"),
+                                    (Field("i2"), Field("i1"), Field("i3")),
+                                ),
+                                (Field("i1"), Field("i2"), Field("i3")),
+                            ),
+                            Alias("A0"),
+                        )
+                    ),
+                )
+            ),
+        )
+    )
+
+    result = materialize_squeeze_expand_productions(plan)
+    assert result == expected
+
+
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -684,16 +734,16 @@ def test_scheduler_e2e_matmul(a, b):
     i, j, k = Field("i"), Field("j"), Field("k")
 
     plan = Plan(
-        [
+        (
             Query(Alias("A"), Table(Literal(a), (i, k))),
             Query(Alias("B"), Table(Literal(b), (k, j))),
             Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
             Query(
                 Alias("C"),
-                Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
+                Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)),
             ),
             Produces((Alias("C"),)),
-        ]
+        )
     )
 
     plan_opt = optimize(plan)
@@ -785,53 +835,3 @@ def test_scheduler_e2e_sddmm():
     expected = s * np.matmul(a, b)
 
     np.testing.assert_equal(result, expected)
-
-
-def test_materialize_squeeze_expand_productions():
-    plan = Plan(
-        (
-            Produces(
-                (
-                    Reorder(
-                        Relabel(Alias("A0"), (Field("i2"), Field("i1"))),
-                        (Field("i1"), Field("i2"), Field("i3")),
-                    ),
-                    Reorder(
-                        Relabel(Alias("A0"), (Field("i1"), Field("i2"))),
-                        (Field("i1"), Field("i2")),
-                    ),
-                )
-            ),
-        )
-    )
-
-    expected = Plan(
-        (
-            Plan(
-                (
-                    Query(
-                        Alias(f"#A#{_sg.counter}"),
-                        Reorder(
-                            Relabel(Alias("A0"), (Field("i2"), Field("i1"))),
-                            (Field("i2"), Field("i1"), Field("i3")),
-                        ),
-                    ),
-                    Produces(
-                        (
-                            Reorder(
-                                Relabel(
-                                    Alias(f"#A#{_sg.counter}"),
-                                    (Field("i2"), Field("i1"), Field("i3")),
-                                ),
-                                (Field("i1"), Field("i2"), Field("i3")),
-                            ),
-                            Alias("A0"),
-                        )
-                    ),
-                )
-            ),
-        )
-    )
-
-    result = materialize_squeeze_expand_productions(plan)
-    assert result == expected
