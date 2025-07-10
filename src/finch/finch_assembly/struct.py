@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import NamedTuple
 
 from ..algebra import register_property
-from ..symbolic import Format
+from ..symbolic import Format, format
 
 
 class AssemblyStructFormat(Format, ABC):
@@ -13,6 +13,10 @@ class AssemblyStructFormat(Format, ABC):
     @property
     @abstractmethod
     def struct_fields(self): ...
+
+    @property
+    def is_mutable(self):
+        return False
 
     def struct_getattr(self, obj, attr):
         return getattr(obj, attr)
@@ -99,6 +103,7 @@ def tupleformat(x):
     if hasattr(type(x), "_fields"):
         return NamedTupleFormat(type(x).__name__, [(fieldname, format(getattr(x, fieldname))) for fieldname in type(x)._fields])
     else:
+        print(type(x).__name__)
         return TupleFormat(type(x).__name__, [type(elem) for elem in x])
 
 

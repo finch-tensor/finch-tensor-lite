@@ -354,4 +354,4 @@ def test_simple_struct(compiler):
     )
 
     result = mod.simple_struct(p, x)
-    assert result == 9.0
+    assert result == np.float64(9.0)

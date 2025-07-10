@@ -16,7 +16,7 @@ import numpy as np
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFormat, BufferFormat, TupleFormat
-from ..symbolic import Context, Namespace, ScopedDict, has_format
+from ..symbolic import Context, Namespace, ScopedDict, has_format, format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -104,7 +104,7 @@ def serialize_to_c(fmt, obj):
     """
     if hasattr(fmt, "serialize_to_c"):
         return fmt.serialize_to_c(obj)
-    return query_property(fmt, "serialize_to_c", "__attr__")(obj)
+    return query_property(fmt, "serialize_to_c", "__attr__", obj)
 
 
 def deserialize_from_c(fmt, obj, c_obj):
@@ -122,7 +122,7 @@ def deserialize_from_c(fmt, obj, c_obj):
     if hasattr(fmt, "deserialize_from_c"):
         fmt.deserialize_from_c(obj, c_obj)
     else:
-        query_property(fmt, "deserialize_from_c", "__attr__")(obj, c_obj)
+        query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
 
 
 def construct_from_c(fmt, c_obj):
@@ -139,7 +139,7 @@ def construct_from_c(fmt, c_obj):
     if hasattr(fmt, "construct_from_c"):
         return fmt.construct_from_c(c_obj)
     try:
-        query_property(fmt, "construct_from_c", "__attr__")(c_obj)
+        query_property(fmt, "construct_from_c", "__attr__", c_obj)
     except NotImplementedError:
         return fmt(c_obj)
 
@@ -333,6 +333,16 @@ def c_function_call(op: Any, ctx, *args: Any) -> str:
     except NotImplementedError:
         return f"{c_function_name(op, ctx, *args)}({', '.join(map(ctx, args))})"
 
+
+def c_getattr(fmt, ctx, obj, attr):
+    if hasattr(fmt, "c_getattr"):
+        return fmt.c_getattr(ctx, obj, attr)
+    return query_property(fmt, "c_getattr", "__attr__", ctx, obj, attr)
+
+def c_setattr(fmt, ctx, obj, attr, val):
+    if hasattr(fmt, "c_setattr"):
+        return fmt.c_setattr(ctx, obj, attr, val)
+    return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
 
 def register_n_ary_c_op_call(op, symbol):
     def property_func(op, ctx, *args):
@@ -680,10 +690,9 @@ class CContext(Context):
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.GetAttr(obj, attr):
-                obj = self.cache("obj", obj)
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return obj.result_format.c_getattr(self, obj, attr.val)
+                return c_getattr(obj.result_format, self, self(obj), attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
                 if not has_format(val, obj.result_format.struct_attrtype(attr.val)):
@@ -692,7 +701,7 @@ class CContext(Context):
                         f"{obj.result_format.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                obj.result_format.c_setattr(self, obj, attr.val, val_code)
+                c_setattr(obj.result_format, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
                 assert isinstance(f, asm.Literal)
@@ -946,8 +955,8 @@ class CStackFormat(ABC):
 
 
 def serialize_struct_to_c(fmt: AssemblyStructFormat, obj) -> Any:
-    args = [getattr(obj, name) for (name, _) in obj.fieldnames]
-    return obj.c_type(*args)
+    args = [getattr(obj, name) for name in fmt.struct_fieldnames]
+    return struct_c_type(fmt)(*args)
 
 
 register_property(
@@ -956,9 +965,10 @@ register_property(
 
 
 def deserialize_struct_from_c(fmt: AssemblyStructFormat, obj, c_struct: Any) -> None:
-    for name, _ in obj.fieldnames:
-        setattr(obj, name, getattr(c_struct, name))
-    return
+    if fmt.is_mutable:
+        for name in fmt.struct_fieldnames:
+            setattr(obj, name, getattr(c_struct, name))
+        return
 
 
 register_property(
@@ -980,14 +990,14 @@ def struct_c_type(fmt: AssemblyStructFormat):
         {"_fields_": fields},
     )
     c_structs[fmt] = new_struct
-    return ctypes.POINTER(new_struct)
+    return new_struct
 
 
 register_property(
     AssemblyStructFormat,
     "c_type",
     "__attr__",
-    struct_c_type,
+    lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
 )
 
 
@@ -1030,8 +1040,8 @@ register_property(
 
 
 def serialize_tuple_to_c(fmt, obj):
-    x = namedtuple("CTuple", fmt.fieldnames)(*obj)  # noqa: PYI024
-    return serialize_to_c(fmt(x), x)
+    x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
+    return serialize_to_c(format(x), x)
 
 
 register_property(
@@ -1045,4 +1055,11 @@ register_property(
     "construct_from_c",
     "__attr__",
     lambda fmt, obj, c_tuple: tuple(c_tuple),
+)
+
+register_property(
+    TupleFormat,
+    "c_type",
+    "__attr__",
+    lambda fmt: ctypes.POINTER(struct_c_type(asm.NamedTupleFormat("CTuple", fmt.struct_fields)))
 )
