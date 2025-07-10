@@ -590,7 +590,11 @@ def combine_dims(x, axes: tuple[int, ...]):
     x: array
         The input tensor
     axes: tuple[int, ...]
-        Consecutive axes to combine
+        Consecutive axes to combine.
+
+        The axes will be considered in increasing order.
+        So passing axes=(2, 1, 3) will be equivalent to
+        passing axes=(1, 2, 3).
 
     Returns
     -------

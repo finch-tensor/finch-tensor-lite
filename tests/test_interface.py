@@ -1051,4 +1051,116 @@ def test_split_dims_errors(array_shape, axis, split_shape):
     """Test error cases for split_dims."""
     x = np.arange(np.prod(array_shape)).reshape(array_shape)
     with pytest.raises(ValueError):
+        # error must be raised before computing
         finch.split_dims(x, axis, split_shape)
+
+
+@pytest.mark.parametrize(
+    "array_shape, axes, expected_shape",
+    [
+        # Basic 2D to 1D combinations
+        ((2, 3, 4), (1, 2), (2, 12)),
+        # Negative axis indexing
+        ((4, 2, 3), (-3, -2), (8, 3)),
+        # (combine all dimensions)
+        ((2, 3, 4), (0, 1, 2), (24,)),
+        # 4D
+        ((2, 3, 4, 5), (1, 2), (2, 12, 5)),
+        # Edge case: dimensions with size 1
+        ((1, 3, 1, 4), (0, 1), (3, 1, 4)),
+        # Edge case: zero-size dimensions
+        ((0, 3, 4), (1, 2), (0, 12)),
+        ((2, 0, 3), (0, 1), (0, 3)),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_combine_dims(array_shape, axes, expected_shape, wrapper):
+    """Test combining multiple consecutive dimensions into one."""
+    # Create input tensor with identifiable values
+    x = np.arange(np.prod(array_shape)).reshape(array_shape)
+    wrapped_x = wrapper(x)
+    expected = np.reshape(x, expected_shape)
+
+    # Apply combine_dims operation
+    result = finch.combine_dims(wrapped_x, axes)
+
+    # Compute if result is lazy
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+
+    assert_equal(result, expected, strict=True)
+
+
+@pytest.mark.parametrize(
+    "array_shape, axes",
+    [
+        # Non-consecutive axes
+        ((2, 3, 4, 5), (0, 2)),
+        # Axis out of bounds
+        ((2, 3, 4), (2, 3)),
+        ((2, 3), (-3, -2)),
+        # Empty axes tuple
+        ((2, 3, 4), ()),
+        # Single axis (need at least 2 for consecutive)
+        ((2, 3, 4), (1,)),
+    ],
+)
+def test_combine_dims_errors(array_shape, axes):
+    """Test error cases for combine_dims."""
+    x = np.arange(np.prod(array_shape)).reshape(array_shape)
+    with pytest.raises(ValueError):
+        # error must be raised before computing
+        finch.combine_dims(x, axes)
+
+
+@pytest.mark.parametrize(
+    "array_shape, expected_shape",
+    [
+        # 2D array
+        ((2, 3), (6,)),
+        # 3D array
+        ((2, 3, 4), (24,)),
+        # 1D array (no change)
+        ((6,), (6,)),
+        # Scalar (0D) - should become 1D
+        ((), (1,)),
+        # Edge case: zero-size array
+        ((0, 3), (0,)),
+        # 4D array
+        ((2, 1, 3, 2), (12,)),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finch.defer,
+    ],
+)
+def test_flatten(array_shape, expected_shape, wrapper):
+    """Test flattening arrays to 1D."""
+    if array_shape == ():
+        # Scalar case
+        x = np.array(5)
+    else:
+        x = np.arange(np.prod(array_shape)).reshape(array_shape)
+
+    wrapped_x = wrapper(x)
+    expected = x.flatten() if array_shape != () else np.array([5])
+
+    # Apply flatten operation
+    result = finch.flatten(wrapped_x)
+
+    # Compute if result is lazy
+    if isinstance(result, finch.LazyTensor):
+        result = finch.compute(result)
+
+    assert_equal(result, expected, strict=True)

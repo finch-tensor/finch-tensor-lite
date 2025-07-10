@@ -1218,6 +1218,10 @@ class CombineDimsTensor(Tensor):
         self.tensor = tensor
 
         # Normalize and validate axes
+        if len(axes) < 2:
+            raise ValueError(
+                "At least two axes must be specified to combine dimensions"
+            )
         axes = normalize_axis_tuple(axes, tensor.ndim)
         axes = tuple(sorted(axes))
         # Check that axes are consecutive
@@ -1337,7 +1341,7 @@ def flatten(x) -> LazyTensor:
         # If x is a scalar, expand to 1D
         return expand_dims(x, axis=0)
     if x.ndim == 1:
-        return x
+        x = expand_dims(x, axis=0)  # make it a row vector
     # Combine all dimensions into one
     return combine_dims(x, tuple(range(x.ndim)))
 
