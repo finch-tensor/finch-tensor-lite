@@ -1341,7 +1341,9 @@ def flatten(x) -> LazyTensor:
         # If x is a scalar, expand to 1D
         return expand_dims(x, axis=0)
     if x.ndim == 1:
-        x = expand_dims(x, axis=0)  # make it a row vector
+        # we need it to pass through the elementwise
+        # it may be benficial to optimize these cases
+        return elementwise(identity, x)
     # Combine all dimensions into one
     return combine_dims(x, tuple(range(x.ndim)))
 
