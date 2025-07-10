@@ -277,6 +277,33 @@ class LazyTensor(OverrideTensor):
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
 
+    def __log__(self):
+        return log(self)
+
+    def __log1p__(self):
+        return log1p(self)
+
+    def __log2__(self):
+        return log2(self)
+
+    def __log10__(self):
+        return log10(self)
+
+    def __logaddexp__(self, other):
+        return logaddexp(self, other)
+
+    def __logical_and__(self, other):
+        return logical_and(self, other)
+
+    def __logical_or__(self, other):
+        return logical_or(self, other)
+
+    def __logical_xor__(self, other):
+        return logical_xor(self, other)
+
+    def __logical_not__(self):
+        return logical_not(self)
+
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
@@ -528,10 +555,10 @@ def reduce(
     )
     if keepdims:
         keeps = tuple(
-            fields[i] if i in axis else Field(gensym("j")) for i in range(x.ndim)
+            fields[i] if i not in axis else Field(gensym("j")) for i in range(x.ndim)
         )
         data = Reorder(data, keeps)
-        shape = tuple(shape[i] if i in axis else 1 for i in range(x.ndim))
+        shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
     return LazyTensor(identify(data), shape, init, dtype)
@@ -1438,3 +1465,91 @@ def atanh(x) -> LazyTensor:
 
 def atan2(x1, x2) -> LazyTensor:
     return elementwise(np.atan2, defer(x1), defer(x2))
+
+
+def log(x) -> LazyTensor:
+    return elementwise(np.log, defer(x))
+
+
+def log1p(x) -> LazyTensor:
+    return elementwise(np.log1p, defer(x))
+
+
+def log2(x) -> LazyTensor:
+    return elementwise(np.log2, defer(x))
+
+
+def log10(x) -> LazyTensor:
+    return elementwise(np.log10, defer(x))
+
+
+def logaddexp(x1, x2) -> LazyTensor:
+    return elementwise(np.logaddexp, defer(x1), defer(x2))
+
+
+def logical_and(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_and, defer(x1), defer(x2))
+
+
+def logical_or(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_or, defer(x1), defer(x2))
+
+
+def logical_xor(x1, x2) -> LazyTensor:
+    return elementwise(np.logical_xor, defer(x1), defer(x2))
+
+
+def logical_not(x) -> LazyTensor:
+    return elementwise(np.logical_not, defer(x))
+
+
+def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    """
+    Calculates the arithmetic mean of the input array ``x``.
+    """
+    x = defer(x)
+    n = (
+        np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
+        if isinstance(axis, tuple)
+        else (np.prod(x.shape) if axis is None else x.shape[axis])
+    )
+    s = sum(x, axis=axis, keepdims=keepdims)
+    return truediv(s, n)
+
+
+def var(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    """
+    Calculates the variance of the input array ``x``.
+    """
+    x = defer(x)
+    n = (
+        np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
+        if isinstance(axis, tuple)
+        else (np.prod(x.shape) if axis is None else x.shape[axis])
+    )
+    m = mean(x, axis=axis, keepdims=True)
+    v = truediv(pow(x - m, 2.0), (n - correction))
+    return sum(v, axis=axis, keepdims=keepdims)
+
+
+def std(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    """
+    Calculates the standard deviation of the input array ``x``.
+    """
+    x = defer(x)
+    d = var(x, axis=axis, correction=correction, keepdims=keepdims)
+    return pow(d, 0.5)

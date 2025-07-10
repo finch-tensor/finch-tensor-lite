@@ -178,6 +178,33 @@ class EagerTensor(OverrideTensor, ABC):
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
 
+    def __log__(self):
+        return log(self)
+
+    def __log1p__(self):
+        return log1p(self)
+
+    def __log2__(self):
+        return log2(self)
+
+    def __log10__(self):
+        return log10(self)
+
+    def __logaddexp__(self, other):
+        return logaddexp(self, other)
+
+    def __logical_and__(self, other):
+        return logical_and(self, other)
+
+    def __logical_or__(self, other):
+        return logical_or(self, other)
+
+    def __logical_xor__(self, other):
+        return logical_xor(self, other)
+
+    def __logical_not__(self):
+        return logical_not(self)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -718,3 +745,89 @@ def atan2(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.atan2(x1, x2)
     return compute(lazy.atan2(x1, x2))
+
+
+def log(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log(x)
+    return compute(lazy.log(x))
+
+
+def log1p(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log1p(x)
+    return compute(lazy.log1p(x))
+
+
+def log2(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log2(x)
+    return compute(lazy.log2(x))
+
+
+def log10(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.log10(x)
+    return compute(lazy.log10(x))
+
+
+def logaddexp(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logaddexp(x1, x2)
+    return compute(lazy.logaddexp(x1, x2))
+
+
+def logical_and(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logical_and(x1, x2)
+    return compute(lazy.logical_and(x1, x2))
+
+
+def logical_or(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logical_or(x1, x2)
+    return compute(lazy.logical_or(x1, x2))
+
+
+def logical_xor(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.logical_xor(x1, x2)
+    return compute(lazy.logical_xor(x1, x2))
+
+
+def logical_not(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.logical_not(x)
+    return compute(lazy.logical_not(x))
+
+
+def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.mean(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+
+
+def var(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.var(x, axis=axis, correction=correction, keepdims=keepdims)
+    return compute(lazy.var(x, axis=axis, correction=correction, keepdims=keepdims))
+
+
+def std(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: float = 0.0,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
+    return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))

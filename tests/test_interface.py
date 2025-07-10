@@ -162,6 +162,10 @@ class TestEagerTensor(finch.EagerTensor):
         ((operator.mod, finch.mod, np.mod), np.mod),
         ((operator.pow, finch.pow, np.pow), np.pow),
         ((finch.atan2, np.atan2), np.atan2),
+        ((finch.logaddexp, np.logaddexp), np.logaddexp),
+        ((finch.logical_and, np.logical_and), np.logical_and),
+        ((finch.logical_or, np.logical_or), np.logical_or),
+        ((finch.logical_xor, np.logical_xor), np.logical_xor),
     ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -230,6 +234,11 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((finch.acosh, np.acosh), np.acosh),
         ((finch.atan, np.atan), np.atan),
         ((finch.atanh, np.atanh), np.atanh),
+        ((finch.log, np.log), np.log),
+        ((finch.log1p, np.log1p), np.log1p),
+        ((finch.log2, np.log2), np.log2),
+        ((finch.log10, np.log10), np.log10),
+        ((finch.logical_not, np.logical_not), np.logical_not),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):
@@ -288,6 +297,9 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         ((finch.all, np.all), np.all),
         ((finch.min, np.min), np.min),
         ((finch.max, np.max), np.max),
+        ((finch.mean, np.mean), np.mean),
+        ((finch.std, np.std), np.std),
+        ((finch.var, np.var), np.var),
     ],
 )
 @pytest.mark.parametrize(
@@ -312,7 +324,12 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
 
             result = finch.compute(result)
 
-        assert_equal(result, expected)
+        if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
+            expected.dtype, np.complexfloating
+        ):
+            assert_allclose(result, expected, rtol=1e-15, atol=0.0)
+        else:
+            assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
