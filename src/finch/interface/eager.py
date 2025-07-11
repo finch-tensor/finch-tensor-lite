@@ -461,6 +461,214 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
 
 
+# manipulation functions:
+# https://data-apis.org/array-api/2024.12/API_specification/manipulation_functions.html
+
+
+def broadcast_to(x, /, shape: Sequence[int]):
+    """
+    Broadcasts an array to a new shape.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to be broadcasted.
+    shape: Sequence[int]
+        The target shape to which the input tensor should be broadcasted.
+
+    Returns
+    -------
+    out: array
+        A tensor with the same data as `x`, but with the specified shape.
+    """
+    shape = tuple(shape)  # Ensure shape is a tuple for consistency
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.broadcast_to(x, shape=shape)
+    return compute(lazy.broadcast_to(x, shape=shape))
+
+
+def broadcast_arrays(*args):
+    """
+    Broadcasts one or more arrays against one another.
+
+    Parameters
+    ----------
+    *args: array
+        an arbitrary number of to-be broadcasted arrays.
+
+    Returns
+    -------
+    out: List[array]
+        a list of broadcasted arrays. Each array has the same shape.
+        Element types are preserved.
+    """
+    if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
+        return lazy.broadcast_arrays(*args)
+    # compute can take in a list of LazyTensors
+    return compute(lazy.broadcast_arrays(*args))
+
+
+def concat(arrays: tuple | list, /, *, axis: int | None = 0):
+    """
+    Concatenates a sequence of arrays along an existing axis.
+
+    Parameters
+    ----------
+    arrays: tuple or list
+        A sequence of arrays to concatenate. Arrays must have the same shape
+        except in the dimension corresponding to the specified axis.
+    axis: int, optional
+        The axis along which to concatenate the arrays. Default is 0. If None,
+        the arrays are flattened before concatenation.
+
+    Returns
+    -------
+    out: array
+        A new concatenated array.
+    """
+    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
+        return lazy.concat(arrays, axis=axis)
+    return compute(lazy.concat(arrays, axis=axis))
+
+
+def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
+    """
+    Moves array axes (dimensions) to new positions,
+    while leaving other axes in their original positions.
+
+    Args
+    ---------
+    - x (array) - input array.
+    - source - Axes to move.
+    - destination - indices defining the desired
+    positions for each respective source axis index.
+
+    Returns
+    --------
+    - out (array) - an array containing reordered axes.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.moveaxis(x, source, destination)
+    return compute(lazy.moveaxis(x, source, destination))
+
+
+def stack(arrays: Sequence, /, *, axis: int = 0):
+    """
+    Stacks a sequence of arrays along a new axis.
+
+    Parameters
+    ----------
+    arrays: Sequence
+        A sequence of arrays to stack. All arrays must have the same shape.
+    axis: int, optional
+        The axis along which to stack the arrays. Default is 0.
+
+    Returns
+    -------
+    out: array
+        A new array with the stacked arrays along the specified axis.
+    """
+    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
+        return lazy.stack(arrays, axis=axis)
+    return compute(lazy.stack(arrays, axis=axis))
+
+
+def split_dims(x, axis: int, shape: tuple):
+    """
+    Split a dimension into multiple dimensions. The product
+    of the sizes in the `shape` tuple must equal the size
+    of the dimension being split.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to split
+    axis: int
+        The axis to split
+    shape: tuple
+        The new shape for the split dimensions
+
+    Returns
+    -------
+    out: array
+        A tensor with the specified dimension split into multiple dimensions
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(12).reshape(2, 6)  # shape (2, 6)
+    >>> result = split_dims(x, axis=1, shape=(2, 3))
+    >>> result.shape
+    (2, 2, 3)
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.split_dims(x, axis, shape)
+    return compute(lazy.split_dims(x, axis, shape))
+
+
+def combine_dims(x, axes: tuple[int, ...]):
+    """
+    Combine multiple consecutive dimensions into a single dimension.
+    The resulting axis will have a size equal to the product of the
+    sizes of the combined axes.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor
+    axes: tuple[int, ...]
+        Consecutive axes to combine.
+
+        The axes will be considered in increasing order.
+        So passing axes=(2, 1, 3) will be equivalent to
+        passing axes=(1, 2, 3).
+
+    Returns
+    -------
+    out: array
+        A tensor with the specified dimensions combined into one
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
+    >>> result = combine_dims(x, axes=(1, 2))
+    >>> result.shape
+    (2, 12)
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.combine_dims(x, axes)
+    return compute(lazy.combine_dims(x, axes))
+
+
+def flatten(x):
+    """
+    Flattens the input tensor into a 1D tensor.
+
+    Parameters
+    ----------
+    x: array
+        The input tensor to be flattened.
+
+    Returns
+    -------
+    out: array
+        A new tensor that is a flattened version of the input.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
+    >>> result = flatten(x)
+    >>> result.shape
+    (24,)
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.flatten(x)
+    return compute(lazy.flatten(x))
+
+
+# trigonometric functions:
 def sin(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.sin(x)

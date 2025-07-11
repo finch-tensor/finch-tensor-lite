@@ -116,3 +116,34 @@ algebra.register_property(
     "return_type",
     lambda op, x, y: y,
 )
+
+
+def first_arg(*args):
+    """
+    Returns the first argument passed to it.
+    """
+    return args[0] if args else None
+
+
+algebra.register_property(
+    first_arg,
+    "__call__",
+    "return_type",
+    # args[0] is the function name
+    lambda *args: args[1],
+)
+
+
+def identity(x):
+    """
+    Returns the input value unchanged.
+    """
+    return x
+
+
+algebra.register_property(
+    identity,
+    "__call__",
+    "return_type",
+    lambda op, x: x,
+)
