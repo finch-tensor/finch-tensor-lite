@@ -1,4 +1,5 @@
 import operator
+from collections import namedtuple
 
 import pytest
 
@@ -7,6 +8,7 @@ from numpy.testing import assert_equal
 
 import finch
 import finch.finch_assembly as asm
+from finch import format
 from finch.codegen import (
     CCompiler,
     NumbaCompiler,
@@ -291,3 +293,66 @@ def test_if_statement(compiler, buffer):
     expected = interp.if_else()
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        CCompiler(),
+        NumbaCompiler(),
+    ],
+)
+def test_simple_struct(compiler):
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+    x = (1, 4)
+
+    p_var = asm.Variable("p", format(p))
+    x_var = asm.Variable("x", format(x))
+    res_var = asm.Variable("res", np.float64)
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("simple_struct", np.float64),
+                    (p_var, x_var),
+                    asm.Block(
+                        (
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.mul),
+                                    (
+                                        asm.GetAttr(p_var, asm.Literal("x")),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                    ),
+                                ),
+                            ),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.add),
+                                    (
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = mod.simple_struct(p, x)
+    assert result == np.float64(9.0)

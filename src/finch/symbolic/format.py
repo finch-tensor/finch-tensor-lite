@@ -14,7 +14,7 @@ class Format(ABC):
         """
         Check if `other` is an instance of this format.
         """
-        return other.format == self
+        return format(other) == self
 
 
 class Formattable:

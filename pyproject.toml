@@ -32,6 +32,7 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022"]
+ignore = ["PYI024"]
 
 [tool.ruff.lint.isort.sections]
 numpy = ["numpy", "numpy.*", "scipy", "scipy.*"]
@@ -51,3 +52,6 @@ section-order = [
     "first-party",
     "local-folder",
 ]
+
+[tool.mypy]
+ignore_missing_imports = true
