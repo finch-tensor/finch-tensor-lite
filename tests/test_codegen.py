@@ -1,6 +1,5 @@
 import operator
 from collections import namedtuple
-from typing import NamedTuple
 
 import pytest
 
@@ -9,13 +8,13 @@ from numpy.testing import assert_equal
 
 import finch
 import finch.finch_assembly as asm
+from finch import format
 from finch.codegen import (
     CCompiler,
     NumbaCompiler,
     NumpyBuffer,
     NumpyBufferFormat,
 )
-from finch import format
 
 
 def test_add_function():
@@ -326,7 +325,7 @@ def test_simple_struct(compiler):
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
                                         asm.GetAttr(x_var, asm.Literal("element_0")),
-                                    )
+                                    ),
                                 ),
                             ),
                             asm.Assign(
@@ -339,8 +338,10 @@ def test_simple_struct(compiler):
                                             asm.Literal(operator.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
-                                                asm.GetAttr(x_var, asm.Literal("element_1"))
-                                            )
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
                                         ),
                                     ),
                                 ),

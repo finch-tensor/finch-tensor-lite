@@ -1,19 +1,21 @@
 import logging
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from dataclasses import make_dataclass
 from typing import Any
 
-import numba  # type: ignore[import-untyped]
 import numpy as np
+
+import numba  # type: ignore[import-untyped]
+
+import finch  # noqa: F401
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFormat, BufferFormat, TupleFormat
-from ..symbolic import Context, Namespace, ScopedDict, has_format, format
-import finch
+from ..symbolic import Context, Namespace, ScopedDict, format, has_format
 
 logger = logging.getLogger(__name__)
+
 
 def numba_type(t):
     """
@@ -298,7 +300,7 @@ class NumbaContext(Context):
 
     @staticmethod
     def full_name(val: Any) -> str:
-        #if numba.typeof(val) == val:
+        # if numba.typeof(val) == val:
         #    return val
         if hasattr(val, "numba_name"):
             return val.numba_name()
@@ -320,14 +322,22 @@ class NumbaContext(Context):
                     self.exec(f"{feed}{var_n} = {val_code}")
                 else:
                     self.types[var_n] = var_t
-                    self.exec(f"{feed}{var_n}: {self.full_name(numba_type(var_t))} = {val_code}")
+                    self.exec(
+                        f"{feed}{var_n}: {self.full_name(numba_type(var_t))}"
+                        f" = {val_code}"
+                    )
                 return None
             case asm.GetAttr(obj, attr):
                 obj_code = self(obj)
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return query_property(obj.result_format, "numba_getattr", "__attr__",
-                    self, obj_code, attr.val
+                return query_property(
+                    obj.result_format,
+                    "numba_getattr",
+                    "__attr__",
+                    self,
+                    obj_code,
+                    attr.val,
                 )
             case asm.SetAttr(obj, attr, val):
                 obj_code = self(obj)
@@ -337,12 +347,19 @@ class NumbaContext(Context):
                         f"{obj.result_format.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                query_property(obj.result_format, "numba_setattr", "__attr__",
-                    self, obj_code, attr.val, val_code
+                query_property(
+                    obj.result_format,
+                    "numba_setattr",
+                    "__attr__",
+                    self,
+                    obj_code,
+                    attr.val,
+                    val_code,
                 )
                 return None
             case asm.Call(asm.Literal(val), args):
-                #TODO: This line, and other lowering of literals, should really use a property called "numba_literal" or similar.
+                # TODO: This line, and other lowering of literals, should really use a
+                # property called "numba_literal" or similar.
                 return f"{self.full_name(val)}({', '.join(self(arg) for arg in args)})"
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 if val.result_format != var_t:
@@ -529,11 +546,15 @@ def really_numba_type(x):
         return numba.from_dtype(x)
     return numba.extending.as_numba_type(x)
 
+
 def struct_numba_type(fmt: AssemblyStructFormat):
     res = numba_structs.get(fmt)
     if res:
         return res
-    spec = [(name, really_numba_type(numba_type(field_type))) for (name, field_type) in fmt.struct_fields]
+    spec = [
+        (name, really_numba_type(numba_type(field_type)))
+        for (name, field_type) in fmt.struct_fields
+    ]
     class_name = numba_structnames.freshen("Numba", fmt.struct_name)
     # Dynamically create a regular class with the given fields
     class_dict = {}
@@ -564,6 +585,7 @@ register_property(
     "__attr__",
     struct_numba_type,
 )
+
 
 def struct_numba_getattr(fmt: AssemblyStructFormat, ctx, obj, attr):
     return f"{obj}.{attr}"

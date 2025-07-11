@@ -16,7 +16,7 @@ import numpy as np
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFormat, BufferFormat, TupleFormat
-from ..symbolic import Context, Namespace, ScopedDict, has_format, format
+from ..symbolic import Context, Namespace, ScopedDict, format, has_format
 from ..util import config
 from ..util.cache import file_cache
 
@@ -339,10 +339,12 @@ def c_getattr(fmt, ctx, obj, attr):
         return fmt.c_getattr(ctx, obj, attr)
     return query_property(fmt, "c_getattr", "__attr__", ctx, obj, attr)
 
+
 def c_setattr(fmt, ctx, obj, attr, val):
     if hasattr(fmt, "c_setattr"):
         return fmt.c_setattr(ctx, obj, attr, val)
     return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
+
 
 def register_n_ary_c_op_call(op, symbol):
     def property_func(op, ctx, *args):
@@ -1061,5 +1063,7 @@ register_property(
     TupleFormat,
     "c_type",
     "__attr__",
-    lambda fmt: ctypes.POINTER(struct_c_type(asm.NamedTupleFormat("CTuple", fmt.struct_fields)))
+    lambda fmt: ctypes.POINTER(
+        struct_c_type(asm.NamedTupleFormat("CTuple", fmt.struct_fields))
+    ),
 )
