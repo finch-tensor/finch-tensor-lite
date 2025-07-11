@@ -36,14 +36,6 @@ def numba_type(t):
         return t
 
 
-#register_property(
-#    np.generic,
-#    "numba_type",
-#    "__attr__",
-#    lambda t: numba.from_dtype(t),
-#)
-
-
 class NumbaArgumentFormat(ABC):
     @abstractmethod
     def serialize_to_numba(fmt, obj):
@@ -515,9 +507,10 @@ register_property(
 def deserialize_struct_from_numba(
     fmt: AssemblyStructFormat, obj, numba_struct: Any
 ) -> None:
-    for name, _ in obj.fieldnames:
-        setattr(obj, name, getattr(numba_struct, name))
-    return
+    if fmt.is_mutable:
+        for name in fmt.struct_fieldnames:
+            setattr(obj, name, getattr(numba_struct, name))
+        return
 
 
 register_property(
@@ -531,11 +524,16 @@ numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 
 
+def really_numba_type(x):
+    if issubclass(x, np.generic):
+        return numba.from_dtype(x)
+    return numba.extending.as_numba_type(x)
+
 def struct_numba_type(fmt: AssemblyStructFormat):
     res = numba_structs.get(fmt)
     if res:
         return res
-    spec = [(name, numba_type(field_type)) for (name, field_type) in fmt.struct_fields]
+    spec = [(name, really_numba_type(numba_type(field_type))) for (name, field_type) in fmt.struct_fields]
     class_name = numba_structnames.freshen("Numba", fmt.struct_name)
     # Dynamically create a regular class with the given fields
     class_dict = {}
@@ -549,12 +547,12 @@ def struct_numba_type(fmt: AssemblyStructFormat):
     # Compose the full function source
     func_src = f"def __init__(self, {arg_list}):\n{body if body else '    pass'}"
     # Define __init__ in a temporary namespace and extract it
-    ns = {}
+    ns: dict[str, object] = {}
     exec(func_src, ns)
     __init__ = ns["__init__"]
     class_dict["__init__"] = __init__
     new_struct = type(class_name, (object,), class_dict)
-    new_struct = numba.experimental.jitclass(new_struct)
+    new_struct = numba.experimental.jitclass(spec)(new_struct)
     numba_structs[fmt] = new_struct
     globals()[new_struct.__name__] = new_struct
     return new_struct
@@ -606,7 +604,7 @@ register_property(
 
 
 def serialize_tuple_to_numba(fmt, obj):
-    x = namedtuple("NumbaTuple", fmt.fieldnames)(*obj)  # noqa: PYI024
+    x = namedtuple("NumbaTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
     return serialize_to_numba(format(x), x)
 
 
@@ -615,12 +613,4 @@ register_property(
     "serialize_to_numba",
     "__attr__",
     serialize_tuple_to_numba,
-)
-
-
-register_property(
-    TupleFormat,
-    "deserialize_from_numba",
-    "__attr__",
-    lambda fmt, obj, numba_tuple: tuple(numba_tuple),
 )
