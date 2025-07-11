@@ -573,7 +573,7 @@ def stack(arrays: Sequence, /, *, axis: int = 0):
     return compute(lazy.stack(arrays, axis=axis))
 
 
-def split_dims(x, axis: int, shape: tuple[int, ...]):
+def split_dims(x, axis: int, shape: tuple):
     """
     Split a dimension into multiple dimensions. The product
     of the sizes in the `shape` tuple must equal the size
@@ -585,7 +585,7 @@ def split_dims(x, axis: int, shape: tuple[int, ...]):
         The input tensor to split
     axis: int
         The axis to split
-    shape: tuple[int, ...]
+    shape: tuple
         The new shape for the split dimensions
 
     Returns

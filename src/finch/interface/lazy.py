@@ -3,6 +3,7 @@ import builtins
 import operator
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
@@ -564,7 +565,7 @@ def reduce(
     return LazyTensor(identify(data), shape, init, dtype)
 
 
-def _broadcast_shape(*args: tuple[int, ...]) -> tuple[int, ...]:
+def _broadcast_shape(*args: tuple) -> tuple:
     """
     Computes the broadcasted shape for the given LazyTensor arguments,
     following array_api broadcasting rules.
@@ -576,7 +577,7 @@ def _broadcast_shape(*args: tuple[int, ...]) -> tuple[int, ...]:
 
     Returns:
     --------------
-    tuple[int, ...]: The broadcasted shape as a tuple of integers.
+    tuple: The broadcasted shape as a tuple.
     """
     if len(args) < 2:
         return args[0] if args else ()
@@ -1003,6 +1004,30 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
 
 # Manipulation functions
+@dataclass(frozen=True)
+class WrapperTensorFormat(TensorFormat):
+    _fill_value: Any
+    _element_type: Any
+    _shape_type: tuple
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+
+@dataclass(frozen=True)
+class NoneTensorFormat(WrapperTensorFormat):
+    pass
+
+
 class NoneTensor(Tensor):
     def __init__(self, shape):
         self._shape = shape
@@ -1016,17 +1041,17 @@ class NoneTensor(Tensor):
 
     @property
     def format(self):
-        return LazyTensorFormat(
+        return NoneTensorFormat(
             None,
             None,
-            _shape_type=tuple(type(dim) for dim in self.shape),
+            tuple(type(dim) for dim in self.shape),
         )
 
     def asarray(self):
         return self
 
 
-def broadcast_to(tensor, /, shape: tuple[int, ...]) -> LazyTensor:
+def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.
 
@@ -1053,6 +1078,10 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
     """
     shape = _broadcast_shape(*(array.shape for array in arrays))
     return tuple(broadcast_to(arr, shape) for arr in arrays)
+
+
+class ConcatTensorFormat(WrapperTensorFormat):
+    pass
 
 
 class ConcatTensor(Tensor):
@@ -1095,10 +1124,10 @@ class ConcatTensor(Tensor):
         for t in tensors:
             self._element_type = promote_type(element_type(self), element_type(t))
 
-    def __getitem__(self, idxs: tuple[int, ...]):
+    def __getitem__(self, idxs: tuple):
         """
         Args:
-            idxs: tuple[int, ...]
+            idxs: tuple
                 Indices to access the concatenated tensor.
         Returns the element at the specified indices.
         """
@@ -1115,7 +1144,7 @@ class ConcatTensor(Tensor):
 
     @property
     def format(self):
-        return LazyTensorFormat(
+        return ConcatTensorFormat(
             fill_value(self.tensors[0]),
             self._element_type,
             _shape_type=tuple(type(dim) for dim in self.shape),
@@ -1157,12 +1186,16 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     return elementwise(identity, defer(concat_tensor))
 
 
+class SplitDimsTensorFormat(WrapperTensorFormat):
+    pass
+
+
 class SplitDimsTensor(Tensor):
     """
     Tensor representing a dimension split operation.
     """
 
-    def __init__(self, tensor, axis: int, shape: tuple[int, ...]):
+    def __init__(self, tensor, axis: int, shape: tuple):
         """
         Args:
             tensor: The input tensor to split
@@ -1188,7 +1221,7 @@ class SplitDimsTensor(Tensor):
         self._element_type = element_type(tensor)
         self.dtype = self._element_type
 
-    def __getitem__(self, idxs: tuple[int, ...]):
+    def __getitem__(self, idxs: tuple):
         """
         Args:
             idxs: Indices to access the split tensor
@@ -1216,7 +1249,7 @@ class SplitDimsTensor(Tensor):
 
     @property
     def format(self):
-        return LazyTensorFormat(
+        return SplitDimsTensorFormat(
             fill_value(self.tensor),
             self._element_type,
             tuple(type(dim) for dim in self.shape),
@@ -1228,6 +1261,10 @@ class SplitDimsTensor(Tensor):
 
     def asarray(self):
         return self
+
+
+class CombineDimsTensorFormat(WrapperTensorFormat):
+    pass
 
 
 class CombineDimsTensor(Tensor):
@@ -1276,7 +1313,7 @@ class CombineDimsTensor(Tensor):
         # Store original dimensions for reconstruction. For ease of access
         self.original_dims = [tensor.shape[i] for i in axes]
 
-    def __getitem__(self, idxs: tuple[int, ...]):
+    def __getitem__(self, idxs: tuple):
         """
         Args:
             idxs: Indices to access the combined tensor
@@ -1306,7 +1343,7 @@ class CombineDimsTensor(Tensor):
 
     @property
     def format(self):
-        return LazyTensorFormat(
+        return CombineDimsTensorFormat(
             fill_value(self.tensor),
             self._element_type,
             tuple(type(dim) for dim in self.shape),
@@ -1326,7 +1363,7 @@ def _compute(arg, ctx=None):
     return compute(arg, ctx=ctx)
 
 
-def split_dims(x, axis: int, shape: tuple[int, ...]) -> LazyTensor:
+def split_dims(x, axis: int, shape: tuple) -> LazyTensor:
     """
     Split a dimension into multiple dimensions. The product
     of the sizes in the `shape` tuple must equal the size
