@@ -105,7 +105,6 @@ def tupleformat(x):
                 for fieldname in type(x)._fields
             ],
         )
-    print(type(x).__name__)
     return TupleFormat(type(x).__name__, [type(elem) for elem in x])
 
 

@@ -556,24 +556,22 @@ def struct_numba_type(fmt: AssemblyStructFormat):
         for (name, field_type) in fmt.struct_fields
     ]
     class_name = numba_structnames.freshen("Numba", fmt.struct_name)
-    # Dynamically create a regular class with the given fields
-    class_dict = {}
     # Dynamically define __init__ based on spec, unrolling the arguments
     field_names = [name for name, _ in spec]
     # Build the argument list for __init__
     arg_list = ", ".join(field_names)
     # Build the body of __init__ to assign each argument to self
-    body_lines = [f"    self.{name} = {name}" for name in field_names]
+    body_lines = [f"        self.{name} = {name}" for name in field_names]
     body = "\n".join(body_lines)
-    # Compose the full function source
-    func_src = f"def __init__(self, {arg_list}):\n{body if body else '    pass'}"
-    # Define __init__ in a temporary namespace and extract it
+    # Compose the full class source
+    init_func_src = f"def __init__(self, {arg_list}):\n{body if body else '    pass'}"
+    name_func_src = (
+        f"@staticmethod\n    def numba_name():\n        return '{class_name}'"
+    )
+    class_src = f"class {class_name}:\n    {init_func_src}\n    {name_func_src}"
     ns: dict[str, object] = {}
-    exec(func_src, ns)
-    __init__ = ns["__init__"]
-    class_dict["__init__"] = __init__
-    new_struct = type(class_name, (object,), class_dict)
-    new_struct = numba.experimental.jitclass(spec)(new_struct)
+    exec(class_src, ns)
+    new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[fmt] = new_struct
     globals()[new_struct.__name__] = new_struct
     return new_struct
