@@ -1,13 +1,12 @@
 import logging
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from textwrap import dedent
 from typing import Any
 
 import numpy as np
 
 import numba  # type: ignore[import-untyped]
-
-import finch  # noqa: F401
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -40,7 +39,7 @@ def numba_type(t):
 
 class NumbaArgumentFormat(ABC):
     @abstractmethod
-    def serialize_to_numba(fmt, obj):
+    def serialize_to_numba(self, obj):
         """
         Return a Numba-compatible object to be used in place of this argument
         for the Numba backend.
@@ -48,14 +47,18 @@ class NumbaArgumentFormat(ABC):
         ...
 
     @abstractmethod
-    def deserialize_from_numba(fmt, obj, res):
+    def deserialize_from_numba(self, obj, numba_buffer):
         """
         Return an object from Numba returned value.
         """
         ...
 
     @abstractmethod
-    def construct_from_numba(fmt, res): ...
+    def construct_from_numba(self, numba_buffer):
+        """
+        Construct and return an object from Numba returned value.
+        """
+        ...
 
 
 def serialize_to_numba(fmt, obj):
@@ -106,7 +109,7 @@ def construct_from_numba(fmt, numba_obj):
     if hasattr(fmt, "construct_from_numba"):
         return fmt.construct_from_numba(numba_obj)
     try:
-        query_property(fmt, "construct_from_numba", "__attr__")(numba_obj)
+        return query_property(fmt, "construct_from_numba", "__attr__")(numba_obj)
     except NotImplementedError:
         return fmt(numba_obj)
 
@@ -300,8 +303,6 @@ class NumbaContext(Context):
 
     @staticmethod
     def full_name(val: Any) -> str:
-        # if numba.typeof(val) == val:
-        #    return val
         if hasattr(val, "numba_name"):
             return val.numba_name()
         return f"{val.__module__}.{val.__name__}"
@@ -330,7 +331,7 @@ class NumbaContext(Context):
             case asm.GetAttr(obj, attr):
                 obj_code = self(obj)
                 if not obj.result_format.struct_hasattr(attr.val):
-                    raise ValueError("trying to get missing attr")
+                    raise ValueError(f"trying to get missing attr: {attr}")
                 return query_property(
                     obj.result_format,
                     "numba_getattr",
@@ -511,17 +512,20 @@ class NumbaStackFormat(ABC):
         ...
 
 
-def serialize_struct_to_numba(fmt: AssemblyStructFormat, obj) -> Any:
+def _serialize_asm_struct_to_numba(fmt: AssemblyStructFormat, obj) -> Any:
     args = [getattr(obj, name) for (name, _) in fmt.struct_fields]
     return numba_type(fmt)(*args)
 
 
 register_property(
-    AssemblyStructFormat, "serialize_to_numba", "__attr__", serialize_struct_to_numba
+    AssemblyStructFormat,
+    "serialize_to_numba",
+    "__attr__",
+    _serialize_asm_struct_to_numba,
 )
 
 
-def deserialize_struct_from_numba(
+def _deserialize_asm_struct_from_numba(
     fmt: AssemblyStructFormat, obj, numba_struct: Any
 ) -> None:
     if fmt.is_mutable:
@@ -534,25 +538,29 @@ register_property(
     AssemblyStructFormat,
     "deserialize_from_numba",
     "__attr__",
-    deserialize_struct_from_numba,
+    _deserialize_asm_struct_from_numba,
 )
 
+# Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 
 
-def really_numba_type(x):
-    if issubclass(x, np.generic):
-        return numba.from_dtype(x)
-    return numba.extending.as_numba_type(x)
-
-
 def struct_numba_type(fmt: AssemblyStructFormat):
-    res = numba_structs.get(fmt)
-    if res:
-        return res
+    """
+    Creates Numba jitclasses for struct formats.
+    """
+
+    def _strict_numba_type(x):
+        if issubclass(x, np.generic):
+            return numba.from_dtype(x)
+        return numba.extending.as_numba_type(x)
+
+    if fmt in numba_structs:
+        return numba_structs[fmt]
+
     spec = [
-        (name, really_numba_type(numba_type(field_type)))
+        (name, _strict_numba_type(numba_type(field_type)))
         for (name, field_type) in fmt.struct_fields
     ]
     class_name = numba_structnames.freshen("Numba", fmt.struct_name)
@@ -561,14 +569,18 @@ def struct_numba_type(fmt: AssemblyStructFormat):
     # Build the argument list for __init__
     arg_list = ", ".join(field_names)
     # Build the body of __init__ to assign each argument to self
-    body_lines = [f"        self.{name} = {name}" for name in field_names]
-    body = "\n".join(body_lines)
+    body = "; ".join([f"self.{name} = {name}" for name in field_names])
     # Compose the full class source
-    init_func_src = f"def __init__(self, {arg_list}):\n{body if body else '    pass'}"
-    name_func_src = (
-        f"@staticmethod\n    def numba_name():\n        return '{class_name}'"
+    class_src = dedent(
+        f"""\
+        class {class_name}:
+            def __init__(self, {arg_list}):
+                {body if body else "pass"}
+            @staticmethod
+            def numba_name():
+                return '{class_name}'
+        """
     )
-    class_src = f"class {class_name}:\n    {init_func_src}\n    {name_func_src}"
     ns: dict[str, object] = {}
     exec(class_src, ns)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
