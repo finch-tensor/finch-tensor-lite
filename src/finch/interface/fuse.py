@@ -50,19 +50,29 @@ Performance:
   or `with_scheduler`.
 """
 
+from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
 from ..finch_logic import (
     Alias,
-    FinchLogicInterpreter,
     Plan,
     Produces,
     Query,
 )
+from ..finch_notation import NotationInterpreter
 from ..symbolic import gensym
 from .lazy import defer
 
 
 def get_default_scheduler():
-    return FinchLogicInterpreter()
+    optimizer = DefaultLogicOptimizer(LogicCompiler())
+    ntn_interp = NotationInterpreter()
+
+    def compile(plan):
+        prgm, tables = optimizer(plan)
+        mod = ntn_interp(prgm)
+        args = [tables[Alias(arg.name)] for arg in prgm.funcs[0].args]
+        return mod.func(*args)
+
+    return compile
 
 
 def compute(arg, ctx=None):
@@ -89,7 +99,7 @@ def compute(arg, ctx=None):
     res = ctx(prgm)
     if isinstance(arg, tuple):
         return tuple(res)
-    return res[0]
+    return res
 
 
 def fuse(f, *args, ctx=None):

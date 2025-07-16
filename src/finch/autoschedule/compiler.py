@@ -4,14 +4,14 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra.tensor import TensorFormat
+from ..algebra import InitWrite, TensorFormat, return_type
+from ..algebra.tensor import NDArrayFormat
 from ..compile import dimension
 from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
     Literal,
-    LogicExpression,
     LogicNode,
     LogicTree,
     MapJoin,
@@ -25,7 +25,7 @@ from ..finch_logic import (
     Table,
     Value,
 )
-from ..symbolic.rewriters import Fixpoint, PostWalk, Rewrite
+from ..symbolic import Fixpoint, PostWalk, Rewrite, format
 from ._utils import intersect, setdiff, with_subsequence
 
 T = TypeVar("T", bound="LogicNode")
@@ -177,9 +177,10 @@ class LogicLowerer:
         dim_size_vars: dict[ntn.Variable, ntn.Call],
     ) -> ntn.NotationNode:
         match ex:
-            case Query(Alias(name), Table(tns, _)):
+            case Query(Alias(name), Table(tns, _)) if isinstance(tns, np.ndarray):
                 return ntn.Assign(
-                    ntn.Variable(name, type(tns)), compile_logic_constant(tns)
+                    ntn.Variable(name, NDArrayFormat(tns.dtype, tns.ndim)),
+                    compile_logic_constant(tns),
                 )
             case Query(Alias(_), None):
                 # we already removed tables
@@ -200,14 +201,17 @@ class LogicLowerer:
                 Reformat(tns, Reorder(MapJoin(op, args), _) as reorder),
             ):
                 assert isinstance(tns, TensorFormat)
-                fv = tns.fill_value
+                # TODO: fetch fill value the right way
+                import operator
+
+                fv = 0 if op.val in (operator.add, operator.sub) else 1
                 return self(
                     Query(
                         lhs,
                         Reformat(
                             tns,
-                            Aggregate(initwrite(fv), Literal(fv), reorder, ()),
-                        ),  # TODO: initwrite
+                            Aggregate(Literal(InitWrite(fv)), Literal(fv), reorder, ()),
+                        ),
                     ),
                     table_vars,
                     slot_vars,
@@ -313,42 +317,6 @@ class LogicLowerer:
                 raise Exception(f"Unrecognized logic: {ex}")
 
 
-def format_queries(ex: LogicNode) -> LogicNode:
-    return _format_queries(ex, bindings={})
-
-
-def _format_queries(ex: LogicNode, bindings: dict) -> LogicNode:
-    # TODO: continue rep_construct & SuitableRep implementation
-    def rep_construct(a):
-        return a
-
-    class SuitableRep:
-        def __init__(self, bindings):
-            pass
-
-        def __call__(self, obj):
-            return np.ndarray
-
-    match ex:
-        case Plan(bodies):
-            return Plan(tuple(_format_queries(body, bindings) for body in bodies))
-        case Query(lhs, rhs) if not isinstance(rhs, Reformat | Table):
-            assert isinstance(rhs, LogicExpression)
-            rep = SuitableRep(bindings)(rhs)
-            bindings[lhs] = rep
-            tns = rep_construct(rep)
-            return Query(lhs, Reformat(tns, rhs))
-        case Query(lhs, rhs) as query:
-            bindings[lhs] = SuitableRep(bindings)(rhs)
-            return query
-        case _:
-            return ex
-
-
-def initwrite(*args):  # TODO: figure out the implementation
-    raise NotImplementedError
-
-
 # TODO: replace with appropriate Tensor class
 _TensorType = np.ndarray
 
@@ -379,7 +347,7 @@ def record_tables(
     def rule_0(node):
         match node:
             case Query(Alias(name) as alias, Table(Literal(val), fields)):
-                table_var = ntn.Variable(name, type(val))
+                table_var = ntn.Variable(name, format(val))
                 table_vars[alias] = table_var
                 slot_var = ntn.Slot(f"{name}_slot", type(val))
                 slot_vars[alias] = slot_var
@@ -395,8 +363,38 @@ def record_tables(
 
                 return Query(alias, None)
 
+            case Query(Alias(name) as alias, rhs):
+                suitable_rep = find_suitable_rep(rhs, table_vars)
+                table_vars[alias] = ntn.Variable(name, suitable_rep)
+                tables[alias] = np.zeros(dtype=suitable_rep.element_type, shape=())
+
+                return Query(alias, Reformat(suitable_rep, rhs))
+
     processed_root = Rewrite(PostWalk(rule_0))(root)
     return processed_root, table_vars, slot_vars, dim_size_vars, tables
+
+
+def find_suitable_rep(root, table_vars) -> TensorFormat:
+    match root:
+        case MapJoin(Literal(op), args):
+            return NDArrayFormat(
+                dtype=np.dtype(
+                    return_type(
+                        op, *[find_suitable_rep(arg, table_vars) for arg in args]
+                    )
+                ),
+                ndim=0,
+            )
+        case LogicTree() as tree:
+            for child in tree.children:
+                suitable_rep = find_suitable_rep(child, table_vars)
+                if suitable_rep is not None:
+                    return suitable_rep
+            raise Exception("didn't find suitable rep")
+        case Alias(_) as alias:
+            return table_vars[alias].type_.element_type
+        case _:
+            return None
 
 
 def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:
@@ -423,12 +421,5 @@ class LogicCompiler:
         prgm = format_queries(prgm)
         prgm, table_vars, slot_vars, dim_size_vars, tables = record_tables(prgm)
         lowered_prgm = self.ll(prgm, table_vars, slot_vars, dim_size_vars)
-
-        for table_var in table_vars:
-            # include return tables and intermediaries
-            if table_var not in tables:
-                tables[table_var] = np.zeros(
-                    dtype=np.float64, shape=()
-                )  # TODO: select correct dtype
 
         return merge_blocks(lowered_prgm), tables
