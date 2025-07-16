@@ -49,13 +49,21 @@ class BufferizedNDArray(Tensor):
             if stride % itemsize != 0:
                 raise ValueError("Array must be aligned to multiple of itemsize")
         self.strides = [stride // itemsize for stride in arr.strides]
+        self._shape = arr.shape
         self.buf = NumpyBuffer(
             np.lib.stride_tricks.as_strided(
                 arr,
-                shape=(np.dot(arr.strides, arr.shape) / itemsize,),
+                shape=(np.dot(arr.strides, arr.shape) // itemsize,),
                 strides=(itemsize,),
             )
         )
+
+    def to_numpy(self):
+        """
+        Convert the bufferized NDArray to a NumPy array.
+        This is used to get the underlying NumPy array from the bufferized NDArray.
+        """
+        return self.buf.arr.reshape(self._shape)
 
     @property
     def format(self):
@@ -66,7 +74,47 @@ class BufferizedNDArray(Tensor):
 
     @property
     def shape(self):
-        return self.arr.shape
+        return self._shape
+
+    def declare(self, init, op, shape):
+        """
+        Declare a bufferized NDArray with the given initialization value,
+        operation, and shape.
+        """
+        for dim in shape:
+            if dim.start != 0:
+                raise ValueError(
+                    f"Invalid dimension start value {dim.start} for ndarray declaration."
+                )
+        shape = tuple(dim.end for dim in shape)
+        self.buf.resize(np.prod(shape))
+        for i in range(self.buf.length()):
+            self.buf.store(i, init)
+        return self
+
+    def freeze(self, op):
+        return self
+    
+    def thaw(self, op):
+        return self
+
+    def __getitem__(self, index):
+        """
+        Get an item from the bufferized NDArray.
+        This allows for indexing into the bufferized array.
+        """
+        if isinstance(index, tuple):
+            index = np.ravel_multi_index(index, self._shape)
+        return self.buf.load(index)
+    
+    def __setitem__(self, index, value):
+        """
+        Set an item in the bufferized NDArray.
+        This allows for indexing into the bufferized array.
+        """
+        if isinstance(index, tuple):
+            index = np.ravel_multi_index(index, self._shape)
+        self.buf.store(index, value)
 
 
 class BufferizedNDArrayFormat(FinchTensorFormat):

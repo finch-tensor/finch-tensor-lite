@@ -79,6 +79,7 @@ from .tensor import (
     ElementLevelFormat,
     FiberTensorFormat,
 )
+from .compile import BufferizedNDArray, NotationContext
 
 __all__ = [
     "DenseLevelFormat",
@@ -159,4 +160,6 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
+    "NotationContext",
+    "BufferizedNDArray",
 ]
