@@ -8,7 +8,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..symbolic import Context, ScopedDict, has_format
-from .codegen import NumpyBuffer
+from ..codegen import NumpyBuffer
 
 
 class FinchTensorFormat(TensorFormat, ABC):
@@ -50,7 +50,7 @@ class BufferizedNDArray(Tensor):
                 raise ValueError("Array must be aligned to multiple of itemsize")
         self.strides = [stride // itemsize for stride in arr.strides]
         self.buf = NumpyBuffer(
-            np.stride_tricks.as_strided(
+            np.lib.stride_tricks.as_strided(
                 arr,
                 shape=(np.dot(arr.strides, arr.shape) / itemsize,),
                 strides=(itemsize,),
