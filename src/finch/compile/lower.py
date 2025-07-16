@@ -7,8 +7,8 @@ import numpy as np
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
-from ..symbolic import Context, ScopedDict, has_format
 from ..codegen import NumpyBuffer
+from ..symbolic import Context, ScopedDict, has_format
 
 
 class FinchTensorFormat(TensorFormat, ABC):
