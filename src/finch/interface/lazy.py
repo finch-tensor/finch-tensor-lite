@@ -1005,7 +1005,11 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
 # Manipulation functions
 @dataclass(frozen=True)
-class WrapperTensorFormat(TensorFormat):
+class DefaultTensorFormat(TensorFormat):
+    """
+    Default tensor format for easily defining new tensor formats.
+    """
+
     _fill_value: Any
     _element_type: Any
     _shape_type: tuple
@@ -1024,11 +1028,37 @@ class WrapperTensorFormat(TensorFormat):
 
 
 @dataclass(frozen=True)
-class NoneTensorFormat(WrapperTensorFormat):
+class WrapperTensorFormat(TensorFormat):
+    """Tensor format that wraps other tensor formats."""
+
+    _constituent_formats: tuple[TensorFormat, ...]  # Formats of the constituent tensors
+
+    @property
+    def fill_value(self):
+        """Returns the fill value of the first constituent format."""
+        return self._constituent_formats[0].fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Promotes the element type to be compatible with all constituent formats."""
+        etype = self._constituent_formats[0].element_type
+        for t in self._constituent_formats:
+            etype = promote_type(etype, t.element_type)
+        return etype
+
+
+@dataclass(frozen=True)
+class NoneTensorFormat(DefaultTensorFormat):
     pass
 
 
 class NoneTensor(Tensor):
+    """
+    A tensor that has a specific shape but contains no actual data.
+    Used primarily for broadcasting operations where a tensor of a specific
+    shape is needed but the values are irrelevant.
+    """
+
     def __init__(self, shape):
         self._shape = shape
 
@@ -1080,8 +1110,20 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
     return tuple(broadcast_to(arr, shape) for arr in arrays)
 
 
+@dataclass(frozen=True)
 class ConcatTensorFormat(WrapperTensorFormat):
-    pass
+    """
+    Tensor format for concatenated tensors.
+    Takes in a tuple of constituent formats, the shape type, and the concatenation axis.
+    Shape type is needed as it cannot be computed just from the constituent formats
+    """
+
+    _shape_type: tuple
+    concat_axis: int
+
+    @property
+    def shape_type(self):
+        return self._shape_type
 
 
 class ConcatTensor(Tensor):
@@ -1117,12 +1159,8 @@ class ConcatTensor(Tensor):
         self._shape = (
             tensor.shape[:axis] + (self.ps_sizes[-1],) + tensor.shape[axis + 1 :]
         )
-        self.tensors = (tensor,) + tensors
+        self.tensors = tuple(defer(t) for t in ((tensor,) + tensors))
         self.concat_axis = axis
-        # find the appropriate element type
-        self._element_type = element_type(tensor)
-        for t in tensors:
-            self._element_type = promote_type(element_type(self), element_type(t))
 
     def __getitem__(self, idxs: tuple):
         """
@@ -1145,9 +1183,9 @@ class ConcatTensor(Tensor):
     @property
     def format(self):
         return ConcatTensorFormat(
-            fill_value(self.tensors[0]),
-            self._element_type,
-            _shape_type=tuple(type(dim) for dim in self.shape),
+            tuple(t.format for t in self.tensors),
+            tuple(type(dim) for dim in self.shape),
+            self.concat_axis,
         )
 
     @property
@@ -1186,8 +1224,19 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     return elementwise(identity, defer(concat_tensor))
 
 
+@dataclass(frozen=True)
 class SplitDimsTensorFormat(WrapperTensorFormat):
-    pass
+    split_axis: int
+    split_shape: tuple
+
+    @property
+    def shape_type(self):
+        parent_shape_type = self._constituent_formats[0].shape_type
+        shape_type_list = list(parent_shape_type)
+        shape_type_list[self.split_axis : self.split_axis + 1] = [
+            type(dim) for dim in self.split_shape
+        ]
+        return tuple(shape_type_list)
 
 
 class SplitDimsTensor(Tensor):
@@ -1250,9 +1299,9 @@ class SplitDimsTensor(Tensor):
     @property
     def format(self):
         return SplitDimsTensorFormat(
-            fill_value(self.tensor),
-            self._element_type,
-            tuple(type(dim) for dim in self.shape),
+            (self.tensor.format,),
+            self.axis,
+            self.split_shape,
         )
 
     @property
@@ -1263,8 +1312,24 @@ class SplitDimsTensor(Tensor):
         return self
 
 
+@dataclass(frozen=True)
 class CombineDimsTensorFormat(WrapperTensorFormat):
-    pass
+    combined_axes: tuple[int, ...]
+
+    @property
+    def shape_type(self):
+        parent_shape_type = self._constituent_formats[0].shape_type
+        # Calculate the combined dimension size
+        combined_size = 1
+        for axis in self.combined_axes:
+            combined_size *= parent_shape_type[axis]
+
+        # Construct the new shape type
+        return (
+            parent_shape_type[: self.combined_axes[0]]
+            + (type(combined_size),)  # Type of the combined dimension
+            + parent_shape_type[self.combined_axes[-1] + 1 :]
+        )
 
 
 class CombineDimsTensor(Tensor):
@@ -1344,9 +1409,8 @@ class CombineDimsTensor(Tensor):
     @property
     def format(self):
         return CombineDimsTensorFormat(
-            fill_value(self.tensor),
-            self._element_type,
-            tuple(type(dim) for dim in self.shape),
+            (self.tensor.format,),
+            self.axes,
         )
 
     @property
