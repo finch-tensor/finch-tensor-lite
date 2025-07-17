@@ -69,55 +69,55 @@ def test_matrix_multiplication(a, b):
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
-                        ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
-                        ),
-                        ntn.Loop(
-                            i,
-                            m,
-                            ntn.Loop(
-                                j,
-                                n,
-                                ntn.Loop(
-                                    k,
-                                    p,
-                                    ntn.Block(
-                                        (
-                                            ntn.Assign(
-                                                a_ik,
-                                                ntn.Unwrap(
-                                                    ntn.Access(A_, ntn.Read(), (i, k))
-                                                ),
-                                            ),
-                                            ntn.Assign(
-                                                b_kj,
-                                                ntn.Unwrap(
-                                                    ntn.Access(B_, ntn.Read(), (k, j))
-                                                ),
-                                            ),
-                                            ntn.Assign(
-                                                c_ij,
-                                                ntn.Call(
-                                                    ntn.Literal(operator.mul),
-                                                    (a_ik, b_kj),
-                                                ),
-                                            ),
-                                            ntn.Increment(
-                                                ntn.Access(
-                                                    C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(operator.add)
-                                                    ),
-                                                    (i, j),
-                                                ),
-                                                c_ij,
-                                            ),
-                                        )
-                                    ),
-                                ),
-                            ),
-                        ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        #ntn.Declare(
+                        #    C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                        #),
+                        #ntn.Loop(
+                        #    i,
+                        #    m,
+                        #    ntn.Loop(
+                        #        j,
+                        #        n,
+                        #        ntn.Loop(
+                        #            k,
+                        #            p,
+                        #            ntn.Block(
+                        #                (
+                        #                    ntn.Assign(
+                        #                        a_ik,
+                        #                        ntn.Unwrap(
+                        #                            ntn.Access(A_, ntn.Read(), (i, k))
+                        #                        ),
+                        #                    ),
+                        #                    ntn.Assign(
+                        #                        b_kj,
+                        #                        ntn.Unwrap(
+                        #                            ntn.Access(B_, ntn.Read(), (k, j))
+                        #                        ),
+                        #                    ),
+                        #                    ntn.Assign(
+                        #                        c_ij,
+                        #                        ntn.Call(
+                        #                            ntn.Literal(operator.mul),
+                        #                            (a_ik, b_kj),
+                        #                        ),
+                        #                    ),
+                        #                    ntn.Increment(
+                        #                        ntn.Access(
+                        #                            C_,
+                        #                            ntn.Update(
+                        #                                ntn.Literal(operator.add)
+                        #                            ),
+                        #                            (i, j),
+                        #                        ),
+                        #                        c_ij,
+                        #                    ),
+                        #                )
+                        #            ),
+                        #        ),
+                        #    ),
+                        #),
+                        #ntn.Freeze(C_, ntn.Literal(operator.add)),
                         ntn.Repack(C_),
                         ntn.Return(C),
                     )

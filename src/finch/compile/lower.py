@@ -9,6 +9,7 @@ from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..codegen import NumpyBuffer
 from ..symbolic import Context, ScopedDict, has_format, format
+from typing import NamedTuple
 
 
 class FinchTensorFormat(TensorFormat, ABC):
@@ -63,7 +64,12 @@ class BufferizedNDArray(Tensor):
         Convert the bufferized NDArray to a NumPy array.
         This is used to get the underlying NumPy array from the bufferized NDArray.
         """
-        return self.buf.arr.reshape(self._shape)
+        itemsize = self.buf.arr.dtype.itemsize
+        return np.lib.stride_tricks.as_strided(
+            self.buf.arr,
+            shape=self._shape,
+            strides=(stride * itemsize for stride in self.strides),
+        )
 
     @property
     def format(self):
@@ -81,13 +87,16 @@ class BufferizedNDArray(Tensor):
         Declare a bufferized NDArray with the given initialization value,
         operation, and shape.
         """
-        for dim in shape:
+        for dim, size in zip(shape, self._shape):
             if dim.start != 0:
                 raise ValueError(
                     f"Invalid dimension start value {dim.start} for ndarray declaration."
                 )
+            if dim.end != size:
+                raise ValueError(
+                    f"Invalid dimension end value {dim.end} for ndarray declaration."
+                )
         shape = tuple(dim.end for dim in shape)
-        self.buf.resize(np.prod(shape))
         for i in range(self.buf.length()):
             self.buf.store(i, init)
         return self
@@ -160,36 +169,28 @@ class BufferizedNDArrayFormat(FinchTensorFormat):
         """
         stride = []
         for i in range(self._ndim):
-            var = asm.Variable(f"stride_{i}", t)
-            stride.append(var)
-            asm.GetAttr(val, f"stride", var)
+            stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf.length_type)
+            stride.append(stride_i)
+            stride_e = asm.GetAttr(val, f"stride")
+            stride_i_e = asm.GetAttr(stride_e, f"element_{i}")
+            ctx.exec(asm.Assign(stride_i, stride_i_e))
+        buf = asm.Variable(f"{var_n}_buf", self.buf)
+        buf_e = asm.GetAttr(val, "buf")
+        ctx.exec(asm.Assign(buf, buf_e))
+        buf_s = asm.Slot(f"{var_n}_buf", self.buf)
+        ctx.exec(asm.Unpack(buf_s, buf))
+        class BufferizedNDArrayFields(NamedTuple):
+            stride: list[asm.Variable]
+            buf: asm.Variable
+            buf_s: asm.Slot
 
-            ctx.exec(asm.Assign(var, asm.GetAttr(val, )))
-
-
-        data = ctx.freshen(var_n, "data")
-        length = ctx.freshen(var_n, "length")
-        t = ctx.ctype_name(c_type(self._dtype))
-        ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
-            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
-        )
-
-        class BufferFields(NamedTuple):
-            data: str
-            length: str
-            obj: str
-
-        return BufferFields(data, length, var_n)
+        return BufferizedNDArrayFields(stride, buf, buf_s)
 
     def asm_repack(self, ctx, lhs, obj):
         """
         Repack the buffer from C context.
         """
-        ctx.exec(
-            f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
-            f"{ctx.feed}{lhs}->length = {obj.length};"
-        )
+        ctx.exec(asm.Repack(obj.buf))
         return
 
 
@@ -323,9 +324,11 @@ class NotationCompiler():
         self.ctx = ctx
     
     def __call__(self, prgm):
-        code = NotationContext()(prgm)
-        return self.ctx(code)
+        ctx_2 = NotationContext()
+        
+        return self.ctx(ctx_2(prgm))
 
+from pprint import pprint
 
 class NotationContext(Context):
     """
@@ -487,13 +490,17 @@ class NotationContext(Context):
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
                 ctx = self.scope()
-                ctx.func_state = HaltState()
-                ctx(body)
-                exec(
+                ctx.func_state = HaltState(return_var=asm.Variable(ctx.freshen(f"{func_n}_return"), ret_t))
+                blk = ctx.scope()
+                blk(body)
+                self.exec(
                     asm.Function(
                         asm.Variable(func_n, ret_t),
                         [ctx(arg) for arg in args],
-                        ctx.scope()(body),
+                        asm.Block([
+                            *blk.emit(), 
+                            asm.Return(ctx.func_state.return_var)
+                        ]),
                     )
                 )
                 return None
@@ -506,5 +513,4 @@ class NotationContext(Context):
                 ctx = self.scope()
                 for func in funcs:
                     ctx(func)
-                ctx.exec(asm.Module(ctx.emit()))
-                return None
+                return asm.Module(ctx.emit())
