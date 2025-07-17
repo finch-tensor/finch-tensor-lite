@@ -25,17 +25,17 @@ class FinchTensorFormat(TensorFormat, ABC):
         This updates the tensor at the specified index with the operation and value.
         """
 
-    def lower_declare(tns, init, op, shape):
+    def lower_declare(self, ctx, tns, init, op, shape):
         """
         Declare a tensor.
         """
 
-    def lower_freeze(tns, op):
+    def lower_freeze(self, ctx, tns, op):
         """
         Freeze a tensor.
         """
 
-    def lower_thaw(tns, op):
+    def lower_thaw(self, ctx, tns, op):
         """
         Thaw a tensor.
         """
@@ -162,6 +162,24 @@ class BufferizedNDArrayFormat(FinchTensorFormat):
     @property
     def shape_type(self) -> tuple:
         return tuple(np.int_ for _ in range(self._ndim))
+
+    def lower_declare(self, ctx, obj, init, op, shape):
+        i_var = asm.Variable(f"i", self.buf.length_type)
+        buf = asm.Stack(obj.buf, self.buf)
+        body = asm.Store(
+            buf,
+            i_var,
+            asm.Literal(init.val),
+        )
+        ctx.exec(
+            asm.ForLoop(
+                i_var,
+                asm.Literal(0),
+                asm.Length(buf),
+                body
+            )
+        )
+        return None
         
     def asm_unpack(self, ctx, var_n, val):
         """
@@ -284,8 +302,6 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
 
     def lower_increment(self, ctx, obj, val): ...
 
-    def lower_declare(self, ctx, init, op, shape): ...
-
     def unfurl(self, ctx, tns, ext, mode, proto): ...
 
 
@@ -390,6 +406,18 @@ class NotationContext(Context):
     def emit(self):
         return self.preamble + self.epilogue
 
+    def resolve(self, node):
+        match node:
+            case ntn.Slot(var_n, var_t):
+                if var_n in self.slots:
+                    var_o = self.slots[var_n]
+                    return var_o
+                raise KeyError(f"Slot {var_n} not found in context")
+            case ntn.Stack(var_o, _):
+                return var_o
+            case _:
+                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+
     def __call__(self, prgm):
         """
         Lower Finch Notation to Finch Assembly. First we check for early
@@ -464,16 +492,19 @@ class NotationContext(Context):
                 ext.format.lower_loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
+                tns_o = self.resolve(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
-                return tns.format.lower_declare(init_e, op_e, shape_e)
+                return tns.result_format.lower_declare(self, tns_o, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
+                tns_o = self.resolve(tns)
                 op_e = self(op)
-                return tns.format.lower_freeze(op_e)
+                return tns.result_format.lower_freeze(tns_o, op_e)
             case ntn.Thaw(tns, op):
+                tns_o = self.resolve(tns)
                 op_e = self(op)
-                return tns.format.lower_thaw(op_e)
+                return tns.result_format.lower_thaw(tns_o, op_e)
             case ntn.If(cond, body):
                 ctx = self.block()
                 ctx_2 = ctx.scope()

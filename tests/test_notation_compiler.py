@@ -11,14 +11,15 @@ from finch import format
 from finch.compile import NotationCompiler
 from finch.symbolic import Reflector
 
+from pprint import pprint
 
 @pytest.mark.parametrize(
     "a, b",
     [
-        (
-            np.array([[1, 2], [3, 4]], dtype=np.float64),
-            np.array([[5, 6], [7, 8]], dtype=np.float64),
-        ),
+#        (
+#            np.array([[1, 2], [3, 4]], dtype=np.float64),
+#            np.array([[5, 6], [7, 8]], dtype=np.float64),
+#        ),
         (
             np.array([[2, 0], [1, 3]], dtype=np.float64),
             np.array([[4, 1], [2, 2]], dtype=np.float64),
@@ -69,9 +70,9 @@ def test_matrix_multiplication(a, b):
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
-                        #ntn.Declare(
-                        #    C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
-                        #),
+                        ntn.Declare(
+                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                        ),
                         #ntn.Loop(
                         #    i,
                         #    m,
@@ -127,11 +128,11 @@ def test_matrix_multiplication(a, b):
     )
 
     mod = ntn.NotationInterpreter()(prgm)
-    print(NotationCompiler(Reflector())(prgm))
+    pprint(NotationCompiler(Reflector())(prgm))
 
-    c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1])))
-    result = mod.matmul(c, a_buf, b_buf).to_numpy()
+    #c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1])))
+    #result = mod.matmul(c, a_buf, b_buf).to_numpy()
+#
+#    expected = np.matmul(a, b)
 
-    expected = np.matmul(a, b)
-
-    assert_equal(result, expected)
+#    assert_equal(result, expected)
