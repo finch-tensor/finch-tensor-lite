@@ -39,7 +39,7 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..symbolic import gensym
+from ..symbolic import format, gensym
 from .overrides import OverrideTensor
 
 
@@ -1031,18 +1031,18 @@ class DefaultTensorFormat(TensorFormat):
 class WrapperTensorFormat(TensorFormat):
     """Tensor format that wraps other tensor formats."""
 
-    _constituent_formats: tuple[TensorFormat, ...]  # Formats of the constituent tensors
+    _child_formats: tuple[TensorFormat, ...]  # Formats of the constituent tensors
 
     @property
     def fill_value(self):
         """Returns the fill value of the first constituent format."""
-        return self._constituent_formats[0].fill_value
+        return self._child_formats[0].fill_value
 
     @property
     def element_type(self) -> Any:
         """Promotes the element type to be compatible with all constituent formats."""
-        etype = self._constituent_formats[0].element_type
-        for t in self._constituent_formats:
+        etype = self._child_formats[0].element_type
+        for t in self._child_formats:
             etype = promote_type(etype, t.element_type)
         return etype
 
@@ -1159,7 +1159,7 @@ class ConcatTensor(Tensor):
         self._shape = (
             tensor.shape[:axis] + (self.ps_sizes[-1],) + tensor.shape[axis + 1 :]
         )
-        self.tensors = tuple(defer(t) for t in ((tensor,) + tensors))
+        self.tensors = (tensor,) + tensors
         self.concat_axis = axis
 
     def __getitem__(self, idxs: tuple):
@@ -1182,8 +1182,17 @@ class ConcatTensor(Tensor):
 
     @property
     def format(self):
+        formats = []
+        for t in self.tensors:
+            f = format(t)
+            if isinstance(f, TensorFormat):
+                formats.append(f)
+            else:
+                raise AttributeError(
+                    f"All tensors must have a valid format defined, got {f}"
+                )
         return ConcatTensorFormat(
-            tuple(t.format for t in self.tensors),
+            tuple(formats),
             tuple(type(dim) for dim in self.shape),
             self.concat_axis,
         )
@@ -1231,7 +1240,7 @@ class SplitDimsTensorFormat(WrapperTensorFormat):
 
     @property
     def shape_type(self):
-        parent_shape_type = self._constituent_formats[0].shape_type
+        parent_shape_type = self._child_formats[0].shape_type
         shape_type_list = list(parent_shape_type)
         shape_type_list[self.split_axis : self.split_axis + 1] = [
             type(dim) for dim in self.split_shape
@@ -1298,8 +1307,11 @@ class SplitDimsTensor(Tensor):
 
     @property
     def format(self):
+        child_format = format(self.tensor)
+        if not isinstance(child_format, TensorFormat):
+            raise AttributeError(f"Expected a valid tensor format, got {child_format}")
         return SplitDimsTensorFormat(
-            (self.tensor.format,),
+            (child_format,),
             self.axis,
             self.split_shape,
         )
@@ -1315,21 +1327,11 @@ class SplitDimsTensor(Tensor):
 @dataclass(frozen=True)
 class CombineDimsTensorFormat(WrapperTensorFormat):
     combined_axes: tuple[int, ...]
+    _shape_type: tuple
 
     @property
     def shape_type(self):
-        parent_shape_type = self._constituent_formats[0].shape_type
-        # Calculate the combined dimension size
-        combined_size = 1
-        for axis in self.combined_axes:
-            combined_size *= parent_shape_type[axis]
-
-        # Construct the new shape type
-        return (
-            parent_shape_type[: self.combined_axes[0]]
-            + (type(combined_size),)  # Type of the combined dimension
-            + parent_shape_type[self.combined_axes[-1] + 1 :]
-        )
+        return self._shape_type
 
 
 class CombineDimsTensor(Tensor):
@@ -1408,9 +1410,13 @@ class CombineDimsTensor(Tensor):
 
     @property
     def format(self):
+        child_format = format(self.tensor)
+        if not isinstance(child_format, TensorFormat):
+            raise AttributeError(f"Expected a valid tensor format, got {child_format}")
         return CombineDimsTensorFormat(
-            (self.tensor.format,),
+            (child_format,),
             self.axes,
+            tuple(type(dim) for dim in self.shape),
         )
 
     @property
