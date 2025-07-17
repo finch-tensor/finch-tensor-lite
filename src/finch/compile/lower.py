@@ -135,6 +135,9 @@ class BufferizedNDArrayFormat(FinchTensorFormat):
             return False
         return self.buf == other.buf and self._ndim == other._ndim
 
+    def __hash__(self):
+        return hash((self.buf, self._ndim))
+
     @property
     def ndim(self) -> int:
         return self._ndim
@@ -215,11 +218,12 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
             isinstance(other, BufferizedNDArrayAccessorFormat)
             and self.tns == other.tns
             and self.nind == other.nind
+            and self.pos == other.pos
             and self.op == other.op
         )
     
     def __hash__(self):
-        return hash((self.tns, self.nind, self.op))
+        return hash((self.tns, self.nind, self.pos, self.op))
 
     @property
     def ndim(self) -> int:
@@ -276,6 +280,15 @@ class HaltState:
     return_var: Any = None
 
 
+class NotationCompiler():
+    def __init__(self, ctx):
+        self.ctx = ctx
+    
+    def __call__(self, prgm):
+        code = NotationContext()(prgm)
+        return self.ctx(code)
+
+
 class NotationContext(Context):
     """
     Compiles Finch Notation to Finch Assembly. Holds the state of the
@@ -297,19 +310,28 @@ class NotationContext(Context):
         if slots is None:
             slots = ScopedDict()
         self.bindings = bindings
+        self.slots = slots
         self.func_state = func_state
+
+    def block(self):
+        """
+        Create a new block. Preambles and epilogues will stay within this block.
+        This is used to create a new context for compiling a block of code.
+        """
+        blk = super().block()
+        blk.bindings = self.bindings
+        blk.slots = self.slots
+        blk.func_state = self.func_state
+        return blk
 
     def scope(self):
         """
         Create a new scoped context that inherits from this one.
         """
-        return NotationContext(
-            namespace=self.namespace,
-            preamble=self.preamble,
-            epilogue=self.epilogue,
-            bindings=self.bindings.scope(),
-            slots=self.slots.scope(),
-        )
+        blk = self.block()
+        blk.bindings = self.bindings.scope()
+        blk.slots = self.slots.scope()
+        return blk
 
     def should_halt(self):
         """
@@ -317,6 +339,9 @@ class NotationContext(Context):
         This is used to determine if the function has returned.
         """
         return self.func_state.has_returned
+
+    def emit(self):
+        return self.preamble + self.epilogue
 
     def __call__(self, prgm):
         """
@@ -332,7 +357,7 @@ class NotationContext(Context):
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
-                return asm.Call(f_e, *args_e)
+                return asm.Call(f_e, args_e)
             case ntn.Assign(var, val):
                 self.exec(asm.Assign(self(var), self(val)))
                 return None

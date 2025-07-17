@@ -127,3 +127,7 @@ class Context(ABC):
         Emit the code in this context.
         """
         ...
+
+class Reflector:
+    def __call__(self, prgm):
+        return prgm

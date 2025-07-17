@@ -8,6 +8,8 @@ from numpy.testing import assert_equal
 import finch.finch_notation as ntn
 import finch
 from finch import format
+from finch.compile import NotationCompiler
+from finch.symbolic import Reflector
 
 
 @pytest.mark.parametrize(
@@ -125,6 +127,7 @@ def test_matrix_multiplication(a, b):
     )
 
     mod = ntn.NotationInterpreter()(prgm)
+    print(NotationCompiler(Reflector())(prgm))
 
     c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1])))
     result = mod.matmul(c, a_buf, b_buf).to_numpy()

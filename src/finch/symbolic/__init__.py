@@ -1,4 +1,4 @@
-from .environment import Context, Namespace, ScopedDict
+from .environment import Context, Namespace, ScopedDict, Reflector
 from .format import Format, Formattable, format, has_format
 from .gensym import gensym
 from .rewriters import (
@@ -33,4 +33,5 @@ __all__ = [
     "format",
     "gensym",
     "has_format",
+    "Reflector",
 ]

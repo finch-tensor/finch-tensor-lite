@@ -162,4 +162,5 @@ __all__ = [
     "vecdot",
     "NotationContext",
     "BufferizedNDArray",
+    "Reflector",
 ]
