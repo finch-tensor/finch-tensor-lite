@@ -153,6 +153,44 @@ class BufferizedNDArrayFormat(FinchTensorFormat):
     @property
     def shape_type(self) -> tuple:
         return tuple(np.int_ for _ in range(self._ndim))
+        
+    def asm_unpack(self, ctx, var_n, val):
+        """
+        Unpack the into asm context.
+        """
+        stride = []
+        for i in range(self._ndim):
+            var = asm.Variable(f"stride_{i}", t)
+            stride.append(var)
+            asm.GetAttr(val, f"stride", var)
+
+            ctx.exec(asm.Assign(var, asm.GetAttr(val, )))
+
+
+        data = ctx.freshen(var_n, "data")
+        length = ctx.freshen(var_n, "length")
+        t = ctx.ctype_name(c_type(self._dtype))
+        ctx.exec(
+            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
+            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
+        )
+
+        class BufferFields(NamedTuple):
+            data: str
+            length: str
+            obj: str
+
+        return BufferFields(data, length, var_n)
+
+    def asm_repack(self, ctx, lhs, obj):
+        """
+        Repack the buffer from C context.
+        """
+        ctx.exec(
+            f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
+            f"{ctx.feed}{lhs}->length = {obj.length};"
+        )
+        return
 
 
 class BufferizedNDArrayAccessor(Tensor):
@@ -302,6 +340,7 @@ class NotationContext(Context):
         epilogue=None,
         bindings=None,
         slots=None,
+        types=None,
         func_state=None,
     ):
         super().__init__(namespace=namespace, preamble=preamble, epilogue=epilogue)
@@ -309,8 +348,11 @@ class NotationContext(Context):
             bindings = ScopedDict()
         if slots is None:
             slots = ScopedDict()
+        if types is None:
+            types = ScopedDict()
         self.bindings = bindings
         self.slots = slots
+        self.types = types
         self.func_state = func_state
 
     def block(self):
@@ -321,6 +363,7 @@ class NotationContext(Context):
         blk = super().block()
         blk.bindings = self.bindings
         blk.slots = self.slots
+        blk.types = self.types
         blk.func_state = self.func_state
         return blk
 
@@ -331,6 +374,7 @@ class NotationContext(Context):
         blk = self.block()
         blk.bindings = self.bindings.scope()
         blk.slots = self.slots.scope()
+        blk.types = self.types.scope()
         return blk
 
     def should_halt(self):
@@ -375,22 +419,32 @@ class NotationContext(Context):
                     return self.slots[var_n]
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
             case ntn.Unpack(ntn.Slot(var_n, var_t), val):
-                val_e = self(val)
-                if not has_format(val_e, var_t):
-                    raise TypeError(
-                        f"Assigned value {val_e} is not of type {var_t} for "
-                        f"variable '{var_n}'."
+                val_code = self(val)
+                if val.result_format != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if var_n in self.slots:
+                    raise KeyError(
+                        f"Slot {var_n} already exists in context, cannot unpack"
                     )
-                assert var_n not in self.types, (
-                    f"Variable '{var_n}' is already defined in the current"
-                    f" context, cannot overwrite with slot."
-                )
+                if var_n in self.types:
+                    raise KeyError(
+                        f"Variable '{var_n}' is already defined in the current"
+                        f" context, cannot overwrite with slot."
+                    )
+                var = asm.Variable(var_n, var_t)
+                self.exec(asm.Assign(var, val_code))
                 self.types[var_n] = var_t
-                self.slots[var_n] = val_e
-                val_e = self(val)
+                self.slots[var_n] = var_t.asm_unpack(
+                    self, var_n, ntn.Variable(var_n, var_t)
+                )
                 return None
             case ntn.Repack(ntn.Slot(var_n, var_t)):
-                self.bindings[var_n] = self.slots[var_n]
+                if var_n not in self.slots or var_n not in self.types:
+                    raise KeyError(f"Slot {var_n} not found in context, cannot repack")
+                if var_t != self.types[var_n]:
+                    raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
+                obj = self.slots[var_n]
+                var_t.asm_repack(self, var_n, obj)
                 return None
             case ntn.Access(_):
                 raise NotImplementedError("Access should have been lowered already.")
