@@ -24,6 +24,7 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
+from ..finch_logic._utils import NonConcordantLists, merge_concordant
 from ..symbolic import (
     Chain,
     Fixpoint,
@@ -247,7 +248,7 @@ def propagate_map_queries_backward(root):
     root = Rewrite(PreWalk(Chain([rule_1, rule_2])))(root)
     root = push_fields(root)
 
-    def rule_1(ex):
+    def rule_3(ex):
         match ex:
             case MapJoin(
                 Literal() as f,
@@ -275,7 +276,7 @@ def propagate_map_queries_backward(root):
                             )
                 return None
 
-    def rule_2(ex):
+    def rule_4(ex):
         match ex:
             case Aggregate(
                 Literal() as op_1,
@@ -285,12 +286,17 @@ def propagate_map_queries_backward(root):
             ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
                 return Aggregate(op_1, init_1, arg, idxs_1 + idxs_2)
 
-    def rule_3(ex):
+    def rule_5(ex):
         match ex:
             case Reorder(Aggregate(op, init, arg, idxs_1), idxs_2):
-                return Aggregate(op, init, Reorder(arg, idxs_2 + idxs_1), idxs_1)
+                merged_idxs: list[Field]
+                try:
+                    merged_idxs = merge_concordant([arg.fields, idxs_1, idxs_2])
+                except NonConcordantLists:
+                    merged_idxs = list(idxs_2 + idxs_1)
+                return Aggregate(op, init, Reorder(arg, tuple(merged_idxs)), idxs_1)
 
-    return Rewrite(Fixpoint(PreWalk(Chain([rule_1, rule_2, rule_3]))))(root)
+    return Rewrite(Fixpoint(PreWalk(Chain([rule_3, rule_4, rule_5]))))(root)
 
 
 def propagate_copy_queries(root):
@@ -612,7 +618,8 @@ def concordize(root):
             root = Rewrite(PostWalk(rule_0))(root)
             root = Rewrite(PostWalk(rule_1))(root)
             return flatten_plans(Plan((root, prod)))
-    return None
+        case _:
+            raise Exception(f"Invalid root: {root}")
 
 
 def normalize_names(root):

@@ -150,6 +150,16 @@ class AssemblyInterpreter:
                 self.bindings[var_n] = val_e
                 self.types[var_n] = var_t
                 return None
+            case asm.GetAttr(obj, attr):
+                obj_e = self(obj)
+                attr = attr.val
+                return obj.result_format.struct_getattr(obj_e, attr)
+            case asm.SetAttr(obj, attr, val):
+                obj_e = self(obj)
+                attr = attr.val
+                val_e = self(val)
+                obj.result_format.struct_setattr(obj_e, attr, val_e)
+                return None
             case asm.Slot(var_n, var_t):
                 if var_n in self.types:
                     def_t = self.types[var_n]

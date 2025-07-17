@@ -15,6 +15,10 @@ from ..finch_logic import (
     Value,
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
+from .compiler import (
+    LogicCompiler,
+    format_queries,
+)
 from .optimize import (
     concordize,
     flatten_plans,
@@ -41,6 +45,7 @@ __all__ = [
     "Alias",
     "Field",
     "Literal",
+    "LogicCompiler",
     "MapJoin",
     "Plan",
     "PostOrderDFS",
@@ -56,6 +61,7 @@ __all__ = [
     "Value",
     "concordize",
     "flatten_plans",
+    "format_queries",
     "isolate_aggregates",
     "isolate_reformats",
     "isolate_tables",
