@@ -1,3 +1,5 @@
+from typing import TypeVar, overload
+
 import numpy as np
 
 from .. import finch_notation as ntn
@@ -9,6 +11,7 @@ from ..finch_logic import (
     Literal,
     LogicExpression,
     LogicNode,
+    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -16,11 +19,85 @@ from ..finch_logic import (
     Reformat,
     Relabel,
     Reorder,
+    Subquery,
     Table,
     Value,
 )
 from ..symbolic.rewriters import Fixpoint, PostWalk, Rewrite
 from ._utils import intersect, setdiff, with_subsequence
+
+T = TypeVar("T", bound="LogicNode")
+
+
+@overload
+def compute_structure(
+    node: Field, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Field: ...
+
+
+@overload
+def compute_structure(
+    node: Alias, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Alias: ...
+
+
+@overload
+def compute_structure(
+    node: Subquery, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Subquery: ...
+
+
+@overload
+def compute_structure(
+    node: Table, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> Table: ...
+
+
+@overload
+def compute_structure(
+    node: LogicTree, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicTree: ...
+
+
+@overload
+def compute_structure(
+    node: LogicExpression, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicExpression: ...
+
+
+@overload
+def compute_structure(
+    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicNode: ...
+
+
+def compute_structure(
+    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
+) -> LogicNode:
+    match node:
+        case Field(name):
+            return fields.setdefault(name, Field(f"{len(fields) + len(aliases)}"))
+        case Alias(name):
+            return aliases.setdefault(name, Alias(f"{len(fields) + len(aliases)}"))
+        case Subquery(Alias(name) as lhs, arg):
+            if name in aliases:
+                return aliases[name]
+            arg_2 = compute_structure(arg, fields, aliases)
+            lhs_2 = compute_structure(lhs, fields, aliases)
+            return Subquery(lhs_2, arg_2)
+        case Table(tns, idxs):
+            assert isinstance(tns, Literal), "tns must be an Literal"
+            return Table(
+                Literal(type(tns.val)),
+                tuple(compute_structure(idx, fields, aliases) for idx in idxs),
+            )
+        case LogicTree() as tree:
+            return tree.make_term(
+                tree.head(),
+                *(compute_structure(arg, fields, aliases) for arg in tree.children),
+            )
+        case _:
+            return node
 
 
 class PointwiseLowerer:
@@ -165,6 +242,7 @@ class LogicLowerer:
                     if idx in rhs_idxs:
                         body = ntn.Loop(
                             ntn.Variable(idx.name, int),
+                            # TODO (mtsokol): Use correct loop index type
                             ntn.Variable(f"{idx.name}_size", int),
                             body,
                         )
@@ -287,6 +365,7 @@ def record_tables(
                 tables[alias] = val
                 for idx, field in enumerate(fields):
                     assert isinstance(field, Field)
+                    # TODO (mtsokol): Use correct loop index type
                     dim_size_var = ntn.Variable(f"{field.name}_size", int)
                     if dim_size_var not in dim_size_vars:
                         dim_size_vars[dim_size_var] = ntn.Call(

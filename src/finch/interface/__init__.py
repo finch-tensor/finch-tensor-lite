@@ -57,8 +57,6 @@ from .eager import (
     var,
     vecdot,
 )
-
-# from .tensor import *
 from .fuse import compute, fuse, fused
 from .lazy import LazyTensor, asarray, defer
 from .scalar import Scalar, ScalarFormat
