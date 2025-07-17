@@ -499,7 +499,7 @@ class NotationInterpreter:
                     ctx_2(body)
                     if ctx_2.function_state.has_returned:
                         ret_e = ctx_2.function_state.return_value
-                        if not isinstance(ret_e, ret_t):
+                        if not has_format(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
                                 f"for function '{func_n}'."

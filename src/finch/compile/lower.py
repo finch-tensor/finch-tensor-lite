@@ -8,7 +8,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..codegen import NumpyBuffer
-from ..symbolic import Context, ScopedDict, has_format
+from ..symbolic import Context, ScopedDict, has_format, format
 
 
 class FinchTensorFormat(TensorFormat, ABC):
@@ -70,7 +70,7 @@ class BufferizedNDArray(Tensor):
         """
         Returns the format of the buffer, which is a BufferizedNDArrayFormat.
         """
-        return BufferizedNDArrayFormat(format(self.arr), len(self.strides))
+        return BufferizedNDArrayFormat(format(self.buf), len(self.strides))
 
     @property
     def shape(self):
@@ -98,13 +98,16 @@ class BufferizedNDArray(Tensor):
     def thaw(self, op):
         return self
 
+    def access(self, indices, op):
+        return BufferizedNDArrayAccessor(self).access(indices, op)
+
     def __getitem__(self, index):
         """
         Get an item from the bufferized NDArray.
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
-            index = np.ravel_multi_index(index, self._shape)
+            index = np.dot(index, self.strides)
         return self.buf.load(index)
     
     def __setitem__(self, index, value):
@@ -154,31 +157,86 @@ class BufferizedNDArrayAccessor(Tensor):
     A class representing a tensor view that is bufferized.
     This is used to create a view of a tensor with a specific extent.
     """
-
-    def __init__(self, tns, ndim=None, pos=None, op=None):
+    def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
             pos = format(self.tns).buf.length_type(0)
         self.pos = pos
         self.op = op
-        self.ndim = ndim(tns)
+        if nind is None:
+            nind = 0
+        self.nind = nind
 
     @property
     def format(self):
-        return BufferizedNDArrayAccessorFormat(format(self.tns), self.ndim, self.op)
+        return BufferizedNDArrayAccessorFormat(format(self.tns), self.nind, format(self.pos), self.op)
+
+    @property
+    def shape(self):
+        return self.tns.shape[self.nind:]
+
+    def access(self, indices, op):
+        pos = self.pos + np.dot(indices, self.tns.strides[self.nind:self.nind + len(indices)])
+        return BufferizedNDArrayAccessor(self.tns, self.nind + len(indices), pos, op)
+
+    def unwrap(self):
+        """
+        Unwrap the tensor view to get the underlying tensor.
+        This is used to get the original tensor from a tensor view.
+        """
+        assert self.ndim == 0, "Cannot unwrap a tensor view with non-zero dimension."
+        return self.tns.buf.load(self.pos)
+
+    def increment(self, val):
+        """
+        Increment the tensor view with a value.
+        This updates the tensor at the specified index with the operation and value.
+        """
+        if self.op is None:
+            raise ValueError("No operation defined for increment.")
+        assert self.ndim == 0, "Cannot unwrap a tensor view with non-zero dimension."
+        self.tns.buf.store(self.pos, self.op(self.tns.buf.load(self.pos), val))
+        return self
+
+    @property
+    def format(self):
+        return BufferizedNDArrayAccessorFormat(format(self.tns), self.nind, format(self.pos), self.op)
 
 
 class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
-    """
-    A format for tensor views that allows unfurling.
-    This is used to create a view of a tensor with a specific extent.
-    """
-
-    def __init__(self, tns, ndim, op):
+    def __init__(self, tns, nind, pos, op):
         self.tns = tns
-        self.ndim = ndim
+        self.nind = nind
+        self.pos = pos
         self.op = op
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, BufferizedNDArrayAccessorFormat)
+            and self.tns == other.tns
+            and self.nind == other.nind
+            and self.op == other.op
+        )
+    
+    def __hash__(self):
+        return hash((self.tns, self.nind, self.op))
+
+    @property
+    def ndim(self) -> int:
+        return self.tns.ndim - self.nind
+
+    @property
+    def shape_type(self) -> tuple:
+        return self.tns.shape_type[self.nind:]
+
+    @property
+    def fill_value(self) -> Any:
+        return self.tns.fill_value
+    
+    @property
+    def element_type(self):
+        return self.tns.element_type
+    
     def lower_unwrap(self, ctx, obj): ...
 
     def lower_increment(self, ctx, obj, val): ...
