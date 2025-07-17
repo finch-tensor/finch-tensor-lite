@@ -4,6 +4,7 @@ import numpy as np
 
 import finch.finch_logic as logic
 import finch.finch_notation as ntn
+from finch.algebra.tensor import NDArrayFormat
 from finch.autoschedule import (
     LogicCompiler,
 )
@@ -105,9 +106,9 @@ def test_logic_compiler():
             Function(
                 name=Variable(name="func", type_=np.ndarray),
                 args=(
-                    Variable(name=":A0", type_=np.ndarray),
-                    Variable(name=":A1", type_=np.ndarray),
-                    Variable(name=":A2", type_=np.ndarray),
+                    Variable(name=":A0", type_=NDArrayFormat(np.dtype(int), 2)),
+                    Variable(name=":A1", type_=NDArrayFormat(np.dtype(int), 2)),
+                    Variable(name=":A2", type_=NDArrayFormat(np.dtype(int), -1)),
                 ),
                 body=Block(
                     bodies=(
@@ -116,7 +117,10 @@ def test_logic_compiler():
                             rhs=Call(
                                 op=ntn.Literal(val=ntn.dimension),
                                 args=(
-                                    Variable(name=":A0", type_=np.ndarray),
+                                    Variable(
+                                        name=":A0",
+                                        type_=NDArrayFormat(np.dtype(int), 2),
+                                    ),
                                     ntn.Literal(val=0),
                                 ),
                             ),
@@ -126,7 +130,10 @@ def test_logic_compiler():
                             rhs=Call(
                                 op=ntn.Literal(val=ntn.dimension),
                                 args=(
-                                    Variable(name=":A0", type_=np.ndarray),
+                                    Variable(
+                                        name=":A0",
+                                        type_=NDArrayFormat(np.dtype(int), 2),
+                                    ),
                                     ntn.Literal(val=1),
                                 ),
                             ),
@@ -136,15 +143,22 @@ def test_logic_compiler():
                             rhs=Call(
                                 op=ntn.Literal(val=ntn.dimension),
                                 args=(
-                                    Variable(name=":A1", type_=np.ndarray),
+                                    Variable(
+                                        name=":A1",
+                                        type_=NDArrayFormat(np.dtype(int), 2),
+                                    ),
                                     ntn.Literal(val=1),
                                 ),
                             ),
                         ),
                         Assign(
-                            lhs=Variable(name=":A2", type_=np.ndarray),
+                            lhs=Variable(
+                                name=":A2", type_=NDArrayFormat(np.dtype(int), -1)
+                            ),
                             rhs=Declare(
-                                tns=Variable(name=":A2", type_=np.ndarray),
+                                tns=Variable(
+                                    name=":A2", type_=NDArrayFormat(np.dtype(int), -1)
+                                ),
                                 init=ntn.Literal(val=0),
                                 op=ntn.Literal(val=operator.add),
                                 shape=(
@@ -167,7 +181,10 @@ def test_logic_compiler():
                                             Increment(
                                                 lhs=Access(
                                                     tns=Variable(
-                                                        name=":A2", type_=np.ndarray
+                                                        name=":A2",
+                                                        type_=NDArrayFormat(
+                                                            np.dtype(int), -1
+                                                        ),
                                                     ),
                                                     mode=Update(
                                                         op=ntn.Literal(val=operator.add)
@@ -184,7 +201,9 @@ def test_logic_compiler():
                                                             arg=Access(
                                                                 tns=Variable(
                                                                     name=":A0",
-                                                                    type_=np.ndarray,
+                                                                    type_=NDArrayFormat(
+                                                                        np.dtype(int), 2
+                                                                    ),
                                                                 ),
                                                                 mode=Read(),
                                                                 idxs=(
@@ -203,7 +222,9 @@ def test_logic_compiler():
                                                             arg=Access(
                                                                 tns=Variable(
                                                                     name=":A1",
-                                                                    type_=np.ndarray,
+                                                                    type_=NDArrayFormat(
+                                                                        np.dtype(int), 2
+                                                                    ),
                                                                 ),
                                                                 mode=Read(),
                                                                 idxs=(
@@ -227,13 +248,21 @@ def test_logic_compiler():
                             ),
                         ),
                         Assign(
-                            lhs=Variable(name=":A2", type_=np.ndarray),
+                            lhs=Variable(
+                                name=":A2", type_=NDArrayFormat(np.dtype(int), -1)
+                            ),
                             rhs=Freeze(
-                                tns=Variable(name=":A2", type_=np.ndarray),
+                                tns=Variable(
+                                    name=":A2", type_=NDArrayFormat(np.dtype(int), -1)
+                                ),
                                 op=ntn.Literal(val=operator.add),
                             ),
                         ),
-                        Return(val=Variable(name=":A2", type_=np.ndarray)),
+                        Return(
+                            val=Variable(
+                                name=":A2", type_=NDArrayFormat(np.dtype(int), -1)
+                            )
+                        ),
                     )
                 ),
             ),
@@ -245,7 +274,7 @@ def test_logic_compiler():
     assert program == expected_program
 
     mod = ntn.NotationInterpreter()(program)
-    args = [tables[logic.Alias(arg.name)] for arg in program.funcs[0].args]
+    args = [tables[logic.Alias(arg.name)].tns.val for arg in program.funcs[0].args]
 
     result = mod.func(*args)
 
