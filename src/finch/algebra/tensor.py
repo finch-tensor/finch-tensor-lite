@@ -155,6 +155,9 @@ class NDArrayFormat(TensorFormat):
     def __hash__(self):
         return hash((self._dtype, self._ndim))
 
+    def __repr__(self) -> str:
+        return f"NDArrayFormat(dtype={repr(self._dtype)}, ndim={self._ndim})"
+
     @property
     def ndim(self) -> int:
         return self._ndim

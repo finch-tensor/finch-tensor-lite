@@ -332,6 +332,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
             assert_equal(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -425,6 +426,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     assert_allclose(result_with_np, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a",
     [
@@ -457,6 +459,7 @@ def test_matrix_transpose(a, a_wrap):
     assert_equal(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a, b, axes",
     [
@@ -530,6 +533,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     assert_allclose(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x1, x2, axis",
     [
@@ -615,6 +619,7 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
     assert_allclose(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, axis, expected",
     [
@@ -645,6 +650,7 @@ def test_squeeze_invalid(x, axis):
         finch.squeeze(x, axis=axis)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, axis",
     [

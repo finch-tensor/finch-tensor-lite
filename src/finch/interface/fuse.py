@@ -51,28 +51,40 @@ Performance:
 """
 
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
-from ..finch_logic import (
-    Alias,
-    Plan,
-    Produces,
-    Query,
-)
+from ..finch_logic import Alias, FinchLogicInterpreter, Plan, Produces, Query
 from ..finch_notation import NotationInterpreter
 from ..symbolic import gensym
 from .lazy import defer
 
+_DEFAULT_SCHEDULER = None
+
+
+def set_default_scheduler(*, ctx=None, interpret_logic=False):
+    global _DEFAULT_SCHEDULER
+
+    if ctx is not None:
+        _DEFAULT_SCHEDULER = ctx
+    elif interpret_logic:
+        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
+    else:
+        optimizer = DefaultLogicOptimizer(LogicCompiler())
+        ntn_interp = NotationInterpreter()
+
+        def fn_compile(plan):
+            prgm, tables = optimizer(plan)
+            mod = ntn_interp(prgm)
+            args = [tables[Alias(arg.name)].tns.val for arg in prgm.funcs[0].args]
+            return (mod.func(*args),)
+
+        _DEFAULT_SCHEDULER = fn_compile
+
+
+set_default_scheduler()
+
 
 def get_default_scheduler():
-    optimizer = DefaultLogicOptimizer(LogicCompiler())
-    ntn_interp = NotationInterpreter()
-
-    def compile(plan):
-        prgm, tables = optimizer(plan)
-        mod = ntn_interp(prgm)
-        args = [tables[Alias(arg.name)] for arg in prgm.funcs[0].args]
-        return mod.func(*args)
-
-    return compile
+    global _DEFAULT_SCHEDULER
+    return _DEFAULT_SCHEDULER
 
 
 def compute(arg, ctx=None):
@@ -99,7 +111,7 @@ def compute(arg, ctx=None):
     res = ctx(prgm)
     if isinstance(arg, tuple):
         return tuple(res)
-    return res
+    return res[0]
 
 
 def fuse(f, *args, ctx=None):
