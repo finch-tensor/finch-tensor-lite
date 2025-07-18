@@ -776,7 +776,7 @@ class CContext(Context):
                 return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(
-                    self.freshen(var.name + "_i"), buf.result_format.index_type()
+                    self.freshen(var.name + "_i"), buf.result_format.shape_type()
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(
