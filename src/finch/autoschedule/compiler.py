@@ -131,7 +131,7 @@ class PointwiseLowerer:
                         tuple(
                             self(idx, table_vars, field_relabels)
                             if idx in self.loop_idxs
-                            else ntn.Value(1, int)
+                            else ntn.Value(0, int)
                             for idx in idxs_1
                         ),
                     )
