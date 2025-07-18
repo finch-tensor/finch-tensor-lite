@@ -9,6 +9,7 @@ from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..codegen import NumpyBuffer
 from ..symbolic import Context, ScopedDict, has_format, format
+from ..symbolic import PostOrderDFS, PostWalk
 from typing import NamedTuple
 
 
@@ -163,9 +164,9 @@ class BufferizedNDArrayFormat(FinchTensorFormat):
     def shape_type(self) -> tuple:
         return tuple(np.int_ for _ in range(self._ndim))
 
-    def lower_declare(self, ctx, obj, init, op, shape):
+    def lower_declare(self, ctx, tns, init, op, shape):
         i_var = asm.Variable(f"i", self.buf.length_type)
-        buf = asm.Stack(obj.buf, self.buf)
+        buf = asm.Stack(tns.obj.buf, self.buf)
         body = asm.Store(
             buf,
             i_var,
@@ -411,10 +412,10 @@ class NotationContext(Context):
             case ntn.Slot(var_n, var_t):
                 if var_n in self.slots:
                     var_o = self.slots[var_n]
-                    return var_o
+                    return ntn.stack(var_o, var_t)
                 raise KeyError(f"Slot {var_n} not found in context")
-            case ntn.Stack(var_o, _):
-                return var_o
+            case ntn.Stack(_, _):
+                return node
             case _:
                 raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
 
@@ -489,22 +490,23 @@ class NotationContext(Context):
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
+                #first instantiate tensors
                 ext.format.lower_loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
-                tns_o = self.resolve(tns)
+                tns = self.resolve(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
-                return tns.result_format.lower_declare(self, tns_o, init_e, op_e, shape_e)
+                return tns.result_format.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
-                tns_o = self.resolve(tns)
+                tns = self.resolve(tns)
                 op_e = self(op)
-                return tns.result_format.lower_freeze(tns_o, op_e)
+                return tns.result_format.lower_freeze(tns, op_e)
             case ntn.Thaw(tns, op):
-                tns_o = self.resolve(tns)
+                tns = self.resolve(tns)
                 op_e = self(op)
-                return tns.result_format.lower_thaw(tns_o, op_e)
+                return tns.result_format.lower_thaw(tns, op_e)
             case ntn.If(cond, body):
                 ctx = self.block()
                 ctx_2 = ctx.scope()
@@ -545,3 +547,78 @@ class NotationContext(Context):
                 for func in funcs:
                     ctx(func)
                 return asm.Module(ctx.emit())
+
+def get_undeclared_slots(prgm):
+    undeclared = set()
+    for node in PostOrderDFS(prgm):
+        match node:
+            case ntn.Declare(ntn.Slot(tns_n, _), _, _, _):
+                undeclared.add(tns_n)
+
+
+def instantiate_tns(ctx, tns, mode, undeclared = set()):
+    match tns:
+        case ntn.Slot(tns_n, tns_t):
+            if tns_n in undeclared:
+                tns = ctx.resolve(tns_n)
+                tns_2 = tns_t.lower_instantiate(ctx, tns, mode)
+                return tns_2
+    return tns
+
+def instantiate(ctx, prgm):
+    undeclared = get_undeclared_slots(prgm)
+    def instantiate_node(node):
+        match node:
+            case ntn.Access(tns, mode, idxs):
+                return ntn.Access(
+                    instantiate_tns(ctx, tns, mode),
+                    mode,
+                    idxs,
+                )
+            case ntn.Increment(tns, val):
+                return ntn.Increment(
+                    instantiate_tns(ctx, tns, ntn.Update()),
+                    val,
+                )
+            case ntn.Unwrap(tns):
+                return ntn.Unwrap(
+                    instantiate_tns(ctx, tns, ntn.Read())
+                )
+            case _:
+                return None
+    prgm = PostWalk(instantiate_node, prgm)
+
+
+def lower_looplets(ctx, idx, ext, body):
+    body = instantiate(ctx, body)
+    ctx_2 = ctx.scope()
+    def unfurl_node(node):
+        match node:
+            case ntn.Access(tns, mode, (j, *idxs)):
+                if j == idx:
+                    tns = ctx_2.resolve(tns)
+                    tns_2 = tns.result_type.unfurl(
+                        ctx_2,
+                        tns,
+                        ext,
+                        mode,
+                    )
+                    return ntn.Access(tns_2, mode, (j, *idxs))
+        return None
+    body = PostWalk(unfurl_node, body)
+    ctx_3 = LoopletContext(ctx, idx)
+    ctx_3(ext, body)
+
+
+class LoopletContext:
+    def __init__(self, ctx, idx):
+        self.ctx = ctx
+        self.idx = idx
+
+    def __call__(self, ext, body):
+        """
+        Lower a looplet with the given index and body.
+        This is used to compile the looplet into assembly.
+        """
+        lower_looplets(self.ctx, self.idx, ext, body)
+        return self.ctx
