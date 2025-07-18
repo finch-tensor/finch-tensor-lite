@@ -135,7 +135,7 @@ class PointwiseLowerer:
                         tuple(
                             self(idx, slot_vars, field_relabels)
                             if idx in self.loop_idxs
-                            else ntn.Value(asm.Literal(1), int)
+                            else ntn.Value(asm.Literal(0), int)
                             for idx in idxs_1
                         ),
                     )

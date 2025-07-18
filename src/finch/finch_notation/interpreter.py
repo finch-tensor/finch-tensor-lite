@@ -339,8 +339,15 @@ class NotationInterpreter:
         Run the program.
         """
         match prgm:
-            case ntn.Literal(value):
-                return value
+            case ntn.Literal(val):
+                return val
+            case ntn.Value(val, val_t):
+                if type(val) is not val_t:
+                    raise TypeError(
+                        f"Value '{val}' is expected to be of type {val_t}, "
+                        f"but is a type {type(val)}."
+                    )
+                return val
             case ntn.Variable(var_n, var_t):
                 if var_n in self.types:
                     def_t = self.types[var_n]
