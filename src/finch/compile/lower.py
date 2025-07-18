@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
@@ -412,7 +412,7 @@ class NotationContext(Context):
             case ntn.Slot(var_n, var_t):
                 if var_n in self.slots:
                     var_o = self.slots[var_n]
-                    return ntn.stack(var_o, var_t)
+                    return ntn.Stack(var_o, var_t)
                 raise KeyError(f"Slot {var_n} not found in context")
             case ntn.Stack(_, _):
                 return node
@@ -609,16 +609,94 @@ def lower_looplets(ctx, idx, ext, body):
     ctx_3 = LoopletContext(ctx, idx)
     ctx_3(ext, body)
 
+class LoopletPass(ABC):
+    @property
+    @abstractmethod
+    def priority(self):
+        ...
 
-class LoopletContext:
+    def lt(self, other):
+        if other is None:
+            return False
+        assert isinstance(other, LoopletPass)
+        return self.priority < other.priority
+
+
+class DefaultPass(LoopletPass):
+    @property
+    def priority(self):
+        return -Inf
+
+class LookupPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
+    
+    def __call__(self, ctx, idx, ext, body):
+        idx_2 = asm.Variable(self.freshen("i"), idx.result_type)
+        def lookup_node(node):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx:
+                        tns = ctx.resolve(tns)
+                        tns_2 = tns.result_type.lookup(
+                            ctx,
+                            tns,
+                            idx_2,
+                        )
+                        return ntn.Access(tns_2, mode, (j, *idxs))
+            return None
+        body_2 = PostWalk(lookup_node)(body)
+        ctx.exec(
+            asm.ForLoop(
+                idx_2,
+                asm.Literal(ext.start),
+                asm.Literal(ext.end),
+                ctx(body_2)
+            )
+        )
+
+
+class LoopletContext(Context):
     def __init__(self, ctx, idx):
         self.ctx = ctx
         self.idx = idx
+
+    def freshen(self, *tags):
+        return self.ctx.freshen(*tags)
+    
+    def resolve(self, *names: str):
+        return self.ctx.resolve(*names)
+    
+    def exec(self, thunk: Any):
+        self.ctx.exec(thunk)
+
+    def post(self, thunk: Any):
+        self.ctx.post(thunk)
+
+    def scope(self):
+        blk = self.ctx.scope()
+        return LoopletContext(blk, self.idx)
+
+    def select_pass(self, body):
+        def pass_request(node):
+            match node:
+                case ntn.Access(tns, _, (j, *_)):
+                    if j == self.idx:
+                        return tns.pass_request()
+            return None
+
+        return max(map(pass_request, PostOrderDFS(body)))
 
     def __call__(self, ext, body):
         """
         Lower a looplet with the given index and body.
         This is used to compile the looplet into assembly.
         """
-        lower_looplets(self.ctx, self.idx, ext, body)
-        return self.ctx
+        pass_ = self.select_pass(body)
+        if pass_ is None:
+            ctx_2 = self.ctx.scope()
+            ctx_2(body)
+            return ctx_2.emit()
+        else:
+            return pass_(self.ctx, self.idx, ext, body)
