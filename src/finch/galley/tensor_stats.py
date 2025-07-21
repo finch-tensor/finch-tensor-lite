@@ -2,13 +2,19 @@ from collections import OrderedDict
 from typing import Any, Iterable, Mapping, Set, Callable, Type
 from abc import ABC, abstractmethod
 
-from finch.algebra import fill_value
-
 class TensorStats(ABC):
 
+    def __init__(self, *args, **kwargs):
+        raise TypeError(
+            "Direct __init__ is disabled; use "
+            "`MyStats.from_tensor(tensor, fields)` instead."
+        )
+
     @classmethod
-    def create(cls, tensor: Any, fields: Iterable[str]) -> "TensorStats":
-        return cls(tensor, fields)
+    def from_tensor(cls: Type["TensorStats"], tensor: Any, fields: Iterable[str]) -> "TensorStats":
+        stats = object.__new__(cls)
+        stats._init(tensor, fields)
+        return stats
 
     @abstractmethod
     def _init(self, tensor: Any, fields: Iterable[str]) -> None:
