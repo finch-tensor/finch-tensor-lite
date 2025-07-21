@@ -104,7 +104,7 @@ class BufferizedNDArray(Tensor):
 
     def freeze(self, op):
         return self
-    
+
     def thaw(self, op):
         return self
 
@@ -119,7 +119,7 @@ class BufferizedNDArray(Tensor):
         if isinstance(index, tuple):
             index = np.dot(index, self.strides)
         return self.buf.load(index)
-    
+
     def __setitem__(self, index, value):
         """
         Set an item in the bufferized NDArray.
@@ -183,7 +183,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
             )
         )
         return None
-        
+
     def asm_unpack(self, ctx, var_n, val):
         """
         Unpack the into asm context.
@@ -281,7 +281,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
             and self.pos == other.pos
             and self.op == other.op
         )
-    
+
     def __hash__(self):
         return hash((self.tns, self.nind, self.pos, self.op))
 
@@ -296,11 +296,11 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
     @property
     def fill_value(self) -> Any:
         return self.tns.fill_value
-    
+
     @property
     def element_type(self):
         return self.tns.element_type
-    
+
     def lower_unwrap(self, ctx, obj): ...
 
     def lower_increment(self, ctx, obj, val): ...
@@ -341,10 +341,10 @@ class HaltState:
 class NotationCompiler():
     def __init__(self, ctx):
         self.ctx = ctx
-    
+
     def __call__(self, prgm):
         ctx_2 = NotationContext()
-        
+
         return self.ctx(ctx_2(prgm))
 
 from pprint import pprint
@@ -533,7 +533,7 @@ class NotationContext(Context):
                         asm.Variable(func_n, ret_t),
                         [ctx(arg) for arg in args],
                         asm.Block([
-                            *blk.emit(), 
+                            *blk.emit(),
                             asm.Return(ctx.func_state.return_var)
                         ]),
                     )
@@ -633,7 +633,7 @@ class LookupPass(LoopletPass):
     @property
     def priority(self):
         return 0
-    
+
     def __call__(self, ctx, idx, ext, body):
         idx_2 = asm.Variable(self.freshen("i"), idx.result_type)
         def lookup_node(node):
@@ -666,10 +666,10 @@ class LoopletContext(Context):
 
     def freshen(self, *tags):
         return self.ctx.freshen(*tags)
-    
+
     def resolve(self, *names: str):
         return self.ctx.resolve(*names)
-    
+
     def exec(self, thunk: Any):
         self.ctx.exec(thunk)
 

@@ -3,6 +3,7 @@ from .codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
 )
+from .compile import BufferizedNDArray, NotationContext
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -79,9 +80,9 @@ from .tensor import (
     ElementLevelFormat,
     FiberTensorFormat,
 )
-from .compile import BufferizedNDArray, NotationContext
 
 __all__ = [
+    "BufferizedNDArray",
     "DenseLevelFormat",
     "EagerTensor",
     "ElementLevelFormat",
@@ -89,8 +90,10 @@ __all__ = [
     "Formattable",
     "LazyTensor",
     "LazyTensor",
+    "NotationContext",
     "NumpyBuffer",
     "NumpyBufferFormat",
+    "Reflector",
     "Scalar",
     "Tensor",
     "TensorFormat",
@@ -160,7 +163,4 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
-    "NotationContext",
-    "BufferizedNDArray",
-    "Reflector",
 ]

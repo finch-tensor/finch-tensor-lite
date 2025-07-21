@@ -1,25 +1,24 @@
 import operator
+from pprint import pprint
 
 import pytest
 
 import numpy as np
-from numpy.testing import assert_equal
 
-import finch.finch_notation as ntn
 import finch
+import finch.finch_notation as ntn
 from finch import format
 from finch.compile import NotationCompiler
 from finch.symbolic import Reflector
 
-from pprint import pprint
 
 @pytest.mark.parametrize(
     "a, b",
     [
-#        (
-#            np.array([[1, 2], [3, 4]], dtype=np.float64),
-#            np.array([[5, 6], [7, 8]], dtype=np.float64),
-#        ),
+        #        (
+        #            np.array([[1, 2], [3, 4]], dtype=np.float64),
+        #            np.array([[5, 6], [7, 8]], dtype=np.float64),
+        #        ),
         (
             np.array([[2, 0], [1, 3]], dtype=np.float64),
             np.array([[4, 1], [2, 2]], dtype=np.float64),
@@ -30,7 +29,7 @@ def test_matrix_multiplication(a, b):
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
-    
+
     a_buf = finch.compile.BufferizedNDArray(a)
     b_buf = finch.compile.BufferizedNDArray(b)
 
@@ -73,7 +72,7 @@ def test_matrix_multiplication(a, b):
                         ntn.Declare(
                             C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
                         ),
-                        #ntn.Loop(
+                        # ntn.Loop(
                         #    i,
                         #    m,
                         #    ntn.Loop(
@@ -117,8 +116,8 @@ def test_matrix_multiplication(a, b):
                         #            ),
                         #        ),
                         #    ),
-                        #),
-                        #ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        # ),
+                        # ntn.Freeze(C_, ntn.Literal(operator.add)),
                         ntn.Repack(C_),
                         ntn.Return(C),
                     )
@@ -130,8 +129,10 @@ def test_matrix_multiplication(a, b):
     mod = ntn.NotationInterpreter()(prgm)
     pprint(NotationCompiler(Reflector())(prgm))
 
-    #c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1])))
-    #result = mod.matmul(c, a_buf, b_buf).to_numpy()
+    # c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1])))
+    # result = mod.matmul(c, a_buf, b_buf).to_numpy()
+
+
 #
 #    expected = np.matmul(a, b)
 

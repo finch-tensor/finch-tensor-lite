@@ -1,4 +1,4 @@
-from .environment import Context, Namespace, ScopedDict, Reflector
+from .environment import Context, Namespace, Reflector, ScopedDict
 from .format import Format, Formattable, format, has_format
 from .gensym import gensym
 from .rewriters import (
@@ -26,6 +26,7 @@ __all__ = [
     "PostWalk",
     "PreOrderDFS",
     "PreWalk",
+    "Reflector",
     "Rewrite",
     "ScopedDict",
     "Term",
@@ -33,5 +34,4 @@ __all__ = [
     "format",
     "gensym",
     "has_format",
-    "Reflector",
 ]

@@ -1,7 +1,7 @@
-from .lower import NotationContext, NotationCompiler, BufferizedNDArray
+from .lower import BufferizedNDArray, NotationCompiler, NotationContext
 
 __all__ = [
-    "NotationContext",
-    "NotationCompiler",
     "BufferizedNDArray",
+    "NotationCompiler",
+    "NotationContext",
 ]

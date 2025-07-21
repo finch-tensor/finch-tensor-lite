@@ -45,7 +45,7 @@ class NumpyBuffer(Buffer):
         """
         return NumpyBufferFormat(self.arr.dtype.type)
 
-    #TODO should be property
+    # TODO should be property
     def length(self):
         return self.arr.size
 
