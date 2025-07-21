@@ -2,7 +2,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-
 @dataclass
 class Thunk:
     preamble: Any = None
@@ -69,8 +68,29 @@ class Null:
 
 @dataclass
 class Lookup:
-    body: Any
+    body: Callable
+    def get_body(self, ctx, idx):
+        return self.body(ctx, idx)
 
+class LookupPass:
+    def __init__(self, body: Any):
+        self.body = body
+
+    def __call__(self, ctx, ext):
+        idx = asm.Variable(ctx.freshen(ctx.idx, "_lookup"))
+        def get_body(node):
+            match node:
+                case ntn.Access(tns, _, (j, *_)):
+                    if j == self.ctx.idx:
+                        return tns.fmt.get_body(self.ctx, idx)
+            return None
+        body_2 = self.ctx(Rewrite(PostWalk(get_body))(self.body))
+        return asm.ForLoop(
+            start = ext.start,
+            stop = ext.stop,
+            step = 1,
+            body = body_2,
+        )
 
 @dataclass
 class Jumper:

@@ -691,14 +691,10 @@ class LoopletContext(Context):
         return max(map(pass_request, PostOrderDFS(body)))
 
     def __call__(self, ext, body):
-        """
-        Lower a looplet with the given index and body.
-        This is used to compile the looplet into assembly.
-        """
         pass_ = self.select_pass(body)
         if pass_ is None:
             ctx_2 = self.ctx.scope()
             ctx_2(body)
             return ctx_2.emit()
         else:
-            return pass_(self.ctx, self.idx, ext, body)
+            return pass_(self, self.idx, ext, body)
