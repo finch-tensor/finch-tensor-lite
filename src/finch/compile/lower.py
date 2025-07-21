@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -8,9 +8,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..codegen import NumpyBuffer
-from ..symbolic import Context, ScopedDict, has_format, format
-from ..symbolic import PostOrderDFS, PostWalk
-from typing import NamedTuple
+from ..symbolic import Context, PostOrderDFS, PostWalk, ScopedDict, format
 
 
 class FinchTensorFormat(TensorFormat, ABC):
@@ -88,7 +86,7 @@ class BufferizedNDArray(Tensor):
         Declare a bufferized NDArray with the given initialization value,
         operation, and shape.
         """
-        for dim, size in zip(shape, self._shape):
+        for dim, size in zip(shape, self._shape, strict=False):
             if dim.start != 0:
                 raise ValueError(
                     f"Invalid dimension start value {dim.start} for ndarray declaration."
@@ -136,7 +134,12 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
     This includes the fill value, element type, and shape type.
     """
 
-    def struct_fields(...):
+    @property
+    def struct_fields():
+        return [
+            ("buf", self.buf),
+            ("_ndim", self._ndim),
+        ]
 
     def __init__(self, buf, ndim: int):
         self.buf = buf
@@ -167,22 +170,15 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         return tuple(np.int_ for _ in range(self._ndim))
 
     def lower_declare(self, ctx, tns, init, op, shape):
-        i_var = asm.Variable(f"i", self.buf.length_type)
+        i_var = asm.Variable("i", self.buf.length_type)
         buf = asm.Stack(tns.obj.buf, self.buf)
         body = asm.Store(
             buf,
             i_var,
             asm.Literal(init.val),
         )
-        ctx.exec(
-            asm.ForLoop(
-                i_var,
-                asm.Literal(0),
-                asm.Length(buf),
-                body
-            )
-        )
-        return None
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(0), asm.Length(buf), body))
+        return
 
     def asm_unpack(self, ctx, var_n, val):
         """
@@ -192,7 +188,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         for i in range(self._ndim):
             stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf.length_type)
             stride.append(stride_i)
-            stride_e = asm.GetAttr(val, f"stride")
+            stride_e = asm.GetAttr(val, "stride")
             stride_i_e = asm.GetAttr(stride_e, f"element_{i}")
             ctx.exec(asm.Assign(stride_i, stride_i_e))
         buf = asm.Variable(f"{var_n}_buf", self.buf)
@@ -200,6 +196,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         ctx.exec(asm.Assign(buf, buf_e))
         buf_s = asm.Slot(f"{var_n}_buf", self.buf)
         ctx.exec(asm.Unpack(buf_s, buf))
+
         class BufferizedNDArrayFields(NamedTuple):
             stride: list[asm.Variable]
             buf: asm.Variable
@@ -220,6 +217,7 @@ class BufferizedNDArrayAccessor(Tensor):
     A class representing a tensor view that is bufferized.
     This is used to create a view of a tensor with a specific extent.
     """
+
     def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
@@ -232,14 +230,18 @@ class BufferizedNDArrayAccessor(Tensor):
 
     @property
     def format(self):
-        return BufferizedNDArrayAccessorFormat(format(self.tns), self.nind, format(self.pos), self.op)
+        return BufferizedNDArrayAccessorFormat(
+            format(self.tns), self.nind, format(self.pos), self.op
+        )
 
     @property
     def shape(self):
-        return self.tns.shape[self.nind:]
+        return self.tns.shape[self.nind :]
 
     def access(self, indices, op):
-        pos = self.pos + np.dot(indices, self.tns.strides[self.nind:self.nind + len(indices)])
+        pos = self.pos + np.dot(
+            indices, self.tns.strides[self.nind : self.nind + len(indices)]
+        )
         return BufferizedNDArrayAccessor(self.tns, self.nind + len(indices), pos, op)
 
     def unwrap(self):
@@ -263,7 +265,9 @@ class BufferizedNDArrayAccessor(Tensor):
 
     @property
     def format(self):
-        return BufferizedNDArrayAccessorFormat(format(self.tns), self.nind, format(self.pos), self.op)
+        return BufferizedNDArrayAccessorFormat(
+            format(self.tns), self.nind, format(self.pos), self.op
+        )
 
 
 class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
@@ -291,7 +295,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
 
     @property
     def shape_type(self) -> tuple:
-        return self.tns.shape_type[self.nind:]
+        return self.tns.shape_type[self.nind :]
 
     @property
     def fill_value(self) -> Any:
@@ -338,7 +342,7 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler():
+class NotationCompiler:
     def __init__(self, ctx):
         self.ctx = ctx
 
@@ -347,7 +351,6 @@ class NotationCompiler():
 
         return self.ctx(ctx_2(prgm))
 
-from pprint import pprint
 
 class NotationContext(Context):
     """
@@ -492,7 +495,7 @@ class NotationContext(Context):
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                #first instantiate tensors
+                # first instantiate tensors
                 ext.format.lower_loop(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
@@ -525,17 +528,16 @@ class NotationContext(Context):
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
                 ctx = self.scope()
-                ctx.func_state = HaltState(return_var=asm.Variable(ctx.freshen(f"{func_n}_return"), ret_t))
+                ctx.func_state = HaltState(
+                    return_var=asm.Variable(ctx.freshen(f"{func_n}_return"), ret_t)
+                )
                 blk = ctx.scope()
                 blk(body)
                 self.exec(
                     asm.Function(
                         asm.Variable(func_n, ret_t),
                         [ctx(arg) for arg in args],
-                        asm.Block([
-                            *blk.emit(),
-                            asm.Return(ctx.func_state.return_var)
-                        ]),
+                        asm.Block([*blk.emit(), asm.Return(ctx.func_state.return_var)]),
                     )
                 )
                 return None
@@ -550,6 +552,7 @@ class NotationContext(Context):
                     ctx(func)
                 return asm.Module(ctx.emit())
 
+
 def get_undeclared_slots(prgm):
     undeclared = set()
     for node in PostOrderDFS(prgm):
@@ -558,7 +561,7 @@ def get_undeclared_slots(prgm):
                 undeclared.add(tns_n)
 
 
-def instantiate_tns(ctx, tns, mode, undeclared = set()):
+def instantiate_tns(ctx, tns, mode, undeclared=set()):
     match tns:
         case ntn.Slot(tns_n, tns_t):
             if tns_n in undeclared:
@@ -567,8 +570,10 @@ def instantiate_tns(ctx, tns, mode, undeclared = set()):
                 return tns_2
     return tns
 
+
 def instantiate(ctx, prgm):
     undeclared = get_undeclared_slots(prgm)
+
     def instantiate_node(node):
         match node:
             case ntn.Access(tns, mode, idxs):
@@ -583,17 +588,17 @@ def instantiate(ctx, prgm):
                     val,
                 )
             case ntn.Unwrap(tns):
-                return ntn.Unwrap(
-                    instantiate_tns(ctx, tns, ntn.Read())
-                )
+                return ntn.Unwrap(instantiate_tns(ctx, tns, ntn.Read()))
             case _:
                 return None
+
     prgm = PostWalk(instantiate_node, prgm)
 
 
 def lower_looplets(ctx, idx, ext, body):
     body = instantiate(ctx, body)
     ctx_2 = ctx.scope()
+
     def unfurl_node(node):
         match node:
             case ntn.Access(tns, mode, (j, *idxs)):
@@ -607,15 +612,16 @@ def lower_looplets(ctx, idx, ext, body):
                     )
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
+
     body = PostWalk(unfurl_node, body)
     ctx_3 = LoopletContext(ctx, idx)
     ctx_3(ext, body)
 
+
 class LoopletPass(ABC):
     @property
     @abstractmethod
-    def priority(self):
-        ...
+    def priority(self): ...
 
     def lt(self, other):
         if other is None:
@@ -629,6 +635,7 @@ class DefaultPass(LoopletPass):
     def priority(self):
         return -Inf
 
+
 class LookupPass(LoopletPass):
     @property
     def priority(self):
@@ -636,6 +643,7 @@ class LookupPass(LoopletPass):
 
     def __call__(self, ctx, idx, ext, body):
         idx_2 = asm.Variable(self.freshen("i"), idx.result_type)
+
         def lookup_node(node):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
@@ -648,13 +656,11 @@ class LookupPass(LoopletPass):
                         )
                         return ntn.Access(tns_2, mode, (j, *idxs))
             return None
+
         body_2 = PostWalk(lookup_node)(body)
         ctx.exec(
             asm.ForLoop(
-                idx_2,
-                asm.Literal(ext.start),
-                asm.Literal(ext.end),
-                ctx(body_2)
+                idx_2, asm.Literal(ext.start), asm.Literal(ext.end), ctx(body_2)
             )
         )
 
@@ -696,5 +702,4 @@ class LoopletContext(Context):
             ctx_2 = self.ctx.scope()
             ctx_2(body)
             return ctx_2.emit()
-        else:
-            return pass_(self, self.idx, ext, body)
+        return pass_(self, self.idx, ext, body)

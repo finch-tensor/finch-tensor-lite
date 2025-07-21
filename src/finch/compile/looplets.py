@@ -2,6 +2,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from .. import finch_assembly as asm
+from .. import finch_notation as ntn
+from ..symbolic import PostWalk
+
 
 @dataclass
 class Thunk:
