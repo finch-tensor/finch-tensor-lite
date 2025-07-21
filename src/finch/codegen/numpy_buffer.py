@@ -78,7 +78,7 @@ class NumpyBufferFormat(CBufferFormat, NumbaBufferFormat, CStackFormat):
         """
         Returns the type used for the length of the buffer.
         """
-        return int
+        return np.intp
 
     @property
     def element_type(self):

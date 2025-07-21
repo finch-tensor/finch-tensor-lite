@@ -130,11 +130,13 @@ class BufferizedNDArray(Tensor):
         self.buf.store(index, value)
 
 
-class BufferizedNDArrayFormat(FinchTensorFormat):
+class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
     """
     A format for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
     """
+
+    def struct_fields(...):
 
     def __init__(self, buf, ndim: int):
         self.buf = buf
