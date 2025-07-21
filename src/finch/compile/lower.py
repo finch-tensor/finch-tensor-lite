@@ -8,6 +8,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..codegen import NumpyBuffer
+from ..finch_assembly import AssemblyStructFormat
 from ..symbolic import Context, PostOrderDFS, PostWalk, ScopedDict, format
 
 
@@ -89,7 +90,8 @@ class BufferizedNDArray(Tensor):
         for dim, size in zip(shape, self._shape, strict=False):
             if dim.start != 0:
                 raise ValueError(
-                    f"Invalid dimension start value {dim.start} for ndarray declaration."
+                    f"Invalid dimension start value {dim.start} for ndarray"
+                    f" declaration."
                 )
             if dim.end != size:
                 raise ValueError(
@@ -135,7 +137,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
     """
 
     @property
-    def struct_fields():
+    def struct_fields(self):
         return [
             ("buf", self.buf),
             ("_ndim", self._ndim),
@@ -262,12 +264,6 @@ class BufferizedNDArrayAccessor(Tensor):
         assert self.ndim == 0, "Cannot unwrap a tensor view with non-zero dimension."
         self.tns.buf.store(self.pos, self.op(self.tns.buf.load(self.pos), val))
         return self
-
-    @property
-    def format(self):
-        return BufferizedNDArrayAccessorFormat(
-            format(self.tns), self.nind, format(self.pos), self.op
-        )
 
 
 class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
@@ -561,13 +557,14 @@ def get_undeclared_slots(prgm):
                 undeclared.add(tns_n)
 
 
-def instantiate_tns(ctx, tns, mode, undeclared=set()):
+def instantiate_tns(ctx, tns, mode, undeclared=None):
+    if undeclared is None:
+        undeclared = set()
     match tns:
         case ntn.Slot(tns_n, tns_t):
             if tns_n in undeclared:
                 tns = ctx.resolve(tns_n)
-                tns_2 = tns_t.lower_instantiate(ctx, tns, mode)
-                return tns_2
+                return tns_t.lower_instantiate(ctx, tns, mode)
     return tns
 
 
@@ -577,20 +574,22 @@ def instantiate(ctx, prgm):
     def instantiate_node(node):
         match node:
             case ntn.Access(tns, mode, idxs):
-                return ntn.Access(
-                    instantiate_tns(ctx, tns, mode),
-                    mode,
-                    idxs,
-                )
+                if tns not in undeclared:
+                    return ntn.Access(
+                        instantiate_tns(ctx, tns, mode),
+                        mode,
+                        idxs,
+                    )
             case ntn.Increment(tns, val):
-                return ntn.Increment(
-                    instantiate_tns(ctx, tns, ntn.Update()),
-                    val,
-                )
+                if tns not in undeclared:
+                    return ntn.Increment(
+                        instantiate_tns(ctx, tns, ntn.Update()),
+                        val,
+                    )
             case ntn.Unwrap(tns):
-                return ntn.Unwrap(instantiate_tns(ctx, tns, ntn.Read()))
-            case _:
-                return None
+                if tns not in undeclared:
+                    return ntn.Unwrap(instantiate_tns(ctx, tns, ntn.Read()))
+        return None
 
     prgm = PostWalk(instantiate_node, prgm)
 
@@ -633,7 +632,7 @@ class LoopletPass(ABC):
 class DefaultPass(LoopletPass):
     @property
     def priority(self):
-        return -Inf
+        return float("-inf")
 
 
 class LookupPass(LoopletPass):
