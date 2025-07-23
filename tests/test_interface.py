@@ -300,6 +300,8 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         ((finch.mean, np.mean), np.mean),
         ((finch.std, np.std), np.std),
         ((finch.var, np.var), np.var),
+        ((finch.argmin, np.argmin), np.argmin),
+        ((finch.argmax, np.argmax), np.argmax),
     ],
 )
 @pytest.mark.parametrize(
@@ -313,6 +315,10 @@ def test_unary_operations(a, a_wrap, ops, np_op):
 )
 def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     wa = a_wrap(a)
+
+    # argmin and argmax do not allow tuple type axis
+    if (np_op is np.argmin or np_op is np.argmax) and isinstance(axis, tuple):
+        return
 
     expected = np_op(a, axis=axis)
 

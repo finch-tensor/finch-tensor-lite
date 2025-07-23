@@ -13,9 +13,12 @@ from .algebra import (
 )
 from .operator import (
     InitWrite,
+    Pair,
     conjugate,
     first_arg,
     identity,
+    maxby,
+    minby,
     overwrite,
     promote_max,
     promote_min,
@@ -30,6 +33,7 @@ from .tensor import (
 
 __all__ = [
     "InitWrite",
+    "Pair",
     "StableNumber",
     "Tensor",
     "TensorFormat",
@@ -47,6 +51,8 @@ __all__ = [
     "is_associative",
     "is_distributive",
     "is_identity",
+    "maxby",
+    "minby",
     "overwrite",
     "promote_max",
     "promote_min",

@@ -11,6 +11,7 @@ import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from ..algebra import (
+    Pair,
     Tensor,
     TensorFormat,
     element_type,
@@ -19,6 +20,8 @@ from ..algebra import (
     fixpoint_type,
     identity,
     init_value,
+    maxby,
+    minby,
     promote_max,
     promote_min,
     promote_type,
@@ -488,6 +491,28 @@ def squeeze(
     data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
     return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
+
+
+# def pairwise_indices(x, indices):
+#     args = tuple(defer(a) for a in indices)
+#     ndim = x.ndim
+#     shape = x.shape
+#     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
+#     bargs = []
+#     for arg in args:
+#         idims = []
+#         odims = []
+#         for i in range(ndim - arg.ndim, ndim):
+#             if arg.shape[i - ndim + arg.ndim] == shape[i]:
+#                 idims.append(idxs[i])
+#                 odims.append(idxs[i])
+#             else:
+#                 if arg.shape[i - ndim + arg.ndim] != 1:
+#                     raise ValueError("Invalid shape for broadcasting")
+#                 idims.append(Field(gensym("j")))
+#         bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
+#     data = Reorder(MapJoin(tuple(bargs)), idxs)
+#     return LazyTensor(identify(data), shape, None, element_type(x))
 
 
 def reduce(
@@ -1660,3 +1685,63 @@ def std(
     x = defer(x)
     d = var(x, axis=axis, correction=correction, keepdims=keepdims)
     return pow(d, 0.5)
+
+
+def argmin(x, /, *, axis: int | None = None, keepdims: bool = False, init=None):
+    """
+    Returns the indices of the minimum values in input array ``x`` along given axis.
+    """
+    if isinstance(axis, tuple):
+        raise ValueError("Type of axis should is only allowed to be int or None.")
+
+    x = defer(x)
+    computed_x = _compute(x)
+    if hasattr(computed_x, "to_numpy") and callable(computed_x.to_numpy):
+        computed_x = computed_x.to_numpy()
+
+    # Pairwise tensor with indices
+    if axis is None:
+        indices = np.arange(np.prod(x.shape)).reshape(x.shape)
+        pairwise = np.vectorize(lambda tns, idx: Pair(tns, idx), otypes=[Pair])
+        paired_tensor = pairwise(computed_x, indices)
+    else:
+        indices = np.indices(x.shape)
+        pairwise = np.vectorize(lambda tns, *idx: Pair(tns, idx[axis]), otypes=[Pair])
+        paired_tensor = pairwise(computed_x, *indices)
+
+    # Calculate argmin and unpair to return the indices
+    res = _compute(
+        reduce(minby, defer(paired_tensor), axis=axis, keepdims=keepdims, init=init)
+    )
+    unpair = np.vectorize(lambda tns: tns.index, otypes=[Pair])
+    return elementwise(identity, defer(unpair(res)))
+
+
+def argmax(x, /, *, axis: int | None = None, keepdims: bool = False, init=None):
+    """
+    Returns the indices of the maximum values in input array ``x`` along given axis.
+    """
+    if isinstance(axis, tuple):
+        raise ValueError("Type of axis should is only allowed to be int or None.")
+
+    x = defer(x)
+    computed_x = _compute(x)
+    if hasattr(computed_x, "to_numpy") and callable(computed_x.to_numpy):
+        computed_x = computed_x.to_numpy()
+
+    # Pairwise tensor with indices
+    if axis is None:
+        indices = np.arange(np.prod(x.shape)).reshape(x.shape)
+        pairwise = np.vectorize(lambda tns, idx: Pair(tns, idx), otypes=[Pair])
+        paired_tensor = pairwise(computed_x, indices)
+    else:
+        indices = np.indices(x.shape)
+        pairwise = np.vectorize(lambda tns, *idx: Pair(tns, idx[axis]), otypes=[Pair])
+        paired_tensor = pairwise(computed_x, *indices)
+
+    # Calculate argmin and unpair to return the indices
+    res = _compute(
+        reduce(maxby, defer(paired_tensor), axis=axis, keepdims=keepdims, init=init)
+    )
+    unpair = np.vectorize(lambda tns: tns.index, otypes=[Pair])
+    return elementwise(identity, defer(unpair(res)))
