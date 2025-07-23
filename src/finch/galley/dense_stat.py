@@ -5,50 +5,51 @@ from .tensor_def import TensorDef
 T = TypeVar("T", bound="DenseStats")
 
 class DenseStats(TensorStats):
-    def from_tensor(...) -> T:
-        return None
+    @classmethod
+    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> None:
+        self.tensordef = TensorDef.from_tensor(tensor, fields)
 
     @classmethod
-    def from_def(cls: Type[T], tensor: TensorDef) -> T:
+    def from_def(cls: Type[T], d: TensorDef) -> T:
         stats = object.__new__(cls)
-        stats.tensordef = tensor.copy()
+        stats.tensordef = d.copy()
         return stats
 
     @staticmethod
-    def estimate_non_fill_values(arg: "DenseStats") -> float:
+    def estimate_non_fill_values(arg: TensorStats) -> float:
         total = 1.0
-        for size in arg.tensordef.get_dim_sizes().values():
+        for size in arg.get_dim_sizes().values():
             total *= size
         return total
 
     @staticmethod
-    def mapjoin(op: Callable, *args: "DenseStats") -> "DenseStats":
-        new_axes = set().union(*(s.tensordef.get_index_set() for s in args))
+    def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
+        new_axes = set().union(*(s.get_index_set() for s in args))
 
         new_dims = {}
         for i in new_axes:
             for j in args:
-                if i in j.tensordef.get_index_set():
-                    new_dims[i] = j.tensordef.get_dim_size(i)
+                if i in j.get_index_set():
+                    new_dims[i] = j.get_dim_size(i)
                     break
 
-        new_fill = op(*(m.tensordef.get_fill_value() for m in args))
+        new_fill = op(*(m.get_fill_value() for m in args))
 
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)
 
 
     @staticmethod
-    def aggregate(op: Callable, fields: Iterable[str], arg: "DenseStats") -> "DenseStats":
-        new_axes = set(arg.tensordef.get_index_set()) - set(fields)
-        new_dims = {m: arg.tensordef.get_dim_size(m) for m in new_axes}
-        new_fill = arg.tensordef.get_fill_value()
+    def aggregate(op: Callable, fields: Iterable[str], arg: TensorStats) -> "DenseStats":
+        new_axes = set(arg.get_index_set()) - set(fields)
+        new_dims = {m: arg.get_dim_size(m) for m in new_axes}
+        new_fill = arg.get_fill_value()
 
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)
 
     @staticmethod
-    def issimilar(a: "DenseStats", b: "DenseStats") -> bool:
+    def issimilar(a: TensorStats, b: TensorStats) -> bool:
         return (isinstance(a, DenseStats) and isinstance(b, DenseStats)
             and a.tensordef.get_dim_sizes() == b.tensordef.get_dim_sizes()
             and a.tensordef.get_fill_value() == b.tensordef.get_fill_value()

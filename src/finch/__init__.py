@@ -88,6 +88,11 @@ from .tensor import (
     FiberTensorFormat,
 )
 
+from .galley import(
+    TensorDef,
+    DenseStats,
+)
+
 __all__ = [
     "DenseLevelFormat",
     "EagerTensor",
@@ -174,4 +179,6 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
+    "TensorDef",
+    "DenseStats",
 ]

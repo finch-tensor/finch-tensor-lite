@@ -5,10 +5,13 @@ from abc import ABC, abstractmethod
 class TensorStats(ABC):
 
     def __init__(self, tensor:Any, fields: Iterable[str]):
-        self = from_tensor(tensor, fields)
+        self.from_tensor(tensor, fields)
 
     @abstractmethod
-    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> "TensorStats":
+    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> None:
+        """
+        Populate this instance’s state from (tensor, fields).
+        """
         ...
 
     @staticmethod
