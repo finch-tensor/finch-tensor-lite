@@ -30,7 +30,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 extend-exclude = [
-    "regressions",
+    "tests/references",
 ]
 line-length = 88
 

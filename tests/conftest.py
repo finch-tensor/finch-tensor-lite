@@ -1,3 +1,4 @@
+import contextlib
 import os
 import pprint
 import re
@@ -28,19 +29,25 @@ def random_wrapper(rng):
 
 
 # Regression fixtures, helpers, and hooks
-base_regr_dir = Path("tests/regressions")
+# If you want to change the base directory, make sure to
+# update pyproject.toml, and pre-commit config to make
+# sure the references are not linted/formatted.
+base_regr_dir = Path("tests/references")
 
 
 @pytest.fixture
 def lazy_datadir(request) -> Path:
     """
-    Creates a unique per-test directory for regression files.
-    E.g., tests/regressions/<module_name>/<test_name>/
+    Creates a unique per-test directory for reference files.
+    E.g., tests/references/<module_name>/<test_name>/
     """
-    # Derive names
     # test_module will be something like "tests.test_logic_compiler"
     # We don't want the "tests." part
-    test_module = os.path.join(*(request.module.__name__.split(".")[1:]))
+    module_parts = request.module.__name__.split(".")
+    if module_parts[0] == "tests" and len(module_parts) > 1:
+        test_module = "/".join(module_parts[1:])
+    else:
+        test_module = request.module.__name__.replace(".", os.sep)
     test_name = request.node.name
 
     # Construct path
@@ -76,22 +83,25 @@ def pytest_runtest_makereport(item, call):
     - If the test fails, do not remove any files. A diff is generated from
     the html report.
     """
-    if (
-        call.when == "call"  # Only clean up after the test run
-        and call.excinfo is None  # Only clean up if the test passed
-        and not (
-            hasattr(item, "preserve_obtained") and item.preserve_obtained
-        )  # Only clean up if preserve_obtained is not set
-    ):
-        # Test passed clean up obtained files
-        test_module = Path(item.location[0].replace(".py", "")).parts[1:]
-        test_module = os.path.join(*test_module)
-        test_name = item.name
-        test_dir: Path = base_regr_dir / test_module / test_name
-        if test_dir.exists():
-            # find and remove all .obtained files in the directory
-            for file in test_dir.glob("*.obtained*"):
-                file.unlink()
+    with contextlib.suppress(Exception):
+        if (
+            call.when == "call"  # Only clean up after the test run
+            and call.excinfo is None  # Only clean up if the test passed
+            and not (
+                hasattr(item, "preserve_obtained") and item.preserve_obtained
+            )  # Only clean up if preserve_obtained is not set
+        ):
+            # Test passed clean up obtained files
+            test_module = Path(item.location[0].replace(".py", "")).parts[1:]
+            test_module = os.path.join(*test_module)
+            test_name = item.name
+            test_dir: Path = base_regr_dir / test_module / test_name
+            if test_dir.exists():
+                # find and remove all .obtained files in the directory
+                for file in test_dir.glob("*.obtained*"):
+                    with contextlib.suppress(OSError):
+                        file.unlink()
+
     return (yield)
 
 
@@ -106,14 +116,16 @@ def program_regression(file_regression, tmp_path):
 
     def _program_regression(program, formatter=pprint.pformat, extension=".txt"):
         """
-        Compares the AST with the regression fixture.
+        Compares the program with the regression fixture.
         Args:
-            ast: The AST to compare.
+            program: The program to compare.
             formatter: Optional formatter function to convert the AST to a string.
         """
         if not isinstance(program, str):
             program = formatter(program)
         # Replace memory addresses with ...
-        file_regression.check(re.sub(r"0x\w+", "...", program), extension=extension)
+        file_regression.check(
+            re.sub(r"0x[0-9a-fA-F]+", "...", program), extension=extension
+        )
 
     return _program_regression

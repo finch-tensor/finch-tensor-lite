@@ -102,4 +102,4 @@ def test_tree_regression(program_regression):
         )
     )
     program, tables = LogicCompiler()(plan)
-    program_regression(plan)
+    program_regression(program)
