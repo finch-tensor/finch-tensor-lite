@@ -3,8 +3,11 @@ repos:
     rev: v5.0.0
     hooks:
     - id: end-of-file-fixer
+      exclude: /regressions/
     - id: trailing-whitespace
+      exclude: /regressions/
     - id: mixed-line-ending
+      exclude: /regressions/
     - id: name-tests-test
       args: ["--pytest-test-first"]
     - id: no-commit-to-branch
