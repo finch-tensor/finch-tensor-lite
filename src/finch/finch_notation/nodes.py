@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
-from ..symbolic import Term, TermTree
+from ..symbolic import LiteralRepr, Term, TermTree
 
 
 @dataclass(eq=True, frozen=True)
@@ -53,7 +53,7 @@ class NotationExpression(NotationNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(NotationExpression):
+class Literal(NotationExpression, LiteralRepr):
     """
     Notation AST expression for the literal value `val`.
     """
@@ -64,9 +64,12 @@ class Literal(NotationExpression):
     def result_format(self):
         return type(self.val)
 
+    def __repr__(self) -> str:
+        return self.literal_repr()
+
 
 @dataclass(eq=True, frozen=True)
-class Value(NotationExpression):
+class Value(NotationExpression, LiteralRepr):
     """
     Notation AST expression for host code `val` expected to evaluate to a value of
     type `type_`.
@@ -79,9 +82,12 @@ class Value(NotationExpression):
     def result_format(self):
         return self.type_
 
+    def __repr__(self) -> str:
+        return self.literal_repr()
+
 
 @dataclass(eq=True, frozen=True)
-class Variable(NotationExpression):
+class Variable(NotationExpression, LiteralRepr):
     """
     Notation AST expression for a variable named `name`.
 
@@ -96,6 +102,9 @@ class Variable(NotationExpression):
     @property
     def result_format(self):
         return self.type_
+
+    def __repr__(self) -> str:
+        return self.literal_repr()
 
 
 @dataclass(eq=True, frozen=True)

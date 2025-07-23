@@ -1,11 +1,32 @@
+import _operator  # noqa: F401
 import operator
 
 import pytest
 
+import numpy  # noqa: F401, ICN001
 import numpy as np
 from numpy.testing import assert_equal
 
+import finch  # noqa: F401
 import finch.finch_notation as ntn
+from finch.finch_notation import (  # noqa: F401
+    Access,
+    Assign,
+    Block,
+    Call,
+    Declare,
+    Freeze,
+    Function,
+    Increment,
+    Literal,
+    Loop,
+    Module,
+    Read,
+    Return,
+    Unwrap,
+    Update,
+    Variable,
+)
 
 
 @pytest.mark.parametrize(
@@ -124,3 +145,5 @@ def test_matrix_multiplication(a, b):
     expected = np.matmul(a, b)
 
     assert_equal(result, expected)
+
+    assert prgm == eval(repr(prgm))

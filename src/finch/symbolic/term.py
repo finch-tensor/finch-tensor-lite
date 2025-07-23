@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from inspect import isbuiltin, isclass, isfunction
 from typing import Any, Self
 
 """
@@ -69,6 +70,28 @@ class TermTree(Term, ABC):
     def children(self) -> list[Term]:
         """Return the children (AKA tail) of the S-expression."""
         ...
+
+
+@dataclass(frozen=True, eq=True)
+class LiteralRepr:
+    """
+    Helper class to have `eval`uable reprs for builtins functions.
+    """
+
+    @staticmethod
+    def _get_repr(val: Any) -> str:
+        if isbuiltin(val) or isclass(val) or isfunction(val):
+            return f"{val.__module__}.{val.__qualname__}"
+        return repr(val)
+
+    def literal_repr(self) -> str:
+        fields = asdict(self)
+        return (
+            type(self).__qualname__
+            + "("
+            + ", ".join([f"{k}={self._get_repr(v)}" for k, v in fields.items()])
+            + ")"
+        )
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Term, TermTree
+from ..symbolic import LiteralRepr, Term, TermTree
 from .buffer import element_type, length_type
 
 
@@ -52,7 +52,7 @@ class AssemblyExpression(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(AssemblyExpression):
+class Literal(AssemblyExpression, LiteralRepr):
     """
     Represents the literal value `val`.
 
@@ -67,9 +67,12 @@ class Literal(AssemblyExpression):
         """Returns the type of the expression."""
         return type(self.val)
 
+    def __repr__(self) -> str:
+        return self.literal_repr()
+
 
 @dataclass(eq=True, frozen=True)
-class Variable(AssemblyExpression):
+class Variable(AssemblyExpression, LiteralRepr):
     """
     Represents a logical AST expression for a variable named `name`, which
     will hold a value of type `type`.
@@ -86,6 +89,9 @@ class Variable(AssemblyExpression):
     def result_format(self):
         """Returns the type of the expression."""
         return self.type
+
+    def __repr__(self) -> str:
+        return self.literal_repr()
 
 
 @dataclass(eq=True, frozen=True)

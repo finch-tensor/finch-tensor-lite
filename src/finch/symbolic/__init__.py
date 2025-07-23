@@ -9,6 +9,7 @@ from .rewriters import (
     Rewrite,
 )
 from .term import (
+    LiteralRepr,
     PostOrderDFS,
     PreOrderDFS,
     Term,
@@ -21,6 +22,7 @@ __all__ = [
     "Fixpoint",
     "Format",
     "Formattable",
+    "LiteralRepr",
     "Namespace",
     "PostOrderDFS",
     "PostWalk",
