@@ -1,13 +1,27 @@
+import _operator  # noqa: F401
 import operator
 from collections import namedtuple
 
 import pytest
 
+import numpy  # noqa: F401, ICN001
 import numpy as np
 
 from finch import finch_assembly as asm
 from finch.codegen import NumpyBuffer
-from finch.finch_assembly import AssemblyInterpreter
+from finch.finch_assembly import (  # noqa: F401
+    AssemblyInterpreter,
+    Assign,
+    Block,
+    Call,
+    Function,
+    If,
+    IfElse,
+    Literal,
+    Module,
+    Return,
+    Variable,
+)
 from finch.symbolic import format
 
 
@@ -89,70 +103,72 @@ def test_dot_product(a, b):
 
 def test_if_statement():
     var = asm.Variable("a", np.int64)
-    mod = AssemblyInterpreter()(
-        asm.Module(
-            (
-                asm.Function(
-                    asm.Variable("if_else", np.int64),
-                    (),
-                    asm.Block(
-                        (
-                            asm.Assign(var, asm.Literal(np.int64(5))),
-                            asm.If(
-                                asm.Call(
-                                    asm.Literal(operator.eq),
-                                    (var, asm.Literal(np.int64(5))),
-                                ),
-                                asm.Block(
-                                    (
-                                        asm.Assign(
-                                            var,
-                                            asm.Call(
-                                                asm.Literal(operator.add),
-                                                (var, asm.Literal(np.int64(10))),
-                                            ),
-                                        ),
-                                    )
-                                ),
+    root = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("if_else", np.int64),
+                (),
+                asm.Block(
+                    (
+                        asm.Assign(var, asm.Literal(np.int64(5))),
+                        asm.If(
+                            asm.Call(
+                                asm.Literal(operator.eq),
+                                (var, asm.Literal(np.int64(5))),
                             ),
-                            asm.IfElse(
-                                asm.Call(
-                                    asm.Literal(operator.lt),
-                                    (var, asm.Literal(np.int64(15))),
-                                ),
-                                asm.Block(
-                                    (
-                                        asm.Assign(
-                                            var,
-                                            asm.Call(
-                                                asm.Literal(operator.sub),
-                                                (var, asm.Literal(np.int64(3))),
-                                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(operator.add),
+                                            (var, asm.Literal(np.int64(10))),
                                         ),
-                                    )
-                                ),
-                                asm.Block(
-                                    (
-                                        asm.Assign(
-                                            var,
-                                            asm.Call(
-                                                asm.Literal(operator.mul),
-                                                (var, asm.Literal(np.int64(2))),
-                                            ),
-                                        ),
-                                    )
-                                ),
+                                    ),
+                                )
                             ),
-                            asm.Return(var),
-                        )
-                    ),
+                        ),
+                        asm.IfElse(
+                            asm.Call(
+                                asm.Literal(operator.lt),
+                                (var, asm.Literal(np.int64(15))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(operator.sub),
+                                            (var, asm.Literal(np.int64(3))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (var, asm.Literal(np.int64(2))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(var),
+                    )
                 ),
-            )
+            ),
         )
     )
 
+    mod = AssemblyInterpreter()(root)
+
     result = mod.if_else()
     assert result == 30
+
+    assert root == eval(repr(root))
 
 
 def test_simple_struct():
