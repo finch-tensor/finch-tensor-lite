@@ -1,8 +1,9 @@
 from collections import OrderedDict
-from typing import Any, Iterable, Mapping, Set, Callable, Type
-from abc import ABC, abstractmethod
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from finch.algebra import fill_value
+
 
 class TensorDef:
     def __init__(
@@ -21,9 +22,9 @@ class TensorDef:
             Deep copy of TensorDef fields
         """
         return TensorDef(
-            index_set = self.index_set.copy(),
-            dim_sizes = self.dim_sizes.copy(),
-            fill_val = self.fill_val,
+            index_set=self.index_set.copy(),
+            dim_sizes=self.dim_sizes.copy(),
+            fill_val=self.fill_val,
         )
 
     @classmethod
@@ -33,12 +34,14 @@ class TensorDef:
 
         """
         shape = tensor.shape
-        dim_sizes = OrderedDict((axis, float(shape[i])) for i, axis in enumerate(indices))
+        dim_sizes = OrderedDict(
+            (axis, float(shape[i])) for i, axis in enumerate(indices)
+        )
         fv = fill_value(tensor)
         return klass(
-            index_set = indices,
-            dim_sizes = dim_sizes,
-            fill_val = fv,
+            index_set=indices,
+            dim_sizes=dim_sizes,
+            fill_val=fv,
         )
 
     def reindex_def(self, new_axis: Iterable[str]) -> "TensorDef":
@@ -49,11 +52,10 @@ class TensorDef:
         new_axis = list(new_axis)
         new_dim_sizes = OrderedDict((axis, self.dim_sizes[axis]) for axis in new_axis)
         return TensorDef(
-            index_set = new_axis,
-            dim_sizes = new_dim_sizes,
-            fill_val = self.fill_val,
-    )
-
+            index_set=new_axis,
+            dim_sizes=new_dim_sizes,
+            fill_val=self.fill_val,
+        )
 
     def set_fill_value(self, fill_val: Any) -> "TensorDef":
         """
@@ -61,9 +63,9 @@ class TensorDef:
             :TensorDef with  new fill_val
         """
         return TensorDef(
-            index_set = self.index_set,
-            dim_sizes = self.dim_sizes,
-            fill_val  = fill_val,
+            index_set=self.index_set,
+            dim_sizes=self.dim_sizes,
+            fill_val=fill_val,
         )
 
     def relabel_index(self, i: str, j: str) -> "TensorDef":
@@ -75,20 +77,20 @@ class TensorDef:
 
         new_index_set = (self.index_set - {i}) | {j}
         new_dim_sizes = dict(self.dim_sizes)
-        new_dim_sizes[i] = new_dim_sizes.pop(j)
+        new_dim_sizes[j] = new_dim_sizes.pop(i)
 
         return TensorDef(
-            index_set = new_index_set,
-            dim_sizes = new_dim_sizes,
-            fill_val  = self.fill_val,
+            index_set=new_index_set,
+            dim_sizes=new_dim_sizes,
+            fill_val=self.fill_val,
         )
 
     def add_dummy_idx(self, idx: str) -> "TensorDef":
         """
-          Add a new axis `idx` of size 1
+        Add a new axis `idx` of size 1
 
-          Return:
-          TensorDef with new axis `idx` of size 1
+        Return:
+        TensorDef with new axis `idx` of size 1
 
         """
         if idx in self.index_set:
@@ -101,7 +103,14 @@ class TensorDef:
 
         return TensorDef(new_index_set, new_dim_sizes, self.fill_val)
 
-    def get_dim_sizes(self) -> Mapping[str, float]: return self.dim_sizes
-    def get_dim_size(self, idx: str) -> float: return self.dim_sizes[idx]
-    def get_index_set(self) -> Set[str]: return self.index_set
-    def get_fill_value(self) -> Any: return self.fill_val
+    def get_dim_sizes(self) -> Mapping[str, float]:
+        return self.dim_sizes
+
+    def get_dim_size(self, idx: str) -> float:
+        return self.dim_sizes[idx]
+
+    def get_index_set(self) -> set[str]:
+        return self.index_set
+
+    def get_fill_value(self) -> Any:
+        return self.fill_val
