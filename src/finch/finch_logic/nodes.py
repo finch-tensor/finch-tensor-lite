@@ -6,7 +6,7 @@ from typing import Any, Self
 
 import numpy as np
 
-from ..symbolic import Term, TermTree
+from ..symbolic import LiteralRepr, Term, TermTree
 
 
 @dataclass(eq=True, frozen=True)
@@ -52,7 +52,7 @@ class LogicExpression(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(LogicNode):
+class Literal(LogicNode, LiteralRepr):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -71,6 +71,9 @@ class Literal(LogicNode):
             return False
         res = self.val == other.val
         return res.all() if isinstance(res, np.ndarray) else res
+
+    def __repr__(self) -> str:
+        return self.literal_repr()
 
 
 @dataclass(eq=True, frozen=True)

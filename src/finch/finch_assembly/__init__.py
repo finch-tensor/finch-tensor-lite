@@ -63,6 +63,5 @@ __all__ = [
     "Variable",
     "WhileLoop",
     "element_type",
-    "has_format",
     "length_type",
 ]
