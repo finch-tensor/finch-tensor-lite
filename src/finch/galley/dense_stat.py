@@ -5,8 +5,8 @@ from .tensor_def import TensorDef
 T = TypeVar("T", bound="DenseStats")
 
 class DenseStats(TensorStats):
-    def __init__(self, tensor: Any, fields: Iterable[str]) -> None:
-        self.tensordef = TensorDef.from_tensor(tensor, fields)
+    def from_tensor(...) -> T:
+        return None
 
     @classmethod
     def from_def(cls: Type[T], tensor: TensorDef) -> T:

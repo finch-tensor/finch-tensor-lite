@@ -4,20 +4,11 @@ from abc import ABC, abstractmethod
 
 class TensorStats(ABC):
 
-    def __init__(self, *args, **kwargs):
-        raise TypeError(
-            "Direct __init__ is disabled; use "
-            "`MyStats.from_tensor(tensor, fields)` instead."
-        )
-
-    @classmethod
-    def from_tensor(cls: Type["TensorStats"], tensor: Any, fields: Iterable[str]) -> "TensorStats":
-        stats = object.__new__(cls)
-        stats._init(tensor, fields)
-        return stats
+    def __init__(self, tensor:Any, fields: Iterable[str]):
+        self = from_tensor(tensor, fields)
 
     @abstractmethod
-    def _init(self, tensor: Any, fields: Iterable[str]) -> None:
+    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> "TensorStats":
         ...
 
     @staticmethod
