@@ -1,11 +1,8 @@
 from collections.abc import Callable, Iterable
-from typing import Any, Self, TypeVar
+from typing import Any, Self
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
-
-T = TypeVar("T", bound="DenseStats")
-
 
 class DenseStats(TensorStats):
     def __init__(self, tensor: Any, fields: Iterable[str]) -> None:
