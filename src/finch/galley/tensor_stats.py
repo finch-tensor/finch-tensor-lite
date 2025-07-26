@@ -1,20 +1,24 @@
-from collections import OrderedDict
-from typing import Any, Iterable, Mapping, Set, Callable, Type
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any
+
+from .tensor_def import TensorDef
+
 
 class TensorStats(ABC):
+    tensordef: TensorDef
 
-    def __init__(self, tensor:Any, fields: Iterable[str]):
+    def __init__(self, tensor: Any, fields: Iterable[str]):
         self.from_tensor(tensor, fields)
 
+    @classmethod
     @abstractmethod
-    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> None:
+    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> "TensorStats":
         """
         Populate this instance’s state from (tensor, fields).
         """
         ...
 
-    @staticmethod
     @abstractmethod
     def estimate_non_fill_values(arg: "TensorStats") -> float:
         """
@@ -32,10 +36,9 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def aggregate(op: Callable,
-                  fields: Iterable[str],
-                  arg: "TensorStats"
-                 ) -> "TensorStats":
+    def aggregate(
+        op: Callable, fields: Iterable[str], arg: "TensorStats"
+    ) -> "TensorStats":
         """
         Return a new statistic representing the tensor resulting from aggregating arg over fields with the op aggregation function
         """
@@ -43,12 +46,21 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def issimilar(
-        a: "TensorStats",
-        b: "TensorStats"
-    ) -> bool:
+    def issimilar(a: "TensorStats", b: "TensorStats") -> bool:
         """
         Returns whether two statistics objects represent similarly distributed tensors,
         and only returns true if the tensors have the same dimensions and fill value
         """
         ...
+
+    def get_dim_sizes(self) -> Mapping[str, float]:
+        return self.tensordef.get_dim_sizes()
+
+    def get_dim_size(self, idx: str) -> float:
+        return self.tensordef.get_dim_size(idx)
+
+    def get_index_set(self) -> set[str]:
+        return self.tensordef.get_index_set()
+
+    def get_fill_value(self) -> Any:
+        return self.tensordef.get_fill_value()

@@ -62,11 +62,11 @@ def test_add_dummy_idx():
 def test_from_tensor_and_getters():
     arr = np.zeros((2, 3))
     ds = DenseStats(arr, ["i", "j"])
-    # TODO: remove .tensordef
-    assert ds.tensordef.get_index_set() == {"i", "j"}
-    assert ds.tensordef.get_dim_size("i") == 2.0
-    assert ds.tensordef.get_dim_size("j") == 3.0
-    assert ds.tensordef.get_fill_value() == 0
+
+    assert ds.get_index_set() == {"i", "j"}
+    assert ds.get_dim_size("i") == 2.0
+    assert ds.get_dim_size("j") == 3.0
+    assert ds.get_fill_value() == 0
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,6 @@ def test_from_tensor_and_getters():
         ((2, 3), 6.0),
         ((4, 5, 6), 120.0),
         ((1,), 1.0),
-        # ((0, 7), 0.0),
     ],
 )
 def test_estimate_non_fill_values(shape, expected):
@@ -90,14 +89,12 @@ def test_mapjoin_mul_and_add():
     dsa = DenseStats(A, ["i", "j"])
     dsb = DenseStats(B, ["j", "k"])
 
-    # TODO: remove .tensordef
     dsm = DenseStats.mapjoin(mul, dsa, dsb)
-    assert dsm.tensordef.get_index_set() == {"i", "j", "k"}
-    assert dsm.tensordef.get_dim_size("i") == 2.0
-    assert dsm.tensordef.get_dim_size("j") == 3.0
-    assert dsm.tensordef.get_dim_size("k") == 4.0
-    # TODO: is the default 0.0?
-    assert dsm.tensordef.get_fill_value() == 0.0
+    assert dsm.get_index_set() == {"i", "j", "k"}
+    assert dsm.get_dim_size("i") == 2.0
+    assert dsm.get_dim_size("j") == 3.0
+    assert dsm.get_dim_size("k") == 4.0
+    assert dsm.get_fill_value() == 0.0
 
     dsa2 = DenseStats.from_tensor(2 * A, ["i", "j"])
     ds_sum = DenseStats.mapjoin(add, dsa, dsa2)

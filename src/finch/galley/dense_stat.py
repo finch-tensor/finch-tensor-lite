@@ -8,35 +8,40 @@ T = TypeVar("T", bound="DenseStats")
 
 
 class DenseStats(TensorStats):
-    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> None:
+    def __init__(self, tensor: Any, fields: Iterable[str]) -> None:
         self.tensordef = TensorDef.from_tensor(tensor, fields)
 
     @classmethod
+    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> "DenseStats":
+        return cls(tensor, fields)
+
+    @classmethod
     def from_def(cls, d: TensorDef) -> Self:
-        stats = object.__new__(cls)
-        stats.tensordef = d.copy()
-        return stats
+        ds = object.__new__(cls)
+        ds.tensordef = d.copy()
+        return ds
 
     def estimate_non_fill_values(self) -> float:
         total = 1.0
-        # TODO: remove .tensordef
-        for size in self.tensordef.get_dim_sizes().values():
+        for size in self.get_dim_sizes().values():
             total *= size
         return total
 
     @staticmethod
     def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
-        # TODO: remove .tensordef
-        new_axes = set().union(*(s.tensordef.get_index_set() for s in args))
+        new_axes = set().union(*(s.get_index_set() for s in args))
 
-        new_dims = {}
-        for i in new_axes:
-            for j in args:
-                if i in j.tensordef.get_index_set():
-                    new_dims[i] = j.tensordef.get_dim_size(i)
-                    break
+        new_dims = {
+            ax: next(s.get_dim_size(ax) for s in args if ax in s.get_index_set())
+            for ax in new_axes
+        }
 
-        new_fill = op(*(m.tensordef.get_fill_value() for m in args))
+        axes_sets = [set(s.get_index_set()) for s in args]
+        same_axes = all(axes_sets[0] == axes for axes in axes_sets)
+        if same_axes:
+            new_fill = op(*[s.get_fill_value() for s in args])
+        else:
+            new_fill = 0.0
 
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)
@@ -57,6 +62,6 @@ class DenseStats(TensorStats):
         return (
             isinstance(a, DenseStats)
             and isinstance(b, DenseStats)
-            and a.tensordef.get_dim_sizes() == b.tensordef.get_dim_sizes()
-            and a.tensordef.get_fill_value() == b.tensordef.get_fill_value()
+            and a.get_dim_sizes() == b.get_dim_sizes()
+            and a.get_fill_value() == b.get_fill_value()
         )

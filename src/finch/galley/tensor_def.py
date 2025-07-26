@@ -2,6 +2,8 @@ from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+import numpy as np
+
 from finch.algebra import fill_value
 
 
@@ -38,6 +40,15 @@ class TensorDef:
             (axis, float(shape[i])) for i, axis in enumerate(indices)
         )
         fv = fill_value(tensor)
+        try:
+            arr = np.asarray(tensor)
+            if arr.size > 0:
+                first = arr.flat[0]
+                if np.all(arr == first):
+                    fv = float(first)
+        except Exception:
+            pass
+
         return klass(
             index_set=indices,
             dim_sizes=dim_sizes,
