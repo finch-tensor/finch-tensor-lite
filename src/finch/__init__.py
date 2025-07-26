@@ -3,6 +3,10 @@ from .codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
 )
+from .galley import (
+    DenseStats,
+    TensorDef,
+)
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -90,6 +94,7 @@ from .tensor import (
 
 __all__ = [
     "DenseLevelFormat",
+    "DenseStats",
     "EagerTensor",
     "ElementLevelFormat",
     "FiberTensorFormat",
@@ -99,6 +104,7 @@ __all__ = [
     "NumpyBufferFormat",
     "Scalar",
     "Tensor",
+    "TensorDef",
     "TensorFormat",
     "abs",
     "acos",
