@@ -4,6 +4,7 @@ from typing import Any, Self
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
+
 class DenseStats(TensorStats):
     def __init__(self, tensor: Any, fields: Iterable[str]) -> None:
         self.tensordef = TensorDef.from_tensor(tensor, fields)
