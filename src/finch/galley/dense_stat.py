@@ -38,10 +38,7 @@ class DenseStats(TensorStats):
 
         axes_sets = [set(s.get_index_set()) for s in args]
         same_axes = all(axes_sets[0] == axes for axes in axes_sets)
-        if same_axes:
-            new_fill = op(*[s.get_fill_value() for s in args])
-        else:
-            new_fill = 0.0
+        new_fill = op(*[s.get_fill_value() for s in args]) if same_axes else 0.0
 
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)

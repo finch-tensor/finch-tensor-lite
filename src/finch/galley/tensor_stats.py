@@ -30,7 +30,8 @@ class TensorStats(ABC):
     @abstractmethod
     def mapjoin(op: Callable, *args: "TensorStats") -> "TensorStats":
         """
-        Return a new statistic representing the tensor resulting from calling op on args... in an elementwise fashion
+        Return a new statistic representing the tensor resulting
+        from calling op on args... in an elementwise fashion
         """
         ...
 
@@ -40,7 +41,8 @@ class TensorStats(ABC):
         op: Callable, fields: Iterable[str], arg: "TensorStats"
     ) -> "TensorStats":
         """
-        Return a new statistic representing the tensor resulting from aggregating arg over fields with the op aggregation function
+        Return a new statistic representing the tensor resulting
+        from aggregating arg over fields with the op aggregation function
         """
         ...
 

@@ -46,7 +46,7 @@ class TensorDef:
                 first = arr.flat[0]
                 if np.all(arr == first):
                     fv = float(first)
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
         return klass(
