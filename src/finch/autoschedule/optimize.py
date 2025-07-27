@@ -618,7 +618,8 @@ def concordize(root):
             root = Rewrite(PostWalk(rule_0))(root)
             root = Rewrite(PostWalk(rule_1))(root)
             return flatten_plans(Plan((root, prod)))
-    return None
+        case _:
+            raise Exception(f"Invalid root: {root}")
 
 
 def normalize_names(root):

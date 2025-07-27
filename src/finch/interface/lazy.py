@@ -1,21 +1,27 @@
+import bisect
 import builtins
 import operator
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
 
 import numpy as np
-from numpy.lib.array_utils import normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from ..algebra import (
+    Tensor,
     TensorFormat,
     element_type,
     fill_value,
+    first_arg,
     fixpoint_type,
+    identity,
     init_value,
     promote_max,
     promote_min,
+    promote_type,
     query_property,
     register_property,
     return_type,
@@ -33,7 +39,7 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..symbolic import gensym
+from ..symbolic import format, gensym
 from .overrides import OverrideTensor
 
 
@@ -559,6 +565,44 @@ def reduce(
     return LazyTensor(identify(data), shape, init, dtype)
 
 
+def _broadcast_shape(*args: tuple) -> tuple:
+    """
+    Computes the broadcasted shape for the given LazyTensor arguments,
+    following array_api broadcasting rules.
+    Raises ValueError if shapes are not broadcastable.
+
+    Parameters:
+    --------------
+    - *args: Variable number of tuples representing shapes of LazyTensors.
+
+    Returns:
+    --------------
+    tuple: The broadcasted shape as a tuple.
+    """
+    if len(args) < 2:
+        return args[0] if args else ()
+    shape1, shape2 = args[0], args[1]
+    N1, N2 = len(shape1), len(shape2)
+    N = builtins.max(N1, N2)
+    _shape = [0] * N
+    for i in range(N - 1, -1, -1):
+        n1, n2 = N1 - N + i, N2 - N + i
+        d1 = shape1[n1] if n1 >= 0 else 1
+        d2 = shape2[n2] if n2 >= 0 else 1
+        if d1 == 1:
+            _shape[i] = d2
+        elif d2 == 1 or d1 == d2:
+            _shape[i] = d1
+        else:
+            raise ValueError(f"Shapes {shape1} and {shape2} are not broadcastable")
+    shape = tuple(_shape)
+
+    if len(args) > 2:
+        for arg in args[2:]:
+            shape = _broadcast_shape(shape, arg)
+    return shape
+
+
 def elementwise(f: Callable, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
@@ -583,16 +627,8 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
     args = tuple(defer(a) for a in args)
-    ndim = builtins.max([arg.ndim for arg in args])
-    shape = tuple(
-        builtins.max(
-            [
-                arg.shape[i - ndim + arg.ndim] if i - ndim + arg.ndim >= 0 else 1
-                for arg in args
-            ]
-        )
-        for i in range(ndim)
-    )
+    shape = _broadcast_shape(*(arg.shape for arg in args))
+    ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs = []
     for arg in args:
@@ -743,6 +779,17 @@ def is_broadcastable(shape_a, shape_b):
     return True
 
 
+def is_broadcastable_directional(shape_a, shape_b):
+    """
+    Returns True if shape_a is broadcastable to shape_b according to numpy rules.
+    This is a directional check, so it allows only shape_a to be changed
+    """
+    for a, b in zip_longest(reversed(shape_a), reversed(shape_b), fillvalue=1):
+        if a != b and a != 1:
+            return False
+    return True
+
+
 def matmul(x1, x2) -> LazyTensor:
     """
     Performs matrix multiplication between two tensors.
@@ -888,15 +935,13 @@ def tensordot(
     if not isinstance(axes, tuple):
         N = int(axes)
         if N < 0:
-            raise ValueError("axes must be non-negative")
+            raise ValueError("expected axes to be a non-negative integer")
         axes_a = list(range(x1.ndim - N, x1.ndim))
         axes_b = list(range(N))
     else:
         axes_a, axes_b = (list(ax) for ax in axes)
-        axes_a = [axes_a] if isinstance(axes_a, int) else list(axes_a)
-        axes_b = [axes_b] if isinstance(axes_b, int) else list(axes_b)
 
-    # Normalize negative axes
+    # Normalize negative axes. We need list
     axes_a = [(a if a >= 0 else x1.ndim + a) for a in axes_a]
     axes_b = [(b if b >= 0 else x2.ndim + b) for b in axes_b]
 
@@ -912,7 +957,6 @@ def tensordot(
     notin_b = [k for k in range(x2.ndim) if k not in axes_b]
     newaxes_a = notin_a + axes_a
     newaxes_b = axes_b + notin_b
-
     # Permute
     x1p = permute_dims(x1, tuple(newaxes_a))
     x2p = permute_dims(x2, tuple(newaxes_b))
@@ -957,6 +1001,525 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         multiply(conjugate(x1), x2),
         axis=axis,
     )
+
+
+# Manipulation functions
+@dataclass(frozen=True)
+class DefaultTensorFormat(TensorFormat):
+    """
+    Default tensor format for easily defining new tensor formats.
+    """
+
+    _fill_value: Any
+    _element_type: Any
+    _shape_type: tuple
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+
+@dataclass(frozen=True)
+class WrapperTensorFormat(TensorFormat):
+    """Tensor format that wraps other tensor formats."""
+
+    _child_formats: tuple[TensorFormat, ...]  # Formats of the constituent tensors
+
+    @property
+    def fill_value(self):
+        """Returns the fill value of the first constituent format."""
+        return self._child_formats[0].fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Promotes the element type to be compatible with all constituent formats."""
+        etype = self._child_formats[0].element_type
+        for t in self._child_formats:
+            etype = promote_type(etype, t.element_type)
+        return etype
+
+
+@dataclass(frozen=True)
+class NoneTensorFormat(DefaultTensorFormat):
+    pass
+
+
+class NoneTensor(Tensor):
+    """
+    A tensor that has a specific shape but contains no actual data.
+    Used primarily for broadcasting operations where a tensor of a specific
+    shape is needed but the values are irrelevant.
+    """
+
+    def __init__(self, shape):
+        self._shape = shape
+
+    def __getitem__(self, idxs):
+        return None
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def format(self):
+        return NoneTensorFormat(
+            None,
+            None,
+            tuple(type(dim) for dim in self.shape),
+        )
+
+    def asarray(self):
+        return self
+
+
+def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
+    """
+    Broadcasts a lazy tensor to a specified shape.
+
+    Args:
+        tensor: The lazy tensor to broadcast.
+        shape: The target shape to broadcast to.
+
+    Returns:
+        A new lazy tensor with the specified shape.
+    """
+    tensor = defer(tensor)
+
+    if not is_broadcastable_directional(tensor.shape, shape):
+        raise ValueError(
+            f"Tensor with shape {tensor.shape} is not broadcastable "
+            f"to the shape {shape}"
+        )
+    return elementwise(first_arg, tensor, NoneTensor(shape))
+
+
+def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
+    """
+    Broadcasts one or more arrays against one another.
+    """
+    shape = _broadcast_shape(*(array.shape for array in arrays))
+    return tuple(broadcast_to(arr, shape) for arr in arrays)
+
+
+@dataclass(frozen=True)
+class ConcatTensorFormat(WrapperTensorFormat):
+    """
+    Tensor format for concatenated tensors.
+    Takes in a tuple of constituent formats, the shape type, and the concatenation axis.
+    Shape type is needed as it cannot be computed just from the constituent formats
+    """
+
+    _shape_type: tuple
+    concat_axis: int
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+
+class ConcatTensor(Tensor):
+    """
+    Tensor representing a concatenation of multiple tensors along a specified axis.
+    """
+
+    def __init__(self, tensor, *tensors, axis: int = 0):
+        """
+        Args:
+            tensor (ArrayLike):
+                The first tensor.
+            *tensors (ArrayLike):
+                Tensors to concatenate with the first tensor.
+        All tensors must support `__getitem__` and have a `shape` attribute.
+        `fill_value` is taken from the first tensor.
+        `element_type` is casted according to array_api specification.
+        """
+        self._ndim = len(tensor.shape)
+
+        shape_without_axis = tensor.shape[:axis] + tensor.shape[axis + 1 :]
+        # keep track of partial sums of sizes along the concatenation axis
+        self.ps_sizes = [0, tensor.shape[axis]]
+        for t in tensors:
+            if t.ndim != self._ndim:
+                raise ValueError("All tensors must have same number of dimensions")
+            self.ps_sizes.append(self.ps_sizes[-1] + t.shape[axis])
+            if t.shape[:axis] + t.shape[axis + 1 :] != shape_without_axis:
+                raise ValueError(
+                    "All tensors must have the same shape except "
+                    "along the concatenation axis"
+                )
+        self._shape = (
+            tensor.shape[:axis] + (self.ps_sizes[-1],) + tensor.shape[axis + 1 :]
+        )
+        self.tensors = (tensor,) + tensors
+        self.concat_axis = axis
+
+    def __getitem__(self, idxs: tuple):
+        """
+        Args:
+            idxs: tuple
+                Indices to access the concatenated tensor.
+        Returns the element at the specified indices.
+        """
+        # find the tensor to access
+        tn = bisect.bisect(self.ps_sizes, idxs[self.concat_axis]) - 1
+        if tn < 0 or tn >= len(self.tensors):
+            raise IndexError(f"Index {idxs} out of bounds for shape {self.shape}")
+        t = self.tensors[tn]
+        shifted_idx = idxs[self.concat_axis] - self.ps_sizes[tn]
+        result = t[
+            idxs[: self.concat_axis] + (shifted_idx,) + idxs[self.concat_axis + 1 :]
+        ]
+        return self.format.element_type(result)
+
+    @property
+    def format(self):
+        formats = []
+        for t in self.tensors:
+            f = format(t)
+            if isinstance(f, TensorFormat):
+                formats.append(f)
+            else:
+                raise AttributeError(
+                    f"All tensors must have a valid format defined, got {f}"
+                )
+        return ConcatTensorFormat(
+            tuple(formats),
+            tuple(type(dim) for dim in self.shape),
+            self.concat_axis,
+        )
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def asarray(self):
+        return self
+
+
+def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
+    """
+    Concatenates input tensors along the specified axis.
+
+    Parameters:
+        arrays: Sequence of tensors to concatenate (tuple or list of LazyTensor)
+        axis: Axis along which to concatenate (default=0)
+
+    Returns:
+        Concatenated tensor as LazyTensor
+    """
+    arrays = [defer(arr) for arr in arrays]
+
+    if axis is None:
+        # flatten all tensors
+        for i, t in enumerate(arrays):
+            arrays[i] = flatten(t)
+        axis = 0
+
+    # Convert axis to positive index and validate
+    ndim = arrays[0].ndim
+    axis = normalize_axis_index(axis, ndim)
+    computed_arrays = tuple(_compute(arr) for arr in arrays)
+    concat_tensor = ConcatTensor(*computed_arrays, axis=axis)
+    # Create a LazyTensor that represents the concatenation
+    return elementwise(identity, defer(concat_tensor))
+
+
+@dataclass(frozen=True)
+class SplitDimsTensorFormat(WrapperTensorFormat):
+    split_axis: int
+    split_shape: tuple
+
+    @property
+    def shape_type(self):
+        parent_shape_type = self._child_formats[0].shape_type
+        shape_type_list = list(parent_shape_type)
+        shape_type_list[self.split_axis : self.split_axis + 1] = [
+            type(dim) for dim in self.split_shape
+        ]
+        return tuple(shape_type_list)
+
+
+class SplitDimsTensor(Tensor):
+    """
+    Tensor representing a dimension split operation.
+    """
+
+    def __init__(self, tensor, axis: int, shape: tuple):
+        """
+        Args:
+            tensor: The input tensor to split
+            axis: The axis to split
+            shape: The new shape for the split dimensions
+        """
+        self.tensor = tensor
+        self.axis = normalize_axis_index(axis, tensor.ndim)
+
+        # Validate that the product of new dimensions equals the original dimension
+        shape_product = np.prod(shape)
+        if shape_product != tensor.shape[self.axis]:
+            raise ValueError(
+                f"Cannot split dimension of size {tensor.shape[self.axis]} "
+                f"into shape {shape}. Product of new dimensions "
+                f"({shape_product}) must equal original size."
+            )
+
+        # Create new shape by replacing the axis dimension with the split dimensions
+        self._shape = tensor.shape[: self.axis] + shape + tensor.shape[self.axis + 1 :]
+        self.split_shape = shape
+        self._ndim = len(self._shape)
+        self._element_type = element_type(tensor)
+        self.dtype = self._element_type
+
+    def __getitem__(self, idxs: tuple):
+        """
+        Args:
+            idxs: Indices to access the split tensor
+        Returns the element at the specified indices by mapping back to original tensor
+        """
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+
+        # Extract the indices for the split dimensions
+        split_start = self.axis
+        split_end = self.axis + len(self.split_shape)
+        split_idxs = idxs[split_start:split_end]
+
+        # Convert multi-dimensional split indices back to linear index
+        linear_idx = 0
+        multiplier = 1
+        for i in reversed(range(len(self.split_shape))):
+            linear_idx += split_idxs[i] * multiplier
+            multiplier *= self.split_shape[i]
+
+        # Reconstruct the original indices
+        original_idxs = idxs[: self.axis] + (linear_idx,) + idxs[split_end:]
+
+        return self.tensor[original_idxs]
+
+    @property
+    def format(self):
+        child_format = format(self.tensor)
+        if not isinstance(child_format, TensorFormat):
+            raise AttributeError(f"Expected a valid tensor format, got {child_format}")
+        return SplitDimsTensorFormat(
+            (child_format,),
+            self.axis,
+            self.split_shape,
+        )
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def asarray(self):
+        return self
+
+
+@dataclass(frozen=True)
+class CombineDimsTensorFormat(WrapperTensorFormat):
+    combined_axes: tuple[int, ...]
+    _shape_type: tuple
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+
+class CombineDimsTensor(Tensor):
+    """
+    Tensor representing a dimension combination operation.
+    Lazily combines multiple consecutive dimensions into one when accessed.
+    """
+
+    def __init__(self, tensor, axes: tuple[int, ...]):
+        """
+        Args:
+            tensor: The input tensor
+            axes: Consecutive axes to combine
+        """
+        self.tensor = tensor
+
+        # Normalize and validate axes
+        if len(axes) < 2:
+            raise ValueError(
+                "At least two axes must be specified to combine dimensions"
+            )
+        axes = normalize_axis_tuple(axes, tensor.ndim)
+        axes = tuple(sorted(axes))
+        # Check that axes are consecutive
+        if not builtins.all(
+            b - a == 1 for a, b in zip(axes[:-1], axes[1:], strict=True)
+        ):
+            raise ValueError("Axes to combine must be consecutive")
+
+        self.axes = axes
+        self.start_axis, self.end_axis = axes[0], axes[-1]
+
+        # Calculate the new combined dimension size
+        combined_size = np.prod([tensor.shape[i] for i in axes])
+
+        # Create new shape
+        self._shape = (
+            tensor.shape[: self.start_axis]
+            + (combined_size,)
+            + tensor.shape[self.end_axis + 1 :]
+        )
+        self._ndim = len(self._shape)
+        self._element_type = element_type(tensor)
+        self.dtype = self._element_type
+
+        # Store original dimensions for reconstruction. For ease of access
+        self.original_dims = [tensor.shape[i] for i in axes]
+
+    def __getitem__(self, idxs: tuple):
+        """
+        Args:
+            idxs: Indices to access the combined tensor
+        Returns the element by mapping to original multi-dimensional indices
+        """
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+
+        # Extract the linear index for the combined dimension
+        combined_idx = idxs[self.start_axis]
+
+        # Convert linear index back to multi-dimensional indices
+        multi_idxs = []
+        remaining = combined_idx
+        for dim_size in reversed(self.original_dims):
+            multi_idxs.append(remaining % dim_size)
+            remaining //= dim_size
+
+        # Reconstruct the original indices
+        original_idxs = (
+            idxs[: self.start_axis]
+            + tuple(reversed(multi_idxs))
+            + idxs[self.start_axis + 1 :]
+        )
+
+        return self.tensor[original_idxs]
+
+    @property
+    def format(self):
+        child_format = format(self.tensor)
+        if not isinstance(child_format, TensorFormat):
+            raise AttributeError(f"Expected a valid tensor format, got {child_format}")
+        return CombineDimsTensorFormat(
+            (child_format,),
+            self.axes,
+            tuple(type(dim) for dim in self.shape),
+        )
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def asarray(self):
+        return self
+
+
+def _compute(arg, ctx=None):
+    from finch import compute
+
+    return compute(arg, ctx=ctx)
+
+
+def split_dims(x, axis: int, shape: tuple) -> LazyTensor:
+    """
+    Split a dimension into multiple dimensions. The product
+    of the sizes in the `shape` tuple must equal the size
+    of the dimension being split.
+    """
+    x = defer(x)
+    computed_x = _compute(x)
+    split_tensor = SplitDimsTensor(computed_x, axis, shape)
+    return elementwise(identity, defer(split_tensor))
+
+
+def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
+    """
+    Combine multiple consecutive dimensions into a single dimension.
+    The resulting axis will have a size equal to the product of the
+    sizes of the combined axes.
+    """
+    x = defer(x)
+    computed_x = _compute(x)
+    combine_tensor = CombineDimsTensor(computed_x, axes)
+    return elementwise(identity, defer(combine_tensor))
+
+
+def flatten(x) -> LazyTensor:
+    """
+    Flattens the input tensor `x` into a 1D tensor.
+
+    Parameters
+    ----------
+    x: LazyTensor
+        The input tensor to be flattened.
+    Returns
+    -------
+    LazyTensor
+        A new LazyTensor that is a flattened version of `x`.
+    """
+    x = defer(x)
+    if x.ndim == 0:
+        # If x is a scalar, expand to 1D
+        return expand_dims(x, axis=0)
+    if x.ndim == 1:
+        # we need it to pass through the elementwise
+        # it may be benficial to optimize these cases
+        return elementwise(identity, x)
+    # Combine all dimensions into one
+    return combine_dims(x, tuple(range(x.ndim)))
+
+
+def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
+    """
+    Moves axes of an array to new positions.
+    """
+    # argument validation
+    # handles uniqueness, int -> tuple, and bound check
+    source = normalize_axis_tuple(source, x.ndim, "source")
+    destination = normalize_axis_tuple(destination, x.ndim, "destination")
+
+    if len(source) != len(destination):
+        raise ValueError("Source and Destination indices must have the same length")
+
+    x = defer(x)
+
+    final_order = [i for i in range(x.ndim) if i not in source]
+    for dest, src in sorted(zip(destination, source, strict=True)):
+        final_order.insert(dest, src)
+
+    return permute_dims(x, axis=tuple(final_order))
+
+
+def stack(arrays, /, axis: int = 0) -> LazyTensor:
+    """
+    Stacks input tensors along a new axis.
+
+    Parameters:
+        arrays: Sequence of tensors to stack (tuple or list of LazyTensor)
+        axis: Axis along which to stack (default=0)
+    Returns:
+        Stacked tensor as LazyTensor
+    """
+    if not isinstance(arrays, tuple | list):
+        raise TypeError("arrays must be a tuple or list of LazyTensors")
+    arrays = [defer(arr) for arr in arrays]
+    # add 1-dim at the axis position for stacking
+    arrays = tuple(expand_dims(x, axis=axis) for x in arrays)
+    # concat, this will also do the shape verification
+    return concat(arrays, axis=axis)
 
 
 def sin(x) -> LazyTensor:
