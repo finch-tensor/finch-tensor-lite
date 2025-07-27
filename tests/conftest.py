@@ -105,9 +105,18 @@ def pytest_runtest_makereport(item, call):
     return (yield)
 
 
+# a dictionary of regex pattern strings with their intended substitutions
+substitution_rules = {r"<function (\S+) at 0x[0-9a-fA-F]+>": r"<function \1 at 0x...>"}
+# compile into patterns
+compiled_substitution_pairs = [
+    (re.compile(pattern), replacement)
+    for pattern, replacement in substitution_rules.items()
+]
+
+
 # Regression fixture for compiler outputs
 @pytest.fixture
-def program_regression(file_regression, tmp_path):
+def program_regression(file_regression):
     """
     Fixture for program and tree regression testing.
     This overcomes the challenge of comparing non-deterministic outputs like
@@ -123,9 +132,11 @@ def program_regression(file_regression, tmp_path):
         """
         if not isinstance(program, str):
             program = formatter(program)
-        # Replace memory addresses with ...
-        file_regression.check(
-            re.sub(r"0x[0-9a-fA-F]+", "...", program), extension=extension
-        )
+
+        # Substitute matching regex patterns
+        for pattern, replacement in compiled_substitution_pairs:
+            program = pattern.sub(replacement, program)
+
+        file_regression.check(program, extension=extension)
 
     return _program_regression
