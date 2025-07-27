@@ -1,0 +1,7 @@
+ProcessResult(
+  objects=[
+    Object(name='...', id=..., func=<function process at 0x...>),
+    Object(name='...', id=..., func=<function validate at 0x...>)
+  ],
+  status='...'
+)

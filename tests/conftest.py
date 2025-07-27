@@ -105,12 +105,12 @@ def pytest_runtest_makereport(item, call):
     return (yield)
 
 
-# a dictionary of regex pattern strings with their intended substitutions
-substitution_rules = {r"<function (\S+) at 0x[0-9a-fA-F]+>": r"<function \1 at 0x...>"}
-# compile into patterns
-compiled_substitution_pairs = [
+# Module-level constants for consistent substitutions
+SUBSTITUTION_RULES = {r"<function (\S+) at 0x[0-9a-fA-F]+>": r"<function \1 at 0x...>"}
+
+COMPILED_SUBSTITUTION_PAIRS = [
     (re.compile(pattern), replacement)
-    for pattern, replacement in substitution_rules.items()
+    for pattern, replacement in SUBSTITUTION_RULES.items()
 ]
 
 
@@ -136,21 +136,20 @@ def program_regression(file_regression):
             formatter: Optional formatter function to convert the AST to a string.
             extension: The file extension for the regression file.
             substitutions: Optional dictionary of regex patterns and their replacements.
-            E.g: {"<function ( \\S+) at 0x[0-9a-fA-F]+>": "<function \\1 at 0x...>"}
+            E.g: {"<function (\\S+) at 0x[0-9a-fA-F]+>": "<function \\1 at 0x...>"}
         """
         if not isinstance(program, str):
             program = formatter(program)
 
-        # Substitute matching regex patterns
-        for pattern, replacement in compiled_substitution_pairs:
-            program = pattern.sub(replacement, program)
+        # Apply predefined substitutions
+        for compiled_pattern, replacement in COMPILED_SUBSTITUTION_PAIRS:
+            program = compiled_pattern.sub(replacement, program)
 
-        # If additional substitutions are provided, apply them
-        # this allows us to add test-specific substitutions
+        # Apply additional test-specific substitutions
         if substitutions:
-            for pattern, replacement in substitutions.items():
-                pattern = re.compile(pattern)
-                program = pattern.sub(replacement, program)
+            for pattern_str, replacement in substitutions.items():
+                compiled_pattern = re.compile(pattern_str)
+                program = compiled_pattern.sub(replacement, program)
 
         file_regression.check(program, extension=extension)
 

@@ -103,3 +103,30 @@ def test_tree_regression(program_regression):
     )
     program, tables = LogicCompiler()(plan)
     program_regression(program)
+
+
+def test_regex_substitution_patterns(program_regression):
+    """
+    Test comprehensive regex substitution functionality including:
+    - Global substitution from conftest.py
+    - Custom substitutions
+    - Multiple pattern applications
+    """
+    program = (
+        "ProcessResult(\n"
+        "  objects=[\n"
+        "    Object(name='obj1', id=12345, func=<function process at 0x7f8c2c0d1e50>),"
+        "\n"
+        "    Object(name='obj2', id=67890, func=<function validate at 0x7f8c2c0d2a80>)"
+        "\n"
+        "  ],\n"
+        "  status='complete'\n"
+        ")"
+    )
+
+    substitutions = {
+        r"Object\(name='[^']+', id=\d+,": r"Object(name='...', id=...,",
+        r"status='[^']+'": r"status='...'",
+    }
+
+    program_regression(program, substitutions=substitutions, extension=".txt")
