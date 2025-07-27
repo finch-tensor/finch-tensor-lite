@@ -123,12 +123,20 @@ def program_regression(file_regression):
     memory addresses in program trees.
     """
 
-    def _program_regression(program, formatter=pprint.pformat, extension=".txt"):
+    def _program_regression(
+        program,
+        formatter=pprint.pformat,
+        extension=".txt",
+        substitutions: dict[str, str] | None = None,
+    ):
         """
         Compares the program with the regression fixture.
         Args:
             program: The program to compare.
             formatter: Optional formatter function to convert the AST to a string.
+            extension: The file extension for the regression file.
+            substitutions: Optional dictionary of regex patterns and their replacements.
+            E.g: {"<function ( \\S+) at 0x[0-9a-fA-F]+>": "<function \\1 at 0x...>"}
         """
         if not isinstance(program, str):
             program = formatter(program)
@@ -136,6 +144,13 @@ def program_regression(file_regression):
         # Substitute matching regex patterns
         for pattern, replacement in compiled_substitution_pairs:
             program = pattern.sub(replacement, program)
+
+        # If additional substitutions are provided, apply them
+        # this allows us to add test-specific substitutions
+        if substitutions:
+            for pattern, replacement in substitutions.items():
+                pattern = re.compile(pattern)
+                program = pattern.sub(replacement, program)
 
         file_regression.check(program, extension=extension)
 

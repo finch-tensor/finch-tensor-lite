@@ -1,0 +1,1 @@
+Object(name='myObject', id=12345, function=<function my_func at 0x...>)

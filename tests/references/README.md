@@ -8,4 +8,6 @@ Beyond the basic pytest-regressions usage, this project has some customizations 
 - **Cleanup**: A hook is provided that automatically cleans up any *obtained* files of a test in case it passes. If the test fails, files are preserved for debugging.
 - **Preserving Obtained Files**: The `preserve_obtained` fixture can be used to preserve the obtained files even if the test passes.
 - Avoid using a `basename` in `..._regression.check()` calls. It will throw off the automatic cleanup mechanism and you'll have to manually clean up the files after the test run. Not using the parameter will cause pytest-regressions to place the files in a directory named after the test function, so everything is organized.
+- **Adding more substitutions**: If you need to add more substitutions for non-deterministic outputs in your specific test, you can do so by providing the optional `substitutions` parameter to the `program_regression` fixture. If you want to add a custom substitution for all tests, you can edit the `substitution_rules` dictionary in `tests/conftest.py`. In case,
+you do end up adding a global substitution, please try to add a test for it in `tests/test_regressions.py` to ensure it works as expected.
 - Use `--force-regen` flag to regenerate the regression files. This is useful when you want to update the expected outputs after making changes to the compiler logic.
