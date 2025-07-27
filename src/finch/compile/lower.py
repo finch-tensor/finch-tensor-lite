@@ -137,6 +137,10 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
     """
 
     @property
+    def struct_name(self):
+        return "BufferizedNDArray"
+
+    @property
     def struct_fields(self):
         return [
             ("buf", self.buf),
