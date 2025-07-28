@@ -115,30 +115,21 @@ def test_logic_compiler():
                             lhs=Variable(name=":i0_size", type_=int),
                             rhs=Call(
                                 op=ntn.Literal(val=ntn.dimension),
-                                args=(
-                                    Variable(name=":A0", type_=np.ndarray),
-                                    ntn.Literal(val=0),
-                                ),
+                                args=(Variable(name=":A0", type_=np.ndarray),),
                             ),
                         ),
                         Assign(
                             lhs=Variable(name=":i1_size", type_=int),
                             rhs=Call(
                                 op=ntn.Literal(val=ntn.dimension),
-                                args=(
-                                    Variable(name=":A0", type_=np.ndarray),
-                                    ntn.Literal(val=1),
-                                ),
+                                args=(Variable(name=":A0", type_=np.ndarray),),
                             ),
                         ),
                         Assign(
                             lhs=Variable(name=":i2_size", type_=int),
                             rhs=Call(
                                 op=ntn.Literal(val=ntn.dimension),
-                                args=(
-                                    Variable(name=":A1", type_=np.ndarray),
-                                    ntn.Literal(val=1),
-                                ),
+                                args=(Variable(name=":A1", type_=np.ndarray),),
                             ),
                         ),
                         Assign(

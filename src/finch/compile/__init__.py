@@ -1,7 +1,19 @@
-from .lower import BufferizedNDArray, NotationCompiler, NotationContext
+from .lower import (
+    BufferizedNDArray,
+    Extent,
+    ExtentFormat,
+    NotationCompiler,
+    NotationContext,
+    dimension,
+    extent,
+)
 
 __all__ = [
     "BufferizedNDArray",
+    "Extent",
+    "ExtentFormat",
     "NotationCompiler",
     "NotationContext",
+    "dimension",
+    "extent",
 ]

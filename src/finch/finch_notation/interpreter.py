@@ -230,38 +230,6 @@ def thaw(tns, op):
         return tns
 
 
-@dataclass(eq=True, frozen=True)
-class ExtentValue:
-    """
-    A class to represent the extent of a loop variable.
-    This is used to define the start and end values of a loop.
-    """
-
-    start: Any
-    end: Any
-
-    def loop(self, ctx, idx, body):
-        for idx_e in range(self.start, self.end):
-            # Create a new scope for each iteration
-            ctx_2 = ctx.scope(loop_state=HaltState())
-            # Assign the loop variable
-            ctx_2.bindings[idx.name] = idx.type_(idx_e)
-            # Execute the body of the loop
-            ctx_2(body)
-
-
-def extent(start, end):
-    """
-    Create an extent value for a loop.
-    """
-    return ExtentValue(start, end)
-
-
-def dimension(tns, mode):
-    end = tns.shape[mode]
-    return extent(type(end)(0), end)
-
-
 class NotationInterpreterKernel:
     """
     A kernel for interpreting FinchNotation code.

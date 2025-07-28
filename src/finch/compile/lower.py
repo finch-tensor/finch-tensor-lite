@@ -9,37 +9,43 @@ from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorFormat
 from ..codegen import NumpyBuffer
 from ..finch_assembly import AssemblyStructFormat
-from ..symbolic import Context, PostOrderDFS, PostWalk, ScopedDict, format
+from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict, format
 
 
 class FinchTensorFormat(TensorFormat, ABC):
+    @abstractmethod
     def lower_unwrap(tns):
         """
         Unwrap a tensor view to get the underlying tensor.
         This is used to get the original tensor from a tensor view.
         """
 
+    @abstractmethod
     def lower_increment(tns, val):
         """
         Increment a tensor view with an operation and value.
         This updates the tensor at the specified index with the operation and value.
         """
 
+    @abstractmethod
     def lower_declare(self, ctx, tns, init, op, shape):
         """
         Declare a tensor.
         """
 
+    @abstractmethod
     def lower_freeze(self, ctx, tns, op):
         """
         Freeze a tensor.
         """
 
+    @abstractmethod
     def lower_thaw(self, ctx, tns, op):
         """
         Thaw a tensor.
         """
 
+    @abstractmethod
     def unfurl(ctx, tns, ext, proto): ...
 
 
@@ -186,6 +192,20 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         ctx.exec(asm.ForLoop(i_var, asm.Literal(0), asm.Length(buf), body))
         return
 
+    def lower_freeze(self, ctx, tns, op):
+        return tns
+
+    def lower_thaw(self, ctx, tns, op):
+        return tns
+
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        acc = BufferizedNDArrayAccessorFormat(self, 0, tns.buf.length_type(0), None)
+        return acc.unfurl(ctx, tns, ext, mode, proto)
+
+    def lower_unwrap(self, ctx, obj): ...
+
+    def lower_increment(self, ctx, obj, val): ...
+
     def asm_unpack(self, ctx, var_n, val):
         """
         Unpack the into asm context.
@@ -313,6 +333,38 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
 
 
 @dataclass(eq=True, frozen=True)
+class Extent:
+    """
+    A class to represent the extent of a loop variable.
+    This is used to define the start and end values of a loop.
+    """
+
+    start: Any
+    end: Any
+
+    def loop(self, ctx, idx, body):
+        for idx_e in range(self.start, self.end):
+            # Create a new scope for each iteration
+            ctx_2 = ctx.scope(loop_state=HaltState())
+            # Assign the loop variable
+            ctx_2.bindings[idx.name] = idx.type_(idx_e)
+            # Execute the body of the loop
+            ctx_2(body)
+
+
+def extent(start, end):
+    """
+    Create an extent value for a loop.
+    """
+    return Extent(start, end)
+
+
+def dimension(tns, mode):
+    end = tns.shape[mode]
+    return extent(type(end)(0), end)
+
+
+@dataclass(eq=True, frozen=True)
 class ExtentFormat:
     start: Any
     end: Any
@@ -322,13 +374,8 @@ class ExtentFormat:
         Lower a loop with the given index and body.
         This is used to compile the loop into assembly.
         """
-
-        def rewrite(node):
-            match node:
-                case ntn.Access(idx, ext, body):
-                    return asm.Loop(ctx(idx), ctx(ext.start), ctx(ext.end), ctx(body))
-                case _:
-                    return node
+        lower_looplets(ctx, idx, ext, body)
+        return
 
 
 @dataclass(eq=True)
@@ -496,7 +543,7 @@ class NotationContext(Context):
                 return None
             case ntn.Loop(idx, ext, body):
                 # first instantiate tensors
-                ext.result_format.lower_loop(self, idx, body)
+                ext.result_format.lower_loop(self, idx, ext, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 tns = self.resolve(tns)
@@ -507,11 +554,11 @@ class NotationContext(Context):
             case ntn.Freeze(tns, op):
                 tns = self.resolve(tns)
                 op_e = self(op)
-                return tns.result_format.lower_freeze(tns, op_e)
+                return tns.result_format.lower_freeze(self, tns, op_e)
             case ntn.Thaw(tns, op):
                 tns = self.resolve(tns)
                 op_e = self(op)
-                return tns.result_format.lower_thaw(tns, op_e)
+                return tns.result_format.lower_thaw(self, tns, op_e)
             case ntn.If(cond, body):
                 ctx = self.block()
                 ctx_2 = ctx.scope()
@@ -559,6 +606,7 @@ def get_undeclared_slots(prgm):
         match node:
             case ntn.Declare(ntn.Slot(tns_n, _), _, _, _):
                 undeclared.add(tns_n)
+    return undeclared
 
 
 def instantiate_tns(ctx, tns, mode, undeclared=None):
@@ -584,18 +632,9 @@ def instantiate(ctx, prgm):
                         mode,
                         idxs,
                     )
-            case ntn.Increment(tns, val):
-                if tns not in undeclared:
-                    return ntn.Increment(
-                        instantiate_tns(ctx, tns, ntn.Update()),
-                        val,
-                    )
-            case ntn.Unwrap(tns):
-                if tns not in undeclared:
-                    return ntn.Unwrap(instantiate_tns(ctx, tns, ntn.Read()))
         return None
 
-    prgm = PostWalk(instantiate_node, prgm)
+    prgm = Rewrite(PostWalk(instantiate_node))(prgm)
 
 
 def lower_looplets(ctx, idx, ext, body):
@@ -616,7 +655,7 @@ def lower_looplets(ctx, idx, ext, body):
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
-    body = PostWalk(unfurl_node, body)
+    body = Rewrite(PostWalk(unfurl_node))(body)
     ctx_3 = LoopletContext(ctx, idx)
     ctx_3(ext, body)
 
@@ -688,6 +727,9 @@ class LoopletContext(Context):
     def scope(self):
         blk = self.ctx.scope()
         return LoopletContext(blk, self.idx)
+
+    def emit(self):
+        return self.ctx.emit()
 
     def select_pass(self, body):
         def pass_request(node):

@@ -1,4 +1,4 @@
-from .interpreter import NotationInterpreter, TensorView, dimension, extent
+from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
     Assign,
@@ -59,6 +59,4 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
-    "dimension",
-    "extent",
 ]

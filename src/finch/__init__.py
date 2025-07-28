@@ -3,7 +3,14 @@ from .codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
 )
-from .compile import BufferizedNDArray, NotationContext
+from .compile import (
+    BufferizedNDArray,
+    Extent,
+    ExtentFormat,
+    NotationContext,
+    dimension,
+    extent,
+)
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -94,6 +101,8 @@ __all__ = [
     "DenseLevelFormat",
     "EagerTensor",
     "ElementLevelFormat",
+    "Extent",
+    "ExtentFormat",
     "FiberTensorFormat",
     "Formattable",
     "LazyTensor",
@@ -130,9 +139,11 @@ __all__ = [
     "cos",
     "cosh",
     "defer",
+    "dimension",
     "element_type",
     "elementwise",
     "expand_dims",
+    "extent",
     "fill_value",
     "flatten",
     "floordiv",
