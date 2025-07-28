@@ -199,8 +199,8 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         return tns
 
     def unfurl(self, ctx, tns, ext, mode, proto):
-        acc = BufferizedNDArrayAccessorFormat(self, 0, tns.buf.length_type(0), None)
-        return acc.unfurl(ctx, tns, ext, mode, proto)
+        acc_t = BufferizedNDArrayAccessorFormat(self, 0, self.buf.length_type(0), None)
+        return acc_t.unfurl(ctx, tns, ext, mode, proto)
 
     def lower_unwrap(self, ctx, obj): ...
 
@@ -634,7 +634,7 @@ def instantiate(ctx, prgm):
                     )
         return None
 
-    prgm = Rewrite(PostWalk(instantiate_node))(prgm)
+    return Rewrite(PostWalk(instantiate_node))(prgm)
 
 
 def lower_looplets(ctx, idx, ext, body):
@@ -646,11 +646,12 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_type.unfurl(
+                    tns_2 = tns.result_format.unfurl(
                         ctx_2,
                         tns,
                         ext,
                         mode,
+                        None
                     )
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
@@ -684,14 +685,14 @@ class LookupPass(LoopletPass):
         return 0
 
     def __call__(self, ctx, idx, ext, body):
-        idx_2 = asm.Variable(self.freshen("i"), idx.result_type)
+        idx_2 = asm.Variable(self.freshen("i"), idx.result_format)
 
         def lookup_node(node):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
                     if j == idx:
                         tns = ctx.resolve(tns)
-                        tns_2 = tns.result_type.lookup(
+                        tns_2 = tns.result_format.lookup(
                             ctx,
                             tns,
                             idx_2,
