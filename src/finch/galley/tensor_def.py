@@ -114,14 +114,17 @@ class TensorDef:
 
         return TensorDef(new_index_set, new_dim_sizes, self.fill_val)
 
-    def get_dim_sizes(self) -> Mapping[str, float]:
+    @property
+    def dim_sizes(self) -> Mapping[str, float]:
         return self.dim_sizes
 
     def get_dim_size(self, idx: str) -> float:
         return self.dim_sizes[idx]
 
-    def get_index_set(self) -> set[str]:
+    @property
+    def index_set(self) -> set[str]:
         return self.index_set
 
-    def get_fill_value(self) -> Any:
+    @property
+    def fill_value(self) -> Any:
         return self.fill_val

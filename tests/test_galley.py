@@ -14,10 +14,10 @@ def test_copy_and_getters():
     td = TensorDef(index_set=["i", "j"], dim_sizes={"i": 2.0, "j": 3.0}, fill_val=42)
     td_copy = td.copy()
     assert td_copy is not td
-    assert td_copy.get_index_set() == {"i", "j"}
-    assert td_copy.get_dim_sizes() == {"i": 2.0, "j": 3.0}
+    assert td_copy.index_set == {"i", "j"}
+    assert td_copy.dim_sizes == {"i": 2.0, "j": 3.0}
     assert td_copy.get_dim_size("j") == 3.0
-    assert td_copy.get_fill_value() == 42
+    assert td_copy.fill_value == 42
 
 
 @pytest.mark.parametrize(
@@ -31,7 +31,7 @@ def test_reindex_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
     td = TensorDef(index_set=orig_axes, dim_sizes=dim_sizes, fill_val=0)
     td2 = td.reindex_def(new_axes)
-    assert td2.get_index_set() == set(new_axes)
+    assert td2.index_set == set(new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
 
@@ -39,21 +39,21 @@ def test_reindex_def(orig_axes, new_axes):
 def test_set_fill_value_and_relabel_index():
     td = TensorDef(index_set=["i"], dim_sizes={"i": 5.0}, fill_val=0)
     td2 = td.set_fill_value(7)
-    assert td2.get_fill_value() == 7
+    assert td2.fill_value == 7
 
     td3 = td2.relabel_index("i", "k")
-    assert "k" in td3.get_index_set() and "i" not in td3.get_index_set()
+    assert "k" in td3.index_set and "i" not in td3.index_set
     assert td3.get_dim_size("k") == 5.0
 
 
 def test_add_dummy_idx():
     td = TensorDef(index_set=["i"], dim_sizes={"i": 3.0}, fill_val=0)
     td2 = td.add_dummy_idx("j")
-    assert td2.get_index_set() == {"i", "j"}
+    assert td2.index_set == {"i", "j"}
     assert td2.get_dim_size("j") == 1.0
 
     td3 = td2.add_dummy_idx("j")
-    assert td3.get_index_set() == {"i", "j"}
+    assert td3.index_set == {"i", "j"}
 
 
 # ─────────────────────────────── DenseStats tests ─────────────────────────────
@@ -63,10 +63,10 @@ def test_from_tensor_and_getters():
     arr = np.zeros((2, 3))
     ds = DenseStats(arr, ["i", "j"])
 
-    assert ds.get_index_set() == {"i", "j"}
+    assert ds.index_set == {"i", "j"}
     assert ds.get_dim_size("i") == 2.0
     assert ds.get_dim_size("j") == 3.0
-    assert ds.get_fill_value() == 0
+    assert ds.fill_value == 0
 
 
 @pytest.mark.parametrize(
@@ -90,15 +90,15 @@ def test_mapjoin_mul_and_add():
     dsb = DenseStats(B, ["j", "k"])
 
     dsm = DenseStats.mapjoin(mul, dsa, dsb)
-    assert dsm.get_index_set() == {"i", "j", "k"}
+    assert dsm.index_set == {"i", "j", "k"}
     assert dsm.get_dim_size("i") == 2.0
     assert dsm.get_dim_size("j") == 3.0
     assert dsm.get_dim_size("k") == 4.0
-    assert dsm.get_fill_value() == 0.0
+    assert dsm.fill_value == 0.0
 
     dsa2 = DenseStats(2 * A, ["i", "j"])
     ds_sum = DenseStats.mapjoin(add, dsa, dsa2)
-    assert ds_sum.get_fill_value() == 1 + 2
+    assert ds_sum.fill_value == 1 + 2
 
 
 def test_aggregate_and_issimilar():
@@ -106,9 +106,9 @@ def test_aggregate_and_issimilar():
     dsa = DenseStats(A, ["i", "j"])
 
     ds_agg = DenseStats.aggregate(sum, ["j"], dsa)
-    assert ds_agg.get_index_set() == {"i"}
+    assert ds_agg.index_set == {"i"}
     assert ds_agg.get_dim_size("i") == 2.0
-    assert ds_agg.get_fill_value() == dsa.get_fill_value()
+    assert ds_agg.fill_value == dsa.fill_value
     assert DenseStats.issimilar(dsa, dsa)
     B = np.ones((3, 4))
     dsb = DenseStats.from_tensor(B, ["j", "k"])

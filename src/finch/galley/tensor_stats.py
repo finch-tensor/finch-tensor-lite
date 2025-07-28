@@ -57,17 +57,16 @@ class TensorStats(ABC):
         ...
 
     @property
-    def get_dim_sizes(self) -> Mapping[str, float]:
-        return self.tensordef.get_dim_sizes()
+    def dim_sizes(self) -> Mapping[str, float]:
+        return self.tensordef.dim_sizes
 
-    @property
     def get_dim_size(self, idx: str) -> float:
         return self.tensordef.get_dim_size(idx)
 
     @property
-    def get_index_set(self) -> set[str]:
-        return self.tensordef.get_index_set()
+    def index_set(self) -> set[str]:
+        return self.tensordef.index_set
 
     @property
-    def get_fill_value(self) -> Any:
-        return self.tensordef.get_fill_value()
+    def fill_value(self) -> Any:
+        return self.tensordef.fill_value
