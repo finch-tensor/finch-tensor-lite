@@ -12,11 +12,11 @@ class TensorDef:
         self,
         index_set: Iterable[str],
         dim_sizes: Mapping[str, float],
-        fill_val: Any,
+        fill_value: Any,
     ):
-        self.index_set = set(index_set)
-        self.dim_sizes = OrderedDict(dim_sizes)
-        self.fill_val = fill_val
+        self._index_set = set(index_set)
+        self._dim_sizes = OrderedDict(dim_sizes)
+        self._fill_value = fill_value
 
     def copy(self) -> "TensorDef":
         """
@@ -24,15 +24,15 @@ class TensorDef:
             Deep copy of TensorDef fields
         """
         return TensorDef(
-            index_set=self.index_set.copy(),
-            dim_sizes=self.dim_sizes.copy(),
-            fill_val=self.fill_val,
+            index_set=self._index_set.copy(),
+            dim_sizes=self._dim_sizes.copy(),
+            fill_value=self._fill_value,
         )
 
     @classmethod
     def from_tensor(cls, tensor: Any, indices: Iterable[str]) -> "TensorDef":
         """
-        Storing axis, sizes, and fill_val of the tensor
+        Storing axis, sizes, and fill_value of the tensor
 
         """
         shape = tensor.shape
@@ -52,7 +52,7 @@ class TensorDef:
         return cls(
             index_set=indices,
             dim_sizes=dim_sizes,
-            fill_val=fv,
+            fill_value=fv,
         )
 
     def reindex_def(self, new_axis: Iterable[str]) -> "TensorDef":
@@ -65,18 +65,18 @@ class TensorDef:
         return TensorDef(
             index_set=new_axis,
             dim_sizes=new_dim_sizes,
-            fill_val=self.fill_val,
+            fill_value=self.fill_value,
         )
 
-    def set_fill_value(self, fill_val: Any) -> "TensorDef":
+    def set_fill_value(self, fill_value: Any) -> "TensorDef":
         """
         Return
-            :TensorDef with  new fill_val
+            :TensorDef with  new fill_value
         """
         return TensorDef(
             index_set=self.index_set,
             dim_sizes=self.dim_sizes,
-            fill_val=fill_val,
+            fill_value=fill_value,
         )
 
     def relabel_index(self, i: str, j: str) -> "TensorDef":
@@ -93,7 +93,7 @@ class TensorDef:
         return TensorDef(
             index_set=new_index_set,
             dim_sizes=new_dim_sizes,
-            fill_val=self.fill_val,
+            fill_value=self.fill_value,
         )
 
     def add_dummy_idx(self, idx: str) -> "TensorDef":
@@ -112,19 +112,31 @@ class TensorDef:
         new_dim_sizes = dict(self.dim_sizes)
         new_dim_sizes[idx] = 1.0
 
-        return TensorDef(new_index_set, new_dim_sizes, self.fill_val)
+        return TensorDef(new_index_set, new_dim_sizes, self.fill_value)
 
     @property
     def dim_sizes(self) -> Mapping[str, float]:
-        return self.dim_sizes
+        return self._dim_sizes
+
+    @dim_sizes.setter
+    def dim_sizes(self, value: Mapping[str, float]):
+        self._dim_sizes = OrderedDict(value)
 
     def get_dim_size(self, idx: str) -> float:
         return self.dim_sizes[idx]
 
     @property
     def index_set(self) -> set[str]:
-        return self.index_set
+        return self._index_set
+
+    @index_set.setter
+    def index_set(self, value: Iterable[str]):
+        self._index_set = set(value)
 
     @property
     def fill_value(self) -> Any:
-        return self.fill_val
+        return self._fill_value
+
+    @fill_value.setter
+    def fill_value(self, value: Any):
+        self._fill_value = value

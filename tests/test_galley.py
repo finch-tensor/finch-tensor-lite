@@ -11,7 +11,7 @@ from finch.galley.tensor_def import TensorDef
 
 
 def test_copy_and_getters():
-    td = TensorDef(index_set=["i", "j"], dim_sizes={"i": 2.0, "j": 3.0}, fill_val=42)
+    td = TensorDef(index_set=["i", "j"], dim_sizes={"i": 2.0, "j": 3.0}, fill_value=42)
     td_copy = td.copy()
     assert td_copy is not td
     assert td_copy.index_set == {"i", "j"}
@@ -29,7 +29,7 @@ def test_copy_and_getters():
 )
 def test_reindex_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
-    td = TensorDef(index_set=orig_axes, dim_sizes=dim_sizes, fill_val=0)
+    td = TensorDef(index_set=orig_axes, dim_sizes=dim_sizes, fill_value=0)
     td2 = td.reindex_def(new_axes)
     assert td2.index_set == set(new_axes)
     for ax in new_axes:
@@ -37,7 +37,7 @@ def test_reindex_def(orig_axes, new_axes):
 
 
 def test_set_fill_value_and_relabel_index():
-    td = TensorDef(index_set=["i"], dim_sizes={"i": 5.0}, fill_val=0)
+    td = TensorDef(index_set=["i"], dim_sizes={"i": 5.0}, fill_value=0)
     td2 = td.set_fill_value(7)
     assert td2.fill_value == 7
 
@@ -47,7 +47,7 @@ def test_set_fill_value_and_relabel_index():
 
 
 def test_add_dummy_idx():
-    td = TensorDef(index_set=["i"], dim_sizes={"i": 3.0}, fill_val=0)
+    td = TensorDef(index_set=["i"], dim_sizes={"i": 3.0}, fill_value=0)
     td2 = td.add_dummy_idx("j")
     assert td2.index_set == {"i", "j"}
     assert td2.get_dim_size("j") == 1.0

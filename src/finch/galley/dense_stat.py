@@ -7,10 +7,10 @@ from .tensor_stats import TensorStats
 
 class DenseStats(TensorStats):
     @classmethod
-    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> "DenseStats":
+    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
         # Dense Stats only requires the TensorDef from the tensor,
         # so no additional processing is needed
-        pass
+        return None
 
     @classmethod
     def from_def(cls, d: TensorDef) -> Self:

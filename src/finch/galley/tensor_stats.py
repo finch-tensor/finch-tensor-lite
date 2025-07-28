@@ -14,7 +14,7 @@ class TensorStats(ABC):
 
     @classmethod
     @abstractmethod
-    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> "TensorStats":
+    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> None:
         """
         Populate this instance’s state from (tensor, fields).
         """
@@ -60,6 +60,10 @@ class TensorStats(ABC):
     def dim_sizes(self) -> Mapping[str, float]:
         return self.tensordef.dim_sizes
 
+    @dim_sizes.setter
+    def dim_sizes(self, value: Mapping[str, float]):
+        self.tensordef.dim_sizes = value
+
     def get_dim_size(self, idx: str) -> float:
         return self.tensordef.get_dim_size(idx)
 
@@ -67,6 +71,14 @@ class TensorStats(ABC):
     def index_set(self) -> set[str]:
         return self.tensordef.index_set
 
+    @index_set.setter
+    def index_set(self, value: set[str]):
+        self.tensordef.index_set = value
+
     @property
     def fill_value(self) -> Any:
         return self.tensordef.fill_value
+
+    @fill_value.setter
+    def fill_value(self, value: Any):
+        self.tensordef.fill_value = value
