@@ -1,3 +1,7 @@
+from typing import Any
+
+import numpy as np
+
 from . import algebra
 
 
@@ -25,6 +29,33 @@ def promote_min(a, b):
 def promote_max(a, b):
     cast = algebra.promote_type(a, b)
     return max(cast(a), cast(b))
+
+
+class Pair:
+    value: Any
+    index: int
+
+    def __init__(self, value, index):
+        self.value = value
+        self.index = index
+
+
+def minby(a: Pair, b: Pair):
+    # init_value case
+    if not isinstance(a, Pair):
+        return b
+
+    cast = algebra.promote_type(a.value, b.value)
+    return a if cast(a.value) <= cast(b.value) else b
+
+
+def maxby(a: Pair, b: Pair):
+    # init_value case
+    if not isinstance(a, Pair):
+        return b
+
+    cast = algebra.promote_type(a.value, b.value)
+    return a if cast(a.value) >= cast(b.value) else b
 
 
 def conjugate(x):
@@ -147,3 +178,10 @@ algebra.register_property(
     "return_type",
     lambda op, x: x,
 )
+
+
+algebra.register_property(minby, "__call__", "return_type", lambda op, a, b: Pair)
+algebra.register_property(maxby, "__call__", "return_type", lambda op, a, b: Pair)
+
+algebra.register_property(minby, "__call__", "init_value", lambda op, arg: np.inf)
+algebra.register_property(maxby, "__call__", "init_value", lambda op, arg: -np.inf)

@@ -831,3 +831,15 @@ def std(
     if isinstance(x, lazy.LazyTensor):
         return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
+
+
+def argmin(x, /, *, axis: int | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmin(x, axis=axis, keepdims=keepdims))
+
+
+def argmax(x, /, *, axis: int | None = None, keepdims: bool = False):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmax(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
