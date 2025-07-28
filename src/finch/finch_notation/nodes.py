@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
-from ..symbolic import Term, TermTree
+from ..symbolic import Term, TermTree, literal_repr
 
 
 @dataclass(eq=True, frozen=True)
@@ -64,6 +64,9 @@ class Literal(NotationExpression):
     def result_format(self):
         return type(self.val)
 
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
+
 
 @dataclass(eq=True, frozen=True)
 class Value(NotationExpression):
@@ -78,6 +81,9 @@ class Value(NotationExpression):
     @property
     def result_format(self):
         return self.type_
+
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)
@@ -96,6 +102,9 @@ class Variable(NotationExpression):
     @property
     def result_format(self):
         return self.type_
+
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)
