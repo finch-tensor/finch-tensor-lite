@@ -230,16 +230,7 @@ def thaw(tns, op):
         return tns
 
 
-@dataclass(eq=True, frozen=True)
-class ExtentValue:
-    """
-    A class to represent the extent of a loop variable.
-    This is used to define the start and end values of a loop.
-    """
-
-    start: Any
-    end: Any
-
+class InterpreterExecutor:
     def loop(self, ctx, idx, body):
         for idx_e in range(self.start, self.end):
             # Create a new scope for each iteration
@@ -248,18 +239,6 @@ class ExtentValue:
             ctx_2.bindings[idx.name] = idx.type_(idx_e)
             # Execute the body of the loop
             ctx_2(body)
-
-
-def extent(start, end):
-    """
-    Create an extent value for a loop.
-    """
-    return ExtentValue(start, end)
-
-
-def dimension(tns, mode):
-    end = tns.shape[mode]
-    return extent(type(end)(0), end)
 
 
 class NotationInterpreterKernel:
@@ -444,9 +423,9 @@ class NotationInterpreter:
                 for body in bodies:
                     self(body)
                 return None
-            case ntn.Loop(idx, ext, body):
+            case ntn.Loop(idx, ext, exec, body):
                 ext_e = self(ext)
-                ext_e.loop(self, idx, body)
+                exec.loop(self, idx, ext_e, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 assert isinstance(tns, ntn.Slot)

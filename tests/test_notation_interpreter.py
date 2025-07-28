@@ -66,12 +66,15 @@ def test_matrix_multiplication(a, b):
                         ntn.Loop(
                             i,
                             m,
+                            ntn.Literal(None),
                             ntn.Loop(
                                 j,
                                 n,
+                                ntn.Literal(None),
                                 ntn.Loop(
                                     k,
                                     p,
+                                    ntn.Literal(None),
                                     ntn.Block(
                                         (
                                             ntn.Assign(

@@ -494,9 +494,9 @@ class NotationContext(Context):
                 for body in bodies:
                     self(body)
                 return None
-            case ntn.Loop(idx, ext, body):
+            case ntn.Loop(idx, ext, exec, body):
                 # first instantiate tensors
-                ext.result_format.lower_loop(self, idx, body)
+                exec.result_format.lower_loop(self, idx, ext, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 tns = self.resolve(tns)

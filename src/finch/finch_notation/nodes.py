@@ -6,7 +6,7 @@ from typing import Any
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Term, TermTree
+from ..symbolic import Format, Term, TermTree
 
 
 @dataclass(eq=True, frozen=True)
@@ -243,11 +243,61 @@ class Loop(NotationTree):
 
     idx: NotationNode
     ext: NotationNode
+    exec: NotationNode
     body: NotationNode
 
     @property
     def children(self):
-        return [self.idx, self.ext, self.body]
+        return [self.idx, self.ext, self.exec, self.body]
+
+
+@dataclass(eq=True, frozen=True)
+class Extent(NotationExpression):
+    """
+    A class to represent the extent of a loop variable.
+    This is used to define the start and end values of a loop.
+    """
+
+    start: Any
+    end: Any
+
+    def children(self):
+        return [self.start, self.end]
+
+
+@dataclass(eq=True, frozen=True)
+class ExtentValue:
+    """
+    A class to represent the extent of a loop variable.
+    This is used to define the start and end values of a loop.
+    """
+
+    start: Any
+    end: Any
+
+
+class ExtentValueFormat(Format):
+    """
+    A class to represent the extent of a loop variable.
+    This is used to define the start and end values of a loop.
+    """
+
+    start_type: Any
+    end_type: Any
+
+    def __eq__(self, other):
+        if not isinstance(other, ExtentValueFormat):
+            return False
+        return self.start_type == other.start_type and self.end_type == other.end_type
+
+    def __hash__(self):
+        return hash((self.start_type, self.end_type))
+
+    def __call__(self, start, end):
+        """
+        Create an extent value for a loop.
+        """
+        return ExtentValue(start, end)
 
 
 @dataclass(eq=True, frozen=True)

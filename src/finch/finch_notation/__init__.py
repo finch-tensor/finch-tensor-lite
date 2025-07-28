@@ -1,4 +1,4 @@
-from .interpreter import NotationInterpreter, TensorView, dimension, extent
+from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
     Assign,
@@ -6,6 +6,9 @@ from .nodes import (
     Cached,
     Call,
     Declare,
+    Extent,
+    ExtentValue,
+    ExtentValueFormat,
     Freeze,
     Function,
     If,
@@ -27,6 +30,8 @@ from .nodes import (
     Update,
     Value,
     Variable,
+    dimension,
+    extent,
 )
 
 __all__ = [
@@ -36,6 +41,9 @@ __all__ = [
     "Cached",
     "Call",
     "Declare",
+    "Extent",
+    "ExtentValue",
+    "ExtentValueFormat",
     "Freeze",
     "Function",
     "If",

@@ -243,13 +243,17 @@ class LogicLowerer:
                         body = ntn.Loop(
                             ntn.Variable(idx.name, int),
                             # TODO (mtsokol): Use correct loop index type
-                            ntn.Variable(f"{idx.name}_size", int),
+                            ntn.Extent(
+                                ntn.Literal(0), ntn.Variable(f"{idx.name}_size", int)
+                            ),
+                            ntn.Literal(None),
                             body,
                         )
                     elif idx in lhs_idxs:
                         body = ntn.Loop(
-                            ntn.Literal(1),
-                            ntn.Literal(1),
+                            ntn.Variable(idx.name, int),
+                            ntn.Extent(ntn.Literal(1), ntn.Literal(1)),
+                            ntn.Literal(None),
                             body,
                         )
 

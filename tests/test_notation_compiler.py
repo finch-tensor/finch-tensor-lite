@@ -8,7 +8,7 @@ import numpy as np
 import finch
 import finch.finch_notation as ntn
 from finch import format
-from finch.compile import NotationCompiler
+from finch.compile import ExtentFormat, NotationCompiler, dimension
 from finch.symbolic import Reflector
 
 
@@ -46,9 +46,9 @@ def test_matrix_multiplication(a, b):
     b_kj = ntn.Variable("b_kj", np.float64)
     c_ij = ntn.Variable("c_ij", np.float64)
 
-    m = ntn.Variable("m", finch.finch_notation.ExtentValueFormat(np.int64, np.int64))
-    n = ntn.Variable("n", finch.finch_notation.ExtentValueFormat(np.int64, np.int64))
-    p = ntn.Variable("p", finch.finch_notation.ExtentValueFormat(np.int64, np.int64))
+    m = ntn.Variable("m", ExtentFormat(np.int64, np.int64))
+    n = ntn.Variable("n", ExtentFormat(np.int64, np.int64))
+    p = ntn.Variable("p", ExtentFormat(np.int64, np.int64))
 
     prgm = ntn.Module(
         (
@@ -58,13 +58,13 @@ def test_matrix_multiplication(a, b):
                 ntn.Block(
                     (
                         ntn.Assign(
-                            m, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(0)))
+                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
                         ),
                         ntn.Assign(
-                            n, ntn.Call(ntn.Literal(ntn.dimension), (B, ntn.Literal(1)))
+                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
                         ),
                         ntn.Assign(
-                            p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))
+                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
                         ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
@@ -75,12 +75,15 @@ def test_matrix_multiplication(a, b):
                         ntn.Loop(
                             i,
                             m,
+                            ntn.Literal(None),
                             ntn.Loop(
                                 j,
                                 n,
+                                ntn.Literal(None),
                                 ntn.Loop(
                                     k,
                                     p,
+                                    ntn.Literal(None),
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -93,7 +96,7 @@ def test_matrix_multiplication(a, b):
                                                 b_kj,
                                                 ntn.Unwrap(
                                                     ntn.Access(B_, ntn.Read(), (k, j))
-                                               ),
+                                                ),
                                             ),
                                             ntn.Assign(
                                                 c_ij,
