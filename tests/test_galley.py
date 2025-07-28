@@ -96,7 +96,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size("k") == 4.0
     assert dsm.get_fill_value() == 0.0
 
-    dsa2 = DenseStats.from_tensor(2 * A, ["i", "j"])
+    dsa2 = DenseStats(2 * A, ["i", "j"])
     ds_sum = DenseStats.mapjoin(add, dsa, dsa2)
     assert ds_sum.get_fill_value() == 1 + 2
 

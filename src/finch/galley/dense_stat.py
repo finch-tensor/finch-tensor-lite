@@ -6,12 +6,10 @@ from .tensor_stats import TensorStats
 
 
 class DenseStats(TensorStats):
-    def __init__(self, tensor: Any, fields: Iterable[str]) -> None:
-        self.tensordef = TensorDef.from_tensor(tensor, fields)
 
     @classmethod
     def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> "DenseStats":
-        return cls(tensor, fields)
+        pass # Dense Stats only requires the TensorDef from the tensor, so no additional processing is needed
 
     @classmethod
     def from_def(cls, d: TensorDef) -> Self:

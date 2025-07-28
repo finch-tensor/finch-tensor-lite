@@ -9,6 +9,7 @@ class TensorStats(ABC):
     tensordef: TensorDef
 
     def __init__(self, tensor: Any, fields: Iterable[str]):
+        self.tensordef = TensorDef.from_tensor(tensor, fields)
         self.from_tensor(tensor, fields)
 
     @classmethod

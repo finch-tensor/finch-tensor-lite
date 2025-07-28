@@ -30,7 +30,7 @@ class TensorDef:
         )
 
     @classmethod
-    def from_tensor(klass, tensor: Any, indices: Iterable[str]) -> "TensorDef":
+    def from_tensor(cls, tensor: Any, indices: Iterable[str]) -> "TensorDef":
         """
         Storing axis, sizes, and fill_val of the tensor
 
@@ -49,7 +49,7 @@ class TensorDef:
         except (TypeError, ValueError):
             pass
 
-        return klass(
+        return cls(
             index_set=indices,
             dim_sizes=dim_sizes,
             fill_val=fv,
