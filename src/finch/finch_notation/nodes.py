@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
-from ..symbolic import LiteralRepr, Term, TermTree
+from ..symbolic import Term, TermTree, literal_repr
 
 
 @dataclass(eq=True, frozen=True)
@@ -53,7 +53,7 @@ class NotationExpression(NotationNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(NotationExpression, LiteralRepr):
+class Literal(NotationExpression):
     """
     Notation AST expression for the literal value `val`.
     """
@@ -65,11 +65,11 @@ class Literal(NotationExpression, LiteralRepr):
         return type(self.val)
 
     def __repr__(self) -> str:
-        return self.literal_repr()
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)
-class Value(NotationExpression, LiteralRepr):
+class Value(NotationExpression):
     """
     Notation AST expression for host code `val` expected to evaluate to a value of
     type `type_`.
@@ -83,11 +83,11 @@ class Value(NotationExpression, LiteralRepr):
         return self.type_
 
     def __repr__(self) -> str:
-        return self.literal_repr()
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(NotationExpression, LiteralRepr):
+class Variable(NotationExpression):
     """
     Notation AST expression for a variable named `name`.
 
@@ -104,7 +104,7 @@ class Variable(NotationExpression, LiteralRepr):
         return self.type_
 
     def __repr__(self) -> str:
-        return self.literal_repr()
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)

@@ -9,11 +9,11 @@ from .rewriters import (
     Rewrite,
 )
 from .term import (
-    LiteralRepr,
     PostOrderDFS,
     PreOrderDFS,
     Term,
     TermTree,
+    literal_repr,
 )
 
 __all__ = [
@@ -22,7 +22,6 @@ __all__ = [
     "Fixpoint",
     "Format",
     "Formattable",
-    "LiteralRepr",
     "Namespace",
     "PostOrderDFS",
     "PostWalk",
@@ -35,4 +34,5 @@ __all__ = [
     "format",
     "gensym",
     "has_format",
+    "literal_repr",
 ]

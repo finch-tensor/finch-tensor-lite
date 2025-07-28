@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Self
 
 import numpy as np
 
-from ..symbolic import LiteralRepr, Term, TermTree
+from ..symbolic import Term, TermTree, literal_repr
 
 
 @dataclass(eq=True, frozen=True)
@@ -52,7 +52,7 @@ class LogicExpression(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(LogicNode, LiteralRepr):
+class Literal(LogicNode):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -73,7 +73,7 @@ class Literal(LogicNode, LiteralRepr):
         return res.all() if isinstance(res, np.ndarray) else res
 
     def __repr__(self) -> str:
-        return self.literal_repr()
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)
