@@ -8,8 +8,6 @@ from .tensor_stats import TensorStats
 class DenseStats(TensorStats):
     @classmethod
     def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
-        # Dense Stats only requires the TensorDef from the tensor,
-        # so no additional processing is needed
         return None
 
     @classmethod
