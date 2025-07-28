@@ -55,6 +55,7 @@ class TensorStats(ABC):
         and only returns true if the tensors have the same dimensions and fill value
         """
         ...
+
     @property
     def get_dim_sizes(self) -> Mapping[str, float]:
         return self.tensordef.get_dim_sizes()
@@ -62,11 +63,11 @@ class TensorStats(ABC):
     @property
     def get_dim_size(self, idx: str) -> float:
         return self.tensordef.get_dim_size(idx)
-    
+
     @property
     def get_index_set(self) -> set[str]:
         return self.tensordef.get_index_set()
-    
+
     @property
     def get_fill_value(self) -> Any:
         return self.tensordef.get_fill_value()
