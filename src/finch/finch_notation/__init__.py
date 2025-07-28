@@ -30,8 +30,7 @@ from .nodes import (
     Update,
     Value,
     Variable,
-    dimension,
-    extent,
+    zero_to_extent,
 )
 
 __all__ = [
@@ -67,6 +66,5 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
-    "dimension",
-    "extent",
+    "zero_to_extent",
 ]

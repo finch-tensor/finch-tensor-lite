@@ -7,8 +7,7 @@ from .compile import (
     BufferizedNDArray,
     Extent,
     NotationContext,
-    dimension,
-    extent,
+    zero_to_extent,
 )
 from .interface import (
     EagerTensor,
@@ -137,11 +136,10 @@ __all__ = [
     "cos",
     "cosh",
     "defer",
-    "dimension",
+    "zero_to_extent",
     "element_type",
     "elementwise",
     "expand_dims",
-    "extent",
     "fill_value",
     "flatten",
     "floordiv",

@@ -4,6 +4,4 @@ __all__ = [
     "BufferizedNDArray",
     "NotationCompiler",
     "NotationContext",
-    "dimension",
-    "extent",
 ]

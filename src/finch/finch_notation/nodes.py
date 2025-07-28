@@ -299,6 +299,13 @@ class ExtentValueFormat(Format):
         """
         return ExtentValue(start, end)
 
+def zero_to_extent(end):
+    """
+    Returns an extent value with both start and end set to zero.
+    This is used to represent a loop that does not execute.
+    """
+    return ExtentValue(Literal(end.result_type(0)), end)
+
 
 @dataclass(eq=True, frozen=True)
 class If(NotationTree):

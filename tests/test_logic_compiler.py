@@ -113,11 +113,9 @@ def test_logic_compiler():
                     bodies=(
                         Assign(
                             lhs=Variable(name=":i0_size", type_=int),
-                            rhs=Call(
-                                op=ntn.Literal(val=ntn.dimension),
-                                args=(
-                                    Variable(name=":A0", type_=np.ndarray),
+                            rhs=ntn.Extent(
                                     ntn.Literal(val=0),
+                                    Variable(name=":A0", type_=np.ndarray),
                                 ),
                             ),
                         ),
