@@ -1,5 +1,4 @@
 from .lower import (
-    BufferizedNDArray,
     Extent,
     ExtentFormat,
     NotationCompiler,
@@ -7,6 +6,7 @@ from .lower import (
     dimension,
     extent,
 )
+from .buffferized_ndarray import BufferizedNDArray
 
 __all__ = [
     "BufferizedNDArray",

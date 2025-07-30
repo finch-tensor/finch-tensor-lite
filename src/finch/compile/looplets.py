@@ -1,11 +1,19 @@
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+from finch.compile.lower import LoopletPass
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..symbolic import PostWalk, Rewrite
 
+class Looplet(ABC):
+    @property
+    @abstractmethod
+    def pass_request(self):
+        ...
 
 @dataclass
 class Thunk:
@@ -13,17 +21,30 @@ class Thunk:
     body: Any = None
     epilogue: Any = None
 
+    @property
+    def pass_request(self):
+        return ThunkPass()
+
+class ThunkPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
+
 
 @dataclass
 class Switch:
-    cases: Any
-
-
-@dataclass
-class Case:
     cond: Any
-    body: Any
+    if_true: Any
+    if_false: Any
+    @property
+    def pass_request(self):
+        return SwitchPass()
 
+
+class SwitchPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
 
 @dataclass
 class Stepper:
@@ -36,35 +57,64 @@ class Stepper:
         NotImplementedError("seek not implemented error")
     )
 
+    @property
+    def pass_request(self):
+        return StepperPass()
+    
+class StepperPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
+
 
 @dataclass
 class Spike:
     body: Any
     tail: Any
 
+@dataclass
+class SpikePass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
+
 
 @dataclass
 class Sequence:
-    phases: Any
+    head: Any
+    split: Any
+    tail: Any
 
+@dataclass
+class SequencePass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
 
 @dataclass
 class Run:
     body: Any
 
+    @property
+    def pass_request(self):
+        return RunPass()
+
+class RunPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
 
 @dataclass
 class AcceptRun:
     body: Any
+    @property
+    def pass_request(self):
+        return AcceptRunPass()
 
-
-@dataclass
-class Phase:
-    body: Any
-    start: Callable = lambda ctx, ext: None
-    stop: Callable = lambda ctx, ext: None
-    range: Callable = lambda ctx, ext: None
-
+class AcceptRunPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
 
 @dataclass
 class Null:
@@ -75,30 +125,38 @@ class Null:
 class Lookup:
     body: Callable
 
-    def get_body(self, ctx, idx):
-        return self.body(ctx, idx)
+    @property
+    def pass_request(self):
+        return LookupPass()
 
 
-class LookupPass:
-    def __init__(self, body: Any):
-        self.body = body
+class LookupPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
 
-    def __call__(self, ctx, ext):
-        idx = asm.Variable(ctx.freshen(ctx.idx, "_lookup"))
+    def __call__(self, ctx, idx, ext, body):
+        idx_2 = asm.Variable(ctx.freshen("i"), idx.result_format)
 
-        def get_body(node):
+        def lookup_node(node):
             match node:
-                case ntn.Access(tns, _, (j, *_)):
-                    if j == self.ctx.idx:
-                        return tns.fmt.get_body(self.ctx, idx)
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx and isinstance(tns, Lookup):
+                        tns_2 = tns.body(
+                            ctx,
+                            idx_2,
+                        )
+                        return ntn.Access(tns_2, mode, (j, *idxs))
             return None
 
-        body_2 = self.ctx(Rewrite(PostWalk(get_body))(self.body))
-        return asm.ForLoop(
-            start=ext.start,
-            stop=ext.stop,
-            step=1,
-            body=body_2,
+        body_2 = PostWalk(lookup_node)(body)
+        ctx_2 = ctx.ctx.scope()
+        ctx_2(body_2)
+        body_3 = ctx_2.emit()
+        ctx.exec(
+            asm.ForLoop(
+                idx_2, ext.result_format.get_start(ext), ext.result_format.get_end(ext), body_3
+            )
         )
 
 
@@ -113,12 +171,25 @@ class Jumper:
         NotImplementedError("seek not implemented error")
     )
 
+    @property
+    def pass_request(self):
+        return JumperPass()
+    
+class JumperPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
+
 
 @dataclass
 class FillLeaf:
     body: Any
 
-
-@dataclass
-class ShortCircuitVisitor:
-    ctx: Any
+    @property
+    def pass_request(self):
+        return FillLeafPass()
+    
+class FillLeafPass(LoopletPass):
+    @property
+    def priority(self):
+        return 0
