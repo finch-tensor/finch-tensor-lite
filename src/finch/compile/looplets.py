@@ -7,13 +7,14 @@ from finch.compile.lower import LoopletPass
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..symbolic import PostWalk, Rewrite
+from ..symbolic import PostWalk
+
 
 class Looplet(ABC):
     @property
     @abstractmethod
-    def pass_request(self):
-        ...
+    def pass_request(self): ...
+
 
 @dataclass
 class Thunk:
@@ -24,6 +25,7 @@ class Thunk:
     @property
     def pass_request(self):
         return ThunkPass()
+
 
 class ThunkPass(LoopletPass):
     @property
@@ -36,6 +38,7 @@ class Switch:
     cond: Any
     if_true: Any
     if_false: Any
+
     @property
     def pass_request(self):
         return SwitchPass()
@@ -45,6 +48,7 @@ class SwitchPass(LoopletPass):
     @property
     def priority(self):
         return 0
+
 
 @dataclass
 class Stepper:
@@ -60,7 +64,8 @@ class Stepper:
     @property
     def pass_request(self):
         return StepperPass()
-    
+
+
 class StepperPass(LoopletPass):
     @property
     def priority(self):
@@ -71,6 +76,7 @@ class StepperPass(LoopletPass):
 class Spike:
     body: Any
     tail: Any
+
 
 @dataclass
 class SpikePass(LoopletPass):
@@ -85,11 +91,13 @@ class Sequence:
     split: Any
     tail: Any
 
+
 @dataclass
 class SequencePass(LoopletPass):
     @property
     def priority(self):
         return 0
+
 
 @dataclass
 class Run:
@@ -99,22 +107,27 @@ class Run:
     def pass_request(self):
         return RunPass()
 
+
 class RunPass(LoopletPass):
     @property
     def priority(self):
         return 0
 
+
 @dataclass
 class AcceptRun:
     body: Any
+
     @property
     def pass_request(self):
         return AcceptRunPass()
+
 
 class AcceptRunPass(LoopletPass):
     @property
     def priority(self):
         return 0
+
 
 @dataclass
 class Null:
@@ -155,7 +168,10 @@ class LookupPass(LoopletPass):
         body_3 = ctx_2.emit()
         ctx.exec(
             asm.ForLoop(
-                idx_2, ext.result_format.get_start(ext), ext.result_format.get_end(ext), body_3
+                idx_2,
+                ext.result_format.get_start(ext),
+                ext.result_format.get_end(ext),
+                body_3,
             )
         )
 
@@ -174,7 +190,8 @@ class Jumper:
     @property
     def pass_request(self):
         return JumperPass()
-    
+
+
 class JumperPass(LoopletPass):
     @property
     def priority(self):
@@ -188,7 +205,8 @@ class FillLeaf:
     @property
     def pass_request(self):
         return FillLeafPass()
-    
+
+
 class FillLeafPass(LoopletPass):
     @property
     def priority(self):

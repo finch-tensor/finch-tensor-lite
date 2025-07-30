@@ -1,16 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, NamedTuple
-
-import numpy as np
+from pprint import pprint
+from typing import Any
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor, TensorFormat
-from ..codegen import NumpyBuffer
-from ..finch_assembly import AssemblyStructFormat
-from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict, format
-from pprint import pprint
+from ..algebra import TensorFormat
+from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 
 
 class FinchTensorFormat(TensorFormat, ABC):
@@ -48,8 +44,6 @@ class FinchTensorFormat(TensorFormat, ABC):
 
     @abstractmethod
     def unfurl(ctx, tns, ext, proto): ...
-
-
 
 
 @dataclass(eq=True, frozen=True)
@@ -372,13 +366,7 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(
-                        ctx_2,
-                        tns,
-                        ext,
-                        mode,
-                        None
-                    )
+                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
@@ -409,7 +397,6 @@ class DefaultPass(LoopletPass):
         assert False
 
 
-
 class LoopletContext(Context):
     def __init__(self, ctx, idx):
         self.ctx = ctx
@@ -436,6 +423,7 @@ class LoopletContext(Context):
 
     def select_pass(self, body):
         pprint(body)
+
         def pass_request(node):
             match node:
                 case ntn.Access(tns, _, (j, *_)):

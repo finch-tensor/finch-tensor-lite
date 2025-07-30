@@ -1,19 +1,17 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, NamedTuple
 import operator
+from typing import Any, NamedTuple
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor, TensorFormat
+from ..algebra import Tensor
 from ..codegen import NumpyBuffer
 from ..finch_assembly import AssemblyStructFormat
-from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict, format
-from pprint import pprint
+from ..symbolic import format
 from .looplets import Lookup
 from .lower import FinchTensorFormat
+
 
 class BufferizedNDArray(Tensor):
     def __init__(self, arr: np.ndarray):
@@ -101,10 +99,12 @@ class BufferizedNDArray(Tensor):
             index = np.ravel_multi_index(index, self._shape)
         self.buf.store(index, value)
 
+
 class BufferizedNDArrayFields(NamedTuple):
     stride: tuple[asm.Variable, ...]
     buf: asm.Variable
     buf_s: asm.Slot
+
 
 class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
     """
@@ -174,7 +174,9 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
             op = mode.op
         tns = ctx.resolve(tns).obj
         acc_t = BufferizedNDArrayAccessorFormat(self, 0, self.buf.length_type, op)
-        obj = BufferizedNDArrayAccessorFields(tns, 0, asm.Literal(self.buf.length_type(0)), op)
+        obj = BufferizedNDArrayAccessorFields(
+            tns, 0, asm.Literal(self.buf.length_type(0)), op
+        )
         return acc_t.unfurl(ctx, obj, ext, mode, proto)
 
     def lower_unwrap(self, ctx, obj): ...
@@ -197,7 +199,6 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         ctx.exec(asm.Assign(buf, buf_e))
         buf_s = asm.Slot(f"{var_n}_buf", self.buf)
         ctx.exec(asm.Unpack(buf_s, buf))
-
 
         return BufferizedNDArrayFields(tuple(stride), buf, buf_s)
 
@@ -267,6 +268,7 @@ class BufferizedNDArrayAccessorFields(NamedTuple):
     pos: asm.AssemblyNode
     op: Any
 
+
 class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
     def __init__(self, tns, nind, pos, op):
         self.tns = tns
@@ -318,29 +320,31 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
         )
 
     def asm_unpack(self, ctx, var_n, val):
-            """
-            Unpack the into asm context.
-            """
-            tns = asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
-            nind = asm.Variable(f"{var_n}_nind", self.nind)
-            pos = asm.Variable(f"{var_n}_pos", self.pos)
-            op = asm.Variable(f"{var_n}_op", self.op)
-            ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
-            ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
-            ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
-            return BufferizedNDArrayFields(tns, pos, nind, op)
+        """
+        Unpack the into asm context.
+        """
+        tns = asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
+        nind = asm.Variable(f"{var_n}_nind", self.nind)
+        pos = asm.Variable(f"{var_n}_pos", self.pos)
+        op = asm.Variable(f"{var_n}_op", self.op)
+        ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
+        ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
+        ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
+        return BufferizedNDArrayFields(tns, pos, nind, op)
 
     def asm_repack(self, ctx, lhs, obj):
         """
         Repack the buffer from C context.
         """
-        asm_repack(ctx, lhs.tns, obj.tns),
-        ctx.exec(asm.Block(
-            asm.SetAttr(lhs, "tns", obj.tns),
-            asm.SetAttr(lhs, "pos", obj.pos),
-            asm.SetAttr(lhs, "nind", obj.nind),
-            asm.SetAttr(lhs, "op", obj.op)
-        ))
+        (asm_repack(ctx, lhs.tns, obj.tns),)
+        ctx.exec(
+            asm.Block(
+                asm.SetAttr(lhs, "tns", obj.tns),
+                asm.SetAttr(lhs, "pos", obj.pos),
+                asm.SetAttr(lhs, "nind", obj.nind),
+                asm.SetAttr(lhs, "op", obj.op),
+            )
+        )
 
     def lower_unwrap(self, ctx, obj): ...
 
@@ -351,34 +355,33 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
             pos_2 = asm.Variable(
                 ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.pos
             )
-            ctx.exec(asm.Assign(
-                pos_2,
-                asm.Call(
-                    asm.Literal(operator.add),
-                    [
-                        self.pos,
-                        asm.Call(
-                            asm.Literal(operator.mul),
-                            [
-                                tns.tns.stride[self.nind],
-                                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}")
-                            ]
-                        )
-                    ]
+            ctx.exec(
+                asm.Assign(
+                    pos_2,
+                    asm.Call(
+                        asm.Literal(operator.add),
+                        [
+                            self.pos,
+                            asm.Call(
+                                asm.Literal(operator.mul),
+                                [
+                                    tns.tns.stride[self.nind],
+                                    ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"),
+                                ],
+                            ),
+                        ],
+                    ),
                 )
-            ))
+            )
             return ntn.Stack(
                 BufferizedNDArrayAccessorFormat(
                     self.tns, self.nind + 1, pos_2, self.op
                 ),
                 BufferizedNDArrayAccessorFields(
-                    tns = tns.tns,
-                    nind = self.nind - 1,
-                    pos = pos_2,
-                    op = self.op
+                    tns=tns.tns, nind=self.nind - 1, pos=pos_2, op=self.op
                 ),
             )
 
         return Lookup(
-            body = child_accessor,
+            body=child_accessor,
         )
