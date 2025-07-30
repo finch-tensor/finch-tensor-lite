@@ -98,6 +98,114 @@ class ExtentFormat:
         return
 
 
+@dataclass(eq=True, frozen=True)
+class SingletonExtent:
+    idx: Any
+
+    def loop(self, ctx, idx, body):
+        # Create a new scope for each iteration
+        ctx_2 = ctx.scope(loop_state=HaltState())
+        # Assign the loop variable
+        ctx_2.bindings[idx.name] = idx.type_(self.idx)
+        # Execute the body of the loop
+        ctx_2(body)
+
+
+def extent(start, end):
+    """
+    Create an extent value for a loop.
+    """
+    return Extent(start, end)
+
+
+def dimension(tns, mode):
+    end = tns.shape[mode]
+    return extent(type(end)(0), end)
+
+class FinchCompileError(Exception):
+    """
+    Exception raised during Finch compilation.
+    This is used to indicate errors in the compilation process.
+    """
+
+    def __init__(self, node, message):
+        super().__init__(f"{message}:\n{pprint(node)}")
+        self.message = message
+        self.node = node
+
+@dataclass(eq=True, frozen=True)
+class ExtentFormat:
+    start: Any
+    end: Any
+
+    def get_start(self, ext):
+        return asm.GetAttr(ext, "start")
+
+    def get_end(self, ext):
+        return asm.GetAttr(ext, "end")
+
+    def lower_loop(self, ctx, idx, ext, body):
+        """
+        Lower a loop with the given index and body.
+        This is used to compile the loop into assembly.
+        """
+        lower_looplets(ctx, idx, ext, body)
+        return
+
+    def default_loop(self, ctx, idx, ext, body):
+        def assert_lowered(node):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx:
+                        raise FinchCompileError(node, f"Access with {j} should have been lowered already")
+            return None
+        map(assert_lowered, PostOrderDFS(body))
+
+        idx = asm.Variable(ctx.freshen(idx.name), idx.result_format)
+        ctx_2 = ctx.scope()
+        ctx_2.bindings[idx.name] = idx
+        body_2 = ctx_2(body)
+        body_3 = ctx_2.emit()
+        ctx.exec(
+            asm.ForLoop(
+                idx,
+                self.get_start(ext),
+                self.get_end(ext),
+                body_3,
+            )
+        )
+        return None
+
+
+@dataclass(eq=True, frozen=True)
+class SingletonExtentFormat:
+    idx: Any
+
+    def get_start(self, ext):
+        return asm.GetAttr(ext, "idx")
+
+    def get_end(self, ext):
+        return asm.GetAttr(ext, "idx")
+
+    def lower_loop(self, ctx, idx, ext, body):
+        lower_looplets(ctx, idx, ext, body)
+        return
+    
+    def default_loop(self, ctx, idx, ext, body):
+        def assert_lowered(node):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx:
+                        raise FinchCompileError(node, f"Access with {j} should have been lowered already")
+            return None
+        map(assert_lowered, PostOrderDFS(body))
+
+        ctx_2 = ctx.scope()
+        ctx_2.bindings[idx.name] = self.get_start(ext)
+        body_2 = ctx_2(body)
+        body_3 = ctx_2.emit()
+        return body_3
+
 @dataclass(eq=True)
 class HaltState:
     """
@@ -371,6 +479,8 @@ def lower_looplets(ctx, idx, ext, body):
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
+    pprint(body)
+    exit()
     ctx_3 = LoopletContext(ctx, idx)
     ctx_3(ext, body)
 

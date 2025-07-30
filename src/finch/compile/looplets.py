@@ -149,7 +149,7 @@ class LookupPass(LoopletPass):
         return 0
 
     def __call__(self, ctx, idx, ext, body):
-        idx_2 = asm.Variable(ctx.freshen("i"), idx.result_format)
+        idx_2 = asm.Variable(ctx.freshen(idx.name), idx.result_format)
 
         def lookup_node(node):
             match node:
@@ -163,15 +163,14 @@ class LookupPass(LoopletPass):
             return None
 
         body_2 = PostWalk(lookup_node)(body)
-        ctx_2 = ctx.ctx.scope()
-        ctx_2(body_2)
-        body_3 = ctx_2.emit()
+        ctx_2 = ctx.scope()
+        prgm = ctx_2(ntn.Loop(idx, ntn.Call(ntn.Literal(extent), (idx_2, idx_2)), body_2))
         ctx.exec(
             asm.ForLoop(
                 idx_2,
-                ext.result_format.get_start(ext),
+                ext.res. lt_format.get_start(ext),
                 ext.result_format.get_end(ext),
-                body_3,
+                prgm,
             )
         )
 
@@ -199,15 +198,24 @@ class JumperPass(LoopletPass):
 
 
 @dataclass
-class FillLeaf:
+class Leaf:
     body: Any
 
     @property
     def pass_request(self):
-        return FillLeafPass()
+        return LeafPass()
 
 
-class FillLeafPass(LoopletPass):
+class LeafPass(LoopletPass):
     @property
     def priority(self):
-        return 0
+        return 2
+
+    def __call__(self, ctx, idx, ext, body):
+        def leaf_node(node):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx and isinstance(tns, Leaf):
+                        return ntn.Access(tns.body, mode, idxs)
+            return None
+

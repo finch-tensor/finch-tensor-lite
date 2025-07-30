@@ -9,7 +9,7 @@ from ..algebra import Tensor
 from ..codegen import NumpyBuffer
 from ..finch_assembly import AssemblyStructFormat
 from ..symbolic import format
-from .looplets import Lookup
+from . import looplets as lplt
 from .lower import FinchTensorFormat
 
 
@@ -382,6 +382,8 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
                 ),
             )
 
-        return Lookup(
-            body=child_accessor,
+        return lplt.Lookup(
+            body=lplt.Leaf(
+                body = child_accessor,
+            )
         )
