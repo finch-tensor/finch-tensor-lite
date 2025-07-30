@@ -199,7 +199,7 @@ class JumperPass(LoopletPass):
 
 @dataclass
 class Leaf:
-    body: Any
+    body: Callable
 
     @property
     def pass_request(self):
@@ -216,6 +216,6 @@ class LeafPass(LoopletPass):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
                     if j == idx and isinstance(tns, Leaf):
-                        return ntn.Access(tns.body, mode, idxs)
+                        return ntn.Access(tns.body(ctx), mode, idxs)
             return None
 

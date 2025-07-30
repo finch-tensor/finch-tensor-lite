@@ -479,8 +479,6 @@ def lower_looplets(ctx, idx, ext, body):
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
-    pprint(body)
-    exit()
     ctx_3 = LoopletContext(ctx, idx)
     ctx_3(ext, body)
 

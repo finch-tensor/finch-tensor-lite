@@ -383,7 +383,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
             )
 
         return lplt.Lookup(
-            body=lplt.Leaf(
-                body = child_accessor,
+            body=lambda ctx, idx: lplt.Leaf(
+                body=lambda ctx: child_accessor(ctx, idx),
             )
         )
