@@ -323,7 +323,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
         """
         Unpack the into asm context.
         """
-        tns = asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
+        tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
         nind = asm.Variable(f"{var_n}_nind", self.nind)
         pos = asm.Variable(f"{var_n}_pos", self.pos)
         op = asm.Variable(f"{var_n}_op", self.op)
@@ -336,7 +336,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
         """
         Repack the buffer from C context.
         """
-        (asm_repack(ctx, lhs.tns, obj.tns),)
+        (self.tns.asm_repack(ctx, lhs.tns, obj.tns),)
         ctx.exec(
             asm.Block(
                 asm.SetAttr(lhs, "tns", obj.tns),
