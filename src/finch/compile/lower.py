@@ -533,8 +533,6 @@ class LoopletContext(Context):
         return self.ctx.emit()
 
     def select_pass(self, body):
-        pprint(body)
-
         def pass_request(node):
             match node:
                 case ntn.Access(tns, _, (j, *_)):
