@@ -79,23 +79,9 @@ def dimension(tns, mode):
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFormat:
+class ExtentFields:
     start: Any
     end: Any
-
-    def get_start(self, ext):
-        return asm.GetAttr(ext, "start")
-
-    def get_end(self, ext):
-        return asm.GetAttr(ext, "end")
-
-    def lower_loop(self, ctx, idx, ext, body):
-        """
-        Lower a loop with the given index and body.
-        This is used to compile the loop into assembly.
-        """
-        lower_looplets(ctx, idx, ext, body)
-        return
 
 
 @dataclass(eq=True, frozen=True)
@@ -138,6 +124,13 @@ class ExtentFormat:
     start: Any
     end: Any
 
+    @classmethod
+    def stack(cls, start, end):
+        return ntn.Stack(
+            ExtentFields(start, end),
+            ExtentFormat(start.result_format, end.result_format),
+        )
+
     def get_start(self, ext):
         return asm.GetAttr(ext, "start")
 
@@ -176,10 +169,20 @@ class ExtentFormat:
         )
         return None
 
+@dataclass(eq=True, frozen=True)
+class SingletonExtentFields:
+    idx:Any
 
 @dataclass(eq=True, frozen=True)
 class SingletonExtentFormat:
     idx: Any
+
+    @classmethod
+    def stack(cls, idx):
+        return ntn.Stack(
+            SingletonExtentFields(idx),
+            SingletonExtentFormat(idx.result_format),
+        )
 
     def get_start(self, ext):
         return asm.GetAttr(ext, "idx")
