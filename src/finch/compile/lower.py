@@ -97,17 +97,6 @@ class SingletonExtent:
         ctx_2(body)
 
 
-def extent(start, end):
-    """
-    Create an extent value for a loop.
-    """
-    return Extent(start, end)
-
-
-def dimension(tns, mode):
-    end = tns.shape[mode]
-    return extent(type(end)(0), end)
-
 class FinchCompileError(Exception):
     """
     Exception raised during Finch compilation.
@@ -118,6 +107,7 @@ class FinchCompileError(Exception):
         super().__init__(f"{message}:\n{pprint(node)}")
         self.message = message
         self.node = node
+
 
 @dataclass(eq=True, frozen=True)
 class ExtentFormat:
@@ -148,16 +138,19 @@ class ExtentFormat:
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
+                case ntn.Access(_, _, (j, *_)):
                     if j == idx:
-                        raise FinchCompileError(node, f"Access with {j} should have been lowered already")
-            return None
+                        raise FinchCompileError(
+                            node, f"Access with {j} should have been lowered already"
+                        )
+            return
+
         map(assert_lowered, PostOrderDFS(body))
 
         idx = asm.Variable(ctx.freshen(idx.name), idx.result_format)
         ctx_2 = ctx.scope()
         ctx_2.bindings[idx.name] = idx
-        body_2 = ctx_2(body)
+        ctx_2(body)
         body_3 = ctx_2.emit()
         ctx.exec(
             asm.ForLoop(
@@ -167,11 +160,13 @@ class ExtentFormat:
                 body_3,
             )
         )
-        return None
+        return
+
 
 @dataclass(eq=True, frozen=True)
 class SingletonExtentFields:
-    idx:Any
+    idx: Any
+
 
 @dataclass(eq=True, frozen=True)
 class SingletonExtentFormat:
@@ -193,21 +188,24 @@ class SingletonExtentFormat:
     def lower_loop(self, ctx, idx, ext, body):
         lower_looplets(ctx, idx, ext, body)
         return
-    
+
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
+                case ntn.Access(_, _, (j, *_)):
                     if j == idx:
-                        raise FinchCompileError(node, f"Access with {j} should have been lowered already")
-            return None
+                        raise FinchCompileError(
+                            node, f"Access with {j} should have been lowered already"
+                        )
+            return
+
         map(assert_lowered, PostOrderDFS(body))
 
         ctx_2 = ctx.scope()
         ctx_2.bindings[idx.name] = self.get_start(ext)
-        body_2 = ctx_2(body)
-        body_3 = ctx_2.emit()
-        return body_3
+        ctx_2(body)
+        return ctx_2.emit()
+
 
 @dataclass(eq=True)
 class HaltState:
@@ -362,9 +360,13 @@ class NotationContext(Context):
                 var_t.asm_repack(self, var_n, obj)
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
+                assert isinstance(mode, ntn.Read)
+                assert len(idxs) == 0
                 tns = self.resolve(tns)
                 return tns.result_format.lower_unwrap(self, tns.obj)
             case ntn.Increment(ntn.Access(tns, mode, idxs), val):
+                assert isinstance(mode, ntn.Update)
+                assert len(idxs) == 0
                 tns = self.resolve(tns)
                 val_e = self(val)
                 return tns.result_format.lower_increment(self, tns.obj, val_e)
@@ -505,7 +507,7 @@ class DefaultPass(LoopletPass):
         """
         Default pass that does nothing. This is used when no other pass is selected.
         """
-        assert False
+        ext.result_format.default_loop(ctx, idx, ext, body)
 
 
 class LoopletContext(Context):

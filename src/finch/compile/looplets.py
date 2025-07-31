@@ -142,7 +142,6 @@ class Lookup:
     def pass_request(self):
         return LookupPass()
 
-from pprint import pprint
 
 class LookupPass(LoopletPass):
     @property
@@ -213,11 +212,9 @@ class LeafPass(LoopletPass):
         def leaf_node(node):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
-                    acc = node
                     if j == idx and isinstance(tns, Leaf):
                         return ntn.Access(tns.body(ctx), mode, idxs)
             return None
-        
+
         body_2 = PostWalk(leaf_node)(body)
         ctx.ctx(body_2)
-

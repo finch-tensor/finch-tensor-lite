@@ -350,7 +350,13 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
         return asm.Load(obj.tns.buf, obj.pos)
 
     def lower_increment(self, ctx, obj, val):
-        ctx.exec(asm.Store(obj.tns.buf, obj.pos, asm.Call(asm.Literal(self.op), [asm.Load(obj.tns.buf, obj.pos), val])))
+        ctx.exec(
+            asm.Store(
+                obj.tns.buf,
+                obj.pos,
+                asm.Call(asm.Literal(self.op), [asm.Load(obj.tns.buf, obj.pos), val]),
+            )
+        )
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         def child_accessor(ctx, idx):

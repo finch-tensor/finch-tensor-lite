@@ -6,7 +6,7 @@ from typing import Any
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Term, TermTree, Format
+from ..symbolic import Format, Term, TermTree
 
 
 @dataclass(eq=True, frozen=True)
@@ -128,6 +128,7 @@ class AccessMode(NotationNode):
     Notation AST node representing the access mode of a tensor.
     """
 
+
 class AccessFormat(Format):
     obj: Any
 
@@ -149,6 +150,7 @@ class AccessFormat(Format):
         """
         return element_type(self.obj)
 
+
 @dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
@@ -164,8 +166,7 @@ class Access(NotationTree, NotationExpression):
     def result_format(self):
         if len(self.idxs) == 0:
             return self.tns.result_format
-        else:
-            return AccessFormat(self.tns.result_format)
+        return AccessFormat(self.tns.result_format)
 
     @classmethod
     def from_children(cls, tns, mode, *idxs):
@@ -239,6 +240,7 @@ class Unwrap(NotationTree):
         Returns the type of the unwrapped value.
         """
         return element_type(self.arg.result_format)
+
 
 @dataclass(eq=True, frozen=True)
 class Cached(NotationTree, NotationExpression):

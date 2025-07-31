@@ -31,7 +31,7 @@ def test_matrix_multiplication(a, b):
     k = ntn.Variable("k", np.int64)
 
     a_buf = finch.compile.BufferizedNDArray(a)
-    b_buf = finch.compile.BufferizedNDArray(b)
+    # b_buf = finch.compile.BufferizedNDArray(b)
 
     a_format = format(a_buf)
 
@@ -126,7 +126,7 @@ def test_matrix_multiplication(a, b):
         )
     )
 
-    mod = ntn.NotationInterpreter()(prgm)
+    # mod = ntn.NotationInterpreter()(prgm)
     pprint(NotationCompiler(Reflector())(prgm))
 
     # c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64,
