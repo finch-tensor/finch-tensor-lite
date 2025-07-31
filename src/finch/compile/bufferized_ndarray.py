@@ -145,7 +145,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
 
     @property
     def element_type(self):
-        return self.buf.dtype.type
+        return self.buf.element_type
 
     @property
     def shape_type(self) -> tuple:
@@ -177,7 +177,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         obj = BufferizedNDArrayAccessorFields(
             tns, 0, asm.Literal(self.buf.length_type(0)), op
         )
-        return acc_t.unfurl(ctx, obj, ext, mode, proto)
+        return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
 
     def lower_unwrap(self, ctx, obj): ...
 
@@ -346,9 +346,11 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
             )
         )
 
-    def lower_unwrap(self, ctx, obj): ...
+    def lower_unwrap(self, ctx, obj):
+        return asm.Load(obj.tns.buf, obj.pos)
 
-    def lower_increment(self, ctx, obj, val): ...
+    def lower_increment(self, ctx, obj, val):
+        ctx.exec(asm.Store(obj.tns.buf, obj.pos, asm.Call(asm.Literal(self.op), [asm.Load(obj.tns.buf, obj.pos), val])))
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         def child_accessor(ctx, idx):
@@ -365,7 +367,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [
-                                    tns.tns.stride[self.nind],
+                                    tns.obj.tns.stride[self.nind],
                                     ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"),
                                 ],
                             ),
@@ -374,11 +376,11 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
                 )
             )
             return ntn.Stack(
+                BufferizedNDArrayAccessorFields(
+                    tns=tns.obj.tns, nind=self.nind - 1, pos=pos_2, op=self.op
+                ),
                 BufferizedNDArrayAccessorFormat(
                     self.tns, self.nind + 1, pos_2, self.op
-                ),
-                BufferizedNDArrayAccessorFields(
-                    tns=tns.tns, nind=self.nind - 1, pos=pos_2, op=self.op
                 ),
             )
 

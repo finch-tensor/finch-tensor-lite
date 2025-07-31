@@ -1,4 +1,4 @@
-from .buffferized_ndarray import BufferizedNDArray
+from .bufferized_ndarray import BufferizedNDArray
 from .lower import (
     Extent,
     ExtentFormat,

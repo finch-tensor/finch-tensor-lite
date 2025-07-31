@@ -361,13 +361,13 @@ class NotationContext(Context):
                 obj = self.slots[var_n]
                 var_t.asm_repack(self, var_n, obj)
                 return None
-            case ntn.Access(_):
-                raise NotImplementedError("Access should have been lowered already.")
-            case ntn.Unwrap(tns):
-                return tns.format.lower_unwrap(self)
-            case ntn.Increment(tns, val):
+            case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
+                tns = self.resolve(tns)
+                return tns.result_format.lower_unwrap(self, tns.obj)
+            case ntn.Increment(ntn.Access(tns, mode, idxs), val):
+                tns = self.resolve(tns)
                 val_e = self(val)
-                return tns.format.lower_increment(self, val_e)
+                return tns.result_format.lower_increment(self, tns.obj, val_e)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)
@@ -548,4 +548,5 @@ class LoopletContext(Context):
             ctx_2 = self.ctx.scope()
             ctx_2(body)
             return ctx_2.emit()
-        return pass_(self, self.idx, ext, body)
+        pass_(self, self.idx, ext, body)
+        return None

@@ -6,7 +6,7 @@ from typing import Any
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Term, TermTree
+from ..symbolic import Term, TermTree, Format
 
 
 @dataclass(eq=True, frozen=True)
@@ -128,6 +128,26 @@ class AccessMode(NotationNode):
     Notation AST node representing the access mode of a tensor.
     """
 
+class AccessFormat(Format):
+    obj: Any
+
+    def __init__(self, obj: Any):
+        self.obj = obj
+
+    def __eq__(self, other):
+        if not isinstance(other, AccessFormat):
+            return False
+        return self.obj == other.obj
+
+    def __hash__(self):
+        return hash(self.obj)
+
+    @property
+    def element_type(self):
+        """
+        Returns the element type of the access format.
+        """
+        return element_type(self.obj)
 
 @dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
@@ -142,8 +162,10 @@ class Access(NotationTree, NotationExpression):
 
     @property
     def result_format(self):
-        # Placeholder: in a real system, would use tns/type system
-        return element_type(self.tns.result_format)
+        if len(self.idxs) == 0:
+            return self.tns.result_format
+        else:
+            return AccessFormat(self.tns.result_format)
 
     @classmethod
     def from_children(cls, tns, mode, *idxs):
@@ -212,6 +234,11 @@ class Unwrap(NotationTree):
     def children(self):
         return [self.arg]
 
+    def result_format(self):
+        """
+        Returns the type of the unwrapped value.
+        """
+        return element_type(self.arg.result_format)
 
 @dataclass(eq=True, frozen=True)
 class Cached(NotationTree, NotationExpression):

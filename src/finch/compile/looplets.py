@@ -142,6 +142,7 @@ class Lookup:
     def pass_request(self):
         return LookupPass()
 
+from pprint import pprint
 
 class LookupPass(LoopletPass):
     @property
@@ -166,6 +167,11 @@ class LookupPass(LoopletPass):
         ctx_2 = ctx.scope()
         ext_2 = SingletonExtentFormat.stack(idx_2)
         ctx_2(ext_2, body_2)
+        start = ext.result_format.get_start(ext)
+        stop = ext.result_format.get_end(ext)
+        body_3 = ctx_2.emit()
+        ctx.exec(asm.ForLoop(idx_2, start, stop, body_3))
+
 
 @dataclass
 class Jumper:
@@ -207,7 +213,11 @@ class LeafPass(LoopletPass):
         def leaf_node(node):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
+                    acc = node
                     if j == idx and isinstance(tns, Leaf):
                         return ntn.Access(tns.body(ctx), mode, idxs)
             return None
+        
+        body_2 = PostWalk(leaf_node)(body)
+        ctx.ctx(body_2)
 
