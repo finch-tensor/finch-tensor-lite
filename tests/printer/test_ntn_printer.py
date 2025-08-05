@@ -4,8 +4,8 @@ from textwrap import dedent
 import numpy as np
 
 import finch.finch_notation as ntn
-from finch.finch_notation.printer import PrinterCompiler
 from finch.compile import dimension
+from finch.finch_notation.printer import PrinterCompiler
 
 
 def test_printer():

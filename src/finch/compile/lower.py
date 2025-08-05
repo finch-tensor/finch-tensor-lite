@@ -359,12 +359,12 @@ class NotationContext(Context):
                 obj = self.slots[var_n]
                 var_t.asm_repack(self, var_n, obj)
                 return None
-            case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
+            case ntn.Unwrap(ntn.Access(tns, mode, _)):
                 assert isinstance(mode, ntn.Read)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
                 return tns.result_format.lower_unwrap(self, tns.obj)
-            case ntn.Increment(ntn.Access(tns, mode, idxs), val):
+            case ntn.Increment(ntn.Access(tns, mode, _), val):
                 assert isinstance(mode, ntn.Update)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
