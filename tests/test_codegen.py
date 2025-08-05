@@ -84,13 +84,13 @@ def test_codegen(compiler, buffer):
     buf = buffer(a)
 
     a_var = asm.Variable("a", buf.format)
-    i_var = asm.Variable("i", int)
-    length_var = asm.Variable("l", int)
+    i_var = asm.Variable("i", np.intp)
+    length_var = asm.Variable("l", np.intp)
     a_slt = asm.Slot("a_", buf.format)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("test_function", int),
+                asm.Variable("test_function", np.intp),
                 (a_var,),
                 asm.Block(
                     (

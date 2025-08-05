@@ -27,6 +27,7 @@ from finch.finch_notation import (  # noqa: F401
     Update,
     Variable,
 )
+from finch.compile import dimension
 
 
 @pytest.mark.parametrize(
@@ -70,13 +71,13 @@ def test_matrix_multiplication(a, b):
                 ntn.Block(
                     (
                         ntn.Assign(
-                            m, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(0)))
+                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
                         ),
                         ntn.Assign(
-                            n, ntn.Call(ntn.Literal(ntn.dimension), (B, ntn.Literal(1)))
+                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
                         ),
                         ntn.Assign(
-                            p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))
+                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
                         ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),

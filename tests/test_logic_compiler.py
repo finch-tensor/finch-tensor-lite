@@ -3,10 +3,10 @@ import operator
 import numpy as np
 
 import finch.finch_logic as logic
-import finch.finch_notation as ntn
 from finch.autoschedule import (
     LogicCompiler,
 )
+from finch.compile import dimension
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -28,14 +28,19 @@ from finch.finch_notation import (
     Freeze,
     Function,
     Increment,
+    Literal,
     Loop,
     Module,
+    NotationInterpreter,
     Read,
     Return,
+    Slot,
+    Unpack,
     Unwrap,
     Update,
     Variable,
 )
+from finch.finch_notation.nodes import Repack
 
 
 def test_logic_compiler():
@@ -114,34 +119,52 @@ def test_logic_compiler():
                         Assign(
                             lhs=Variable(name=":i0_size", type_=int),
                             rhs=Call(
-                                op=ntn.Literal(val=ntn.dimension),
-                                args=(Variable(name=":A0", type_=np.ndarray),),
+                                op=Literal(val=dimension),
+                                args=(
+                                    Variable(name=":A0", type_=np.ndarray),
+                                    Literal(val=0),
+                                ),
                             ),
                         ),
                         Assign(
                             lhs=Variable(name=":i1_size", type_=int),
                             rhs=Call(
-                                op=ntn.Literal(val=ntn.dimension),
-                                args=(Variable(name=":A0", type_=np.ndarray),),
+                                op=Literal(val=dimension),
+                                args=(
+                                    Variable(name=":A0", type_=np.ndarray),
+                                    Literal(val=1),
+                                ),
                             ),
                         ),
                         Assign(
                             lhs=Variable(name=":i2_size", type_=int),
                             rhs=Call(
-                                op=ntn.Literal(val=ntn.dimension),
-                                args=(Variable(name=":A1", type_=np.ndarray),),
+                                op=Literal(val=dimension),
+                                args=(
+                                    Variable(name=":A1", type_=np.ndarray),
+                                    Literal(val=1),
+                                ),
                             ),
                         ),
-                        Assign(
-                            lhs=Variable(name=":A2", type_=np.ndarray),
-                            rhs=Declare(
-                                tns=Variable(name=":A2", type_=np.ndarray),
-                                init=ntn.Literal(val=0),
-                                op=ntn.Literal(val=operator.add),
-                                shape=(
-                                    Variable(name=":i0_size", type_=int),
-                                    Variable(name=":i2_size", type_=int),
-                                ),
+                        Unpack(
+                            Slot(name=":A0_slot", type=np.ndarray),
+                            Variable(name=":A0", type_=np.ndarray),
+                        ),
+                        Unpack(
+                            Slot(name=":A1_slot", type=np.ndarray),
+                            Variable(name=":A1", type_=np.ndarray),
+                        ),
+                        Unpack(
+                            Slot(name=":A2_slot", type=np.ndarray),
+                            Variable(name=":A2", type_=np.ndarray),
+                        ),
+                        Declare(
+                            tns=Slot(name=":A2_slot", type=np.ndarray),
+                            init=Literal(val=0),
+                            op=Literal(val=operator.add),
+                            shape=(
+                                Variable(name=":i0_size", type_=int),
+                                Variable(name=":i2_size", type_=int),
                             ),
                         ),
                         Loop(
@@ -157,11 +180,11 @@ def test_logic_compiler():
                                         bodies=(
                                             Increment(
                                                 lhs=Access(
-                                                    tns=Variable(
-                                                        name=":A2", type_=np.ndarray
+                                                    tns=Slot(
+                                                        name=":A2_slot", type=np.ndarray
                                                     ),
                                                     mode=Update(
-                                                        op=ntn.Literal(val=operator.add)
+                                                        op=Literal(val=operator.add)
                                                     ),
                                                     idxs=(
                                                         Variable(name=":i0", type_=int),
@@ -169,13 +192,13 @@ def test_logic_compiler():
                                                     ),
                                                 ),
                                                 rhs=Call(
-                                                    op=ntn.Literal(val=operator.mul),
+                                                    op=Literal(val=operator.mul),
                                                     args=(
                                                         Unwrap(
                                                             arg=Access(
-                                                                tns=Variable(
-                                                                    name=":A0",
-                                                                    type_=np.ndarray,
+                                                                tns=Slot(
+                                                                    name=":A0_slot",
+                                                                    type=np.ndarray,
                                                                 ),
                                                                 mode=Read(),
                                                                 idxs=(
@@ -192,9 +215,9 @@ def test_logic_compiler():
                                                         ),
                                                         Unwrap(
                                                             arg=Access(
-                                                                tns=Variable(
-                                                                    name=":A1",
-                                                                    type_=np.ndarray,
+                                                                tns=Slot(
+                                                                    name=":A1_slot",
+                                                                    type=np.ndarray,
                                                                 ),
                                                                 mode=Read(),
                                                                 idxs=(
@@ -217,13 +240,11 @@ def test_logic_compiler():
                                 ),
                             ),
                         ),
-                        Assign(
-                            lhs=Variable(name=":A2", type_=np.ndarray),
-                            rhs=Freeze(
-                                tns=Variable(name=":A2", type_=np.ndarray),
-                                op=ntn.Literal(val=operator.add),
-                            ),
+                        Freeze(
+                            tns=Slot(name=":A2_slot", type=np.ndarray),
+                            op=Literal(val=operator.add),
                         ),
+                        Repack(val=Slot(name=":A2_slot", type=np.ndarray)),
                         Return(val=Variable(name=":A2", type_=np.ndarray)),
                     )
                 ),
@@ -235,7 +256,7 @@ def test_logic_compiler():
 
     assert program == expected_program
 
-    mod = ntn.NotationInterpreter()(program)
+    mod = NotationInterpreter()(program)
     args = [tables[logic.Alias(arg.name)] for arg in program.funcs[0].args]
 
     result = mod.func(*args)
