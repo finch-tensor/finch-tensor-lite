@@ -117,34 +117,32 @@ def test_aggregate_and_issimilar():
 
 # ─────────────────────────────── DCStats tests ─────────────────────────────
 
-def test_vector_dc_stats():
-    vector = np.array([1.0, 0.0, 3.0])
-    stats = DCStats(vector, ["i"])
-    dcs = stats.dcs
 
-    expected = {
-        DC(frozenset(), frozenset(["i"]), 2.0)
-    }
-
-    assert dcs == expected
-
-
-def test_matrix_dc_stats():
-    matrix = np.array([
-        [1.0, 0.0, 2.0],
-        [0.0, 0.0, 0.0],
-        [3.0, 4.0, 0.0],
-    ])
-    stats = DCStats(matrix, ["i", "j"])
-    dcs = stats.dcs
-
-    i, j = "i", "j"
-    expected = {
-        DC(frozenset(), frozenset([i, j]), 4.0),
-        DC(frozenset(), frozenset([i]), 2.0),
-        DC(frozenset(), frozenset([j]), 3.0),
-        DC(frozenset([i]), frozenset([i, j]), 2.0),
-        DC(frozenset([j]), frozenset([i, j]), 2.0),
-    }
-
-    assert dcs == expected
+@pytest.mark.parametrize(
+    "tensor, fields, expected_dcs",
+    [
+        (
+            np.array([1.0, 0.0, 3.0]),
+            ["i"],
+            {DC(frozenset(), frozenset(["i"]), 2.0)}
+        ),
+        (
+            np.array([
+                [1.0, 0.0, 2.0],
+                [0.0, 0.0, 0.0],
+                [3.0, 4.0, 0.0],
+            ]),
+            ["i", "j"],
+            {
+                DC(frozenset(), frozenset(["i", "j"]), 4.0),
+                DC(frozenset(), frozenset(["i"]), 2.0),
+                DC(frozenset(), frozenset(["j"]), 3.0),
+                DC(frozenset(["i"]), frozenset(["i", "j"]), 2.0),
+                DC(frozenset(["j"]), frozenset(["i", "j"]), 2.0),
+            }
+        )
+    ]
+)
+def test_dc_stats(tensor, fields, expected_dcs):
+    stats = DCStats(tensor, fields)
+    assert stats.dcs == expected_dcs
