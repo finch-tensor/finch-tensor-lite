@@ -13,6 +13,7 @@ from .term import (
     PreOrderDFS,
     Term,
     TermTree,
+    literal_repr,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "format",
     "gensym",
     "has_format",
+    "literal_repr",
 ]
