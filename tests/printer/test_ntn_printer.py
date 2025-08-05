@@ -5,6 +5,7 @@ import numpy as np
 
 import finch.finch_notation as ntn
 from finch.finch_notation.printer import PrinterCompiler
+from finch.compile import dimension
 
 
 def test_printer():
@@ -34,13 +35,13 @@ def test_printer():
                 ntn.Block(
                     (
                         ntn.Assign(
-                            m, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(0)))
+                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
                         ),
                         ntn.Assign(
-                            n, ntn.Call(ntn.Literal(ntn.dimension), (B, ntn.Literal(1)))
+                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
                         ),
                         ntn.Assign(
-                            p, ntn.Call(ntn.Literal(ntn.dimension), (A, ntn.Literal(1)))
+                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
                         ),
                         ntn.Assign(
                             C,
