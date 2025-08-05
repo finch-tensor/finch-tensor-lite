@@ -1,8 +1,10 @@
+import _operator  # noqa: F401
 from operator import add, mul
 
 import pytest
 
 import numpy as np
+from numpy import array  # noqa: F401
 from numpy.testing import assert_equal
 
 from finch.finch_logic import (
@@ -50,3 +52,5 @@ def test_matrix_multiplication(a, b):
     expected = np.matmul(a, b)
 
     assert_equal(result, expected)
+
+    assert p == eval(repr(p))

@@ -1,48 +1,15 @@
-import _operator  # noqa: F401
 import operator
+from textwrap import dedent
 
-import pytest
-
-import numpy  # noqa: F401, ICN001
 import numpy as np
-from numpy.testing import assert_equal
 
-import finch  # noqa: F401
 import finch.finch_notation as ntn
-from finch.finch_notation import (  # noqa: F401
-    Access,
-    Assign,
-    Block,
-    Call,
-    Declare,
-    Freeze,
-    Function,
-    Increment,
-    Literal,
-    Loop,
-    Module,
-    Read,
-    Return,
-    Unwrap,
-    Update,
-    Variable,
-)
+from finch.finch_notation.printer import PrinterCompiler
 
 
-@pytest.mark.parametrize(
-    "a, b",
-    [
-        (
-            np.array([[1, 2], [3, 4]], dtype=np.float64),
-            np.array([[5, 6], [7, 8]], dtype=np.float64),
-        ),
-        (
-            np.array([[2, 0], [1, 3]], dtype=np.float64),
-            np.array([[4, 1], [2, 2]], dtype=np.float64),
-        ),
-    ],
-)
-def test_matrix_multiplication(a, b):
+def test_printer():
+    pc = PrinterCompiler()
+
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
@@ -137,13 +104,23 @@ def test_matrix_multiplication(a, b):
         )
     )
 
-    mod = ntn.NotationInterpreter()(prgm)
+    actual = pc(prgm)
 
-    c = np.zeros(dtype=np.float64, shape=())
-    result = mod.matmul(c, a, b)
+    expected = dedent("""\
+    def matmul(C: ndarray, A: ndarray, B: ndarray) -> ndarray:
+        m: int64 = dimension(A, 0)
+        n: int64 = dimension(B, 1)
+        p: int64 = dimension(A, 1)
+        C: ndarray = declare(C, 0.0, add, ['m', 'n'])
+        loop(i, m):
+            loop(j, n):
+                loop(k, p):
+                    a_ik: float64 = unwrap(read(A, ['i', 'k']))
+                    b_kj: float64 = unwrap(read(B, ['k', 'j']))
+                    c_ij: float64 = mul(a_ik, b_kj)
+                    increment(update(C, ['i', 'j'], add), c_ij)
+        C: ndarray = freeze(C, add)
+        return C
+    """)
 
-    expected = np.matmul(a, b)
-
-    assert_equal(result, expected)
-
-    assert prgm == eval(repr(prgm))
+    assert expected == actual
