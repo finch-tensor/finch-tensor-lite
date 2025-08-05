@@ -6,6 +6,7 @@ import numpy as np
 
 from finch.galley.dense_stat import DenseStats
 from finch.galley.tensor_def import TensorDef
+from finch.galley.dc_stats import DCStats, DC
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
@@ -113,3 +114,37 @@ def test_aggregate_and_issimilar():
     B = np.ones((3, 4))
     dsb = DenseStats.from_tensor(B, ["j", "k"])
     assert not DenseStats.issimilar(dsa, dsb)
+
+# ─────────────────────────────── DCStats tests ─────────────────────────────
+
+def test_vector_dc_stats():
+    vector = np.array([1.0, 0.0, 3.0])
+    stats = DCStats(vector, ["i"])
+    dcs = stats.dcs
+
+    expected = {
+        DC(frozenset(), frozenset(["i"]), 2.0)
+    }
+
+    assert dcs == expected
+
+
+def test_matrix_dc_stats():
+    matrix = np.array([
+        [1.0, 0.0, 2.0],
+        [0.0, 0.0, 0.0],
+        [3.0, 4.0, 0.0],
+    ])
+    stats = DCStats(matrix, ["i", "j"])
+    dcs = stats.dcs
+
+    i, j = "i", "j"
+    expected = {
+        DC(frozenset(), frozenset([i, j]), 4.0),
+        DC(frozenset(), frozenset([i]), 2.0),
+        DC(frozenset(), frozenset([j]), 3.0),
+        DC(frozenset([i]), frozenset([i, j]), 2.0),
+        DC(frozenset([j]), frozenset([i, j]), 2.0),
+    }
+
+    assert dcs == expected

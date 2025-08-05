@@ -6,6 +6,8 @@ from .codegen import (
 from .galley import (
     DenseStats,
     TensorDef,
+    DCStats,
+    DC,
 )
 from .interface import (
     EagerTensor,
@@ -180,4 +182,6 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
+    "DCStats",
+    "DC",
 ]
