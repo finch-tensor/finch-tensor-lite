@@ -9,6 +9,7 @@ from numpy.testing import assert_equal
 
 import finch  # noqa: F401
 import finch.finch_notation as ntn
+from finch.compile import dimension
 from finch.finch_notation import (  # noqa: F401
     Access,
     Assign,
@@ -22,12 +23,14 @@ from finch.finch_notation import (  # noqa: F401
     Loop,
     Module,
     Read,
+    Repack,
     Return,
+    Slot,
+    Unpack,
     Unwrap,
     Update,
     Variable,
 )
-from finch.compile import dimension
 
 
 @pytest.mark.parametrize(

@@ -5,12 +5,8 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
-
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Format, Term, TermTree
-
-from ..symbolic import Term, TermTree, literal_repr
-
+from ..symbolic import Format, Term, TermTree, literal_repr
 
 
 @dataclass(eq=True, frozen=True)
@@ -374,6 +370,9 @@ class Slot(NotationExpression):
     def result_format(self):
         """Returns the type of the expression."""
         return self.type
+
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
 
 
 @dataclass(eq=True, frozen=True)

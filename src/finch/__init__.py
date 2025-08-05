@@ -3,7 +3,6 @@ from .codegen import (
     NumpyBuffer,
     NumpyBufferFormat,
 )
-
 from .compile import (
     BufferizedNDArray,
     Extent,
@@ -11,11 +10,10 @@ from .compile import (
     NotationContext,
     dimension,
     extent,
-
+)
 from .galley import (
     DenseStats,
     TensorDef,
-
 )
 from .interface import (
     EagerTensor,
