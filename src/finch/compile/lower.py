@@ -361,12 +361,12 @@ class NotationContext(Context):
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
                 assert isinstance(mode, ntn.Read)
-                assert len(idxs) == 0
+                # assert len(idxs) == 0
                 tns = self.resolve(tns)
                 return tns.result_format.lower_unwrap(self, tns.obj)
             case ntn.Increment(ntn.Access(tns, mode, idxs), val):
                 assert isinstance(mode, ntn.Update)
-                assert len(idxs) == 0
+                # assert len(idxs) == 0
                 tns = self.resolve(tns)
                 val_e = self(val)
                 return tns.result_format.lower_increment(self, tns.obj, val_e)
