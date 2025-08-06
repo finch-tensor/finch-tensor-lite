@@ -134,7 +134,7 @@ def test_matrix_multiplication(a, b):
                             ),
                         ),
                         ntn.Freeze(C_, ntn.Literal(operator.add)),
-                        ntn.Repack(C_),
+                        ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
                 ),

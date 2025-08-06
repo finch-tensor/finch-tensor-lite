@@ -400,18 +400,20 @@ class Unpack(NotationTree):
 class Repack(NotationTree):
     """
     Registers updates from a symbolic object `val` with the original
-    object. The original object may now be accessed and modified.
+    object `obj`. The original object may now be accessed and modified.
 
     Attributes:
         slot: The symbolic object to read from.
+        obj: The original object to write to.
     """
 
     val: Slot
+    obj: NotationExpression
 
     @property
     def children(self):
         """Returns the children of the node."""
-        return [self.val]
+        return [self.val, self.obj]
 
 
 @dataclass(eq=True, frozen=True)

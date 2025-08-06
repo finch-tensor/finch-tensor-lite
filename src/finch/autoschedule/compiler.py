@@ -271,7 +271,7 @@ class LogicLowerer:
                         declaration,
                         body,
                         ntn.Freeze(agg_slot, ntn.Literal(op)),
-                        ntn.Repack(agg_slot),
+                        ntn.Repack(agg_slot, agg_var),
                     )
                 )
 
@@ -413,11 +413,6 @@ def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:
     return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
 
-# def fetch_declaration(root: ntn.NotationNode):
-
-#     def rule_0():
-
-
 class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
@@ -429,16 +424,11 @@ class LogicCompiler:
         prgm, table_vars, slot_vars, dim_size_vars, tables = record_tables(prgm)
         lowered_prgm = self.ll(prgm, table_vars, slot_vars, dim_size_vars)
 
-        # print(table_vars)
-        # print(slot_vars)
-        # print(dim_size_vars)
-        # print(tables)
-
         for table_var in table_vars:
             # include return tables and intermediaries
             if table_var not in tables:
                 tables[table_var] = np.zeros(
-                    dtype=np.float64, shape=(2, 2)
+                    dtype=np.float64, shape=()
                 )  # TODO: select correct dtype
 
         return merge_blocks(lowered_prgm), tables

@@ -351,7 +351,7 @@ class NotationContext(Context):
                     self, var_n, ntn.Variable(var_n, var_t)
                 )
                 return None
-            case ntn.Repack(ntn.Slot(var_n, var_t)):
+            case ntn.Repack(ntn.Slot(var_n, var_t), _):
                 if var_n not in self.slots or var_n not in self.types:
                     raise KeyError(f"Slot {var_n} not found in context, cannot repack")
                 if var_t != self.types[var_n]:

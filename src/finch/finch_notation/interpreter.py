@@ -194,12 +194,17 @@ def np_declare(tns, init, op, shape):
                 f"Invalid dimension start value {dim.start} for ndarray declaration."
             )
     shape = tuple(dim.end for dim in shape)
+
     if tns.shape != shape:
-        raise ValueError(
-            f"Shape mismatch: cannot resize numpy array. Expected {shape},"
-            f" got {tns.shape} for ndarray declaration."
-        )
-    tns.fill(init)
+        if tns.shape == ():
+            tns = np.full(shape, init, tns.dtype)
+        else:
+            raise ValueError(
+                f"Shape mismatch: cannot resize numpy array. Expected {shape},"
+                f" got {tns.shape} for ndarray declaration."
+            )
+    else:
+        tns.fill(init)
     return tns
 
 
@@ -386,11 +391,13 @@ class NotationInterpreter:
                 )
                 self.types[var_n] = var_t
                 self.slots[var_n] = val_e
-                val_e = self(val)
                 return None
-            case ntn.Repack(ntn.Slot(var_n, var_t)):
-                self.bindings[var_n] = self.slots[var_n]
-                return None
+            case ntn.Repack(ntn.Slot(var_n, var_t), val):
+                if isinstance(val, ntn.Variable):
+                    val_n = val.name
+                    self.bindings[val_n] = self.slots[var_n]
+                    return None
+                raise NotImplementedError(f"Unrecognized repack obj target: {val}")
             case ntn.Access(tns, mode, idxs):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)

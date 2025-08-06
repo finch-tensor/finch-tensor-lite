@@ -244,7 +244,10 @@ def test_logic_compiler():
                             tns=Slot(name=":A2_slot", type=np.ndarray),
                             op=Literal(val=operator.add),
                         ),
-                        Repack(val=Slot(name=":A2_slot", type=np.ndarray)),
+                        Repack(
+                            val=Slot(name=":A2_slot", type=np.ndarray),
+                            obj=Variable(name=":A2", type_=np.ndarray),
+                        ),
                         Return(val=Variable(name=":A2", type_=np.ndarray)),
                     )
                 ),

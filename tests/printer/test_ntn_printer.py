@@ -18,6 +18,9 @@ def test_printer():
     A = ntn.Variable("A", np.ndarray)
     B = ntn.Variable("B", np.ndarray)
     C = ntn.Variable("C", np.ndarray)
+    A_ = ntn.Slot("A_", np.ndarray)
+    B_ = ntn.Slot("B_", np.ndarray)
+    C_ = ntn.Slot("C_", np.ndarray)
 
     a_ik = ntn.Variable("a_ik", np.float64)
     b_kj = ntn.Variable("b_kj", np.float64)
@@ -43,11 +46,11 @@ def test_printer():
                         ntn.Assign(
                             p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
                         ),
-                        ntn.Assign(
-                            C,
-                            ntn.Declare(
-                                C, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
-                            ),
+                        ntn.Unpack(A_, A),
+                        ntn.Unpack(B_, B),
+                        ntn.Unpack(C_, C),
+                        ntn.Declare(
+                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
@@ -63,13 +66,13 @@ def test_printer():
                                             ntn.Assign(
                                                 a_ik,
                                                 ntn.Unwrap(
-                                                    ntn.Access(A, ntn.Read(), (i, k))
+                                                    ntn.Access(A_, ntn.Read(), (i, k))
                                                 ),
                                             ),
                                             ntn.Assign(
                                                 b_kj,
                                                 ntn.Unwrap(
-                                                    ntn.Access(B, ntn.Read(), (k, j))
+                                                    ntn.Access(B_, ntn.Read(), (k, j))
                                                 ),
                                             ),
                                             ntn.Assign(
@@ -81,7 +84,7 @@ def test_printer():
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
-                                                    C,
+                                                    C_,
                                                     ntn.Update(
                                                         ntn.Literal(operator.add)
                                                     ),
@@ -94,9 +97,10 @@ def test_printer():
                                 ),
                             ),
                         ),
-                        ntn.Assign(
-                            C,
-                            ntn.Freeze(C, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Repack(
+                            val=C_,
+                            obj=C,
                         ),
                         ntn.Return(C),
                     )
@@ -112,15 +116,19 @@ def test_printer():
         m: int64 = dimension(A, 0)
         n: int64 = dimension(B, 1)
         p: int64 = dimension(A, 1)
-        C: ndarray = declare(C, 0.0, add, ['m', 'n'])
+        A_: ndarray = unpack(A)
+        B_: ndarray = unpack(B)
+        C_: ndarray = unpack(C)
+        declare(C_, 0.0, add, ['m', 'n'])
         loop(i, m):
             loop(j, n):
                 loop(k, p):
-                    a_ik: float64 = unwrap(read(A, ['i', 'k']))
-                    b_kj: float64 = unwrap(read(B, ['k', 'j']))
+                    a_ik: float64 = unwrap(read(A_, ['i', 'k']))
+                    b_kj: float64 = unwrap(read(B_, ['k', 'j']))
                     c_ij: float64 = mul(a_ik, b_kj)
-                    increment(update(C, ['i', 'j'], add), c_ij)
-        C: ndarray = freeze(C, add)
+                    increment(update(C_, ['i', 'j'], add), c_ij)
+        freeze(C_, add)
+        repack(C_, C)
         return C
     """)
 

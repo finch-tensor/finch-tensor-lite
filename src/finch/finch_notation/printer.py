@@ -18,8 +18,11 @@ from .nodes import (
     Module,
     NotationNode,
     Read,
+    Repack,
     Return,
+    Slot,
     Thaw,
+    Unpack,
     Unwrap,
     Update,
     Variable,
@@ -70,6 +73,8 @@ class PrinterContext(Context):
                 return _get_str(value)
             case Variable(name, _):
                 return str(name)
+            case Slot(name, _):
+                return str(name)
             case Call(f, args):
                 return f"{self(f)}({', '.join(self(arg) for arg in args)})"
             case Unwrap(tns):
@@ -110,11 +115,21 @@ class PrinterContext(Context):
                 return None
             case Declare(tns, init, op, shape):
                 shape_e = [self(s) for s in shape]
-                return f"declare({self(tns)}, {self(init)}, {self(op)}, {shape_e})"
+                self.exec(
+                    f"{feed}declare({self(tns)}, {self(init)}, {self(op)}, {shape_e})"
+                )
+                return None
             case Freeze(tns, op):
-                return f"freeze({self(tns)}, {self(op)})"
+                self.exec(f"{feed}freeze({self(tns)}, {self(op)})")
+                return None
             case Thaw(tns, op):
                 return f"thaw({self(tns)}, {self(op)})"
+            case Unpack(Slot(var_n, var_t), val):
+                self.exec(f"{feed}{var_n}: {_get_str(var_t)} = unpack({self(val)})")
+                return None
+            case Repack(Slot(var_n, var_t), obj):
+                self.exec(f"{feed}repack({var_n}, {self(obj)})")
+                return None
             case If(cond, body):
                 cond_code = self(cond)
                 ctx_2 = self.subblock()
