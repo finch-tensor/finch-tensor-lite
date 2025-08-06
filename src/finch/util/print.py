@@ -11,11 +11,11 @@ from finch.finch_notation import Module as NotationModule
 from finch.finch_notation.printer import PrinterCompiler as ntn_printer
 
 
-def print_finch_program(program):
+def print_finch_program(program: LogicNode | NotationModule | AssemblyModule) -> str:
     """
     Print a Finch program in a human-readable format.
     Args:
-        program (LogicNode | NotationNode | AssemblyNode): The program to print.
+        program: The program to print.
     Returns:
         str: The printed program.
     """
