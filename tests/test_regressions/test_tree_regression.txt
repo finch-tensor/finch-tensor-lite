@@ -1,0 +1,11 @@
+def func(:A0: ndarray, :A1: ndarray, :A2: ndarray) -> ndarray:
+    :i0_size: int = dimension(:A0, 0)
+    :i1_size: int = dimension(:A0, 1)
+    :i2_size: int = dimension(:A1, 1)
+    :A2: ndarray = declare(:A2, 0, add, [':i0_size', ':i2_size'])
+    loop(:i2, :i2_size):
+        loop(:i1, :i1_size):
+            loop(:i0, :i0_size):
+                increment(update(:A2, [':i0', ':i2'], add), mul(unwrap(read(:A0, [':i0', ':i1'])), unwrap(read(:A1, [':i1', ':i2']))))
+    :A2: ndarray = freeze(:A2, add)
+    return :A2
