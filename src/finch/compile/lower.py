@@ -5,11 +5,11 @@ from typing import Any
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFormat
+from ..algebra import TensorFType
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 
 
-class FinchTensorFormat(TensorFormat, ABC):
+class FinchTensorFType(TensorFType, ABC):
     @abstractmethod
     def lower_unwrap(tns):
         """
@@ -110,7 +110,7 @@ class FinchCompileError(Exception):
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFormat:
+class ExtentFType:
     start: Any
     end: Any
 
@@ -118,7 +118,7 @@ class ExtentFormat:
     def stack(cls, start, end):
         return ntn.Stack(
             ExtentFields(start, end),
-            ExtentFormat(start.result_format, end.result_format),
+            ExtentFType(start.result_format, end.result_format),
         )
 
     def get_start(self, ext):
@@ -169,14 +169,14 @@ class SingletonExtentFields:
 
 
 @dataclass(eq=True, frozen=True)
-class SingletonExtentFormat:
+class SingletonExtentFType:
     idx: Any
 
     @classmethod
     def stack(cls, idx):
         return ntn.Stack(
             SingletonExtentFields(idx),
-            SingletonExtentFormat(idx.result_format),
+            SingletonExtentFType(idx.result_format),
         )
 
     def get_start(self, ext):

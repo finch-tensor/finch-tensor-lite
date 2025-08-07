@@ -4,8 +4,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import InitWrite, TensorFormat, query_property, return_type
-from ..algebra.tensor import NDArrayFormat
+from ..algebra import InitWrite, TensorFType, query_property, return_type
+from ..algebra.tensor import NDArrayFType
 from ..compile import dimension
 from ..finch_logic import (
     Aggregate,
@@ -26,7 +26,7 @@ from ..finch_logic import (
     Table,
     Value,
 )
-from ..symbolic import Fixpoint, PostWalk, Rewrite, format
+from ..symbolic import Fixpoint, PostWalk, Rewrite, ftype
 from ._utils import intersect, setdiff, with_subsequence
 
 T = TypeVar("T", bound="LogicNode")
@@ -186,7 +186,7 @@ class LogicLowerer:
         match ex:
             case Query(Alias(name), Table(tns, _)) if isinstance(tns, np.ndarray):
                 return ntn.Assign(
-                    ntn.Variable(name, NDArrayFormat(tns.dtype, tns.ndim)),
+                    ntn.Variable(name, NDArrayFType(tns.dtype, tns.ndim)),
                     compile_logic_constant(tns),
                 )
             case Query(Alias(_), None):
@@ -207,7 +207,7 @@ class LogicLowerer:
                 Alias(_) as lhs,
                 Reformat(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
             ):
-                assert isinstance(tns, TensorFormat)
+                assert isinstance(tns, TensorFType)
                 # TODO: fetch fill value the right way
                 import operator
 
@@ -363,9 +363,9 @@ def record_tables(
     def rule_0(node):
         match node:
             case Query(Alias(name) as alias, Table(Literal(val), fields) as tbl):
-                table_var = ntn.Variable(name, format(val))
+                table_var = ntn.Variable(name, ftype(val))
                 table_vars[alias] = table_var
-                slot_var = ntn.Slot(f"{name}_slot", format(val))
+                slot_var = ntn.Slot(f"{name}_slot", ftype(val))
                 slot_vars[alias] = slot_var
                 tables[alias] = tbl
                 for idx, field in enumerate(fields):
@@ -395,10 +395,10 @@ def record_tables(
     return processed_root, table_vars, slot_vars, dim_size_vars, tables, field_relabels
 
 
-def find_suitable_rep(root, table_vars) -> TensorFormat:
+def find_suitable_rep(root, table_vars) -> TensorFType:
     match root:
         case MapJoin(Literal(op), args):
-            return NDArrayFormat(
+            return NDArrayFType(
                 dtype=np.dtype(
                     return_type(
                         op,
@@ -411,7 +411,7 @@ def find_suitable_rep(root, table_vars) -> TensorFormat:
                 ndim=0,  # TODO: this should know actual ndim
             )
         case Aggregate(Literal(op), init, arg, _):
-            return NDArrayFormat(
+            return NDArrayFType(
                 dtype=np.dtype(
                     return_type(
                         op,

@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import TensorFormat, register_property
+from ..algebra import TensorFType, register_property
 from .eager import EagerTensor
 
 
-class ScalarFormat(TensorFormat):
+class ScalarFType(TensorFType):
     def __init__(self, _element_type: type, _fill_value: Any):
         self._element_type = _element_type
         self._fill_value = _fill_value
 
     def __eq__(self, other):
-        if isinstance(other, ScalarFormat):
+        if isinstance(other, ScalarFType):
             return (
                 self._element_type == other._element_type
                 and self._fill_value == other._fill_value
@@ -43,8 +43,8 @@ class Scalar(EagerTensor):
         self._fill_value = fill_value
 
     @property
-    def format(self):
-        return ScalarFormat(type(self.val), self._fill_value)
+    def ftype(self):
+        return ScalarFType(type(self.val), self._fill_value)
 
     @property
     def shape(self):

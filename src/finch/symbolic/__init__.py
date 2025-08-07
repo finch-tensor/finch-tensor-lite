@@ -1,5 +1,5 @@
 from .environment import Context, Namespace, Reflector, ScopedDict
-from .format import Format, Formattable, format, has_format
+from .ftype import FType, FTyped, ftype, fisinstance
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -20,8 +20,8 @@ __all__ = [
     "Chain",
     "Context",
     "Fixpoint",
-    "Format",
-    "Formattable",
+    "FType",
+    "FTyped",
     "Namespace",
     "PostOrderDFS",
     "PostWalk",
@@ -32,8 +32,8 @@ __all__ = [
     "ScopedDict",
     "Term",
     "TermTree",
-    "format",
+    "ftype",
     "gensym",
-    "has_format",
+    "fisinstance",
     "literal_repr",
 ]

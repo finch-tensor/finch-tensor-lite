@@ -1,7 +1,7 @@
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any
 
-from finch.codegen.numpy_buffer import NumpyBuffer, NumpyBufferFormat
+from finch.codegen.numpy_buffer import NumpyBuffer, NumpyBufferFType
 
 from ..symbolic import Context
 from .nodes import (
@@ -38,8 +38,8 @@ def _get_str(val: Any) -> str:
     if isinstance(val, NumpyBuffer):
         arr_str = str(val.arr).replace("\n", "")
         return f"np_buf({arr_str})"
-    if isinstance(val, NumpyBufferFormat):
-        return f"format({_get_str(val._dtype)})"
+    if isinstance(val, NumpyBufferFType):
+        return f"ftype({_get_str(val._dtype)})"
     return str(val)
 
 

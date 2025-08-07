@@ -3,10 +3,10 @@ from typing import Any
 
 from .. import algebra
 from ..algebra import query_property
-from ..symbolic import Format, Formattable
+from ..symbolic import FType, FTyped
 
 
-class Buffer(Formattable, ABC):
+class Buffer(FTyped, ABC):
     """
     Abstract base class for buffer-like data structures. Buffers support random access,
     and can be resized. They are used to store data in a way that allows for efficient
@@ -29,7 +29,7 @@ class Buffer(Formattable, ABC):
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
         """
-        return self.format.element_type()
+        return self.ftype.element_type()
 
     @property
     def length_type(self):
@@ -37,7 +37,7 @@ class Buffer(Formattable, ABC):
         Return the type of indices used to access elements in the buffer.
         This is typically an integer type.
         """
-        return self.format.length_type()
+        return self.ftype.length_type()
 
     @abstractmethod
     def load(self, idx: int): ...
@@ -75,16 +75,16 @@ def element_type(arg: Any):
     return algebra.element_type(arg)
 
 
-class BufferFormat(Format):
+class BufferFType(FType):
     """
-    Abstract base class for the format of arguments. The format defines how the
+    Abstract base class for the ftype of arguments. The ftype defines how the
     data structures store data, and can construct a data structure with the call method.
     """
 
     @abstractmethod
     def __call__(self, *args, **kwargs):
         """
-        Create an instance of an object in this format with the given arguments.
+        Create an instance of an object in this ftype with the given arguments.
         """
         ...
 

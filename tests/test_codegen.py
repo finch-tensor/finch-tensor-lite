@@ -8,12 +8,12 @@ from numpy.testing import assert_equal
 
 import finch
 import finch.finch_assembly as asm
-from finch import format
+from finch import ftype
 from finch.codegen import (
     CCompiler,
     NumbaCompiler,
     NumpyBuffer,
-    NumpyBufferFormat,
+    NumpyBufferFType,
 )
 
 
@@ -65,7 +65,7 @@ def test_buffer_function():
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
     f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finch.codegen.c.CKernel(f, type(None), [NumpyBufferFormat(np.float64)])
+    k = finch.codegen.c.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
@@ -83,10 +83,10 @@ def test_codegen(compiler, buffer):
     a = np.array([1, 2, 3], dtype=np.float64)
     buf = buffer(a)
 
-    a_var = asm.Variable("a", buf.format)
+    a_var = asm.Variable("a", buf.ftype)
     i_var = asm.Variable("i", np.intp)
     length_var = asm.Variable("l", np.intp)
-    a_slt = asm.Slot("a_", buf.format)
+    a_slt = asm.Slot("a_", buf.ftype)
     prgm = asm.Module(
         (
             asm.Function(
@@ -152,10 +152,10 @@ def test_dot_product(compiler, buffer):
     i = asm.Variable("i", np.int64)
     ab = buffer(a)
     bb = buffer(b)
-    ab_v = asm.Variable("a", ab.format)
-    ab_slt = asm.Slot("a_", ab.format)
-    bb_v = asm.Variable("b", bb.format)
-    bb_slt = asm.Slot("b_", bb.format)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
     prgm = asm.Module(
         (
             asm.Function(
@@ -307,8 +307,8 @@ def test_simple_struct(compiler):
     p = Point(np.float64(1.0), np.float64(2.0))
     x = (1, 4)
 
-    p_var = asm.Variable("p", format(p))
-    x_var = asm.Variable("x", format(x))
+    p_var = asm.Variable("p", ftype(p))
+    x_var = asm.Variable("x", ftype(x))
     res_var = asm.Variable("res", np.float64)
     mod = compiler(
         asm.Module(

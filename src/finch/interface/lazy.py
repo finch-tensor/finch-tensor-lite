@@ -12,7 +12,7 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from ..algebra import (
     Tensor,
-    TensorFormat,
+    TensorFType,
     element_type,
     fill_value,
     first_arg,
@@ -39,7 +39,7 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..symbolic import format, gensym
+from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
 
 
@@ -48,7 +48,7 @@ def identify(data):
     return Subquery(lhs, data)
 
 
-class LazyTensorFormat(TensorFormat):
+class LazyTensorFType(TensorFType):
     _fill_value: Any
     _element_type: Any
     _shape_type: Any
@@ -59,7 +59,7 @@ class LazyTensorFormat(TensorFormat):
         self._shape_type = _shape_type
 
     def __eq__(self, other):
-        if not isinstance(other, LazyTensorFormat):
+        if not isinstance(other, LazyTensorFType):
             return False
         return (
             self._fill_value == other._fill_value
@@ -93,8 +93,8 @@ class LazyTensor(OverrideTensor):
         self._element_type = element_type
 
     @property
-    def format(self):
-        return LazyTensorFormat(
+    def ftype(self):
+        return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
             _shape_type=tuple(type(dim) for dim in self.shape),
@@ -1005,9 +1005,9 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
 # Manipulation functions
 @dataclass(frozen=True)
-class DefaultTensorFormat(TensorFormat):
+class DefaultTensorFType(TensorFType):
     """
-    Default tensor format for easily defining new tensor formats.
+    Default tensor ftype for easily defining new tensor formats.
     """
 
     _fill_value: Any
@@ -1028,14 +1028,14 @@ class DefaultTensorFormat(TensorFormat):
 
 
 @dataclass(frozen=True)
-class WrapperTensorFormat(TensorFormat):
-    """Tensor format that wraps other tensor formats."""
+class WrapperTensorFType(TensorFType):
+    """Tensor ftype that wraps other tensor formats."""
 
-    _child_formats: tuple[TensorFormat, ...]  # Formats of the constituent tensors
+    _child_formats: tuple[TensorFType, ...]  # FTypes of the constituent tensors
 
     @property
     def fill_value(self):
-        """Returns the fill value of the first constituent format."""
+        """Returns the fill value of the first constituent ftype."""
         return self._child_formats[0].fill_value
 
     @property
@@ -1048,7 +1048,7 @@ class WrapperTensorFormat(TensorFormat):
 
 
 @dataclass(frozen=True)
-class NoneTensorFormat(DefaultTensorFormat):
+class NoneTensorFType(DefaultTensorFType):
     pass
 
 
@@ -1070,8 +1070,8 @@ class NoneTensor(Tensor):
         return self._shape
 
     @property
-    def format(self):
-        return NoneTensorFormat(
+    def ftype(self):
+        return NoneTensorFType(
             None,
             None,
             tuple(type(dim) for dim in self.shape),
@@ -1111,9 +1111,9 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
 
 
 @dataclass(frozen=True)
-class ConcatTensorFormat(WrapperTensorFormat):
+class ConcatTensorFType(WrapperTensorFType):
     """
-    Tensor format for concatenated tensors.
+    Tensor ftype for concatenated tensors.
     Takes in a tuple of constituent formats, the shape type, and the concatenation axis.
     Shape type is needed as it cannot be computed just from the constituent formats
     """
@@ -1178,20 +1178,20 @@ class ConcatTensor(Tensor):
         result = t[
             idxs[: self.concat_axis] + (shifted_idx,) + idxs[self.concat_axis + 1 :]
         ]
-        return self.format.element_type(result)
+        return self.ftype.element_type(result)
 
     @property
-    def format(self):
+    def ftype(self):
         formats = []
         for t in self.tensors:
-            f = format(t)
-            if isinstance(f, TensorFormat):
+            f = ftype(t)
+            if isinstance(f, TensorFType):
                 formats.append(f)
             else:
                 raise AttributeError(
-                    f"All tensors must have a valid format defined, got {f}"
+                    f"All tensors must have a valid ftype defined, got {f}"
                 )
-        return ConcatTensorFormat(
+        return ConcatTensorFType(
             tuple(formats),
             tuple(type(dim) for dim in self.shape),
             self.concat_axis,
@@ -1234,7 +1234,7 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
 
 
 @dataclass(frozen=True)
-class SplitDimsTensorFormat(WrapperTensorFormat):
+class SplitDimsTensorFType(WrapperTensorFType):
     split_axis: int
     split_shape: tuple
 
@@ -1306,11 +1306,11 @@ class SplitDimsTensor(Tensor):
         return self.tensor[original_idxs]
 
     @property
-    def format(self):
-        child_format = format(self.tensor)
-        if not isinstance(child_format, TensorFormat):
-            raise AttributeError(f"Expected a valid tensor format, got {child_format}")
-        return SplitDimsTensorFormat(
+    def ftype(self):
+        child_format = ftype(self.tensor)
+        if not isinstance(child_format, TensorFType):
+            raise AttributeError(f"Expected a valid tensor ftype, got {child_format}")
+        return SplitDimsTensorFType(
             (child_format,),
             self.axis,
             self.split_shape,
@@ -1325,7 +1325,7 @@ class SplitDimsTensor(Tensor):
 
 
 @dataclass(frozen=True)
-class CombineDimsTensorFormat(WrapperTensorFormat):
+class CombineDimsTensorFType(WrapperTensorFType):
     combined_axes: tuple[int, ...]
     _shape_type: tuple
 
@@ -1409,11 +1409,11 @@ class CombineDimsTensor(Tensor):
         return self.tensor[original_idxs]
 
     @property
-    def format(self):
-        child_format = format(self.tensor)
-        if not isinstance(child_format, TensorFormat):
-            raise AttributeError(f"Expected a valid tensor format, got {child_format}")
-        return CombineDimsTensorFormat(
+    def ftype(self):
+        child_format = ftype(self.tensor)
+        if not isinstance(child_format, TensorFType):
+            raise AttributeError(f"Expected a valid tensor ftype, got {child_format}")
+        return CombineDimsTensorFType(
             (child_format,),
             self.axes,
             tuple(type(dim) for dim in self.shape),

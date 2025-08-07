@@ -67,13 +67,13 @@ from .eager import (
 )
 from .fuse import compute, fuse, fused, get_default_scheduler, set_default_scheduler
 from .lazy import LazyTensor, asarray, defer
-from .scalar import Scalar, ScalarFormat
+from .scalar import Scalar, ScalarFType
 
 __all__ = [
     "EagerTensor",
     "LazyTensor",
     "Scalar",
-    "ScalarFormat",
+    "ScalarFType",
     "abs",
     "acos",
     "acosh",

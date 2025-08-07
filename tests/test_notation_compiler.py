@@ -7,8 +7,8 @@ import numpy as np
 
 import finch
 import finch.finch_notation as ntn
-from finch import format
-from finch.compile import ExtentFormat, NotationCompiler, dimension
+from finch import ftype
+from finch.compile import ExtentFType, NotationCompiler, dimension
 from finch.symbolic import Reflector
 
 
@@ -33,7 +33,7 @@ def test_matrix_multiplication(a, b):
     a_buf = finch.compile.BufferizedNDArray(a)
     # b_buf = finch.compile.BufferizedNDArray(b)
 
-    a_format = format(a_buf)
+    a_format = ftype(a_buf)
 
     A = ntn.Variable("A", a_format)
     B = ntn.Variable("B", a_format)
@@ -46,9 +46,9 @@ def test_matrix_multiplication(a, b):
     b_kj = ntn.Variable("b_kj", np.float64)
     c_ij = ntn.Variable("c_ij", np.float64)
 
-    m = ntn.Variable("m", ExtentFormat(np.int64, np.int64))
-    n = ntn.Variable("n", ExtentFormat(np.int64, np.int64))
-    p = ntn.Variable("p", ExtentFormat(np.int64, np.int64))
+    m = ntn.Variable("m", ExtentFType(np.int64, np.int64))
+    n = ntn.Variable("n", ExtentFType(np.int64, np.int64))
+    p = ntn.Variable("p", ExtentFType(np.int64, np.int64))
 
     prgm = ntn.Module(
         (

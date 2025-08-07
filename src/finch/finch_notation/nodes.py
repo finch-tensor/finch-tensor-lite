@@ -6,7 +6,7 @@ from typing import Any
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Format, Term, TermTree, literal_repr
+from ..symbolic import FType, Term, TermTree, literal_repr
 
 
 @dataclass(eq=True, frozen=True)
@@ -138,14 +138,14 @@ class AccessMode(NotationNode):
     """
 
 
-class AccessFormat(Format):
+class AccessFType(FType):
     obj: Any
 
     def __init__(self, obj: Any):
         self.obj = obj
 
     def __eq__(self, other):
-        if not isinstance(other, AccessFormat):
+        if not isinstance(other, AccessFType):
             return False
         return self.obj == other.obj
 
@@ -155,7 +155,7 @@ class AccessFormat(Format):
     @property
     def element_type(self):
         """
-        Returns the element type of the access format.
+        Returns the element type of the access ftype.
         """
         return element_type(self.obj)
 
@@ -175,7 +175,7 @@ class Access(NotationTree, NotationExpression):
     def result_format(self):
         if len(self.idxs) == 0:
             return self.tns.result_format
-        return AccessFormat(self.tns.result_format)
+        return AccessFType(self.tns.result_format)
 
     @classmethod
     def from_children(cls, tns, mode, *idxs):

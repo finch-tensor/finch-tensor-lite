@@ -7,10 +7,10 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor
 from ..codegen import NumpyBuffer
-from ..finch_assembly import AssemblyStructFormat
-from ..symbolic import format
+from ..finch_assembly import AssemblyStructFType
+from ..symbolic import ftype
 from . import looplets as lplt
-from .lower import FinchTensorFormat
+from .lower import FinchTensorFType
 
 
 class BufferizedNDArray(Tensor):
@@ -42,11 +42,11 @@ class BufferizedNDArray(Tensor):
         )
 
     @property
-    def format(self):
+    def ftype(self):
         """
-        Returns the format of the buffer, which is a BufferizedNDArrayFormat.
+        Returns the ftype of the buffer, which is a BufferizedNDArrayFType.
         """
-        return BufferizedNDArrayFormat(format(self.buf), len(self.strides))
+        return BufferizedNDArrayFType(ftype(self.buf), len(self.strides))
 
     @property
     def shape(self):
@@ -106,9 +106,9 @@ class BufferizedNDArrayFields(NamedTuple):
     buf_s: asm.Slot
 
 
-class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
+class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     """
-    A format for bufferized NumPy arrays that provides metadata about the array.
+    A ftype for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
     """
 
@@ -128,7 +128,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         self._ndim = ndim
 
     def __eq__(self, other):
-        if not isinstance(other, BufferizedNDArrayFormat):
+        if not isinstance(other, BufferizedNDArrayFType):
             return False
         return self.buf == other.buf and self._ndim == other._ndim
 
@@ -173,7 +173,7 @@ class BufferizedNDArrayFormat(FinchTensorFormat, AssemblyStructFormat):
         if isinstance(mode, ntn.Update):
             op = mode.op
         tns = ctx.resolve(tns).obj
-        acc_t = BufferizedNDArrayAccessorFormat(self, 0, self.buf.length_type, op)
+        acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf.length_type, op)
         obj = BufferizedNDArrayAccessorFields(
             tns, 0, asm.Literal(self.buf.length_type(0)), op
         )
@@ -219,7 +219,7 @@ class BufferizedNDArrayAccessor(Tensor):
     def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
-            pos = format(self.tns).buf.length_type(0)
+            pos = ftype(self.tns).buf.length_type(0)
         self.pos = pos
         self.op = op
         if nind is None:
@@ -227,9 +227,9 @@ class BufferizedNDArrayAccessor(Tensor):
         self.nind = nind
 
     @property
-    def format(self):
-        return BufferizedNDArrayAccessorFormat(
-            format(self.tns), self.nind, format(self.pos), self.op
+    def ftype(self):
+        return BufferizedNDArrayAccessorFType(
+            ftype(self.tns), self.nind, ftype(self.pos), self.op
         )
 
     @property
@@ -269,7 +269,7 @@ class BufferizedNDArrayAccessorFields(NamedTuple):
     op: Any
 
 
-class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
+class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def __init__(self, tns, nind, pos, op):
         self.tns = tns
         self.nind = nind
@@ -278,7 +278,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
 
     def __eq__(self, other):
         return (
-            isinstance(other, BufferizedNDArrayAccessorFormat)
+            isinstance(other, BufferizedNDArrayAccessorFType)
             and self.tns == other.tns
             and self.nind == other.nind
             and self.pos == other.pos
@@ -306,17 +306,17 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         raise NotImplementedError(
-            "BufferizedNDArrayAccessorFormat does not support lower_declare."
+            "BufferizedNDArrayAccessorFType does not support lower_declare."
         )
 
     def lower_freeze(self, ctx, tns, op):
         raise NotImplementedError(
-            "BufferizedNDArrayAccessorFormat does not support lower_freeze."
+            "BufferizedNDArrayAccessorFType does not support lower_freeze."
         )
 
     def lower_thaw(self, ctx, tns, op):
         raise NotImplementedError(
-            "BufferizedNDArrayAccessorFormat does not support lower_thaw."
+            "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
     def asm_unpack(self, ctx, var_n, val):
@@ -385,7 +385,7 @@ class BufferizedNDArrayAccessorFormat(FinchTensorFormat):
                 BufferizedNDArrayAccessorFields(
                     tns=tns.obj.tns, nind=self.nind - 1, pos=pos_2, op=self.op
                 ),
-                BufferizedNDArrayAccessorFormat(
+                BufferizedNDArrayAccessorFType(
                     self.tns, self.nind + 1, pos_2, self.op
                 ),
             )

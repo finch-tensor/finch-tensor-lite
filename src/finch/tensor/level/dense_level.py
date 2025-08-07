@@ -4,11 +4,11 @@ from typing import Any
 
 import numpy as np
 
-from ..fiber_tensor import Level, LevelFormat
+from ..fiber_tensor import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFormat(LevelFormat, ABC):
+class DenseLevelFType(LevelFType, ABC):
     lvl: Any
     dimension_type: Any = None
 
@@ -18,7 +18,7 @@ class DenseLevelFormat(LevelFormat, ABC):
 
     def __call__(self, shape):
         """
-        Creates an instance of DenseLevel with the given format.
+        Creates an instance of DenseLevel with the given ftype.
         Args:
             shape: The shape to be used for the level. (mandatory)
         Returns:
@@ -59,13 +59,13 @@ class DenseLevelFormat(LevelFormat, ABC):
     @property
     def buffer_factory(self):
         """
-        Returns the format of the buffer used for the fibers.
+        Returns the ftype of the buffer used for the fibers.
         """
         return self.lvl.buffer_factory
 
 
 def dense(lvl, dimension_type=None):
-    return DenseLevelFormat(lvl, dimension_type=dimension_type)
+    return DenseLevelFType(lvl, dimension_type=dimension_type)
 
 
 @dataclass
@@ -74,7 +74,7 @@ class DenseLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    _format: DenseLevelFormat
+    _format: DenseLevelFType
     lvl: Any
     dimension: Any
 
@@ -83,5 +83,5 @@ class DenseLevel(Level):
         return (self.dimension, *self.lvl.shape)
 
     @property
-    def format(self):
+    def ftype(self):
         return self._format

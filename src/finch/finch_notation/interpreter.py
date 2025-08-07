@@ -7,7 +7,7 @@ import numpy as np
 
 from ..algebra import (
     Tensor,
-    TensorFormat,
+    TensorFType,
     element_type,
     fill_value,
     query_property,
@@ -15,24 +15,24 @@ from ..algebra import (
     shape_type,
 )
 from ..finch_assembly import nodes as asm
-from ..symbolic import ScopedDict, has_format
+from ..symbolic import ScopedDict, fisinstance
 from . import nodes as ntn
 
 
-class TensorViewFormat(TensorFormat):
+class TensorViewFType(TensorFType):
     """
-    A format for tensor views.
-    This is used to represent the format of a tensor at specific indices.
-    It is a subclass of ntn.Format to allow for custom formatting.
+    A ftype for tensor views.
+    This is used to represent the ftype of a tensor at specific indices.
+    It is a subclass of ntn.FType to allow for custom formatting.
     """
 
     def __init__(self, idxs: tuple[Any, ...], tns: Any, op: Any = None):
         """
-        Initialize the TensorViewFormat with the specified indices, tensor, and
+        Initialize the TensorViewFType with the specified indices, tensor, and
         operation.
 
         :param idxs: Tuple of index types for the tensor view.
-        :param tns: The underlying tensor format.
+        :param tns: The underlying tensor ftype.
         :param op: The operation applied to the tensor view, if any.
         """
         self.idxs = idxs
@@ -41,7 +41,7 @@ class TensorViewFormat(TensorFormat):
 
     def __eq__(self, other):
         return (
-            isinstance(other, TensorViewFormat)
+            isinstance(other, TensorViewFType)
             and self.idxs == other.idxs
             and self.tns == other.tns
             and self.op == other.op
@@ -85,12 +85,12 @@ class TensorView(Tensor):
         self.op = op
 
     @property
-    def format(self):
+    def ftype(self):
         """
-        Get the format of the tensor view.
-        This is the format of the tensor at the specified indices.
+        Get the ftype of the tensor view.
+        This is the ftype of the tensor at the specified indices.
         """
-        return TensorViewFormat(map(format, self.idxs), self.tns.format, self.op)
+        return TensorViewFType(map(ftype, self.idxs), self.tns.ftype, self.op)
 
     @property
     def shape(self):
@@ -389,7 +389,7 @@ class NotationInterpreter:
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
             case ntn.Unpack(ntn.Slot(var_n, var_t), val):
                 val_e = self(val)
-                if not has_format(val_e, var_t):
+                if not fisinstance(val_e, var_t):
                     raise TypeError(
                         f"Assigned value {val_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
@@ -485,7 +485,7 @@ class NotationInterpreter:
                     ctx_2(body)
                     if ctx_2.function_state.has_returned:
                         ret_e = ctx_2.function_state.return_value
-                        if not has_format(ret_e, ret_t):
+                        if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
                                 f"for function '{func_n}'."

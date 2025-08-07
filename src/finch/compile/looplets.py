@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from finch.compile.lower import LoopletPass, SingletonExtentFormat
+from finch.compile.lower import LoopletPass, SingletonExtentFType
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -164,7 +164,7 @@ class LookupPass(LoopletPass):
 
         body_2 = PostWalk(lookup_node)(body)
         ctx_2 = ctx.scope()
-        ext_2 = SingletonExtentFormat.stack(idx_2)
+        ext_2 = SingletonExtentFType.stack(idx_2)
         ctx_2(ext_2, body_2)
         start = ext.result_format.get_start(ext)
         stop = ext.result_format.get_end(ext)

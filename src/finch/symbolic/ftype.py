@@ -3,53 +3,53 @@ from abc import ABC, abstractmethod
 from ..algebra import query_property
 
 
-class Format(ABC):
+class FType(ABC):
     @abstractmethod
     def __eq__(self, other): ...
 
     @abstractmethod
     def __hash__(self): ...
 
-    def has_format(self, other):
+    def fisinstance(self, other):
         """
-        Check if `other` is an instance of this format.
+        Check if `other` is an instance of this ftype.
         """
-        return format(other) == self
+        return ftype(other) == self
 
 
-class Formattable:
+class FTyped:
     """
     Abstract base class for objects that can be formatted.
     """
 
     @property
     @abstractmethod
-    def format(self):
+    def ftype(self):
         """
-        The format of the object.
+        The ftype of the object.
         """
         ...
 
 
-def has_format(x, f):
+def fisinstance(x, f):
     """
     Check if `x` is an instance of `f`.
     """
     if isinstance(f, type):
         return isinstance(x, f)
-    return f.has_format(x)
+    return f.fisinstance(x)
 
 
-def format(x):
+def ftype(x):
     """
-    Get the format of `x`.
+    Get the ftype of `x`.
     """
-    if hasattr(x, "format"):
-        return x.format
+    if hasattr(x, "ftype"):
+        return x.ftype
     try:
         return query_property(
             x,
-            "format",
+            "ftype",
             "__attr__",
         )
     except AttributeError:

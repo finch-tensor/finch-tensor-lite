@@ -61,7 +61,7 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
 
-class TestEagerTensorFormat(finch.TensorFormat):
+class TestEagerTensorFType(finch.TensorFType):
     # This class doesn't define any pytests
     __test__ = False
 
@@ -69,7 +69,7 @@ class TestEagerTensorFormat(finch.TensorFormat):
         self.fmt = fmt
 
     def __eq__(self, other):
-        if not isinstance(other, TestEagerTensorFormat):
+        if not isinstance(other, TestEagerTensorFType):
             return False
         return self.fmt == other.fmt
 
@@ -107,8 +107,8 @@ class TestEagerTensor(finch.EagerTensor):
         return self.array.shape
 
     @property
-    def format(self):
-        return TestEagerTensorFormat(finch.format(self.array))
+    def ftype(self):
+        return TestEagerTensorFType(finch.ftype(self.array))
 
     def to_numpy(self):
         return self.array
