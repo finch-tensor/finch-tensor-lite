@@ -385,9 +385,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 BufferizedNDArrayAccessorFields(
                     tns=tns.obj.tns, nind=self.nind - 1, pos=pos_2, op=self.op
                 ),
-                BufferizedNDArrayAccessorFType(
-                    self.tns, self.nind + 1, pos_2, self.op
-                ),
+                BufferizedNDArrayAccessorFType(self.tns, self.nind + 1, pos_2, self.op),
             )
 
         return lplt.Lookup(

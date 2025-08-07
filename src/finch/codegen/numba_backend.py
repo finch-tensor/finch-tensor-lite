@@ -11,7 +11,7 @@ import numba  # type: ignore[import-untyped]
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
-from ..symbolic import Context, Namespace, ScopedDict, ftype, fisinstance
+from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 
 logger = logging.getLogger(__name__)
 

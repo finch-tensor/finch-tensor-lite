@@ -15,7 +15,7 @@ from ..algebra import (
     shape_type,
 )
 from ..finch_assembly import nodes as asm
-from ..symbolic import ScopedDict, fisinstance
+from ..symbolic import ScopedDict, fisinstance, ftype
 from . import nodes as ntn
 
 

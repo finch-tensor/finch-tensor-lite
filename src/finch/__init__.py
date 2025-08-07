@@ -91,8 +91,8 @@ from .interface import (
 )
 from .symbolic import (
     FTyped,
-    ftype,
     fisinstance,
+    ftype,
 )
 from .tensor import (
     DenseLevelFType,
@@ -108,8 +108,8 @@ __all__ = [
     "ElementLevelFType",
     "Extent",
     "ExtentFType",
-    "FiberTensorFType",
     "FTyped",
+    "FiberTensorFType",
     "LazyTensor",
     "NotationContext",
     "NumpyBuffer",
@@ -151,12 +151,12 @@ __all__ = [
     "expand_dims",
     "extent",
     "fill_value",
+    "fisinstance",
     "flatten",
     "floordiv",
     "ftype",
     "fuse",
     "fused",
-    "fisinstance",
     "log",
     "log1p",
     "log2",
