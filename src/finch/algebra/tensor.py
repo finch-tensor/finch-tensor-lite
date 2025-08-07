@@ -150,7 +150,10 @@ class NDArrayFormat(TensorFormat):
     def __eq__(self, other):
         if not isinstance(other, NDArrayFormat):
             return False
-        return self._dtype == other._dtype and self._ndim == other._ndim
+        return self._dtype == other._dtype and (
+            # TODO: Remove `0` once logic compiler supports ndim inference
+            self._ndim == other._ndim or self._ndim == 0 or other._ndim == 0
+        )
 
     def __hash__(self):
         return hash((self._dtype, self._ndim))

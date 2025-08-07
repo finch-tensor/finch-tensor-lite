@@ -113,7 +113,7 @@ def test_logic_compiler():
                 args=(
                     Variable(name=":A0", type_=NDArrayFormat(np.dtype(int), 2)),
                     Variable(name=":A1", type_=NDArrayFormat(np.dtype(int), 2)),
-                    Variable(name=":A2", type_=NDArrayFormat(np.dtype(int), -1)),
+                    Variable(name=":A2", type_=NDArrayFormat(np.dtype(int), 0)),
                 ),
                 body=Block(
                     bodies=(
@@ -148,25 +148,30 @@ def test_logic_compiler():
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
-                                    Variable(name=":A1", type_=NDArrayFormat(np.dtype(int), -1)),
+                                    Variable(
+                                        name=":A1",
+                                        type_=NDArrayFormat(np.dtype(int), 2),
+                                    ),
                                     Literal(val=1),
                                 ),
                             ),
                         ),
                         Unpack(
-                            Slot(name=":A0_slot", type=np.ndarray),
-                            Variable(name=":A0", type_=np.ndarray),
+                            Slot(name=":A0_slot", type=NDArrayFormat(np.dtype(int), 2)),
+                            Variable(name=":A0", type_=NDArrayFormat(np.dtype(int), 2)),
                         ),
                         Unpack(
-                            Slot(name=":A1_slot", type=np.ndarray),
-                            Variable(name=":A1", type_=np.ndarray),
+                            Slot(name=":A1_slot", type=NDArrayFormat(np.dtype(int), 2)),
+                            Variable(name=":A1", type_=NDArrayFormat(np.dtype(int), 2)),
                         ),
                         Unpack(
-                            Slot(name=":A2_slot", type=np.ndarray),
-                            Variable(name=":A2", type_=np.ndarray),
+                            Slot(name=":A2_slot", type=NDArrayFormat(np.dtype(int), 0)),
+                            Variable(name=":A2", type_=NDArrayFormat(np.dtype(int), 0)),
                         ),
                         Declare(
-                            tns=Slot(name=":A2_slot", type=np.ndarray),
+                            tns=Slot(
+                                name=":A2_slot", type=NDArrayFormat(np.dtype(int), 0)
+                            ),
                             init=Literal(val=0),
                             op=Literal(val=operator.add),
                             shape=(
@@ -189,8 +194,8 @@ def test_logic_compiler():
                                                 lhs=Access(
                                                     tns=Slot(
                                                         name=":A2_slot",
-                                                        type_=NDArrayFormat(
-                                                            np.dtype(int), -1
+                                                        type=NDArrayFormat(
+                                                            np.dtype(int), 0
                                                         ),
                                                     ),
                                                     mode=Update(
@@ -208,7 +213,7 @@ def test_logic_compiler():
                                                             arg=Access(
                                                                 tns=Slot(
                                                                     name=":A0_slot",
-                                                                    type_=NDArrayFormat(
+                                                                    type=NDArrayFormat(
                                                                         np.dtype(int), 2
                                                                     ),
                                                                 ),
@@ -229,7 +234,7 @@ def test_logic_compiler():
                                                             arg=Access(
                                                                 tns=Slot(
                                                                     name=":A1_slot",
-                                                                    type_=NDArrayFormat(
+                                                                    type=NDArrayFormat(
                                                                         np.dtype(int), 2
                                                                     ),
                                                                 ),
@@ -255,16 +260,38 @@ def test_logic_compiler():
                             ),
                         ),
                         Freeze(
-                            tns=Slot(name=":A2_slot", type=NDArrayFormat(np.dtype(int), -1)),
+                            tns=Slot(
+                                name=":A2_slot", type=NDArrayFormat(np.dtype(int), 0)
+                            ),
                             op=Literal(val=operator.add),
                         ),
                         Repack(
-                            val=Slot(name=":A2_slot", type=NDArrayFormat(np.dtype(int), -1)),
-                            obj=Variable(name=":A2", type_=NDArrayFormat(np.dtype(int), -1)),
+                            val=Slot(
+                                name=":A0_slot", type=NDArrayFormat(np.dtype(int), 2)
+                            ),
+                            obj=Variable(
+                                name=":A0", type_=NDArrayFormat(np.dtype(int), 2)
+                            ),
+                        ),
+                        Repack(
+                            val=Slot(
+                                name=":A1_slot", type=NDArrayFormat(np.dtype(int), 2)
+                            ),
+                            obj=Variable(
+                                name=":A1", type_=NDArrayFormat(np.dtype(int), 2)
+                            ),
+                        ),
+                        Repack(
+                            val=Slot(
+                                name=":A2_slot", type=NDArrayFormat(np.dtype(int), 0)
+                            ),
+                            obj=Variable(
+                                name=":A2", type_=NDArrayFormat(np.dtype(int), 0)
+                            ),
                         ),
                         Return(
                             val=Variable(
-                                name=":A2", type_=NDArrayFormat(np.dtype(int), -1)
+                                name=":A2", type_=NDArrayFormat(np.dtype(int), 0)
                             )
                         ),
                     )

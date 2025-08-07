@@ -14,7 +14,7 @@ class ScalarFormat(TensorFormat):
     def __eq__(self, other):
         if isinstance(other, ScalarFormat):
             return (
-                self.__element_type == other.__element_type
+                self._element_type == other._element_type
                 and self._fill_value == other._fill_value
             )
         return False

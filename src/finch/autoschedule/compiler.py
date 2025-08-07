@@ -291,6 +291,7 @@ class LogicLowerer:
                         declaration,
                         body,
                         ntn.Freeze(agg_slot, ntn.Literal(op)),
+                        *[ntn.Repack(slot_vars[a], table_vars[a]) for a in req_slots],
                         ntn.Repack(agg_slot, agg_var),
                     )
                 )
@@ -338,7 +339,7 @@ def record_tables(
 ) -> tuple[
     LogicNode,
     dict[Alias, ntn.Variable],
-    dict[ntn.Variable, ntn.Slot],
+    dict[Alias, ntn.Slot],
     dict[ntn.Variable, ntn.Call],
     dict[Alias, Table],
     dict[Field, Field],
@@ -351,7 +352,7 @@ def record_tables(
     # alias to notation variable mapping
     table_vars: dict[Alias, ntn.Variable] = {}
     # notation variable to slot mapping
-    slot_vars: dict[ntn.Variable, ntn.Slot] = {}
+    slot_vars: dict[Alias, ntn.Slot] = {}
     # store loop extent variable
     dim_size_vars: dict[ntn.Variable, ntn.Call] = {}
     # actual tables
@@ -364,7 +365,7 @@ def record_tables(
             case Query(Alias(name) as alias, Table(Literal(val), fields) as tbl):
                 table_var = ntn.Variable(name, format(val))
                 table_vars[alias] = table_var
-                slot_var = ntn.Slot(f"{name}_slot", type(val))
+                slot_var = ntn.Slot(f"{name}_slot", format(val))
                 slot_vars[alias] = slot_var
                 tables[alias] = tbl
                 for idx, field in enumerate(fields):
@@ -407,7 +408,7 @@ def find_suitable_rep(root, table_vars) -> TensorFormat:
                         ],
                     )
                 ),
-                ndim=-1,
+                ndim=0,  # TODO: this should know actual ndim
             )
         case Aggregate(Literal(op), init, arg, _):
             return NDArrayFormat(
@@ -418,7 +419,7 @@ def find_suitable_rep(root, table_vars) -> TensorFormat:
                         find_suitable_rep(arg, table_vars).element_type,
                     )
                 ),
-                ndim=-1,
+                ndim=0,  # TODO: this should know actual ndim
             )
         case LogicTree() as tree:
             for child in tree.children:
@@ -453,6 +454,10 @@ class LogicCompiler:
         self.ll = LogicLowerer()
 
     def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict[Alias, Table]]:
-        prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = record_tables(prgm)
-        lowered_prgm = self.ll(prgm, table_vars, slot_vars, dim_size_vars, field_relabels)
+        prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
+            record_tables(prgm)
+        )
+        lowered_prgm = self.ll(
+            prgm, table_vars, slot_vars, dim_size_vars, field_relabels
+        )
         return merge_blocks(lowered_prgm), tables

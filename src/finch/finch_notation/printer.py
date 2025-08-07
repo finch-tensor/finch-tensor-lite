@@ -25,6 +25,7 @@ from .nodes import (
     Unpack,
     Unwrap,
     Update,
+    Value,
     Variable,
 )
 
@@ -72,6 +73,8 @@ class PrinterContext(Context):
             case Literal(value):
                 return _get_str(value)
             case Variable(name, _):
+                return str(name)
+            case Value(name, _):
                 return str(name)
             case Slot(name, _):
                 return str(name)
@@ -182,5 +185,5 @@ class PrinterContext(Context):
                 return None
             case _:
                 raise NotImplementedError(
-                    f"Unrecognized assembly node type: {type(prgm)}"
+                    f"Unrecognized notation node type: {type(prgm)}"
                 )
