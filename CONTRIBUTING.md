@@ -94,5 +94,11 @@ poetry run mypy ./src/
 - Avoid using `get_` and `set_` prefixes in method names.
 - `get_` and `set_` prefixes are allowed for global getters and setters, such as `util.get_version()`.
 
+### Path Handling
+- **Use `pathlib.Path` instead of `os.path` for file and directory operations.**
+- `pathlib.Path` provides a more modern interface for path manipulation.
+- It's cross-platform by default and more readable than string-based `os.path` operations.
+- Example: Use `Path("dir") / "file.txt"` instead of `os.path.join("dir", "file.txt")`.
+
 ---
 **If you find an error or unclear section, please fix it or open an issue.**
