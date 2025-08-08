@@ -4,10 +4,10 @@ from typing import Any
 import numpy as np
 
 from ..algebra import register_property
-from ..symbolic import Format, Formattable, format
+from ..symbolic import FType, FTyped, ftype
 
 
-class TensorFormat(Format, ABC):
+class TensorFType(FType, ABC):
     @property
     def ndim(self) -> int:
         """Number of dimensions of the tensor."""
@@ -35,7 +35,7 @@ class TensorFormat(Format, ABC):
         ...
 
 
-class Tensor(Formattable, ABC):
+class Tensor(FTyped, ABC):
     """
     Abstract base class for tensor-like data structures. Tensors are
     multi-dimensional arrays that can be used to represent data in various
@@ -48,7 +48,7 @@ class Tensor(Formattable, ABC):
     @property
     def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        return self.format.ndim
+        return self.ftype.ndim
 
     @property
     @abstractmethod
@@ -58,19 +58,19 @@ class Tensor(Formattable, ABC):
 
     @property
     @abstractmethod
-    def format(self) -> TensorFormat:
-        """Format of the tensor, which may include metadata about the tensor."""
+    def ftype(self) -> TensorFType:
+        """FType of the tensor, which may include metadata about the tensor."""
         ...
 
     @property
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        return self.format.fill_value
+        return self.ftype.fill_value
 
     @property
     def element_type(self):
         """Data type of the tensor elements."""
-        return self.format.element_type
+        return self.ftype.element_type
 
     @property
     def shape_type(self) -> tuple:
@@ -78,7 +78,7 @@ class Tensor(Formattable, ABC):
         types in the tensor. It's the type of each element in tns.shape. It
         should be an actual tuple, rather than a tuple type, so that it can hold
         e.g. dtypes, formats, or types, and so that we can easily index it."""
-        return self.format.shape_type
+        return self.ftype.shape_type
 
 
 def fill_value(arg: Any) -> Any:
@@ -97,7 +97,7 @@ def fill_value(arg: Any) -> Any:
     """
     if hasattr(arg, "fill_value"):
         return arg.fill_value
-    return format(arg).fill_value
+    return ftype(arg).fill_value
 
 
 def element_type(arg: Any):
@@ -116,7 +116,7 @@ def element_type(arg: Any):
     """
     if hasattr(arg, "element_type"):
         return arg.element_type
-    return format(arg).element_type
+    return ftype(arg).element_type
 
 
 def shape_type(arg: Any) -> tuple:
@@ -134,12 +134,12 @@ def shape_type(arg: Any) -> tuple:
     """
     if hasattr(arg, "shape_type"):
         return arg.shape_type
-    return format(arg).shape_type
+    return ftype(arg).shape_type
 
 
-class NDArrayFormat(TensorFormat):
+class NDArrayFType(TensorFType):
     """
-    A format for NumPy arrays that provides metadata about the array.
+    A ftype for NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
     """
 
@@ -148,12 +148,18 @@ class NDArrayFormat(TensorFormat):
         self._ndim = ndim
 
     def __eq__(self, other):
-        if not isinstance(other, NDArrayFormat):
+        if not isinstance(other, NDArrayFType):
             return False
-        return self._dtype == other._dtype and self._ndim == other._ndim
+        return self._dtype == other._dtype and (
+            # TODO: Remove `0` once logic compiler supports ndim inference
+            self._ndim == other._ndim or self._ndim == 0 or other._ndim == 0
+        )
 
     def __hash__(self):
         return hash((self._dtype, self._ndim))
+
+    def __repr__(self) -> str:
+        return f"NDArrayFType(dtype={repr(self._dtype)}, ndim={self._ndim})"
 
     @property
     def ndim(self) -> int:
@@ -173,5 +179,5 @@ class NDArrayFormat(TensorFormat):
 
 
 register_property(
-    np.ndarray, "format", "__attr__", lambda x: NDArrayFormat(x.dtype, x.ndim)
+    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, x.ndim)
 )

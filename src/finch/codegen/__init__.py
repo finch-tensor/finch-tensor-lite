@@ -1,24 +1,24 @@
-from .c import CArgumentFormat, CBufferFormat, CCompiler, CKernel, CModule
+from .c import CArgumentFType, CBufferFType, CCompiler, CKernel, CModule
 from .numba_backend import (
     NumbaCompiler,
     NumbaKernel,
     NumbaModule,
 )
-from .numpy_buffer import NumpyBuffer, NumpyBufferFormat
+from .numpy_buffer import NumpyBuffer, NumpyBufferFType
 
 __all__ = [
-    "CArgumentFormat",
-    "CBufferFormat",
+    "CArgumentFType",
+    "CBufferFType",
     "CCompiler",
     "CKernel",
     "CModule",
     "CStruct",
-    "CStructFormatNumbaCompiler",
+    "CStructFTypeNumbaCompiler",
     "NumbaCompiler",
     "NumbaKernel",
     "NumbaModule",
     "NumbaStruct",
-    "NumbaStructFormat",
+    "NumbaStructFType",
     "NumpyBuffer",
-    "NumpyBufferFormat",
+    "NumpyBufferFType",
 ]

@@ -61,7 +61,7 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
 
-class TestEagerTensorFormat(finch.TensorFormat):
+class TestEagerTensorFType(finch.TensorFType):
     # This class doesn't define any pytests
     __test__ = False
 
@@ -69,7 +69,7 @@ class TestEagerTensorFormat(finch.TensorFormat):
         self.fmt = fmt
 
     def __eq__(self, other):
-        if not isinstance(other, TestEagerTensorFormat):
+        if not isinstance(other, TestEagerTensorFType):
             return False
         return self.fmt == other.fmt
 
@@ -107,8 +107,8 @@ class TestEagerTensor(finch.EagerTensor):
         return self.array.shape
 
     @property
-    def format(self):
-        return TestEagerTensorFormat(finch.format(self.array))
+    def ftype(self):
+        return TestEagerTensorFType(finch.ftype(self.array))
 
     def to_numpy(self):
         return self.array
@@ -332,6 +332,9 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
             assert_equal(result, expected)
 
 
+@pytest.mark.usefixtures(
+    "interpreter_scheduler"
+)  # batched and broadcasting not supported
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -425,6 +428,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     assert_allclose(result_with_np, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a",
     [
@@ -457,6 +461,7 @@ def test_matrix_transpose(a, a_wrap):
     assert_equal(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a, b, axes",
     [
@@ -615,6 +620,7 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
     assert_allclose(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, axis, expected",
     [
@@ -645,6 +651,7 @@ def test_squeeze_invalid(x, axis):
         finch.squeeze(x, axis=axis)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, axis",
     [
@@ -718,6 +725,7 @@ def test_scalar_coerce(x, func):
     assert works, f"Expected {expected}, got {result}"
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, shape",
     [
@@ -780,6 +788,7 @@ def test_broadcast_to(x, shape, x_wrap):
         assert_equal(out, expected, strict=True)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "shapes",
     [
@@ -827,6 +836,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
         assert_equal(res, exp, "Values mismatch in broadcasted arrays")
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "shapes_and_types, axis",
     [
@@ -907,6 +917,7 @@ def test_concat_invalid(shapes, rng):
         finch.concat(arrays, axis=0)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "shape, source, destination",
     [
@@ -950,6 +961,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     assert_equal(result, expected, "Values mismatch in moved axis array", strict=True)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "shapes_and_types, axis",
     [
@@ -1015,6 +1027,7 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     assert_equal(result, expected, "Values mismatch in stacked array", strict=True)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "array_shape, axis, split_shape, expected_shape",
     [
@@ -1072,6 +1085,7 @@ def test_split_dims_errors(array_shape, axis, split_shape):
         finch.split_dims(x, axis, split_shape)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "array_shape, axes, expected_shape",
     [
@@ -1137,6 +1151,7 @@ def test_combine_dims_errors(array_shape, axes):
         finch.combine_dims(x, axes)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "array_shape, expected_shape",
     [

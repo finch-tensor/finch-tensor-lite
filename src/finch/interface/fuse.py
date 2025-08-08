@@ -50,19 +50,41 @@ Performance:
   or `with_scheduler`.
 """
 
-from ..finch_logic import (
-    Alias,
-    FinchLogicInterpreter,
-    Plan,
-    Produces,
-    Query,
-)
+from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
+from ..finch_logic import Alias, FinchLogicInterpreter, Plan, Produces, Query
+from ..finch_notation import NotationInterpreter
 from ..symbolic import gensym
 from .lazy import defer
 
+_DEFAULT_SCHEDULER = None
+
+
+def set_default_scheduler(*, ctx=None, interpret_logic=False):
+    global _DEFAULT_SCHEDULER
+
+    if ctx is not None:
+        _DEFAULT_SCHEDULER = ctx
+    elif interpret_logic:
+        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
+    else:
+        optimizer = DefaultLogicOptimizer(LogicCompiler())
+        ntn_interp = NotationInterpreter()
+
+        def fn_compile(plan):
+            prgm, tables = optimizer(plan)
+            mod = ntn_interp(prgm)
+            args = [tables[Alias(arg.name)].tns.val for arg in prgm.funcs[0].args]
+            return (mod.func(*args),)
+
+        _DEFAULT_SCHEDULER = fn_compile
+
+
+set_default_scheduler()
+
 
 def get_default_scheduler():
-    return FinchLogicInterpreter()
+    global _DEFAULT_SCHEDULER
+    return _DEFAULT_SCHEDULER
 
 
 def compute(arg, ctx=None):

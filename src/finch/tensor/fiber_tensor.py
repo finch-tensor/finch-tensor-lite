@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from finch.algebra import Tensor, TensorFormat
-from finch.symbolic import Format, Formattable
+from finch.algebra import Tensor, TensorFType
+from finch.symbolic import FType, FTyped
 
 
-class LevelFormat(Format, ABC):
+class LevelFType(FType, ABC):
     """
-    An abstract base class representing the format of levels.
+    An abstract base class representing the ftype of levels.
     """
 
     @property
@@ -60,7 +60,7 @@ class LevelFormat(Format, ABC):
         ...
 
 
-class Level(Formattable, ABC):
+class Level(FTyped, ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
@@ -76,27 +76,27 @@ class Level(Formattable, ABC):
 
     @property
     def ndim(self):
-        return self.format.ndim
+        return self.ftype.ndim
 
     @property
     def fill_value(self):
-        return self.format.fill_value
+        return self.ftype.fill_value
 
     @property
     def element_type(self):
-        return self.format.element_type
+        return self.ftype.element_type
 
     @property
     def shape_type(self):
-        return self.format.shape_type
+        return self.ftype.shape_type
 
     @property
     def position_type(self):
-        return self.format.position_type
+        return self.ftype.position_type
 
     @property
     def buffer_factory(self):
-        return self.format.buffer_factory
+        return self.ftype.buffer_factory
 
 
 Tp = TypeVar("Tp")
@@ -122,11 +122,11 @@ class FiberTensor(Generic[Tp], Tensor):
         return res
 
     @property
-    def format(self):
+    def ftype(self):
         """
-        Returns the format of the fiber tensor, which is a FiberTensorFormat.
+        Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
-        return FiberTensorFormat(self.lvl.format, type(self.pos))
+        return FiberTensorFType(self.lvl.ftype, type(self.pos))
 
     @property
     def shape(self):
@@ -155,22 +155,22 @@ class FiberTensor(Generic[Tp], Tensor):
     @property
     def buffer_factory(self):
         """
-        Returns the format of the buffer used for the fibers.
-        This is typically a NumpyBufferFormat or similar.
+        Returns the ftype of the buffer used for the fibers.
+        This is typically a NumpyBufferFType or similar.
         """
         return self.lvl.buffer_factory
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFormat(TensorFormat):
+class FiberTensorFType(TensorFType):
     """
-    An abstract base class representing the format of a fiber tensor.
+    An abstract base class representing the ftype of a fiber tensor.
 
     Attributes:
         lvl: a fiber allocator that manages the fibers in the tensor.
     """
 
-    lvl: LevelFormat
+    lvl: LevelFType
     _position_type: type | None = None
 
     def __post_init__(self):
@@ -210,22 +210,22 @@ class FiberTensorFormat(TensorFormat):
     @property
     def buffer_factory(self):
         """
-        Returns the format of the buffer used for the fibers.
-        This is typically a NumpyBufferFormat or similar.
+        Returns the ftype of the buffer used for the fibers.
+        This is typically a NumpyBufferFType or similar.
         """
         return self.lvl.buffer_factory
 
 
-def tensor(lvl: LevelFormat, position_type: type | None = None):
+def tensor(lvl: LevelFType, position_type: type | None = None):
     """
-    Creates a FiberTensorFormat with the given level format and position type.
+    Creates a FiberTensorFType with the given level ftype and position type.
 
     Args:
-        lvl: The level format to be used for the tensor.
+        lvl: The level ftype to be used for the tensor.
         pos_type: The type of positions within the tensor. Defaults to None.
 
     Returns:
-        An instance of FiberTensorFormat.
+        An instance of FiberTensorFType.
     """
     # mypy does not understand that dataclasses generate __hash__ and __eq__
-    return FiberTensorFormat(lvl, position_type)  # type: ignore[abstract]
+    return FiberTensorFType(lvl, position_type)  # type: ignore[abstract]

@@ -133,6 +133,9 @@ class Slot(AssemblyExpression):
         """Returns the type of the expression."""
         return self.type
 
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
+
 
 @dataclass(eq=True, frozen=True)
 class Unpack(AssemblyTree):

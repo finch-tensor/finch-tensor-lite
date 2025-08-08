@@ -72,11 +72,22 @@ class ScopedDict(Generic[T]):
         else:
             leaf.bindings[key] = value
 
+    def del_in_ancestor(self, leaf, key: str) -> None:
+        if key in self.bindings:
+            del self.bindings[key]
+        elif self.parent is not None:
+            self.parent.del_in_ancestor(leaf, key)
+        else:
+            del leaf.bindings[key]
+
     def __setitem__(self, key: str, value: T) -> None:
         self.set_in_ancestor(self, key, value)
 
     def __contains__(self, key: str) -> bool:
         return key in self.bindings or (self.parent is not None and key in self.parent)
+
+    def __delitem__(self, key: str) -> None:
+        self.del_in_ancestor(self, key)
 
     def scope(self) -> "ScopedDict[T]":
         """
@@ -127,3 +138,8 @@ class Context(ABC):
         Emit the code in this context.
         """
         ...
+
+
+class Reflector:
+    def __call__(self, prgm):
+        return prgm
