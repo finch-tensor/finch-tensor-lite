@@ -2,6 +2,13 @@ from dataclasses import dataclass
 from typing import FrozenSet, Iterable, Any
 import numpy as np
 
+from finch.finch_notation.nodes import (
+    Variable, Literal, Call, Access, Read, Update, Declare, Thaw, Freeze,
+    Loop, If, Increment, Unwrap, Block, Slot, Unpack, Repack
+)
+
+from operator import add, ne
+
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
@@ -29,32 +36,41 @@ class DCStats(TensorStats):
         if ndim == 1:
             return self._vector_structure_to_dcs()
         elif ndim == 2:
-            return self._matrix_structure_to_dcs()
+            return None
         else:
             raise NotImplementedError(f"DC analysis not implemented for {ndim}D tensors")
 
     def _vector_structure_to_dcs(self) -> set[DC]:
-        i = self.fields[0]
-        nnz = float(np.count_nonzero(self.tensor))
 
-        return {
-            DC(frozenset(), frozenset([i]), nnz)
-        }
+        A_slot = Slot("A", type=None)
+        A_unpack = Unpack(A_slot, Literal(self.tensor) )
 
-    def _matrix_structure_to_dcs(self) -> set[DC]:
-        i, j = self.fields
-        A = self.tensor
+        B_slot = Slot("B", type=None)
+        B_declare = Declare(B_slot, Literal(0.0), Literal(add), ())
+        B_thaw = Thaw(B_slot, Literal(add))
 
-        row_nnz = np.count_nonzero(A, axis=1)
-        col_nnz = np.count_nonzero(A, axis=0)
+        body = If(
+            Call(Literal(ne), Access(A_slot, Read(), Variable("i")), Literal(0.0)),
+            Increment(Access(B_slot, Update(Literal(add)), ()), Literal(1.0))
+        )
+        loop = Loop(Variable("i"), Literal(self.tensor.shape[0]), body)
 
-        return {
-            DC(frozenset(), frozenset([i, j]), float(np.count_nonzero(A))),
-            DC(frozenset(), frozenset([i]), float(np.count_nonzero(row_nnz > 0))),
-            DC(frozenset(), frozenset([j]), float(np.count_nonzero(col_nnz > 0))),
-            DC(frozenset([i]), frozenset([i, j]), float(np.max(row_nnz))),
-            DC(frozenset([j]), frozenset([i, j]), float(np.max(col_nnz))),
-        }
+        B_freeze = Freeze(B_slot, Literal(add))
+        result = Unwrap(B_slot)
+
+        A_repack = Repack(A_slot, Literal(self.tensor))
+
+        prog = Block.from_children(
+            A_unpack,
+            B_declare,
+            B_thaw,
+            loop,
+            B_freeze,
+            result,
+            A_repack,
+        )
+        return prog
+
 
     @staticmethod
     def mapjoin(op, *args, **kwargs):

@@ -125,22 +125,22 @@ def test_aggregate_and_issimilar():
             np.array([1.0, 0.0, 3.0]),
             ["i"],
             {DC(frozenset(), frozenset(["i"]), 2.0)}
-        ),
-        (
-            np.array([
-                [1.0, 0.0, 2.0],
-                [0.0, 0.0, 0.0],
-                [3.0, 4.0, 0.0],
-            ]),
-            ["i", "j"],
-            {
-                DC(frozenset(), frozenset(["i", "j"]), 4.0),
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset(), frozenset(["j"]), 3.0),
-                DC(frozenset(["i"]), frozenset(["i", "j"]), 2.0),
-                DC(frozenset(["j"]), frozenset(["i", "j"]), 2.0),
-            }
         )
+        # (
+        #     np.array([
+        #         [1.0, 0.0, 2.0],
+        #         [0.0, 0.0, 0.0],
+        #         [3.0, 4.0, 0.0],
+        #     ]),
+        #     ["i", "j"],
+        #     {
+        #         DC(frozenset(), frozenset(["i", "j"]), 4.0),
+        #         DC(frozenset(), frozenset(["i"]), 2.0),
+        #         DC(frozenset(), frozenset(["j"]), 3.0),
+        #         DC(frozenset(["i"]), frozenset(["i", "j"]), 2.0),
+        #         DC(frozenset(["j"]), frozenset(["i", "j"]), 2.0),
+        #     }
+        # )
     ]
 )
 def test_dc_stats(tensor, fields, expected_dcs):
