@@ -60,7 +60,7 @@ class DCStats(TensorStats):
 
         A_repack = Repack(A_slot, Literal(self.tensor))
 
-        prog = Block.from_children(
+        program = Block.from_children(
             A_unpack,
             B_declare,
             B_thaw,
@@ -69,20 +69,20 @@ class DCStats(TensorStats):
             result,
             A_repack,
         )
-        return prog
+        return program
 
 
     @staticmethod
     def mapjoin(op, *args, **kwargs):
-        raise NotImplementedError()
+        pass
 
     @staticmethod
     def aggregate(op, dims, *args, **kwargs):
-        raise NotImplementedError()
+        pass
 
     @staticmethod
     def issimilar(*args, **kwargs):
-        raise NotImplementedError()
+        pass
 
     def estimate_non_fill_values(self):
-        raise NotImplementedError()
+        pass
