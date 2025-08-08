@@ -1,4 +1,4 @@
-from .buffer import Buffer, BufferFormat
+from .buffer import Buffer, BufferFType
 
 
 class SafeBuffer(Buffer):
@@ -19,11 +19,11 @@ class SafeBuffer(Buffer):
         self._underlying_buffer = underlying_buffer
 
     @property
-    def format(self):
+    def ftype(self):
         """
         Returns the format of the safe buffer.
         """
-        return SafeBufferFormat(self._underlying_buffer.format)
+        return SafeBufferFType(self._underlying_buffer.ftype)
 
     def length(self):
         """
@@ -114,31 +114,31 @@ class SafeBuffer(Buffer):
         return self._underlying_buffer
 
 
-class SafeBufferFormat(BufferFormat):
+class SafeBufferFType(BufferFType):
     """
     A format for SafeBuffer that wraps another buffer format.
     """
 
-    def __init__(self, underlying_format: BufferFormat):
+    def __init__(self, underlying_format: BufferFType):
         """
         Initialize with the underlying buffer format to wrap.
 
         Args:
             underlying_format: The buffer format to add safety to
         """
-        if not isinstance(underlying_format, BufferFormat):
+        if not isinstance(underlying_format, BufferFType):
             raise TypeError(
-                f"Expected BufferFormat instance, got {type(underlying_format)}"
+                f"Expected BufferFType instance, got {type(underlying_format)}"
             )
         self._underlying_format = underlying_format
 
     def __eq__(self, other):
-        if not isinstance(other, SafeBufferFormat):
+        if not isinstance(other, SafeBufferFType):
             return False
         return self._underlying_format == other._underlying_format
 
     def __hash__(self):
-        return hash(("SafeBufferFormat", self._underlying_format))
+        return hash(("SafeBufferFType", self._underlying_format))
 
     @property
     def element_type(self):

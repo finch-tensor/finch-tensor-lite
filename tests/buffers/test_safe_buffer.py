@@ -2,9 +2,9 @@ import pytest
 
 import numpy as np
 
-from finch.codegen import NumpyBuffer, NumpyBufferFormat
+from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.finch_assembly import (
-    SafeBufferFormat,
+    SafeBufferFType,
     make_safe,
 )
 
@@ -41,18 +41,18 @@ def test_safe_buffer_bounds_checking(array_data, valid_indices, invalid_indices)
             safe_buf.store(idx, 99.0)
 
     # Test format
-    assert safe_buf.format.element_type == numpy_buf.format.element_type
-    assert safe_buf.format.length_type == numpy_buf.format.length_type
-    assert safe_buf.format == SafeBufferFormat(numpy_buf.format)
-    assert safe_buf.format.underlying_format == numpy_buf.format
+    assert safe_buf.ftype.element_type == numpy_buf.ftype.element_type
+    assert safe_buf.ftype.length_type == numpy_buf.ftype.length_type
+    assert safe_buf.ftype == SafeBufferFType(numpy_buf.ftype)
+    assert safe_buf.ftype.underlying_format == numpy_buf.ftype
 
 
 def test_safe_buffer_format_call():
-    fmt = NumpyBufferFormat(dtype=np.int32)
-    safe_fmt = SafeBufferFormat(fmt)
-    assert safe_fmt(
-        len=5, dtype=np.int32
-    ).underlying_buffer.format == NumpyBufferFormat(np.int32)
+    fmt = NumpyBufferFType(dtype=np.int32)
+    safe_fmt = SafeBufferFType(fmt)
+    assert safe_fmt(len=5, dtype=np.int32).underlying_buffer.ftype == NumpyBufferFType(
+        np.int32
+    )
 
 
 def test_resize_safe_buffer():

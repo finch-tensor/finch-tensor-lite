@@ -27,7 +27,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
-from .safe_buffer import SafeBuffer, SafeBufferFormat, make_safe
+from .safe_buffer import SafeBuffer, SafeBufferFType, make_safe
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 
 __all__ = [
@@ -56,7 +56,7 @@ __all__ = [
     "Resize",
     "Return",
     "SafeBuffer",
-    "SafeBufferFormat",
+    "SafeBufferFType",
     "SetAttr",
     "Slot",
     "Stack",
