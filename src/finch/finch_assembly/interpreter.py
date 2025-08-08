@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..symbolic import ScopedDict, has_format
+from ..symbolic import ScopedDict, fisinstance
 from . import nodes as asm
 
 
@@ -173,7 +173,7 @@ class AssemblyInterpreter:
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_e = self(val)
-                if not has_format(val_e, var_t):
+                if not fisinstance(val_e, var_t):
                     raise TypeError(
                         f"Assigned value {val_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
@@ -282,7 +282,7 @@ class AssemblyInterpreter:
                     for arg, arg_e in zip(args, args_e, strict=False):
                         match arg:
                             case asm.Variable(arg_n, arg_t):
-                                if not has_format(arg_e, arg_t):
+                                if not fisinstance(arg_e, arg_t):
                                     raise TypeError(
                                         f"Argument '{arg_n}' is expected to be of type "
                                         f"{arg_t}, but got {type(arg_e)}."

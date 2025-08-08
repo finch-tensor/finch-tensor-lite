@@ -3,22 +3,22 @@ from typing import Any
 
 import numpy as np
 
-from ...codegen import NumpyBufferFormat
-from ...symbolic import Format, format
-from ..fiber_tensor import Level, LevelFormat
+from ...codegen import NumpyBufferFType
+from ...symbolic import FType, ftype
+from ..fiber_tensor import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
-class ElementLevelFormat(LevelFormat):
+class ElementLevelFType(LevelFType):
     _fill_value: Any
-    _element_type: type | Format | None = None
-    _position_type: type | Format | None = None
-    _buffer_factory: Any = NumpyBufferFormat
+    _element_type: type | FType | None = None
+    _position_type: type | FType | None = None
+    _buffer_factory: Any = NumpyBufferFType
     val_format: Any = None
 
     def __post_init__(self):
         if self._element_type is None:
-            self._element_type = format(self._fill_value)
+            self._element_type = ftype(self._fill_value)
         if self.val_format is None:
             self.val_format = self._buffer_factory(self._element_type)
         if self._position_type is None:
@@ -28,14 +28,14 @@ class ElementLevelFormat(LevelFormat):
 
     def __call__(self, shape=()):
         """
-        Creates an instance of ElementLevel with the given format.
+        Creates an instance of ElementLevel with the given ftype.
         Args:
-            fmt: The format to be used for the level.
+            fmt: The ftype to be used for the level.
         Returns:
             An instance of ElementLevel.
         """
         if len(shape) != 0:
-            raise ValueError("ElementLevelFormat must be called with an empty shape.")
+            raise ValueError("ElementLevelFType must be called with an empty shape.")
         return ElementLevel(self)
 
     @property
@@ -71,7 +71,7 @@ def element(
     val_format=None,
 ):
     """
-    Creates an ElementLevelFormat with the given parameters.
+    Creates an ElementLevelFType with the given parameters.
 
     Args:
         fill_value: The value to be used as the fill value for the level.
@@ -80,9 +80,9 @@ def element(
         buffer_factory: The factory used to create buffers for the level.
 
     Returns:
-        An instance of ElementLevelFormat.
+        An instance of ElementLevelFType.
     """
-    return ElementLevelFormat(
+    return ElementLevelFType(
         _fill_value=fill_value,
         _element_type=element_type,
         _position_type=position_type,
@@ -97,7 +97,7 @@ class ElementLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    _format: ElementLevelFormat
+    _format: ElementLevelFType
     val: Any | None = None
 
     def __post_init__(self):
@@ -109,5 +109,5 @@ class ElementLevel(Level):
         return ()
 
     @property
-    def format(self):
+    def ftype(self):
         return self._format

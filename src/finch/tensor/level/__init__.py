@@ -1,11 +1,11 @@
-from .dense_level import DenseLevel, DenseLevelFormat, dense
-from .element_level import ElementLevel, ElementLevelFormat, element
+from .dense_level import DenseLevel, DenseLevelFType, dense
+from .element_level import ElementLevel, ElementLevelFType, element
 
 __all__ = [
     "DenseLevel",
-    "DenseLevelFormat",
+    "DenseLevelFType",
     "ElementLevel",
-    "ElementLevelFormat",
+    "ElementLevelFType",
     "dense",
     "element",
 ]

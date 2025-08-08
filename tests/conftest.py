@@ -4,6 +4,8 @@ import pytest
 
 from numpy.random import default_rng
 
+from finch.finch_logic import Field
+from finch.interface import get_default_scheduler, set_default_scheduler
 from finch.util.print import print_finch_program
 
 
@@ -63,3 +65,30 @@ def program_regression(file_regression, request):
         file_regression.check(program, extension=extension, basename=basename)
 
     return _program_regression
+
+
+@pytest.fixture
+def interpreter_scheduler():
+    ctx = get_default_scheduler()
+    yield set_default_scheduler(interpret_logic=True)
+    set_default_scheduler(ctx=ctx)
+
+
+@pytest.fixture
+def tp_0():
+    return (Field("A1"), Field("A3"))
+
+
+@pytest.fixture
+def tp_1():
+    return (Field("A0"), Field("A1"), Field("A2"), Field("A3"))
+
+
+@pytest.fixture
+def tp_2():
+    return (Field("A3"), Field("A1"))
+
+
+@pytest.fixture
+def tp_3():
+    return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))

@@ -65,15 +65,15 @@ from .eager import (
     var,
     vecdot,
 )
-from .fuse import compute, fuse, fused
+from .fuse import compute, fuse, fused, get_default_scheduler, set_default_scheduler
 from .lazy import LazyTensor, asarray, defer
-from .scalar import Scalar, ScalarFormat
+from .scalar import Scalar, ScalarFType
 
 __all__ = [
     "EagerTensor",
     "LazyTensor",
     "Scalar",
-    "ScalarFormat",
+    "ScalarFType",
     "abs",
     "acos",
     "acosh",
@@ -106,6 +106,7 @@ __all__ = [
     "floordiv",
     "fuse",
     "fused",
+    "get_default_scheduler",
     "log",
     "log1p",
     "log2",
@@ -129,6 +130,7 @@ __all__ = [
     "pow",
     "prod",
     "reduce",
+    "set_default_scheduler",
     "sin",
     "sinh",
     "split_dims",

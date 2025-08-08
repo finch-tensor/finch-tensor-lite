@@ -5,7 +5,8 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
-from ..symbolic import Term, TermTree, literal_repr
+from ..finch_assembly import AssemblyNode
+from ..symbolic import FType, Term, TermTree, literal_repr
 
 
 @dataclass(eq=True, frozen=True)
@@ -75,7 +76,7 @@ class Value(NotationExpression):
     type `type_`.
     """
 
-    val: Any
+    ex: AssemblyNode
     type_: Any
 
     @property
@@ -137,6 +138,28 @@ class AccessMode(NotationNode):
     """
 
 
+class AccessFType(FType):
+    obj: Any
+
+    def __init__(self, obj: Any):
+        self.obj = obj
+
+    def __eq__(self, other):
+        if not isinstance(other, AccessFType):
+            return False
+        return self.obj == other.obj
+
+    def __hash__(self):
+        return hash(self.obj)
+
+    @property
+    def element_type(self):
+        """
+        Returns the element type of the access ftype.
+        """
+        return element_type(self.obj)
+
+
 @dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
@@ -150,8 +173,9 @@ class Access(NotationTree, NotationExpression):
 
     @property
     def result_format(self):
-        # Placeholder: in a real system, would use tns/type system
-        return element_type(self.tns.result_format)
+        if len(self.idxs) == 0:
+            return self.tns.result_format
+        return AccessFType(self.tns.result_format)
 
     @classmethod
     def from_children(cls, tns, mode, *idxs):
@@ -219,6 +243,12 @@ class Unwrap(NotationTree):
     @property
     def children(self):
         return [self.arg]
+
+    def result_format(self):
+        """
+        Returns the type of the unwrapped value.
+        """
+        return element_type(self.arg.result_format)
 
 
 @dataclass(eq=True, frozen=True)
@@ -300,6 +330,90 @@ class Assign(NotationTree):
     @property
     def children(self):
         return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Stack(NotationExpression):
+    """
+    A logical AST expression representing an object using a set `obj` of
+    expressions, variables, and literals in the target language.
+
+    Attributes:
+        obj: The object referencing symbolic variables defined in the target language.
+        type: The type of the symbolic object.
+    """
+
+    obj: Any
+    type: Any
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.type
+
+
+@dataclass(eq=True, frozen=True)
+class Slot(NotationExpression):
+    """
+    Represents a register to a symbolic object. Using a register in an
+    expression creates a copy of the object.
+
+    Attributes:
+        name: The name of the symbolic object to register.
+        type: The type of the symbolic object.
+    """
+
+    name: str
+    type: Any
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.type
+
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
+
+
+@dataclass(eq=True, frozen=True)
+class Unpack(NotationTree):
+    """
+    Attempts to convert `rhs` into a symbolic, which can be registerd with
+    `lhs`. The original object must not be accessed or modified until the
+    corresponding `Repack` node is reached.
+
+    Attributes:
+        lhs: The symbolic object to write to.
+        rhs: The original object to read from.
+    """
+
+    lhs: Slot
+    rhs: NotationExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Repack(NotationTree):
+    """
+    Registers updates from a symbolic object `val` with the original
+    object `obj`. The original object may now be accessed and modified.
+
+    Attributes:
+        slot: The symbolic object to read from.
+        obj: The original object to write to.
+    """
+
+    val: Slot
+    obj: NotationExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.val, self.obj]
 
 
 @dataclass(eq=True, frozen=True)

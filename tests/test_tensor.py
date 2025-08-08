@@ -1,15 +1,15 @@
 import numpy as np
 
 from finch import (
-    DenseLevelFormat,
-    ElementLevelFormat,
-    FiberTensorFormat,
-    NumpyBufferFormat,
+    DenseLevelFType,
+    ElementLevelFType,
+    FiberTensorFType,
+    NumpyBufferFType,
 )
 
 
 def test_fiber_tensor_attributes():
-    fmt = FiberTensorFormat(DenseLevelFormat(ElementLevelFormat(0.0)))
+    fmt = FiberTensorFType(DenseLevelFType(ElementLevelFType(0.0)))
     shape = (3,)
     a = fmt(shape)
 
@@ -32,4 +32,4 @@ def test_fiber_tensor_attributes():
     assert a.position_type == np.intp
 
     # Check buffer_format exists
-    assert a.buffer_factory == NumpyBufferFormat
+    assert a.buffer_factory == NumpyBufferFType
