@@ -1,7 +1,15 @@
-from .algebra import Tensor, TensorFormat, element_type, fill_value, shape_type
+from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type
 from .codegen import (
     NumpyBuffer,
-    NumpyBufferFormat,
+    NumpyBufferFType,
+)
+from .compile import (
+    BufferizedNDArray,
+    Extent,
+    ExtentFType,
+    NotationContext,
+    dimension,
+    extent,
 )
 from .galley import (
     DenseStats,
@@ -82,30 +90,35 @@ from .interface import (
     vecdot,
 )
 from .symbolic import (
-    Formattable,
-    format,
-    has_format,
+    FTyped,
+    fisinstance,
+    ftype,
 )
 from .tensor import (
-    DenseLevelFormat,
-    ElementLevelFormat,
-    FiberTensorFormat,
+    DenseLevelFType,
+    ElementLevelFType,
+    FiberTensorFType,
 )
 
 __all__ = [
-    "DenseLevelFormat",
+    "BufferizedNDArray",
+    "DenseLevelFType",
     "DenseStats",
     "EagerTensor",
-    "ElementLevelFormat",
-    "FiberTensorFormat",
-    "Formattable",
+    "ElementLevelFType",
+    "Extent",
+    "ExtentFType",
+    "FTyped",
+    "FiberTensorFType",
     "LazyTensor",
+    "NotationContext",
     "NumpyBuffer",
-    "NumpyBufferFormat",
+    "NumpyBufferFType",
+    "Reflector",
     "Scalar",
     "Tensor",
     "TensorDef",
-    "TensorFormat",
+    "TensorFType",
     "abs",
     "acos",
     "acosh",
@@ -132,16 +145,18 @@ __all__ = [
     "cos",
     "cosh",
     "defer",
+    "dimension",
     "element_type",
     "elementwise",
     "expand_dims",
+    "extent",
     "fill_value",
+    "fisinstance",
     "flatten",
     "floordiv",
-    "format",
+    "ftype",
     "fuse",
     "fused",
-    "has_format",
     "log",
     "log1p",
     "log2",

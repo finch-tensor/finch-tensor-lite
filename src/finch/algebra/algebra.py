@@ -419,6 +419,18 @@ register_property(
     "is_distributive",
     lambda op, other_op: other_op == np.logical_and,
 )
+register_property(
+    operator.pow,
+    "__call__",
+    "is_distributive",
+    lambda op, other_op: False,
+)
+register_property(
+    operator.truediv,
+    "__call__",
+    "is_distributive",
+    lambda op, other_op: False,
+)
 
 
 def is_annihilator(op, val):

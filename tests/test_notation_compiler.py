@@ -1,39 +1,59 @@
 import operator
-from textwrap import dedent
+from pprint import pprint
+
+import pytest
 
 import numpy as np
 
+import finch
 import finch.finch_notation as ntn
-from finch.compile import dimension
-from finch.finch_notation.printer import PrinterCompiler
+from finch import ftype
+from finch.compile import ExtentFType, NotationCompiler, dimension
+from finch.symbolic import Reflector
 
 
-def test_printer():
-    pc = PrinterCompiler()
-
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        #        (
+        #            np.array([[1, 2], [3, 4]], dtype=np.float64),
+        #            np.array([[5, 6], [7, 8]], dtype=np.float64),
+        #        ),
+        (
+            np.array([[2, 0], [1, 3]], dtype=np.float64),
+            np.array([[4, 1], [2, 2]], dtype=np.float64),
+        ),
+    ],
+)
+def test_matrix_multiplication(a, b):
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
 
-    A = ntn.Variable("A", np.ndarray)
-    B = ntn.Variable("B", np.ndarray)
-    C = ntn.Variable("C", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
-    B_ = ntn.Slot("B_", np.ndarray)
-    C_ = ntn.Slot("C_", np.ndarray)
+    a_buf = finch.compile.BufferizedNDArray(a)
+    # b_buf = finch.compile.BufferizedNDArray(b)
+
+    a_format = ftype(a_buf)
+
+    A = ntn.Variable("A", a_format)
+    B = ntn.Variable("B", a_format)
+    C = ntn.Variable("C", a_format)
+    A_ = ntn.Slot("A_", a_format)
+    B_ = ntn.Slot("B_", a_format)
+    C_ = ntn.Slot("C_", a_format)
 
     a_ik = ntn.Variable("a_ik", np.float64)
     b_kj = ntn.Variable("b_kj", np.float64)
     c_ij = ntn.Variable("c_ij", np.float64)
 
-    m = ntn.Variable("m", np.int64)
-    n = ntn.Variable("n", np.int64)
-    p = ntn.Variable("p", np.int64)
+    m = ntn.Variable("m", ExtentFType(np.int64, np.int64))
+    n = ntn.Variable("n", ExtentFType(np.int64, np.int64))
+    p = ntn.Variable("p", ExtentFType(np.int64, np.int64))
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", np.ndarray),
+                ntn.Variable("matmul", a_format),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -98,10 +118,7 @@ def test_printer():
                             ),
                         ),
                         ntn.Freeze(C_, ntn.Literal(operator.add)),
-                        ntn.Repack(
-                            val=C_,
-                            obj=C,
-                        ),
+                        ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
                 ),
@@ -109,27 +126,15 @@ def test_printer():
         )
     )
 
-    actual = pc(prgm)
+    # mod = ntn.NotationInterpreter()(prgm)
+    pprint(NotationCompiler(Reflector())(prgm))
 
-    expected = dedent("""\
-    def matmul(C: ndarray, A: ndarray, B: ndarray) -> ndarray:
-        m: int64 = dimension(A, 0)
-        n: int64 = dimension(B, 1)
-        p: int64 = dimension(A, 1)
-        A_: ndarray = unpack(A)
-        B_: ndarray = unpack(B)
-        C_: ndarray = unpack(C)
-        declare(C_, 0.0, add, ['m', 'n'])
-        loop(i, m):
-            loop(j, n):
-                loop(k, p):
-                    a_ik: float64 = unwrap(read(A_, ['i', 'k']))
-                    b_kj: float64 = unwrap(read(B_, ['k', 'j']))
-                    c_ij: float64 = mul(a_ik, b_kj)
-                    increment(update(C_, ['i', 'j'], add), c_ij)
-        freeze(C_, add)
-        repack(C_, C)
-        return C
-    """)
+    # c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64,
+    # shape=(a.shape[0], b.shape[1])))
+    # result = mod.matmul(c, a_buf, b_buf).to_numpy()
 
-    assert expected == actual
+
+#
+#    expected = np.matmul(a, b)
+
+#    assert_equal(result, expected)

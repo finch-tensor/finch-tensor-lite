@@ -1,4 +1,4 @@
-from .buffer import Buffer, BufferFormat, element_type, length_type
+from .buffer import Buffer, BufferFType, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -28,18 +28,18 @@ from .nodes import (
     WhileLoop,
 )
 from .safe_buffer import SafeBuffer, SafeBufferFormat, make_safe
-from .struct import AssemblyStructFormat, NamedTupleFormat, TupleFormat
+from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 
 __all__ = [
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
-    "AssemblyStructFormat",
+    "AssemblyStructFType",
     "Assign",
     "Block",
     "Break",
     "Buffer",
-    "BufferFormat",
+    "BufferFType",
     "BufferLoop",
     "Call",
     "ForLoop",
@@ -51,7 +51,7 @@ __all__ = [
     "Literal",
     "Load",
     "Module",
-    "NamedTupleFormat",
+    "NamedTupleFType",
     "Repack",
     "Resize",
     "Return",
@@ -61,7 +61,7 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
-    "TupleFormat",
+    "TupleFType",
     "Unpack",
     "Variable",
     "WhileLoop",

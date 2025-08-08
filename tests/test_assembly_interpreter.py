@@ -22,7 +22,7 @@ from finch.finch_assembly import (  # noqa: F401
     Return,
     Variable,
 )
-from finch.symbolic import format
+from finch.symbolic import ftype
 
 
 @pytest.mark.parametrize(
@@ -42,10 +42,10 @@ def test_dot_product(a, b):
     i = asm.Variable("i", np.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
-    ab_v = asm.Variable("a", ab.format)
-    ab_slt = asm.Slot("a_", ab.format)
-    bb_v = asm.Variable("b", bb.format)
-    bb_slt = asm.Slot("b_", bb.format)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
 
     mod = AssemblyInterpreter()(
         asm.Module(
@@ -176,8 +176,8 @@ def test_simple_struct():
     p = Point(np.float64(1.0), np.float64(2.0))
     x = (1, 4)
 
-    p_var = asm.Variable("p", format(p))
-    x_var = asm.Variable("x", format(x))
+    p_var = asm.Variable("p", ftype(p))
+    x_var = asm.Variable("x", ftype(x))
     res_var = asm.Variable("res", np.float64)
     mod = AssemblyInterpreter()(
         asm.Module(

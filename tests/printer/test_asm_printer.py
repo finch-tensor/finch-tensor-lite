@@ -96,10 +96,10 @@ def test_printer_dot():
     i = asm.Variable("i", np.int64)
     ab = NumpyBuffer(np.array([1, 2, 3], dtype=np.float64))
     bb = NumpyBuffer(np.array([4, 5, 6], dtype=np.float64))
-    ab_v = asm.Variable("a", ab.format)
-    ab_slt = asm.Slot("a_", ab.format)
-    bb_v = asm.Variable("b", bb.format)
-    bb_slt = asm.Slot("b_", bb.format)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
 
     prgm = asm.Module(
         (
@@ -151,12 +151,12 @@ def test_printer_dot():
     actual = pc(prgm)
 
     expected = dedent("""\
-    def dot_product(a: format(float64), b: format(float64)) -> float64:
+    def dot_product(a: ftype(float64), b: ftype(float64)) -> float64:
         c: float64 = 0.0
-        a_: format(float64) = unpack(a)
-        b_: format(float64) = unpack(b)
-        for i in range(0, length(slot(a_, format(float64)))):
-            c: float64 = add(c, mul(load(slot(a_, format(float64)), i), load(slot(b_, format(float64)), i)))
+        a_: ftype(float64) = unpack(a)
+        b_: ftype(float64) = unpack(b)
+        for i in range(0, length(slot(a_, ftype(float64)))):
+            c: float64 = add(c, mul(load(slot(a_, ftype(float64)), i), load(slot(b_, ftype(float64)), i)))
         repack(a_)
         repack(b_)
         return c

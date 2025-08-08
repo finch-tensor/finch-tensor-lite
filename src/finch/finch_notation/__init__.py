@@ -1,4 +1,4 @@
-from .interpreter import NotationInterpreter, dimension, extent
+from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
     Assign,
@@ -17,8 +17,12 @@ from .nodes import (
     NotationExpression,
     NotationNode,
     Read,
+    Repack,
     Return,
+    Slot,
+    Stack,
     Thaw,
+    Unpack,
     Unwrap,
     Update,
     Value,
@@ -44,12 +48,15 @@ __all__ = [
     "NotationInterpreter",
     "NotationNode",
     "Read",
+    "Repack",
     "Return",
+    "Slot",
+    "Stack",
+    "TensorView",
     "Thaw",
+    "Unpack",
     "Unwrap",
     "Update",
     "Value",
     "Variable",
-    "dimension",
-    "extent",
 ]

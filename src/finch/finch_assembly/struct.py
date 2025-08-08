@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 
 from ..algebra import register_property
-from ..symbolic import Format, format
+from ..symbolic import FType, ftype
 
 
-class AssemblyStructFormat(Format, ABC):
+class AssemblyStructFType(FType, ABC):
     @property
     @abstractmethod
     def struct_name(self): ...
@@ -39,14 +39,14 @@ class AssemblyStructFormat(Format, ABC):
         return dict(self.struct_fields)[attr]
 
 
-class NamedTupleFormat(AssemblyStructFormat):
+class NamedTupleFType(AssemblyStructFType):
     def __init__(self, struct_name, struct_fields):
         self._struct_name = struct_name
         self._struct_fields = struct_fields
 
     def __eq__(self, other):
         return (
-            isinstance(other, NamedTupleFormat)
+            isinstance(other, NamedTupleFType)
             and self.struct_name == other.struct_name
             and self.struct_fields == other.struct_fields
         )
@@ -63,14 +63,14 @@ class NamedTupleFormat(AssemblyStructFormat):
         return self._struct_fields
 
 
-class TupleFormat(AssemblyStructFormat):
+class TupleFType(AssemblyStructFType):
     def __init__(self, name, struct_fieldformats):
         self._struct_name = name
         self._struct_formats = struct_fieldformats
 
     def __eq__(self, other):
         return (
-            isinstance(other, TupleFormat)
+            isinstance(other, TupleFType)
             and self.struct_name == other.struct_name
             and self._struct_formats == other._struct_formats
         )
@@ -98,14 +98,14 @@ class TupleFormat(AssemblyStructFormat):
 
 def tupleformat(x):
     if hasattr(type(x), "_fields"):
-        return NamedTupleFormat(
+        return NamedTupleFType(
             type(x).__name__,
             [
-                (fieldname, format(getattr(x, fieldname)))
+                (fieldname, ftype(getattr(x, fieldname)))
                 for fieldname in type(x)._fields
             ],
         )
-    return TupleFormat(type(x).__name__, [type(elem) for elem in x])
+    return TupleFType(type(x).__name__, [type(elem) for elem in x])
 
 
-register_property(tuple, "format", "__attr__", tupleformat)
+register_property(tuple, "ftype", "__attr__", tupleformat)

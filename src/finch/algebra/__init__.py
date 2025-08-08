@@ -22,7 +22,7 @@ from .operator import (
 )
 from .tensor import (
     Tensor,
-    TensorFormat,
+    TensorFType,
     element_type,
     fill_value,
     shape_type,
@@ -32,7 +32,7 @@ __all__ = [
     "InitWrite",
     "StableNumber",
     "Tensor",
-    "TensorFormat",
+    "TensorFType",
     "conjugate",
     "conjugate",
     "element_type",

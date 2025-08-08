@@ -15,8 +15,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFormat, BufferFormat, TupleFormat
-from ..symbolic import Context, Namespace, ScopedDict, format, has_format
+from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
+from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
 
@@ -93,10 +93,10 @@ def load_shared_lib(c_code, cc=None, cflags=None):
 
 def serialize_to_c(fmt, obj):
     """
-    Serialize an object to a C-compatible format.
+    Serialize an object to a C-compatible ftype.
 
     Args:
-        fmt: Format of obj
+        fmt: FType of obj
         obj: The object to serialize.
 
     Returns:
@@ -109,10 +109,10 @@ def serialize_to_c(fmt, obj):
 
 def deserialize_from_c(fmt, obj, c_obj):
     """
-    Deserialize a C-compatible object back to the original format.
+    Deserialize a C-compatible object back to the original ftype.
 
     Args:
-        fmt: Format of obj
+        fmt: FType of obj
         obj: The original object to update.
         c_obj: The C-compatible object to deserialize from.
 
@@ -127,10 +127,10 @@ def deserialize_from_c(fmt, obj, c_obj):
 
 def construct_from_c(fmt, c_obj):
     """
-    Construct an object from a C-compatible format.
+    Construct an object from a C-compatible ftype.
 
     Args:
-        fmt: The format of the object.
+        fmt: The ftype of the object.
         c_obj: The C-compatible object to construct from.
 
     Returns:
@@ -216,7 +216,7 @@ class CKernel:
                 f"Expected {len(self.argtypes)} arguments, got {len(args)}"
             )
         for argtype, arg in zip(self.argtypes, args, strict=False):
-            if not has_format(arg, argtype):
+            if not fisinstance(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
         serial_args = list(map(serialize_to_c, self.argtypes, args))
         res = self.c_function(*serial_args)
@@ -225,7 +225,7 @@ class CKernel:
         ):
             deserialize_from_c(type_, arg, serial_arg)
         if hasattr(self.ret_type, "construct_from_c"):
-            return construct_from_c(res.format, res)
+            return construct_from_c(res.ftype, res)
         if self.ret_type is type(None):
             return None
         return self.ret_type(res)
@@ -697,7 +697,7 @@ class CContext(Context):
                 return c_getattr(obj.result_format, self, self(obj), attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
-                if not has_format(val, obj.result_format.struct_attrtype(attr.val)):
+                if not fisinstance(val, obj.result_format.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_format} != "
                         f"{obj.result_format.struct_attrtype(attr.val)}"
@@ -776,7 +776,7 @@ class CContext(Context):
                 return None
             case asm.BufferLoop(buf, var, body):
                 idx = asm.Variable(
-                    self.freshen(var.name + "_i"), buf.result_format.index_type()
+                    self.freshen(var.name + "_i"), buf.result_format.shape_type()
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(
@@ -872,7 +872,7 @@ class CContext(Context):
                 )
 
 
-class CArgumentFormat(ABC):
+class CArgumentFType(ABC):
     @abstractmethod
     def serialize_to_c(self, obj):
         """
@@ -896,9 +896,9 @@ class CArgumentFormat(ABC):
         """
 
 
-class CBufferFormat(BufferFormat, CArgumentFormat, ABC):
+class CBufferFType(BufferFType, CArgumentFType, ABC):
     """
-    Abstract base class for the format of datastructures. The format defines how
+    Abstract base class for the ftype of datastructures. The ftype defines how
     the data in an Buffer is organized and accessed.
     """
 
@@ -931,7 +931,7 @@ class CBufferFormat(BufferFormat, CArgumentFormat, ABC):
         ...
 
 
-class CStackFormat(ABC):
+class CStackFType(ABC):
     """
     Abstract base class for symbolic formats in C. Stack formats must also
     support other functions with symbolic inputs in addition to variable ones.
@@ -956,17 +956,17 @@ class CStackFormat(ABC):
         ...
 
 
-def serialize_struct_to_c(fmt: AssemblyStructFormat, obj) -> Any:
+def serialize_struct_to_c(fmt: AssemblyStructFType, obj) -> Any:
     args = [getattr(obj, name) for name in fmt.struct_fieldnames]
     return struct_c_type(fmt)(*args)
 
 
 register_property(
-    AssemblyStructFormat, "serialize_to_c", "__attr__", serialize_struct_to_c
+    AssemblyStructFType, "serialize_to_c", "__attr__", serialize_struct_to_c
 )
 
 
-def deserialize_struct_from_c(fmt: AssemblyStructFormat, obj, c_struct: Any) -> None:
+def deserialize_struct_from_c(fmt: AssemblyStructFType, obj, c_struct: Any) -> None:
     if fmt.is_mutable:
         for name in fmt.struct_fieldnames:
             setattr(obj, name, getattr(c_struct, name))
@@ -974,14 +974,14 @@ def deserialize_struct_from_c(fmt: AssemblyStructFormat, obj, c_struct: Any) -> 
 
 
 register_property(
-    AssemblyStructFormat, "deserialize_from_c", "__attr__", deserialize_struct_from_c
+    AssemblyStructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
 )
 
 c_structs: dict[Any, Any] = {}
 c_structnames = Namespace()
 
 
-def struct_c_type(fmt: AssemblyStructFormat):
+def struct_c_type(fmt: AssemblyStructFType):
     res = c_structs.get(fmt)
     if res:
         return res
@@ -996,45 +996,45 @@ def struct_c_type(fmt: AssemblyStructFormat):
 
 
 register_property(
-    AssemblyStructFormat,
+    AssemblyStructFType,
     "c_type",
     "__attr__",
     lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
 )
 
 
-def struct_c_getattr(fmt: AssemblyStructFormat, ctx, obj, attr):
+def struct_c_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
     return f"{obj}->{attr}"
 
 
 register_property(
-    AssemblyStructFormat,
+    AssemblyStructFType,
     "c_getattr",
     "__attr__",
     struct_c_getattr,
 )
 
 
-def struct_c_setattr(fmt: AssemblyStructFormat, ctx, obj, attr, val):
+def struct_c_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
     ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
     return
 
 
 register_property(
-    AssemblyStructFormat,
+    AssemblyStructFType,
     "c_setattr",
     "__attr__",
     struct_c_setattr,
 )
 
 
-def struct_construct_from_c(fmt: AssemblyStructFormat, c_struct):
+def struct_construct_from_c(fmt: AssemblyStructFType, c_struct):
     args = [getattr(c_struct, name) for (name, _) in fmt.struct_fieldnames]
     return fmt.__class__(*args)
 
 
 register_property(
-    AssemblyStructFormat,
+    AssemblyStructFType,
     "construct_from_c",
     "__attr__",
     struct_construct_from_c,
@@ -1043,27 +1043,27 @@ register_property(
 
 def serialize_tuple_to_c(fmt, obj):
     x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
-    return serialize_to_c(format(x), x)
+    return serialize_to_c(ftype(x), x)
 
 
 register_property(
-    TupleFormat,
+    TupleFType,
     "serialize_to_c",
     "__attr__",
     serialize_tuple_to_c,
 )
 register_property(
-    TupleFormat,
+    TupleFType,
     "construct_from_c",
     "__attr__",
     lambda fmt, obj, c_tuple: tuple(c_tuple),
 )
 
 register_property(
-    TupleFormat,
+    TupleFType,
     "c_type",
     "__attr__",
     lambda fmt: ctypes.POINTER(
-        struct_c_type(asm.NamedTupleFormat("CTuple", fmt.struct_fields))
+        struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields))
     ),
 )
