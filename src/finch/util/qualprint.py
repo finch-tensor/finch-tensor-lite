@@ -1,6 +1,7 @@
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any
 
+
 def qual_str(val: Any) -> str:
     if hasattr(val, "__qual_str__"):
         return val.__qual_str__()
