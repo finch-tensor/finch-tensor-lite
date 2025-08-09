@@ -5,12 +5,9 @@ import numpy as np
 
 import finch.finch_assembly as asm
 from finch.codegen.numpy_buffer import NumpyBuffer
-from finch.finch_assembly.printer import PrinterCompiler
 
 
 def test_printer_if():
-    pc = PrinterCompiler()
-
     var = asm.Variable("a", np.int64)
     root = asm.Module(
         (
@@ -72,7 +69,7 @@ def test_printer_if():
         )
     )
 
-    actual = pc(root)
+    actual = str(root)
 
     expected = dedent("""\
     def if_else() -> int64:
@@ -90,8 +87,6 @@ def test_printer_if():
 
 
 def test_printer_dot():
-    pc = PrinterCompiler()
-
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
     ab = NumpyBuffer(np.array([1, 2, 3], dtype=np.float64))
@@ -148,15 +143,15 @@ def test_printer_dot():
         )
     )
 
-    actual = pc(prgm)
+    actual = str(prgm)
 
     expected = dedent("""\
-    def dot_product(a: ftype(float64), b: ftype(float64)) -> float64:
+    def dot_product(a: np_buf_t(float64), b: np_buf_t(float64)) -> float64:
         c: float64 = 0.0
-        a_: ftype(float64) = unpack(a)
-        b_: ftype(float64) = unpack(b)
-        for i in range(0, length(slot(a_, ftype(float64)))):
-            c: float64 = add(c, mul(load(slot(a_, ftype(float64)), i), load(slot(b_, ftype(float64)), i)))
+        a_: np_buf_t(float64) = unpack(a)
+        b_: np_buf_t(float64) = unpack(b)
+        for i in range(0, length(slot(a_, np_buf_t(float64)))):
+            c: float64 = add(c, mul(load(slot(a_, np_buf_t(float64)), i), load(slot(b_, np_buf_t(float64)), i)))
         repack(a_)
         repack(b_)
         return c
