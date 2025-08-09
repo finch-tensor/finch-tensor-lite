@@ -4,6 +4,7 @@ from typing import NamedTuple
 import numpy as np
 
 from ..finch_assembly import Buffer
+from ..util import qual_str
 from .c import CBufferFType, CStackFType, c_type
 from .numba_backend import NumbaBufferFType
 
@@ -58,6 +59,10 @@ class NumpyBuffer(Buffer):
     def resize(self, new_length: int):
         self.arr = np.resize(self.arr, new_length)
 
+    def __str__(self):
+        arr_str = str(self.arr).replace("\n", "")
+        return f"np_buf({arr_str})"
+
 
 class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     """
@@ -72,6 +77,9 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         if not isinstance(other, NumpyBufferFType):
             return False
         return self._dtype == other._dtype
+
+    def __str__(self):
+        return f"np_buf_t({qual_str(self._dtype)})"
 
     @property
     def length_type(self):
