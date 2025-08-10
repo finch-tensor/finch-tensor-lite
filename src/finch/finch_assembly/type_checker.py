@@ -1,5 +1,10 @@
-from ..symbolic import FType, ScopedDict
+from ..symbolic import FType, ScopedDict, ftype
 from . import nodes as asm
+from .struct import AssemblyStructFType
+
+
+class AssemblyTypeError(Exception):
+    pass
 
 
 class AssemblyTypeChecker:
@@ -16,7 +21,7 @@ class AssemblyTypeChecker:
         try:
             check_type_match(self.ctxt[var_n], var_t)
         except KeyError:
-            raise TypeError(
+            raise AssemblyTypeError(
                 f"'{var_n}' is not defined in the current context."
             ) from KeyError
 
@@ -26,7 +31,7 @@ class AssemblyTypeChecker:
     def __call__(self, prgm: asm.AssemblyNode):
         match prgm:
             case asm.Literal(value) as lit:
-                return lit.result_format
+                return ftype(lit.val)
             case asm.Variable(var_n, var_t) as var:
                 check_var(var)
                 self.check_in_ctxt(var_n, var_t)
@@ -35,39 +40,46 @@ class AssemblyTypeChecker:
                 check_slot(slot)
                 self.check_in_ctxt(var_n, var_t)
                 return var_t
-            case asm.Assign(var, rhs):
-                check_is_var(var)
-                rhs_type = self(rhs)
-                check_is_type(rhs_type)  # rhs must be expression with type
-                check_type_match(var.result_format, rhs_type)
-                self.ctxt[var.name] = var.result_format
-                return None
+            case asm.Assign(lhs, rhs):
+                match lhs:
+                    case asm.Variable(var_n, var_t) as var:
+                        check_var(var)
+                        rhs_type = self(rhs)
+                        check_is_type(rhs_type)  # rhs must be expression with type
+                        check_type_match(var_t, rhs_type)
+                        self.ctxt[var_n] = var_t
+                        return None
+                    case asm.Stack(_obj, _obj_t):
+                        return None  # TODO
             case asm.GetAttr(obj, attr):
                 obj_type = self(obj)
                 check_is_struct_type(obj_type)
                 check_is_literal(attr)
-                return obj_type.struct_attrtype(attr.val)
-            case asm.Unpack(slot, rhs):
-                # TODO: find corresponding repack
-                # TODO: rhs cannot be accessed or modified until repack
-                check_is_slot(slot)
-                check_type_match(slot.return_format, self(rhs))
-                if var_n in self.ctxt:
-                    raise TypeError(
-                        f"Slot {var_n} is already defined in the current "
-                        f"context, cannot overwrite with slot."
-                    )
-                self.ctxt[var_n] = var_t
-                return None
-            case asm.Repack(slot):
-                # TODO: allow rhs of unpack to be modified
-                check_is_slot(slot)
-                return None
+                return check_attrtype(obj_type, attr.val)
             case asm.SetAttr(obj, attr, value):
                 obj_type = self(obj)
                 check_is_struct_type(obj_type)
                 check_is_literal(attr)
-                check_type_match(obj_type.struct_attrtype(attr.val), self(value))
+                attrtype = check_attrtype(obj_type, attr.val)
+                value_type = self(value)
+                check_is_type(value_type)  # rhs must be expression with type
+                check_type_match(attrtype, value_type)
+                return None
+            case asm.Unpack(slot, rhs):
+                # TODO: find corresponding repack
+                # TODO: rhs cannot be accessed or modified until repack
+                check_is_slot(slot)
+                check_type_match(slot.type, self(rhs))
+                if slot.name in self.ctxt:
+                    raise AssemblyTypeError(
+                        f"Slot {slot.name} is already defined in the current "
+                        f"context, cannot overwrite with slot."
+                    )
+                self.ctxt[slot.name] = slot.type
+                return None
+            case asm.Repack(slot):
+                # TODO: allow rhs of unpack to be modified
+                check_is_slot(slot)
                 return None
             case asm.Call(_op, _args):
                 # DOUBLE CHECK
@@ -146,10 +158,6 @@ class AssemblyTypeChecker:
                 return None
 
 
-def check_is_struct_type(type_):
-    return None  # TODO
-
-
 def check_is_buffer_expr(expr):
     return None  # TODO
 
@@ -162,19 +170,24 @@ def check_is_bool(expr):
     return None  # TODO
 
 
+def check_type_match(expected_type, actual_type):
+    if expected_type != actual_type:
+        raise AssemblyTypeError(f"Expected {expected_type}, found {actual_type}")
+
+
 def check_is_literal(lit):
     if not isinstance(lit, asm.Literal):
-        raise TypeError("Expected literal.")
+        raise AssemblyTypeError("Expected literal.")
 
 
 def check_is_str(var_n):
     if not isinstance(var_n, str):
-        raise TypeError("Identifier must be a string.")
+        raise AssemblyTypeError("Identifier must be a string.")
 
 
 def check_is_type(type_):
     if not isinstance(type_, type | FType):
-        raise TypeError(f"Expected type, {type_} is not a type.")
+        raise AssemblyTypeError(f"Expected type, {type_} is not a type.")
 
 
 def check_var(var):
@@ -191,16 +204,23 @@ def check_is_slot(slot):
     if isinstance(slot, asm.Slot):
         check_slot(slot)
     else:
-        raise TypeError("Expected slot.")
+        raise AssemblyTypeError("Expected slot.")
 
 
 def check_is_var(var):
     if isinstance(var, asm.Variable):
         check_var(var)
     else:
-        raise TypeError("Expected var.")
+        raise AssemblyTypeError("Expected variable.")
 
 
-def check_type_match(expected_type, actual_type):
-    if expected_type != actual_type:
-        raise TypeError(f"Expected {expected_type}, found {actual_type}")
+def check_is_struct_type(type_):
+    if not isinstance(type_, AssemblyStructFType):
+        raise AssemblyTypeError("Expected struct.")
+
+
+def check_attrtype(obj_type, attr):
+    try:
+        return obj_type.struct_attrtype(attr)
+    except KeyError:
+        raise AssemblyTypeError("{attr.val} is not attribute.") from KeyError
