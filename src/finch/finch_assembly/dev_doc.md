@@ -51,4 +51,4 @@ MODULE     := Module(funcs=NODE...)
 * Are the nodes in a module required to be `FUNCTION`s? Should this be reflected in the signature of the constructor?
 * The left-hand side of `UNPACK` and the argument of `REPACK` seem to be allowed to be `STACK`. Should this be reflected in the signature of the constructor?
 
-[^1] Nathan: Not my own words, taken from docstring.
+[^1]: Nathan: Not my own words, taken from docstring.
