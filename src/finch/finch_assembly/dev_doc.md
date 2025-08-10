@@ -35,3 +35,13 @@ RETURN     := Return(arg=EXPR)
 BREAK      := Break()
 BLOCK      := Block(bodies=STMTS...)
 ```
+
+## Questions
+
+* Can TYPE by anything besides a type or FType (or function type)
+* What can the right-hand side of an unpack statement be? Can it be anything
+  but a variable? If not, what does it mean to make sure the original object is
+  not accessed or modified?
+* Are unpacks and repacks linear? Are double unpacks overriding or errors? Are
+  double repacks noops or errors?
+* Is assignment overloaded as declaration?

@@ -25,62 +25,49 @@ class AssemblyTypeChecker:
 
     def __call__(self, prgm: asm.AssemblyNode):
         match prgm:
-            case asm.Literal(value):
-                return prgm.result_format
-            case asm.Variable(var_n, var_t) | asm.Slot(var_n, var_t):
-                check_is_str(var_n)
-                check_is_type(var_t)
+            case asm.Literal(value) as lit:
+                return lit.result_format
+            case asm.Variable(var_n, var_t) as var:
+                check_var(var)
                 self.check_in_ctxt(var_n, var_t)
                 return var_t
-            case asm.Unpack(lhs, rhs):
-                # TODO: make sure rhs is not modified
-                # TODO: make sure there is an unpack
-                # TODO: is the rhs always a variable
-                match lhs:
-                    case asm.Slot(var_n, var_t):
-                        check_is_str(var_n)
-                        check_is_type(var_t)
-                        rhs_type = self(rhs)
-                        check_is_type(rhs_type)
-                        check_type_match(var_t, rhs_type)
-                        if var_n in self.ctxt:
-                            raise TypeError(
-                                f"Slot {var_n} is already defined in the current "
-                                f"context, cannot overwrite with slot."
-                            )
-                        self.ctxt[var_n] = var_t
-                        return None
-                    case _:
-                        raise TypeError("Left-hand side of unpack must be a slot.")
-            case asm.Repack(val):
-                # TODO: allow variable to be modified after
-                if not isinstance(val, asm.Slot):
-                    raise TypeError("Left-hand side of repack must be a slot.")
+            case asm.Slot(var_n, var_t) as slot:
+                check_slot(slot)
+                self.check_in_ctxt(var_n, var_t)
+                return var_t
+            case asm.Assign(var, rhs):
+                check_is_var(var)
+                rhs_type = self(rhs)
+                check_is_type(rhs_type)  # rhs must be expression with type
+                check_type_match(var.result_format, rhs_type)
+                self.ctxt[var.name] = var.result_format
                 return None
-            case asm.Assign(lhs, rhs):
-                match lhs:
-                    case asm.Variable(var_n, var_t):
-                        check_is_str(var_n)
-                        check_is_type(var_t)
-                        rhs_type = self(var_t)
-                        check_type_match(var_t, rhs_type)
-                        self.ctxt[var_n] = var_t
-                        return None
-                    case _:
-                        raise TypeError(
-                            "Left-hand side of assignment must be a variable."
-                        )
             case asm.GetAttr(obj, attr):
                 obj_type = self(obj)
                 check_is_struct_type(obj_type)
                 check_is_literal(attr)
                 return obj_type.struct_attrtype(attr.val)
+            case asm.Unpack(slot, rhs):
+                # TODO: find corresponding repack
+                # TODO: rhs cannot be accessed or modified until repack
+                check_is_slot(slot)
+                check_type_match(slot.return_format, self(rhs))
+                if var_n in self.ctxt:
+                    raise TypeError(
+                        f"Slot {var_n} is already defined in the current "
+                        f"context, cannot overwrite with slot."
+                    )
+                self.ctxt[var_n] = var_t
+                return None
+            case asm.Repack(slot):
+                # TODO: allow rhs of unpack to be modified
+                check_is_slot(slot)
+                return None
             case asm.SetAttr(obj, attr, value):
                 obj_type = self(obj)
                 check_is_struct_type(obj_type)
                 check_is_literal(attr)
-                value_type = self(value)
-                check_type_match(obj_type.struct_attrtype(attr.val), value_type)
+                check_type_match(obj_type.struct_attrtype(attr.val), self(value))
                 return None
             case asm.Call(_op, _args):
                 # DOUBLE CHECK
@@ -163,15 +150,7 @@ def check_is_struct_type(type_):
     return None  # TODO
 
 
-def check_is_literal(expr):
-    return None  # TODO
-
-
 def check_is_buffer_expr(expr):
-    return None  # TODO
-
-
-def check_is_var(expr):
     return None  # TODO
 
 
@@ -183,14 +162,43 @@ def check_is_bool(expr):
     return None  # TODO
 
 
+def check_is_literal(lit):
+    if not isinstance(lit, asm.Literal):
+        raise TypeError("Expected literal.")
+
+
+def check_is_str(var_n):
+    if not isinstance(var_n, str):
+        raise TypeError("Identifier must be a string.")
+
+
 def check_is_type(type_):
     if not isinstance(type_, type | FType):
         raise TypeError(f"Expected type, {type_} is not a type.")
 
 
-def check_is_str(var_n):
-    if not isinstance(var_n, str):
-        raise TypeError("Variable/slot identifier must be a string.")
+def check_var(var):
+    check_is_str(var.name)
+    check_is_type(var.type)
+
+
+def check_slot(slot):
+    check_is_str(slot.name)
+    check_is_type(slot.type)
+
+
+def check_is_slot(slot):
+    if isinstance(slot, asm.Slot):
+        check_slot(slot)
+    else:
+        raise TypeError("Expected slot.")
+
+
+def check_is_var(var):
+    if isinstance(var, asm.Variable):
+        check_var(var)
+    else:
+        raise TypeError("Expected var.")
 
 
 def check_type_match(expected_type, actual_type):
