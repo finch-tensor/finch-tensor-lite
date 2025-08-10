@@ -12,9 +12,9 @@ class AssemblyTypeChecker:
             ctxt = ScopedDict()
         self.ctxt = ctxt
 
-    def check_ctxt(self, var_n):
+    def check_in_ctxt(self, var_n, var_t):
         try:
-            return self.ctxt[var_n]
+            check_type_match(self.ctxt[var_n], var_t)
         except KeyError:
             raise TypeError(
                 f"'{var_n}' is not defined in the current context."
@@ -30,35 +30,41 @@ class AssemblyTypeChecker:
             case asm.Variable(var_n, var_t) | asm.Slot(var_n, var_t):
                 check_is_str(var_n)
                 check_is_type(var_t)
-                def_t = self.check_ctxt(var_n)
-                check_type_match(def_t, var_t)
+                self.check_in_ctxt(var_n, var_t)
                 return var_t
             case asm.Unpack(lhs, rhs):
+                # TODO: make sure rhs is not modified
+                # TODO: make sure there is an unpack
+                # TODO: is the rhs always a variable
                 match lhs:
-                    case asm.Slot(name, type_):
+                    case asm.Slot(var_n, var_t):
+                        check_is_str(var_n)
+                        check_is_type(var_t)
                         rhs_type = self(rhs)
                         check_is_type(rhs_type)
-                        check_type_match(type_, rhs)
-                        if name in self.ctxt:
+                        check_type_match(var_t, rhs_type)
+                        if var_n in self.ctxt:
                             raise TypeError(
-                                f"Slot {name} is already defined in the current "
+                                f"Slot {var_n} is already defined in the current "
                                 f"context, cannot overwrite with slot."
                             )
-                        self.ctxt[name] = type_
+                        self.ctxt[var_n] = var_t
                         return None
                     case _:
                         raise TypeError("Left-hand side of unpack must be a slot.")
             case asm.Repack(val):
+                # TODO: allow variable to be modified after
                 if not isinstance(val, asm.Slot):
                     raise TypeError("Left-hand side of repack must be a slot.")
                 return None
             case asm.Assign(lhs, rhs):
                 match lhs:
-                    case asm.Variable(name, type_):
-                        check_is_type(type_)
-                        rhs_type = self(type_)
-                        check_type_match(type_, rhs_type)
-                        self.ctxt[name] = type_
+                    case asm.Variable(var_n, var_t):
+                        check_is_str(var_n)
+                        check_is_type(var_t)
+                        rhs_type = self(var_t)
+                        check_type_match(var_t, rhs_type)
+                        self.ctxt[var_n] = var_t
                         return None
                     case _:
                         raise TypeError(
