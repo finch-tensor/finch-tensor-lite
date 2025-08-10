@@ -50,5 +50,6 @@ MODULE     := Module(funcs=NODE...)
 * Are bodies of loops, conditions, and functions required to be `BLOCK`s? Should this be reflected in signature of the constructor?
 * Are the nodes in a module required to be `FUNCTION`s? Should this be reflected in the signature of the constructor?
 * The left-hand side of `UNPACK` and the argument of `REPACK` seem to be allowed to be `STACK`. Should this be reflected in the signature of the constructor?
+* Just to verify, are the ops of function calls required to be `LITERAL`s? In particular, is it not possible to use a function defined in a module within the module itself (I think technically this is possible at the moment in the interpreter)?
 
 [^1]: Nathan: Not my own words, taken from docstring.
