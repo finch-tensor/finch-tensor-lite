@@ -47,6 +47,8 @@ class AssemblyTypeChecker:
                         rhs_type = self(rhs)
                         check_is_type(rhs_type)  # rhs must be expression with type
                         check_type_match(var_t, rhs_type)
+                        if var_n in self.ctxt:
+                            check_type_match(self.ctxt[var_n], var_t)
                         self.ctxt[var_n] = var_t
                         return None
                     case asm.Stack(_obj, _obj_t):
