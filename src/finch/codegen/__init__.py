@@ -5,6 +5,7 @@ from .numba_backend import (
     NumbaModule,
 )
 from .numpy_buffer import NumpyBuffer, NumpyBufferFType
+from .safe_buffer import SafeBuffer, SafeBufferFType, make_safe
 
 __all__ = [
     "CArgumentFType",
@@ -12,13 +13,12 @@ __all__ = [
     "CCompiler",
     "CKernel",
     "CModule",
-    "CStruct",
-    "CStructFTypeNumbaCompiler",
     "NumbaCompiler",
     "NumbaKernel",
     "NumbaModule",
-    "NumbaStruct",
-    "NumbaStructFType",
     "NumpyBuffer",
     "NumpyBufferFType",
+    "SafeBuffer",
+    "SafeBufferFType",
+    "make_safe",
 ]

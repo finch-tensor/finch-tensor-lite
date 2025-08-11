@@ -15,6 +15,7 @@ from finch.codegen import (
     NumpyBuffer,
     NumpyBufferFType,
 )
+from finch.codegen.safe_buffer import safe_wrapper
 
 
 def test_add_function():
@@ -79,7 +80,9 @@ def test_buffer_function():
         (NumbaCompiler(), NumpyBuffer),
     ],
 )
-def test_codegen(compiler, buffer):
+@pytest.mark.parametrize("wrapper", [lambda x: x, safe_wrapper])
+def test_codegen(compiler, buffer, wrapper):
+    buffer = wrapper(buffer)
     a = np.array([1, 2, 3], dtype=np.float64)
     buf = buffer(a)
 
@@ -141,7 +144,9 @@ def test_codegen(compiler, buffer):
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )
-def test_dot_product(compiler, buffer):
+@pytest.mark.parametrize("wrapper", [lambda x: x, safe_wrapper])
+def test_dot_product(compiler, buffer, wrapper):
+    buffer = wrapper(buffer)
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
@@ -222,7 +227,9 @@ def test_dot_product(compiler, buffer):
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
 )
-def test_if_statement(compiler, buffer):
+@pytest.mark.parametrize("wrapper", [lambda x: x, safe_wrapper])
+def test_if_statement(compiler, buffer, wrapper):
+    buffer = wrapper(buffer)
     var = asm.Variable("a", np.int64)
     prgm = asm.Module(
         (

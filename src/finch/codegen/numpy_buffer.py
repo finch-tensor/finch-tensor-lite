@@ -5,7 +5,7 @@ import numpy as np
 
 from ..finch_assembly import Buffer
 from .c import CBufferFType, CStackFType, c_type
-from .numba_backend import NumbaBufferFType
+from .numba_backend import NumbaBufferFType, NumbaStackFType
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -59,7 +59,7 @@ class NumpyBuffer(Buffer):
         self.arr = np.resize(self.arr, new_length)
 
 
-class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
+class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFType):
     """
     A ftype for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFType class.
