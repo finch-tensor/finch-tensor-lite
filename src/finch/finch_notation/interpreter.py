@@ -195,17 +195,9 @@ def np_declare(tns, init, op, shape):
                 f"Invalid dimension start value {dim.start} for ndarray declaration."
             )
     shape = tuple(dim.end for dim in shape)
-
+    tns.fill(init)
     if tns.shape != shape:
-        if tns.shape == ():
-            tns = np.full(shape, init, tns.dtype)
-        else:
-            raise ValueError(
-                f"Shape mismatch: cannot resize numpy array. Expected {shape},"
-                f" got {tns.shape} for ndarray declaration."
-            )
-    else:
-        tns.fill(init)
+        tns = np.broadcast_to(tns, shape).copy()
     return tns
 
 
