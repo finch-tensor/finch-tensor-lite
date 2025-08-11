@@ -4,12 +4,9 @@ from textwrap import dedent
 import numpy as np
 
 import finch.finch_logic as log
-from finch.finch_logic.printer import PrinterCompiler
 
 
 def test_printer():
-    pc = PrinterCompiler()
-
     s = np.array([[2, 4], [6, 0]])
     a = np.array([[1, 2], [3, 2]])
     b = np.array([[9, 8], [6, 5]])
@@ -44,7 +41,7 @@ def test_printer():
         )
     )
 
-    actual = pc(prgm)
+    actual = str(prgm)
 
     expected = dedent("""\
         S = Table([[2 4] [6 0]], ['i', 'j'])

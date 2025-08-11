@@ -5,12 +5,9 @@ import numpy as np
 
 import finch.finch_notation as ntn
 from finch.compile import dimension
-from finch.finch_notation.printer import PrinterCompiler
 
 
 def test_printer():
-    pc = PrinterCompiler()
-
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
@@ -109,7 +106,7 @@ def test_printer():
         )
     )
 
-    actual = pc(prgm)
+    actual = str(prgm)
 
     expected = dedent("""\
     def matmul(C: ndarray, A: ndarray, B: ndarray) -> ndarray:
