@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Optional
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
 from ..symbolic import Context, FType, Term, TermTree, literal_repr
-from ..util import qual_str
+from ..util import qstr
 
 
 @dataclass(eq=True, frozen=True)
@@ -33,7 +33,15 @@ class NotationNode(Term, ABC):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return NotationPrinter()(self)
+        return self.qstr()
+
+    def qstr(self, normalize=False, heap:Optional[dict]=None) -> str:
+        """Pretty prints the node."""
+        if normalize:
+            heap = {}
+        ctx = NotationPrinterContext(heap=heap)
+        ctx(self)
+        return ctx.emit()
 
 
 @dataclass(eq=True, frozen=True)
@@ -600,18 +608,12 @@ class Module(NotationTree):
         return cls(funcs)
 
 
-class NotationPrinter:
-    def __call__(self, prgm: Module):
-        ctx = PrinterContext()
-        ctx(prgm)
-        return ctx.emit()
-
-
-class PrinterContext(Context):
-    def __init__(self, tab="    ", indent=0):
+class NotationPrinterContext(Context):
+    def __init__(self, tab="    ", indent=0, heap=None):
         super().__init__()
         self.tab = tab
         self.indent = indent
+        self.heap = heap
 
     @property
     def feed(self) -> str:
@@ -620,7 +622,7 @@ class PrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> PrinterContext:
+    def block(self) -> NotationPrinterContext:
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
@@ -635,7 +637,7 @@ class PrinterContext(Context):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qual_str(value)
+                return qstr(value, heap=self.heap)
             case Variable(name, _):
                 return str(name)
             case Value(name, _):
@@ -647,7 +649,7 @@ class PrinterContext(Context):
             case Unwrap(tns):
                 return f"unwrap({self(tns)})"
             case Assign(Variable(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
+                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = {self(val)}")
                 return None
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
@@ -692,7 +694,7 @@ class PrinterContext(Context):
             case Thaw(tns, op):
                 return f"thaw({self(tns)}, {self(op)})"
             case Unpack(Slot(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
+                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = unpack({self(val)})")
                 return None
             case Repack(Slot(var_n, var_t), obj):
                 self.exec(f"{feed}repack({var_n}, {self(obj)})")
@@ -722,7 +724,7 @@ class PrinterContext(Context):
                 for arg in args:
                     match arg:
                         case Variable(name, t):
-                            arg_decls.append(f"{name}: {qual_str(t)}")
+                            arg_decls.append(f"{name}: {qstr(t, heap=self.heap)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -732,7 +734,7 @@ class PrinterContext(Context):
                 feed = self.feed
                 self.exec(
                     f"{feed}def {func_n}({', '.join(arg_decls)}) -> "
-                    f"{qual_str(ret_t)}:\n"
+                    f"{qstr(ret_t, heap=self.heap)}:\n"
                     f"{body_code}\n"
                 )
                 return None

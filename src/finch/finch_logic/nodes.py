@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Self
+from typing import Any, Self, Optional
 
 import numpy as np
 
 from ..symbolic import Context, Term, TermTree, literal_repr
-from ..util import qual_str
+from ..util import qstr
 
 
 @dataclass(eq=True, frozen=True)
@@ -37,7 +37,15 @@ class LogicNode(Term, ABC):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return LogicPrinter()(self)
+        return self.qstr()
+
+    def qstr(self, normalize:bool = False, heap: Optional[dict] = None) -> str:
+        """Pretty prints the node."""
+        if normalize:
+            heap = {}
+        ctx = LogicPrinterContext(heap=heap)
+        ctx(self)
+        return ctx.emit()
 
 
 @dataclass(eq=True, frozen=True)
@@ -397,18 +405,12 @@ class Plan(LogicTree):
         return cls(bodies)
 
 
-class LogicPrinter:
-    def __call__(self, prgm: LogicNode):
-        ctx = PrinterContext()
-        ctx(prgm)
-        return ctx.emit()
-
-
-class PrinterContext(Context):
-    def __init__(self, tab="    ", indent=0):
+class LogicPrinterContext(Context):
+    def __init__(self, tab="    ", indent=0, heap=None):
         super().__init__()
         self.tab = tab
         self.indent = indent
+        self.heap = heap
 
     @property
     def feed(self) -> str:
@@ -417,10 +419,11 @@ class PrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> PrinterContext:
+    def block(self) -> LogicPrinterContext:
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
+        blk.heap = self.heap
         return blk
 
     def subblock(self):
@@ -432,7 +435,7 @@ class PrinterContext(Context):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qual_str(value).replace("\n", "")
+                return qstr(value, heap=self.heap).replace("\n", "")
             case Value(ex):
                 return self(ex)
             case Field(name):

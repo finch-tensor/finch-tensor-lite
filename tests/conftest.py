@@ -4,9 +4,7 @@ import pytest
 
 from numpy.random import default_rng
 
-from finch.finch_assembly.nodes import AssemblyNode, AssemblyPrinter
-from finch.finch_logic.nodes import LogicNode, LogicPrinter
-from finch.finch_notation.nodes import NotationNode, NotationPrinter
+from finch.util import qstr
 
 from finch.finch_logic import Field
 from finch.interface import get_default_scheduler, set_default_scheduler
@@ -55,15 +53,7 @@ def program_regression(file_regression, request):
             substitutions: Optional dictionary of regex patterns and their replacements.
             E.g: {"<function (\\S+) at 0x[0-9a-fA-F]+>": "<function \\1 at 0x...>"}
         """
-        if not isinstance(program, str):
-            if isinstance(program, LogicNode):
-                program = LogicPrinter()(program)
-            elif isinstance(program, NotationNode):
-                program = NotationPrinter()(program)
-            elif isinstance(program, AssemblyNode):
-                program = AssemblyPrinter()(program)
-            else:
-                raise TypeError(f"Unsupported program type: {type(program)}")
+        program = qstr(program, normalize=True)
 
         # Apply additional test-specific substitutions
         if substitutions:

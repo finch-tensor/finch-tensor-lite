@@ -1,10 +1,10 @@
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Optional
 
 from ..algebra import return_type
 from ..symbolic import Context, Term, TermTree, literal_repr
-from ..util import qual_str
+from ..util import qstr
 from .buffer import element_type, length_type
 
 
@@ -38,7 +38,15 @@ class AssemblyNode(Term):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return AssemblyPrinter()(self)
+        return self.qstr()
+
+    def qstr(self, normalize:bool=False, heap: Optional[dict] = None) -> str:
+        """Pretty prints the node."""
+        if normalize:
+            heap = {}
+        ctx = AssemblyPrinterContext(heap=heap)
+        ctx(self)
+        return ctx.emit()
 
 
 class AssemblyTree(AssemblyNode, TermTree):
@@ -561,18 +569,12 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
-class AssemblyPrinter:
-    def __call__(self, prgm: Module):
-        ctx = PrinterContext()
-        ctx(prgm)
-        return ctx.emit()
-
-
-class PrinterContext(Context):
-    def __init__(self, tab="    ", indent=0):
+class AssemblyPrinterContext(Context):
+    def __init__(self, tab="    ", indent=0, heap=None):
         super().__init__()
         self.tab = tab
         self.indent = indent
+        self.heap = heap if heap is not None else {}
 
     @property
     def feed(self) -> str:
@@ -581,10 +583,11 @@ class PrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> "PrinterContext":
+    def block(self) -> "AssemblyPrinterContext":
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
+        blk.heap = self.heap
         return blk
 
     def subblock(self):
@@ -596,11 +599,11 @@ class PrinterContext(Context):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qual_str(value)
+                return qstr(value, heap=self.heap)
             case Variable(name, _):
                 return str(name)
             case Assign(Variable(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
+                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = {self(val)}")
                 return None
             case GetAttr(obj, attr):
                 return f"getattr({obj}, {attr})"
@@ -609,7 +612,7 @@ class PrinterContext(Context):
             case Call(Literal(_) as lit, args):
                 return f"{self(lit)}({', '.join(self(arg) for arg in args)})"
             case Unpack(Slot(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
+                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = unpack({self(val)})")
                 return None
             case Repack(Slot(var_n, var_t)):
                 self.exec(f"{feed}repack({var_n})")
@@ -617,7 +620,7 @@ class PrinterContext(Context):
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
             case Slot(name, type_):
-                return f"slot({name}, {qual_str(type_)})"
+                return f"slot({name}, {qstr(type_, heap=self.heap)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)})")
                 return None
@@ -675,7 +678,7 @@ class PrinterContext(Context):
                 for arg in args:
                     match arg:
                         case Variable(name, t):
-                            arg_decls.append(f"{name}: {qual_str(t)}")
+                            arg_decls.append(f"{name}: {qstr(t, heap=self.heap)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -685,7 +688,7 @@ class PrinterContext(Context):
                 feed = self.feed
                 self.exec(
                     f"{feed}def {func_name}({', '.join(arg_decls)}) -> "
-                    f"{qual_str(return_t)}:\n"
+                    f"{qstr(return_t, heap=self.heap)}:\n"
                     f"{body_code}\n"
                 )
                 return None
