@@ -24,7 +24,7 @@ from finch.finch_logic import (
 )
 
 
-def test_c_program(program_regression):
+def test_c_program(file_regression):
     """
     Example test for a C program using the program_regression fixture.
     This test will generate a program and compare it against the stored regression.
@@ -32,7 +32,7 @@ def test_c_program(program_regression):
     # Your C program logic here
     program = 'int main() { int a= 5; printf("Hello, World!"); return 0; }'
     # Compare the generated program against the stored regression
-    program_regression(program, extension=".c")
+    file_regression.check(program, extension=".c")
 
 
 def test_file_regression(file_regression):
@@ -40,7 +40,7 @@ def test_file_regression(file_regression):
     file_regression.check(content)
 
 
-def test_tree_regression(program_regression):
+def test_tree_regression(file_regression):
     plan = Plan(
         bodies=(
             Query(
@@ -102,31 +102,4 @@ def test_tree_regression(program_regression):
         )
     )
     program, tables = LogicCompiler()(plan)
-    program_regression(program)
-
-
-def test_regex_substitution_patterns(program_regression):
-    """
-    Test comprehensive regex substitution functionality including:
-    - Global substitution from conftest.py
-    - Custom substitutions
-    - Multiple pattern applications
-    """
-    program = (
-        "ProcessResult(\n"
-        "  objects=[\n"
-        "    Object(name='obj1', id=12345, func=<function process at 0x7f8c2c0d1e50>),"
-        "\n"
-        "    Object(name='obj2', id=67890, func=<function validate at 0x7f8c2c0d2a80>)"
-        "\n"
-        "  ],\n"
-        "  status='complete'\n"
-        ")"
-    )
-
-    substitutions = {
-        r"Object\(name='[^']+', id=\d+,": r"Object(name='...', id=...,",
-        r"status='[^']+'": r"status='...'",
-    }
-
-    program_regression(program, substitutions=substitutions, extension=".txt")
+    file_regression.check(str(program), extension=".txt")

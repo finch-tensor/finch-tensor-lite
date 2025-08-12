@@ -574,7 +574,7 @@ class AssemblyPrinterContext(Context):
         super().__init__()
         self.tab = tab
         self.indent = indent
-        self.heap = heap if heap is not None else {}
+        self.heap = heap
 
     @property
     def feed(self) -> str:
