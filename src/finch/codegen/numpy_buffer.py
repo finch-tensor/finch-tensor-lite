@@ -4,7 +4,7 @@ from typing import NamedTuple
 import numpy as np
 
 from ..finch_assembly import Buffer
-from ..util import qstr
+from ..util import qual_str
 from .c import CBufferFType, CStackFType, c_type
 from .numba_backend import NumbaBufferFType
 
@@ -79,7 +79,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         return self._dtype == other._dtype
 
     def __str__(self):
-        return f"np_buf_t({qstr(self._dtype)})"
+        return f"np_buf_t({qual_str(self._dtype)})"
 
     @property
     def length_type(self):

@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from ..algebra import return_type
 from ..symbolic import Context, Term, TermTree, literal_repr
-from ..util import qstr
+from ..util import qual_str
 from .buffer import element_type, length_type
 
 
@@ -38,13 +38,7 @@ class AssemblyNode(Term):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return self.qstr()
-
-    def qstr(self, normalize:bool=False, heap: Optional[dict] = None) -> str:
-        """Pretty prints the node."""
-        if normalize:
-            heap = {}
-        ctx = AssemblyPrinterContext(heap=heap)
+        ctx = AssemblyPrinterContext()
         ctx(self)
         return ctx.emit()
 
@@ -570,11 +564,10 @@ class Module(AssemblyTree):
 
 
 class AssemblyPrinterContext(Context):
-    def __init__(self, tab="    ", indent=0, heap=None):
+    def __init__(self, tab="    ", indent=0):
         super().__init__()
         self.tab = tab
         self.indent = indent
-        self.heap = heap
 
     @property
     def feed(self) -> str:
@@ -587,7 +580,6 @@ class AssemblyPrinterContext(Context):
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
-        blk.heap = self.heap
         return blk
 
     def subblock(self):
@@ -599,11 +591,11 @@ class AssemblyPrinterContext(Context):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qstr(value, heap=self.heap)
+                return qual_str(value)
             case Variable(name, _):
                 return str(name)
             case Assign(Variable(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = {self(val)}")
+                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
             case GetAttr(obj, attr):
                 return f"getattr({obj}, {attr})"
@@ -612,7 +604,7 @@ class AssemblyPrinterContext(Context):
             case Call(Literal(_) as lit, args):
                 return f"{self(lit)}({', '.join(self(arg) for arg in args)})"
             case Unpack(Slot(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = unpack({self(val)})")
+                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
             case Repack(Slot(var_n, var_t)):
                 self.exec(f"{feed}repack({var_n})")
@@ -620,7 +612,7 @@ class AssemblyPrinterContext(Context):
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
             case Slot(name, type_):
-                return f"slot({name}, {qstr(type_, heap=self.heap)})"
+                return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)})")
                 return None
@@ -678,7 +670,7 @@ class AssemblyPrinterContext(Context):
                 for arg in args:
                     match arg:
                         case Variable(name, t):
-                            arg_decls.append(f"{name}: {qstr(t, heap=self.heap)}")
+                            arg_decls.append(f"{name}: {qual_str(t)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -688,7 +680,7 @@ class AssemblyPrinterContext(Context):
                 feed = self.feed
                 self.exec(
                     f"{feed}def {func_name}({', '.join(arg_decls)}) -> "
-                    f"{qstr(return_t, heap=self.heap)}:\n"
+                    f"{qual_str(return_t)}:\n"
                     f"{body_code}\n"
                 )
                 return None

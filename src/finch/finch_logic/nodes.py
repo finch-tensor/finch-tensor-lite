@@ -7,7 +7,7 @@ from typing import Any, Self, Optional
 import numpy as np
 
 from ..symbolic import Context, Term, TermTree, literal_repr
-from ..util import qstr
+from ..util import qual_str
 
 
 @dataclass(eq=True, frozen=True)
@@ -37,13 +37,7 @@ class LogicNode(Term, ABC):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return self.qstr()
-
-    def qstr(self, normalize:bool = False, heap: Optional[dict] = None) -> str:
-        """Pretty prints the node."""
-        if normalize:
-            heap = {}
-        ctx = LogicPrinterContext(heap=heap)
+        ctx = LogicPrinterContext()
         ctx(self)
         return ctx.emit()
 
@@ -406,11 +400,10 @@ class Plan(LogicTree):
 
 
 class LogicPrinterContext(Context):
-    def __init__(self, tab="    ", indent=0, heap=None):
+    def __init__(self, tab="    ", indent=0):
         super().__init__()
         self.tab = tab
         self.indent = indent
-        self.heap = heap
 
     @property
     def feed(self) -> str:
@@ -423,7 +416,6 @@ class LogicPrinterContext(Context):
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
-        blk.heap = self.heap
         return blk
 
     def subblock(self):
@@ -435,7 +427,7 @@ class LogicPrinterContext(Context):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qstr(value, heap=self.heap).replace("\n", "")
+                return qual_str(value).replace("\n", "")
             case Value(ex):
                 return self(ex)
             case Field(name):

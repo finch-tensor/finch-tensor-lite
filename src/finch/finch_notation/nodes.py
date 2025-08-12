@@ -7,7 +7,7 @@ from typing import Any, Optional
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
 from ..symbolic import Context, FType, Term, TermTree, literal_repr
-from ..util import qstr
+from ..util import qual_str
 
 
 @dataclass(eq=True, frozen=True)
@@ -33,13 +33,7 @@ class NotationNode(Term, ABC):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return self.qstr()
-
-    def qstr(self, normalize=False, heap:Optional[dict]=None) -> str:
-        """Pretty prints the node."""
-        if normalize:
-            heap = {}
-        ctx = NotationPrinterContext(heap=heap)
+        ctx = NotationPrinterContext()
         ctx(self)
         return ctx.emit()
 
@@ -609,11 +603,10 @@ class Module(NotationTree):
 
 
 class NotationPrinterContext(Context):
-    def __init__(self, tab="    ", indent=0, heap=None):
+    def __init__(self, tab="    ", indent=0):
         super().__init__()
         self.tab = tab
         self.indent = indent
-        self.heap = heap
 
     @property
     def feed(self) -> str:
@@ -637,7 +630,7 @@ class NotationPrinterContext(Context):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qstr(value, heap=self.heap)
+                return qual_str(value)
             case Variable(name, _):
                 return str(name)
             case Value(name, _):
@@ -649,7 +642,7 @@ class NotationPrinterContext(Context):
             case Unwrap(tns):
                 return f"unwrap({self(tns)})"
             case Assign(Variable(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = {self(val)}")
+                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
@@ -694,7 +687,7 @@ class NotationPrinterContext(Context):
             case Thaw(tns, op):
                 return f"thaw({self(tns)}, {self(op)})"
             case Unpack(Slot(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qstr(var_t, heap=self.heap)} = unpack({self(val)})")
+                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
             case Repack(Slot(var_n, var_t), obj):
                 self.exec(f"{feed}repack({var_n}, {self(obj)})")
@@ -724,7 +717,7 @@ class NotationPrinterContext(Context):
                 for arg in args:
                     match arg:
                         case Variable(name, t):
-                            arg_decls.append(f"{name}: {qstr(t, heap=self.heap)}")
+                            arg_decls.append(f"{name}: {qual_str(t)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -734,7 +727,7 @@ class NotationPrinterContext(Context):
                 feed = self.feed
                 self.exec(
                     f"{feed}def {func_n}({', '.join(arg_decls)}) -> "
-                    f"{qstr(ret_t, heap=self.heap)}:\n"
+                    f"{qual_str(ret_t)}:\n"
                     f"{body_code}\n"
                 )
                 return None
