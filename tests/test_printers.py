@@ -1,26 +1,12 @@
 import operator
-from textwrap import dedent
 
 import numpy as np
 
 import finch.finch_assembly as asm
-from finch.codegen.numpy_buffer import NumpyBuffer
-
-
-import operator
-from textwrap import dedent
-
-import numpy as np
-
-import finch.finch_notation as ntn
-from finch.compile import dimension
-
-import operator
-from textwrap import dedent
-
-import numpy as np
-
 import finch.finch_logic as log
+import finch.finch_notation as ntn
+from finch.codegen.numpy_buffer import NumpyBuffer
+from finch.compile import dimension
 
 
 def test_log_printer(file_regression):
@@ -59,6 +45,7 @@ def test_log_printer(file_regression):
     )
 
     file_regression.check(str(prgm), extension=".txt")
+
 
 def test_ntn_printer(file_regression):
     i = ntn.Variable("i", np.int64)

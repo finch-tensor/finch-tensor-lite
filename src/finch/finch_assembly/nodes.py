@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ..algebra import return_type
 from ..symbolic import Context, Term, TermTree, literal_repr

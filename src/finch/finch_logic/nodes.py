@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Self, Optional
+from typing import Any, Self
 
 import numpy as np
 

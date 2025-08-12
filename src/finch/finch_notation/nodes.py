@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode

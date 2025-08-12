@@ -1,13 +1,10 @@
-import re
-
 import pytest
 
 from numpy.random import default_rng
 
-from finch.util import qual_str
-
 from finch.finch_logic import Field
 from finch.interface import get_default_scheduler, set_default_scheduler
+
 
 @pytest.fixture
 def rng():

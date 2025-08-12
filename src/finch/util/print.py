@@ -1,5 +1,6 @@
 from inspect import isbuiltin, isclass, isfunction
-from typing import Any, Optional
+from typing import Any
+
 
 class SPrinter:
     def __call__(self, val: Any) -> str:
@@ -9,7 +10,8 @@ class SPrinter:
 class Printer:
     def __call__(self, val: Any):
         print(val)
-        return None
+        return
+
 
 def qual_str(val: Any) -> str:
     if hasattr(val, "__qual_str__"):
