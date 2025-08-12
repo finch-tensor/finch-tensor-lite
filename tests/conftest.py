@@ -4,14 +4,12 @@ import pytest
 
 from numpy.random import default_rng
 
-from finch.finch_assembly import Module as AssemblyModule
-from finch.finch_assembly.nodes import AssemblyPrinter
-from finch.finch_logic import Field
+from finch.finch_assembly.nodes import AssemblyNode, AssemblyPrinter
 from finch.finch_logic.nodes import LogicNode, LogicPrinter
-from finch.finch_notation import Module as NotationModule
-from finch.finch_notation.nodes import NotationPrinter
-from finch.interface import get_default_scheduler, set_default_scheduler
+from finch.finch_notation.nodes import NotationNode, NotationPrinter
 
+from finch.finch_logic import Field
+from finch.interface import get_default_scheduler, set_default_scheduler
 
 @pytest.fixture
 def rng():
@@ -60,9 +58,9 @@ def program_regression(file_regression, request):
         if not isinstance(program, str):
             if isinstance(program, LogicNode):
                 program = LogicPrinter()(program)
-            elif isinstance(program, NotationModule):
+            elif isinstance(program, NotationNode):
                 program = NotationPrinter()(program)
-            elif isinstance(program, AssemblyModule):
+            elif isinstance(program, AssemblyNode):
                 program = AssemblyPrinter()(program)
             else:
                 raise TypeError(f"Unsupported program type: {type(program)}")
