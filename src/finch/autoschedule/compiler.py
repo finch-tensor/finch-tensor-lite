@@ -1,3 +1,4 @@
+import operator
 from typing import TypeVar, overload
 
 import numpy as np
@@ -200,7 +201,7 @@ class LogicLowerer:
                 rhs, rhs_idxs, req_slots = compile_pointwise_logic(
                     Relabel(arg, idxs_1), list(loop_idxs), slot_vars, field_relabels
                 )
-                # TODO: mostly the same as aggregate, used for explicit transpose
+                # TODO (mtsokol): mostly the same as `agg`, used for explicit transpose
                 raise NotImplementedError
 
             case Query(
@@ -208,9 +209,7 @@ class LogicLowerer:
                 Reformat(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
             ):
                 assert isinstance(tns, TensorFType)
-                # TODO: fetch fill value the right way
-                import operator
-
+                # TODO (mtsokol): fetch fill value the right way
                 fv = 0 if op in (operator.add, operator.sub) else 1
                 return self(
                     Query(
@@ -382,13 +381,25 @@ def record_tables(
                 suitable_rep = find_suitable_rep(rhs, table_vars)
                 table_vars[alias] = ntn.Variable(name, suitable_rep)
                 tables[alias] = Table(
-                    Literal(np.zeros(dtype=suitable_rep.element_type, shape=())), ()
+                    Literal(
+                        np.zeros(
+                            dtype=suitable_rep.element_type,
+                            shape=tuple(1 for _ in range(suitable_rep.ndim)),
+                        )
+                    ),
+                    rhs.fields,
                 )
 
                 return Query(alias, Reformat(suitable_rep, rhs))
 
             case Relabel(Alias(_) as alias, idxs) as relabel:
-                field_relabels.update(dict(zip(idxs, tables[alias].idxs, strict=False)))
+                field_relabels.update(
+                    {
+                        k: v
+                        for k, v in zip(idxs, tables[alias].idxs, strict=False)
+                        if k != v
+                    }
+                )
                 return relabel
 
     processed_root = Rewrite(PostWalk(rule_0))(root)
@@ -398,41 +409,41 @@ def record_tables(
 def find_suitable_rep(root, table_vars) -> TensorFType:
     match root:
         case MapJoin(Literal(op), args):
+            args_suitable_reps = [find_suitable_rep(arg, table_vars) for arg in args]
             return NDArrayFType(
                 dtype=np.dtype(
                     return_type(
                         op,
-                        *[
-                            find_suitable_rep(arg, table_vars).element_type
-                            for arg in args
-                        ],
+                        *[rep.element_type for rep in args_suitable_reps],
                     )
                 ),
-                ndim=0,  # TODO: this should know actual ndim
+                ndim=max(rep.ndim for rep in args_suitable_reps),
             )
-        case Aggregate(Literal(op), init, arg, _):
+        case Aggregate(Literal(op), init, arg, idxs):
+            init_suitable_rep = find_suitable_rep(init, table_vars)
+            arg_suitable_rep = find_suitable_rep(arg, table_vars)
             return NDArrayFType(
                 dtype=np.dtype(
                     return_type(
                         op,
-                        find_suitable_rep(init, table_vars).element_type,
-                        find_suitable_rep(arg, table_vars).element_type,
+                        init_suitable_rep.element_type,
+                        arg_suitable_rep.element_type,
                     )
                 ),
-                ndim=0,  # TODO: this should know actual ndim
+                ndim=len(arg.fields) - len(idxs),
             )
         case LogicTree() as tree:
             for child in tree.children:
                 suitable_rep = find_suitable_rep(child, table_vars)
                 if suitable_rep is not None:
                     return suitable_rep
-            raise Exception("didn't find suitable rep")
+            raise Exception(f"Couldn't find a suitable rep for: {tree}")
         case Alias(_) as alias:
             return table_vars[alias].type_
         case Literal(val):
             return query_property(val, "asarray", "__attr__")
         case _:
-            raise Exception("XD")
+            raise Exception(f"Unrecognized node: {root}")
 
 
 def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:

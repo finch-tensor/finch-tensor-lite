@@ -150,10 +150,7 @@ class NDArrayFType(TensorFType):
     def __eq__(self, other):
         if not isinstance(other, NDArrayFType):
             return False
-        return self._dtype == other._dtype and (
-            # TODO: Remove `0` once logic compiler supports ndim inference
-            self._ndim == other._ndim or self._ndim == 0 or other._ndim == 0
-        )
+        return self._dtype == other._dtype and self._ndim == other._ndim
 
     def __hash__(self):
         return hash((self._dtype, self._ndim))

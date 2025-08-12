@@ -467,5 +467,7 @@ class LogicPrinterContext(Context):
             case Subquery(lhs, arg):
                 self.exec(f"{feed}{self(lhs)} = {self(arg)}")
                 return self(lhs)
+            case str(label):
+                return label
             case _:
                 raise ValueError(f"Unknown expression type: {type(prgm)}")

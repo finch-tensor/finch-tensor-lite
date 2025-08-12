@@ -113,7 +113,7 @@ def test_logic_compiler():
                 args=(
                     Variable(name=":A0", type_=NDArrayFType(np.dtype(int), 2)),
                     Variable(name=":A1", type_=NDArrayFType(np.dtype(int), 2)),
-                    Variable(name=":A2", type_=NDArrayFType(np.dtype(int), 0)),
+                    Variable(name=":A2", type_=NDArrayFType(np.dtype(int), 2)),
                 ),
                 body=Block(
                     bodies=(
@@ -165,12 +165,12 @@ def test_logic_compiler():
                             Variable(name=":A1", type_=NDArrayFType(np.dtype(int), 2)),
                         ),
                         Unpack(
-                            Slot(name=":A2_slot", type=NDArrayFType(np.dtype(int), 0)),
-                            Variable(name=":A2", type_=NDArrayFType(np.dtype(int), 0)),
+                            Slot(name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)),
+                            Variable(name=":A2", type_=NDArrayFType(np.dtype(int), 2)),
                         ),
                         Declare(
                             tns=Slot(
-                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 0)
+                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)
                             ),
                             init=Literal(val=0),
                             op=Literal(val=operator.add),
@@ -195,7 +195,7 @@ def test_logic_compiler():
                                                     tns=Slot(
                                                         name=":A2_slot",
                                                         type=NDArrayFType(
-                                                            np.dtype(int), 0
+                                                            np.dtype(int), 2
                                                         ),
                                                     ),
                                                     mode=Update(
@@ -261,7 +261,7 @@ def test_logic_compiler():
                         ),
                         Freeze(
                             tns=Slot(
-                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 0)
+                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)
                             ),
                             op=Literal(val=operator.add),
                         ),
@@ -283,15 +283,15 @@ def test_logic_compiler():
                         ),
                         Repack(
                             val=Slot(
-                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 0)
+                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)
                             ),
                             obj=Variable(
-                                name=":A2", type_=NDArrayFType(np.dtype(int), 0)
+                                name=":A2", type_=NDArrayFType(np.dtype(int), 2)
                             ),
                         ),
                         Return(
                             val=Variable(
-                                name=":A2", type_=NDArrayFType(np.dtype(int), 0)
+                                name=":A2", type_=NDArrayFType(np.dtype(int), 2)
                             )
                         ),
                     )
