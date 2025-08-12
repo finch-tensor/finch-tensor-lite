@@ -3,10 +3,14 @@ repos:
     rev: v5.0.0
     hooks:
     - id: end-of-file-fixer
+      exclude: ^tests/reference/
     - id: trailing-whitespace
+      exclude: ^tests/reference/
     - id: mixed-line-ending
+      exclude: ^tests/reference/
     - id: name-tests-test
       args: ["--pytest-test-first"]
+      exclude: ^tests/reference/
     - id: no-commit-to-branch
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
