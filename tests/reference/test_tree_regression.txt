@@ -1,10 +1,10 @@
-def func(:A0: NDArrayFType(dtype=dtype('int64'), ndim=2), :A1: NDArrayFType(dtype=dtype('int64'), ndim=2), :A2: NDArrayFType(dtype=dtype('int64'), ndim=0)) -> ndarray:
+def func(:A0: NDArrayFType(dtype=dtype('int64'), ndim=2), :A1: NDArrayFType(dtype=dtype('int64'), ndim=2), :A2: NDArrayFType(dtype=dtype('int64'), ndim=2)) -> ndarray:
     :i0_size: int = dimension(:A0, 0)
     :i1_size: int = dimension(:A0, 1)
     :i2_size: int = dimension(:A1, 1)
     :A0_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A0)
     :A1_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A1)
-    :A2_slot: NDArrayFType(dtype=dtype('int64'), ndim=0) = unpack(:A2)
+    :A2_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A2)
     declare(:A2_slot, 0, add, [':i0_size', ':i2_size'])
     loop(:i2, :i2_size):
         loop(:i1, :i1_size):
