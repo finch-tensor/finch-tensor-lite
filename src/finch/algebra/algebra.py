@@ -613,7 +613,7 @@ for unary in (
     np.log10,
 ):
     register_property(
-        unary, "__call__", "return_type", lambda op, a, _unary=unary: float
+        unary, "__call__", "return_type", lambda op, a, _unary=unary: np.float64
     )
 
 for binary_op in (
