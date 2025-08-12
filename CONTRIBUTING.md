@@ -79,6 +79,9 @@ In case you do need to run mypy manually, you can do so with:
 poetry run mypy ./src/
 ```
 
+#### Regression Tests
+pytest-regression is used to ensure that compiler outputs remain consistent across changes, and to better understand the impacts of compiler changes on the test outputs. To regenerate regression test outputs, run pytest with the `--regen-all` flag. Those who are curious can consult the [`pytest-regression` docs](https://pytest-regressions.readthedocs.io/en/latest/overview.html#using-data-regression).
+
 ## Code Style
 ### Assertions and Validation
 

@@ -227,9 +227,6 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    a_buf = buffer(a)
-    b_buf = buffer(b)
-
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
     ab = buffer(a)
@@ -286,6 +283,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     )
 
     file_regression.check(compiler(prgm), extension=extension)
+
 
 @pytest.mark.parametrize(
     ["compiler", "buffer"],

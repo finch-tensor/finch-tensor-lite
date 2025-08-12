@@ -142,7 +142,7 @@ def test_matrix_multiplication(a, b):
 
 def test_matrix_multiplication_regression(file_regression):
     a = np.array([[2, 0], [1, 3]], dtype=np.float64)
-    b = np.array([[4, 1], [2, 2]], dtype=np.float64)
+    # b = np.array([[4, 1], [2, 2]], dtype=np.float64)
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
@@ -244,5 +244,5 @@ def test_matrix_multiplication_regression(file_regression):
     )
 
     NotationCompiler(Reflector())(prgm)
-    #TODO bug here
-    #file_regression.check(str(asm_code), extension=".txt")
+    # TODO bug here
+    # file_regression.check(str(asm_code), extension=".txt")
