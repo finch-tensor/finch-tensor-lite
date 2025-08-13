@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Term, TermTree, literal_repr
+from ..symbolic import FType, Term, TermTree, ftype, literal_repr
 from .buffer import element_type, length_type
 
 
@@ -65,7 +65,7 @@ class Literal(AssemblyExpression):
     @property
     def result_format(self):
         """Returns the type of the expression."""
-        return type(self.val)
+        return ftype(self.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
@@ -83,7 +83,7 @@ class Variable(AssemblyExpression):
     """
 
     name: str
-    type: Any
+    type: type | FType
 
     @property
     def result_format(self):
@@ -106,7 +106,7 @@ class Stack(AssemblyExpression):
     """
 
     obj: Any
-    type: Any
+    type: type | FType
 
     @property
     def result_format(self):
@@ -126,7 +126,7 @@ class Slot(AssemblyExpression):
     """
 
     name: str
-    type: Any
+    type: type | FType
 
     @property
     def result_format(self):

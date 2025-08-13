@@ -612,8 +612,17 @@ for unary in (
     np.log2,
     np.log10,
 ):
+
+    def unary_type(op, a):
+        if np.can_cast(a, np.float64):
+            return np.float64
+        raise TypeError("Invalid input")
+
     register_property(
-        unary, "__call__", "return_type", lambda op, a, _unary=unary: np.float64
+        unary,
+        "__call__",
+        "return_type",
+        unary_type,
     )
 
 for binary_op in (

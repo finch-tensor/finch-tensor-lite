@@ -127,7 +127,6 @@ def test_call_basic():
     assert checker(Call(Literal(np.sin), (Literal(np.float64(3.0)),))) == np.float64
 
 
-@pytest.mark.skip(reason="currently broken")
 def test_call_sin():
     checker = AssemblyTypeChecker()
     with pytest.raises(AssemblyTypeError):
