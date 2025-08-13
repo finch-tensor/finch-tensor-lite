@@ -1,9 +1,21 @@
+from pathlib import Path
+
 import pytest
 
 from numpy.random import default_rng
 
 from finch.finch_logic import Field
 from finch.interface import get_default_scheduler, set_default_scheduler
+
+
+@pytest.fixture(scope="session")
+def lazy_datadir() -> Path:
+    return Path(__file__).parent / "reference"
+
+
+@pytest.fixture(scope="session")
+def original_datadir() -> Path:
+    return Path(__file__).parent / "reference"
 
 
 @pytest.fixture

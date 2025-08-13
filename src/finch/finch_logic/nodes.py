@@ -37,7 +37,9 @@ class LogicNode(Term, ABC):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return LogicPrinter()(self)
+        ctx = LogicPrinterContext()
+        ctx(self)
+        return ctx.emit()
 
 
 @dataclass(eq=True, frozen=True)
@@ -397,14 +399,7 @@ class Plan(LogicTree):
         return cls(bodies)
 
 
-class LogicPrinter:
-    def __call__(self, prgm: LogicNode):
-        ctx = PrinterContext()
-        ctx(prgm)
-        return ctx.emit()
-
-
-class PrinterContext(Context):
+class LogicPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
         self.tab = tab
@@ -417,7 +412,7 @@ class PrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> PrinterContext:
+    def block(self) -> LogicPrinterContext:
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
@@ -472,5 +467,7 @@ class PrinterContext(Context):
             case Subquery(lhs, arg):
                 self.exec(f"{feed}{self(lhs)} = {self(arg)}")
                 return self(lhs)
+            case str(label):
+                return label
             case _:
                 raise ValueError(f"Unknown expression type: {type(prgm)}")

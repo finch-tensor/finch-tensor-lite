@@ -33,7 +33,9 @@ class NotationNode(Term, ABC):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return NotationPrinter()(self)
+        ctx = NotationPrinterContext()
+        ctx(self)
+        return ctx.emit()
 
 
 @dataclass(eq=True, frozen=True)
@@ -600,14 +602,7 @@ class Module(NotationTree):
         return cls(funcs)
 
 
-class NotationPrinter:
-    def __call__(self, prgm: Module):
-        ctx = PrinterContext()
-        ctx(prgm)
-        return ctx.emit()
-
-
-class PrinterContext(Context):
+class NotationPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
         self.tab = tab
@@ -620,7 +615,7 @@ class PrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> PrinterContext:
+    def block(self) -> NotationPrinterContext:
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab

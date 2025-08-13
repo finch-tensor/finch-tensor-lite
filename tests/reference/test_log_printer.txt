@@ -1,0 +1,7 @@
+S = Table([[2 4] [6 0]], ['i', 'j'])
+A = Table([[1 2] [3 2]], ['i', 'k'])
+B = Table([[9 8] [6 5]], ['k', 'j'])
+AB = MapJoin(mul, ('A', 'B'))
+C = Aggregate(add, 0, AB, ['k'])
+RES = MapJoin(mul, ('C', 'S'))
+return ('RES',)

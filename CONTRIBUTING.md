@@ -79,6 +79,9 @@ In case you do need to run mypy manually, you can do so with:
 poetry run mypy ./src/
 ```
 
+#### Regression Tests
+pytest-regression is used to ensure that compiler outputs remain consistent across changes, and to better understand the impacts of compiler changes on the test outputs. To regenerate regression test outputs, run pytest with the `--regen-all` flag. Those who are curious can consult the [`pytest-regression` docs](https://pytest-regressions.readthedocs.io/en/latest/overview.html#using-data-regression).
+
 ## Code Style
 ### Assertions and Validation
 
@@ -93,6 +96,12 @@ poetry run mypy ./src/
 - This means you may need to define a private `_foo` attribute in your dataclass to implement the `foo` property.
 - Avoid using `get_` and `set_` prefixes in method names.
 - `get_` and `set_` prefixes are allowed for global getters and setters, such as `util.get_version()`.
+
+### Path Handling
+- **Use `pathlib.Path` instead of `os.path` for file and directory operations.**
+- `pathlib.Path` provides a more modern interface for path manipulation.
+- It's cross-platform by default and more readable than string-based `os.path` operations.
+- Example: Use `Path("dir") / "file.txt"` instead of `os.path.join("dir", "file.txt")`.
 
 ---
 **If you find an error or unclear section, please fix it or open an issue.**

@@ -21,6 +21,7 @@ test = [
     "numpy>=0.61.0",
     "mypy==1.15.*",
     "pytest-mypy==1.*",
+    "pytest-regressions~=2.8.1",
 ]
 
 [build-system]
@@ -28,6 +29,9 @@ requires = ["poetry-core>=1.0.8"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
+extend-exclude = [
+    "tests/reference",
+]
 line-length = 88
 
 [tool.ruff.lint]
@@ -55,3 +59,4 @@ section-order = [
 
 [tool.mypy]
 ignore_missing_imports = true
+exclude = ["tests/reference"]

@@ -38,7 +38,9 @@ class AssemblyNode(Term):
 
     def __str__(self):
         """Returns a string representation of the node."""
-        return AssemblyPrinter()(self)
+        ctx = AssemblyPrinterContext()
+        ctx(self)
+        return ctx.emit()
 
 
 class AssemblyTree(AssemblyNode, TermTree):
@@ -561,14 +563,7 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
-class AssemblyPrinter:
-    def __call__(self, prgm: Module):
-        ctx = PrinterContext()
-        ctx(prgm)
-        return ctx.emit()
-
-
-class PrinterContext(Context):
+class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
         self.tab = tab
@@ -581,7 +576,7 @@ class PrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> "PrinterContext":
+    def block(self) -> "AssemblyPrinterContext":
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab

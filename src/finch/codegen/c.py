@@ -264,6 +264,7 @@ class CCompiler:
         self.cc = cc
         self.cflags = cflags
         self.shared_cflags = shared_cflags
+        self.ctx = CGenerator() if ctx is None else ctx
 
     def __call__(self, prgm):
         ctx = CContext()
@@ -524,6 +525,13 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_void_p: ("void*", []),
     ctypes.py_object: ("void*", []),
 }
+
+
+class CGenerator:
+    def __call__(self, prgm: asm.AssemblyNode):
+        ctx = CContext()
+        ctx(prgm)
+        return ctx.emit_global()
 
 
 class CContext(Context):

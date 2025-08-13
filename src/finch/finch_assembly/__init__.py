@@ -2,7 +2,6 @@ from .buffer import Buffer, BufferFType, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
-    AssemblyPrinter,
     Assign,
     Block,
     Break,
@@ -34,7 +33,6 @@ __all__ = [
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
-    "AssemblyPrinter",
     "AssemblyStructFType",
     "Assign",
     "Block",
