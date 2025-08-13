@@ -152,3 +152,58 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
     assert prgm == eval(repr(prgm))
+
+
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([0, 1, 0, 0, 1]),
+        np.array([1, 1, 1, 1, 1]),
+        np.array([0, 1, 0, 0, 0]),
+    ],
+)
+def test_count_nonfill_vector(a):
+    A = ntn.Variable("A", np.ndarray)
+    A_ = ntn.Slot("A_", np.ndarray)
+
+    d = ntn.Variable("d", np.int64)
+    i = ntn.Variable("i", np.int64)
+    m = ntn.Variable("m", np.int64)
+
+    prgm = ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable("count_nonfill_vector", np.int64),
+                (A,),
+                ntn.Block(
+                    (
+                        ntn.Assign(
+                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                        ),
+                        ntn.Assign(d, ntn.Literal(np.int64(0))),
+                        ntn.Unpack(A_, A),
+                        ntn.Loop(
+                            i,
+                            m,
+                            ntn.Assign(
+                                d,
+                                ntn.Call(
+                                    Literal(operator.add),
+                                    (
+                                        d,
+                                        ntn.Unwrap(ntn.Access(A_, ntn.Read(), (i,))),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        ntn.Repack(A_, A),
+                        ntn.Return(d),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = ntn.NotationInterpreter()(prgm)
+    cnt = mod.count_nonfill_vector(a)
+    assert cnt == np.count_nonzero(a)
