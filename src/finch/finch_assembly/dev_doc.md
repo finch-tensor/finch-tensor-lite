@@ -42,6 +42,8 @@ MODULE     := Module(funcs=NODE...)
 
 ## Notes
 
+* Every function is defined on concrete types and has a concrete return type
+
 * Assignment statements is also used for declaration.
   This means it's not possible to shadow a variable in a given scope and, in particular, if a variable already appears in the current scope then it must be assigned a value of the type given in the context.
   It is, however, possible to shadow a variable that appears in a parent scope.

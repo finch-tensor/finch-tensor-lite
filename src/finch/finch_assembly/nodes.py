@@ -250,7 +250,7 @@ class Call(AssemblyExpression, AssemblyTree):
     """
 
     op: Literal
-    args: tuple[AssemblyNode, ...]
+    args: tuple[AssemblyExpression, ...]
 
     @property
     def children(self):
@@ -384,7 +384,7 @@ class BufferLoop(AssemblyTree):
         body: The body of the loop to execute for each element.
     """
 
-    buffer: AssemblyExpression
+    buffer: Slot | Stack
     var: Variable
     body: AssemblyNode
 
