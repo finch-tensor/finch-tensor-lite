@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import FType, Term, TermTree, ftype, literal_repr
+from ..symbolic import Term, TermTree, ftype, literal_repr
 from .buffer import element_type, length_type
 
 
@@ -83,7 +83,7 @@ class Variable(AssemblyExpression):
     """
 
     name: str
-    type: type | FType
+    type: Any
 
     @property
     def result_format(self):
@@ -106,7 +106,7 @@ class Stack(AssemblyExpression):
     """
 
     obj: Any
-    type: type | FType
+    type: Any
 
     @property
     def result_format(self):
@@ -126,7 +126,7 @@ class Slot(AssemblyExpression):
     """
 
     name: str
-    type: type | FType
+    type: Any
 
     @property
     def result_format(self):

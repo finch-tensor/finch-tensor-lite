@@ -8,7 +8,7 @@ It is a low-level imperative description of the program with control flow, linea
 The following is a rough grammar for FinchAssembly, written in terms of the current `__repr__`s of the corresponding AssemblyNodes.
 
 ```
-EXPR       := LITERAL | VARIABLE | SLOT | GETATTR | CALL | LOAD | LENGTH | STACK
+EXPR       := LITERAL | VARIABLE | SLOT | STACK | GETATTR | CALL | LOAD | LENGTH
 STMT       := UNPACK | REPACK | ASSIGN | SETATTR | STORE | RESIZE | FORLOOP
             | BUFFERLOOP | WHILELOOP | IF | IFELSE | FUNCTION | RETURN | BREAK
             | BLOCK | MODULE
