@@ -38,8 +38,6 @@ class DCStats(TensorStats):
         ndim = self.tensor.ndim
         if ndim == 1:
             return self._vector_structure_to_dcs()
-        elif ndim == 2:
-            return None
         else:
             raise NotImplementedError(f"DC analysis not implemented for {ndim}D tensors")
 
@@ -48,51 +46,49 @@ class DCStats(TensorStats):
         Build a Finch Notation program that counts non-fill entries in a 1-D tensor,
         execute it, and return a set of DC.
         """
-        A  = ntn.Variable("A", np.ndarray)
+        A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
 
-        d  = ntn.Slot("d", np.ndarray)
-        i  = ntn.Variable("i", np.int64)
-        fill = ntn.Literal(self.tensordef.fill_value)
+        d = ntn.Variable("d", np.int64)
+        i = ntn.Variable("i", np.int64)
+        m = ntn.Variable("m", np.int64)
 
-        prgm = ntn.Module((
-            ntn.Function(
-                ntn.Variable("count_nonfill", np.int64),
-                (A,),
-                ntn.Block((
-                    ntn.Unpack(A_, A),
-                    ntn.Declare(d, ntn.Literal(0.0), ntn.Literal(operator.add), ()),
-                    ntn.Thaw(d, ntn.Literal(operator.add)),
-
-                    ntn.Loop(
-                        i,
-                        ntn.Literal(int(self.tensor.shape[0])),
-                        ntn.Block((
-                            ntn.If(
-                                ntn.Call(
-                                    ntn.Literal(operator.ne),
-                                    (
-                                        ntn.Unwrap(ntn.Access(A_, ntn.Read(), (i,))),
-                                        fill,
+        prgm = ntn.Module(
+            (
+                ntn.Function(
+                    ntn.Variable("vector_structure_to_dcs", np.int64),
+                    (A,),
+                    ntn.Block(
+                        (
+                            ntn.Assign(
+                                m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                            ),
+                            ntn.Assign(d, ntn.Literal(np.int64(0))),
+                            ntn.Unpack(A_, A),
+                            ntn.Loop(
+                                i,
+                                m,
+                                ntn.Assign(
+                                    d,
+                                    ntn.Call(
+                                        Literal(operator.add),
+                                        (
+                                            d,
+                                            ntn.Unwrap(ntn.Access(A_, ntn.Read(), (i,))),
+                                        ),
                                     ),
                                 ),
-                                ntn.Increment(
-                                    ntn.Access(d, ntn.Update(ntn.Literal(operator.add)), ()),
-                                    ntn.Literal(1.0),
-                                ),
                             ),
-                        )),
+                            ntn.Repack(A_, A),
+                            ntn.Return(d),
+                        )
                     ),
-
-                    ntn.Freeze(d, ntn.Literal(operator.add)),
-                    ntn.Return(ntn.Unwrap(d)),
-                    ntn.Repack(A_, A),
-                )),
-            ),
-        ))
+                ),
+            )
+        )
 
         mod = ntn.NotationInterpreter()(prgm)
-        cnt = mod.count_nonfill(np.asarray(self.tensor))
+        cnt = mod.vector_structure_to_dcs(self.tensor)
         result = self.fields[0]
 
         return {DC(frozenset(), frozenset([result]), float(cnt))}
