@@ -144,13 +144,7 @@ class DCStats(TensorStats):
                                     ntn.Literal(operator.add),
                                     (
                                         dij,
-                                        ntn.Unwrap(
-                                            ntn.Access(
-                                                A_,
-                                                ntn.Read(),
-                                                (j, i)
-                                            )
-                                        )
+                                        ntn.Unwrap(ntn.Access(A_, ntn.Read(), (j, i)))
                                     )
                                 )
                             )
@@ -171,13 +165,21 @@ class DCStats(TensorStats):
                         nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
                     ),
                     ntn.Unpack(A_,A),
-                    ntn.Assign(
-                        nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                    ntn.Declare(
+                        X, ntn.Literal(0.0), ntn.Literal(operator.add), (ni,)
                     ),
-                    ntn.Assign(
-                        ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                    ntn.Declare(
+                        Y, ntn.Literal(0.0), ntn.Literal(operator.add), (nj,)
                     ),
-
+                    ntn.Loop(
+                        i,
+                        ni,
+                        ntn.Loop(
+                            j,
+                            nj,
+                            ntn.Assign
+                        )
+                    )
                 )
             )
         )
