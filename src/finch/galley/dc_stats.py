@@ -38,6 +38,8 @@ class DCStats(TensorStats):
         ndim = self.tensor.ndim
         if ndim == 1:
             return self._vector_structure_to_dcs()
+        if ndim == 2:
+            return self._matrix_structure_to_dcs()
         else:
             raise NotImplementedError(f"DC analysis not implemented for {ndim}D tensors")
 
@@ -92,6 +94,100 @@ class DCStats(TensorStats):
         result = self.fields[0]
 
         return {DC(frozenset(), frozenset([result]), float(cnt))}
+
+    def _matrix_structure_to_dcs(self) -> set[DC]:
+
+        A = ntn.Variable("A", np.ndarray)
+        A_ = ntn.Slot("A_", np.ndarray)
+
+        i = ntn.Variable("i", np.int64)
+        j = ntn.Variable("j", np.int64)
+        ni = ntn.Variable("ni", np.int64)
+        nj = ntn.Variable("nj", np.int64)
+
+        dij = ntn.Variable("dij", np.int64)
+
+        X = ntn.Slot("X", np.ndarray)
+        Y = ntn.Slot("Y", np.ndarray)
+        xi = ntn.Variable("xi", np.int64)
+        yj = ntn.Variable("yj", np.int64)
+
+        d_i    = ntn.Variable("d_i",   np.float64)
+        d_i_j  = ntn.Variable("d_i_j", np.float64)
+        d_j    = ntn.Variable("d_j",   np.float64)
+        d_j_i  = ntn.Variable("d_j_i", np.float64)
+
+        prgm = ntn.Module(
+            ntn.Function(
+                ntn.Variable("total_nnz", np.int64),
+                (A,),
+                ntn.Block(
+                    ntn.Assign(
+                        ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                    ),
+                    ntn.Assign(
+                        nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                    ),
+                    ntn.Assign(
+                        dij, ntn.Literal(np.int64(0))
+                    ),
+                    ntn.Unpack(A_,A),
+                    ntn.Loop(
+                        i,
+                        ni,
+                        ntn.Loop(
+                            j,
+                            nj,
+                            ntn.Assign(
+                                dij,
+                                ntn.Call(
+                                    ntn.Literal(operator.add),
+                                    (
+                                        dij,
+                                        ntn.Unwrap(
+                                            ntn.Access(
+                                                A_,
+                                                ntn.Read(),
+                                                (j, i)
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    ntn.Repack(A_,A),
+                    ntn.Return(dij),
+                )
+            ),
+            ntn.Function(
+                ntn.Variable("matrix_structure_to_dcs", tuple),
+                (A,),
+                ntn.Block(
+                    ntn.Assign(
+                        ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                    ),
+                    ntn.Assign(
+                        nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                    ),
+                    ntn.Unpack(A_,A),
+                    ntn.Assign(
+                        nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                    ),
+                    ntn.Assign(
+                        ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                    ),
+
+                )
+            )
+        )
+
+
+
+
+
+
+
 
     @staticmethod
     def mapjoin(op, *args, **kwargs):
