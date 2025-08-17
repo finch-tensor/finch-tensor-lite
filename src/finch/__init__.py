@@ -12,10 +12,10 @@ from .compile import (
     extent,
 )
 from .galley import (
+    DC,
+    DCStats,
     DenseStats,
     TensorDef,
-    DCStats,
-    DC,
 )
 from .interface import (
     EagerTensor,
@@ -103,7 +103,9 @@ from .tensor import (
 )
 
 __all__ = [
+    "DC",
     "BufferizedNDArray",
+    "DCStats",
     "DenseLevelFType",
     "DenseStats",
     "EagerTensor",
@@ -197,6 +199,4 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
-    "DCStats",
-    "DC",
 ]

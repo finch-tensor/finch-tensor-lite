@@ -208,17 +208,15 @@ def test_count_nonfill_vector(a):
     cnt = mod.count_nonfill_vector(a)
     assert cnt == np.count_nonzero(a)
 
+
 @pytest.mark.parametrize(
     "a",
     [
-        np.array([[1, 0, 1],
-                  [0, 0, 0],
-                  [1, 1, 0]], dtype=int),
+        np.array([[1, 0, 1], [0, 0, 0], [1, 1, 0]], dtype=int),
         np.zeros((2, 3), dtype=int),
         np.ones((3, 2), dtype=int),
     ],
 )
-
 def test_count_nonfill_matrix(a):
     A = ntn.Variable("A", np.ndarray)
     A_ = ntn.Slot("A_", np.ndarray)
@@ -230,154 +228,168 @@ def test_count_nonfill_matrix(a):
 
     dij = ntn.Variable("dij", np.int64)
 
-    X = ntn.Slot("X", np.ndarray)
-    Y = ntn.Slot("Y", np.ndarray)
     xi = ntn.Variable("xi", np.int64)
     yj = ntn.Variable("yj", np.int64)
 
-    d_i    = ntn.Variable("d_i",   np.int64)
-    d_i_j  = ntn.Variable("d_i_j", np.int64)
-    d_j    = ntn.Variable("d_j",   np.int64)
-    d_j_i  = ntn.Variable("d_j_i", np.int64)
+    d_i = ntn.Variable("d_i", np.int64)
+    d_i_j = ntn.Variable("d_i_j", np.int64)
+    d_j = ntn.Variable("d_j", np.int64)
+    d_j_i = ntn.Variable("d_j_i", np.int64)
 
-    prgm = ntn.Module((
-        ntn.Function(
-            ntn.Variable("matrix_total_nnz", np.int64),
-            (A,),
-            ntn.Block((
-                ntn.Assign(nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))),
-                ntn.Assign(ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))),
-                ntn.Assign(dij, ntn.Literal(np.int64(0))),
-                ntn.Unpack(A_,A),
-                ntn.Loop(
-                    i,
-                    ni,
-                    ntn.Loop(
-                        j,
-                        nj,
+    prgm = ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable("matrix_total_nnz", np.int64),
+                (A,),
+                ntn.Block(
+                    (
                         ntn.Assign(
-                            dij,
-                            ntn.Call(
-                                ntn.Literal(operator.add),
-                                (
+                            nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                        ),
+                        ntn.Assign(
+                            ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                        ),
+                        ntn.Assign(dij, ntn.Literal(np.int64(0))),
+                        ntn.Unpack(A_, A),
+                        ntn.Loop(
+                            i,
+                            ni,
+                            ntn.Loop(
+                                j,
+                                nj,
+                                ntn.Assign(
                                     dij,
-                                    ntn.Unwrap(ntn.Access(A_, ntn.Read(), (j, i)))
-                                )
-                            )
-                        )
-                    )
-                ),
-                ntn.Repack(A_,A),
-                ntn.Return(dij),
-            ))
-        ),
-        ntn.Function(
-            ntn.Variable("matrix_structure_to_dcs", tuple),
-            (A,),
-            ntn.Block((
-                ntn.Assign(nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))),
-                ntn.Assign(ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))),
-                ntn.Unpack(A_,A),
-                ntn.Loop(
-                    i,
-                    ni,
-                    ntn.Loop(
-                        j,
-                        nj,
-                        ntn.Block((
-                            ntn.Increment(
-                                ntn.Access(
-                                    X,
-                                    ntn.Update(ntn.Literal(operator.add)), (i,)
+                                    ntn.Call(
+                                        ntn.Literal(operator.add),
+                                        (
+                                            dij,
+                                            ntn.Unwrap(
+                                                ntn.Access(A_, ntn.Read(), (j, i))
+                                            ),
+                                        ),
+                                    ),
                                 ),
-                                ntn.Unwrap(
-                                    ntn.Access(A_, ntn.Read(),(j, i))
+                            ),
+                        ),
+                        ntn.Repack(A_, A),
+                        ntn.Return(dij),
+                    )
+                ),
+            ),
+            ntn.Function(
+                ntn.Variable("matrix_structure_to_dcs", tuple),
+                (A,),
+                ntn.Block(
+                    (
+                        ntn.Assign(
+                            nj, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                        ),
+                        ntn.Assign(
+                            ni, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                        ),
+                        ntn.Unpack(A_, A),
+                        ntn.Assign(d_i, ntn.Literal(np.int64(0))),
+                        ntn.Assign(d_i_j, ntn.Literal(np.int64(0))),
+                        ntn.Loop(
+                            i,
+                            ni,
+                            ntn.Block(
+                                (
+                                    ntn.Assign(xi, ntn.Literal(np.int64(0))),
+                                    ntn.Loop(
+                                        j,
+                                        nj,
+                                        ntn.Assign(
+                                            xi,
+                                            ntn.Call(
+                                                ntn.Literal(operator.add),
+                                                (
+                                                    xi,
+                                                    ntn.Unwrap(
+                                                        ntn.Access(
+                                                            A_, ntn.Read(), (j, i)
+                                                        )
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                    ntn.If(
+                                        ntn.Call(
+                                            ntn.Literal(operator.ne),
+                                            (xi, ntn.Literal(np.int64(0))),
+                                        ),
+                                        ntn.Assign(
+                                            d_i,
+                                            ntn.Call(
+                                                ntn.Literal(operator.add),
+                                                (d_i, ntn.Literal(np.int64(1))),
+                                            ),
+                                        ),
+                                    ),
+                                    ntn.Assign(
+                                        d_i_j, ntn.Call(ntn.Literal(max), (d_i_j, xi))
+                                    ),
                                 )
                             ),
-                            ntn.Increment(
-                                ntn.Access(
-                                    Y,
-                                    ntn.Update(ntn.Literal(operator.add)), (j,)
-                                ),
-                                ntn.Unwrap(
-                                    ntn.Access(A_, ntn.Read(), (j, i))
+                        ),
+                        ntn.Assign(d_j, ntn.Literal(np.int64(0))),
+                        ntn.Assign(d_j_i, ntn.Literal(np.int64(0))),
+                        ntn.Loop(
+                            j,
+                            nj,
+                            ntn.Block(
+                                (
+                                    ntn.Assign(yj, ntn.Literal(np.int64(0))),
+                                    ntn.Loop(
+                                        i,
+                                        ni,
+                                        ntn.Assign(
+                                            yj,
+                                            ntn.Call(
+                                                ntn.Literal(operator.add),
+                                                (
+                                                    yj,
+                                                    ntn.Unwrap(
+                                                        ntn.Access(
+                                                            A_, ntn.Read(), (j, i)
+                                                        )
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                    ntn.If(
+                                        ntn.Call(
+                                            ntn.Literal(operator.ne),
+                                            (yj, ntn.Literal(np.int64(0))),
+                                        ),
+                                        ntn.Assign(
+                                            d_j,
+                                            ntn.Call(
+                                                ntn.Literal(operator.add),
+                                                (d_j, ntn.Literal(np.int64(1))),
+                                            ),
+                                        ),
+                                    ),
+                                    ntn.Assign(
+                                        d_j_i, ntn.Call(ntn.Literal(max), (d_j_i, yj))
+                                    ),
                                 )
-
+                            ),
+                        ),
+                        ntn.Repack(A_, A),
+                        ntn.Return(
+                            ntn.Call(
+                                ntn.Literal(lambda a, b, c, d: (a, b, c, d)),
+                                (d_i, d_i_j, d_j, d_j_i),
                             )
-                        ))
+                        ),
                     )
                 ),
-                ntn.Assign(d_i, ntn.Literal(np.int64(0))),
-                ntn.Assign(d_i_j, ntn.Literal(np.int64(0))),
-                ntn.Loop(
-                    i,
-                    ni,
-                    ntn.Block((
-                        ntn.Assign(
-                            xi,
-                            ntn.Unwrap(ntn.Access(X, ntn.Read(), (i,)))
-                        ),
-                        ntn.If(
-                            ntn.Call(ntn.Literal(operator.ne), (xi, ntn.Literal(np.int64(0)))),
-                            ntn.Assign(
-                                d_i,
-                                ntn.Call(
-                                    ntn.Literal(operator.add),
-                                    (d_i,
-                                    ntn.Literal(np.int64(1))
-                                    )
-                                )
-                            ),
-                        ),
-                        ntn.Assign(
-                            d_i_j,
-                            ntn.Call(
-                                ntn.Literal(max),
-                                (d_i_j, xi))
-                        ),
-                    ))
-                ),
-                ntn.Assign(d_j, ntn.Literal(np.int64(0))),
-                ntn.Assign(d_j_i, ntn.Literal(np.int64(0))),
-                ntn.Loop(
-                    j,
-                    nj,
-                    ntn.Block((
-                        ntn.Assign(
-                            yj,
-                            ntn.Unwrap(ntn.Access(Y, ntn.Read(), (j,)))
-                        ),
-                        ntn.If(
-                            ntn.Call(ntn.Literal(operator.ne), (yj, ntn.Literal(np.int64(0)))),
-                            ntn.Assign(
-                                d_j,
-                                ntn.Call(
-                                    ntn.Literal(operator.add),
-                                    (d_j,
-                                    ntn.Literal(np.int64(1))
-                                    )
-                                )
-                            ),
-                        ),
-                        ntn.Assign(
-                            d_j_i,
-                            ntn.Call(
-                                ntn.Literal(max),
-                                (d_j_i, yj))
-                        ),
-                    ))
-                ),
-                ntn.Repack(A_, A),
-                ntn.Return(
-                    ntn.Call(
-                        ntn.Literal(lambda a, b, c, d: (a, b, c, d)),
-                        (d_i, d_i_j, d_j, d_j_i)
-                    )
-                ),
-            ))
+            ),
         )
-    ))
-
+    )
     mod = ntn.NotationInterpreter()(prgm)
 
     d_ij = mod.matrix_total_nnz(a)
@@ -386,7 +398,7 @@ def test_count_nonfill_matrix(a):
     row_sums = a.sum(axis=1)
 
     assert d_ij == int(np.count_nonzero(a))
-    assert d_i   == int((col_sums > 0).sum())
+    assert d_i == int((col_sums > 0).sum())
     assert d_i_j == int(col_sums.max(initial=0))
-    assert d_j   == int((row_sums > 0).sum())
+    assert d_j == int((row_sums > 0).sum())
     assert d_j_i == int(row_sums.max(initial=0))

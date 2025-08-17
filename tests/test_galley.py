@@ -4,9 +4,9 @@ import pytest
 
 import numpy as np
 
+from finch.galley.dc_stats import DC, DCStats
 from finch.galley.dense_stat import DenseStats
 from finch.galley.tensor_def import TensorDef
-from finch.galley.dc_stats import DCStats, DC
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
@@ -115,18 +115,44 @@ def test_aggregate_and_issimilar():
     dsb = DenseStats.from_tensor(B, ["j", "k"])
     assert not DenseStats.issimilar(dsa, dsb)
 
+
 # ─────────────────────────────── DCStats tests ─────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "tensor, fields, expected_dcs",
+    [
+        (np.array([0, 1, 0, 0, 1]), ["i"], {DC(frozenset(), frozenset(["i"]), 2.0)}),
+    ],
+)
+def test_dc_stats_vector(tensor, fields, expected_dcs):
+    stats = DCStats(tensor, fields)
+    assert stats.dcs == expected_dcs
+
 
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
         (
-            np.array([0, 1, 0, 0, 1]),
-            ["i"],
-            {DC(frozenset(), frozenset(["i"]), 2.0)}
+            np.array(
+                [
+                    [1, 0, 1],
+                    [0, 0, 0],
+                    [1, 1, 0],
+                ],
+                dtype=int,
+            ),
+            ["i", "j"],
+            {
+                DC(frozenset(), frozenset(["i", "j"]), 4.0),
+                DC(frozenset(), frozenset(["i"]), 3.0),
+                DC(frozenset(), frozenset(["j"]), 2.0),
+                DC(frozenset(["i"]), frozenset(["i", "j"]), 2.0),
+                DC(frozenset(["j"]), frozenset(["i", "j"]), 2.0),
+            },
         ),
-    ]
+    ],
 )
-def test_dc_stats(tensor, fields, expected_dcs):
+def test_dc_stats_matrix(tensor, fields, expected_dcs):
     stats = DCStats(tensor, fields)
     assert stats.dcs == expected_dcs
