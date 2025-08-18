@@ -374,7 +374,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                                 asm.Literal(operator.mul),
                                 [
                                     tns.obj.tns.stride[self.nind],
-                                    ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"),
+                                    ctx.idx,
                                 ],
                             ),
                         ],

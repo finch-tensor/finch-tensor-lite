@@ -129,6 +129,7 @@ def test_matrix_multiplication(a, b):
     # mod = ntn.NotationInterpreter()(prgm)
     pprint(NotationCompiler(Reflector())(prgm))
 
+    # TODO uncomment these lines and get these to work
     # c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64,
     # shape=(a.shape[0], b.shape[1])))
     # result = mod.matmul(c, a_buf, b_buf).to_numpy()
@@ -244,5 +245,5 @@ def test_matrix_multiplication_regression(file_regression):
     )
 
     NotationCompiler(Reflector())(prgm)
-    # TODO bug here
+    # TODO uncomment these lines, run a regression test on the compiler output
     # file_regression.check(str(asm_code), extension=".txt")
