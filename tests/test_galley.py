@@ -122,6 +122,8 @@ def test_aggregate_and_issimilar():
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
+        (np.array([], dtype=int), ["i"], set()),
+        (np.array([1, 1, 1, 1]), ["i"], {DC(frozenset(), frozenset(["i"]), 4.0)}),
         (np.array([0, 1, 0, 0, 1]), ["i"], {DC(frozenset(), frozenset(["i"]), 2.0)}),
     ],
 )
@@ -133,6 +135,18 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
+        (np.zeros((0, 0), dtype=int), ["i", "j"], set()),
+        (
+            np.ones((3, 3), dtype=int),
+            ["i", "j"],
+            {
+                DC(frozenset(), frozenset(["i", "j"]), 9.0),
+                DC(frozenset(), frozenset(["i"]), 3.0),
+                DC(frozenset(), frozenset(["j"]), 3.0),
+                DC(frozenset(["i"]), frozenset(["i", "j"]), 3.0),
+                DC(frozenset(["j"]), frozenset(["i", "j"]), 3.0),
+            },
+        ),
         (
             np.array(
                 [
