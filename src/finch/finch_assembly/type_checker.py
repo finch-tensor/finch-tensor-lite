@@ -68,7 +68,7 @@ class AssemblyTypeChecker:
 
     def check_in_loop(self):
         if not self.loop_state:
-            raise AssemblyTypeError("not in loop")
+            raise AssemblyTypeError("Not in loop.")
 
     def check_return_type(self, return_type):
         if self.function_state:
@@ -165,7 +165,9 @@ class AssemblyTypeChecker:
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
                 check_type(var_t)
-                # TODO: check in ctxt
+                if var_n not in self.ctxt:
+                    raise AssemblyTypeError("Slot {var_n} not found in context.")
+                check_type_match(self.ctxt[var_n], var_t)
                 return None
             case asm.Assign(asm.Variable(var_n, var_t), rhs):
                 check_type(var_t)
@@ -238,8 +240,10 @@ class AssemblyTypeChecker:
                 for arg in args:
                     check_type(arg.type)
                     body_scope.ctxt[arg.name] = arg.type
-                body_scope.check_stmt(body)
-                # TODO: add to self.ctxt
+                body_type = body_scope.check_stmt(body)
+                if body_type is None:
+                    raise AssemblyTypeError("Function not guaranteed to return")
+                check_type_match(return_type, body_type)
                 return None
             case asm.Return(arg):
                 return_type = self.check_expr(arg)
@@ -262,6 +266,7 @@ class AssemblyTypeChecker:
                 raise AssemblyTypeError("Expected statement.")
 
     def check_module(self, mod: asm.AssemblyNode):
+        # TODO: check to double defined functions
         match mod:
             case asm.Module(funcs):
                 for func in funcs:
