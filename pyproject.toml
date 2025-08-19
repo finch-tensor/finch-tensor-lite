@@ -11,9 +11,6 @@ dependencies = ['numpy>=1.19', 'numba>=0.61', 'donfig>=0.8.1.post1,<0.9.0']
 packages = [{include = "finch", from = "src"}]
 requires-poetry = '>=2.0,<3.0'
 
-[tool.poetry.group.dev.dependencies]
-pytest-regressions = "^2.8.2"
-
 [project.optional-dependencies]
 test = [
     "pytest>=7.4.4,<8",
