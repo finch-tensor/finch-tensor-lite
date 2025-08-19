@@ -135,6 +135,9 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def __hash__(self):
         return hash((self.buf, self._ndim))
 
+    def __str__(self):
+        return f"{self.struct_name}(ndim={self.ndim})"
+
     @property
     def ndim(self) -> int:
         return self._ndim
@@ -173,6 +176,8 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         if isinstance(mode, ntn.Update):
             op = mode.op
         tns = ctx.resolve(tns).obj
+        # print("XDDDDDDDDD")
+        # print(self.buf.length_type)
         acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf.length_type, op)
         obj = BufferizedNDArrayAccessorFields(
             tns, 0, asm.Literal(self.buf.length_type(0)), op
@@ -206,7 +211,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         """
         Repack the buffer from C context.
         """
-        ctx.exec(asm.Repack(obj.buf))
+        ctx.exec(asm.Repack(obj.buf_s))
         return
 
 
@@ -270,10 +275,11 @@ class BufferizedNDArrayAccessorFields(NamedTuple):
 
 
 class BufferizedNDArrayAccessorFType(FinchTensorFType):
-    def __init__(self, tns, nind, pos, op):
+    def __init__(self, tns, nind, pos, op, *, pos_var=None):
         self.tns = tns
         self.nind = nind
         self.pos = pos
+        self.pos_var = pos_var
         self.op = op
 
     def __eq__(self, other):
@@ -350,11 +356,14 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return asm.Load(obj.tns.buf, obj.pos)
 
     def lower_increment(self, ctx, obj, val):
+        lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
         ctx.exec(
             asm.Store(
                 obj.tns.buf,
-                obj.pos,
-                asm.Call(asm.Literal(self.op), [asm.Load(obj.tns.buf, obj.pos), val]),
+                lowered_pos,
+                asm.Call(
+                    asm.Literal(self.op), [asm.Load(obj.tns.buf, lowered_pos), val]
+                ),
             )
         )
 
@@ -369,12 +378,14 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                     asm.Call(
                         asm.Literal(operator.add),
                         [
-                            self.pos,
+                            self.pos_var
+                            if self.pos_var is not None
+                            else asm.Literal(0),
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [
                                     tns.obj.tns.stride[self.nind],
-                                    ctx.idx,
+                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ],
                             ),
                         ],
@@ -385,7 +396,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 BufferizedNDArrayAccessorFields(
                     tns=tns.obj.tns, nind=self.nind - 1, pos=pos_2, op=self.op
                 ),
-                BufferizedNDArrayAccessorFType(self.tns, self.nind + 1, pos_2, self.op),
+                BufferizedNDArrayAccessorFType(
+                    self.tns, self.nind + 1, self.pos, self.op, pos_var=pos_2
+                ),
             )
 
         return lplt.Lookup(

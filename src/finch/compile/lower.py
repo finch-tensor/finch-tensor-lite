@@ -151,7 +151,7 @@ class ExtentFType:
         ctx_2 = ctx.scope()
         ctx_2.bindings[idx.name] = idx
         ctx_2(body)
-        body_3 = ctx_2.emit()
+        body_3 = asm.Block(ctx_2.emit())
         ctx.exec(
             asm.ForLoop(
                 idx,
@@ -314,6 +314,7 @@ class NotationContext(Context):
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
+                # print(args_e)
                 return asm.Call(f_e, args_e)
             case ntn.Assign(var, val):
                 self.exec(asm.Assign(self(var), self(val)))
@@ -348,7 +349,7 @@ class NotationContext(Context):
                 self.exec(asm.Assign(var, val_code))
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.asm_unpack(
-                    self, var_n, ntn.Variable(var_n, var_t)
+                    self, var_n, asm.Variable(var_n, var_t)
                 )
                 return None
             case ntn.Repack(ntn.Slot(var_n, var_t), _):
@@ -357,6 +358,7 @@ class NotationContext(Context):
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
+                # print(self.slots[var_n])
                 var_t.asm_repack(self, var_n, obj)
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, _)):
