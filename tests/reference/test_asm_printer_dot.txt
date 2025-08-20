@@ -1,0 +1,9 @@
+def dot_product(a: np_buf_t(float64), b: np_buf_t(float64)) -> float64:
+    c: float64 = 0.0
+    a_: np_buf_t(float64) = unpack(a)
+    b_: np_buf_t(float64) = unpack(b)
+    for i in range(0, length(slot(a_, np_buf_t(float64)))):
+        c: float64 = add(c, mul(load(slot(a_, np_buf_t(float64)), i), load(slot(b_, np_buf_t(float64)), i)))
+    repack(a_)
+    repack(b_)
+    return c

@@ -202,10 +202,13 @@ class NumbaKernel:
 
 
 class NumbaCompiler:
+    def __init__(self, ctx=None):
+        if ctx is None:
+            ctx = NumbaGenerator()
+        self.ctx = ctx
+
     def __call__(self, prgm: asm.Module):
-        ctx = NumbaContext()
-        ctx(prgm)
-        numba_code = ctx.emit_global()
+        numba_code = self.ctx(prgm)
         logger.info(f"Executing Numba code:\n{numba_code}")
         try:
             exec(numba_code, globals(), None)
@@ -230,6 +233,13 @@ class NumbaCompiler:
                     )
 
         return NumbaModule(kernels)
+
+
+class NumbaGenerator:
+    def __call__(self, prgm: asm.AssemblyNode):
+        ctx = NumbaContext()
+        ctx(prgm)
+        return ctx.emit_global()
 
 
 class NumbaContext(Context):
