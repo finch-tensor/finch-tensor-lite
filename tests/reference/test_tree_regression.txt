@@ -1,0 +1,17 @@
+def func(:A0: NDArrayFType(dtype=dtype('int64'), ndim=2), :A1: NDArrayFType(dtype=dtype('int64'), ndim=2), :A2: NDArrayFType(dtype=dtype('int64'), ndim=2)) -> ndarray:
+    :i0_size: int = dimension(:A0, 0)
+    :i1_size: int = dimension(:A0, 1)
+    :i2_size: int = dimension(:A1, 1)
+    :A0_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A0)
+    :A1_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A1)
+    :A2_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A2)
+    declare(:A2_slot, 0, add, [':i0_size', ':i2_size'])
+    loop(:i2, :i2_size):
+        loop(:i1, :i1_size):
+            loop(:i0, :i0_size):
+                increment(update(:A2_slot, [':i0', ':i2'], add), mul(unwrap(read(:A0_slot, [':i0', ':i1'])), unwrap(read(:A1_slot, [':i1', ':i2']))))
+    freeze(:A2_slot, add)
+    repack(:A0_slot, :A0)
+    repack(:A1_slot, :A1)
+    repack(:A2_slot, :A2)
+    return :A2
