@@ -614,8 +614,17 @@ for unary in (
 ):
 
     def unary_type(op, a):
+        # TODO: Determine a better way to do this
+        if a is np.float16:
+            return a
+        if a is np.float32:
+            return a
         if np.can_cast(a, np.float64):
             return np.float64
+        if a is np.complex64:
+            return a
+        if a is np.complex128:
+            return a
         raise TypeError(f"Unsupported operand type for {op}:  {a}")
 
     register_property(

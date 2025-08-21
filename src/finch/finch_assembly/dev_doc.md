@@ -42,21 +42,19 @@ MODULE     := Module(funcs=NODE...)
 
 ## Notes
 
-* Every function is defined on concrete types and has a concrete return type
-
-* Assignment statements is also used for declaration.
-  This means it's not possible to shadow a variable in a given scope and, in particular, if a variable already appears in the current scope then it must be assigned a value of the type given in the context.
-  It is, however, possible to shadow a variable that appears in a parent scope.
-* There is no higher-order programming.
-  In particular, function definitions must appear at the top-level within a module.
+* Variables and slots can be given the type `AutoType` in assignments, for-loops, buffer-loops, and within a program if it has been previously declared.
+* Every function is defined on concrete types and has a concrete return type.
+  In particular, `AutoType` cannot be used for parameter types or return types.
+* Stacks cannot be given the type `AutoType` (this may change).
+* Assignment statements are also used for declaration.
+  This means it's not possible to shadow a variable within a scope; if a variable already appears in the current scope then it must be assigned a value of the type given in the context.
 * The bodies of loops and conditionals are not required to be blocks.
-  A new scope is implicitly opened when evaluating the body of a loop or a conditional.
-* At the moment, nodes in modules are required to be function definitions.
-* At the moment, functions in
-
-## Questions
-
-* Are function monomorphic? I presume yes (in particular, variables *must* be type annotated in function definitions)
-* What can the right-hand side of an `UNPACK` be? Can it be anything but a variable? If not, what does it mean to make sure the original object is not accessed or modified?
+  A new scope is implicitly opened when evaluating the body of a for-loop and a buffer-loop, but not a while-loo or a conditional.
+* A break statement can only appear within a loop.
+* There is no higher-order programming.
+  Function definitions must appear at the top-level within a module.
+* Functions are required to have a path with a return statement.
+* There can be no additional statements in a block after a return or break statement.
+* Nodes in modules are required to be function definitions (this may change).
 
 [^1]: Nathan: Not my own words, taken from docstring.
