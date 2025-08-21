@@ -25,12 +25,6 @@ class LoopState:
         pass
 
 
-@dataclass(eq=True)
-class StmtReturnType:
-    def __init__(self, return_type):
-        self.return_type = return_type
-
-
 class AssemblyTypeChecker:
     """
     A type checker for FinchAssembly
@@ -66,10 +60,6 @@ class AssemblyTypeChecker:
             function_state=function_state,
         )
 
-    def check_in_loop(self):
-        if not self.loop_state:
-            raise AssemblyTypeError("Not in loop.")
-
     def check_return_type(self, return_type):
         if self.function_state:
             check_type_match(
@@ -77,36 +67,35 @@ class AssemblyTypeChecker:
                 return_type,
             )
         else:
-            raise AssemblyTypeError("Cannot return outside of function")
+            raise AssemblyTypeError("Cannot return outside of function.")
 
     def check_in_ctxt(self, var_n, var_t):
         try:
             check_type_match(self.ctxt[var_n], var_t)
         except KeyError:
             raise AssemblyTypeError(
-                f"'{var_n}' is not defined in the current context."
+                f"The variable '{var_n}' is not defined in the current context."
             ) from KeyError
 
     def check_buffer(self, buffer):
         buffer_type = self.check_expr(buffer)
         if isinstance(buffer_type, BufferFType):
             return buffer_type
-        raise AssemblyTypeError("Expected buffer.")
+        raise AssemblyTypeError(f"Expected buffer, got {buffer_type}.")
 
     def check_struct(self, struct):
         struct_type = self.check_expr(struct)
         if isinstance(struct_type, AssemblyStructFType):
             return struct_type
-        raise AssemblyTypeError("Expected struct.")
+        raise AssemblyTypeError(f"Expected struct, got {struct_type}.")
 
     def check_cond(self, cond):
         cond_type = self.check_expr(cond)
-        if (
-            not isinstance(cond_type, type)
-            or not np.issubdtype(cond_type, np.number)
-            and not np.issubdtype(cond_type, np.bool_)
+        if isinstance(cond_type, type) and (
+            np.issubdtype(cond_type, np.number) or np.issubdtype(cond_type, np.bool_)
         ):
-            raise AssemblyTypeError("Expected number or boolean for conditional")
+            return
+        raise AssemblyTypeError("Conditional must be number or boolean.")
 
     def check_expr(self, expr: asm.AssemblyExpression):
         match expr:
@@ -133,9 +122,6 @@ class AssemblyTypeChecker:
                     raise AssemblyTypeError(
                         "Operation not defined on given types."
                     ) from TypeError
-            case asm.Call(asm.Variable(var_n, var_t), args):
-                return None
-                # TODO
             case asm.Load(buffer, index):
                 buffer_type = self.check_buffer(buffer)
                 index_type = self.check_expr(index)
@@ -145,7 +131,7 @@ class AssemblyTypeChecker:
                 buffer_type = self.check_buffer(buffer)
                 return buffer_type.length_type
             case _:
-                raise AssemblyTypeError("expected AssemblyExpression.")
+                raise ValueError(f"Ill-formed AssemblyExpression:  {type(expr)}.")
 
     def check_stmt(self, stmt: asm.AssemblyNode):
         if isinstance(stmt, asm.AssemblyExpression):
@@ -165,9 +151,7 @@ class AssemblyTypeChecker:
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
                 check_type(var_t)
-                if var_n not in self.ctxt:
-                    raise AssemblyTypeError("Slot {var_n} not found in context.")
-                check_type_match(self.ctxt[var_n], var_t)
+                self.check_in_ctxt(var_n, var_t)
                 return None
             case asm.Assign(asm.Variable(var_n, var_t), rhs):
                 check_type(var_t)
@@ -178,8 +162,8 @@ class AssemblyTypeChecker:
                 else:
                     self.ctxt[var_n] = var_t
                 return None
-            case asm.Assign(asm.Stack(_obj, _obj_t), rhs):
-                return None  # TODO
+            case asm.Assign(asm.Stack(_obj, _obj_t), _rhs):
+                raise NotImplementedError("Cannot assign to stack currently.")
             case asm.SetAttr(obj, asm.Literal(attr), value):
                 obj_type = self.check_struct(obj)
                 attrtype = check_attrtype(obj_type, attr)
@@ -219,7 +203,9 @@ class AssemblyTypeChecker:
                 return None
             case asm.WhileLoop(cond, body):
                 self.check_cond(cond)
+                self.loop_state = LoopState()
                 self.check_stmt(body)
+                self.loop_state = None
                 return None
             case asm.If(cond, body):
                 self.check_cond(cond)
@@ -232,17 +218,21 @@ class AssemblyTypeChecker:
                 if body_type is None or else_body_type is None:
                     return None
                 return body_type
-            case asm.Function(asm.Variable(_, return_type), args, body):
+            case asm.Function(asm.Variable(func_name, return_type), args, body):
                 check_type(return_type)
                 if self.function_state:
-                    raise AssemblyTypeError("Cannot nest function definition")
+                    raise AssemblyTypeError(
+                        f"Cannot nest function definitions:  '{func_name}'."
+                    )
                 body_scope = self.scope(function_state=FunctionState(return_type))
                 for arg in args:
                     check_type(arg.type)
                     body_scope.ctxt[arg.name] = arg.type
                 body_type = body_scope.check_stmt(body)
                 if body_type is None:
-                    raise AssemblyTypeError("Function not guaranteed to return")
+                    raise AssemblyTypeError(
+                        f"Function '{func_name}' is not guaranteed to return."
+                    )
                 check_type_match(return_type, body_type)
                 return None
             case asm.Return(arg):
@@ -250,7 +240,8 @@ class AssemblyTypeChecker:
                 self.check_return_type(return_type)
                 return return_type
             case asm.Break():
-                self.check_in_loop()
+                if self.loop_state is None:
+                    raise AssemblyTypeError("Cannot break outside of loop.")
                 return None
             case asm.Block(bodies):
                 block = self.scope()
@@ -258,23 +249,28 @@ class AssemblyTypeChecker:
                 left_already = False
                 for body in bodies:
                     if left_already:
-                        raise AssemblyTypeError("unreachable statements in block")
+                        raise AssemblyTypeError("Unreachable statements in block.")
                     return_type = block.check_stmt(body)
                     left_already = return_type is not None or body is asm.Break
                 return return_type
             case _:
-                raise AssemblyTypeError("Expected statement.")
+                raise ValueError(f"Ill-formed statement:  {type(stmt)}.")
 
     def check_module(self, mod: asm.AssemblyNode):
-        # TODO: check to double defined functions
+        defined_funcs = []
         match mod:
             case asm.Module(funcs):
                 for func in funcs:
-                    check_is_func(func)  # can be removed later
+                    func_name = check_is_func(func)  # can be removed later
+                    if func_name in defined_funcs:
+                        raise AssemblyTypeError(
+                            f"Two functions defined with the name '{func_name}'."
+                        )
                     self.check_stmt(func)
+                    defined_funcs.append(func_name)
                 return
             case _:
-                raise AssemblyTypeError("Expected module.")
+                raise AssemblyTypeError(f"Expected module, got {type(mod)}.")
 
     def __call__(self, prgm: asm.AssemblyNode):
         if isinstance(prgm, asm.Module):
@@ -288,26 +284,29 @@ class AssemblyTypeChecker:
 
 def check_is_index_type(index_type):
     if not np.issubdtype(index_type, np.integer):
-        raise AssemblyTypeError("invalid index type")
+        raise AssemblyTypeError(f"Expected index, got {index_type}.")
 
 
 def check_type_match(expected_type, actual_type):
     if expected_type != actual_type:
-        raise AssemblyTypeError(f"Expected {expected_type}, found {actual_type}")
+        raise AssemblyTypeError(f"Expected {expected_type}, got {actual_type}.")
 
 
 def check_type(type_):
     if not isinstance(type_, type | FType):
-        raise AssemblyTypeError(f"Expected type, {type_} is not a type.")
+        raise AssemblyTypeError(f"Expected type, got {type_}.")
 
 
 def check_attrtype(obj_type, attr):
     try:
         return obj_type.struct_attrtype(attr)
     except KeyError:
-        raise AssemblyTypeError("{attr.val} is not attribute.") from KeyError
+        raise AssemblyTypeError(f"'{attr}' is not valid attribute.") from KeyError
 
 
 def check_is_func(func):
-    if not isinstance(func, asm.Function):
-        raise AssemblyTypeError("Expected function defintion")
+    match func:
+        case asm.Function(asm.Variable(func_name, _), _, _):
+            return func_name
+        case _:
+            raise AssemblyTypeError(f"Expected function definition, got {type(func)}.")

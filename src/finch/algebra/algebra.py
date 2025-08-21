@@ -616,7 +616,7 @@ for unary in (
     def unary_type(op, a):
         if np.can_cast(a, np.float64):
             return np.float64
-        raise TypeError("Invalid input")
+        raise TypeError(f"Unsupported operand type for {op}:  {a}")
 
     register_property(
         unary,
