@@ -1,5 +1,4 @@
 import operator
-from pprint import pprint
 
 import pytest
 
@@ -9,6 +8,7 @@ import finch
 import finch.finch_notation as ntn
 from finch import ftype
 from finch.compile import ExtentFType, NotationCompiler, dimension
+from finch.finch_assembly import AssemblyInterpreter
 from finch.symbolic import Reflector
 
 
@@ -31,7 +31,7 @@ def test_matrix_multiplication(a, b):
     k = ntn.Variable("k", np.int64)
 
     a_buf = finch.compile.BufferizedNDArray(a)
-    # b_buf = finch.compile.BufferizedNDArray(b)
+    b_buf = finch.compile.BufferizedNDArray(b)
 
     a_format = ftype(a_buf)
 
@@ -126,19 +126,19 @@ def test_matrix_multiplication(a, b):
         )
     )
 
-    # mod = ntn.NotationInterpreter()(prgm)
-    pprint(NotationCompiler(Reflector())(prgm))
+    assembly = NotationCompiler(Reflector())(prgm)
 
-    # TODO uncomment these lines and get these to work
-    # c = finch.compile.BufferizedNDArray(np.zeros(dtype=np.float64,
-    # shape=(a.shape[0], b.shape[1])))
-    # result = mod.matmul(c, a_buf, b_buf).to_numpy()
+    asm_mod = AssemblyInterpreter()(assembly)
 
+    expected = np.matmul(a, b)
 
-#
-#    expected = np.matmul(a, b)
+    c = finch.compile.BufferizedNDArray(
+        np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
+    )
 
-#    assert_equal(result, expected)
+    result = asm_mod.matmul(c, a_buf, b_buf).to_numpy()
+
+    np.testing.assert_equal(result, expected)
 
 
 def test_matrix_multiplication_regression(file_regression):
@@ -176,19 +176,31 @@ def test_matrix_multiplication_regression(file_regression):
                 ntn.Block(
                     (
                         ntn.Assign(
-                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
+                            m,
+                            ntn.Call(
+                                ntn.Literal(dimension), (A, ntn.Literal(np.int64(0)))
+                            ),
                         ),
                         ntn.Assign(
-                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
+                            n,
+                            ntn.Call(
+                                ntn.Literal(dimension), (B, ntn.Literal(np.int64(1)))
+                            ),
                         ),
                         ntn.Assign(
-                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
+                            p,
+                            ntn.Call(
+                                ntn.Literal(dimension), (A, ntn.Literal(np.int64(1)))
+                            ),
                         ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                            C_,
+                            ntn.Literal(np.float64(0.0)),
+                            ntn.Literal(operator.add),
+                            (m, n),
                         ),
                         ntn.Loop(
                             i,

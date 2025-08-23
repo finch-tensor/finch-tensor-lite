@@ -7,7 +7,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor
 from ..codegen import NumpyBuffer
-from ..finch_assembly import AssemblyStructFType
+from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import ftype
 from . import looplets as lplt
 from .lower import FinchTensorFType
@@ -19,8 +19,8 @@ class BufferizedNDArray(Tensor):
         for stride in arr.strides:
             if stride % itemsize != 0:
                 raise ValueError("Array must be aligned to multiple of itemsize")
-        self.strides = tuple(stride // itemsize for stride in arr.strides)
-        self._shape = arr.shape
+        self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
+        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
         self.buf = NumpyBuffer(
             np.lib.stride_tricks.as_strided(
                 arr,
@@ -46,7 +46,9 @@ class BufferizedNDArray(Tensor):
         """
         Returns the ftype of the buffer, which is a BufferizedNDArrayFType.
         """
-        return BufferizedNDArrayFType(ftype(self.buf), len(self.strides))
+        return BufferizedNDArrayFType(
+            ftype(self.buf), np.intp(len(self.strides)), ftype(self.strides)
+        )
 
     @property
     def shape(self):
@@ -121,11 +123,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return [
             ("buf", self.buf),
             ("_ndim", self._ndim),
+            ("strides", self._strides),
         ]
 
-    def __init__(self, buf, ndim: int):
+    def __init__(self, buf, ndim: int, strides: TupleFType):
         self.buf = buf
         self._ndim = ndim
+        self._strides = strides
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
@@ -143,6 +147,10 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return self._ndim
 
     @property
+    def strides(self) -> TupleFType:
+        return self._strides
+
+    @property
     def fill_value(self) -> Any:
         return np.zeros((), dtype=self.buf.dtype)[()]
 
@@ -156,13 +164,14 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         i_var = asm.Variable("i", self.buf.length_type)
-        buf = asm.Stack(tns.obj.buf, self.buf)
         body = asm.Store(
-            buf,
+            tns.obj.buf_s,
             i_var,
             asm.Literal(init.val),
         )
-        ctx.exec(asm.ForLoop(i_var, asm.Literal(0), asm.Length(buf), body))
+        ctx.exec(
+            asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns.obj.buf_s), body)
+        )
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -196,13 +205,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         for i in range(self._ndim):
             stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf.length_type)
             stride.append(stride_i)
-            stride_e = asm.GetAttr(val, "stride")
-            stride_i_e = asm.GetAttr(stride_e, f"element_{i}")
+            stride_e = asm.GetAttr(val, asm.Literal("strides"))
+            stride_i_e = asm.GetAttr(stride_e, asm.Literal(f"element_{i}"))
             ctx.exec(asm.Assign(stride_i, stride_i_e))
         buf = asm.Variable(f"{var_n}_buf", self.buf)
-        buf_e = asm.GetAttr(val, "buf")
+        buf_e = asm.GetAttr(val, asm.Literal("buf"))
         ctx.exec(asm.Assign(buf, buf_e))
-        buf_s = asm.Slot(f"{var_n}_buf", self.buf)
+        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf)
         ctx.exec(asm.Unpack(buf_s, buf))
 
         return BufferizedNDArrayFields(tuple(stride), buf, buf_s)
@@ -353,16 +362,17 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         )
 
     def lower_unwrap(self, ctx, obj):
-        return asm.Load(obj.tns.buf, obj.pos)
+        return asm.Load(obj.tns.buf_s, obj.pos)
 
     def lower_increment(self, ctx, obj, val):
         lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
         ctx.exec(
             asm.Store(
-                obj.tns.buf,
+                obj.tns.buf_s,
                 lowered_pos,
                 asm.Call(
-                    asm.Literal(self.op), [asm.Load(obj.tns.buf, lowered_pos), val]
+                    asm.Literal(self.op.val),
+                    [asm.Load(obj.tns.buf_s, lowered_pos), val],
                 ),
             )
         )
@@ -378,9 +388,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                     asm.Call(
                         asm.Literal(operator.add),
                         [
-                            self.pos_var
-                            if self.pos_var is not None
-                            else asm.Literal(0),
+                            tns.obj.pos,
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [

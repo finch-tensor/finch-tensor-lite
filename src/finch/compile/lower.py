@@ -3,6 +3,10 @@ from dataclasses import dataclass
 from pprint import pprint
 from typing import Any
 
+import numpy as np
+
+from finch.finch_assembly.struct import AssemblyStructFType
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType
@@ -65,6 +69,12 @@ class Extent:
             # Execute the body of the loop
             ctx_2(body)
 
+    @property
+    def ftype(self):
+        return ExtentFType(
+            np.asarray(self.start).dtype.type, np.asarray(self.end).dtype.type
+        )
+
 
 def extent(start, end):
     """
@@ -110,7 +120,7 @@ class FinchCompileError(Exception):
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFType:
+class ExtentFType(AssemblyStructFType):
     start: Any
     end: Any
 
@@ -121,11 +131,19 @@ class ExtentFType:
             ExtentFType(start.result_format, end.result_format),
         )
 
+    @property
+    def struct_name(self):
+        return "Extent"
+
+    @property
+    def struct_fields(self):
+        return [("start", np.intp), ("end", np.intp)]
+
     def get_start(self, ext):
-        return asm.GetAttr(ext, "start")
+        return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
-        return asm.GetAttr(ext, "end")
+        return asm.GetAttr(ext, asm.Literal("end"))
 
     def lower_loop(self, ctx, idx, ext, body):
         """
@@ -138,10 +156,10 @@ class ExtentFType:
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
             match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
+                case ntn.Access(_, _, idxs):
+                    if idx in idxs:
                         raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
+                            node, f"Access with {idx} should have been lowered already"
                         )
             return
 
@@ -378,7 +396,7 @@ class NotationContext(Context):
                 return None
             case ntn.Loop(idx, ext, body):
                 # first instantiate tensors
-                ext.result_format.lower_loop(self, idx, ext, body)
+                ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 tns = self.resolve(tns)
@@ -478,11 +496,11 @@ def lower_looplets(ctx, idx, ext, body):
 
     def unfurl_node(node):
         match node:
-            case ntn.Access(tns, mode, (j, *idxs)):
-                if j == idx:
+            case ntn.Access(tns, mode, idxs):
+                if idx in idxs:
                     tns = ctx_2.resolve(tns)
                     tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
-                    return ntn.Access(tns_2, mode, (j, *idxs))
+                    return ntn.Access(tns_2, mode, idxs)
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
