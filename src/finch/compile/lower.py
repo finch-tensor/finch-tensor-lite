@@ -47,7 +47,7 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(ctx, tns, ext, proto): ...
+    def unfurl(self, ctx, tns, ext, mode, idxs): ...
 
 
 @dataclass(eq=True, frozen=True)
@@ -499,7 +499,9 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, idxs):
                 if idx in idxs:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
+                    tns_2 = tns.result_format.unfurl(
+                        ctx_2, tns, ext, mode, tuple(ctx_2(i) for i in idxs)
+                    )
                     return ntn.Access(tns_2, mode, idxs)
         return None
 

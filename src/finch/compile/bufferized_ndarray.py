@@ -1,4 +1,6 @@
 import operator
+from collections.abc import Iterable
+from enum import Enum
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -7,10 +9,72 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor
 from ..codegen import NumpyBuffer
-from ..finch_assembly import AssemblyStructFType, TupleFType
+from ..finch_assembly import AssemblyStructFType, TupleFType, Variable
 from ..symbolic import ftype
 from . import looplets as lplt
 from .lower import FinchTensorFType
+
+
+class StrideState(Enum):
+    FREE = 0
+    ACTIVE = 1
+    VISITED = 2
+
+
+class BufferizedNDArrayStrideState:
+    vars: tuple[Variable, ...]
+    strides: tuple[StrideState, ...]
+
+    def __init__(
+        self, vars: tuple[Variable, ...], strides: tuple[StrideState, ...]
+    ) -> None:
+        self.vars = vars
+        self.strides = strides
+
+    def __str__(self) -> str:
+        return f"StrideState({self.vars}, {self.strides})"
+
+    def __hash__(self) -> int:
+        return hash((self.vars, self.strides))
+
+    @classmethod
+    def full(
+        cls, vars: tuple[Variable, ...], fv: StrideState = StrideState.FREE
+    ) -> "BufferizedNDArrayStrideState":
+        return BufferizedNDArrayStrideState(vars, tuple(fv for _ in range(len(vars))))
+
+    def ndim(self, skip_visited: bool = True) -> int:
+        return len(
+            [s for s in self.strides if not skip_visited or s != StrideState.VISITED]
+        )
+
+    def get_shape(self, shape: Iterable[Any]) -> tuple[Any, ...]:
+        return tuple(
+            elem
+            for elem, stride in zip(shape, self.strides, strict=True)
+            if stride != StrideState.VISITED
+        )
+
+    def get_active_stride(self) -> int:
+        return self.strides.index(StrideState.ACTIVE)
+
+    def activate_step(self, var: Variable) -> "BufferizedNDArrayStrideState":
+        assert self.strides.count(StrideState.ACTIVE) == 0
+        idx = self.vars.index(var)
+        assert self.strides[idx] == StrideState.FREE
+        result = list(self.strides)
+        result[idx] = StrideState.ACTIVE
+        return BufferizedNDArrayStrideState(self.vars, tuple(result))
+
+    def visit_step(self) -> "BufferizedNDArrayStrideState":
+        assert self.strides.count(StrideState.ACTIVE) == 1
+        return BufferizedNDArrayStrideState(
+            self.vars,
+            tuple(
+                s if s == StrideState.FREE else StrideState.VISITED
+                for s in self.strides
+            ),
+        )
 
 
 class BufferizedNDArray(Tensor):
@@ -21,25 +85,14 @@ class BufferizedNDArray(Tensor):
                 raise ValueError("Array must be aligned to multiple of itemsize")
         self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
         self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
-        self.buf = NumpyBuffer(
-            np.lib.stride_tricks.as_strided(
-                arr,
-                shape=(np.dot(arr.strides, arr.shape) // itemsize,),
-                strides=(itemsize,),
-            )
-        )
+        self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
 
     def to_numpy(self):
         """
         Convert the bufferized NDArray to a NumPy array.
         This is used to get the underlying NumPy array from the bufferized NDArray.
         """
-        itemsize = self.buf.arr.dtype.itemsize
-        return np.lib.stride_tricks.as_strided(
-            self.buf.arr,
-            shape=self._shape,
-            strides=(stride * itemsize for stride in self.strides),
-        )
+        return self.buf.arr.reshape(self._shape, copy=False)
 
     @property
     def ftype(self):
@@ -80,8 +133,8 @@ class BufferizedNDArray(Tensor):
     def thaw(self, op):
         return self
 
-    def access(self, indices, op):
-        return BufferizedNDArrayAccessor(self).access(indices, op)
+    def access_indices(self, idxs, op):
+        return BufferizedNDArrayAccessor(self).access_indices(idxs, op)
 
     def __getitem__(self, index):
         """
@@ -89,6 +142,7 @@ class BufferizedNDArray(Tensor):
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
+            print(f"__getitem__: {self.strides}")
             index = np.dot(index, self.strides)
         return self.buf.load(index)
 
@@ -180,18 +234,19 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def lower_thaw(self, ctx, tns, op):
         return tns
 
-    def unfurl(self, ctx, tns, ext, mode, proto):
+    def unfurl(self, ctx, tns, ext, mode, idxs):
         op = None
         if isinstance(mode, ntn.Update):
             op = mode.op
         tns = ctx.resolve(tns).obj
-        # print("XDDDDDDDDD")
-        # print(self.buf.length_type)
-        acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf.length_type, op)
-        obj = BufferizedNDArrayAccessorFields(
-            tns, 0, asm.Literal(self.buf.length_type(0)), op
+        stride_state = BufferizedNDArrayStrideState.full(idxs)
+        acc_t = BufferizedNDArrayAccessorFType(
+            self, stride_state, self.buf.length_type, op
         )
-        return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
+        obj = BufferizedNDArrayAccessorFields(
+            tns, stride_state, asm.Literal(self.buf.length_type(0)), op
+        )
+        return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, idxs)
 
     def lower_unwrap(self, ctx, obj): ...
 
@@ -230,31 +285,42 @@ class BufferizedNDArrayAccessor(Tensor):
     This is used to create a view of a tensor with a specific extent.
     """
 
-    def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
+    def __init__(self, tns: BufferizedNDArray, stride_state=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
             pos = ftype(self.tns).buf.length_type(0)
+        if stride_state is None:
+            stride_state = BufferizedNDArrayStrideState.full(())
+        self.stride_state = stride_state
         self.pos = pos
         self.op = op
-        if nind is None:
-            nind = 0
-        self.nind = nind
 
     @property
     def ftype(self):
         return BufferizedNDArrayAccessorFType(
-            ftype(self.tns), self.nind, ftype(self.pos), self.op
+            ftype(self.tns), self.stride_state, ftype(self.pos), self.op
         )
 
     @property
     def shape(self):
-        return self.tns.shape[self.nind :]
+        return self.stride_state.get_shape(self.tns.shape)
 
-    def access(self, indices, op):
-        pos = self.pos + np.dot(
-            indices, self.tns.strides[self.nind : self.nind + len(indices)]
+    def access_indices(self, idxs, op):
+        pos = self.pos + np.dot(idxs, self.tns.strides[:])
+        return BufferizedNDArrayAccessor(
+            self.tns,
+            self.stride_state.full(
+                tuple(None for _ in range(self.tns.ndim)), fv=StrideState.VISITED
+            ),
+            pos,
+            op,
         )
-        return BufferizedNDArrayAccessor(self.tns, self.nind + len(indices), pos, op)
+
+    def access(self, index, op):
+        pos = self.pos + index * self.tns.strides[self.stride_state.get_active_stride()]
+        return BufferizedNDArrayAccessor(
+            self.tns, self.stride_state.visit_step(), pos, op
+        )
 
     def unwrap(self):
         """
@@ -278,38 +344,37 @@ class BufferizedNDArrayAccessor(Tensor):
 
 class BufferizedNDArrayAccessorFields(NamedTuple):
     tns: BufferizedNDArrayFields
-    nind: int
+    stride_state: BufferizedNDArrayStrideState
     pos: asm.AssemblyNode
     op: Any
 
 
 class BufferizedNDArrayAccessorFType(FinchTensorFType):
-    def __init__(self, tns, nind, pos, op, *, pos_var=None):
+    def __init__(self, tns, stride_state: BufferizedNDArrayStrideState, pos, op):
         self.tns = tns
-        self.nind = nind
+        self.stride_state = stride_state
         self.pos = pos
-        self.pos_var = pos_var
         self.op = op
 
     def __eq__(self, other):
         return (
             isinstance(other, BufferizedNDArrayAccessorFType)
             and self.tns == other.tns
-            and self.nind == other.nind
+            and self.stride_state == other.stride_state
             and self.pos == other.pos
             and self.op == other.op
         )
 
     def __hash__(self):
-        return hash((self.tns, self.nind, self.pos, self.op))
+        return hash((self.tns, self.stride_state, self.pos, self.op))
 
     @property
     def ndim(self) -> int:
-        return self.tns.ndim - self.nind
+        return self.stride_state.ndim()
 
     @property
     def shape_type(self) -> tuple:
-        return self.tns.shape_type[self.nind :]
+        return self.stride_state.get_shape(self.tns.shape_type)
 
     @property
     def fill_value(self) -> Any:
@@ -334,18 +399,18 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
-    def asm_unpack(self, ctx, var_n, val):
-        """
-        Unpack the into asm context.
-        """
-        tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
-        nind = asm.Variable(f"{var_n}_nind", self.nind)
-        pos = asm.Variable(f"{var_n}_pos", self.pos)
-        op = asm.Variable(f"{var_n}_op", self.op)
-        ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
-        ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
-        ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
-        return BufferizedNDArrayFields(tns, pos, nind, op)
+    # def asm_unpack(self, ctx, var_n, val):
+    #     """
+    #     Unpack the into asm context.
+    #     """
+    #     tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
+    #     nind = asm.Variable(f"{var_n}_nind", self.nind)
+    #     pos = asm.Variable(f"{var_n}_pos", self.pos)
+    #     op = asm.Variable(f"{var_n}_op", self.op)
+    #     ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
+    #     ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
+    #     ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
+    #     return BufferizedNDArrayFields(tns, pos, nind, op)
 
     def asm_repack(self, ctx, lhs, obj):
         """
@@ -377,8 +442,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             )
         )
 
-    def unfurl(self, ctx, tns, ext, mode, proto):
-        def child_accessor(ctx, idx):
+    def unfurl(self, ctx, tns, ext, mode, idxs):
+        def child_accessor(ctx, idx, idxs):
+            stride_state = self.stride_state.activate_step(idx)
             pos_2 = asm.Variable(
                 ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.pos
             )
@@ -392,7 +458,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [
-                                    tns.obj.tns.stride[self.nind],
+                                    tns.obj.tns.stride[
+                                        stride_state.get_active_stride()
+                                    ],
                                     asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ],
                             ),
@@ -402,15 +470,18 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             )
             return ntn.Stack(
                 BufferizedNDArrayAccessorFields(
-                    tns=tns.obj.tns, nind=self.nind - 1, pos=pos_2, op=self.op
+                    tns=tns.obj.tns,
+                    stride_state=stride_state.visit_step(),
+                    pos=pos_2,
+                    op=self.op,
                 ),
                 BufferizedNDArrayAccessorFType(
-                    self.tns, self.nind + 1, self.pos, self.op, pos_var=pos_2
+                    self.tns, stride_state.visit_step(), self.pos, self.op
                 ),
             )
 
         return lplt.Lookup(
             body=lambda ctx, idx: lplt.Leaf(
-                body=lambda ctx: child_accessor(ctx, idx),
+                body=lambda ctx, idxs: child_accessor(ctx, idx, idxs),
             )
         )

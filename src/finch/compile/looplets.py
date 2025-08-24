@@ -214,7 +214,9 @@ class LeafPass(LoopletPass):
                 case ntn.Access(tns, mode, idxs):
                     if idx in idxs and isinstance(tns, Leaf):
                         return ntn.Access(
-                            tns.body(ctx), mode, [i for i in idxs if i != idx]
+                            tns.body(ctx, idxs.index(idx)),
+                            mode,
+                            [i for i in idxs if i != idx],
                         )
             return None
 

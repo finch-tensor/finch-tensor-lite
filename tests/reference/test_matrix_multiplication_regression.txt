@@ -1,0 +1,37 @@
+def matmul(C: BufferizedNDArray(ndim=2), A: BufferizedNDArray(ndim=2), B: BufferizedNDArray(ndim=2)) -> BufferizedNDArray(ndim=2):
+    m: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(A, 0)
+    n: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(B, 1)
+    p: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(A, 1)
+    A_: BufferizedNDArray(ndim=2) = A
+    A__stride_0: int64 = getattr(getattr(A_, strides), element_0)
+    A__stride_1: int64 = getattr(getattr(A_, strides), element_1)
+    A__buf: np_buf_t(float64) = getattr(A_, buf)
+    A__buf_slot: np_buf_t(float64) = unpack(A__buf)
+    B_: BufferizedNDArray(ndim=2) = B
+    B__stride_0: int64 = getattr(getattr(B_, strides), element_0)
+    B__stride_1: int64 = getattr(getattr(B_, strides), element_1)
+    B__buf: np_buf_t(float64) = getattr(B_, buf)
+    B__buf_slot: np_buf_t(float64) = unpack(B__buf)
+    C_: BufferizedNDArray(ndim=2) = C
+    C__stride_0: int64 = getattr(getattr(C_, strides), element_0)
+    C__stride_1: int64 = getattr(getattr(C_, strides), element_1)
+    C__buf: np_buf_t(float64) = getattr(C_, buf)
+    C__buf_slot: np_buf_t(float64) = unpack(C__buf)
+    for i in range(0, length(slot(C__buf_slot, np_buf_t(float64)))):
+        store(slot(C__buf_slot, np_buf_t(float64)), i, 0.0)
+    for i in range(getattr(m, start), getattr(m, end)):
+        i__pos: int64 = add(0, mul(A__stride_0, i))
+        i__pos_2: int64 = add(0, mul(C__stride_0, i))
+        for j in range(getattr(n, start), getattr(n, end)):
+            j__pos: int64 = add(0, mul(B__stride_1, j))
+            j__pos_2: int64 = add(i__pos_2, mul(C__stride_1, j))
+            for k in range(getattr(p, start), getattr(p, end)):
+                k__pos: int64 = add(i__pos, mul(A__stride_1, k))
+                k__pos_2: int64 = add(j__pos, mul(B__stride_0, k))
+                a_ik: float64 = load(slot(A__buf_slot, np_buf_t(float64)), k__pos)
+                b_kj: float64 = load(slot(B__buf_slot, np_buf_t(float64)), k__pos_2)
+                c_ij: float64 = mul(a_ik, b_kj)
+                store(slot(C__buf_slot, np_buf_t(float64)), j__pos_2, add(load(slot(C__buf_slot, np_buf_t(float64)), j__pos_2), c_ij))
+    repack(C__buf_slot)
+    matmul_return: BufferizedNDArray(ndim=2) = C
+    return matmul_return

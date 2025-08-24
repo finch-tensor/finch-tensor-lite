@@ -15,10 +15,10 @@ from finch.symbolic import Reflector
 @pytest.mark.parametrize(
     "a, b",
     [
-        #        (
-        #            np.array([[1, 2], [3, 4]], dtype=np.float64),
-        #            np.array([[5, 6], [7, 8]], dtype=np.float64),
-        #        ),
+        (
+            np.array([[1, 2, 3], [3, 4, 0]], dtype=np.float64),
+            np.array([[5, 0, 6, 9], [7, 8, 0, 0], [-1, -4, 9, 0]], dtype=np.float64),
+        ),
         (
             np.array([[2, 0], [1, 3]], dtype=np.float64),
             np.array([[4, 1], [2, 2]], dtype=np.float64),
@@ -126,31 +126,37 @@ def test_matrix_multiplication(a, b):
         )
     )
 
-    assembly = NotationCompiler(Reflector())(prgm)
+    # NOTATION
+    ntn_mod = ntn.NotationInterpreter()(prgm)
 
-    asm_mod = AssemblyInterpreter()(assembly)
-
-    expected = np.matmul(a, b)
-
-    c = finch.compile.BufferizedNDArray(
+    c_buf = finch.compile.BufferizedNDArray(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
-    result = asm_mod.matmul(c, a_buf, b_buf).to_numpy()
-
+    result = ntn_mod.matmul(c_buf, a_buf, b_buf).to_numpy()
+    expected = np.matmul(a, b)
     np.testing.assert_equal(result, expected)
+
+    # ASSEMBLY
+    asm_program = NotationCompiler(Reflector())(prgm)
+    asm_mod = AssemblyInterpreter()(asm_program)
+
+    c_buf = finch.compile.BufferizedNDArray(
+        np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
+    )
+
+    expected = np.matmul(a, b)
+    actual = asm_mod.matmul(c_buf, a_buf, b_buf).to_numpy()
+    np.testing.assert_equal(actual, expected)
 
 
 def test_matrix_multiplication_regression(file_regression):
     a = np.array([[2, 0], [1, 3]], dtype=np.float64)
-    # b = np.array([[4, 1], [2, 2]], dtype=np.float64)
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
 
     a_buf = finch.compile.BufferizedNDArray(a)
-    # b_buf = finch.compile.BufferizedNDArray(b)
-
     a_format = ftype(a_buf)
 
     A = ntn.Variable("A", a_format)
@@ -177,28 +183,22 @@ def test_matrix_multiplication_regression(file_regression):
                     (
                         ntn.Assign(
                             m,
-                            ntn.Call(
-                                ntn.Literal(dimension), (A, ntn.Literal(np.int64(0)))
-                            ),
+                            ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0))),
                         ),
                         ntn.Assign(
                             n,
-                            ntn.Call(
-                                ntn.Literal(dimension), (B, ntn.Literal(np.int64(1)))
-                            ),
+                            ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1))),
                         ),
                         ntn.Assign(
                             p,
-                            ntn.Call(
-                                ntn.Literal(dimension), (A, ntn.Literal(np.int64(1)))
-                            ),
+                            ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1))),
                         ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
                         ntn.Declare(
                             C_,
-                            ntn.Literal(np.float64(0.0)),
+                            ntn.Literal(0.0),
                             ntn.Literal(operator.add),
                             (m, n),
                         ),
@@ -256,6 +256,5 @@ def test_matrix_multiplication_regression(file_regression):
         )
     )
 
-    NotationCompiler(Reflector())(prgm)
-    # TODO uncomment these lines, run a regression test on the compiler output
-    # file_regression.check(str(asm_code), extension=".txt")
+    asm_program = NotationCompiler(Reflector())(prgm)
+    file_regression.check(str(asm_program), extension=".txt")
