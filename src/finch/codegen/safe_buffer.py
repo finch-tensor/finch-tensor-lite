@@ -1,4 +1,4 @@
-from ..finch_assembly.buffer import Buffer, BufferFType
+from ..finch_assembly.buffer import Buffer
 from .c import CBufferFType, CStackFType
 from .numba_backend import NumbaBufferFType, NumbaStackFType
 
@@ -123,18 +123,27 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
         Args:
             underlying_format: The buffer format to add safety to
         """
-        required_types = (
-            BufferFType,
-            CBufferFType,
-            NumbaBufferFType,
-            CStackFType,
-            NumbaStackFType,
-        )
-        if not all(isinstance(underlying_format, t) for t in required_types):
-            raise TypeError(
-                "SafeBufferFType requires underlying buffer"
-                " type to implement C and Numba buffer interface support"
-            )
+        # TODO: Uncomment and enforce these requirements
+        # required_types = (
+        #     # BufferFType,
+        #     CBufferFType,
+        #     NumbaBufferFType,
+        #     CStackFType,
+        #     NumbaStackFType,
+        # )
+        # missing_types = [
+        #     req_type.__name__
+        #     for req_type in required_types
+        #     if not isinstance(underlying_format, req_type)
+        # ]
+
+        # if missing_types:
+        #     raise TypeError(
+        #         f"SafeBufferFType requires underlying buffer type to "
+        #         f"implement all of {[t.__name__ for t in required_types]}"
+        #         f", but {type(underlying_format).__name__} "
+        #         f"is missing: {missing_types}"
+        #     )
 
         self._ftype = underlying_format
 
@@ -192,16 +201,26 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
         return self.underlying_ftype.c_type()
 
     def c_load(self, ctx, buffer, idx):
-        _check_bounds(self.c_length(ctx, buffer), idx)
-        return self.underlying_ftype.c_load(ctx, buffer, idx)
+        # An expression in the target language is expected to be returned
+        # ! BAD: This assumes the underlying type is an integer type
+        # ! BAD: Magically returns -1 on out-of-bounds, which may be valid data
+        return (
+            f"({self.c_length(ctx, buffer)} > {ctx(idx)} && {ctx(idx)} >= 0) ?"
+            "{self.underlying_ftype.c_load(ctx, buffer, idx)} : -1"
+        )
 
     def c_store(self, ctx, buffer, idx, value):
-        _check_bounds(self.c_length(ctx, buffer), idx)
-        return self.underlying_ftype.c_store(ctx, buffer, idx, value)
+        return (
+            f"if({self.c_length(ctx, buffer)} > {ctx(idx)} && {ctx(idx)} >= 0)"
+            "{" + self.underlying_ftype.c_store(ctx, buffer, idx, value) + "}"
+        )
 
     def c_resize(self, ctx, buffer, new_len):
-        # TODO: No way to statically check the new_len and confirm its validity
-        return self.underlying_ftype.c_resize(ctx, buffer, new_len)
+        return (
+            f"if({new_len} >= 0) {{"
+            + self.underlying_ftype.c_resize(ctx, buffer, new_len)
+            + "}"
+        )
 
     def serialize_to_c(self, obj):
         return self.underlying_ftype.serialize_to_c(obj)
@@ -233,16 +252,30 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
         return self.underlying_ftype.numba_length(ctx, buffer)
 
     def numba_load(self, ctx, buffer, idx):
-        _check_bounds(self.c_length(ctx, buffer), idx)
-        return self.underlying_ftype.numba_load(ctx, buffer, idx)
+        ctx_2 = ctx.subblock()
+        self.underlying_ftype.numba_load(ctx_2, buffer, idx)
+        body_code = ctx_2.emit()
+        ctx.exec(
+            f"{ctx.feed}if {self.numba_length(ctx, buffer)} > {ctx(idx)}"
+            f"and {ctx(idx)} >= 0:"
+            f"\n{body_code}"
+        )
 
     def numba_store(self, ctx, buffer, idx, value=None):
-        _check_bounds(self.c_length(ctx, buffer), idx)
-        return self.underlying_ftype.numba_store(ctx, buffer, idx, value)
+        ctx_2 = ctx.subblock()
+        self.underlying_ftype.numba_store(ctx_2, buffer, idx, value)
+        body_code = ctx_2.emit()
+        ctx.exec(
+            f"{ctx.feed}if {self.numba_length(ctx, buffer)} > {ctx(idx)}"
+            f"and {ctx(idx)} >= 0:"
+            f"\n{body_code}"
+        )
 
-    def numba_resize(self, ctx, buffer, size):
-        _check_resize(size)
-        return self.underlying_ftype.numba_resize(ctx, buffer, size)
+    def numba_resize(self, ctx, buffer, new_len):
+        ctx_2 = ctx.subblock()
+        self.underlying_ftype.numba_resize(ctx_2, buffer, new_len)
+        body_code = ctx_2.emit()
+        ctx.exec(f"{ctx.feed}if {new_len} >= 0:\n{body_code}")
 
     def numba_unpack(self, ctx, var_n, val):
         return self.underlying_ftype.numba_unpack(ctx, var_n, val)
