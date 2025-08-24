@@ -38,8 +38,8 @@ class LogicNode(Term, ABC):
     def __str__(self):
         """Returns a string representation of the node."""
         ctx = LogicPrinterContext()
-        ctx(self)
-        return ctx.emit()
+        res = ctx(self)
+        return res if res is not None else ctx.emit()
 
 
 @dataclass(eq=True, frozen=True)

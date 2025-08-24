@@ -34,8 +34,8 @@ class NotationNode(Term, ABC):
     def __str__(self):
         """Returns a string representation of the node."""
         ctx = NotationPrinterContext()
-        ctx(self)
-        return ctx.emit()
+        res = ctx(self)
+        return res if res is not None else ctx.emit()
 
 
 @dataclass(eq=True, frozen=True)
@@ -637,6 +637,8 @@ class NotationPrinterContext(Context):
                 return str(name)
             case Slot(name, _):
                 return str(name)
+            case Stack(obj, _):
+                return str(obj)
             case Call(f, args):
                 return f"{self(f)}({', '.join(self(arg) for arg in args)})"
             case Unwrap(tns):
