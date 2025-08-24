@@ -332,7 +332,6 @@ class NotationContext(Context):
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
-                # print(args_e)
                 return asm.Call(f_e, args_e)
             case ntn.Assign(var, val):
                 self.exec(asm.Assign(self(var), self(val)))
@@ -376,7 +375,6 @@ class NotationContext(Context):
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
-                # print(self.slots[var_n])
                 var_t.asm_repack(self, var_n, obj)
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, _)):

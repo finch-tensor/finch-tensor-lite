@@ -142,7 +142,6 @@ class BufferizedNDArray(Tensor):
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
-            print(f"__getitem__: {self.strides}")
             index = np.dot(index, self.strides)
         return self.buf.load(index)
 
@@ -443,7 +442,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         )
 
     def unfurl(self, ctx, tns, ext, mode, idxs):
-        def child_accessor(ctx, idx, idxs):
+        def child_accessor(ctx, idx):
             stride_state = self.stride_state.activate_step(idx)
             pos_2 = asm.Variable(
                 ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.pos
@@ -482,6 +481,6 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
 
         return lplt.Lookup(
             body=lambda ctx, idx: lplt.Leaf(
-                body=lambda ctx, idxs: child_accessor(ctx, idx, idxs),
+                body=lambda ctx: child_accessor(ctx, idx),
             )
         )
