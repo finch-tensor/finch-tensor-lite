@@ -11,6 +11,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from finch import algebra
 
 
 class FinchTensorFType(TensorFType, ABC):
@@ -86,6 +87,17 @@ def extent(start, end):
 def dimension(tns, mode):
     end = tns.shape[mode]
     return extent(type(end)(0), end)
+
+
+def xd(a, b, c):
+    raise Exception(f"{a}, {b}, {c}")
+
+algebra.register_property(
+    dimension,
+    "__call__",
+    "return_type",
+    lambda op, x, y: ExtentFType(np.intp, np.intp),
+)
 
 
 @dataclass(eq=True, frozen=True)

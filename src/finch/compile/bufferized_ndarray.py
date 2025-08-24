@@ -175,7 +175,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def struct_fields(self):
         return [
             ("buf", self.buf),
-            ("_ndim", self._ndim),
+            ("_ndim", np.intp),
             ("strides", self._strides),
         ]
 
