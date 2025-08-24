@@ -84,6 +84,10 @@ class TupleFType(AssemblyStructFType):
         obj[index] = value
         return
 
+    # def numba_type(self):
+    #     import numba
+    #     return numba.types.ClassType()
+
     def __hash__(self):
         return hash((self.struct_name, tuple(self.struct_fieldformats)))
 

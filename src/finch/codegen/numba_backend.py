@@ -27,6 +27,7 @@ def numba_type(t):
     Returns:
         The corresponding Numba type.
     """
+    #print(f"GGGGG: {t}")
     if hasattr(t, "numba_type"):
         return t.numba_type()
     if isinstance(t, AssemblyStructFType):
@@ -315,6 +316,8 @@ class NumbaContext(Context):
     def full_name(val: Any) -> str:
         if hasattr(val, "numba_name"):
             return val.numba_name()
+        if hasattr(val, "name"):
+            return val.name
         return f"{val.__module__}.{val.__name__}"
 
     def __call__(self, prgm: asm.AssemblyNode):
@@ -493,8 +496,8 @@ class NumbaContext(Context):
                         )
                     self(func)
                 return None
-            case _:
-                raise NotImplementedError
+            case node:
+                raise NotImplementedError(type(node))
 
 
 class NumbaStackFType(ABC):
@@ -562,12 +565,23 @@ def struct_numba_type(fmt: AssemblyStructFType):
     """
 
     def _strict_numba_type(x):
-        if issubclass(x, np.generic):
-            return numba.from_dtype(x)
-        return numba.extending.as_numba_type(x)
+        #print(x)
+        try:
+            if issubclass(x, np.generic):
+                return numba.from_dtype(x)
+            if hasattr(x, "class_type") and isinstance(x.class_type, numba.types.ClassType):
+                return x.class_type
+        except TypeError:
+            pass
+        return x
+        # print(x)
+        # return numba.extending.as_numba_type(x)
 
     if fmt in numba_structs:
         return numba_structs[fmt]
+
+    #print(fmt.struct_fields)
+    #raise Exception("XD")
 
     spec = [
         (name, _strict_numba_type(numba_type(field_type)))
@@ -593,6 +607,8 @@ def struct_numba_type(fmt: AssemblyStructFType):
     )
     ns: dict[str, object] = {}
     exec(class_src, ns)
+    print(class_src)
+    print(spec)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[fmt] = new_struct
     globals()[new_struct.__name__] = new_struct
