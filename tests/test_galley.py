@@ -170,3 +170,47 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
 def test_dc_stats_matrix(tensor, fields, expected_dcs):
     stats = DCStats(tensor, fields)
     assert stats.dcs == expected_dcs
+
+@pytest.mark.parametrize(
+    "tensor, fields, expected_dcs",
+    [
+        (np.zeros((0, 0, 0), dtype=int), ["i", "j", "k"], set()),
+        (
+            np.ones((2, 2, 2), dtype=int),
+            ["i", "j", "k"],
+            {
+                DC(frozenset(), frozenset(["i", "j", "k"]), 8.0),
+                DC(frozenset(), frozenset(["i"]), 2.0),
+                DC(frozenset(), frozenset(["j"]), 2.0),
+                DC(frozenset(), frozenset(["k"]), 2.0),
+                DC(frozenset(["i"]), frozenset(["j", "k"]), 4.0),
+                DC(frozenset(["j"]), frozenset(["i", "k"]), 4.0),
+                DC(frozenset(["k"]), frozenset(["i", "j"]), 4.0),
+            },
+        ),
+        (
+            np.array(
+                [
+                    [[1, 0],
+                     [0, 0]],
+                    [[0, 1],
+                     [1, 0]],
+                ],
+                dtype=int,
+            ),
+            ["i", "j", "k"],
+            {
+                DC(frozenset(), frozenset(["i", "j", "k"]), 3.0),
+                DC(frozenset(), frozenset(["i"]), 2.0),
+                DC(frozenset(), frozenset(["j"]), 2.0),
+                DC(frozenset(), frozenset(["k"]), 2.0),
+                DC(frozenset(["i"]), frozenset(["j", "k"]), 2.0),
+                DC(frozenset(["j"]), frozenset(["i", "k"]), 2.0),
+                DC(frozenset(["k"]), frozenset(["i", "j"]), 2.0),
+            },
+        ),
+    ],
+)
+def test_dc_stats_3d(tensor, fields, expected_dcs):
+    stats = DCStats(tensor, fields)
+    assert stats.dcs == expected_dcs
