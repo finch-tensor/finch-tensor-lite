@@ -213,3 +213,56 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
 def test_dc_stats_3d(tensor, fields, expected_dcs):
     stats = DCStats(tensor, fields)
     assert stats.dcs == expected_dcs
+
+
+@pytest.mark.parametrize(
+    "tensor, fields, expected_dcs",
+    [
+        (np.zeros((0, 0, 0, 0), dtype=int), ["i", "j", "k", "l"], set()),
+        (
+            np.ones((2, 2, 2, 2), dtype=int),
+            ["i", "j", "k", "l"],
+            {
+                DC(frozenset(), frozenset(["i", "j", "k", "l"]), 16.0),
+                DC(frozenset(), frozenset(["i"]), 2.0),
+                DC(frozenset(), frozenset(["j"]), 2.0),
+                DC(frozenset(), frozenset(["k"]), 2.0),
+                DC(frozenset(), frozenset(["l"]), 2.0),
+                DC(frozenset(["i"]), frozenset(["j", "k", "l"]), 8.0),
+                DC(frozenset(["j"]), frozenset(["i", "k", "l"]), 8.0),
+                DC(frozenset(["k"]), frozenset(["i", "j", "l"]), 8.0),
+                DC(frozenset(["l"]), frozenset(["i", "j", "k"]), 8.0),
+            },
+        ),
+        (
+            np.array(
+                [
+                    [
+                        [[1, 0], [0, 0]],
+                        [[0, 0], [0, 1]],
+                    ],
+                    [
+                        [[0, 0], [1, 0]],
+                        [[0, 0], [0, 0]],
+                    ],
+                ],
+                dtype=int,
+            ),
+            ["i", "j", "k", "l"],
+            {
+                DC(frozenset(), frozenset(["i", "j", "k", "l"]), 3.0),
+                DC(frozenset(), frozenset(["i"]), 2.0),
+                DC(frozenset(), frozenset(["j"]), 2.0),
+                DC(frozenset(), frozenset(["k"]), 2.0),
+                DC(frozenset(), frozenset(["l"]), 2.0),
+                DC(frozenset(["i"]), frozenset(["j", "k", "l"]), 2.0),
+                DC(frozenset(["j"]), frozenset(["i", "k", "l"]), 2.0),
+                DC(frozenset(["k"]), frozenset(["i", "j", "l"]), 2.0),
+                DC(frozenset(["l"]), frozenset(["i", "j", "k"]), 2.0),
+            },
+        ),
+    ],
+)
+def test_dc_stats_4d(tensor, fields, expected_dcs):
+    stats = DCStats(tensor, fields)
+    assert stats.dcs == expected_dcs
