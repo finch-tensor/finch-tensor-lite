@@ -403,19 +403,15 @@ def test_count_nonfill_matrix(a):
     assert d_j_ == int((row_sums > 0).sum())
     assert d_j_i_ == int(row_sums.max(initial=0))
 
+
 @pytest.mark.parametrize(
     "a",
     [
         np.array(
             [
-                [[1,0,0,1],
-                 [0,1,0,0]],
-
-                [[0,0,0,0],
-                 [1,1,0,0]],
-
-                [[0,0,1,0],
-                 [0,0,0,0]],
+                [[1, 0, 0, 1], [0, 1, 0, 0]],
+                [[0, 0, 0, 0], [1, 1, 0, 0]],
+                [[0, 0, 1, 0], [0, 0, 0, 0]],
             ],
             dtype=int,
         ),
@@ -485,7 +481,9 @@ def test_count_nonfill_3d(a):
                                             (
                                                 dijk,
                                                 ntn.Unwrap(
-                                                    ntn.Access(A_, ntn.Read(), (k, j, i))
+                                                    ntn.Access(
+                                                        A_, ntn.Read(), (k, j, i)
+                                                    )
                                                 ),
                                             ),
                                         ),
@@ -538,7 +536,9 @@ def test_count_nonfill_3d(a):
                                                         xi,
                                                         ntn.Unwrap(
                                                             ntn.Access(
-                                                                A_, ntn.Read(), (k, j, i)
+                                                                A_,
+                                                                ntn.Read(),
+                                                                (k, j, i),
                                                             )
                                                         ),
                                                     ),
@@ -588,7 +588,9 @@ def test_count_nonfill_3d(a):
                                                         yj,
                                                         ntn.Unwrap(
                                                             ntn.Access(
-                                                                A_, ntn.Read(), (k, j, i)
+                                                                A_,
+                                                                ntn.Read(),
+                                                                (k, j, i),
                                                             )
                                                         ),
                                                     ),
@@ -638,7 +640,9 @@ def test_count_nonfill_3d(a):
                                                         zk,
                                                         ntn.Unwrap(
                                                             ntn.Access(
-                                                                A_, ntn.Read(), (k, j, i)
+                                                                A_,
+                                                                ntn.Read(),
+                                                                (k, j, i),
                                                             )
                                                         ),
                                                     ),
@@ -669,10 +673,12 @@ def test_count_nonfill_3d(a):
                         ntn.Repack(A_, A),
                         ntn.Return(
                             ntn.Call(
-                                ntn.Literal(lambda a, b, c, d, e, f: (a, b, c, d, e, f)),
+                                ntn.Literal(
+                                    lambda a, b, c, d, e, f: (a, b, c, d, e, f)
+                                ),
                                 (d_i, d_i_jk, d_j, d_j_ik, d_k, d_k_ij),
                             )
-                        )
+                        ),
                     )
                 ),
             ),
@@ -686,11 +692,11 @@ def test_count_nonfill_3d(a):
     Y = a.sum(axis=(0, 2))
     Z = a.sum(axis=(1, 2))
 
-    assert d_ijk  == int(np.count_nonzero(a))
+    assert d_ijk == int(np.count_nonzero(a))
 
-    assert d_i_    == int((X > 0).sum())
+    assert d_i_ == int((X > 0).sum())
     assert d_i_jk_ == int(X.max(initial=0))
-    assert d_j_    == int((Y > 0).sum())
+    assert d_j_ == int((Y > 0).sum())
     assert d_j_ik_ == int(Y.max(initial=0))
-    assert d_k_    == int((Z > 0).sum())
+    assert d_k_ == int((Z > 0).sum())
     assert d_k_ij_ == int(Z.max(initial=0))

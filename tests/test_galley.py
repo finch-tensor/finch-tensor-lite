@@ -171,6 +171,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
     stats = DCStats(tensor, fields)
     assert stats.dcs == expected_dcs
 
+
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
@@ -191,10 +192,8 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
         (
             np.array(
                 [
-                    [[1, 0],
-                     [0, 0]],
-                    [[0, 1],
-                     [1, 0]],
+                    [[1, 0], [0, 0]],
+                    [[0, 1], [1, 0]],
                 ],
                 dtype=int,
             ),

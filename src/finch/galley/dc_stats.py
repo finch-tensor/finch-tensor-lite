@@ -363,7 +363,9 @@ class DCStats(TensorStats):
                                                 (
                                                     dijk,
                                                     ntn.Unwrap(
-                                                        ntn.Access(A_, ntn.Read(), (k, j, i))
+                                                        ntn.Access(
+                                                            A_, ntn.Read(), (k, j, i)
+                                                        )
                                                     ),
                                                 ),
                                             ),
@@ -416,7 +418,9 @@ class DCStats(TensorStats):
                                                             xi,
                                                             ntn.Unwrap(
                                                                 ntn.Access(
-                                                                    A_, ntn.Read(), (k, j, i)
+                                                                    A_,
+                                                                    ntn.Read(),
+                                                                    (k, j, i),
                                                                 )
                                                             ),
                                                         ),
@@ -466,7 +470,9 @@ class DCStats(TensorStats):
                                                             yj,
                                                             ntn.Unwrap(
                                                                 ntn.Access(
-                                                                    A_, ntn.Read(), (k, j, i)
+                                                                    A_,
+                                                                    ntn.Read(),
+                                                                    (k, j, i),
                                                                 )
                                                             ),
                                                         ),
@@ -516,7 +522,9 @@ class DCStats(TensorStats):
                                                             zk,
                                                             ntn.Unwrap(
                                                                 ntn.Access(
-                                                                    A_, ntn.Read(), (k, j, i)
+                                                                    A_,
+                                                                    ntn.Read(),
+                                                                    (k, j, i),
                                                                 )
                                                             ),
                                                         ),
@@ -547,10 +555,12 @@ class DCStats(TensorStats):
                             ntn.Repack(A_, A),
                             ntn.Return(
                                 ntn.Call(
-                                    ntn.Literal(lambda a, b, c, d, e, f: (a, b, c, d, e, f)),
+                                    ntn.Literal(
+                                        lambda a, b, c, d, e, f: (a, b, c, d, e, f)
+                                    ),
                                     (d_i, d_i_jk, d_j, d_j_ik, d_k, d_k_ij),
                                 )
-                            )
+                            ),
                         )
                     ),
                 ),
@@ -559,7 +569,9 @@ class DCStats(TensorStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         d_ijk = mod._3d_total_nnz(self.tensor)
-        d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(self.tensor)
+        d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(
+            self.tensor
+        )
         i_result, j_result, k_result = self.fields
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
@@ -588,5 +600,3 @@ class DCStats(TensorStats):
         Return:
             the estimated number of non-fill values using DCs.
         """
-        pass
-
