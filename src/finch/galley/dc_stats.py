@@ -1031,8 +1031,10 @@ class DCStats(TensorStats):
                 for dc in self.dcs:
                     if node.issuperset(dc.from_indices):
                         y = node.union(dc.to_indices)
-                        if best[node] > float(2 ** (64 - 2))  or float(dc.value) > float(2 ** (64 - 2)) :
-                            y_weight = float(2 ** 64)
+                        if best[node] > float(2 ** (64 - 2)) or float(dc.value) > float(
+                            2 ** (64 - 2)
+                        ):
+                            y_weight = float(2**64)
                         else:
                             y_weight = best[node] * dc.value
                         if min(current_bound, best.get(y, float("inf"))) > y_weight:
