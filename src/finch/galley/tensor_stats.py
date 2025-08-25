@@ -82,3 +82,6 @@ class TensorStats(ABC):
     @fill_value.setter
     def fill_value(self, value: Any):
         self.tensordef.fill_value = value
+
+    def get_dim_space_size(self, idx: Iterable[str]):
+        return self.tensordef.get_dim_space_size(idx)

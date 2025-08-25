@@ -1011,8 +1011,39 @@ class DCStats(TensorStats):
     def issimilar(*args, **kwargs):
         pass
 
-    def estimate_non_fill_values(self):
+    def estimate_non_fill_values(self) -> float:
         """
         Return:
             the estimated number of non-fill values using DCs.
         """
+        idx = frozenset(self.fields)
+        if not idx:
+            return 1.0
+
+        best: dict[frozenset[str], float] = {frozenset(): 1.0}
+        frontier: set[frozenset[str]] = {frozenset()}
+
+        while True:
+            current_bound = best.get(idx, float("inf"))
+            new_frontier: set[frozenset[str]] = set()
+
+            for node in frontier:
+                for dc in self.dcs:
+                    if node.issuperset(dc.from_indices):
+                        y = node.union(dc.to_indices)
+                        if best[node] > float(2 ** (64 - 2))  or float(dc.value) > float(2 ** (64 - 2)) :
+                            y_weight = float(2 ** 64)
+                        else:
+                            y_weight = best[node] * dc.value
+                        if min(current_bound, best.get(y, float("inf"))) > y_weight:
+                            best[y] = y_weight
+                            new_frontier.add(y)
+            if not new_frontier:
+                break
+            frontier = new_frontier
+
+        min_weight = float(self.get_dim_space_size(idx))
+        for node, weight in best.items():
+            if node.issuperset(idx):
+                min_weight = min(min_weight, weight)
+        return float(min_weight)

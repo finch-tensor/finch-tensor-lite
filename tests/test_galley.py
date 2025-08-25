@@ -266,3 +266,55 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
 def test_dc_stats_4d(tensor, fields, expected_dcs):
     stats = DCStats(tensor, fields)
     assert stats.dcs == expected_dcs
+
+@pytest.mark.parametrize(
+    "tensor, fields",
+    [
+        (np.array([0, 1, 0, 1, 1], dtype=int), ["i"]),
+        (np.zeros((5,), dtype=int), ["i"]),
+        (np.ones((5,), dtype=int), ["i"]),
+
+        (np.array([[1, 0, 1],
+                   [0, 0, 0],
+                   [1, 1, 0]], dtype=int), ["i", "j"]),
+        (np.zeros((3, 3), dtype=int), ["i", "j"]),
+        (np.ones((3, 3), dtype=int), ["i", "j"]),
+
+        (np.array(
+            [
+                [[1, 0],
+                 [0, 0]],
+                [[0, 1],
+                 [1, 0]],
+            ],
+            dtype=int,
+        ), ["i", "j", "k"]),
+        (np.zeros((2, 2, 2), dtype=int), ["i", "j", "k"]),
+        (np.ones((2, 2, 2), dtype=int), ["i", "j", "k"]),
+
+        (np.array(
+            [
+                [
+                    [[1, 0],
+                     [0, 0]],
+                    [[0, 0],
+                     [0, 1]],
+                ],
+                [
+                    [[0, 0],
+                     [1, 0]],
+                    [[0, 0],
+                     [0, 0]],
+                ],
+            ],
+            dtype=int,
+        ), ["i", "j", "k", "l"]),
+        (np.zeros((2, 3, 1, 4), dtype=int), ["i", "j", "k", "l"]),
+        (np.ones((2, 2, 2, 2), dtype=int), ["i", "j", "k", "l"]),
+    ],
+)
+def test_estimate_nnz(tensor, fields):
+    stats = DCStats(tensor, fields)
+    estimated = stats.estimate_non_fill_values()
+    expected = float(np.count_nonzero(tensor))
+    assert estimated == expected
