@@ -210,10 +210,10 @@ class SingletonExtentFType:
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
             match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
+                case ntn.Access(_, _, idxs):
+                    if idx in idxs:
                         raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
+                            node, f"Access with {idx} should have been lowered already"
                         )
             return
 
@@ -557,8 +557,8 @@ class LoopletContext(Context):
     def select_pass(self, body):
         def pass_request(node):
             match node:
-                case ntn.Access(tns, _, (j, *_)):
-                    if j == self.idx:
+                case ntn.Access(tns, _, idxs):
+                    if self.idx in idxs:
                         return tns.pass_request
             return DefaultPass()
 
