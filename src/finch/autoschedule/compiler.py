@@ -7,7 +7,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import InitWrite, TensorFType, query_property, return_type
 from ..algebra.tensor import NDArrayFType
-from ..compile import dimension
+from ..compile import dimension, ExtentFType
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -245,7 +245,7 @@ class LogicLowerer:
                     ntn.Literal(init),
                     ntn.Literal(op),
                     tuple(
-                        ntn.Variable(f"{field_relabels.get(idx, idx).name}_size", int)
+                        ntn.Variable(f"{field_relabels.get(idx, idx).name}_size", ExtentFType(np.intp, np.intp))
                         for idx in lhs_idxs
                     ),
                 )
@@ -271,7 +271,7 @@ class LogicLowerer:
                             ntn.Variable(field_relabels.get(idx, idx).name, int),
                             # TODO (mtsokol): Use correct loop index type
                             ntn.Variable(
-                                f"{field_relabels.get(idx, idx).name}_size", int
+                                f"{field_relabels.get(idx, idx).name}_size", ExtentFType(np.int64, np.int64)
                             ),
                             body,
                         )
@@ -369,8 +369,7 @@ def record_tables(
                 tables[alias] = tbl
                 for idx, field in enumerate(fields):
                     assert isinstance(field, Field)
-                    # TODO (mtsokol): Use correct loop index type
-                    dim_size_var = ntn.Variable(f"{field.name}_size", int)
+                    dim_size_var = ntn.Variable(f"{field.name}_size", ExtentFType(np.intp, np.intp))
                     if dim_size_var not in dim_size_vars:
                         dim_size_vars[dim_size_var] = ntn.Call(
                             ntn.Literal(dimension), (table_var, ntn.Literal(idx))

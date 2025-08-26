@@ -96,6 +96,10 @@ def set_default_scheduler(
         asm_interp = AssemblyInterpreter()
 
         def fn_compile(plan):
+
+            print("XDDDD")
+            print(plan)
+
             ntn_prgm, tables = optimizer(plan)
 
             import numpy as np
@@ -113,6 +117,7 @@ def set_default_scheduler(
 
             ntn_prgm = Rewrite(PostWalk(rule_0))(ntn_prgm)
 
+            print("XDDDD")
             print(ntn_prgm)
 
             asm_prgm = notation_compiler(ntn_prgm)

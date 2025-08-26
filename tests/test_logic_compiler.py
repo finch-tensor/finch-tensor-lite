@@ -7,7 +7,7 @@ from finch.algebra.tensor import NDArrayFType
 from finch.autoschedule import (
     LogicCompiler,
 )
-from finch.compile import dimension
+from finch.compile import dimension, ExtentFType
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -118,7 +118,7 @@ def test_logic_compiler():
                 body=Block(
                     bodies=(
                         Assign(
-                            lhs=Variable(name=":i0_size", type_=int),  # TODO: use Extent instead of int
+                            lhs=Variable(name=":i0_size", type_=ExtentFType(np.int64, np.int64)),
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
@@ -131,7 +131,7 @@ def test_logic_compiler():
                             ),
                         ),
                         Assign(
-                            lhs=Variable(name=":i1_size", type_=int),
+                            lhs=Variable(name=":i1_size", type_=ExtentFType(np.int64, np.int64)),
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
@@ -144,7 +144,7 @@ def test_logic_compiler():
                             ),
                         ),
                         Assign(
-                            lhs=Variable(name=":i2_size", type_=int),
+                            lhs=Variable(name=":i2_size", type_=ExtentFType(np.int64, np.int64)),
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
@@ -175,19 +175,19 @@ def test_logic_compiler():
                             init=Literal(val=0),
                             op=Literal(val=operator.add),
                             shape=(
-                                Variable(name=":i0_size", type_=int),
-                                Variable(name=":i2_size", type_=int),
+                                Variable(name=":i0_size", type_=ExtentFType(np.int64, np.int64)),
+                                Variable(name=":i2_size", type_=ExtentFType(np.int64, np.int64)),
                             ),
                         ),
                         Loop(
                             idx=Variable(name=":i2", type_=int),
-                            ext=Variable(name=":i2_size", type_=int),
+                            ext=Variable(name=":i2_size", type_=ExtentFType(np.int64, np.int64)),
                             body=Loop(
                                 idx=Variable(name=":i1", type_=int),
-                                ext=Variable(name=":i1_size", type_=int),
+                                ext=Variable(name=":i1_size", type_=ExtentFType(np.int64, np.int64)),
                                 body=Loop(
                                     idx=Variable(name=":i0", type_=int),
-                                    ext=Variable(name=":i0_size", type_=int),
+                                    ext=Variable(name=":i0_size", type_=ExtentFType(np.int64, np.int64)),
                                     body=Block(
                                         bodies=(
                                             Increment(
