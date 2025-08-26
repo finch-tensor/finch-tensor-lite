@@ -357,9 +357,21 @@ def is_identity(op: Any, val: Any) -> bool:
 register_property(operator.add, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.mul, "__call__", "is_identity", lambda op, val: val == 1)
 register_property(
-    operator.or_, "__call__", "is_identity", lambda op, val: not bool(val)
+    operator.or_, "__call__", "is_identity",
+    lambda op, val: (isinstance(val, (bool, np.bool_)) and not bool(val))
+                    or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)
 )
-register_property(operator.and_, "__call__", "is_identity", lambda op, val: bool(val))
+register_property(
+    operator.and_, "__call__", "is_identity",
+    lambda op, val: (isinstance(val, (bool, np.bool_)) and bool(val))
+                    or (isinstance(val, np.integer) and val.item() == np.array(-1, dtype=type(val)).item())
+                    or (isinstance(val, int) and not isinstance(val, bool) and val == -1)
+)
+register_property(
+    operator.xor, "__call__", "is_identity",
+    lambda op, val: (isinstance(val, (bool, np.bool_)) and not bool(val))
+                    or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)
+)
 register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
 register_property(
     operator.floordiv, "__call__", "is_identity", lambda op, val: val == 1
@@ -370,9 +382,14 @@ register_property(operator.pow, "__call__", "is_identity", lambda op, val: val =
 register_property(
     np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
 )
-register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
-register_property(np.logical_or, "__call__", "is_identity", lambda op, val: not val)
+register_property(np.logical_and, "__call__", "is_identity",
+                  lambda op, val:bool(val))
 
+register_property(np.logical_or, "__call__", "is_identity",
+                  lambda op, val: not bool(val))
+
+register_property(np.logical_xor, "__call__", "is_identity",
+                  lambda op, val: not bool(val))
 
 def is_distributive(op, other_op):
     """
@@ -432,7 +449,6 @@ register_property(
     lambda op, other_op: False,
 )
 
-
 def is_annihilator(op, val):
     """
     Returns whether the given object is an annihilator for the given function, that is,
@@ -449,10 +465,12 @@ def is_annihilator(op, val):
 
 
 for op, func in [
-    (operator.add, lambda op, val: np.isinf(val)),
-    (operator.mul, lambda op, val: val == 0),
-    (operator.or_, lambda op, val: bool(val)),
-    (operator.and_, lambda op, val: not bool(val)),
+    (operator.mul, lambda op, val: (isinstance(val, (bool, np.bool_)) and not v)
+                             or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)),
+    (operator.or_, lambda op, val: (isinstance(val, (bool, np.bool_)) and bool(val))
+                     or (isinstance(val, (int, np.integer) and not isinstance(val, bool) and val == -1))),
+    (operator.and_, lambda op, val:(isinstance(val, (bool, np.bool_)) and not bool(val))
+                     or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)),
 ]:
     register_property(op, "__call__", "is_annihilator", func)
 
@@ -460,10 +478,10 @@ register_property(
     np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf
 )
 register_property(
-    np.logical_and, "__call__", "is_annihilator", lambda op, val: not bool(val)
+    np.logical_and, "__call__", "is_annihilator", lambda op, val: not bool(val),
 )
 register_property(
-    np.logical_or, "__call__", "is_annihilator", lambda op, val: bool(val)
+    np.logical_or, "__call__", "is_annihilator", lambda op, val: bool(val),
 )
 
 
