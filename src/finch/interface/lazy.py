@@ -819,7 +819,7 @@ def matmul(x1, x2) -> LazyTensor:
     x2 = defer(x2)
 
     if x1.ndim < 1 or x2.ndim < 1:
-        raise ValueError("Both inputs must be at least 1D arrays")
+        raise ValueError(f"Both inputs must be at least 1D arrays: {x1.ndim}, {x2.ndim}")
 
     if x1.ndim == 1 and x2.ndim == 1:
         return reduce(operator.add, multiply(x1, x2), axis=0)

@@ -50,23 +50,36 @@ Performance:
   or `with_scheduler`.
 """
 
+from finch.algebra.tensor import NDArrayFType
+from finch.compile.bufferized_ndarray import BufferizedNDArrayFType
+from finch.symbolic.rewriters import PostWalk, Rewrite
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
+from ..compile import NotationCompiler, BufferizedNDArray
+from ..codegen import NumbaCompiler
 from ..finch_logic import Alias, FinchLogicInterpreter, Plan, Produces, Query
-from ..finch_notation import NotationInterpreter
-from ..symbolic import gensym
+from ..finch_notation import NotationInterpreter, Variable, Slot
+from ..finch_assembly import AssemblyInterpreter
+from ..symbolic import gensym, Reflector
 from .lazy import defer
 
 _DEFAULT_SCHEDULER = None
 
 
-def set_default_scheduler(*, ctx=None, interpret_logic=False):
+def set_default_scheduler(
+    *,
+    ctx=None,
+    interpret_logic=False,
+    interpret_notation=False,
+    interpret_assembly=True,
+    compile_numba=False,
+):
     global _DEFAULT_SCHEDULER
 
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
     elif interpret_logic:
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
-    else:
+    elif interpret_notation:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         ntn_interp = NotationInterpreter()
 
@@ -77,6 +90,44 @@ def set_default_scheduler(*, ctx=None, interpret_logic=False):
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
+    elif interpret_assembly:
+        optimizer = DefaultLogicOptimizer(LogicCompiler())
+        notation_compiler = NotationCompiler(Reflector())
+        asm_interp = AssemblyInterpreter()
+
+        def fn_compile(plan):
+            ntn_prgm, tables = optimizer(plan)
+
+            import numpy as np
+
+            def rule_0(root):
+                match root:
+                    case Variable(name, type_) if isinstance(type_, NDArrayFType):
+                        return Variable(name, BufferizedNDArray(np.array([[1, 2], [3, 4]], dtype=np.float64)).ftype)
+                    case Variable(name, type_) if type_ is np.ndarray:
+                        return Variable(name, BufferizedNDArray(np.array([[1, 2], [3, 4]], dtype=np.float64)).ftype)
+                    case Slot(name, type_) if isinstance(type_, NDArrayFType):
+
+                        return Slot(name, BufferizedNDArray(np.array([[1, 2], [3, 4]], dtype=np.float64)).ftype)
+
+
+            ntn_prgm = Rewrite(PostWalk(rule_0))(ntn_prgm)
+
+            print(ntn_prgm)
+
+            asm_prgm = notation_compiler(ntn_prgm)
+            mod = asm_interp(asm_prgm)
+            args = [BufferizedNDArray(tables[Alias(arg.name)].tns.val) for arg in asm_prgm.funcs[0].args]
+            return (mod.func(*args),)
+
+        _DEFAULT_SCHEDULER = fn_compile
+    elif compile_numba:
+        optimizer = DefaultLogicOptimizer(LogicCompiler())
+        notation_compiler = NotationCompiler(Reflector())
+        numba_compiler = NumbaCompiler()
+        raise NotImplementedError("TODO")
+    else:
+        raise Exception("Invalid scheduler setup")
 
 
 set_default_scheduler()

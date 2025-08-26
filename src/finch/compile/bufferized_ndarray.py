@@ -5,6 +5,8 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
+from finch.algebra.algebra import register_property
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor

@@ -118,7 +118,7 @@ def test_logic_compiler():
                 body=Block(
                     bodies=(
                         Assign(
-                            lhs=Variable(name=":i0_size", type_=int),
+                            lhs=Variable(name=":i0_size", type_=int),  # TODO: use Extent instead of int
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
