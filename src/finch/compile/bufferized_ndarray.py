@@ -6,6 +6,7 @@ from typing import Any, NamedTuple
 import numpy as np
 
 from finch.algebra.algebra import register_property
+from finch.codegen.numba_backend import serialize_tuple_to_numba, struct_numba_type
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -85,8 +86,9 @@ class BufferizedNDArray(Tensor):
         for stride in arr.strides:
             if stride % itemsize != 0:
                 raise ValueError("Array must be aligned to multiple of itemsize")
-        self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
-        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
+        self._strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
+        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)  # TODO: np.intp should be better
+        self._ndim = arr.ndim
         self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
 
     def to_numpy(self):
@@ -102,12 +104,26 @@ class BufferizedNDArray(Tensor):
         Returns the ftype of the buffer, which is a BufferizedNDArrayFType.
         """
         return BufferizedNDArrayFType(
-            ftype(self.buf), np.intp(len(self.strides)), ftype(self.strides)
+            ftype(self.buf), # TODO: not really... just make it [array]
+            np.intp(len(self._strides)), ftype(self._shape), ftype(self._strides)
         )
 
     @property
+    def buf_arr(self):
+        import numba
+        return numba.typed.List([self.buf.arr])
+
+    @property
     def shape(self):
-        return self._shape
+        # print("UU")
+        # print(ftype(self._shape))
+        # struct_numba_type
+        return struct_numba_type(ftype(self._shape))(*self._shape)
+
+    @property
+    def strides(self):
+        return struct_numba_type(ftype(self._strides))(*self._strides)
+
 
     def declare(self, init, op, shape):
         """
@@ -144,7 +160,7 @@ class BufferizedNDArray(Tensor):
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
-            index = np.dot(index, self.strides)
+            index = np.dot(index, self._strides)
         return self.buf.load(index)
 
     def __setitem__(self, index, value):
@@ -176,14 +192,16 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     @property
     def struct_fields(self):
         return [
-            ("buf", self.buf),
+            ("buf_arr", self.buf),
             ("_ndim", np.intp),
+            ("shape", self._shape),
             ("strides", self._strides),
         ]
 
-    def __init__(self, buf, ndim: int, strides: TupleFType):
+    def __init__(self, buf, ndim: int, shape: TupleFType, strides: TupleFType):
         self.buf = buf
         self._ndim = ndim
+        self._shape = shape
         self._strides = strides
 
     def __eq__(self, other):
@@ -200,6 +218,10 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     @property
     def ndim(self) -> int:
         return self._ndim
+
+    @property
+    def shape(self) -> TupleFType:
+        return self._shape
 
     @property
     def strides(self) -> TupleFType:
@@ -265,7 +287,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             stride_i_e = asm.GetAttr(stride_e, asm.Literal(f"element_{i}"))
             ctx.exec(asm.Assign(stride_i, stride_i_e))
         buf = asm.Variable(f"{var_n}_buf", self.buf)
-        buf_e = asm.GetAttr(val, asm.Literal("buf"))
+        buf_e = asm.GetAttr(val, asm.Literal("buf_arr"))
         ctx.exec(asm.Assign(buf, buf_e))
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf)
         ctx.exec(asm.Unpack(buf_s, buf))
@@ -278,6 +300,12 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         """
         ctx.exec(asm.Repack(obj.buf_s))
         return
+
+    def construct_from_numba(self, numba_buffer):
+        """
+        Construct a NumpyBuffer from a Numba-compatible object.
+        """
+        return BufferizedNDArray(numba_buffer.buf_arr[0].reshape((numba_buffer.shape.element_0, numba_buffer.shape.element_1)))
 
 
 class BufferizedNDArrayAccessor(Tensor):

@@ -100,6 +100,13 @@ class TupleFType(AssemblyStructFType):
         return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
 
 
+import functools
+
+@functools.lru_cache
+def _get_tuple_type(elem_types: tuple):
+    return TupleFType("tuple", [elem for elem in elem_types])
+
+
 def tupleformat(x):
     if hasattr(type(x), "_fields"):
         return NamedTupleFType(
@@ -109,7 +116,15 @@ def tupleformat(x):
                 for fieldname in type(x)._fields
             ],
         )
-    return TupleFType(type(x).__name__, [type(elem) for elem in x])
+    print(x)
+    import numba
+
+    res =  _get_tuple_type(tuple(getattr(numba, type(elem).__name__) for elem in x))  #TupleFType(type(x).__name__, [type(elem) for elem in x])
+
+    #raise Exception(getattr(numba, type(x[0]).__name__))
+    #raise Exception("res.element_0")
+
+    return res
 
 
 register_property(tuple, "ftype", "__attr__", tupleformat)

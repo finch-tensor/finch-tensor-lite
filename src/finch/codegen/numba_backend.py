@@ -28,14 +28,27 @@ def numba_type(t):
         The corresponding Numba type.
     """
     #print(f"GGGGG: {t}")
+    if isinstance(t, numba.types.Integer):
+        r = getattr(np, t.name)
+        #print(f"IIII: {r}")
+        return r
     if hasattr(t, "numba_type"):
-        return t.numba_type()
+        r = t.numba_type()
+        #print(f"IIII: {r}")
+        return r
     if isinstance(t, AssemblyStructFType):
-        return query_property(t, "numba_type", "__attr__")
+        r = query_property(t, "numba_type", "__attr__")
+        #print(f"IIII: {r}")
+        return r
     try:
-        return query_property(t, "numba_type", "__attr__")
+        r = query_property(t, "numba_type", "__attr__")
+        #print(f"IIII: {r}")
+        return r
     except AttributeError:
-        return t
+        r = t
+        #print(f"IIII: {r}")
+        return r
+
 
 
 class NumbaArgumentFType(ABC):
@@ -210,9 +223,28 @@ class NumbaCompiler:
 
     def __call__(self, prgm: asm.Module):
         numba_code = self.ctx(prgm)
-        logger.info(f"Executing Numba code:\n{numba_code}")
+        print(f"Executing Numba code:\n{numba_code}")
         try:
             exec(numba_code, globals(), None)
+
+            rr = dedent("""\
+            @numba.njit
+            def extent(start, end):
+                return Numba_Extent(start, end)
+            """)
+            exec(rr, globals(), None)
+
+            ww = dedent("""\
+            @numba.njit
+            def dimension(tns, mode):
+                if mode == 0:
+                    end = tns.shape.element_0
+                else:
+                    end = tns.shape.element_1
+                return extent(type(end)(0), end)
+            """)
+            exec(ww, globals(), None)
+
         except Exception as e:
             logger.error(
                 f"Numba compilation failed on the following code:\n"
@@ -316,8 +348,15 @@ class NumbaContext(Context):
     def full_name(val: Any) -> str:
         if hasattr(val, "numba_name"):
             return val.numba_name()
+        print("DDDDD: ", val)
+        # NOTE: Once https://github.com/numba/numba/pull/10195 is backported
+        #       this path can be removed.
+        if isinstance(val, numba.types.ListType):
+            return f"ListType({repr(val.key)})"
         if hasattr(val, "name"):
             return val.name
+        if val.__name__ == "dimension":
+            return "dimension"
         return f"{val.__module__}.{val.__name__}"
 
     def __call__(self, prgm: asm.AssemblyNode):
@@ -326,10 +365,12 @@ class NumbaContext(Context):
             case asm.Literal(value):
                 return str(value)
             case asm.Variable(name, _):
-                return name
-            case asm.Assign(asm.Variable(var_n, var_t), val):
+                return name.lstrip(":")
+            case asm.Assign(asm.Variable(var_n, var_t), val) as xd:
                 val_code = self(val)
-                if val.result_format != var_t:
+                import numba
+                if val.result_format != var_t and val.result_format is not numba.int64:
+                    print(xd)
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
@@ -337,7 +378,7 @@ class NumbaContext(Context):
                 else:
                     self.types[var_n] = var_t
                     self.exec(
-                        f"{feed}{var_n}: {self.full_name(numba_type(var_t))}"
+                        f"{feed}{var_n.lstrip(":")}: {self.full_name(numba_type(var_t))}"
                         f" = {val_code}"
                     )
                 return None
@@ -387,10 +428,10 @@ class NumbaContext(Context):
                         f"Variable '{var_n}' is already defined in the current"
                         f" context, cannot overwrite with slot."
                     )
-                self.exec(f"{feed}{var_n} = {self(val)}")
+                self.exec(f"{feed}{var_n.lstrip(":")} = {self(val)}")
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.numba_unpack(
-                    self, var_n, asm.Variable(var_n, var_t)
+                    self, var_n.lstrip(":"), asm.Variable(var_n.lstrip(":"), var_t)
                 )
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
@@ -399,7 +440,7 @@ class NumbaContext(Context):
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
-                var_t.numba_repack(self, var_n, obj)
+                var_t.numba_repack(self, var_n.lstrip(":"), obj)
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
@@ -465,7 +506,7 @@ class NumbaContext(Context):
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            arg_decls.append(f"{name}: {self.full_name(numba_type(t))}")
+                            arg_decls.append(f"{name.lstrip(":")}: {self.full_name(numba_type(t))}")
                             ctx_2.types[name] = t
                         case _:
                             raise NotImplementedError(
@@ -570,12 +611,14 @@ def struct_numba_type(fmt: AssemblyStructFType):
             if issubclass(x, np.generic):
                 return numba.from_dtype(x)
             if hasattr(x, "class_type") and isinstance(x.class_type, numba.types.ClassType):
-                return x.class_type
+                return x.class_type.instance_type
         except TypeError:
             pass
         return x
         # print(x)
         # return numba.extending.as_numba_type(x)
+
+    print(f"fmt: {fmt}")
 
     if fmt in numba_structs:
         return numba_structs[fmt]
@@ -587,6 +630,9 @@ def struct_numba_type(fmt: AssemblyStructFType):
         (name, _strict_numba_type(numba_type(field_type)))
         for (name, field_type) in fmt.struct_fields
     ]
+
+
+
     class_name = numba_structnames.freshen("Numba", fmt.struct_name)
     # Dynamically define __init__ based on spec, unrolling the arguments
     field_names = [name for name, _ in spec]
@@ -607,6 +653,7 @@ def struct_numba_type(fmt: AssemblyStructFType):
     )
     ns: dict[str, object] = {}
     exec(class_src, ns)
+    print("AAAAAAAA")
     print(class_src)
     print(spec)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)

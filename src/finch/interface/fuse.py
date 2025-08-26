@@ -51,7 +51,6 @@ Performance:
 """
 
 from finch.algebra.tensor import NDArrayFType
-from finch.compile.bufferized_ndarray import BufferizedNDArrayFType
 from finch.symbolic.rewriters import PostWalk, Rewrite
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
 from ..compile import NotationCompiler, BufferizedNDArray
@@ -104,7 +103,7 @@ def set_default_scheduler(
 
             import numpy as np
 
-            def rule_0(root):
+            def rule_0(root):  # TODO: remove
                 match root:
                     case Variable(name, type_) if isinstance(type_, NDArrayFType):
                         return Variable(name, BufferizedNDArray(np.array([[1, 2], [3, 4]], dtype=np.float64)).ftype)
@@ -125,7 +124,11 @@ def set_default_scheduler(
             print("XDDDD")
             print(asm_prgm)
 
-            mod = asm_interp(asm_prgm)
+            numba_compiler = NumbaCompiler()
+
+            mod = numba_compiler(asm_prgm)
+
+            #mod = asm_interp(asm_prgm)
             args = [BufferizedNDArray(tables[Alias(arg.name)].tns.val) for arg in asm_prgm.funcs[0].args]
             return (mod.func(*args),)
 
