@@ -121,6 +121,10 @@ def set_default_scheduler(
             print(ntn_prgm)
 
             asm_prgm = notation_compiler(ntn_prgm)
+
+            print("XDDDD")
+            print(asm_prgm)
+
             mod = asm_interp(asm_prgm)
             args = [BufferizedNDArray(tables[Alias(arg.name)].tns.val) for arg in asm_prgm.funcs[0].args]
             return (mod.func(*args),)

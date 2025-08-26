@@ -136,7 +136,7 @@ class PointwiseLowerer:
                         tuple(
                             self(idx, slot_vars, field_relabels)
                             if idx in self.loop_idxs
-                            else ntn.Value(asm.Literal(0), int)
+                            else ntn.Value(asm.Literal(0), np.intp)
                             for idx in idxs_1
                         ),
                     )
@@ -146,7 +146,7 @@ class PointwiseLowerer:
             case Reorder(arg, _):
                 return self(arg, slot_vars, field_relabels)
             case Field(_) as f:
-                return ntn.Variable(field_relabels.get(f, f).name, int)
+                return ntn.Variable(field_relabels.get(f, f).name, np.intp)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -257,7 +257,7 @@ class LogicLowerer:
                                 agg_slot,
                                 ntn.Update(ntn.Literal(op)),
                                 tuple(
-                                    ntn.Variable(field_relabels.get(idx, idx).name, int)
+                                    ntn.Variable(field_relabels.get(idx, idx).name, np.intp)
                                     for idx in lhs_idxs
                                 ),
                             ),
@@ -268,10 +268,10 @@ class LogicLowerer:
                 for idx in idxs_2:
                     if idx in rhs_idxs:
                         body = ntn.Loop(
-                            ntn.Variable(field_relabels.get(idx, idx).name, int),
+                            ntn.Variable(field_relabels.get(idx, idx).name, np.intp),
                             # TODO (mtsokol): Use correct loop index type
                             ntn.Variable(
-                                f"{field_relabels.get(idx, idx).name}_size", ExtentFType(np.int64, np.int64)
+                                f"{field_relabels.get(idx, idx).name}_size", ExtentFType(np.intp, np.intp)
                             ),
                             body,
                         )
@@ -383,7 +383,7 @@ def record_tables(
                     Literal(
                         np.zeros(
                             dtype=suitable_rep.element_type,
-                            shape=tuple(1 for _ in range(suitable_rep.ndim)),
+                            shape=tuple(2 for _ in range(suitable_rep.ndim)),  # TODO: make it shape!
                         )
                     ),
                     rhs.fields,
@@ -416,7 +416,7 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                         *[rep.element_type for rep in args_suitable_reps],
                     )
                 ),
-                ndim=max(rep.ndim for rep in args_suitable_reps),
+                ndim=max(rep.ndim for rep in args_suitable_reps),  # TODO: make it shape!
             )
         case Aggregate(Literal(op), init, arg, idxs):
             init_suitable_rep = find_suitable_rep(init, table_vars)
