@@ -563,6 +563,25 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree):
+    """
+    Print a message along with an expression.
+
+    Attributes:
+        message: The message to be output.
+        args: The expression to be printed.
+    """
+
+    message: Variable
+    args: Variable
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return []
+
+
 class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -697,6 +716,9 @@ class AssemblyPrinterContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
+                return None
+            case Print(message, args):
+                self.exec(f"{feed}print {message} {self(args)}")
                 return None
             case _:
                 raise NotImplementedError
