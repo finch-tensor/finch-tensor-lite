@@ -362,7 +362,7 @@ register_property(
     "is_identity",
     lambda op, val: (isinstance(val, bool | np.bool_) and not bool(val))
     or (
-        isinstance(val | int) and not isinstance(val, bool | np.bool_) and int(val) == 0
+        isinstance(val, int) and not isinstance(val, bool | np.bool_) and int(val) == 0
     ),
 )
 register_property(
