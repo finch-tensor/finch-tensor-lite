@@ -329,8 +329,11 @@ class AssemblyInterpreter:
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterModule(self, kernels)
-            case asm.Print(message, args):
-                # TODO: Output terminal (stdout is not good)
+            case asm.Print(args):
+                arg_decls = [f"{self(arg)}" for arg in args]
+                print(arg_decls)
+                return None
+            case asm.Debug(message, args):
                 # TODO: Handle expressions, e.g. mul(p_var + x_var)
                 print(f"{message}" + str(self(args)))
                 return None

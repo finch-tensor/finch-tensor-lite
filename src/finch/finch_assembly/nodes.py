@@ -573,8 +573,26 @@ class Print(AssemblyTree):
         args: The expression to be printed.
     """
 
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return []
+
+
+@dataclass(eq=True, frozen=True)
+class Debug(AssemblyTree):
+    """
+    Print a message along with an expression.
+
+    Attributes:
+        message: The message to be output.
+        args: The expression to be printed.
+    """
+
     message: Variable
-    args: Variable
+    args: tuple[Variable, ...]
 
     @property
     def children(self):
@@ -717,8 +735,11 @@ class AssemblyPrinterContext(Context):
                         )
                     self(func)
                 return None
-            case Print(message, args):
-                self.exec(f"{feed}print {message} {self(args)}")
+            case Print(args):
+                self.exec(f"{feed}print {self(args)}")
+                return None
+            case Debug(message, args):
+                self.exec(f"{feed}debug {message} {self(args)}")
                 return None
             case _:
                 raise NotImplementedError

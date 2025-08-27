@@ -14,6 +14,7 @@ from finch.finch_assembly import (  # noqa: F401
     Assign,
     Block,
     Call,
+    Debug,
     Function,
     If,
     IfElse,
@@ -244,8 +245,9 @@ def test_debug_statement():
                     (p_var, x_var),
                     asm.Block(
                         (
-                            asm.Print("p_var: ", p_var),
-                            asm.Print("x_var: ", x_var),
+                            asm.Print((p_var, x_var)),
+                            asm.Debug("p_var: ", p_var),
+                            asm.Debug("x_var: ", x_var),
                             asm.Assign(
                                 res_var,
                                 asm.Call(
@@ -274,7 +276,8 @@ def test_debug_statement():
                                     ),
                                 ),
                             ),
-                            asm.Print("res_var: ", res_var),
+                            asm.Debug("res_var: ", res_var),
+                            asm.Print((p_var, x_var, res_var)),
                             asm.Return(res_var),
                         )
                     ),
