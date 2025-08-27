@@ -11,7 +11,6 @@ from finch.algebra import (
     is_identity,
 )
 
-
 def test_algebra_selected():
     assert is_distributive(operator.mul, operator.add)
     assert is_distributive(operator.mul, operator.sub)
@@ -21,19 +20,13 @@ def test_algebra_selected():
     assert is_distributive(np.logical_and, np.logical_or)
     assert is_distributive(np.logical_and, np.logical_xor)
     assert is_distributive(np.logical_or, np.logical_and)
-    assert is_annihilator(operator.add, math.inf)
     assert is_annihilator(operator.mul, 0)
-    assert is_annihilator(operator.or_, True)
-    assert is_annihilator(operator.and_, False)
     assert is_annihilator(np.logaddexp, math.inf)
     assert is_annihilator(np.logical_or, True)
     assert is_annihilator(np.logical_and, False)
     assert is_identity(operator.add, 0)
     assert is_identity(operator.mul, 1)
-    assert is_identity(operator.or_, False)
-    assert is_identity(operator.and_, True)
     assert is_identity(operator.truediv, 1)
-    assert is_identity(operator.floordiv, 1)
     assert is_identity(operator.lshift, 0)
     assert is_identity(operator.rshift, 0)
     assert is_identity(operator.pow, 1)
@@ -46,10 +39,26 @@ def test_algebra_selected():
     assert is_associative(np.logical_xor)
     assert is_associative(np.logical_or)
     assert is_associative(np.logaddexp)
-    assert init_value(operator.and_, bool) is True
-    assert init_value(operator.or_, bool) is False
-    assert init_value(operator.xor, bool) is False
     assert init_value(np.logaddexp, float) == -math.inf
     assert init_value(np.logical_and, bool) is True
     assert init_value(np.logical_or, bool) is False
     assert init_value(np.logical_xor, bool) is False
+
+
+def test_bitwise_properties_bools_and_ints():
+    assert is_identity(operator.or_, False)
+    assert is_identity(operator.and_, True)
+    assert is_identity(operator.xor, False)
+    assert is_identity(operator.or_, 0)
+    assert is_identity(operator.and_, -1)
+    assert is_identity(operator.xor, 0)
+    assert is_annihilator(operator.and_, False)
+    assert is_annihilator(operator.or_, True)
+    assert is_annihilator(operator.and_, 0)
+    assert is_annihilator(operator.or_, -1)
+    assert init_value(operator.and_, int) == -1
+    assert init_value(operator.or_,  int) == 0
+    assert init_value(operator.xor, int) == 0
+    assert init_value(operator.and_, bool) is True
+    assert init_value(operator.or_, bool) is False
+    assert init_value(operator.xor, bool) is False

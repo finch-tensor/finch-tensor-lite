@@ -359,23 +359,19 @@ register_property(operator.mul, "__call__", "is_identity", lambda op, val: val =
 register_property(
     operator.or_, "__call__", "is_identity",
     lambda op, val: (isinstance(val, (bool, np.bool_)) and not bool(val))
-                    or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)
+                    or (isinstance(val, int) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)
 )
 register_property(
     operator.and_, "__call__", "is_identity",
     lambda op, val: (isinstance(val, (bool, np.bool_)) and bool(val))
-                    or (isinstance(val, np.integer) and val.item() == np.array(-1, dtype=type(val)).item())
-                    or (isinstance(val, int) and not isinstance(val, bool) and val == -1)
+                    or (isinstance(val, int) and not isinstance(val, bool) and int(val) == -1)
 )
 register_property(
     operator.xor, "__call__", "is_identity",
     lambda op, val: (isinstance(val, (bool, np.bool_)) and not bool(val))
-                    or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)
+                    or (isinstance(val, int) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)
 )
 register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(
-    operator.floordiv, "__call__", "is_identity", lambda op, val: val == 1
-)
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
@@ -383,7 +379,7 @@ register_property(
     np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
 )
 register_property(np.logical_and, "__call__", "is_identity",
-                  lambda op, val:bool(val))
+                  lambda op, val: bool(val))
 
 register_property(np.logical_or, "__call__", "is_identity",
                   lambda op, val: not bool(val))
@@ -464,26 +460,17 @@ def is_annihilator(op, val):
     return query_property(op, "__call__", "is_annihilator", val)
 
 
-for op, func in [
-    (operator.mul, lambda op, val: (isinstance(val, (bool, np.bool_)) and not v)
-                             or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)),
+for fn, func in [
+    (operator.mul, lambda op, val: val == 0),
     (operator.or_, lambda op, val: (isinstance(val, (bool, np.bool_)) and bool(val))
-                     or (isinstance(val, (int, np.integer) and not isinstance(val, bool) and val == -1))),
+                     or (isinstance(val, int) and not isinstance(val, (bool, np.bool_)) and int(val) == -1)),
     (operator.and_, lambda op, val:(isinstance(val, (bool, np.bool_)) and not bool(val))
-                     or (isinstance(val, (int, np.integer)) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)),
+                     or (isinstance(val, int) and not isinstance(val, (bool, np.bool_)) and int(val) == 0)),
+    (np.logaddexp, lambda op, val: val == math.inf),
+    (np.logical_and, lambda op, val: not bool(val)),
+    (np.logical_or, lambda op, val: bool(val)),
 ]:
-    register_property(op, "__call__", "is_annihilator", func)
-
-register_property(
-    np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf
-)
-register_property(
-    np.logical_and, "__call__", "is_annihilator", lambda op, val: not bool(val),
-)
-register_property(
-    np.logical_or, "__call__", "is_annihilator", lambda op, val: bool(val),
-)
-
+    register_property(fn, "__call__", "is_annihilator", func)
 
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
     """
@@ -584,12 +571,6 @@ for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_
         lambda op, arg, meth=meth: query_property(arg, meth, "init_value"),
     )
 
-register_property(np.logaddexp, "__call__", "init_value", lambda op, arg: -math.inf)
-register_property(np.logical_and, "__call__", "init_value", lambda op, arg: True)
-register_property(np.logical_or, "__call__", "init_value", lambda op, arg: False)
-register_property(np.logical_xor, "__call__", "init_value", lambda op, arg: False)
-
-
 def sum_init_value(t):
     if t is bool:
         return 0
@@ -605,10 +586,14 @@ def sum_init_value(t):
 for t in StableNumber.__args__:
     register_property(t, "__add__", "init_value", sum_init_value)
     register_property(t, "__mul__", "init_value", lambda a: a(True))
-    register_property(t, "__and__", "init_value", lambda a: a(True))
-    register_property(t, "__xor__", "init_value", lambda a: a(False))
-    register_property(t, "__or__", "init_value", lambda a: a(False))
+    register_property(t, "__and__", "init_value", lambda a: a(-1))
+    register_property(t, "__xor__", "init_value", lambda a: a(0))
+    register_property(t, "__or__", "init_value", lambda a: a(0))
 
+register_property(np.logaddexp, "__call__", "init_value", lambda op, arg: -math.inf)
+register_property(np.logical_and, "__call__", "init_value", lambda op, arg: True)
+register_property(np.logical_or, "__call__", "init_value", lambda op, arg: False)
+register_property(np.logical_xor, "__call__", "init_value", lambda op, arg: False)
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
