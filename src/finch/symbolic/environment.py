@@ -15,7 +15,7 @@ class Namespace:
         self.counts = defaultdict(int)
         self.resolutions = {}
 
-    def freshen(self, *tags):
+    def freshen(self, *tags) -> str:
         name = "_".join(str(tag) for tag in tags)
         m = re.match(r"^(.*)_(\d*)$", name)
         if m is None:

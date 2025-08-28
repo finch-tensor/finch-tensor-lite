@@ -153,13 +153,13 @@ class LookupPass(LoopletPass):
 
         def lookup_node(node):
             match node:
-                case ntn.Access(tns, mode, idxs):
-                    if idx in idxs and isinstance(tns, Lookup):
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx and isinstance(tns, Lookup):
                         tns_2 = tns.body(
                             ctx,
                             idx_2,
                         )
-                        return ntn.Access(tns_2, mode, idxs)
+                        return ntn.Access(tns_2, mode, (j, *idxs))
             return None
 
         body_2 = PostWalk(lookup_node)(body)
@@ -211,13 +211,9 @@ class LeafPass(LoopletPass):
     def __call__(self, ctx, idx, ext, body):
         def leaf_node(node):
             match node:
-                case ntn.Access(tns, mode, idxs):
-                    if idx in idxs and isinstance(tns, Leaf):
-                        return ntn.Access(
-                            tns.body(ctx),
-                            mode,
-                            [i for i in idxs if i != idx],
-                        )
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx and isinstance(tns, Leaf):
+                        return ntn.Access(tns.body(ctx), mode, idxs)
             return None
 
         body_2 = PostWalk(leaf_node)(body)

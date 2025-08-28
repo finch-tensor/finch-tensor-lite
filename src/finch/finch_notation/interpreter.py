@@ -146,15 +146,15 @@ class TensorView(Tensor):
         return
 
 
-def access_indices(tns, idxs, op=None):
+def access(tns, idxs, op=None):
     """
     Unfurl a tensor along indices.
     This is used to create a tensor view for a specific slice of the tensor.
     """
-    if hasattr(tns, "access_indices"):
-        return tns.access_indices(idxs, op)
+    if hasattr(tns, "access"):
+        return tns.access(idxs, op)
     try:
-        return query_property(tns, "access_indices", "__attr__", idxs, op)
+        return query_property(tns, "access", "__attr__", idxs, op)
     except AttributeError:
         return TensorView(idxs=idxs, tns=tns, op=op)
 
@@ -407,10 +407,10 @@ class NotationInterpreter:
                 idxs_e = [self(idx) for idx in idxs]
                 match mode:
                     case ntn.Read():
-                        return access_indices(tns_e, idxs_e)
+                        return access(tns_e, idxs_e)
                     case ntn.Update(op):
                         op_e = self(op)
-                        return access_indices(tns_e, idxs_e, op=op_e)
+                        return access(tns_e, idxs_e, op=op_e)
                     case _:
                         raise NotImplementedError(f"Unrecognized access mode: {mode}")
             case ntn.Increment(tns, val):

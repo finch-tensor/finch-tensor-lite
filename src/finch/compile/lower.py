@@ -47,7 +47,7 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(self, ctx, tns, ext, mode, idxs): ...
+    def unfurl(self, ctx, tns, ext, mode, proto): ...
 
 
 @dataclass(eq=True, frozen=True)
@@ -156,10 +156,10 @@ class ExtentFType(AssemblyStructFType):
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
             match node:
-                case ntn.Access(_, _, idxs):
-                    if idx in idxs:
+                case ntn.Access(_, _, (j, *_)):
+                    if j == idx:
                         raise FinchCompileError(
-                            node, f"Access with {idx} should have been lowered already"
+                            node, f"Access with {j} should have been lowered already"
                         )
             return
 
@@ -210,10 +210,10 @@ class SingletonExtentFType:
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
             match node:
-                case ntn.Access(_, _, idxs):
-                    if idx in idxs:
+                case ntn.Access(_, _, (j, *_)):
+                    if j == idx:
                         raise FinchCompileError(
-                            node, f"Access with {idx} should have been lowered already"
+                            node, f"Access with {j} should have been lowered already"
                         )
             return
 
@@ -494,13 +494,11 @@ def lower_looplets(ctx, idx, ext, body):
 
     def unfurl_node(node):
         match node:
-            case ntn.Access(tns, mode, idxs):
-                if idx in idxs:
+            case ntn.Access(tns, mode, (j, *idxs)):
+                if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(
-                        ctx_2, tns, ext, mode, tuple(ctx_2(i) for i in idxs)
-                    )
-                    return ntn.Access(tns_2, mode, idxs)
+                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
+                    return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
@@ -557,8 +555,8 @@ class LoopletContext(Context):
     def select_pass(self, body):
         def pass_request(node):
             match node:
-                case ntn.Access(tns, _, idxs):
-                    if self.idx in idxs:
+                case ntn.Access(tns, _, (j, *_)):
+                    if j == self.idx:
                         return tns.pass_request
             return DefaultPass()
 
