@@ -7,7 +7,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor
 from ..codegen import NumpyBuffer
-from ..finch_assembly import AssemblyStructFType
+from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import ftype
 from . import looplets as lplt
 from .lower import FinchTensorFType
@@ -19,34 +19,25 @@ class BufferizedNDArray(Tensor):
         for stride in arr.strides:
             if stride % itemsize != 0:
                 raise ValueError("Array must be aligned to multiple of itemsize")
-        self.strides = tuple(stride // itemsize for stride in arr.strides)
-        self._shape = arr.shape
-        self.buf = NumpyBuffer(
-            np.lib.stride_tricks.as_strided(
-                arr,
-                shape=(np.dot(arr.strides, arr.shape) // itemsize,),
-                strides=(itemsize,),
-            )
-        )
+        self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
+        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
+        self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
 
     def to_numpy(self):
         """
         Convert the bufferized NDArray to a NumPy array.
         This is used to get the underlying NumPy array from the bufferized NDArray.
         """
-        itemsize = self.buf.arr.dtype.itemsize
-        return np.lib.stride_tricks.as_strided(
-            self.buf.arr,
-            shape=self._shape,
-            strides=(stride * itemsize for stride in self.strides),
-        )
+        return self.buf.arr.reshape(self._shape, copy=False)
 
     @property
     def ftype(self):
         """
         Returns the ftype of the buffer, which is a BufferizedNDArrayFType.
         """
-        return BufferizedNDArrayFType(ftype(self.buf), len(self.strides))
+        return BufferizedNDArrayFType(
+            ftype(self.buf), np.intp(len(self.strides)), ftype(self.strides)
+        )
 
     @property
     def shape(self):
@@ -121,11 +112,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return [
             ("buf", self.buf),
             ("_ndim", self._ndim),
+            ("strides", self._strides),
         ]
 
-    def __init__(self, buf, ndim: int):
+    def __init__(self, buf, ndim: int, strides: TupleFType):
         self.buf = buf
         self._ndim = ndim
+        self._strides = strides
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
@@ -134,6 +127,9 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def __hash__(self):
         return hash((self.buf, self._ndim))
+
+    def __str__(self):
+        return f"{self.struct_name}(ndim={self.ndim})"
 
     @property
     def ndim(self) -> int:
@@ -153,13 +149,14 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         i_var = asm.Variable("i", self.buf.length_type)
-        buf = asm.Stack(tns.obj.buf, self.buf)
         body = asm.Store(
-            buf,
+            tns.obj.buf_s,
             i_var,
             asm.Literal(init.val),
         )
-        ctx.exec(asm.ForLoop(i_var, asm.Literal(0), asm.Length(buf), body))
+        ctx.exec(
+            asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns.obj.buf_s), body)
+        )
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -191,13 +188,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         for i in range(self._ndim):
             stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf.length_type)
             stride.append(stride_i)
-            stride_e = asm.GetAttr(val, "stride")
-            stride_i_e = asm.GetAttr(stride_e, f"element_{i}")
+            stride_e = asm.GetAttr(val, asm.Literal("strides"))
+            stride_i_e = asm.GetAttr(stride_e, asm.Literal(f"element_{i}"))
             ctx.exec(asm.Assign(stride_i, stride_i_e))
         buf = asm.Variable(f"{var_n}_buf", self.buf)
-        buf_e = asm.GetAttr(val, "buf")
+        buf_e = asm.GetAttr(val, asm.Literal("buf"))
         ctx.exec(asm.Assign(buf, buf_e))
-        buf_s = asm.Slot(f"{var_n}_buf", self.buf)
+        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf)
         ctx.exec(asm.Unpack(buf_s, buf))
 
         return BufferizedNDArrayFields(tuple(stride), buf, buf_s)
@@ -206,7 +203,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         """
         Repack the buffer from C context.
         """
-        ctx.exec(asm.Repack(obj.buf))
+        ctx.exec(asm.Repack(obj.buf_s))
         return
 
 
@@ -319,18 +316,18 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
-    def asm_unpack(self, ctx, var_n, val):
-        """
-        Unpack the into asm context.
-        """
-        tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
-        nind = asm.Variable(f"{var_n}_nind", self.nind)
-        pos = asm.Variable(f"{var_n}_pos", self.pos)
-        op = asm.Variable(f"{var_n}_op", self.op)
-        ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
-        ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
-        ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
-        return BufferizedNDArrayFields(tns, pos, nind, op)
+    # def asm_unpack(self, ctx, var_n, val):
+    #     """
+    #     Unpack the into asm context.
+    #     """
+    #     tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
+    #     nind = asm.Variable(f"{var_n}_nind", self.nind)
+    #     pos = asm.Variable(f"{var_n}_pos", self.pos)
+    #     op = asm.Variable(f"{var_n}_op", self.op)
+    #     ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
+    #     ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
+    #     ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
+    #     return BufferizedNDArrayFields(tns, pos, nind, op)
 
     def asm_repack(self, ctx, lhs, obj):
         """
@@ -347,14 +344,18 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         )
 
     def lower_unwrap(self, ctx, obj):
-        return asm.Load(obj.tns.buf, obj.pos)
+        return asm.Load(obj.tns.buf_s, obj.pos)
 
     def lower_increment(self, ctx, obj, val):
+        lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
         ctx.exec(
             asm.Store(
-                obj.tns.buf,
-                obj.pos,
-                asm.Call(asm.Literal(self.op), [asm.Load(obj.tns.buf, obj.pos), val]),
+                obj.tns.buf_s,
+                lowered_pos,
+                asm.Call(
+                    asm.Literal(self.op.val),
+                    [asm.Load(obj.tns.buf_s, lowered_pos), val],
+                ),
             )
         )
 
@@ -369,12 +370,12 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                     asm.Call(
                         asm.Literal(operator.add),
                         [
-                            self.pos,
+                            tns.obj.pos,
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [
                                     tns.obj.tns.stride[self.nind],
-                                    ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"),
+                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ],
                             ),
                         ],
@@ -383,9 +384,14 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             )
             return ntn.Stack(
                 BufferizedNDArrayAccessorFields(
-                    tns=tns.obj.tns, nind=self.nind - 1, pos=pos_2, op=self.op
+                    tns=tns.obj.tns,
+                    nind=self.nind - 1,
+                    pos=pos_2,
+                    op=self.op,
                 ),
-                BufferizedNDArrayAccessorFType(self.tns, self.nind + 1, pos_2, self.op),
+                BufferizedNDArrayAccessorFType(
+                    self.tns, self.nind + 1, self.pos, self.op
+                ),
             )
 
         return lplt.Lookup(

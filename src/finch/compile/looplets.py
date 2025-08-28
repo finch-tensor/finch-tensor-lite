@@ -168,7 +168,7 @@ class LookupPass(LoopletPass):
         ctx_2(ext_2, body_2)
         start = ext.result_format.get_start(ext)
         stop = ext.result_format.get_end(ext)
-        body_3 = ctx_2.emit()
+        body_3 = asm.Block(ctx_2.emit())
         ctx.exec(asm.ForLoop(idx_2, start, stop, body_3))
 
 

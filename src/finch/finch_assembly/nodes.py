@@ -39,8 +39,8 @@ class AssemblyNode(Term):
     def __str__(self):
         """Returns a string representation of the node."""
         ctx = AssemblyPrinterContext()
-        ctx(self)
-        return ctx.emit()
+        res = ctx(self)
+        return res if res is not None else ctx.emit()
 
 
 class AssemblyTree(AssemblyNode, TermTree):
@@ -614,7 +614,7 @@ class AssemblyPrinterContext(Context):
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
-                self.exec(f"{feed}store({self(buf)}, {self(idx)})")
+                self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")
@@ -698,5 +698,8 @@ class AssemblyPrinterContext(Context):
                         )
                     self(func)
                 return None
-            case _:
-                raise NotImplementedError
+            case Stack(obj, type_):
+                self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
+                return None
+            case node:
+                raise NotImplementedError(node)
