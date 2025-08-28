@@ -36,6 +36,7 @@ from .optimize import (
     propagate_map_queries_backward,
     propagate_transpose_queries,
     push_fields,
+    set_loop_order,
 )
 
 __all__ = [
@@ -77,4 +78,5 @@ __all__ = [
     "propagate_map_queries_backward",
     "propagate_transpose_queries",
     "push_fields",
+    "set_loop_order",
 ]
