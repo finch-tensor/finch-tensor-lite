@@ -295,7 +295,7 @@ class Reformat(LogicTree, LogicExpression):
     """
 
     tns: LogicNode
-    arg: LogicExpression
+    arg: LogicNode
 
     @property
     def children(self):
