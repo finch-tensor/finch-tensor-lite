@@ -2,6 +2,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import reduce
+from itertools import chain as join_chains
 from typing import TypeVar, overload
 
 from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
@@ -64,7 +65,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
     prgm = push_fields(prgm)
 
     prgm = propagate_transpose_queries(prgm)
-    # prgm = set_loop_order(prgm)
+    prgm = set_loop_order(prgm)
     prgm = push_fields(prgm)
 
     prgm = concordize(prgm)
@@ -567,6 +568,90 @@ def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
 
 def propagate_transpose_queries(root):
     return _propagate_transpose_queries(root, bindings={})
+
+
+def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
+    chains = [c for c in chains if len(c) > 0]
+    parents = {chain[0]: 0 for chain in chains}
+    for chain in chains:
+        for f in chain[1:]:
+            parents[f] = parents.get(f, 0) + 1
+    roots = [f for f in parents if parents[f] == 0]
+    perm = []
+    while len(parents) > 0:
+        if len(roots) == 0:
+            raise Exception("Cycle detected in fields' orders")
+        perm.append(roots.pop())
+        for chain in chains:
+            if len(chain) > 0 and chain[0] == perm[-1]:
+                chain.pop(0)
+                if len(chain) > 0:
+                    parents[chain[0]] -= 1
+                    if parents[chain[0]] == 0:
+                        roots.append(chain[0])
+        parents.pop(perm[-1])
+    return tuple(perm)
+
+
+def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
+    chains = []
+    for node in PostOrderDFS(root):
+        match node:
+            case Reorder(Relabel(_, idxs_1), idxs_2):
+                chains.append(list(intersect(intersect(idxs_1, idxs_2), root.fields)))
+    chains.extend([f] for f in root.fields)
+    result = toposort(chains)
+    if reduce(max, [len(c) for c in chains], 0) < len(set(join_chains(*chains))):
+        counts: dict[Field, int] = {}
+        for chain in chains:
+            for f in chain:
+                counts[f] = counts.get(f, 0) + 1
+        result = tuple(sorted(result, key=lambda x: counts[x] == 1))
+    return result
+
+
+def _set_loop_order(node: LogicNode, perms: dict[LogicNode, LogicNode]) -> LogicNode:
+    match node:
+        case Plan(bodies):
+            return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
+        case Query(lhs, Reformat(tns, Alias(_) as rhs)):
+            rhs_2 = perms[rhs]
+            perms[lhs] = lhs
+            return Query(lhs, Reformat(tns, rhs_2))
+        case Query(lhs, Reformat(tns, rhs)):
+            arg = Alias(gensym("A"))
+            return _set_loop_order(
+                Plan((Query(arg, rhs), Query(lhs, Reformat(tns, arg)))), perms
+            )
+        case Query(lhs, Table(tns, idxs)) as q:
+            perms[lhs] = lhs
+            return q
+        case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+            arg = push_fields(Rewrite(PostWalk(lambda tns: perms.get(tns, tns))))(arg)
+            assert isinstance(arg, LogicExpression)
+            idxs_2 = _heuristic_loop_order(arg)
+            rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
+            perms[lhs] = Reorder(Relabel(lhs, tuple(rhs_2.fields)), tuple(rhs.fields))
+            return Query(lhs, rhs_2)
+        case Query(lhs, Reorder(Relabel(Alias(_) as tns, _), _)) as q:
+            tns = perms.get(tns, tns)
+            perms[lhs] = lhs
+            return q
+        case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
+            rhs = push_fields(Rewrite(PostWalk(lambda tns: perms.get(tns, tns)))(rhs))
+            assert isinstance(rhs, LogicExpression)
+            idxs = _heuristic_loop_order(rhs)
+            perms[lhs] = Reorder(Relabel(lhs, idxs), tuple(rhs.fields))
+            rhs_2 = Reorder(rhs, idxs)
+            return Query(lhs, rhs_2)
+        case Produces(_) as prod:
+            return Rewrite(PostWalk(lambda tns: perms.get(tns, tns)))(prod)
+        case _:
+            raise Exception(f"Invalid node: {node} in set_loop_order")
+
+
+def set_loop_order(node: LogicNode) -> LogicNode:
+    return _set_loop_order(node, {})
 
 
 def concordize(root):

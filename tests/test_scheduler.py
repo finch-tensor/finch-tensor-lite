@@ -23,6 +23,7 @@ from finch.autoschedule import (
     propagate_map_queries_backward,
     propagate_transpose_queries,
     push_fields,
+    set_loop_order,
 )
 from finch.finch_logic import (
     Aggregate,
@@ -733,6 +734,64 @@ def test_materialize_squeeze_expand_productions():
     assert result == expected
 
 
+def test_set_loop_order():
+    plan = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(add),
+            Literal(0),
+            Reorder(
+                MapJoin(
+                    Literal(mul),
+                    (
+                        Reorder(
+                            Relabel(Alias("A"), (Field("i0"), Field("i1"))),
+                            (Field("i0"), Field("i1")),
+                        ),
+                        Reorder(
+                            Relabel(Alias("B"), (Field("i1"), Field("i2"))),
+                            (Field("i1"), Field("i2")),
+                        ),
+                    ),
+                ),
+                (Field("i0"), Field("i2"), Field("i1")),
+            ),
+            (Field("i1"),),
+        ),
+    )
+
+    expected = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(add),
+            Literal(0),
+            Reorder(
+                Reorder(
+                    MapJoin(
+                        Literal(mul),
+                        (
+                            Reorder(
+                                Relabel(Alias("A"), (Field("i0"), Field("i1"))),
+                                (Field("i0"), Field("i1")),
+                            ),
+                            Reorder(
+                                Relabel(Alias("B"), (Field("i1"), Field("i2"))),
+                                (Field("i1"), Field("i2")),
+                            ),
+                        ),
+                    ),
+                    (Field("i0"), Field("i2"), Field("i1")),
+                ),
+                (Field("i0"), Field("i1"), Field("i2")),
+            ),
+            (Field("i1"),),
+        ),
+    )
+
+    result = set_loop_order(plan)
+    assert result == expected
+
+
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -832,7 +891,7 @@ def test_scheduler_e2e_sddmm():
                     (Field(":i1"),),
                 ),
             ),
-            Plan((Produces((Relabel(Alias(":A3"), (Field(":i0"), Field(":i2"))),)),)),
+            Plan((Produces((Alias(":A3"),)),)),
         )
     )
 

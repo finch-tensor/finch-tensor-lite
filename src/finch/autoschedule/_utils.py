@@ -1,4 +1,7 @@
-def intersect(x1: tuple, x2: tuple) -> tuple:
+from collections.abc import Iterable
+
+
+def intersect(x1: Iterable, x2: Iterable) -> tuple:
     return tuple(x for x in x1 if x in x2)
 
 
