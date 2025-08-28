@@ -1,7 +1,7 @@
 def func(:A0: NDArrayFType(dtype=dtype('int64'), ndim=2), :A1: NDArrayFType(dtype=dtype('int64'), ndim=2), :A2: NDArrayFType(dtype=dtype('int64'), ndim=2)) -> ndarray:
-    :i0_size: int = dimension(:A0, 0)
-    :i1_size: int = dimension(:A0, 1)
-    :i2_size: int = dimension(:A1, 1)
+    :i0_size: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(:A0, 0)
+    :i1_size: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(:A0, 1)
+    :i2_size: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(:A1, 1)
     :A0_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A0)
     :A1_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A1)
     :A2_slot: NDArrayFType(dtype=dtype('int64'), ndim=2) = unpack(:A2)

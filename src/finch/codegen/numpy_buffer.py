@@ -185,7 +185,8 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         return NumpyBuffer(self.arr)
 
     def numba_type(self):
-        return list[np.ndarray]
+        import numba
+        return numba.types.ListType(numba.types.Array(getattr(numba, self._dtype.__name__), 1, 'C'))
 
     def numba_length(self, ctx, buf):
         arr = buf.obj.arr
