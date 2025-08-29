@@ -109,9 +109,14 @@ class AssemblyTypeChecker:
         match expr:
             case asm.Literal(value):
                 return ftype(value)
-            case asm.Variable(var_n, var_t) | asm.Slot(var_n, var_t):
+            case asm.Variable(var_n, var_t) as var:
                 check_type(var_t)
-                return self.check_in_ctxt(var_n, var_t)
+                var.type = self.check_in_ctxt(var_n, var_t)
+                return var.type
+            case asm.Slot(var_n, var_t) as slot:
+                check_type(var_t)
+                slot.type = self.check_in_ctxt(var_n, var_t)
+                return slot.type
             case asm.Stack(obj, obj_t):
                 check_type(obj_t)
                 return obj_t
@@ -145,10 +150,11 @@ class AssemblyTypeChecker:
             self.check_expr(stmt)
             return None
         match stmt:
-            case asm.Unpack(asm.Slot(var_n, var_t), rhs):
+            case asm.Unpack(asm.Slot(var_n, var_t) as slot, rhs):
                 check_type(var_t)
                 rhs_type = self(rhs)
                 check_type_match(var_t, rhs_type)
+                slot.type = rhs_type
                 if var_n in self.ctxt:
                     raise AssemblyTypeError(
                         f"Slot {var_n} is already defined in the current "
@@ -156,14 +162,15 @@ class AssemblyTypeChecker:
                     )
                 self.ctxt[var_n] = rhs_type
                 return None
-            case asm.Repack(asm.Slot(var_n, var_t)):
+            case asm.Repack(asm.Slot(var_n, var_t) as slot):
                 check_type(var_t)
-                self.check_in_ctxt(var_n, var_t)
+                slot.type = self.check_in_ctxt(var_n, var_t)
                 return None
-            case asm.Assign(asm.Variable(var_n, var_t), rhs):
+            case asm.Assign(asm.Variable(var_n, var_t) as var, rhs):
                 check_type(var_t)
                 rhs_type = self.check_expr(rhs)
                 check_type_match(var_t, rhs_type)
+                var.type = rhs_type
                 if var_n in self.ctxt:
                     check_type_match(self.ctxt[var_n], rhs_type)
                 else:
@@ -189,21 +196,23 @@ class AssemblyTypeChecker:
                 new_size_type = self.check_expr(new_size)
                 check_type_match(buffer_type.length_type, new_size_type)
                 return None
-            case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
+            case asm.ForLoop(asm.Variable(var_n, var_t) as var, start, end, body):
                 check_type(var_t)
                 start_type = self.check_expr(start)
                 end_type = self.check_expr(end)
                 check_type_match(var_t, start_type)
                 check_type_match(var_t, end_type)
                 check_is_index_type(start_type)
+                var.type = start_type
                 loop = self.scope(loop_state=LoopState())
                 loop.ctxt[var_n] = start_type
                 loop.check_stmt(body)
                 return None
-            case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
+            case asm.BufferLoop(buffer, asm.Variable(var_n, var_t) as var, body):
                 check_type(var_t)
                 buffer_type = self.check_buffer(buffer)
                 check_type_match(var_t, buffer_type.element_type)
+                var.type = buffer_type.element_type
                 loop = self.scope(loop_state=LoopState())
                 loop.ctxt[var_n] = buffer_type.element_type
                 loop.check_stmt(body)

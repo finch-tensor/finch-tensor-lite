@@ -78,7 +78,7 @@ class Literal(AssemblyExpression):
         return literal_repr(type(self).__name__, asdict(self))
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class Variable(AssemblyExpression):
     """
     Represents a logical AST expression for a variable named `name`, which
@@ -121,7 +121,7 @@ class Stack(AssemblyExpression):
         return self.type
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class Slot(AssemblyExpression):
     """
     Represents a register to a symbolic object. Using a register in an
