@@ -140,3 +140,11 @@ class TensorDef:
     @fill_value.setter
     def fill_value(self, value: Any):
         self._fill_value = value
+
+    def get_dim_space_size(self, idx: Iterable[str]) -> float:
+        prod = 1
+        for i in idx:
+            prod *= int(self.dim_sizes[i])
+            if prod == 0 or prod > np.iinfo(np.int64).max:
+                return float("inf")
+        return float(prod)
