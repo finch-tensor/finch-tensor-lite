@@ -184,7 +184,7 @@ class AssemblyInterpreter:
                 )
                 self.types[var_n] = var_t
                 self.slots[var_n] = val_e
-                val_e = self(val)
+                val_e = self(val)  # TODO: SHOULD THIS BE HERE?
                 return None
             case asm.Repack(slot):
                 self(slot)
