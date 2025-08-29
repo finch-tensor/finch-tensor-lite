@@ -361,9 +361,6 @@ register_property(
 )
 register_property(operator.and_, "__call__", "is_identity", lambda op, val: bool(val))
 register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(
-    operator.floordiv, "__call__", "is_identity", lambda op, val: val == 1
-)
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
@@ -448,24 +445,15 @@ def is_annihilator(op, val):
     return query_property(op, "__call__", "is_annihilator", val)
 
 
-for op, func in [
-    (operator.add, lambda op, val: np.isinf(val)),
+for fn, func in [
     (operator.mul, lambda op, val: val == 0),
     (operator.or_, lambda op, val: bool(val)),
     (operator.and_, lambda op, val: not bool(val)),
+    (np.logaddexp, lambda op, val: val == math.inf),
+    (np.logical_and, lambda op, val: not bool(val)),
+    (np.logical_or, lambda op, val: bool(val)),
 ]:
-    register_property(op, "__call__", "is_annihilator", func)
-
-register_property(
-    np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf
-)
-register_property(
-    np.logical_and, "__call__", "is_annihilator", lambda op, val: not bool(val)
-)
-register_property(
-    np.logical_or, "__call__", "is_annihilator", lambda op, val: bool(val)
-)
-
+    register_property(fn, "__call__", "is_annihilator", func)
 
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
     """
