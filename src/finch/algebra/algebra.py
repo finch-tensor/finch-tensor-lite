@@ -455,6 +455,7 @@ for fn, func in [
 ]:
     register_property(fn, "__call__", "is_annihilator", func)
 
+
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
     """
     Determines the fixpoint type after repeated calling the given operation.
