@@ -205,6 +205,24 @@ class EagerTensor(OverrideTensor, ABC):
     def __logical_not__(self):
         return logical_not(self)
 
+    def __lt__(self, other):
+        return compare_less(self, other)
+
+    def __le__(self, other):
+        return compare_less_equal(self, other)
+
+    def __gt__(self, other):
+        return compare_greater(self, other)
+
+    def __ge__(self, other):
+        return compare_greater_equal(self, other)
+
+    def __eq__(self, other):
+        return compare_equal(self, other)
+
+    def __ne__(self, other):
+        return compare_not_equal(self, other)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -800,6 +818,35 @@ def logical_not(x):
         return lazy.logical_not(x)
     return compute(lazy.logical_not(x))
 
+def compare_less(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.compare_less(x1, x2)
+    return compute(lazy.compare_less(x1, x2))
+
+def compare_less_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.compare_less_equal(x1, x2)
+    return compute(lazy.compare_less_equal(x1, x2))
+
+def compare_greater(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.compare_greater(x1, x2)
+    return compute(lazy.compare_greater(x1, x2))
+    
+def compare_greater_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.compare_greater_equal(x1, x2)
+    return compute(lazy.compare_greater_equal(x1, x2))
+
+def compare_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.compare_equal(x1, x2)
+    return compute(lazy.compare_equal(x1, x2))
+
+def compare_not_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.compare_not_equal(x1, x2)
+    return compute(lazy.compare_not_equal(x1, x2))
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
