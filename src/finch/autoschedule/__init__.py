@@ -18,7 +18,6 @@ from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler
 from .optimize import (
     DefaultLogicOptimizer,
-    PrintingLogicOptimizer,
     concordize,
     flatten_plans,
     isolate_aggregates,
@@ -43,7 +42,6 @@ __all__ = [
     "Aggregate",
     "Alias",
     "DefaultLogicOptimizer",
-    "PrintingLogicOptimizer",
     "Field",
     "Literal",
     "LogicCompiler",
