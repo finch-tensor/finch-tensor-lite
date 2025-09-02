@@ -305,6 +305,24 @@ class LazyTensor(OverrideTensor):
     def __logical_not__(self):
         return logical_not(self)
 
+    def __lt__(self, other):
+        return compare_less(self, other)
+
+    def __le__(self, other):
+        return compare_less_equal(self, other)
+
+    def __gt__(self, other):
+        return compare_greater(self, other)
+
+    def __ge__(self, other):
+        return compare_greater_equal(self, other)
+
+    def __eq__(self, other):
+        return compare_equal(self, other)
+
+    def __ne__(self, other):
+        return compare_not_equal(self, other)
+
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
