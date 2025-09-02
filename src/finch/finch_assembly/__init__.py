@@ -28,12 +28,15 @@ from .nodes import (
     WhileLoop,
 )
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
+from .type_checker import AssemblyTypeChecker, AssemblyTypeError
 
 __all__ = [
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
     "AssemblyStructFType",
+    "AssemblyTypeChecker",
+    "AssemblyTypeError",
     "Assign",
     "Block",
     "Break",

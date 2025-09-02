@@ -3,6 +3,10 @@ from dataclasses import dataclass
 from pprint import pprint
 from typing import Any
 
+import numpy as np
+
+from finch.finch_assembly.struct import AssemblyStructFType
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType
@@ -43,7 +47,7 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(ctx, tns, ext, proto): ...
+    def unfurl(self, ctx, tns, ext, mode, proto): ...
 
 
 @dataclass(eq=True, frozen=True)
@@ -64,6 +68,12 @@ class Extent:
             ctx_2.bindings[idx.name] = idx.type_(idx_e)
             # Execute the body of the loop
             ctx_2(body)
+
+    @property
+    def ftype(self):
+        return ExtentFType(
+            np.asarray(self.start).dtype.type, np.asarray(self.end).dtype.type
+        )
 
 
 def extent(start, end):
@@ -110,7 +120,7 @@ class FinchCompileError(Exception):
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFType:
+class ExtentFType(AssemblyStructFType):
     start: Any
     end: Any
 
@@ -121,11 +131,19 @@ class ExtentFType:
             ExtentFType(start.result_format, end.result_format),
         )
 
+    @property
+    def struct_name(self):
+        return "Extent"
+
+    @property
+    def struct_fields(self):
+        return [("start", np.intp), ("end", np.intp)]
+
     def get_start(self, ext):
-        return asm.GetAttr(ext, "start")
+        return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
-        return asm.GetAttr(ext, "end")
+        return asm.GetAttr(ext, asm.Literal("end"))
 
     def lower_loop(self, ctx, idx, ext, body):
         """
@@ -151,7 +169,7 @@ class ExtentFType:
         ctx_2 = ctx.scope()
         ctx_2.bindings[idx.name] = idx
         ctx_2(body)
-        body_3 = ctx_2.emit()
+        body_3 = asm.Block(ctx_2.emit())
         ctx.exec(
             asm.ForLoop(
                 idx,
@@ -348,7 +366,7 @@ class NotationContext(Context):
                 self.exec(asm.Assign(var, val_code))
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.asm_unpack(
-                    self, var_n, ntn.Variable(var_n, var_t)
+                    self, var_n, asm.Variable(var_n, var_t)
                 )
                 return None
             case ntn.Repack(ntn.Slot(var_n, var_t), _):
@@ -376,7 +394,7 @@ class NotationContext(Context):
                 return None
             case ntn.Loop(idx, ext, body):
                 # first instantiate tensors
-                ext.result_format.lower_loop(self, idx, ext, body)
+                ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 tns = self.resolve(tns)
