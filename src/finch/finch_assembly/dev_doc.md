@@ -42,10 +42,7 @@ MODULE     := Module(funcs=NODE...)
 
 ## Notes
 
-* Variables and slots can be given the type `AutoType` in assignments, for-loops, buffer-loops, and within a program if it has been previously declared.
 * Every function is defined on concrete types and has a concrete return type.
-  In particular, `AutoType` cannot be used for parameter types or return types.
-* Stacks cannot be given the type `AutoType` (this may change).
 * Assignment statements are also used for declaration.
   This means it's not possible to shadow a variable within a scope; if a variable already appears in the current scope then it must be assigned a value of the type given in the context.
 * The bodies of loops and conditionals are not required to be blocks.
