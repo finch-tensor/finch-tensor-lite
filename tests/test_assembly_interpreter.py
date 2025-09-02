@@ -14,11 +14,13 @@ from finch.finch_assembly import (  # noqa: F401
     Assign,
     Block,
     Call,
+    Debug,
     Function,
     If,
     IfElse,
     Literal,
     Module,
+    Print,
     Return,
     Variable,
 )
@@ -225,3 +227,93 @@ def test_simple_struct():
 
     result = mod.simple_struct(p, x)
     assert result == 9.0
+
+
+def test_debug_statement(capsys):
+    p_var_name = "p"
+    x_var_name = "x"
+    res_var_name = "res"
+
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+    x = (1, 4)
+
+    p_var = asm.Variable(p_var_name, ftype(p))
+    x_var = asm.Variable(x_var_name, ftype(x))
+    res_var = asm.Variable(res_var_name, np.float64)
+    mod = AssemblyInterpreter()(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("simple_struct", np.float64),
+                    (p_var, x_var),
+                    asm.Block(
+                        (
+                            asm.Print(p_var),
+                            asm.Print(x_var),
+                            asm.Print((p_var, x_var)),
+                            asm.Debug("p_var: ", p_var),
+                            asm.Debug("x_var: ", x_var),
+                            asm.Debug("All inputs (x_var, p_var): ", (x_var, p_var)),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.mul),
+                                    (
+                                        asm.GetAttr(p_var, asm.Literal("x")),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                    ),
+                                ),
+                            ),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.add),
+                                    (
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            asm.Debug("res_var: ", res_var),
+                            asm.Print((p_var, x_var, res_var)),
+                            asm.Debug(
+                                "All variables (x_var, p_var, res_var): ",
+                                (p_var, x_var, res_var),
+                            ),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = mod.simple_struct(p, x)
+    assert result == 9.0
+
+    capture = capsys.readouterr()
+    expected_print = (
+        f"Point(x=np.float64(1.0), y=np.float64(2.0))\n(1, 4)\n"
+        f"['Point(x=np.float64(1.0), y=np.float64(2.0))', '(1, 4)']\n"
+        f"p_var:  {p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))\n"
+        f"x_var:  {x_var_name}=(1, 4)\n"
+        f"All inputs (x_var, p_var):  "
+        f"['{x_var_name}=(1, 4)', "
+        f"'{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))']\n"
+        f"res_var:  {res_var_name}=9.0\n"
+        f"['Point(x=np.float64(1.0), y=np.float64(2.0))', '(1, 4)', '9.0']\n"
+        f"All variables (x_var, p_var, res_var):  "
+        f"['{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))', "
+        f"'{x_var_name}=(1, 4)', "
+        f"'{res_var_name}=9.0']\n"
+    )
+    assert capture.out == expected_print

@@ -563,6 +563,42 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree):
+    """
+    Print values of give variables.
+
+    Attributes:
+        args: list of variables to be printed.
+    """
+
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
+
+
+@dataclass(eq=True, frozen=True)
+class Debug(AssemblyTree):
+    """
+    Print a message along with an expression.
+
+    Attributes:
+        message: The message to be output.
+        args: The expression to be printed.
+    """
+
+    message: Variable
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.message, *self.args]
+
+
 class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -697,6 +733,41 @@ class AssemblyPrinterContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
+                return None
+            case Print(args):
+                for arg in args:
+                    match arg:
+                        case Variable(name, _):
+                            self.exec(f"{feed}print {arg}")
+                        case _:
+                            if isinstance(args, tuple):
+                                arg_decls = [
+                                    f"{self(arg)}"
+                                    for arg in args
+                                    if isinstance(arg, Variable)
+                                ]
+                                self.exec(f"{feed}print {arg_decls}")
+                            else:
+                                raise NotImplementedError(
+                                    f"Unrecognized argument type: {arg}"
+                                )
+                return None
+            case Debug(message, args):
+                match args:
+                    case Variable(name, _):
+                        self.exec(f"{feed}debug {message} {args}")
+                    case _:
+                        if isinstance(args, tuple):
+                            arg_decls = [
+                                f"{self(arg)}"
+                                for arg in args
+                                if isinstance(arg, Variable)
+                            ]
+                            self.exec(f"{feed}debug {message} {arg_decls}")
+                        else:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {args}"
+                            )
                 return None
             case _:
                 raise NotImplementedError
