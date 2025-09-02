@@ -148,7 +148,7 @@ class TensorView(Tensor):
 
 def access(tns, idxs, op=None):
     """
-    Unfurl a tensor along indices.
+    Unfurl a tensor along an index.
     This is used to create a tensor view for a specific slice of the tensor.
     """
     if hasattr(tns, "access"):
