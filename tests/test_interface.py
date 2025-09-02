@@ -166,6 +166,12 @@ class TestEagerTensor(finch.EagerTensor):
         ((finch.logical_and, np.logical_and), np.logical_and),
         ((finch.logical_or, np.logical_or), np.logical_or),
         ((finch.logical_xor, np.logical_xor), np.logical_xor),
+        ((operator.eq, finch.equal, np.equal), np.equal),
+        ((operator.ne, finch.not_equal, np.not_equal), np.not_equal),
+        ((operator.lt, finch.less, np.less), np.less),
+        ((operator.le, finch.less_equal, np.less_equal), np.less_equal),
+        ((operator.gt, finch.greater, np.greater), np.greater),
+        ((operator.ge, finch.greater_equal, np.greater_equal), np.greater_equal),
     ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
