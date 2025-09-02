@@ -9,12 +9,6 @@ from .buffer import BufferFType
 from .struct import AssemblyStructFType
 
 
-@dataclass(eq=True)
-class AutoType:
-    def __init__(self):
-        pass
-
-
 class AssemblyTypeError(Exception):
     pass
 
@@ -77,9 +71,7 @@ class AssemblyTypeChecker:
 
     def check_in_ctxt(self, var_n, var_t):
         try:
-            type_in_ctxt = self.ctxt[var_n]
-            check_type_match(var_t, self.ctxt[var_n])
-            return type_in_ctxt
+            check_type_match(self.ctxt[var_n], var_t)
         except KeyError:
             raise AssemblyTypeError(
                 f"The variable '{var_n}' is not defined in the current context."
@@ -111,7 +103,8 @@ class AssemblyTypeChecker:
                 return ftype(value)
             case asm.Variable(var_n, var_t) | asm.Slot(var_n, var_t):
                 check_type(var_t)
-                return self.check_in_ctxt(var_n, var_t)
+                self.check_in_ctxt(var_n, var_t)
+                return var_t
             case asm.Stack(obj, obj_t):
                 check_type(obj_t)
                 return obj_t
@@ -154,7 +147,7 @@ class AssemblyTypeChecker:
                         f"Slot {var_n} is already defined in the current "
                         f"context, cannot overwrite with slot."
                     )
-                self.ctxt[var_n] = rhs_type
+                self.ctxt[var_n] = var_t
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
                 check_type(var_t)
@@ -165,9 +158,9 @@ class AssemblyTypeChecker:
                 rhs_type = self.check_expr(rhs)
                 check_type_match(var_t, rhs_type)
                 if var_n in self.ctxt:
-                    check_type_match(self.ctxt[var_n], rhs_type)
+                    check_type_match(self.ctxt[var_n], var_t)
                 else:
-                    self.ctxt[var_n] = rhs_type
+                    self.ctxt[var_n] = var_t
                 return None
             case asm.Assign(asm.Stack(_obj, _obj_t), _rhs):
                 raise NotImplementedError("Cannot assign to stack currently.")
@@ -191,21 +184,21 @@ class AssemblyTypeChecker:
                 return None
             case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
                 check_type(var_t)
+                check_is_index_type(var_t)
                 start_type = self.check_expr(start)
                 end_type = self.check_expr(end)
                 check_type_match(var_t, start_type)
                 check_type_match(var_t, end_type)
-                check_is_index_type(start_type)
                 loop = self.scope(loop_state=LoopState())
-                loop.ctxt[var_n] = start_type
+                loop.ctxt[var_n] = var_t
                 loop.check_stmt(body)
                 return None
             case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
                 check_type(var_t)
                 buffer_type = self.check_buffer(buffer)
-                check_type_match(var_t, buffer_type.element_type)
+                check_type_match(buffer_type.element_type, var_t)
                 loop = self.scope(loop_state=LoopState())
-                loop.ctxt[var_n] = buffer_type.element_type
+                loop.ctxt[var_n] = var_t
                 loop.check_stmt(body)
                 return None
             case asm.WhileLoop(cond, body):
@@ -226,14 +219,14 @@ class AssemblyTypeChecker:
                     return None
                 return body_type
             case asm.Function(asm.Variable(func_name, return_type), args, body):
-                check_type(return_type, auto=False)
+                check_type(return_type)
                 if self.function_state:
                     raise AssemblyTypeError(
                         f"Cannot nest function definitions:  '{func_name}'."
                     )
                 body_scope = self.scope(function_state=FunctionState(return_type))
                 for arg in args:
-                    check_type(arg.type, auto=False)
+                    check_type(arg.type)
                     body_scope.ctxt[arg.name] = arg.type
                 body_type = body_scope.check_stmt(body)
                 if body_type is None:
@@ -295,19 +288,13 @@ def check_is_index_type(index_type):
 
 
 def check_type_match(expected_type, actual_type):
-    if expected_type is not AutoType and expected_type != actual_type:
+    if expected_type != actual_type:
         raise AssemblyTypeError(f"Expected {expected_type}, got {actual_type}.")
 
 
-def check_type(type_, auto=True):
-    if auto:
-        if not isinstance(type_, type | FType | AutoType):
-            raise AssemblyTypeError(f"Expected type, got {type_}.")
-    else:
-        if isinstance(type_, AutoType):
-            raise AssemblyTypeError("Expected concrete type, got {type_}.")
-        if not isinstance(type_, type | FType):
-            raise AssemblyTypeError(f"Expected type, got {type_}.")
+def check_type(type_):
+    if not isinstance(type_, type | FType):
+        raise AssemblyTypeError(f"Expected type, got {type_}.")
 
 
 def check_attrtype(obj_type, attr):

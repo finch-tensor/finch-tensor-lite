@@ -569,7 +569,7 @@ def test_dot_product(a, b):
 
 def test_if_statement():
     # borrowed from test_assembly_interpreter.py
-    var = asm.Variable("a", asm.AutoType)
+    var = asm.Variable("a", np.int64)
     root = asm.Module(
         (
             asm.Function(
@@ -641,7 +641,7 @@ def test_simple_struct():
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", asm.AutoType)
+    res_var = asm.Variable("res", np.float64)
     mod = asm.Module(
         (
             asm.Function(
@@ -682,79 +682,6 @@ def test_simple_struct():
                 ),
             ),
         ),
-    )
-
-    assert asm.AssemblyTypeChecker()(mod) is None
-
-
-@pytest.mark.parametrize(
-    "a, b",
-    [
-        (np.array([1, 2, 3], dtype=np.float64), np.array([4, 5, 6], dtype=np.float64)),
-        (np.array([0], dtype=np.float64), np.array([7], dtype=np.float64)),
-        (
-            np.array([1.5, 2.5], dtype=np.float64),
-            np.array([3.5, 4.5], dtype=np.float64),
-        ),
-    ],
-)
-def test_auto_basic(a, b):
-    # Simple dot product
-    # Borrowed from test_assembly_interpreter.py
-    c = asm.Variable("c", asm.AutoType)
-    i = asm.Variable("i", asm.AutoType)
-    ab = NumpyBuffer(a)
-    bb = NumpyBuffer(b)
-    ab_v = asm.Variable("a", ab.ftype)
-    ab_slt = asm.Slot("a_", asm.AutoType)
-    bb_v = asm.Variable("b", bb.ftype)
-    bb_slt = asm.Slot("b_", asm.AutoType)
-
-    mod = asm.Module(
-        (
-            asm.Function(
-                asm.Variable("dot_product", np.float64),
-                (
-                    ab_v,
-                    bb_v,
-                ),
-                asm.Block(
-                    (
-                        asm.Assign(c, asm.Literal(np.float64(0.0))),
-                        asm.Unpack(ab_slt, ab_v),
-                        asm.Unpack(bb_slt, bb_v),
-                        asm.ForLoop(
-                            i,
-                            asm.Literal(np.int64(0)),
-                            asm.Length(ab_slt),
-                            asm.Block(
-                                (
-                                    asm.Assign(
-                                        c,
-                                        asm.Call(
-                                            asm.Literal(operator.add),
-                                            (
-                                                c,
-                                                asm.Call(
-                                                    asm.Literal(operator.mul),
-                                                    (
-                                                        asm.Load(ab_slt, i),
-                                                        asm.Load(bb_slt, i),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                )
-                            ),
-                        ),
-                        asm.Repack(ab_slt),
-                        asm.Repack(bb_slt),
-                        asm.Return(c),
-                    )
-                ),
-            ),
-        )
     )
 
     assert asm.AssemblyTypeChecker()(mod) is None

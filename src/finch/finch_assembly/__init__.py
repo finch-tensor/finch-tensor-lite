@@ -28,7 +28,7 @@ from .nodes import (
     WhileLoop,
 )
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
-from .type_checker import AssemblyTypeChecker, AssemblyTypeError, AutoType
+from .type_checker import AssemblyTypeChecker, AssemblyTypeError
 
 __all__ = [
     "AssemblyInterpreter",
@@ -38,7 +38,6 @@ __all__ = [
     "AssemblyTypeChecker",
     "AssemblyTypeError",
     "Assign",
-    "AutoType",
     "Block",
     "Break",
     "Buffer",
