@@ -330,12 +330,38 @@ class AssemblyInterpreter:
                             )
                 return AssemblyInterpreterModule(self, kernels)
             case asm.Print(args):
-                arg_decls = [f"{self(arg)}" for arg in args]
-                print(arg_decls)
+                match args:
+                    case asm.Variable():
+                        print(f"{self(args)}")
+                    case _:
+                        if isinstance(args, tuple):
+                            arg_decls = [
+                                f"{self(arg)}"
+                                for arg in args
+                                if isinstance(arg, asm.Variable)
+                            ]
+                            print(arg_decls)
+                        else:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {args}"
+                            )
                 return None
             case asm.Debug(message, args):
-                # TODO: Handle expressions, e.g. mul(p_var + x_var)
-                print(f"{message}" + str(self(args)))
+                match args:
+                    case asm.Variable(name, _):
+                        print(f"{message} " + f"{name}=" + str(self(args)))
+                    case _:
+                        if isinstance(args, tuple):
+                            arg_decls = [
+                                f"{arg.name}={self(arg)}"
+                                for arg in args
+                                if isinstance(arg, asm.Variable)
+                            ]
+                            print(f"{message} " + str(arg_decls))
+                        else:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {args}"
+                            )
                 return None
             case asm.Stack(val):
                 raise NotImplementedError(
