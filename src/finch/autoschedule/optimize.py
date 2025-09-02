@@ -694,7 +694,7 @@ class DefaultLogicOptimizer:
         return self.ctx(prgm)
 
 class PrintingLogicOptimizer(DefaultLogicOptimizer):
-    """Custom optimizer that prints MapJoin and Aggregate operations"""
+    """Custom optimizer that prints logic IR operations MapJoin and Aggregate operations (basically einsum)"""
     
     def __init__(self, ctx: LogicCompiler):
         super().__init__(ctx)

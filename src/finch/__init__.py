@@ -20,6 +20,8 @@ from .galley import (
 from .interface import (
     EagerTensor,
     LazyTensor,
+    MichaelTensor,
+    MichaelTensorFType,
     Scalar,
     abs,
     acos,
@@ -110,6 +112,8 @@ __all__ = [
     "DenseStats",
     "EagerTensor",
     "ElementLevelFType",
+    "MichaelTensor",
+    "MichaelTensorFType",
     "Extent",
     "ExtentFType",
     "FTyped",
