@@ -696,23 +696,16 @@ class DefaultLogicOptimizer:
 class PrintingLogicOptimizer(DefaultLogicOptimizer):
     """Custom optimizer that prints MapJoin and Aggregate operations"""
     
-    def __init__(self, ctx: LogicCompiler, verbose=True):
+    def __init__(self, ctx: LogicCompiler):
         super().__init__(ctx)
-        self.verbose = verbose
-        self.operation_count = {"MapJoin": 0, "Aggregate": 0}
     
     def __call__(self, prgm: LogicNode):
         # First optimize the program
         prgm = optimize(prgm)
-        
-        # Then traverse and print all MapJoin/Aggregate operations
-        if self.verbose:
-            print("\n=== Finch Logic IR Operations ===")
-            self._print_operations(prgm)
-            print(f"\nTotal MapJoins: {self.operation_count['MapJoin']}")
-            print(f"Total Aggregates: {self.operation_count['Aggregate']}")
-            print("================================\n")
-        
+
+        # print the logic ir
+        self._print_operations(prgm)
+
         # Continue with compilation
         return self.ctx(prgm)
     
@@ -721,20 +714,16 @@ class PrintingLogicOptimizer(DefaultLogicOptimizer):
         for n in PostOrderDFS(node):
             match n:
                 case MapJoin(op, args):
-                    self.operation_count["MapJoin"] += 1
-                    print(f"\nMapJoin #{self.operation_count['MapJoin']}:")
                     print(f"  Operation: {self._format_op(op)}")
                     print(f"  Args: {self._format_args(args)}")
-                    print(f"  Fields: {n.fields}")
+                    print(f"  Fields: {n.fields}\n")
                     
                 case Aggregate(op, init, arg, idxs):
-                    self.operation_count["Aggregate"] += 1
-                    print(f"\nAggregate #{self.operation_count['Aggregate']}:")
                     print(f"  Operation: {self._format_op(op)}")
                     print(f"  Init: {self._format_literal(init)}")
                     print(f"  Reduce dims: {idxs}")
                     print(f"  Input fields: {arg.fields if hasattr(arg, 'fields') else 'N/A'}")
-                    print(f"  Output fields: {n.fields}")
+                    print(f"  Output fields: {n.fields}\n")
     
     def _format_op(self, op):
         """Format operation for printing"""
