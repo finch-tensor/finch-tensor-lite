@@ -692,3 +692,61 @@ class DefaultLogicOptimizer:
     def __call__(self, prgm: LogicNode):
         prgm = optimize(prgm)
         return self.ctx(prgm)
+
+class PrintingLogicOptimizer(DefaultLogicOptimizer):
+    """Custom optimizer that prints logic IR operations MapJoin and Aggregate operations (basically einsum)"""
+    
+    def __init__(self, ctx: LogicCompiler):
+        super().__init__(ctx)
+    
+    def __call__(self, prgm: LogicNode):
+        # First optimize the program
+        prgm = optimize(prgm)
+
+        # print the logic ir
+        self._print_operations(prgm)
+
+        # Continue with compilation
+        return self.ctx(prgm)
+    
+    def _print_operations(self, node):
+        """Traverse the Logic IR and print MapJoin/Aggregate operations"""
+        for n in PostOrderDFS(node):
+            match n:
+                case MapJoin(op, args):
+                    print(f"  Operation: {self._format_op(op)}")
+                    print(f"  Args: {self._format_args(args)}")
+                    print(f"  Fields: {n.fields}\n")
+                    
+                case Aggregate(op, init, arg, idxs):
+                    print(f"  Operation: {self._format_op(op)}")
+                    print(f"  Init: {self._format_literal(init)}")
+                    print(f"  Reduce dims: {idxs}")
+                    print(f"  Input fields: {arg.fields if hasattr(arg, 'fields') else 'N/A'}")
+                    print(f"  Output fields: {n.fields}\n")
+    
+    def _format_op(self, op):
+        """Format operation for printing"""
+        if isinstance(op, Literal):
+            if hasattr(op.val, '__name__'):
+                return op.val.__name__
+            return str(op.val)
+        return str(op)
+    
+    def _format_literal(self, lit):
+        """Format literal for printing"""
+        if isinstance(lit, Literal):
+            return str(lit.val)
+        return str(lit)
+    
+    def _format_args(self, args):
+        """Format arguments for printing"""
+        formatted = []
+        for arg in args:
+            if isinstance(arg, Alias):
+                formatted.append(f"Alias({arg.name})")
+            elif isinstance(arg, Table):
+                formatted.append(f"Table(...)")
+            else:
+                formatted.append(type(arg).__name__)
+        return formatted
