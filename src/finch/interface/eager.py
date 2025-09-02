@@ -818,35 +818,42 @@ def logical_not(x):
         return lazy.logical_not(x)
     return compute(lazy.logical_not(x))
 
+
 def compare_less(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.compare_less(x1, x2)
     return compute(lazy.compare_less(x1, x2))
+
 
 def compare_less_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.compare_less_equal(x1, x2)
     return compute(lazy.compare_less_equal(x1, x2))
 
+
 def compare_greater(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.compare_greater(x1, x2)
     return compute(lazy.compare_greater(x1, x2))
-    
+
+
 def compare_greater_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.compare_greater_equal(x1, x2)
     return compute(lazy.compare_greater_equal(x1, x2))
+
 
 def compare_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.compare_equal(x1, x2)
     return compute(lazy.compare_equal(x1, x2))
 
+
 def compare_not_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.compare_not_equal(x1, x2)
     return compute(lazy.compare_not_equal(x1, x2))
+
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):

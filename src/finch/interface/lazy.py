@@ -1609,20 +1609,26 @@ def logical_xor(x1, x2) -> LazyTensor:
 def logical_not(x) -> LazyTensor:
     return elementwise(np.logical_not, defer(x))
 
+
 def compare_less(x1, x2) -> LazyTensor:
     return elementwise(np.less, defer(x1), defer(x2))
+
 
 def compare_less_equal(x1, x2) -> LazyTensor:
     return elementwise(np.less_equal, defer(x1), defer(x2))
 
+
 def compare_greater(x1, x2) -> LazyTensor:
     return elementwise(np.greater, defer(x1), defer(x2))
+
 
 def compare_greater_equal(x1, x2) -> LazyTensor:
     return elementwise(np.greater_equal, defer(x1), defer(x2))
 
+
 def compare_equal(x1, x2) -> LazyTensor:
     return elementwise(np.equal, defer(x1), defer(x2))
+
 
 def compare_not_equal(x1, x2) -> LazyTensor:
     return elementwise(np.not_equal, defer(x1), defer(x2))
