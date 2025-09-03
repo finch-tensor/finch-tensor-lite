@@ -48,7 +48,7 @@ config = donfig.Config("finch", defaults=[default])
 
 def get_version():
     """
-    Get the version of Finch.
+    Get the version of finchlite.
     """
 
     return version("finch-tensor-lite")

@@ -6,7 +6,6 @@ import pytest
 import numpy as np
 from numpy.testing import assert_equal
 
-import finchlite
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -27,7 +26,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finch.codegen.c.load_shared_lib(c_code).add
+    f = finchlite.codegen.c.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -66,8 +65,8 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
-    f = finch.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finch.codegen.c.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
+    f = finchlite.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
+    k = finchlite.codegen.c.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)

@@ -1,6 +1,6 @@
 # finch-tensor-lite
 
-The pure-Python rewrite of [Finch.jl](https://github.com/finch-tensor/Finch.jl), designed to eventually replace [finch-tensor](https://pypi.org/project/finch-tensor/).
+The pure-Python rewrite of [finchlite.jl](https://github.com/finch-tensor/finchlite.jl), designed to eventually replace [finch-tensor](https://pypi.org/project/finch-tensor/).
 
 ## Source
 The source code for `finch-tensor-lite` is available on GitHub at [https://github.com/finch-tensor/finch-tensor-lite](https://github.com/FinchTensor/finch-tensor-lite)
