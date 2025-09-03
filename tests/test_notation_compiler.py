@@ -4,6 +4,7 @@ import pytest
 
 import numpy as np
 
+import finchlite
 import finchlite.finch_notation as ntn
 from finchlite import ftype
 from finchlite.compile import ExtentFType, NotationCompiler, dimension

@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_equal
 
+import finchlite
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (

@@ -2,6 +2,7 @@ import pytest
 
 import numpy as np
 
+import finchlite
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 def test_issue_64():

@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal
 
+import finchlite
 
 # Utility function to generate random complex numpy tensors
 def random_array(shape, dtype=np.complex128, rng: np.random.Generator | None = None):
