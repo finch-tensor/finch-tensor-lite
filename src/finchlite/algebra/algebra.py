@@ -126,8 +126,7 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
                 " lambda ...)` or "
             )
         msg += (
-            f"`finchlite.register_property({obj_name},"
-            f"{attr}', '{prop}', lambda ...)`."
+            f"`finchlite.register_property({obj_name},{attr}', '{prop}', lambda ...)`."
         )
     else:
         msg += f"attribute '{obj_name}.{attr}' has no property '{prop}'. "
@@ -137,7 +136,10 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
                 f"finchlite.register_property({repr(obj)}, '{attr}', '{prop}'"
                 ", lambda ...) or "
             )
-        msg += f"`finchlite.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
+        msg += (
+            f"`finchlite.register_property({obj_name},"
+            f" '{attr}', '{prop}', lambda ...)`."
+        )
     msg += (
         " See https://github.com/finch-tensor/finch-tensor-lite/blob/main/src/finch-lite/"
         "algebra/algebra.py for more information."
