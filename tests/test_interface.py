@@ -187,7 +187,9 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         for op in ops:
             result = op(wa, wb)
 
-            if isinstance(wa, finchlite.LazyTensor) or isinstance(wb, finchlite.LazyTensor):
+            if isinstance(wa, finchlite.LazyTensor) or isinstance(
+                wb, finchlite.LazyTensor
+            ):
                 assert isinstance(result, finchlite.LazyTensor)
 
                 result = finchlite.compute(result)
