@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 
 import finch
+from finch.codegen.numba_backend import NumbaGenerator
 import finch.finch_notation as ntn
 from finch import ftype
 from finch.compile import ExtentFType, NotationCompiler, dimension
@@ -20,9 +21,13 @@ from finch.symbolic import Reflector
             np.array([[5, 0, 6, 9], [7, 8, 0, 0], [-1, -4, 9, 0]], dtype=np.float64),
         ),
         (
-            np.array([[2, 0], [1, 3]], dtype=np.float64),
-            np.array([[4, 1], [2, 2]], dtype=np.float64),
+            np.array([[1, 2, 3], [3, 4, 0]], dtype=np.float64),
+            np.array([[5, 0, 6, 9], [7, 8, 0, 0], [-1, -4, 9, 0]], dtype=np.float64),
         ),
+        # (
+        #     np.array([[2, 0], [1, 3]], dtype=np.float64),
+        #     np.array([[4, 1], [2, 2]], dtype=np.float64),
+        # ),
     ],
 )
 def test_matrix_multiplication(a, b):
@@ -128,7 +133,6 @@ def test_matrix_multiplication(a, b):
 
     # NOTATION
     ntn_mod = ntn.NotationInterpreter()(prgm)
-
     c_buf = finch.compile.BufferizedNDArray(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )

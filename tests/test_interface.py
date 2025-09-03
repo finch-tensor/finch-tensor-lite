@@ -7,6 +7,7 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_equal
 
 import finch
+from finch.compile.bufferized_ndarray import BufferizedNDArray
 
 
 # Utility function to generate random complex numpy tensors
