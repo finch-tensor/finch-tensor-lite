@@ -4,6 +4,7 @@ import numpy as np
 
 import finchlite
 
+
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 def test_issue_64():
     a = finchlite.defer(np.arange(1 * 2).reshape(1, 2, 1))

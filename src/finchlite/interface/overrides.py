@@ -4,6 +4,8 @@ from typing import Any
 
 import numpy as np
 
+import finchlite
+
 from ..algebra.tensor import Tensor
 
 element_wise_ufunc_map = {
