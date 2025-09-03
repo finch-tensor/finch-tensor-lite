@@ -178,13 +178,8 @@ class MapJoin(LogicTree, LogicExpression):
     @property
     def fields(self) -> list[Field]:
         """Returns fields of the node."""
-        from ._utils import NonConcordantLists, merge_concordant
-
         args_fields = [x.fields for x in self.args]
-        try:
-            return merge_concordant(args_fields)
-        except NonConcordantLists:
-            return list(dict.fromkeys([f for fs in args_fields for f in fs]))
+        return list(dict.fromkeys([f for fs in args_fields for f in fs]))
 
     @classmethod
     def from_children(cls, op, *args):

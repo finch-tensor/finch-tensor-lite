@@ -661,10 +661,10 @@ def test_propagate_map_queries_backward():
             Aggregate(
                 Literal(add), Literal(10), Alias("A2"), (Field("i4"), Field("i5"))
             ),
-            Aggregate(
-                Literal(mul),
-                Literal(1),
-                Reorder(
+            Reorder(
+                Aggregate(
+                    Literal(mul),
+                    Literal(1),
                     Table(
                         Literal(10),
                         (
@@ -673,9 +673,9 @@ def test_propagate_map_queries_backward():
                             Field("i8"),
                         ),
                     ),
-                    (Field("i6"), Field("i7"), Field("i8")),
+                    (Field("i7"),),
                 ),
-                (Field("i7"),),
+                (Field("i6"), Field("i8")),
             ),
         )
     )

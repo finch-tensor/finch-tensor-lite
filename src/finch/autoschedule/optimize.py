@@ -25,7 +25,6 @@ from ..finch_logic import (
     Subquery,
     Table,
 )
-from ..finch_logic._utils import NonConcordantLists, merge_concordant
 from ..symbolic import (
     Chain,
     Fixpoint,
@@ -289,15 +288,17 @@ def propagate_map_queries_backward(root):
 
     def rule_5(ex):
         match ex:
-            case Reorder(Aggregate(op, init, arg, idxs_1), idxs_2):
-                merged_idxs: list[Field]
-                try:
-                    merged_idxs = merge_concordant([arg.fields, idxs_1, idxs_2])
-                except NonConcordantLists:
-                    merged_idxs = list(idxs_2 + idxs_1)
-                return Aggregate(op, init, Reorder(arg, tuple(merged_idxs)), idxs_1)
+            case Aggregate(
+                Literal() as op_1,
+                Literal() as init_1,
+                Reorder(Aggregate(op_2, Literal() as init_2, arg, idxs_1), idxs_3),
+                idxs_2,
+            ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
+                return Reorder(Aggregate(op_1, init_1, arg, idxs_1 + idxs_2), setdiff(idxs_3, idxs_1))
 
-    return Rewrite(Fixpoint(PreWalk(Chain([rule_3, rule_4, rule_5]))))(root)
+    root = Rewrite(Fixpoint(PreWalk(Chain([rule_3, rule_4, rule_5]))))(root)
+
+    return root
 
 
 def propagate_copy_queries(root):
