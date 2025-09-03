@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Context, Term, TermTree, literal_repr
+from ..symbolic import Context, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 from .buffer import element_type, length_type
 
@@ -39,8 +39,8 @@ class AssemblyNode(Term):
     def __str__(self):
         """Returns a string representation of the node."""
         ctx = AssemblyPrinterContext()
-        ctx(self)
-        return ctx.emit()
+        res = ctx(self)
+        return res if res is not None else ctx.emit()
 
 
 class AssemblyTree(AssemblyNode, TermTree):
@@ -72,7 +72,7 @@ class Literal(AssemblyExpression):
     @property
     def result_format(self):
         """Returns the type of the expression."""
-        return type(self.val)
+        return ftype(self.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
@@ -257,7 +257,7 @@ class Call(AssemblyExpression, AssemblyTree):
     """
 
     op: Literal
-    args: tuple[AssemblyNode, ...]
+    args: tuple[AssemblyExpression, ...]
 
     @property
     def children(self):
@@ -285,7 +285,7 @@ class Load(AssemblyExpression, AssemblyTree):
         index: The index to load at.
     """
 
-    buffer: AssemblyExpression
+    buffer: Slot | Stack
     index: AssemblyExpression
 
     @property
@@ -309,7 +309,7 @@ class Store(AssemblyTree):
         value: The value to store.
     """
 
-    buffer: AssemblyExpression
+    buffer: Slot | Stack
     index: AssemblyExpression
     value: AssemblyExpression
 
@@ -328,7 +328,7 @@ class Resize(AssemblyTree):
         new_size: The new size for the buffer.
     """
 
-    buffer: AssemblyExpression
+    buffer: Slot | Stack
     new_size: AssemblyExpression
 
     @property
@@ -345,7 +345,7 @@ class Length(AssemblyExpression, AssemblyTree):
         buffer: The buffer whose length is queried.
     """
 
-    buffer: AssemblyExpression
+    buffer: Slot | Stack
 
     @property
     def children(self):
@@ -391,7 +391,7 @@ class BufferLoop(AssemblyTree):
         body: The body of the loop to execute for each element.
     """
 
-    buffer: AssemblyExpression
+    buffer: Slot | Stack
     var: Variable
     body: AssemblyNode
 
@@ -650,7 +650,7 @@ class AssemblyPrinterContext(Context):
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
-                self.exec(f"{feed}store({self(buf)}, {self(idx)})")
+                self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")
@@ -768,5 +768,8 @@ class AssemblyPrinterContext(Context):
                                 f"Unrecognized argument type: {args}"
                             )
                 return None
-            case _:
-                raise NotImplementedError
+            case Stack(obj, type_):
+                self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
+                return None
+            case node:
+                raise NotImplementedError(node)
