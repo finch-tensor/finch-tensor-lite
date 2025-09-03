@@ -86,9 +86,8 @@ class BufferizedNDArray(Tensor):
         for stride in arr.strides:
             if stride % itemsize != 0:
                 raise ValueError("Array must be aligned to multiple of itemsize")
-        self._strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
-        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)  # TODO: np.intp should be better
-        self._ndim = arr.ndim
+        self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
+        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
         self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
 
     def to_numpy(self):
@@ -193,7 +192,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def struct_fields(self):
         return [
             ("buf_arr", self.buf),
-            ("_ndim", np.intp),
+            ("_ndim", self._ndim),
             ("shape", self._shape),
             ("strides", self._strides),
         ]
@@ -487,9 +486,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [
-                                    tns.obj.tns.stride[
-                                        stride_state.get_active_stride()
-                                    ],
+                                    tns.obj.tns.stride[self.nind],
                                     asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ],
                             ),
@@ -500,12 +497,12 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             return ntn.Stack(
                 BufferizedNDArrayAccessorFields(
                     tns=tns.obj.tns,
-                    stride_state=stride_state.visit_step(),
+                    nind=self.nind - 1,
                     pos=pos_2,
                     op=self.op,
                 ),
                 BufferizedNDArrayAccessorFType(
-                    self.tns, stride_state.visit_step(), self.pos, self.op
+                    self.tns, self.nind + 1, self.pos, self.op
                 ),
             )
 

@@ -48,7 +48,7 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(self, ctx, tns, ext, mode, idxs): ...
+    def unfurl(self, ctx, tns, ext, mode, proto): ...
 
 
 @dataclass(eq=True, frozen=True)

@@ -20,6 +20,10 @@ from finch.symbolic import Reflector
             np.array([[1, 2, 3], [3, 4, 0]], dtype=np.float64),
             np.array([[5, 0, 6, 9], [7, 8, 0, 0], [-1, -4, 9, 0]], dtype=np.float64),
         ),
+        (
+            np.array([[1, 2, 3], [3, 4, 0]], dtype=np.float64),
+            np.array([[5, 0, 6, 9], [7, 8, 0, 0], [-1, -4, 9, 0]], dtype=np.float64),
+        ),
         # (
         #     np.array([[2, 0], [1, 3]], dtype=np.float64),
         #     np.array([[4, 1], [2, 2]], dtype=np.float64),
@@ -77,11 +81,11 @@ def test_matrix_multiplication(a, b):
                             i,
                             m,
                             ntn.Loop(
-                                j,
-                                n,
+                                k,
+                                p,
                                 ntn.Loop(
-                                    k,
-                                    p,
+                                    j,
+                                    n,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -129,7 +133,6 @@ def test_matrix_multiplication(a, b):
 
     # NOTATION
     ntn_mod = ntn.NotationInterpreter()(prgm)
-
     c_buf = finch.compile.BufferizedNDArray(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
@@ -149,11 +152,6 @@ def test_matrix_multiplication(a, b):
     expected = np.matmul(a, b)
     actual = asm_mod.matmul(c_buf, a_buf, b_buf).to_numpy()
     np.testing.assert_equal(actual, expected)
-
-    ng = NumbaGenerator()
-    res = ng(prgm)
-
-    print(res)
 
 
 def test_matrix_multiplication_regression(file_regression):
@@ -212,11 +210,11 @@ def test_matrix_multiplication_regression(file_regression):
                             i,
                             m,
                             ntn.Loop(
-                                j,
-                                n,
+                                k,
+                                p,
                                 ntn.Loop(
-                                    k,
-                                    p,
+                                    j,
+                                    n,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
