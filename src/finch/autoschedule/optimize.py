@@ -294,11 +294,12 @@ def propagate_map_queries_backward(root):
                 Reorder(Aggregate(op_2, Literal() as init_2, arg, idxs_1), idxs_3),
                 idxs_2,
             ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
-                return Reorder(Aggregate(op_1, init_1, arg, idxs_1 + idxs_2), setdiff(idxs_3, idxs_1))
+                return Reorder(
+                    Aggregate(op_1, init_1, arg, idxs_1 + idxs_2),
+                    setdiff(idxs_3, idxs_1),
+                )
 
-    root = Rewrite(Fixpoint(PreWalk(Chain([rule_3, rule_4, rule_5]))))(root)
-
-    return root
+    return Rewrite(Fixpoint(PreWalk(Chain([rule_3, rule_4, rule_5]))))(root)
 
 
 def propagate_copy_queries(root):
