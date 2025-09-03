@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from finch.finch_assembly.struct import AssemblyStructFType
+from finchlite.finch_assembly.struct import AssemblyStructFType
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn

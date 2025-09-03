@@ -6,10 +6,10 @@ import pytest
 import numpy as np
 from numpy.testing import assert_equal
 
-import finch
-import finch.finch_assembly as asm
-from finch import ftype
-from finch.codegen import (
+import finchlite
+import finchlite.finch_assembly as asm
+from finchlite import ftype
+from finchlite.codegen import (
     CCompiler,
     CGenerator,
     NumbaCompiler,

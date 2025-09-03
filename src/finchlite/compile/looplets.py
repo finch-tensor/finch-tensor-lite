@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from finch.compile.lower import LoopletPass, SingletonExtentFType
+from finchlite.compile.lower import LoopletPass, SingletonExtentFType
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn

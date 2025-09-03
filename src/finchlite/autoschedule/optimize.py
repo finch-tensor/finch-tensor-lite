@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import chain as join_chains
 from typing import TypeVar, overload
 
-from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
+from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 
 from ..finch_logic import (
     Aggregate,

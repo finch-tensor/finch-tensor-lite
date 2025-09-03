@@ -4,12 +4,12 @@ import pytest
 
 import numpy as np
 
-import finch
-import finch.finch_notation as ntn
-from finch import ftype
-from finch.compile import ExtentFType, NotationCompiler, dimension
-from finch.finch_assembly import AssemblyInterpreter
-from finch.symbolic import Reflector
+import finchlite
+import finchlite.finch_notation as ntn
+from finchlite import ftype
+from finchlite.compile import ExtentFType, NotationCompiler, dimension
+from finchlite.finch_assembly import AssemblyInterpreter
+from finchlite.symbolic import Reflector
 
 
 @pytest.mark.parametrize(

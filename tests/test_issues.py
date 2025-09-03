@@ -2,7 +2,7 @@ import pytest
 
 import numpy as np
 
-import finch
+import finchlite
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove

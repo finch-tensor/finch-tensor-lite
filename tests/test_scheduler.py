@@ -4,7 +4,7 @@ import pytest
 
 import numpy as np
 
-from finch.autoschedule import (
+from finchlite.autoschedule import (
     concordize,
     flatten_plans,
     isolate_aggregates,
@@ -25,7 +25,7 @@ from finch.autoschedule import (
     push_fields,
     set_loop_order,
 )
-from finch.finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -40,8 +40,8 @@ from finch.finch_logic import (
     Subquery,
     Table,
 )
-from finch.finch_logic.interpreter import FinchLogicInterpreter
-from finch.symbolic.gensym import _sg
+from finchlite.finch_logic.interpreter import FinchLogicInterpreter
+from finchlite.symbolic.gensym import _sg
 
 
 def test_propagate_map_queries():

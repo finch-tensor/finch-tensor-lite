@@ -102,6 +102,6 @@ class OverrideTensor(Tensor, ABC):
 
         if api_version not in {"2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
-        import finch
+        import finchlite
 
         return finch

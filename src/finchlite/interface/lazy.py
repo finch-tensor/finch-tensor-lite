@@ -1428,7 +1428,7 @@ class CombineDimsTensor(Tensor):
 
 
 def _compute(arg, ctx=None):
-    from finch import compute
+    from finchlite import compute
 
     return compute(arg, ctx=ctx)
 

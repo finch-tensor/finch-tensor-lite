@@ -18,7 +18,7 @@ For example, we might declare that the `__add__` method of a complex number
 is associative with the following code:
 
 ```python
-from finch import register_property
+from finchlite import register_property
 
 register_property(complex, "__add__", "is_associative", lambda obj: True)
 ```
@@ -26,7 +26,7 @@ register_property(complex, "__add__", "is_associative", lambda obj: True)
 Finch includes a convenience functions to query each property as well,
 for example:
 ```python
-from finch import query_property
+from finchlite import query_property
 from operator import add
 
 query_property(complex, "__add__", "is_associative")
