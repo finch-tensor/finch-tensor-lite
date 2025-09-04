@@ -26,6 +26,7 @@ element_wise_ufunc_map = {
     np.floor_divide: operator.floordiv,
     np.mod: operator.mod,
     np.pow: operator.pow,
+    np.divmod: np.divmod,
     np.sin: np.sin,
     np.sinh: np.sinh,
     np.cos: np.cos,

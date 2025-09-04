@@ -205,6 +205,12 @@ class EagerTensor(OverrideTensor, ABC):
     def __logical_not__(self):
         return logical_not(self)
 
+    def __divmod__(self, other):
+        return divmod(self, other)
+
+    def __rdivmod__(self, other):
+        return divmod(other, self)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -831,3 +837,22 @@ def std(
     if isinstance(x, lazy.LazyTensor):
         return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
+
+def divmod(x1, x2):
+    return lazy.divmod(x1, x2)
+
+def first(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.first(x)
+    return compute(lazy.first(x))
+
+def last(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.last(x)
+    return compute(lazy.last(x))
+
+def divmod_arrays(x1, x2):
+    q, r = lazy.divmod_arrays(x1, x2)
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return q, r
+    return compute(q), compute(r)

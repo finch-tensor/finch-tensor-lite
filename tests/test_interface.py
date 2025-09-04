@@ -1198,3 +1198,60 @@ def test_flatten(array_shape, expected_shape, wrapper):
         result = finchlite.compute(result)
 
     assert_equal(result, expected, strict=True)
+
+@pytest.mark.parametrize(
+    "a,b",
+    [
+        # simple original
+        (
+            np.array([[5, 8, 13],
+                      [9, 10, 11]]),
+            np.array([[2, 3, 4],
+                      [5, 2, 3]]),
+        ),
+        # broadcasting: scalar divisor
+        (np.arange(12).reshape(3, 4), 3),
+        # broadcasting: scalar dividend
+        (42, np.full((2, 5), 7, dtype=int)),
+        # negatives & mixed signs
+        (
+            np.array([-10, -9, -8, -1, 0, 1, 8, 9, 10]),
+            np.array([3, -3, 4, -4, 5, -5, -6, 6, -7]),
+        ),
+        # high-dim array
+        (np.arange(2*3*4).reshape(2, 3, 4), np.ones((2, 3, 4), dtype=int)),
+        # empty arrays
+        (np.array([], dtype=int), np.array([], dtype=int)),
+    ],
+)
+def test_divmod_arrays(a, b):
+    q_expected, r_expected = np.divmod(a, b)
+    q_actual, r_actual = finchlite.divmod_arrays(a, b)
+    assert_equal(q_actual, q_expected, True)
+    assert_equal(r_actual, r_expected, True)
+
+
+@pytest.mark.parametrize(
+    "a,b",
+    [
+        # original simple 1D case
+        (np.array([7, 12, 19, 20]), np.array([3, 4, 5, 6])),
+        # broadcasting: scalar divisor
+        (np.arange(10), 3),
+        # negatives & mixed signs
+        (
+            np.array([-10, -9, -8, -1, 0, 1, 8, 9, 10]),
+            np.array([3, -3, 4, -4, 5, -5, -6, 6, -7]),
+        ),
+        # empty arrays
+        (np.array([], dtype=int), np.array([], dtype=int)),
+    ],
+)
+def test_divmod_array_of_tuples_param_ok(a, b):
+    q_expected, r_expected = np.divmod(a, b)
+
+    q_tuple_first = finchlite.first(finchlite.divmod(a, b))
+    r_tuple_last  = finchlite.last(finchlite.divmod(a, b))
+
+    assert_equal(q_tuple_first, q_expected, True)
+    assert_equal(r_tuple_last,  r_expected, True)

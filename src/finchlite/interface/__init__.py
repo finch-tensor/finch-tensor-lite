@@ -64,6 +64,10 @@ from .eager import (
     truediv,
     var,
     vecdot,
+    divmod,
+    divmod_arrays,
+    first,
+    last,
 )
 from .fuse import compute, fuse, fused, get_default_scheduler, set_default_scheduler
 from .lazy import LazyTensor, asarray, defer
@@ -145,4 +149,8 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
+    "divmod",
+    "divmod_arrays",
+    "first",
+    "last",
 ]

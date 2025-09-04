@@ -19,6 +19,9 @@ from .operator import (
     overwrite,
     promote_max,
     promote_min,
+    TupleFormat,
+    tuple_first,
+    tuple_last,
 )
 from .tensor import (
     Tensor,
@@ -55,4 +58,7 @@ __all__ = [
     "register_property",
     "return_type",
     "shape_type",
+    "TupleFormat",
+    "tuple_first",
+    "tuple_last",
 ]

@@ -1,4 +1,4 @@
-from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type
+from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type, TupleFormat
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -90,6 +90,10 @@ from .interface import (
     truediv,
     var,
     vecdot,
+    divmod,
+    divmod_arrays,
+    first,
+    last,
 )
 from .symbolic import (
     FTyped,
@@ -103,6 +107,9 @@ from .tensor import (
 )
 
 __all__ = [
+    "first",
+    "last",
+    "TupleFormat",
     "DC",
     "BufferizedNDArray",
     "DCStats",
@@ -199,4 +206,6 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
+    "divmod",
+    "divmod_arrays",
 ]

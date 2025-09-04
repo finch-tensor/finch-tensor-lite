@@ -25,6 +25,9 @@ from ..algebra import (
     query_property,
     register_property,
     return_type,
+    TupleFormat,
+    tuple_first,
+    tuple_last,
 )
 from ..algebra import conjugate as conj
 from ..finch_logic import (
@@ -239,6 +242,12 @@ class LazyTensor(OverrideTensor):
 
     def __atan2__(self, other):
         return atan2(self, other)
+
+    def __divmod__(self, other):
+        return divmod(self, other)
+
+    def __rdivmod__(self, other):
+        return divmod(other, self)
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -1521,7 +1530,6 @@ def stack(arrays, /, axis: int = 0) -> LazyTensor:
     # concat, this will also do the shape verification
     return concat(arrays, axis=axis)
 
-
 def sin(x) -> LazyTensor:
     return elementwise(np.sin, defer(x))
 
@@ -1660,3 +1668,56 @@ def std(
     x = defer(x)
     d = var(x, axis=axis, correction=correction, keepdims=keepdims)
     return pow(d, 0.5)
+
+def divmod(x1, x2):
+    return TupleTensor(floordiv(x1, x2), mod(x1, x2))
+
+
+def first(x):
+    """
+    Elementwise tuple accessor: returns the 0th component of a tuple-typed array.
+    """
+    if isinstance(x, TupleTensor):
+        return x.a
+    return elementwise(tuple_first, defer(x))
+
+def last(x):
+    """
+    Elementwise tuple accessor: returns the last component of a tuple-typed array.
+    """
+    if isinstance(x, TupleTensor):
+        return x.b
+    return elementwise(tuple_last, defer(x))
+
+def divmod_arrays(x1, x2):
+    t = divmod(x1, x2)
+    return first(t), last(t)
+
+class TupleTensor:
+    """
+    Wrapper for a pair of LazyTensors (a, b) with identical shape.
+    """
+
+    def __init__(self, a, b):
+        a_shape = getattr(a, "shape", None)
+        b_shape = getattr(b, "shape", None)
+        if a_shape is None or b_shape is None:
+            raise TypeError("TupleTensor expects tensors with a 'shape' attribute.")
+        if a_shape != b_shape:
+            raise ValueError(f"a.shape {a_shape} != b.shape {b_shape}")
+
+        self._a = a
+        self._b = b
+        self._shape = tuple(a_shape)
+
+    @property
+    def a(self):
+        return self._a
+
+    @property
+    def b(self):
+        return self._b
+
+    @property
+    def shape(self):
+        return self._shape
