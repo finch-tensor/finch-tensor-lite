@@ -2,13 +2,13 @@ import operator
 
 import numpy as np
 
-import finch.finch_logic as logic
-from finch.algebra.tensor import NDArrayFType
-from finch.autoschedule import (
+import finchlite.finch_logic as logic
+from finchlite.algebra.tensor import NDArrayFType
+from finchlite.autoschedule import (
     LogicCompiler,
 )
-from finch.compile import dimension
-from finch.finch_logic import (
+from finchlite.compile import dimension
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -20,7 +20,7 @@ from finch.finch_logic import (
     Reorder,
     Table,
 )
-from finch.finch_notation import (
+from finchlite.finch_notation import (
     Access,
     Assign,
     Block,
@@ -41,7 +41,7 @@ from finch.finch_notation import (
     Update,
     Variable,
 )
-from finch.finch_notation.nodes import Repack
+from finchlite.finch_notation.nodes import Repack
 
 
 def test_logic_compiler():
