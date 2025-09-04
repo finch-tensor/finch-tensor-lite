@@ -306,22 +306,22 @@ class LazyTensor(OverrideTensor):
         return logical_not(self)
 
     def __lt__(self, other):
-        return compare_less(self, other)
+        return less(self, other)
 
     def __le__(self, other):
-        return compare_less_equal(self, other)
+        return less_equal(self, other)
 
     def __gt__(self, other):
-        return compare_greater(self, other)
+        return greater(self, other)
 
     def __ge__(self, other):
-        return compare_greater_equal(self, other)
+        return greater_equal(self, other)
 
     def __eq__(self, other):
-        return compare_equal(self, other)
+        return equal(self, other)
 
     def __ne__(self, other):
-        return compare_not_equal(self, other)
+        return not_equal(self, other)
 
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
@@ -1628,27 +1628,27 @@ def logical_not(x) -> LazyTensor:
     return elementwise(np.logical_not, defer(x))
 
 
-def compare_less(x1, x2) -> LazyTensor:
+def less(x1, x2) -> LazyTensor:
     return elementwise(np.less, defer(x1), defer(x2))
 
 
-def compare_less_equal(x1, x2) -> LazyTensor:
+def less_equal(x1, x2) -> LazyTensor:
     return elementwise(np.less_equal, defer(x1), defer(x2))
 
 
-def compare_greater(x1, x2) -> LazyTensor:
+def greater(x1, x2) -> LazyTensor:
     return elementwise(np.greater, defer(x1), defer(x2))
 
 
-def compare_greater_equal(x1, x2) -> LazyTensor:
+def greater_equal(x1, x2) -> LazyTensor:
     return elementwise(np.greater_equal, defer(x1), defer(x2))
 
 
-def compare_equal(x1, x2) -> LazyTensor:
+def equal(x1, x2) -> LazyTensor:
     return elementwise(np.equal, defer(x1), defer(x2))
 
 
-def compare_not_equal(x1, x2) -> LazyTensor:
+def not_equal(x1, x2) -> LazyTensor:
     return elementwise(np.not_equal, defer(x1), defer(x2))
 
 
