@@ -5,9 +5,9 @@ import pytest
 
 import numpy as np
 
-import finch.finch_assembly as asm
-from finch.codegen import NumpyBuffer
-from finch.symbolic import FType, ftype
+import finchlite.finch_assembly as asm
+from finchlite.codegen import NumpyBuffer
+from finchlite.symbolic import FType, ftype
 
 
 def test_lit_basic():

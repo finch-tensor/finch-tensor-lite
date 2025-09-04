@@ -7,9 +7,9 @@ import pytest
 import numpy  # noqa: F401, ICN001
 import numpy as np
 
-from finch import finch_assembly as asm
-from finch.codegen import NumpyBuffer
-from finch.finch_assembly import (  # noqa: F401
+from finchlite import finch_assembly as asm
+from finchlite.codegen import NumpyBuffer
+from finchlite.finch_assembly import (  # noqa: F401
     AssemblyInterpreter,
     Assign,
     Block,
@@ -22,7 +22,7 @@ from finch.finch_assembly import (  # noqa: F401
     Return,
     Variable,
 )
-from finch.symbolic import ftype
+from finchlite.symbolic import ftype
 
 
 @pytest.mark.parametrize(

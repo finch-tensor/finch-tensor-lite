@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from finch.algebra import Tensor, TensorFType
-from finch.symbolic import FType, FTyped
+from finchlite.algebra import Tensor, TensorFType
+from finchlite.symbolic import FType, FTyped
 
 
 class LevelFType(FType, ABC):

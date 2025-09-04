@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import fill_value
+from finchlite.algebra import fill_value
 
 
 class TensorDef:

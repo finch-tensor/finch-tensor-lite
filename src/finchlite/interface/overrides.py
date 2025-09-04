@@ -4,6 +4,8 @@ from typing import Any
 
 import numpy as np
 
+import finchlite
+
 from ..algebra.tensor import Tensor
 
 element_wise_ufunc_map = {
@@ -102,6 +104,5 @@ class OverrideTensor(Tensor, ABC):
 
         if api_version not in {"2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
-        import finch
 
-        return finch
+        return finchlite

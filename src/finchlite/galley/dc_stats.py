@@ -5,9 +5,9 @@ from typing import Any
 
 import numpy as np
 
-import finch.finch_notation as ntn
-from finch.compile import dimension
-from finch.finch_notation.nodes import (
+import finchlite.finch_notation as ntn
+from finchlite.compile import dimension
+from finchlite.finch_notation.nodes import (
     Literal,
 )
 

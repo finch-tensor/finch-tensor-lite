@@ -18,7 +18,7 @@ For example, we might declare that the `__add__` method of a complex number
 is associative with the following code:
 
 ```python
-from finch import register_property
+from finchlite import register_property
 
 register_property(complex, "__add__", "is_associative", lambda obj: True)
 ```
@@ -26,7 +26,7 @@ register_property(complex, "__add__", "is_associative", lambda obj: True)
 Finch includes a convenience functions to query each property as well,
 for example:
 ```python
-from finch import query_property
+from finchlite import query_property
 from operator import add
 
 query_property(complex, "__add__", "is_associative")
@@ -110,31 +110,38 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
         msg += "Hint: You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
             msg += (
-                f"`finch.register_property({repr(obj)}, '{attr}', '{prop}', "
+                f"`finchlite.register_property({repr(obj)}, '{attr}', '{prop}', "
                 "lambda ...)` or "
             )
-        msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`"
+        msg += (
+            f"`finchlite.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`"
+        )
         msg += f"or you may define `{obj_name}.{attr}`. "
     elif attr == "__call__":
         msg += f"function '{repr(obj)}' has no property '{prop}'. "
         msg += "Hint: You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
             msg += (
-                f"`finch.register_property({repr(obj)}, '{attr}', '{prop}',"
+                f"`finchlite.register_property({repr(obj)}, '{attr}', '{prop}',"
                 " lambda ...)` or "
             )
-        msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
+        msg += (
+            f"`finchlite.register_property({obj_name},{attr}', '{prop}', lambda ...)`."
+        )
     else:
         msg += f"attribute '{obj_name}.{attr}' has no property '{prop}'. "
         msg += "You may need to register the property by calling "
         if isinstance(obj, Hashable) and not isinstance(obj, type):
             msg += (
-                f"finch.register_property({repr(obj)}, '{attr}', '{prop}'"
+                f"finchlite.register_property({repr(obj)}, '{attr}', '{prop}'"
                 ", lambda ...) or "
             )
-        msg += f"`finch.register_property({obj_name}, '{attr}', '{prop}', lambda ...)`."
+        msg += (
+            f"`finchlite.register_property({obj_name},"
+            f" '{attr}', '{prop}', lambda ...)`."
+        )
     msg += (
-        " See https://github.com/finch-tensor/finch-tensor-lite/blob/main/src/finch/"
+        " See https://github.com/finch-tensor/finch-tensor-lite/blob/main/src/finch-lite/"
         "algebra/algebra.py for more information."
     )
     raise AttributeError(msg)
