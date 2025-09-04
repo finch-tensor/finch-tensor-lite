@@ -2,11 +2,11 @@ import operator
 
 import numpy as np
 
-import finch.finch_assembly as asm
-import finch.finch_logic as log
-import finch.finch_notation as ntn
-from finch.codegen.numpy_buffer import NumpyBuffer
-from finch.compile import dimension
+import finchlite.finch_assembly as asm
+import finchlite.finch_logic as log
+import finchlite.finch_notation as ntn
+from finchlite.codegen.numpy_buffer import NumpyBuffer
+from finchlite.compile import dimension
 
 
 def test_log_printer(file_regression):

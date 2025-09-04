@@ -3,7 +3,7 @@ import operator
 
 import numpy as np
 
-from finch.algebra import (
+from finchlite.algebra import (
     init_value,
     is_annihilator,
     is_associative,

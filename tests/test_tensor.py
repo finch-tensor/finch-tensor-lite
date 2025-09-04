@@ -1,6 +1,6 @@
 import numpy as np
 
-from finch import (
+from finchlite import (
     DenseLevelFType,
     ElementLevelFType,
     FiberTensorFType,
