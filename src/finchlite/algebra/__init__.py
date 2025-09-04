@@ -13,13 +13,13 @@ from .algebra import (
 )
 from .operator import (
     InitWrite,
+    TupleFormat,
     conjugate,
     first_arg,
     identity,
     overwrite,
     promote_max,
     promote_min,
-    TupleFormat,
     tuple_first,
     tuple_last,
 )
@@ -36,6 +36,7 @@ __all__ = [
     "StableNumber",
     "Tensor",
     "TensorFType",
+    "TupleFormat",
     "conjugate",
     "conjugate",
     "element_type",
@@ -58,7 +59,6 @@ __all__ = [
     "register_property",
     "return_type",
     "shape_type",
-    "TupleFormat",
     "tuple_first",
     "tuple_last",
 ]

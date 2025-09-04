@@ -1199,15 +1199,14 @@ def test_flatten(array_shape, expected_shape, wrapper):
 
     assert_equal(result, expected, strict=True)
 
+
 @pytest.mark.parametrize(
     "a,b",
     [
         # simple original
         (
-            np.array([[5, 8, 13],
-                      [9, 10, 11]]),
-            np.array([[2, 3, 4],
-                      [5, 2, 3]]),
+            np.array([[5, 8, 13], [9, 10, 11]]),
+            np.array([[2, 3, 4], [5, 2, 3]]),
         ),
         # broadcasting: scalar divisor
         (np.arange(12).reshape(3, 4), 3),
@@ -1219,7 +1218,7 @@ def test_flatten(array_shape, expected_shape, wrapper):
             np.array([3, -3, 4, -4, 5, -5, -6, 6, -7]),
         ),
         # high-dim array
-        (np.arange(2*3*4).reshape(2, 3, 4), np.ones((2, 3, 4), dtype=int)),
+        (np.arange(2 * 3 * 4).reshape(2, 3, 4), np.ones((2, 3, 4), dtype=int)),
         # empty arrays
         (np.array([], dtype=int), np.array([], dtype=int)),
     ],
@@ -1251,7 +1250,7 @@ def test_divmod_array_of_tuples_param_ok(a, b):
     q_expected, r_expected = np.divmod(a, b)
 
     q_tuple_first = finchlite.first(finchlite.divmod(a, b))
-    r_tuple_last  = finchlite.last(finchlite.divmod(a, b))
+    r_tuple_last = finchlite.last(finchlite.divmod(a, b))
 
     assert_equal(q_tuple_first, q_expected, True)
-    assert_equal(r_tuple_last,  r_expected, True)
+    assert_equal(r_tuple_last, r_expected, True)

@@ -25,7 +25,6 @@ from ..algebra import (
     query_property,
     register_property,
     return_type,
-    TupleFormat,
     tuple_first,
     tuple_last,
 )
@@ -1530,6 +1529,7 @@ def stack(arrays, /, axis: int = 0) -> LazyTensor:
     # concat, this will also do the shape verification
     return concat(arrays, axis=axis)
 
+
 def sin(x) -> LazyTensor:
     return elementwise(np.sin, defer(x))
 
@@ -1669,6 +1669,7 @@ def std(
     d = var(x, axis=axis, correction=correction, keepdims=keepdims)
     return pow(d, 0.5)
 
+
 def divmod(x1, x2):
     return TupleTensor(floordiv(x1, x2), mod(x1, x2))
 
@@ -1681,6 +1682,7 @@ def first(x):
         return x.a
     return elementwise(tuple_first, defer(x))
 
+
 def last(x):
     """
     Elementwise tuple accessor: returns the last component of a tuple-typed array.
@@ -1689,9 +1691,11 @@ def last(x):
         return x.b
     return elementwise(tuple_last, defer(x))
 
+
 def divmod_arrays(x1, x2):
     t = divmod(x1, x2)
     return first(t), last(t)
+
 
 class TupleTensor:
     """

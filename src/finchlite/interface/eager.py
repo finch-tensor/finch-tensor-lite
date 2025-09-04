@@ -838,18 +838,22 @@ def std(
         return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
 
+
 def divmod(x1, x2):
     return lazy.divmod(x1, x2)
+
 
 def first(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.first(x)
     return compute(lazy.first(x))
 
+
 def last(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.last(x)
     return compute(lazy.last(x))
+
 
 def divmod_arrays(x1, x2):
     q, r = lazy.divmod_arrays(x1, x2)

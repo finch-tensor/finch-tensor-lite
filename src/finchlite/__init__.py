@@ -1,4 +1,11 @@
-from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type, TupleFormat
+from .algebra import (
+    Tensor,
+    TensorFType,
+    TupleFormat,
+    element_type,
+    fill_value,
+    shape_type,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -47,12 +54,16 @@ from .interface import (
     cos,
     cosh,
     defer,
+    divmod,
+    divmod_arrays,
     elementwise,
     expand_dims,
+    first,
     flatten,
     floordiv,
     fuse,
     fused,
+    last,
     log,
     log1p,
     log2,
@@ -90,10 +101,6 @@ from .interface import (
     truediv,
     var,
     vecdot,
-    divmod,
-    divmod_arrays,
-    first,
-    last,
 )
 from .symbolic import (
     FTyped,
@@ -107,9 +114,6 @@ from .tensor import (
 )
 
 __all__ = [
-    "first",
-    "last",
-    "TupleFormat",
     "DC",
     "BufferizedNDArray",
     "DCStats",
@@ -130,6 +134,7 @@ __all__ = [
     "Tensor",
     "TensorDef",
     "TensorFType",
+    "TupleFormat",
     "abs",
     "acos",
     "acosh",
@@ -157,17 +162,21 @@ __all__ = [
     "cosh",
     "defer",
     "dimension",
+    "divmod",
+    "divmod_arrays",
     "element_type",
     "elementwise",
     "expand_dims",
     "extent",
     "fill_value",
+    "first",
     "fisinstance",
     "flatten",
     "floordiv",
     "ftype",
     "fuse",
     "fused",
+    "last",
     "log",
     "log1p",
     "log2",
@@ -206,6 +215,4 @@ __all__ = [
     "truediv",
     "var",
     "vecdot",
-    "divmod",
-    "divmod_arrays",
 ]

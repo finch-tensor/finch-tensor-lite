@@ -1,7 +1,8 @@
-from . import algebra
-import operator, numpy as np
-from . import return_type
+import operator
 
+import numpy as np
+
+from . import algebra, return_type
 
 
 def and_test(a, b):
@@ -151,6 +152,7 @@ algebra.register_property(
     lambda op, x: x,
 )
 
+
 class TupleFormat:
     """
     Lazy tuple element-type. Does not store component formats;
@@ -172,8 +174,10 @@ class TupleFormat:
     def __getitem__(self, i):
         return self.tuple()[i]
 
+
 def tuple_first(x):
     return x[0]
+
 
 algebra.register_property(
     tuple_first,
@@ -182,8 +186,10 @@ algebra.register_property(
     lambda op, x: x[0],
 )
 
+
 def tuple_last(x):
     return x[-1]
+
 
 algebra.register_property(
     tuple_last,
@@ -193,9 +199,13 @@ algebra.register_property(
 )
 
 algebra.register_property(
-    np.divmod, "__call__", "return_type",
-    lambda _op, a, b: TupleFormat((
-        return_type(operator.floordiv, a, b),
-        return_type(operator.mod, a, b),
-    )),
+    np.divmod,
+    "__call__",
+    "return_type",
+    lambda _op, a, b: TupleFormat(
+        (
+            return_type(operator.floordiv, a, b),
+            return_type(operator.mod, a, b),
+        )
+    ),
 )
