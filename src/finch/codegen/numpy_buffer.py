@@ -9,6 +9,11 @@ from .c import CBufferFType, CStackFType, c_type
 from .numba_backend import NumbaBufferFType
 
 
+class BufferFields(NamedTuple):
+    data: str
+    length: str
+    obj: str
+
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
 def numpy_buffer_resize_callback(buf_ptr, new_length):
     """
@@ -142,11 +147,6 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
             f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
             f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
         )
-
-        class BufferFields(NamedTuple):
-            data: str
-            length: str
-            obj: str
 
         return BufferFields(data, length, var_n)
 
