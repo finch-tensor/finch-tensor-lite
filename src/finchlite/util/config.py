@@ -12,7 +12,7 @@ Finch Configuration Module
 
 This module manages configuration settings for the Finch application.
 Finch stores its settings and data in the `FINCH_PATH` directory, which
-defaults to `~/.finch` but can be customized using the `FINCH_PATH`
+defaults to `~/.finchlite` but can be customized using the `FINCH_PATH`
 environment variable.
 
 Configuration details:
@@ -29,7 +29,7 @@ is_windows = os.name == "nt"
 is_apple = sys.platform == "darwin"
 
 default = {
-    "data_path": str(Path(sysconfig.get_path("data")) / "finch"),
+    "data_path": str(Path(sysconfig.get_path("data")) / "finchlite"),
     "cache_size": 10_000,
     "cache_enable": True,
     "cc": str(os.getenv("CC") or shutil.which("gcc") or ("cl" if is_windows else "cc")),
@@ -43,12 +43,12 @@ default = {
     ),
 }
 
-config = donfig.Config("finch", defaults=[default])
+config = donfig.Config("finchlite", defaults=[default])
 
 
 def get_version():
     """
-    Get the version of Finch.
+    Get the version of finchlite.
     """
 
     return version("finch-tensor-lite")

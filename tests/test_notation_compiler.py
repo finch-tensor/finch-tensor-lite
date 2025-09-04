@@ -4,12 +4,12 @@ import pytest
 
 import numpy as np
 
-import finch
-import finch.finch_notation as ntn
-from finch import ftype
-from finch.compile import ExtentFType, NotationCompiler, dimension
-from finch.finch_assembly import AssemblyInterpreter
-from finch.symbolic import Reflector
+import finchlite
+import finchlite.finch_notation as ntn
+from finchlite import ftype
+from finchlite.compile import ExtentFType, NotationCompiler, dimension
+from finchlite.finch_assembly import AssemblyInterpreter
+from finchlite.symbolic import Reflector
 
 
 @pytest.mark.parametrize(
@@ -30,8 +30,8 @@ def test_matrix_multiplication(a, b):
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
 
-    a_buf = finch.compile.BufferizedNDArray(a)
-    b_buf = finch.compile.BufferizedNDArray(b)
+    a_buf = finchlite.compile.BufferizedNDArray(a)
+    b_buf = finchlite.compile.BufferizedNDArray(b)
 
     a_format = ftype(a_buf)
 
@@ -129,7 +129,7 @@ def test_matrix_multiplication(a, b):
     # NOTATION
     ntn_mod = ntn.NotationInterpreter()(prgm)
 
-    c_buf = finch.compile.BufferizedNDArray(
+    c_buf = finchlite.compile.BufferizedNDArray(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
@@ -141,7 +141,7 @@ def test_matrix_multiplication(a, b):
     asm_program = NotationCompiler(Reflector())(prgm)
     asm_mod = AssemblyInterpreter()(asm_program)
 
-    c_buf = finch.compile.BufferizedNDArray(
+    c_buf = finchlite.compile.BufferizedNDArray(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
@@ -156,7 +156,7 @@ def test_matrix_multiplication_regression(file_regression):
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
 
-    a_buf = finch.compile.BufferizedNDArray(a)
+    a_buf = finchlite.compile.BufferizedNDArray(a)
     a_format = ftype(a_buf)
 
     A = ntn.Variable("A", a_format)

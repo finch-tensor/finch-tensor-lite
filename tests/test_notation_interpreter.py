@@ -7,10 +7,10 @@ import numpy  # noqa: F401, ICN001
 import numpy as np
 from numpy.testing import assert_equal
 
-import finch  # noqa: F401
-import finch.finch_notation as ntn
-from finch.compile import dimension
-from finch.finch_notation import (  # noqa: F401
+import finchlite  # noqa: F401
+import finchlite.finch_notation as ntn
+from finchlite.compile import dimension
+from finchlite.finch_notation import (  # noqa: F401
     Access,
     Assign,
     Block,

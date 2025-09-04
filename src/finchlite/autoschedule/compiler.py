@@ -344,7 +344,7 @@ def record_tables(
     dict[Field, Field],
 ]:
     """
-    Transforms plan from Finch Logic to Finch Notation convention. Moves physical
+    Transforms plan from finchlite Logic to Finch Notation convention. Moves physical
     table out of the plan and memorizes dimension sizes as separate variables to
     be used in loops.
     """

@@ -4,8 +4,8 @@ import pytest
 
 from numpy.random import default_rng
 
-from finch.finch_logic import Field
-from finch.interface import get_default_scheduler, set_default_scheduler
+from finchlite.finch_logic import Field
+from finchlite.interface import get_default_scheduler, set_default_scheduler
 
 
 @pytest.fixture(scope="session")
