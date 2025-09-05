@@ -50,23 +50,42 @@ Performance:
   or `with_scheduler`.
 """
 
+from enum import Enum
+
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
+from ..codegen import NumbaCompiler
+from ..compile import NotationCompiler
+from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import Alias, FinchLogicInterpreter, Plan, Produces, Query
 from ..finch_notation import NotationInterpreter
-from ..symbolic import gensym
+from ..symbolic import Reflector, gensym
 from .lazy import defer
 
 _DEFAULT_SCHEDULER = None
 
 
-def set_default_scheduler(*, ctx=None, interpret_logic=False):
+class Mode(Enum):
+    INTERPRET_LOGIC = 0
+    INTERPRET_NOTATION = 1
+    INTERPRET_ASSEMBLY = 2
+    COMPILE_NUMBA = 3
+    COMPILE_C = 4
+
+
+def set_default_scheduler(
+    *,
+    ctx=None,
+    mode=Mode.INTERPRET_LOGIC,  # TODO: change to NOTATION
+):
     global _DEFAULT_SCHEDULER
 
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
-    elif interpret_logic:
+
+    elif mode == Mode.INTERPRET_LOGIC:
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
-    else:
+
+    elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         ntn_interp = NotationInterpreter()
 
@@ -77,6 +96,44 @@ def set_default_scheduler(*, ctx=None, interpret_logic=False):
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
+
+    elif mode == Mode.INTERPRET_ASSEMBLY:
+        optimizer = DefaultLogicOptimizer(LogicCompiler())
+        notation_compiler = NotationCompiler(Reflector())
+        asm_interp = AssemblyInterpreter()
+
+        def fn_compile(plan):
+            ntn_prgm, tables = optimizer(plan)
+            asm_prgm = notation_compiler(ntn_prgm)
+            mod = asm_interp(asm_prgm)
+            args = [tables[Alias(arg.name)].tns.val for arg in asm_prgm.funcs[0].args]
+            return (mod.func(*args),)
+
+        _DEFAULT_SCHEDULER = fn_compile
+
+    elif mode == Mode.COMPILE_NUMBA:
+        optimizer = DefaultLogicOptimizer(LogicCompiler())
+        notation_compiler = NotationCompiler(Reflector())
+        numba_compiler = NumbaCompiler()
+
+        def fn_compile(plan):
+            # TODO: proper logging
+            # print("Logic: \n", plan)
+            ntn_prgm, tables = optimizer(plan)
+            # print("Notation: \n", ntn_prgm)
+            asm_prgm = notation_compiler(ntn_prgm)
+            # print("Assembler: \n", asm_prgm)
+            mod = numba_compiler(asm_prgm)
+            args = [tables[Alias(arg.name)].tns.val for arg in asm_prgm.funcs[0].args]
+            return (mod.func(*args),)
+
+        _DEFAULT_SCHEDULER = fn_compile
+
+    elif mode == Mode.COMPILE_C:
+        raise NotImplementedError
+
+    else:
+        raise Exception(f"Invalid scheduler mode: {mode}")
 
 
 set_default_scheduler()
@@ -111,7 +168,7 @@ def compute(arg, ctx=None):
     res = ctx(prgm)
     if isinstance(arg, tuple):
         return tuple(res)
-    return res[0]
+    return res[0].to_numpy() if hasattr(res[0], "to_numpy") else res[0]
 
 
 def fuse(f, *args, ctx=None):
