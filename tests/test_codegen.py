@@ -388,7 +388,7 @@ def test_if_statement(compiler, buffer):
 def test_simple_struct(compiler):
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))
-    x = (1, 4)
+    x = (np.int64(1), np.int64(4))
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
@@ -716,3 +716,21 @@ def test_np_numba_serialization(value, np_type):
     constructed = construct_from_numba(np_type, serialized)
     assert constructed == np_type(value)
     assert deserialize_from_numba(np_type, constructed, serialized) is None
+
+
+def test_e2e_numba():
+    ctx = finchlite.get_default_scheduler()  # TODO: as fixture
+    finchlite.set_default_scheduler(mode=finchlite.Mode.COMPILE_NUMBA)
+
+    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=np.float64)
+    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=np.float64)
+
+    wa = finchlite.defer(a)
+    wb = finchlite.defer(b)
+
+    plan = finchlite.matmul(wa, wb)
+    result = finchlite.compute(plan)
+
+    assert_equal(result, a @ b)
+
+    finchlite.set_default_scheduler(ctx=ctx)

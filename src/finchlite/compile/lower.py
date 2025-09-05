@@ -6,10 +6,11 @@ from typing import Any
 import numpy as np
 
 from finchlite.finch_assembly.struct import AssemblyStructFType
+from finchlite.util.print import qual_str
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType
+from ..algebra import TensorFType, register_property
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 
 
@@ -76,16 +77,32 @@ class Extent:
         )
 
 
-def extent(start, end):
-    """
-    Create an extent value for a loop.
-    """
-    return Extent(start, end)
-
-
-def dimension(tns, mode):
+def dimension(tns, mode: int) -> Extent:
     end = tns.shape[mode]
-    return extent(type(end)(0), end)
+    return Extent(type(end)(0), end)
+
+
+def numba_lower_dimension(ctx, tns, mode: int) -> str:
+    return (
+        f"Numba_Extent(type({ctx(tns)}.shape.element_{mode})(0), "
+        f"{ctx(tns)}.shape.element_{mode})"
+    )
+
+
+register_property(
+    dimension,
+    "__call__",
+    "return_type",
+    lambda op, x, y: ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
+)
+
+
+register_property(
+    dimension,
+    "numba_literal",
+    "__attr__",
+    lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
+)
 
 
 @dataclass(eq=True, frozen=True)
@@ -123,6 +140,9 @@ class FinchCompileError(Exception):
 class ExtentFType(AssemblyStructFType):
     start: Any
     end: Any
+
+    def __repr__(self):
+        return f"ExtentFType(start={qual_str(self.start)}, end={qual_str(self.end)})"
 
     @classmethod
     def stack(cls, start, end):

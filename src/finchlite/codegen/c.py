@@ -1066,7 +1066,7 @@ register_property(
 
 
 def struct_construct_from_c(fmt: AssemblyStructFType, c_struct):
-    args = [getattr(c_struct, name) for (name, _) in fmt.struct_fieldnames]
+    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return fmt.__class__(*args)
 
 

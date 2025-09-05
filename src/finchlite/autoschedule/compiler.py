@@ -1,13 +1,20 @@
 import operator
+from functools import reduce
 from typing import TypeVar, overload
 
 import numpy as np
 
+from finchlite.codegen.numpy_buffer import NumpyBufferFType
+from finchlite.compile.bufferized_ndarray import (
+    BufferizedNDArray,
+    BufferizedNDArrayFType,
+)
+from finchlite.finch_assembly.struct import TupleFType, tupleformat
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import InitWrite, TensorFType, query_property, return_type
-from ..algebra.tensor import NDArrayFType
-from ..compile import dimension
+from ..compile import ExtentFType, dimension
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -136,7 +143,7 @@ class PointwiseLowerer:
                         tuple(
                             self(idx, slot_vars, field_relabels)
                             if idx in self.loop_idxs
-                            else ntn.Value(asm.Literal(0), int)
+                            else ntn.Value(asm.Literal(0), np.intp)
                             for idx in idxs_1
                         ),
                     )
@@ -146,7 +153,7 @@ class PointwiseLowerer:
             case Reorder(arg, _):
                 return self(arg, slot_vars, field_relabels)
             case Field(_) as f:
-                return ntn.Variable(field_relabels.get(f, f).name, int)
+                return ntn.Variable(field_relabels.get(f, f).name, np.intp)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -187,7 +194,16 @@ class LogicLowerer:
         match ex:
             case Query(Alias(name), Table(tns, _)) if isinstance(tns, np.ndarray):
                 return ntn.Assign(
-                    ntn.Variable(name, NDArrayFType(tns.dtype, tns.ndim)),
+                    ntn.Variable(
+                        name,
+                        BufferizedNDArrayFType(
+                            NumpyBufferFType(tns.dtype),
+                            tns.shape,
+                            TupleFType.from_tuple(
+                                tuple([np.intp for _ in range(tns.ndim)])
+                            ),
+                        ),
+                    ),
                     compile_logic_constant(tns),
                 )
             case Query(Alias(_), None):
@@ -245,7 +261,10 @@ class LogicLowerer:
                     ntn.Literal(init),
                     ntn.Literal(op),
                     tuple(
-                        ntn.Variable(f"{field_relabels.get(idx, idx).name}_size", int)
+                        ntn.Variable(
+                            f"{field_relabels.get(idx, idx).name}_size",
+                            ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
+                        )
                         for idx in lhs_idxs
                     ),
                 )
@@ -257,7 +276,9 @@ class LogicLowerer:
                                 agg_slot,
                                 ntn.Update(ntn.Literal(op)),
                                 tuple(
-                                    ntn.Variable(field_relabels.get(idx, idx).name, int)
+                                    ntn.Variable(
+                                        field_relabels.get(idx, idx).name, np.intp
+                                    )
                                     for idx in lhs_idxs
                                 ),
                             ),
@@ -265,13 +286,13 @@ class LogicLowerer:
                         ),
                     )
                 )
-                for idx in idxs_2:
+                for idx in reversed(idxs_2):
                     if idx in rhs_idxs:
                         body = ntn.Loop(
-                            ntn.Variable(field_relabels.get(idx, idx).name, int),
-                            # TODO (mtsokol): Use correct loop index type
+                            ntn.Variable(field_relabels.get(idx, idx).name, np.intp),
                             ntn.Variable(
-                                f"{field_relabels.get(idx, idx).name}_size", int
+                                f"{field_relabels.get(idx, idx).name}_size",
+                                ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
                             ),
                             body,
                         )
@@ -319,15 +340,23 @@ class LogicLowerer:
                         for body in bodies
                     )
                 )
-                return ntn.Module(
-                    (
-                        ntn.Function(
-                            ntn.Variable("func", np.ndarray),
-                            tuple(var for var in table_vars.values()),
-                            func_block,
-                        ),
-                    )
-                )
+                last_statement = func_block.bodies[-1]
+                match last_statement:
+                    case ntn.Return(ntn.Variable(_, return_type)):
+                        return ntn.Module(
+                            (
+                                ntn.Function(
+                                    ntn.Variable("func", return_type),
+                                    tuple(var for var in table_vars.values()),
+                                    func_block,
+                                ),
+                            )
+                        )
+                    case _:
+                        raise Exception(
+                            "Last function's statement should be Return, "
+                            f"but is: {last_statement}."
+                        )
 
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
@@ -369,8 +398,9 @@ def record_tables(
                 tables[alias] = tbl
                 for idx, field in enumerate(fields):
                     assert isinstance(field, Field)
-                    # TODO (mtsokol): Use correct loop index type
-                    dim_size_var = ntn.Variable(f"{field.name}_size", int)
+                    dim_size_var = ntn.Variable(
+                        f"{field.name}_size", ExtentFType(np.intp, np.intp)
+                    )
                     if dim_size_var not in dim_size_vars:
                         dim_size_vars[dim_size_var] = ntn.Call(
                             ntn.Literal(dimension), (table_var, ntn.Literal(idx))
@@ -382,9 +412,11 @@ def record_tables(
                 table_vars[alias] = ntn.Variable(name, suitable_rep)
                 tables[alias] = Table(
                     Literal(
-                        np.zeros(
-                            dtype=suitable_rep.element_type,
-                            shape=tuple(1 for _ in range(suitable_rep.ndim)),
+                        BufferizedNDArray(
+                            np.zeros(
+                                dtype=suitable_rep.element_type,
+                                shape=suitable_rep.shape,
+                            )
                         )
                     ),
                     rhs.fields,
@@ -408,30 +440,38 @@ def record_tables(
 
 def find_suitable_rep(root, table_vars) -> TensorFType:
     match root:
+        # TODO: take into consideration reorders!
         case MapJoin(Literal(op), args):
             args_suitable_reps = [find_suitable_rep(arg, table_vars) for arg in args]
-            return NDArrayFType(
-                dtype=np.dtype(
-                    return_type(
-                        op,
-                        *[rep.element_type for rep in args_suitable_reps],
-                    )
-                ),
-                ndim=max(rep.ndim for rep in args_suitable_reps),
+            dtype = np.dtype(
+                return_type(
+                    op,
+                    *[rep.element_type for rep in args_suitable_reps],
+                )
             )
-        case Aggregate(Literal(op), init, arg, idxs):
+            init_tuple: tuple[int, ...] = ()
+            shape = reduce(
+                lambda x, y: np.broadcast_shapes(x, y.shape),
+                args_suitable_reps,
+                init_tuple,
+            )
+            intp_shape = tuple(np.intp(x) for x in shape)
+            return BufferizedNDArrayFType(
+                NumpyBufferFType(dtype),
+                intp_shape,
+                tupleformat(intp_shape),
+            )
+        case Aggregate(Literal(op), init, arg, _):
             init_suitable_rep = find_suitable_rep(init, table_vars)
             arg_suitable_rep = find_suitable_rep(arg, table_vars)
-            return NDArrayFType(
-                dtype=np.dtype(
-                    return_type(
-                        op,
-                        init_suitable_rep.element_type,
-                        arg_suitable_rep.element_type,
-                    )
-                ),
-                ndim=len(arg.fields) - len(idxs),
+            dtype = NumpyBufferFType(
+                return_type(
+                    op, init_suitable_rep.element_type, arg_suitable_rep.element_type
+                )
             )
+            # TODO: take into consideration relabels (expand_dims)!
+            intp_shape = arg_suitable_rep.shape
+            return BufferizedNDArrayFType(dtype, intp_shape, tupleformat(intp_shape))
         case LogicTree() as tree:
             for child in tree.children:
                 suitable_rep = find_suitable_rep(child, table_vars)
