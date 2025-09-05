@@ -21,13 +21,19 @@ class TensorFType(FType, ABC):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def element_type(self) -> Any:
         """Data type of the tensor elements."""
         ...
 
     @property
     @abstractmethod
-    def shape_type(self) -> tuple:
+    def shape(self) -> tuple[np.intp, ...]:
+        """Shape of the tensor as a tuple."""
+        ...
+
+    @property
+    @abstractmethod
+    def shape_type(self) -> tuple[type, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
         should be an actual tuple, rather than a tuple type, so that it can hold
@@ -49,12 +55,6 @@ class Tensor(FTyped, ABC):
     def ndim(self) -> int:
         """Number of dimensions of the tensor."""
         return self.ftype.ndim
-
-    @property
-    @abstractmethod
-    def shape(self):
-        """Shape of the tensor as a tuple."""
-        ...
 
     @property
     @abstractmethod
@@ -143,9 +143,10 @@ class NDArrayFType(TensorFType):
     This includes the fill value, element type, and shape type.
     """
 
-    def __init__(self, dtype: np.dtype, ndim: int):
+    def __init__(self, dtype: np.dtype, shape: tuple):
         self._dtype = dtype
-        self._ndim = ndim
+        self._ndim = len(shape)
+        self._shape = shape
 
     def __eq__(self, other):
         if not isinstance(other, NDArrayFType):
@@ -174,7 +175,11 @@ class NDArrayFType(TensorFType):
     def shape_type(self) -> tuple:
         return tuple(np.int_ for _ in range(self._ndim))
 
+    @property
+    def shape(self) -> tuple:
+        return self._shape
+
 
 register_property(
-    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, x.ndim)
+    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, x.shape)
 )

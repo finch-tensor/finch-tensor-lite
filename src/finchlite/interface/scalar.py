@@ -34,6 +34,10 @@ class ScalarFType(TensorFType):
     def shape_type(self):
         return ()
 
+    @property
+    def shape(self):
+        return ()
+
 
 class Scalar(EagerTensor):
     def __init__(self, val: Any, fill_value: Any = None):
