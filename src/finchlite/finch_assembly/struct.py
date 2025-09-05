@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Any, override
+from typing import Any
 
 from ..algebra import register_property
 from ..symbolic import FType, ftype
@@ -83,12 +83,10 @@ class TupleFType(AssemblyStructFType):
     def __len__(self):
         return len(self._struct_formats)
 
-    @override
     def struct_getattr(self, obj, attr):
         index = list(self.struct_fieldnames).index(attr)
         return obj[index]
 
-    @override
     def struct_setattr(self, obj, attr, value):
         index = list(self.struct_fieldnames).index(attr)
         obj[index] = value
