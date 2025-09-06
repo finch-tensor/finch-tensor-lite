@@ -159,6 +159,12 @@ register_property(
     lambda c_obj: None,
 )
 
+def deserialize_from_c_scalar(_, obj, c_value):
+    """
+    A deserializer for scalars. Apparently you need this.
+    """
+    obj.value = c_value.value
+
 for t in (
     ctypes.c_bool,
     ctypes.c_char,
@@ -191,9 +197,14 @@ for t in (
         t,
         "serialize_to_c",
         "__attr__",
-        lambda obj: obj,
+        lambda fmt, obj: obj,
     )
-
+    register_property(
+        t,
+        "deserialize_from_c",
+        "__attr__",
+        deserialize_from_c_scalar,
+    )
 
 class CKernel:
     """
@@ -229,7 +240,6 @@ class CKernel:
         if self.ret_type is type(None):
             return None
         return self.ret_type(res)
-
 
 class CModule:
     """

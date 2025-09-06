@@ -6,6 +6,7 @@ from .numba_backend import (
     NumbaModule,
 )
 from .numpy_buffer import NumpyBuffer, NumpyBufferFType
+from .safe_buffer import SafeNumpyBuffer, SafeNumpyBufferFType
 
 __all__ = [
     "CArgumentFType",
@@ -24,4 +25,6 @@ __all__ = [
     "NumbaStructFType",
     "NumpyBuffer",
     "NumpyBufferFType",
+    "SafeNumpyBuffer",
+    "SafeNumpyBufferFType",
 ]

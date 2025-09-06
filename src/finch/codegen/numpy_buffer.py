@@ -238,3 +238,8 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         Construct a NumpyBuffer from a Numba-compatible object.
         """
         return NumpyBuffer(numba_buffer[0])
+
+if __name__ == "__main__":
+    import finch.finch_assembly as asm
+    prgm = asm.AssemblyNode
+    pass
