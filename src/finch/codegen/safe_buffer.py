@@ -4,7 +4,7 @@ from typing import NamedTuple
 import numpy as np
 
 from finch.codegen.numpy_buffer import (
-    BufferFields,
+    CBufferFields,
     CNumpyBuffer,
     NumpyBufferFType,
     NumpyBuffer,
@@ -101,60 +101,3 @@ __all__ = [
     "SafeNumpyBuffer",
     "SafeNumpyBufferFType",
 ]
-
-if __name__ == "__main__":
-
-    a = np.array([1, 2, 3], dtype=ctypes.c_double)
-    ab = SafeNumpyBuffer(a)
-
-    ab_v = asm.Variable("a", ab.ftype)
-    ab_slt = asm.Slot("a_", ab.ftype)
-    idx = asm.Variable("idx", ctypes.c_size_t)
-    val = asm.Variable("val", ctypes.c_double)
-
-    res_var = asm.Variable("val", ab.ftype.element_type)
-
-    prgm = asm.Module(
-        (
-            asm.Function(
-                asm.Variable("finch_access", ab.ftype.element_type),
-                (ab_v, idx),
-                asm.Block(
-                    (
-                        asm.Unpack(ab_slt, ab_v),
-                        asm.Assign(
-                            res_var,
-                            asm.Load(ab_slt, idx),
-                        ),
-                        asm.Return(res_var),
-                    )
-                ),
-            ),
-            asm.Function(
-                asm.Variable("finch_change", ab.ftype.element_type),
-                (ab_v, idx, val),
-                asm.Block(
-                    (
-                        asm.Unpack(ab_slt, ab_v),
-                        asm.Store(
-                            ab_slt,
-                            idx,
-                            val,
-                        ),
-                    )
-                ),
-            ),
-        )
-    )
-    compiler = CCompiler()
-    mod = compiler(prgm)
-    access = mod.finch_access
-    change = mod.finch_change
-    print(ab)
-    print(access(ab, ctypes.c_size_t(0)))
-    change(ab, ctypes.c_size_t(0), ctypes.c_double(2))
-    print(ab)
-    # should fail here.
-    print(access(ab, ctypes.c_size_t(3)))
-    change(ab, ctypes.c_size_t(3), ctypes.c_double(2))
-    print(ab)

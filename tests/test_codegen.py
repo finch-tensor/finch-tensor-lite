@@ -1,5 +1,8 @@
 import operator
 from collections import namedtuple
+from pathlib import Path
+import re
+import subprocess
 
 import pytest
 
@@ -427,3 +430,64 @@ def test_simple_struct(compiler):
 
     result = mod.simple_struct(p, x)
     assert result == np.float64(9.0)
+
+
+@pytest.mark.parametrize(
+    "size,idx",
+    [(size, idx) for size in range(1, 4) for idx in range(-1, 4)],
+)
+def test_c_load_safebuffer(size, idx):
+    tester = (Path(__file__).parent / "safebufferaccess.py").absolute()
+    result = subprocess.run(
+        [
+            str(tester),
+            "-s",
+            str(size),
+            "load",
+            str(idx),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if 0 <= idx < size:
+        assert result.stdout.strip() == str(idx)
+    else:
+        assert "bounds" in result.stderr
+        assert result.returncode == 1
+
+
+@pytest.mark.parametrize(
+    "size,idx,value",
+    [
+        (size, idx, value)
+        for size in range(1, 4)
+        for idx in range(-1, 3)
+        for value in [-1, 1434]
+    ],
+)
+def test_c_store_safebuffer(size, idx, value):
+    tester = (Path(__file__).parent / "safebufferaccess.py").absolute()
+    result = subprocess.run(
+        [
+            str(tester),
+            "-s",
+            str(size),
+            "store",
+            str(idx),
+            str(value),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if 0 <= idx < size:
+        arr = list(map(str, range(size)))
+        arr[idx] = str(value)
+        stdout = result.stdout.strip()
+        stdout = re.sub(r"\s+", " ", stdout)
+        stdout = stdout.replace("[ ", "[")
+        assert stdout == f"[{' '.join(arr)}]"
+    else:
+        assert "bounds" in result.stderr
+        assert result.returncode == 1

@@ -9,10 +9,16 @@ from .c import CBufferFType, CStackFType, c_type
 from .numba_backend import NumbaBufferFType
 
 
-class BufferFields(NamedTuple):
+class NumbaBufferFields(NamedTuple):
+    arr: str
+    obj: str
+
+
+class CBufferFields(NamedTuple):
     data: str
     length: str
     obj: str
+
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
 def numpy_buffer_resize_callback(buf_ptr, new_length):
@@ -148,7 +154,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
             f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
         )
 
-        return BufferFields(data, length, var_n)
+        return CBufferFields(data, length, var_n)
 
     def c_repack(self, ctx, lhs, obj):
         """
@@ -210,11 +216,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         arr = ctx.freshen(var_n, "arr")
         ctx.exec(f"{ctx.feed}{arr} = {ctx(val)}[0]")
 
-        class BufferFields(NamedTuple):
-            arr: str
-            obj: str
-
-        return BufferFields(arr, var_n)
+        return NumbaBufferFields(arr, var_n)
 
     def numba_repack(self, ctx, lhs, obj):
         """
@@ -239,7 +241,9 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         return NumpyBuffer(numba_buffer[0])
 
+
 if __name__ == "__main__":
     import finch.finch_assembly as asm
+
     prgm = asm.AssemblyNode
     pass

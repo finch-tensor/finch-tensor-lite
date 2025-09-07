@@ -33,7 +33,7 @@ default = {
     "cache_size": 10_000,
     "cache_enable": True,
     "cc": str(os.getenv("CC") or shutil.which("gcc") or ("cl" if is_windows else "cc")),
-    "cflags": os.getenv("CFLAGS") or "-O3",
+    "cflags": os.getenv("CFLAGS") or "-O3 -Wnoreturn-type",
     "shared_cflags": os.getenv(
         "SHARED_CFLAGS",
         "-shared -fPIC",
