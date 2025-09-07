@@ -12,10 +12,11 @@ import ctypes
 
 import numpy as np
 
+from finch.codegen.numpy_buffer import NumpyBuffer
 import finch.finch_assembly as asm
 from finch.util import qual_str
 from finch.codegen.c import CBufferFType, CCompiler, CContext, CStackFType, c_type
-from finch.codegen.safe_buffer import SafeNumpyBuffer, SafeNumpyBufferFType
+from finch.codegen.safe_buffer import SafeBuffer
 import argparse
 
 parser = argparse.ArgumentParser(
@@ -37,7 +38,8 @@ args = parser.parse_args()
 
 
 a = np.array(range(args.size), dtype=ctypes.c_int64)
-ab = SafeNumpyBuffer(a)
+ab = NumpyBuffer(a)
+ab = SafeBuffer(ab)
 ab_v = asm.Variable("a", ab.ftype)
 ab_slt = asm.Slot("a_", ab.ftype)
 idx = asm.Variable("idx", ctypes.c_size_t)
