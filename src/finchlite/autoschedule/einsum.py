@@ -42,6 +42,9 @@ class Einsum(LogicTree, LogicExpression):
     def fields(self) -> list[Field]:
         return list(self.outputs)
 
+    def to_string(self) -> str:
+        return f"np.einsum(\"{','.join(self.inputs)}->{','.join(self.outputs)}\", {','.join(self.args)})"
+
 class EinsumTransformer(DefaultLogicOptimizer):
     """
     Rewrite unoptimized Logic IR (mostly MapJoin and Aggregate) into Einsum nodes.
