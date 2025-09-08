@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import operator
 
-from finchlite.finch_logic import LogicTree, LogicExpression, MapJoin, Aggregate, LogicNode, Alias, Table, Literal, Field
+from finchlite.finch_logic import LogicTree, LogicExpression, MapJoin, Aggregate, LogicNode, Alias, Table, Literal, Field, Relabel, Reorder
 from finchlite.autoschedule import DefaultLogicOptimizer, LogicCompiler, optimize
 from finchlite.symbolic import Rewrite, PostWalk, PostOrderDFS
 
@@ -15,12 +15,15 @@ class Einsum(LogicTree, LogicExpression):
     - args:   input expressions
     """
 
+    isEinProduct: bool
+
     inputs: tuple[tuple[Field, ...], ...]
     outputs: tuple[Field, ...]
     args: tuple[LogicExpression, ...]
 
-    def __init__(self, args: tuple[LogicExpression, ...], inputs: tuple[tuple[Field, ...], ...] | None = None, outputs: tuple[Field, ...] | None = None):
+    def __init__(self, args: tuple[LogicExpression, ...], inputs: tuple[tuple[Field, ...], ...] | None = None, outputs: tuple[Field, ...] | None = None, isEinProduct: bool = False):
         self.args = args
+        self.isEinProduct = isEinProduct #not an einsum but an ein-product
 
         #inputs are the fields of the arguments by default
         self.inputs = inputs if inputs is not None else tuple(tuple(f for f in arg.fields) for arg in args)
@@ -50,10 +53,16 @@ class EinsumTransformer(DefaultLogicOptimizer):
     Rewrite unoptimized Logic IR (mostly MapJoin and Aggregate) into Einsum nodes.
 
     Pattern handled:
-    - Aggregate(add, 0, MapJoin(mul, args), reduce_idxs)  -> Einsum(inputs, output, args)
-    - MapJoin(mul, args)                                  -> Einsum(inputs, output, args)
+    - Aggregate(add, 0, MapJoin(mul, args), reduce_idxs) -> Einsum(args, outputs=reduce_idxs)
+    - Aggregate(add, 0, Relabel(MapJoin(mul, args), _), reduce_idxs)-> Einsum(args, outputs=reduce_idxs)
+    - Aggregate(add, 0, Reorder(MapJoin(mul, args), _), reduce_idxs)-> Einsum(args, outputs=reduce_idxs)
+    - Aggregate(add, 0, Relabel(Reorder(MapJoin(mul, args), _), _), reduce_idxs)-> Einsum(args, outputs=reduce_idxs)
+    - Aggregate(add, 0, Reorder(Relabel(MapJoin(mul, args), _), _), reduce_idxs)-> Einsum(args, outputs=reduce_idxs)
+    - Aggregate(add, 0, Einsum(...), reduce_idxs)-> Einsum(..., outputs=reduce_idxs)
 
-    After rewriting, Einsum nodes are lowered back to MapJoin/Aggregate for compilation.
+    - MapJoin(mul, args)-> Einsum(args) #elementwise product (no contraction)
+    - Aggregate(mul, 0, MapJoin(mul, args), reduce_idxs)-> Einsum(args, outputs=reduce_idxs, isEinProduct=True) #elementwise product (no contraction)
+
     """
 
     def __init__(self, ctx: LogicCompiler, verbose=True):
@@ -69,15 +78,41 @@ class EinsumTransformer(DefaultLogicOptimizer):
     def transform(self, prgm: LogicNode):
         def rule(node):
             match node:
-                # Sum over product -> Einsum
-                case Aggregate(Literal(op_add), Literal(init), MapJoin(Literal(op_mul), args), idxs):
-                    if op_add is operator.add and init == 0:
-                        return Einsum(args=args, inputs=None, outputs=idxs)
 
+                # Sum over product with harmless wrappers -> Einsum
+                case Aggregate(Literal(operator.add), Literal(0), Relabel(MapJoin(Literal(operator.mul), args), _), idxs):
+                    return Einsum(args=args, inputs=None, outputs=idxs)
+                case Aggregate(Literal(operator.add), Literal(0), Reorder(MapJoin(Literal(operator.mul), args), _), idxs):
+                    return Einsum(args=args, inputs=None, outputs=idxs)
+                case Aggregate(
+                    Literal(operator.add),
+                    Literal(0),
+                    Relabel(Reorder(MapJoin(Literal(operator.mul), args), _), _),
+                    idxs,
+                ):
+                    return Einsum(args=args, inputs=None, outputs=idxs)
+                case Aggregate(
+                    Literal(operator.add),
+                    Literal(0),
+                    Reorder(Relabel(MapJoin(Literal(operator.mul), args), _), _),
+                    idxs,
+                ):
+                    return Einsum(args=args, inputs=None, outputs=idxs)
+
+                # Sum over already-converted Einsum (e.g., MapJoin->Einsum happened earlier)
+                case Aggregate(Literal(operator.add), Literal(0), Einsum(args=args, inputs=_, outputs=_), idxs):
+                    return Einsum(args=args, inputs=None, outputs=idxs)
+
+                # Original core pattern matching rules
+                # Sum over product -> Einsum(no contraction)
+                case Aggregate(Literal(operator.add), Literal(0), MapJoin(Literal(operator.mul), args), idxs):
+                    return Einsum(args=args, inputs=None, outputs=idxs)
+                # Sum over product -> Einsum (no contraction)
+                case Aggregate(Literal(operator.mul), Literal(0), MapJoin(Literal(operator.mul), args), idxs):
+                    return Einsum(args=args, inputs=None, outputs=idxs, isEinProduct=True)
                 # Pure elementwise product -> Einsum (no contraction)
-                case MapJoin(Literal(op_mul), args):
-                    if op_mul is operator.mul:
-                        return Einsum(args=args, inputs=None, output=None)
+                case MapJoin(Literal(operator.mul), args):
+                    return Einsum(args=args, inputs=None, outputs=None)
 
         return Rewrite(PostWalk(rule))(prgm)
 
