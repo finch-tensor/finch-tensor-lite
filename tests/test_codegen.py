@@ -440,7 +440,7 @@ def test_simple_struct(compiler):
     [(size, idx) for size in range(1, 4) for idx in range(-1, 4)],
 )
 def test_c_load_safebuffer(size, idx):
-    tester = (Path(__file__).parent / "safebufferaccess.py").absolute()
+    tester = (Path(__file__).parent / "scripts" / "safebufferaccess.py").absolute()
     result = subprocess.run(
         [
             sys.executable,
@@ -626,7 +626,7 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
     ],
 )
 def test_c_store_safebuffer(size, idx, value):
-    tester = (Path(__file__).parent / "safebufferaccess.py").absolute()
+    tester = (Path(__file__).parent / "scripts" / "safebufferaccess.py").absolute()
     result = subprocess.run(
         [
             sys.executable,
