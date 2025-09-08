@@ -22,7 +22,6 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.finch_assembly.interpreter import AssemblyInterpreter
 
 
 def test_add_function():
@@ -495,7 +494,7 @@ def test_c_load_safebuffer(size, idx):
                 2,
             ),
         ]
-        for compiler in [AssemblyInterpreter(), NumbaCompiler()]
+        for compiler in [asm.AssemblyInterpreter(), NumbaCompiler()]
     ],
 )
 def test_numba_load_safebuffer(size, idx, compiler):
@@ -549,7 +548,7 @@ def test_numba_load_safebuffer(size, idx, compiler):
             (2, 2, 3),
             (3, 2, 3),
         ]
-        for compiler in [NumbaCompiler(), AssemblyInterpreter()]
+        for compiler in [NumbaCompiler(), asm.AssemblyInterpreter()]
     ],
 )
 def test_numba_store_safebuffer(size, idx, value, compiler):

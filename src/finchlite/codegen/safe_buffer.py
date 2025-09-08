@@ -6,7 +6,6 @@ from finchlite.finch_assembly.buffer import BufferFType
 
 
 class SafeBuffer:
-
     def __init__(self, buffer: Buffer):
         self._underlying = buffer
 
@@ -35,7 +34,6 @@ class SafeBuffer:
 
 
 class SafeBufferFType(BufferFType):
-
     def __init__(self, underlying_format: "BufferFType"):
         self._underlying_format = underlying_format
 

@@ -14,9 +14,7 @@ import ctypes
 import numpy as np
 
 import finchlite.finch_assembly as asm
-from finchlite.codegen.c import CCompiler
-from finchlite.codegen.numpy_buffer import NumpyBuffer
-from finchlite.codegen.safe_buffer import SafeBuffer
+from finchlite.codegen import CCompiler, NumpyBuffer, SafeBuffer
 
 parser = argparse.ArgumentParser(
     prog="safebufferaccess.py",
