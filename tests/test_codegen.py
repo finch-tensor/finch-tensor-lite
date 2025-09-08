@@ -2,6 +2,7 @@ import operator
 from collections import namedtuple
 from pathlib import Path
 import re
+import sys
 import subprocess
 
 import pytest
@@ -442,6 +443,7 @@ def test_c_load_safebuffer(size, idx):
     tester = (Path(__file__).parent / "safebufferaccess.py").absolute()
     result = subprocess.run(
         [
+            sys.executable,
             str(tester),
             "-s",
             str(size),
@@ -629,6 +631,7 @@ def test_c_store_safebuffer(size, idx, value):
     tester = (Path(__file__).parent / "safebufferaccess.py").absolute()
     result = subprocess.run(
         [
+            sys.executable,
             str(tester),
             "-s",
             str(size),
