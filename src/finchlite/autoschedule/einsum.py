@@ -22,16 +22,16 @@ class Einsum(LogicTree, LogicExpression):
     def __init__(self, args: tuple[LogicExpression, ...], inputs: tuple[tuple[Field, ...], ...] | None = None, outputs: tuple[Field, ...] | None = None):
         self.args = args
 
-        self.inputs = inputs
-        if inputs is None: # If inputs are not provided, compute them from the arguments
-            self.inputs = tuple(tuple(f for f in arg.fields) for arg in args)
+        #inputs are the fields of the arguments by default
+        self.inputs = inputs if inputs is not None else tuple(tuple(f for f in arg.fields) for arg in args)
 
-        union_fields: list[Field] = outputs if outputs is not None else inputs
+        #outputs are the union of the inputs by default, or the union of the outputs if provided
+        union_fields: list[Field] = outputs if outputs is not None else inputs #union fields are inputs by default
         for labels in self.inputs:
             for f in labels:
                 if f not in union_fields:
                     union_fields.append(f)
-        self.outputs = tuple(union_fields)
+        self.outputs = tuple(union_fields) #outputs are simply the union of the union fields
 
     @property
     def children(self):
