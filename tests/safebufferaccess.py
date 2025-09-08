@@ -12,10 +12,10 @@ import ctypes
 
 import numpy as np
 
-from finch.codegen.numpy_buffer import NumpyBuffer
-import finch.finch_assembly as asm
-from finch.codegen.c import CCompiler
-from finch.codegen.safe_buffer import SafeBuffer
+from finchlite.codegen.numpy_buffer import NumpyBuffer
+import finchlite.finch_assembly as asm
+from finchlite.codegen.c import CCompiler
+from finchlite.codegen.safe_buffer import SafeBuffer
 import argparse
 
 parser = argparse.ArgumentParser(
@@ -45,6 +45,7 @@ idx = asm.Variable("idx", ctypes.c_size_t)
 val = asm.Variable("val", ctypes.c_int64)
 
 res_var = asm.Variable("val", ab_safe.ftype.element_type)
+res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
 
 mod = CCompiler()(
     asm.Module(
@@ -55,8 +56,13 @@ mod = CCompiler()(
                 asm.Block(
                     (
                         asm.Unpack(ab_slt, ab_v),
+                        # we assign twice like this; this is intentional and designed to check correct refreshing.
                         asm.Assign(
                             res_var,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Assign(
+                            res_var2,
                             asm.Load(ab_slt, idx),
                         ),
                         asm.Return(res_var),

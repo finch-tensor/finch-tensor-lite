@@ -4,9 +4,9 @@ import pytest
 
 import numpy as np
 
-from finch.galley.dc_stats import DC, DCStats
-from finch.galley.dense_stat import DenseStats
-from finch.galley.tensor_def import TensorDef
+from finchlite.galley.dc_stats import DC, DCStats
+from finchlite.galley.dense_stat import DenseStats
+from finchlite.galley.tensor_def import TensorDef
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 

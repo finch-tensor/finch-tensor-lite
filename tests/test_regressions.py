@@ -6,11 +6,11 @@ import operator
 
 import numpy as np
 
-import finch.finch_logic as logic
-from finch.autoschedule import (
+import finchlite.finch_logic as logic
+from finchlite.autoschedule import (
     LogicCompiler,
 )
-from finch.finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
