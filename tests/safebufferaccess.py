@@ -38,19 +38,19 @@ args = parser.parse_args()
 
 a = np.array(range(args.size), dtype=ctypes.c_int64)
 ab = NumpyBuffer(a)
-ab = SafeBuffer(ab)
-ab_v = asm.Variable("a", ab.ftype)
-ab_slt = asm.Slot("a_", ab.ftype)
+ab_safe = SafeBuffer(ab)
+ab_v = asm.Variable("a", ab_safe.ftype)
+ab_slt = asm.Slot("a_", ab_safe.ftype)
 idx = asm.Variable("idx", ctypes.c_size_t)
 val = asm.Variable("val", ctypes.c_int64)
 
-res_var = asm.Variable("val", ab.ftype.element_type)
+res_var = asm.Variable("val", ab_safe.ftype.element_type)
 
 mod = CCompiler()(
     asm.Module(
         (
             asm.Function(
-                asm.Variable("finch_access", ab.ftype.element_type),
+                asm.Variable("finch_access", ab_safe.ftype.element_type),
                 (ab_v, idx),
                 asm.Block(
                     (
@@ -64,7 +64,7 @@ mod = CCompiler()(
                 ),
             ),
             asm.Function(
-                asm.Variable("finch_change", ab.ftype.element_type),
+                asm.Variable("finch_change", ab_safe.ftype.element_type),
                 (ab_v, idx, val),
                 asm.Block(
                     (
@@ -86,7 +86,7 @@ change = mod.finch_change
 
 match args.subparser_name:
     case "load":
-        print(access(ab, ctypes.c_size_t(args.index)).value)
+        print(access(ab_safe, ctypes.c_size_t(args.index)).value)
     case "store":
-        change(ab, ctypes.c_size_t(args.index), ctypes.c_int64(args.value))
-        print(str(ab.arr).replace("\n", ","))
+        change(ab_safe, ctypes.c_size_t(args.index), ctypes.c_int64(args.value))
+        print(str(ab_safe.arr).replace("\n", ","))

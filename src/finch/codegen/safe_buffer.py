@@ -1,12 +1,8 @@
 import ctypes
 
-from finch.codegen.numpy_buffer import NumpyBufferFType
 import finch.finch_assembly as asm
 from finch.finch_assembly import Buffer
-from finch.codegen.c import CBufferFType, CStackFType
-from finch.codegen.numba_backend import NumbaBufferFType
 from finch.finch_assembly.buffer import BufferFType
-from finch.symbolic.ftype import FType
 
 
 class SafeBuffer():
