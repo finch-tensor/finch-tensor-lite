@@ -1,9 +1,11 @@
 import ctypes
 
+from finch.codegen.numpy_buffer import NumpyBufferFType
 import finch.finch_assembly as asm
 from finch.finch_assembly import Buffer
 from finch.codegen.c import CBufferFType, CStackFType
 from finch.codegen.numba_backend import NumbaBufferFType
+from finch.finch_assembly.buffer import BufferFType
 from finch.symbolic.ftype import FType
 
 
@@ -36,9 +38,9 @@ class SafeBuffer():
         return getattr(self._underlying, name)
 
 
-class SafeBufferFType(FType):
+class SafeBufferFType(BufferFType):
 
-    def __init__(self, underlying_format):
+    def __init__(self, underlying_format: 'BufferFType'):
         self._underlying_format = underlying_format
 
     def __eq__(self, other):
@@ -116,6 +118,14 @@ class SafeBufferFType(FType):
         """
         underlying_buffer = self._underlying_format(*args, **kwargs)
         return SafeBuffer(underlying_buffer)
+
+    @property
+    def element_type(self):
+        """
+        Return the type of elements stored in the buffer.
+        This is typically the same as the dtype used to create the buffer.
+        """
+        return self._underlying_format.element_type
 
     @property
     def underlying_format(self):
