@@ -1,28 +1,82 @@
-from finchlite.finch_logic import LogicTree, LogicExpression, MapJoin, Aggregate, LogicNode, Alias, Table, Literal
-from finchlite.autoschedule import optimize, DefaultLogicOptimizer, LogicCompiler
-from finchlite.symbolic import PostOrderDFS
+from dataclasses import dataclass
+import operator
 
+from finchlite.finch_logic import LogicTree, LogicExpression, MapJoin, Aggregate, LogicNode, Alias, Table, Literal, Field
+from finchlite.autoschedule import DefaultLogicOptimizer, LogicCompiler, optimize
+from finchlite.symbolic import Rewrite, PostWalk, PostOrderDFS
+
+@dataclass(eq=True, frozen=False)
 class Einsum(LogicTree, LogicExpression):
-    pass
+    """
+    NumPy-style einsum logic node.
 
-class Einprod(LogicTree, LogicExpression):
-    pass
+    - inputs: per-argument axis labels as Fields, e.g., ((i,k), (k,j))
+    - output: output axis labels as Fields, e.g., (i,j)
+    - args:   input expressions
+    """
+
+    inputs: tuple[tuple[Field, ...], ...]
+    outputs: tuple[Field, ...]
+    args: tuple[LogicExpression, ...]
+
+    def __init__(self, args: tuple[LogicExpression, ...], inputs: tuple[tuple[Field, ...], ...] | None = None, outputs: tuple[Field, ...] | None = None):
+        self.args = args
+
+        self.inputs = inputs
+        if inputs is None: # If inputs are not provided, compute them from the arguments
+            self.inputs = tuple(tuple(f for f in arg.fields) for arg in args)
+
+        union_fields: list[Field] = outputs if outputs is not None else inputs
+        for labels in self.inputs:
+            for f in labels:
+                if f not in union_fields:
+                    union_fields.append(f)
+        self.outputs = tuple(union_fields)
+
+    @property
+    def children(self):
+        # Treat only args as children in the term tree
+        return list(self.args)
+
+    @property
+    def fields(self) -> list[Field]:
+        return list(self.outputs)
 
 class EinsumTransformer(DefaultLogicOptimizer):
-    """Transforms program into Einsum and Einprod"""
+    """
+    Rewrite unoptimized Logic IR (mostly MapJoin and Aggregate) into Einsum nodes.
+
+    Pattern handled:
+    - Aggregate(add, 0, MapJoin(mul, args), reduce_idxs)  -> Einsum(inputs, output, args)
+    - MapJoin(mul, args)                                  -> Einsum(inputs, output, args)
+
+    After rewriting, Einsum nodes are lowered back to MapJoin/Aggregate for compilation.
+    """
 
     def __init__(self, ctx: LogicCompiler, verbose=True):
         super().__init__(ctx)
         self.verbose = verbose
     
     def __call__(self, prgm: LogicNode):
-        # First optimize the program
         prgm = optimize(prgm)
+        transformed = self.transform(prgm)
 
-        return self.ctx(prgm)
+        return transformed
 
     def transform(self, prgm: LogicNode):
-        pass
+        def rule(node):
+            match node:
+                # Sum over product -> Einsum
+                case Aggregate(Literal(op_add), Literal(init), MapJoin(Literal(op_mul), args), idxs):
+                    if op_add is operator.add and init == 0:
+                        return Einsum(args=args, inputs=None, outputs=idxs)
+
+                # Pure elementwise product -> Einsum (no contraction)
+                case MapJoin(Literal(op_mul), args):
+                    if op_mul is operator.mul:
+                        return Einsum(args=args, inputs=None, output=None)
+
+        return Rewrite(PostWalk(rule))(prgm)
 
 
 class PrintingLogicOptimizer(DefaultLogicOptimizer):
