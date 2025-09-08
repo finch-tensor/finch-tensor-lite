@@ -5,7 +5,7 @@ from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.buffer import BufferFType
 
 
-class SafeBuffer():
+class SafeBuffer:
 
     def __init__(self, buffer: Buffer):
         self._underlying = buffer
@@ -36,7 +36,7 @@ class SafeBuffer():
 
 class SafeBufferFType(BufferFType):
 
-    def __init__(self, underlying_format: 'BufferFType'):
+    def __init__(self, underlying_format: "BufferFType"):
         self._underlying_format = underlying_format
 
     def __eq__(self, other):
@@ -54,7 +54,10 @@ class SafeBufferFType(BufferFType):
         ctx.exec(
             f"{ctx.feed}size_t {idx_n} = ({ctx(idx)});\n"
             f"{ctx.feed}if ({idx_n} < 0 || {idx_n} >= ({self.c_length(ctx, buf)}))"
-            f'{{ fprintf(stderr, "Encountered an index out of bounds error!"); exit(1); }}'
+            "{"
+            f'fprintf(stderr, "Encountered an index out of bounds error!");\n'
+            f"exit(1);\n"
+            "}"
         )
         return asm.Variable(idx_n, ctypes.c_size_t)
 
@@ -92,7 +95,9 @@ class SafeBufferFType(BufferFType):
         self.numba_check returns the value of the computed index so things don't
         get computed twice.
         """
-        return self._underlying_format.numba_load(ctx, buf, self.numba_check(ctx, buf, idx))
+        return self._underlying_format.numba_load(
+            ctx, buf, self.numba_check(ctx, buf, idx)
+        )
 
     def numba_store(self, ctx, buf, idx, value):
         """
@@ -101,7 +106,9 @@ class SafeBufferFType(BufferFType):
         self.numba_check returns the variable name of the computed index so
         things don't get computed twice.
         """
-        self._underlying_format.numba_store(ctx, buf, self.numba_check(ctx, buf, idx), value)
+        self._underlying_format.numba_store(
+            ctx, buf, self.numba_check(ctx, buf, idx), value
+        )
 
     def __call__(self, *args, **kwargs):
         """

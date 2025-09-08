@@ -8,15 +8,15 @@ for a safe buffer, it will panic and bring down the interpreter with it. So
 this script needs to be invoked so that the testing code continues running.
 """
 
+import argparse
 import ctypes
 
 import numpy as np
 
-from finchlite.codegen.numpy_buffer import NumpyBuffer
 import finchlite.finch_assembly as asm
 from finchlite.codegen.c import CCompiler
+from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.codegen.safe_buffer import SafeBuffer
-import argparse
 
 parser = argparse.ArgumentParser(
     prog="safebufferaccess.py",
@@ -56,7 +56,8 @@ mod = CCompiler()(
                 asm.Block(
                     (
                         asm.Unpack(ab_slt, ab_v),
-                        # we assign twice like this; this is intentional and designed to check correct refreshing.
+                        # we assign twice like this; this is intentional and
+                        # designed to check correct refreshing.
                         asm.Assign(
                             res_var,
                             asm.Load(ab_slt, idx),
@@ -80,7 +81,7 @@ mod = CCompiler()(
                             idx,
                             val,
                         ),
-                        asm.Return(asm.Literal(ctypes.c_int64(0)))
+                        asm.Return(asm.Literal(ctypes.c_int64(0))),
                     )
                 ),
             ),

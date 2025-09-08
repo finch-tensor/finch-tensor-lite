@@ -1,9 +1,9 @@
 import operator
+import re
+import subprocess
+import sys
 from collections import namedtuple
 from pathlib import Path
-import re
-import sys
-import subprocess
 
 import pytest
 
@@ -504,8 +504,6 @@ def test_numba_load_safebuffer(size, idx, compiler):
     ab = SafeBuffer(ab)
     ab_v = asm.Variable("a", ftype(ab))
     ab_slt = asm.Slot("a_", ftype(ab))
-
-    val = asm.Variable("val", np.intp)
 
     res_var = asm.Variable("val", ab.ftype.element_type)
 
