@@ -49,7 +49,7 @@ class SafeBufferFType(FType):
     def __hash__(self):
         return hash(("SafeBufferFType", self._underlying_format))
 
-    def check(self, ctx, buf, idx):
+    def c_check(self, ctx, buf, idx):
         ctx.add_header("#include <stdio.h>")
         ctx.add_header("#include <stdlib.h>")
         idx_n = ctx.freshen(idx, "computed")
@@ -67,7 +67,7 @@ class SafeBufferFType(FType):
         self.check returns the value of the computed index so things don't
         get computed twice.
         """
-        return self._underlying_format.c_load(ctx, buf, self.check(ctx, buf, idx))
+        return self._underlying_format.c_load(ctx, buf, self.c_check(ctx, buf, idx))
 
     def c_store(self, ctx, buf, idx, value):
         """
@@ -76,7 +76,34 @@ class SafeBufferFType(FType):
         self.check returns the variable name of the computed index so
         things don't get computed twice.
         """
-        self._underlying_format.c_store(ctx, buf, self.check(ctx, buf, idx), value)
+        self._underlying_format.c_store(ctx, buf, self.c_check(ctx, buf, idx), value)
+
+    def numba_check(self, ctx, buf, idx):
+        idx_n = ctx.freshen(idx, "computed")
+        ctx.exec(
+            f"{ctx.feed}{idx_n} = ({ctx(idx)})\n"
+            f"{ctx.feed}if {idx_n} < 0 or {idx_n} >= ({self.numba_length(ctx, buf)}):\n"
+            f"{ctx.feed}    raise IndexError()"
+        )
+        return asm.Variable(idx_n, int)
+
+    def numba_load(self, ctx, buf, idx):
+        """
+        A numba_load function with preemptive index checking.
+
+        self.numba_check returns the value of the computed index so things don't
+        get computed twice.
+        """
+        return self._underlying_format.numba_load(ctx, buf, self.numba_check(ctx, buf, idx))
+
+    def numba_store(self, ctx, buf, idx, value):
+        """
+        A numba_store function with preemptive index checking.
+
+        self.numba_check returns the variable name of the computed index so
+        things don't get computed twice.
+        """
+        self._underlying_format.numba_store(ctx, buf, self.numba_check(ctx, buf, idx), value)
 
     def __call__(self, *args, **kwargs):
         """

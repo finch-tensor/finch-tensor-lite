@@ -14,8 +14,7 @@ import numpy as np
 
 from finch.codegen.numpy_buffer import NumpyBuffer
 import finch.finch_assembly as asm
-from finch.util import qual_str
-from finch.codegen.c import CBufferFType, CCompiler, CContext, CStackFType, c_type
+from finch.codegen.c import CCompiler
 from finch.codegen.safe_buffer import SafeBuffer
 import argparse
 
@@ -75,6 +74,7 @@ mod = CCompiler()(
                             idx,
                             val,
                         ),
+                        asm.Return(asm.Literal(ctypes.c_int64(0)))
                     )
                 ),
             ),

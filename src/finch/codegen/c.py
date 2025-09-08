@@ -206,6 +206,15 @@ for t in (
         deserialize_from_c_scalar,
     )
 
+register_property(
+    np.generic,
+    "serialize_to_c",
+    "__attr__",
+    lambda fmt, obj: np.ctypeslib.as_ctypes(obj),
+)
+
+# deserialize_to_c should modify in place. TODO: implement
+
 class CKernel:
     """
     A class to represent a C kernel.

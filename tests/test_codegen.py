@@ -10,6 +10,8 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finch
+from finch.codegen.numba_backend import serialize_to_numba
+from finch.codegen.safe_buffer import SafeBuffer
 import finch.finch_assembly as asm
 from finch import ftype
 from finch.codegen import (
@@ -20,6 +22,7 @@ from finch.codegen import (
     NumpyBuffer,
     NumpyBufferFType,
 )
+from finch.finch_assembly.interpreter import AssemblyInterpreter
 
 
 def test_add_function():
@@ -458,11 +461,147 @@ def test_c_load_safebuffer(size, idx):
 
 
 @pytest.mark.parametrize(
+    "size,idx, compiler",
+    [
+        (*params, compiler)
+        for params in [
+            (-1, 2,),
+            (-1, 3,),
+            (0, 2,),
+            (1, 2,),
+            (2, 3,),
+            (2, 2,),
+            (3, 2,),
+        ]
+        for compiler in [AssemblyInterpreter(), NumbaCompiler()]
+    ],
+)
+def test_numba_load_safebuffer(size, idx, compiler):
+    a = np.array(range(size), dtype=np.int64)
+    ab = NumpyBuffer(a)
+    ab = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ftype(ab))
+    ab_slt = asm.Slot("a_", ftype(ab))
+
+    val = asm.Variable("val", np.intp)
+
+    res_var = asm.Variable("val", ab.ftype.element_type)
+
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("finch_access", ab.ftype.element_type),
+                    (ab_v,),
+                    asm.Block(
+                        (
+                            asm.Unpack(ab_slt, ab_v),
+                            asm.Assign(
+                                res_var,
+                                asm.Load(ab_slt, asm.Literal(idx)),
+                            ),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+    access = mod.finch_access
+    # change = mod.finch_change
+    if 0 <= idx < size:
+        assert access(ab) == idx
+    else:
+        with pytest.raises(IndexError):
+            access(ab)
+
+
+@pytest.mark.parametrize(
+    "size,idx,value,compiler",
+    [
+        (*params, compiler)
+        for params in [
+            (-1, 2, 3),
+            (-1, 3, 1434),
+            (0, 2, 3),
+            (1, 2, 3),
+            (2, 3, 3),
+            (2, 2, 3),
+            (3, 2, 3),
+        ]
+        for compiler in [NumbaCompiler(), AssemblyInterpreter()]
+    ],
+)
+def test_numba_store_safebuffer(size, idx, value, compiler):
+    a = np.array(range(size), dtype=np.int64)
+    ab = NumpyBuffer(a)
+    ab = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ftype(ab))
+    ab_slt = asm.Slot("a_", ftype(ab))
+
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("finch_change", ab.ftype.element_type),
+                    (ab_v,),
+                    asm.Block(
+                        (
+                            asm.Unpack(ab_slt, ab_v),
+                            asm.Store(
+                                ab_slt,
+                                asm.Literal(idx),
+                                asm.Literal(value),
+                            ),
+                            asm.Return(asm.Load(ab_slt, asm.Literal(idx))),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+    change = mod.finch_change
+    if 0 <= idx < size:
+        assert change(ab) == value
+    else:
+        with pytest.raises(IndexError):
+            change(ab)
+
+
+@pytest.mark.parametrize(
     "size,idx,value",
     [
-        (size, idx, value)
-        for size in range(1, 4)
-        for idx in range(-1, 3)
+        (*params, value)
+        for params in [
+            (
+                -1,
+                2,
+            ),
+            (
+                -1,
+                3,
+            ),
+            (
+                0,
+                2,
+            ),
+            (
+                1,
+                2,
+            ),
+            (
+                2,
+                3,
+            ),
+            (
+                2,
+                2,
+            ),
+            (
+                3,
+                2,
+            ),
+        ]
         for value in [-1, 1434]
     ],
 )
