@@ -51,13 +51,26 @@ Performance:
 """
 
 from enum import Enum
+from typing import Any
 
+import numpy as np
+
+from .. import finch_assembly as asm
+from .. import finch_notation as ntn
+from ..algebra import Tensor, TensorPlaceholder
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
 from ..codegen import NumbaCompiler
-from ..compile import NotationCompiler
-from ..finch_assembly import AssemblyInterpreter
-from ..finch_logic import Alias, FinchLogicInterpreter, Plan, Produces, Query
-from ..finch_notation import NotationInterpreter
+from ..compile import BufferizedNDArray, NotationCompiler
+from ..finch_logic import (
+    Alias,
+    Field,
+    FinchLogicInterpreter,
+    Literal,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
 from ..symbolic import Reflector, gensym
 from .lazy import defer
 
@@ -87,12 +100,12 @@ def set_default_scheduler(
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
-        ntn_interp = NotationInterpreter()
+        ntn_interp = ntn.NotationInterpreter()
 
         def fn_compile(plan):
             prgm, tables = optimizer(plan)
             mod = ntn_interp(prgm)
-            args = [tables[Alias(arg.name)].tns.val for arg in prgm.funcs[0].args]
+            args = provision_tensor_placeholders(prgm, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -100,13 +113,13 @@ def set_default_scheduler(
     elif mode == Mode.INTERPRET_ASSEMBLY:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         notation_compiler = NotationCompiler(Reflector())
-        asm_interp = AssemblyInterpreter()
+        asm_interp = asm.AssemblyInterpreter()
 
         def fn_compile(plan):
             ntn_prgm, tables = optimizer(plan)
             asm_prgm = notation_compiler(ntn_prgm)
             mod = asm_interp(asm_prgm)
-            args = [tables[Alias(arg.name)].tns.val for arg in asm_prgm.funcs[0].args]
+            args = provision_tensor_placeholders(asm_prgm, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -124,7 +137,7 @@ def set_default_scheduler(
             asm_prgm = notation_compiler(ntn_prgm)
             # print("Assembler: \n", asm_prgm)
             mod = numba_compiler(asm_prgm)
-            args = [tables[Alias(arg.name)].tns.val for arg in asm_prgm.funcs[0].args]
+            args = provision_tensor_placeholders(asm_prgm, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -142,6 +155,30 @@ set_default_scheduler()
 def get_default_scheduler():
     global _DEFAULT_SCHEDULER
     return _DEFAULT_SCHEDULER
+
+
+def provision_tensor_placeholders(
+    prgm: Any, tables: dict[Alias, Table]
+) -> list[Tensor]:
+    args: list[Tensor] = []
+    dims_dict: dict[Field, int] = {}
+    for arg in prgm.funcs[0].args:
+        table = tables[Alias(arg.name)]
+        match table:
+            case Table(Literal(val), idxs):
+                if isinstance(val, TensorPlaceholder):
+                    shape = tuple(dims_dict[field] for field in idxs)
+                    tensor = BufferizedNDArray(np.zeros(dtype=val.dtype, shape=shape))
+                else:
+                    for idx, field in enumerate(table.idxs):
+                        dims_dict[field] = val.shape[idx]
+                    tensor = val
+            case _:
+                raise Exception(f"Invalid table for tensor processing: {table}")
+
+        args.append(tensor)
+
+    return args
 
 
 def compute(arg, ctx=None):

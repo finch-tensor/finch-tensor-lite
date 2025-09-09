@@ -9,9 +9,9 @@ from ..symbolic import FType, FTyped, ftype
 
 class TensorFType(FType, ABC):
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         """Number of dimensions of the tensor."""
-        return len(self.shape_type)
+        return np.intp(len(self.shape_type))
 
     @property
     @abstractmethod
@@ -23,12 +23,6 @@ class TensorFType(FType, ABC):
     @abstractmethod
     def element_type(self) -> Any:
         """Data type of the tensor elements."""
-        ...
-
-    @property
-    @abstractmethod
-    def shape(self) -> tuple[np.intp, ...]:
-        """Shape of the tensor as a tuple."""
         ...
 
     @property
@@ -52,7 +46,7 @@ class Tensor(FTyped, ABC):
     """
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         """Number of dimensions of the tensor."""
         return self.ftype.ndim
 
@@ -145,7 +139,7 @@ class NDArrayFType(TensorFType):
 
     def __init__(self, dtype: np.dtype, shape: tuple):
         self._dtype = dtype
-        self._ndim = len(shape)
+        self._ndim = np.intp(len(shape))
         self._shape = shape
 
     def __eq__(self, other):
@@ -160,7 +154,7 @@ class NDArrayFType(TensorFType):
         return f"NDArrayFType(dtype={repr(self._dtype)}, ndim={self._ndim})"
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         return self._ndim
 
     @property
@@ -183,3 +177,12 @@ class NDArrayFType(TensorFType):
 register_property(
     np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, x.shape)
 )
+
+
+class TensorPlaceholder:
+    def __init__(self, dtype):
+        self._dtype = dtype
+
+    @property
+    def dtype(self):
+        return self._dtype

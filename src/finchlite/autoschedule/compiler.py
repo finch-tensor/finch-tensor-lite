@@ -1,15 +1,12 @@
 import operator
-from functools import reduce
 from typing import TypeVar, overload
 
 import numpy as np
 
+from finchlite.algebra.tensor import TensorPlaceholder
 from finchlite.codegen.numpy_buffer import NumpyBufferFType
-from finchlite.compile.bufferized_ndarray import (
-    BufferizedNDArray,
-    BufferizedNDArrayFType,
-)
-from finchlite.finch_assembly.struct import TupleFType, tupleformat
+from finchlite.compile.bufferized_ndarray import BufferizedNDArrayFType
+from finchlite.finch_assembly.struct import TupleFType
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -192,15 +189,15 @@ class LogicLowerer:
         field_relabels: dict[Field, Field],
     ) -> ntn.NotationNode:
         match ex:
-            case Query(Alias(name), Table(tns, _)) if isinstance(tns, np.ndarray):
+            case Query(Alias(name), Table(Literal(_) as tns, _)):
                 return ntn.Assign(
                     ntn.Variable(
                         name,
                         BufferizedNDArrayFType(
-                            NumpyBufferFType(tns.dtype),
-                            tns.shape,
+                            NumpyBufferFType(tns.val.dtype),
+                            tns.val.ndim,
                             TupleFType.from_tuple(
-                                tuple([np.intp for _ in range(tns.ndim)])
+                                tuple(np.intp for _ in range(tns.val.ndim))
                             ),
                         ),
                     ),
@@ -411,14 +408,7 @@ def record_tables(
                 suitable_rep = find_suitable_rep(rhs, table_vars)
                 table_vars[alias] = ntn.Variable(name, suitable_rep)
                 tables[alias] = Table(
-                    Literal(
-                        BufferizedNDArray(
-                            np.zeros(
-                                dtype=suitable_rep.element_type,
-                                shape=suitable_rep.shape,
-                            )
-                        )
-                    ),
+                    Literal(TensorPlaceholder(dtype=suitable_rep.element_type)),
                     rhs.fields,
                 )
 
@@ -449,29 +439,26 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                     *[rep.element_type for rep in args_suitable_reps],
                 )
             )
-            init_tuple: tuple[int, ...] = ()
-            shape = reduce(
-                lambda x, y: np.broadcast_shapes(x, y.shape),
-                args_suitable_reps,
-                init_tuple,
-            )
-            intp_shape = tuple(np.intp(x) for x in shape)
+            ndim = np.intp(np.max([rep.ndim for rep in args_suitable_reps]))
             return BufferizedNDArrayFType(
                 NumpyBufferFType(dtype),
-                intp_shape,
-                tupleformat(intp_shape),
+                ndim,
+                TupleFType.from_tuple(tuple(np.intp for _ in range(ndim))),
             )
-        case Aggregate(Literal(op), init, arg, _):
+        case Aggregate(Literal(op), init, arg, idxs):
             init_suitable_rep = find_suitable_rep(init, table_vars)
             arg_suitable_rep = find_suitable_rep(arg, table_vars)
-            dtype = NumpyBufferFType(
+            buf_t = NumpyBufferFType(
                 return_type(
                     op, init_suitable_rep.element_type, arg_suitable_rep.element_type
                 )
             )
-            # TODO: take into consideration relabels (expand_dims)!
-            intp_shape = arg_suitable_rep.shape
-            return BufferizedNDArrayFType(dtype, intp_shape, tupleformat(intp_shape))
+            ndim = np.intp(len(arg.fields) - len(idxs))
+            return BufferizedNDArrayFType(
+                buf_t=buf_t,
+                ndim=ndim,
+                strides_t=TupleFType.from_tuple(tuple(np.intp for _ in range(ndim))),
+            )
         case LogicTree() as tree:
             for child in tree.children:
                 suitable_rep = find_suitable_rep(child, table_vars)

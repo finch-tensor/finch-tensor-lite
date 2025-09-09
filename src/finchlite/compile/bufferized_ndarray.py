@@ -35,11 +35,15 @@ class BufferizedNDArray(Tensor):
         """
         Returns the ftype of the buffer, which is a BufferizedNDArrayFType.
         """
-        return BufferizedNDArrayFType(ftype(self.buf), self._shape, ftype(self.strides))
+        return BufferizedNDArrayFType(ftype(self.buf), self.ndim, ftype(self.strides))
 
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def ndim(self):
+        return np.intp(len(self._shape))
 
     def declare(self, init, op, shape):
         """
@@ -116,16 +120,14 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return [
             ("buf", self.buf),  # TODO: change to buf_t to be accurate
             ("ndim", self._ndim),
-            ("shape", self._shape),
-            ("strides", self._strides),
+            ("shape", self._shape_t),
+            ("strides", self._strides),  # TODO: change to strides_t to be accurate
         ]
 
-    def __init__(
-        self, buf_t: NumpyBufferFType, shape: tuple[np.intp, ...], strides_t: TupleFType
-    ):
+    def __init__(self, buf_t: NumpyBufferFType, ndim: np.intp, strides_t: TupleFType):
         self.buf = buf_t
-        self._ndim = len(shape)
-        self._shape = shape
+        self._ndim = ndim
+        self._shape_t = strides_t
         self._strides = strides_t
 
     def __eq__(self, other):
@@ -140,15 +142,11 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return f"{self.struct_name}(ndim={self.ndim})"
 
     def __repr__(self):
-        return f"{self.struct_name}({repr(self.buf)}, {self._shape})"
+        return f"{self.struct_name}({repr(self.buf)})"
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         return self._ndim
-
-    @property
-    def shape(self) -> tuple:
-        return self._shape
 
     @property
     def fill_value(self) -> Any:
@@ -311,7 +309,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return hash((self.tns, self.nind, self.pos, self.op))
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         return self.tns.ndim - self.nind
 
     @property

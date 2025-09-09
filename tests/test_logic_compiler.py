@@ -48,6 +48,7 @@ from finchlite.finch_notation import (
     Variable,
 )
 from finchlite.finch_notation.nodes import Repack
+from finchlite.interface.fuse import provision_tensor_placeholders
 
 
 def test_logic_compiler():
@@ -118,7 +119,7 @@ def test_logic_compiler():
 
     bufferized_ndarray_ftype = BufferizedNDArrayFType(
         buf_t=NumpyBufferFType(np.dtype(int)),
-        shape=(np.intp(2), np.intp(2)),
+        ndim=np.intp(2),
         strides_t=TupleFType.from_tuple((np.intp, np.intp)),
     )
 
@@ -318,8 +319,8 @@ def test_logic_compiler():
     assert program == expected_program
 
     mod = NotationInterpreter()(program)
-    args = [tables[logic.Alias(arg.name)].tns.val for arg in program.funcs[0].args]
 
+    args = provision_tensor_placeholders(program, tables)
     result = mod.func(*args)
 
     expected = np.matmul(args[0].to_numpy(), args[1].to_numpy(), dtype=float)
