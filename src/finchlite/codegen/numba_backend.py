@@ -76,6 +76,7 @@ def serialize_to_numba(fmt, obj):
         return fmt.serialize_to_numba(obj)
     return query_property(fmt, "serialize_to_numba", "__attr__", obj)
 
+
 register_property(
     type(None),
     "serialize_to_numba",
@@ -89,6 +90,7 @@ register_property(
     "__attr__",
     lambda fmt, numba_obj: numba_obj,
 )
+
 
 def deserialize_from_numba(fmt, obj, numba_obj):
     """
@@ -107,6 +109,7 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     else:
         query_property(fmt, "deserialize_from_numba", "__attr__", obj, numba_obj)
 
+
 register_property(
     type(None),
     "deserialize_from_numba",
@@ -120,6 +123,7 @@ register_property(
     "__attr__",
     lambda fmt, obj, numba_obj: None,
 )
+
 
 def construct_from_numba(fmt, numba_obj):
     """

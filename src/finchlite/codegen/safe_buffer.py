@@ -61,7 +61,6 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType):
     def c_data(self, *args, **kwargs):
         return self._underlying_format.c_data(*args, **kwargs)
 
-
     def _c_check(self, ctx, buf, idx):
         ctx.add_header("#include <stdio.h>")
         ctx.add_header("#include <stdlib.h>")

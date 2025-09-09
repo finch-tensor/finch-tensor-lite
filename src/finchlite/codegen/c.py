@@ -201,12 +201,7 @@ for t in (
         lambda fmt, obj, c_value: None,
     )
     # construction from c is just the identity.
-    register_property(
-        t,
-        "construct_from_c",
-        "__attr__",
-        lambda fmt, c_value: c_value
-    )
+    register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
 
 register_property(
     np.generic,
@@ -223,10 +218,7 @@ register_property(
 )
 
 register_property(
-    np.generic,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, c_value: fmt(c_value.value)
+    np.generic, "construct_from_c", "__attr__", lambda fmt, c_value: fmt(c_value.value)
 )
 
 # deserialize_to_c should modify in place. TODO: implement

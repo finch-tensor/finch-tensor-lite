@@ -658,6 +658,7 @@ def test_c_store_safebuffer(size, idx, value):
         assert "bounds" in result.stderr
         assert result.returncode == 1
 
+
 @pytest.mark.parametrize(
     "value,np_type,c_type",
     [
@@ -666,7 +667,7 @@ def test_c_store_safebuffer(size, idx, value):
         (1, np.float32, ctypes.c_float),
         (1.0, np.float64, ctypes.c_double),
         (1.2, np.float64, ctypes.c_double),
-    ]
+    ],
 )
 def test_np_c_serialization(value, np_type, c_type):
     serialized = serialize_to_c(np_type, np_type(value))
@@ -676,6 +677,7 @@ def test_np_c_serialization(value, np_type, c_type):
     assert constructed == np_type(value)
     assert deserialize_from_c(np_type, constructed, serialized) is None
 
+
 @pytest.mark.parametrize(
     "value,c_type",
     [
@@ -684,7 +686,7 @@ def test_np_c_serialization(value, np_type, c_type):
         (1, ctypes.c_float),
         (1.0, ctypes.c_double),
         (1.2, ctypes.c_double),
-    ]
+    ],
 )
 def test_ctypes_c_serialization(value, c_type):
     cvalue = c_type(value)
@@ -695,6 +697,7 @@ def test_ctypes_c_serialization(value, c_type):
     assert constructed.value == c_type(value).value
     assert deserialize_from_c(c_type, constructed, serialized) is None
 
+
 @pytest.mark.parametrize(
     "value,np_type",
     [
@@ -703,7 +706,7 @@ def test_ctypes_c_serialization(value, c_type):
         (1, np.float32),
         (1.0, np.float64),
         (1.2, np.float64),
-    ]
+    ],
 )
 def test_np_numba_serialization(value, np_type):
     cvalue = np_type(value)
