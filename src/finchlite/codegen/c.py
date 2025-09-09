@@ -139,7 +139,7 @@ def construct_from_c(fmt, c_obj):
     if hasattr(fmt, "construct_from_c"):
         return fmt.construct_from_c(c_obj)
     try:
-        query_property(fmt, "construct_from_c", "__attr__", c_obj)
+        return query_property(fmt, "construct_from_c", "__attr__", c_obj)
     except NotImplementedError:
         return fmt(c_obj)
 
@@ -158,14 +158,6 @@ register_property(
     "__attr__",
     lambda c_obj: None,
 )
-
-
-def deserialize_from_c_scalar(_, obj, c_value):
-    """
-    A deserializer for scalars. Apparently you need this.
-    """
-    obj.value = c_value.value
-
 
 for t in (
     ctypes.c_bool,
@@ -199,13 +191,21 @@ for t in (
         t,
         "serialize_to_c",
         "__attr__",
-        lambda fmt, obj: obj,
+        lambda fmt, c_obj: fmt(c_obj.value),
     )
+    # ctypes here should be considered pass by value, so no op this.
     register_property(
         t,
         "deserialize_from_c",
         "__attr__",
-        deserialize_from_c_scalar,
+        lambda fmt, obj, c_value: None,
+    )
+    # construction from c is just the identity.
+    register_property(
+        t,
+        "construct_from_c",
+        "__attr__",
+        lambda fmt, c_value: c_value
     )
 
 register_property(
@@ -213,6 +213,20 @@ register_property(
     "serialize_to_c",
     "__attr__",
     lambda fmt, obj: np.ctypeslib.as_ctypes(obj),
+)
+# pass by value -> no op
+register_property(
+    np.generic,
+    "deserialize_from_c",
+    "__attr__",
+    lambda fmt, obj, c_value: None,
+)
+
+register_property(
+    np.generic,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, c_value: fmt(c_value.value)
 )
 
 # deserialize_to_c should modify in place. TODO: implement

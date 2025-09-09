@@ -5,7 +5,7 @@ from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.buffer import BufferFType
 
 
-class SafeBuffer:
+class SafeBuffer(Buffer):
     def __init__(self, buffer: Buffer):
         self._underlying = buffer
 
@@ -25,6 +25,12 @@ class SafeBuffer:
         if index < 0 or index >= self.length():
             raise IndexError(f"{self} received an index out of bounds!")
         return self._underlying.store(index, value)
+
+    def length(self):
+        return self._underlying.length()
+    
+    def resize(self, len: int):
+        return self._underlying.resize(len)
 
     def __str__(self) -> str:
         return f"safe({self._underlying})"

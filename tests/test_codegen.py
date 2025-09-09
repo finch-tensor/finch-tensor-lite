@@ -1,3 +1,4 @@
+import ctypes
 import operator
 import re
 import subprocess
@@ -5,12 +6,14 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
+from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
 import pytest
 
 import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
+from finchlite.codegen.numba_backend import construct_from_numba, deserialize_from_numba, serialize_to_numba
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -650,3 +653,59 @@ def test_c_store_safebuffer(size, idx, value):
     else:
         assert "bounds" in result.stderr
         assert result.returncode == 1
+
+@pytest.mark.parametrize(
+    "value,np_type,c_type",
+    [
+        (3, np.int64, ctypes.c_int64),
+        (2, np.int32, ctypes.c_int32),
+        (1, np.float32, ctypes.c_float),
+        (1.0, np.float64, ctypes.c_double),
+        (1.2, np.float64, ctypes.c_double),
+    ]
+)
+def test_np_c_serialization(value, np_type, c_type):
+    serialized = serialize_to_c(np_type, np_type(value))
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_c(np_type, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_c(np_type, constructed, serialized) is None
+
+@pytest.mark.parametrize(
+    "value,c_type",
+    [
+        (3, ctypes.c_int64),
+        (2, ctypes.c_int32),
+        (1, ctypes.c_float),
+        (1.0, ctypes.c_double),
+        (1.2, ctypes.c_double),
+    ]
+)
+def test_ctypes_c_serialization(value, c_type):
+    cvalue = c_type(value)
+    serialized = serialize_to_c(c_type, cvalue)
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_c(c_type, serialized)
+    assert constructed.value == c_type(value).value
+    assert deserialize_from_c(c_type, constructed, serialized) is None
+
+@pytest.mark.parametrize(
+    "value,np_type",
+    [
+        (3, np.int64),
+        (2, np.int32),
+        (1, np.float32),
+        (1.0, np.float64),
+        (1.2, np.float64),
+    ]
+)
+def test_np_numba_serialization(value, np_type):
+    cvalue = np_type(value)
+    serialized = serialize_to_numba(np_type, cvalue)
+    assert serialized == np_type(value)
+    assert isinstance(serialized, np_type)
+    constructed = construct_from_numba(np_type, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_numba(np_type, constructed, serialized) is None
