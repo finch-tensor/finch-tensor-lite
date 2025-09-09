@@ -374,6 +374,171 @@ def test_if_statement(compiler, buffer, wrapper):
 
 
 @pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ],
+)
+def test_safety_checks(compiler, buffer):
+    buffer = safe_wrapper(buffer)
+    a = np.array([1, 2, 3], dtype=np.float64)
+
+    a_buf = buffer(a)
+
+    c = asm.Variable("c", np.float64)
+    ab = buffer(a)
+
+    # Test 1: Load from index -1 (should raise)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+
+    prgm_load_negative = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("load_negative", np.float64),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Assign(c, asm.Load(ab_slt, asm.Literal(np.int64(-1)))),
+                        asm.Repack(ab_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm_load_negative)
+    with pytest.raises((RuntimeError, IndexError)):
+        mod.load_negative(a_buf)
+
+    # TODO: Currently, assign case does not check castability of types and raises errors
+    length_var = asm.Variable(
+        "length", int if isinstance(compiler, asm.AssemblyInterpreter) else np.intp
+    )
+
+    # Test 2: Load from index = length (should raise)
+    prgm_load_overflow = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("load_overflow", np.float64),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Assign(length_var, asm.Length(ab_slt)),
+                        asm.Assign(c, asm.Load(ab_slt, length_var)),
+                        asm.Repack(ab_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm_load_overflow)
+    with pytest.raises((RuntimeError, IndexError)):
+        mod.load_overflow(a_buf)
+
+    # Test 3: Store to index -1 (should raise)
+    prgm_store_negative = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("store_negative", np.intp),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Store(
+                            ab_slt,
+                            asm.Literal(np.int64(-1)),
+                            asm.Literal(np.float64(99.0)),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm_store_negative)
+    with pytest.raises((RuntimeError, IndexError)):
+        mod.store_negative(a_buf)
+
+    # Test 4: Store to index = length (should raise)
+    prgm_store_overflow = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("store_overflow", int),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Store(
+                            ab_slt, asm.Length(ab_slt), asm.Literal(np.float64(99.0))
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm_store_overflow)
+    with pytest.raises((RuntimeError, IndexError)):
+        mod.store_overflow(a_buf)
+
+    # Test 5: Resize to 0 (should not raise)
+    prgm_resize_zero = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("resize_zero", int),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(0)),
+                        asm.Repack(ab_slt),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm_resize_zero)
+    # This should not raise an exception
+    mod.resize_zero(a_buf)
+
+    # Test 6: Resize to negative (should raise)
+    prgm_resize_negative = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("resize_negative", int),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(-5)),
+                        asm.Repack(ab_slt),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm_resize_negative)
+    with pytest.raises((ValueError, RuntimeError, AssertionError)):
+        mod.resize_negative(a_buf)
+
+
+@pytest.mark.parametrize(
     "compiler",
     [
         CCompiler(),

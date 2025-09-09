@@ -1,5 +1,6 @@
 from ..finch_assembly.buffer import Buffer
 from .c import CBufferFType, CStackFType
+from .error import c_throw, numba_throw
 from .numba_backend import NumbaBufferFType, NumbaStackFType
 
 
@@ -45,6 +46,10 @@ class SafeBuffer(Buffer):
         if not isinstance(buf, Buffer):
             raise TypeError(f"Expected Buffer instance, got {type(buf)}")
         self._buf = buf
+
+    @property
+    def arr(self):
+        return self._buf.arr
 
     @property
     def ftype(self):
@@ -200,33 +205,33 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
     def c_type(self):
         return self.underlying_ftype.c_type()
 
-    def c_load(self, ctx, buffer, idx):
+    def c_load(self, ctx, buf, idx):
         # An expression in the target language is expected to be returned
-        # ! BAD: This assumes the underlying type is an integer type
-        # ! BAD: Magically returns -1 on out-of-bounds, which may be valid data
-        return (
-            f"({self.c_length(ctx, buffer)} > {ctx(idx)} && {ctx(idx)} >= 0) ?"
-            "{self.underlying_ftype.c_load(ctx, buffer, idx)} : -1"
+        ctx.exec(
+            f"{ctx.feed}if({self.c_length(ctx, buf)} <= {ctx(idx)} || {ctx(idx)} < 0)"
         )
+        ctx.exec(f"{ctx.feed}\t {c_throw(1)}")
+        return f"{buf.obj.data}[{idx}]"
 
-    def c_store(self, ctx, buffer, idx, value):
-        return (
-            f"if({self.c_length(ctx, buffer)} > {ctx(idx)} && {ctx(idx)} >= 0)"
-            "{" + self.underlying_ftype.c_store(ctx, buffer, idx, value) + "}"
+    def c_store(self, ctx, buf, idx, value):
+        ctx.exec(
+            f"{ctx.feed}if({self.c_length(ctx, buf)} <= {ctx(idx)} || {ctx(idx)} < 0)"
         )
+        ctx.exec(f"{ctx.feed}\t {c_throw(1)}")
+        return self.underlying_ftype.c_store(ctx, buf, idx, value)
 
     def c_resize(self, ctx, buffer, new_len):
-        return (
-            f"if({new_len} >= 0) {{"
-            + self.underlying_ftype.c_resize(ctx, buffer, new_len)
-            + "}"
-        )
+        new_len_2 = ctx(ctx.cache("len", new_len))
+        ctx.exec(f"{ctx.feed}if({new_len_2} < 0) {{ {c_throw(2)} }}")
+        return self.underlying_ftype.c_resize(ctx, buffer, new_len)
 
-    def serialize_to_c(self, obj):
-        return self.underlying_ftype.serialize_to_c(obj)
+    def serialize_to_c(self, obj: SafeBuffer):
+        underlying_obj = obj.underlying_buffer
+        return self.underlying_ftype.serialize_to_c(underlying_obj)
 
     def deserialize_from_c(self, obj, c_buffer):
-        return self.underlying_ftype.deserialize_from_c(obj, c_buffer)
+        underlying_obj = obj.underlying_buffer
+        return self.underlying_ftype.deserialize_from_c(underlying_obj, c_buffer)
 
     def construct_from_c(self, res):
         return self.underlying_ftype.construct_from_c(res)
@@ -252,30 +257,24 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
         return self.underlying_ftype.numba_length(ctx, buffer)
 
     def numba_load(self, ctx, buffer, idx):
-        ctx_2 = ctx.subblock()
-        self.underlying_ftype.numba_load(ctx_2, buffer, idx)
-        body_code = ctx_2.emit()
         ctx.exec(
-            f"{ctx.feed}if {self.numba_length(ctx, buffer)} > {ctx(idx)}"
-            f"and {ctx(idx)} >= 0:"
-            f"\n{body_code}"
+            f"{ctx.feed}if {ctx(idx)} < 0 or {ctx(idx)} >= "
+            f"{self.numba_length(ctx, buffer)}:"
         )
+        ctx.exec(f"{ctx.feed}\t {numba_throw(1)}")
+        return self.underlying_ftype.numba_load(ctx, buffer, idx)
 
     def numba_store(self, ctx, buffer, idx, value=None):
-        ctx_2 = ctx.subblock()
-        self.underlying_ftype.numba_store(ctx_2, buffer, idx, value)
-        body_code = ctx_2.emit()
         ctx.exec(
-            f"{ctx.feed}if {self.numba_length(ctx, buffer)} > {ctx(idx)}"
-            f"and {ctx(idx)} >= 0:"
-            f"\n{body_code}"
+            f"{ctx.feed}if {ctx(idx)} < 0 or {ctx(idx)} >= "
+            f"{self.numba_length(ctx, buffer)}:"
         )
+        ctx.exec(f"{ctx.feed}\t {numba_throw(1)}")
+        return self.underlying_ftype.numba_store(ctx, buffer, idx, value)
 
-    def numba_resize(self, ctx, buffer, new_len):
-        ctx_2 = ctx.subblock()
-        self.underlying_ftype.numba_resize(ctx_2, buffer, new_len)
-        body_code = ctx_2.emit()
-        ctx.exec(f"{ctx.feed}if {new_len} >= 0:\n{body_code}")
+    def numba_resize(self, ctx, buf, new_len):
+        ctx.exec(f"{ctx.feed}if {ctx(new_len)} < 0: {numba_throw(2)}")
+        return self.underlying_ftype.numba_resize(ctx, buf, new_len)
 
     def numba_unpack(self, ctx, var_n, val):
         return self.underlying_ftype.numba_unpack(ctx, var_n, val)
@@ -284,10 +283,14 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
         return self.underlying_ftype.numba_repack(ctx, lhs, obj)
 
     def serialize_to_numba(self, obj):
-        return self.underlying_ftype.serialize_to_numba(obj)
+        underlying_obj = obj.underlying_buffer
+        return self.underlying_ftype.serialize_to_numba(underlying_obj)
 
     def deserialize_from_numba(self, obj, numba_buffer):
-        return self.underlying_ftype.deserialize_from_numba(obj, numba_buffer)
+        underlying_obj = obj.underlying_buffer
+        return self.underlying_ftype.deserialize_from_numba(
+            underlying_obj, numba_buffer
+        )
 
     def construct_from_numba(self, numba_buffer):
         return self.underlying_ftype.construct_from_numba(numba_buffer)

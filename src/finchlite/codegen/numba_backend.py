@@ -327,7 +327,10 @@ class NumbaContext(Context):
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                    raise TypeError(
+                        f"Type mismatch assigning {val_code} to {var_n}: "
+                        f"{val.result_format} != {var_t}"
+                    )
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_n} = {val_code}")

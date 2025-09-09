@@ -7,6 +7,7 @@ struct CNumpyBuffer {
     fptr resize;
 };
 #include <unistd.h>
+int __error_code__ = 0;
 double dot_product(struct CNumpyBuffer* a, struct CNumpyBuffer* b) {
     double c = (double)0.0;
     struct CNumpyBuffer* a_ = a;

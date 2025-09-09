@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from types import NoneType
 from typing import Any
@@ -19,6 +19,7 @@ from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
+from .error import check_error_code, error_codes, error_func_name, error_var
 
 logger = logging.getLogger(__name__)
 
@@ -200,12 +201,13 @@ class CKernel:
     A class to represent a C kernel.
     """
 
-    def __init__(self, c_function, ret_type, argtypes):
+    def __init__(self, c_function, ret_type, argtypes, ecode_getter=None):
         self.c_function = c_function
         self.ret_type = ret_type
         self.argtypes = argtypes
         self.c_function.restype = c_type(ret_type)
         self.c_function.argtypes = tuple(c_type(argtype) for argtype in argtypes)
+        self.ecode_getter = ecode_getter
 
     def __call__(self, *args):
         """
@@ -220,6 +222,12 @@ class CKernel:
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
         serial_args = list(map(serialize_to_c, self.argtypes, args))
         res = self.c_function(*serial_args)
+        if self.ecode_getter is not None and self.ecode_getter() != 0:
+            raise RuntimeError(
+                f"C function returned error code {self.ecode_getter()}: "
+                f"{error_codes.get(self.ecode_getter(), 'Unknown error code')}"
+            )
+
         for type_, arg, serial_arg in zip(
             self.argtypes, args, serial_args, strict=False
         ):
@@ -267,6 +275,14 @@ class CCompiler:
         self.ctx = CGenerator() if ctx is None else ctx
 
     def __call__(self, prgm):
+        get_error_func = asm.Function(
+            asm.Variable(error_func_name, np.int16),
+            (),
+            asm.Return(asm.Variable(error_var, np.int16)),
+        )
+        # Add a fucntion to get the error to the beginning of the program
+        prgm = asm.Module((get_error_func,) + prgm.funcs)
+
         ctx = CContext()
         ctx(prgm)
         c_code = ctx.emit_global()
@@ -282,12 +298,15 @@ class CCompiler:
                 "CCompiler expects a Module as the head of the program, "
                 f"got {type(prgm.head())}"
             )
+        ecode_getter = partial(check_error_code, lib)
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
                     return_t = c_type(return_t)
                     arg_ts = [arg.result_format for arg in args]
-                    kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
+                    kern = CKernel(
+                        getattr(lib, func_name), return_t, arg_ts, ecode_getter
+                    )
                     kernels[func_name] = kern
                 case _:
                     raise NotImplementedError(
@@ -690,7 +709,11 @@ class CContext(Context):
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                    raise TypeError(
+                        f"Type mismatch "
+                        f"in assigning {val_code} to {var_n}: "
+                        f"{val.result_format} != {var_t}"
+                    )
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_n} = {val_code};")
@@ -867,6 +890,10 @@ class CContext(Context):
                 self.exec(f"{feed}break;")
                 return None
             case asm.Module(funcs):
+                # Start by defining a global error variable and a fucntion to retreive
+                # the global variable. This shouldn't conflict with other names.
+                self.exec(f"int {error_var} = 0;")
+
                 for func in funcs:
                     if not isinstance(func, asm.Function):
                         raise NotImplementedError(

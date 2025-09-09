@@ -163,6 +163,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFT
     def serialize_to_c(self, obj):
         """
         Serialize the NumPy buffer to a C-compatible structure.
+        obj: NumpyBuffer
         """
         data = ctypes.c_void_p(obj.arr.ctypes.data)
         length = obj.arr.size
