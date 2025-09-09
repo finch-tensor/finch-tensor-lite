@@ -1,5 +1,7 @@
 import ctypes
 
+from finchlite.codegen.c import CBufferFType
+from finchlite.codegen.numba_backend import NumbaBufferFType
 import finchlite.finch_assembly as asm
 from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.buffer import BufferFType
@@ -39,8 +41,8 @@ class SafeBuffer(Buffer):
         return getattr(self._underlying, name)
 
 
-class SafeBufferFType(BufferFType):
-    def __init__(self, underlying_format: "BufferFType"):
+class SafeBufferFType(CBufferFType, NumbaBufferFType):
+    def __init__(self, underlying_format):
         self._underlying_format = underlying_format
 
     def __eq__(self, other):
@@ -51,7 +53,17 @@ class SafeBufferFType(BufferFType):
     def __hash__(self):
         return hash(("SafeBufferFType", self._underlying_format))
 
-    def c_check(self, ctx, buf, idx):
+    def c_type(self, *args, **kwargs):
+        return self._underlying_format.c_type(*args, **kwargs)
+
+    def c_length(self, *args, **kwargs):
+        return self._underlying_format.c_length(*args, **kwargs)
+
+    def c_data(self, *args, **kwargs):
+        return self._underlying_format.c_data(*args, **kwargs)
+
+
+    def _c_check(self, ctx, buf, idx):
         ctx.add_header("#include <stdio.h>")
         ctx.add_header("#include <stdlib.h>")
         idx_n = ctx.freshen("computed")
@@ -72,7 +84,7 @@ class SafeBufferFType(BufferFType):
         self.check returns the value of the computed index so things don't
         get computed twice.
         """
-        return self._underlying_format.c_load(ctx, buf, self.c_check(ctx, buf, idx))
+        return self._underlying_format.c_load(ctx, buf, self._c_check(ctx, buf, idx))
 
     def c_store(self, ctx, buf, idx, value):
         """
@@ -81,7 +93,33 @@ class SafeBufferFType(BufferFType):
         self.check returns the variable name of the computed index so
         things don't get computed twice.
         """
-        self._underlying_format.c_store(ctx, buf, self.c_check(ctx, buf, idx), value)
+        self._underlying_format.c_store(ctx, buf, self._c_check(ctx, buf, idx), value)
+
+    def c_resize(self, *args, **kwargs):
+        return self._underlying_format.c_resize(*args, **kwargs)
+
+    def c_unpack(self, *args, **kwargs):
+        return self._underlying_format.c_unpack(*args, **kwargs)
+
+    def c_repack(self, *args, **kwargs):
+        return self._underlying_format.c_repack(*args, **kwargs)
+
+    def serialize_to_c(self, *args, **kwargs):
+        return self._underlying_format.serialize_to_c(*args, **kwargs)
+
+    def deserialize_from_c(self, *args, **kwargs):
+        return self._underlying_format.deserialize_from_c(*args, **kwargs)
+
+    def construct_from_c(self, *args, **kwargs):
+        return self._underlying_format.construct_from_c(*args, **kwargs)
+
+    # numba definitions
+
+    def numba_type(self, *args, **kwargs):
+        return self._underlying_format.numba_type(*args, **kwargs)
+
+    def numba_length(self, *args, **kwargs):
+        return self._underlying_format.numba_length(*args, **kwargs)
 
     def numba_check(self, ctx, buf, idx):
         idx_n = ctx.freshen("computed")
@@ -113,6 +151,24 @@ class SafeBufferFType(BufferFType):
         self._underlying_format.numba_store(
             ctx, buf, self.numba_check(ctx, buf, idx), value
         )
+
+    def numba_resize(self, *args, **kwargs):
+        return self._underlying_format.numba_resize(*args, **kwargs)
+
+    def numba_unpack(self, *args, **kwargs):
+        return self._underlying_format.numba_unpack(*args, **kwargs)
+
+    def numba_repack(self, *args, **kwargs):
+        return self._underlying_format.numba_repack(*args, **kwargs)
+
+    def serialize_to_numba(self, *args, **kwargs):
+        return self._underlying_format.serialize_to_numba(*args, **kwargs)
+
+    def deserialize_from_numba(self, *args, **kwargs):
+        return self._underlying_format.deserialize_from_numba(*args, **kwargs)
+
+    def construct_from_numba(self, *args, **kwargs):
+        return self._underlying_format.construct_from_numba(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
         """
