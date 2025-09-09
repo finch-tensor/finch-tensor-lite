@@ -6,14 +6,12 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
 import pytest
 
 import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
-from finchlite.codegen.numba_backend import construct_from_numba, deserialize_from_numba, serialize_to_numba
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -24,6 +22,12 @@ from finchlite.codegen import (
     NumpyBuffer,
     NumpyBufferFType,
     SafeBuffer,
+)
+from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.numba_backend import (
+    construct_from_numba,
+    deserialize_from_numba,
+    serialize_to_numba,
 )
 
 

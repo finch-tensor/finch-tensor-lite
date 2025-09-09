@@ -1,10 +1,9 @@
 import ctypes
 
+import finchlite.finch_assembly as asm
 from finchlite.codegen.c import CBufferFType
 from finchlite.codegen.numba_backend import NumbaBufferFType
-import finchlite.finch_assembly as asm
 from finchlite.finch_assembly import Buffer
-from finchlite.finch_assembly.buffer import BufferFType
 
 
 class SafeBuffer(Buffer):
@@ -30,7 +29,7 @@ class SafeBuffer(Buffer):
 
     def length(self):
         return self._underlying.length()
-    
+
     def resize(self, len: int):
         return self._underlying.resize(len)
 
