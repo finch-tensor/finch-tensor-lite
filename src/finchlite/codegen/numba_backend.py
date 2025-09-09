@@ -364,7 +364,7 @@ class NumbaContext(Context):
             case asm.Literal(value):
                 return str(value)
             case asm.Variable(name, _):
-                return name.lstrip(":")
+                return name
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_format != var_t:
@@ -375,7 +375,7 @@ class NumbaContext(Context):
                 else:
                     self.types[var_n] = var_t
                     self.exec(
-                        f"{feed}{var_n.lstrip(':')}: "
+                        f"{feed}{var_n}: "
                         f"{self.full_name(numba_type(var_t))} = {val_code}"
                     )
                 return None
@@ -423,10 +423,10 @@ class NumbaContext(Context):
                         f"Variable '{var_n}' is already defined in the current"
                         f" context, cannot overwrite with slot."
                     )
-                self.exec(f"{feed}{var_n.lstrip(':')} = {self(val)}")
+                self.exec(f"{feed}{var_n} = {self(val)}")
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.numba_unpack(
-                    self, var_n.lstrip(":"), asm.Variable(var_n.lstrip(":"), var_t)
+                    self, var_n, asm.Variable(var_n, var_t)
                 )
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
@@ -435,7 +435,7 @@ class NumbaContext(Context):
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
-                var_t.numba_repack(self, var_n.lstrip(":"), obj)
+                var_t.numba_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
@@ -501,9 +501,7 @@ class NumbaContext(Context):
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            arg_decls.append(
-                                f"{name.lstrip(':')}: {self.full_name(numba_type(t))}"
-                            )
+                            arg_decls.append(f"{name}: {self.full_name(numba_type(t))}")
                             ctx_2.types[name] = t
                         case _:
                             raise NotImplementedError(
