@@ -42,6 +42,9 @@ class Scalar(EagerTensor):
         self.val = val
         self._fill_value = fill_value
 
+    def __hash__(self):
+        return hash((self.val, self._fill_value))
+
     @property
     def ftype(self):
         return ScalarFType(type(self.val), self._fill_value)
