@@ -36,6 +36,9 @@ class SafeBuffer(Buffer):
     def __str__(self) -> str:
         return f"safe({self._underlying})"
 
+    def __getattr__(self, name):
+        return getattr(self._underlying, name)
+
 
 class SafeBufferFType(CBufferFType, NumbaBufferFType):
     def __init__(self, underlying_format):
