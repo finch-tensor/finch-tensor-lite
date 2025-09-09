@@ -94,4 +94,5 @@ match args.subparser_name:
         print(access(ab_safe, ctypes.c_size_t(args.index)).value)
     case "store":
         change(ab_safe, ctypes.c_size_t(args.index), ctypes.c_int64(args.value))
-        print(str(ab_safe.arr).replace("\n", ","))
+        arr = [str(ab_safe.load(i)) for i in range(args.size)]
+        print(f"[{' '.join(arr)}]")

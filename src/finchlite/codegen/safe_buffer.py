@@ -1,8 +1,8 @@
 import ctypes
 
 import finchlite.finch_assembly as asm
-from finchlite.codegen.c import CBufferFType
-from finchlite.codegen.numba_backend import NumbaBufferFType
+from finchlite.codegen.c import CBufferFType, CStackFType
+from finchlite.codegen.numba_backend import NumbaBufferFType, NumbaStackFType
 from finchlite.finch_assembly import Buffer
 
 
@@ -36,11 +36,12 @@ class SafeBuffer(Buffer):
     def __str__(self) -> str:
         return f"safe({self._underlying})"
 
-    def __getattr__(self, name):
-        return getattr(self._underlying, name)
+    @property
+    def underlying(self):
+        return self._underlying
 
 
-class SafeBufferFType(CBufferFType, NumbaBufferFType):
+class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFType):
     def __init__(self, underlying_format):
         self._underlying_format = underlying_format
 
@@ -102,11 +103,13 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType):
     def c_repack(self, *args, **kwargs):
         return self._underlying_format.c_repack(*args, **kwargs)
 
-    def serialize_to_c(self, *args, **kwargs):
-        return self._underlying_format.serialize_to_c(*args, **kwargs)
+    def serialize_to_c(self, obj: SafeBuffer, *args, **kwargs):
+        return self._underlying_format.serialize_to_c(obj.underlying, *args, **kwargs)
 
-    def deserialize_from_c(self, *args, **kwargs):
-        return self._underlying_format.deserialize_from_c(*args, **kwargs)
+    def deserialize_from_c(self, obj: SafeBuffer, *args, **kwargs):
+        return self._underlying_format.deserialize_from_c(
+            obj.underlying, *args, **kwargs
+        )
 
     def construct_from_c(self, *args, **kwargs):
         return self._underlying_format.construct_from_c(*args, **kwargs)
@@ -159,11 +162,15 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType):
     def numba_repack(self, *args, **kwargs):
         return self._underlying_format.numba_repack(*args, **kwargs)
 
-    def serialize_to_numba(self, *args, **kwargs):
-        return self._underlying_format.serialize_to_numba(*args, **kwargs)
+    def serialize_to_numba(self, obj: SafeBuffer, *args, **kwargs):
+        return self._underlying_format.serialize_to_numba(
+            obj.underlying, *args, **kwargs
+        )
 
-    def deserialize_from_numba(self, *args, **kwargs):
-        return self._underlying_format.deserialize_from_numba(*args, **kwargs)
+    def deserialize_from_numba(self, obj: SafeBuffer, *args, **kwargs):
+        return self._underlying_format.deserialize_from_numba(
+            obj.underlying, *args, **kwargs
+        )
 
     def construct_from_numba(self, *args, **kwargs):
         return self._underlying_format.construct_from_numba(*args, **kwargs)
