@@ -10,8 +10,6 @@ from typing import Any
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
-from finchlite.compile.bufferized_ndarray import BufferizedNDArray
-
 from ..algebra import (
     Tensor,
     TensorFType,
@@ -28,7 +26,11 @@ from ..algebra import (
     register_property,
     return_type,
 )
-from ..algebra import conjugate as conj
+from ..algebra import (
+    conjugate as conj,
+)
+from ..compile import BufferizedNDArray
+from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -53,12 +55,12 @@ def identify(data):
 class LazyTensorFType(TensorFType):
     _fill_value: Any
     _element_type: Any
-    _shape: Any
+    _shape_type: Any
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape: tuple):
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: TupleFType):
         self._fill_value = _fill_value
         self._element_type = _element_type
-        self._shape = _shape
+        self._shape_type = _shape_type
 
     def __eq__(self, other):
         if not isinstance(other, LazyTensorFType):
@@ -66,11 +68,11 @@ class LazyTensorFType(TensorFType):
         return (
             self._fill_value == other._fill_value
             and self._element_type == other._element_type
-            and ftype(self._shape) == ftype(other._shape)
+            and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
-        return hash((self._fill_value, self._element_type, ftype(self._shape)))
+        return hash((self._fill_value, self._element_type, self._shape_type))
 
     @property
     def fill_value(self):
@@ -82,11 +84,7 @@ class LazyTensorFType(TensorFType):
 
     @property
     def shape_type(self):
-        return ftype(self._shape)
-
-    @property
-    def shape(self):
-        return self._shape
+        return self._shape_type
 
 
 class LazyTensor(OverrideTensor):
@@ -103,7 +101,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape=self._shape,
+            _shape_type=ftype(self._shape),
         )
 
     @property
@@ -1020,7 +1018,6 @@ class DefaultTensorFType(TensorFType):
     _fill_value: Any
     _element_type: Any
     _shape_type: tuple
-    _shape: tuple
 
     @property
     def fill_value(self):
@@ -1033,10 +1030,6 @@ class DefaultTensorFType(TensorFType):
     @property
     def shape_type(self):
         return self._shape_type
-
-    @property
-    def shape(self):
-        return self._shape
 
 
 @dataclass(frozen=True)
@@ -1087,7 +1080,6 @@ class NoneTensor(Tensor):
             None,
             None,
             tuple(type(dim) for dim in self.shape),
-            self.shape,
         )
 
     def asarray(self):
@@ -1132,16 +1124,11 @@ class ConcatTensorFType(WrapperTensorFType):
     """
 
     _shape_type: tuple
-    _shape: tuple
     concat_axis: int
 
     @property
     def shape_type(self):
         return self._shape_type
-
-    @property
-    def shape(self):
-        return self._shape
 
 
 class ConcatTensor(Tensor):
@@ -1212,7 +1199,6 @@ class ConcatTensor(Tensor):
         return ConcatTensorFType(
             tuple(formats),
             tuple(type(dim) for dim in self.shape),
-            self.shape,
             self.concat_axis,
         )
 
@@ -1265,10 +1251,6 @@ class SplitDimsTensorFType(WrapperTensorFType):
             type(dim) for dim in self.split_shape
         ]
         return tuple(shape_type_list)
-
-    @property
-    def shape(self):
-        return self.split_shape
 
 
 class SplitDimsTensor(Tensor):
@@ -1351,15 +1333,10 @@ class SplitDimsTensor(Tensor):
 class CombineDimsTensorFType(WrapperTensorFType):
     combined_axes: tuple[int, ...]
     _shape_type: tuple
-    _shape: tuple
 
     @property
     def shape_type(self):
         return self._shape_type
-
-    @property
-    def shape(self):
-        return self._shape
 
 
 class CombineDimsTensor(Tensor):
@@ -1445,7 +1422,6 @@ class CombineDimsTensor(Tensor):
             (child_format,),
             self.axes,
             tuple(type(dim) for dim in self.shape),
-            self.shape,
         )
 
     @property

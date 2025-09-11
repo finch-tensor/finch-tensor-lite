@@ -550,7 +550,7 @@ class DefaultPass(LoopletPass):
 
 class LoopletContext(Context):
     def __init__(self, ctx, idx):
-        self.ctx = ctx
+        self.ctx = ctx  # NotationContext
         self.idx = idx
 
     def freshen(self, *tags):

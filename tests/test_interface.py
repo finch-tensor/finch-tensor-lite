@@ -88,10 +88,6 @@ class TestEagerTensorFType(finchlite.TensorFType):
     def shape_type(self):
         return finchlite.shape_type(self.fmt)
 
-    @property
-    def shape(self):
-        return ()
-
 
 class TestEagerTensor(finchlite.EagerTensor):
     # This class doesn't define any pytests

@@ -3,15 +3,18 @@ from typing import TypeVar, overload
 
 import numpy as np
 
-from finchlite.algebra.tensor import TensorPlaceholder
-from finchlite.codegen.numpy_buffer import NumpyBufferFType
-from finchlite.compile.bufferized_ndarray import BufferizedNDArrayFType
-from finchlite.finch_assembly.struct import TupleFType
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import InitWrite, TensorFType, query_property, return_type
-from ..compile import ExtentFType, dimension
+from ..algebra import (
+    InitWrite,
+    TensorFType,
+    TensorPlaceholder,
+    query_property,
+    return_type,
+)
+from ..codegen import NumpyBufferFType
+from ..compile import BufferizedNDArrayFType, ExtentFType, dimension
+from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
     Alias,
