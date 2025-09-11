@@ -92,6 +92,9 @@ class LazyTensor(OverrideTensor):
         self._fill_value = fill_value
         self._element_type = element_type
 
+    def __hash__(self):
+        return hash((self.data, self._shape, self._fill_value, self._element_type))
+
     @property
     def ftype(self):
         return LazyTensorFType(
@@ -304,6 +307,24 @@ class LazyTensor(OverrideTensor):
 
     def __logical_not__(self):
         return logical_not(self)
+
+    def __lt__(self, other):
+        return less(self, other)
+
+    def __le__(self, other):
+        return less_equal(self, other)
+
+    def __gt__(self, other):
+        return greater(self, other)
+
+    def __ge__(self, other):
+        return greater_equal(self, other)
+
+    def __eq__(self, other):
+        return equal(self, other)
+
+    def __ne__(self, other):
+        return not_equal(self, other)
 
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
@@ -1608,6 +1629,30 @@ def logical_xor(x1, x2) -> LazyTensor:
 
 def logical_not(x) -> LazyTensor:
     return elementwise(np.logical_not, defer(x))
+
+
+def less(x1, x2) -> LazyTensor:
+    return elementwise(np.less, defer(x1), defer(x2))
+
+
+def less_equal(x1, x2) -> LazyTensor:
+    return elementwise(np.less_equal, defer(x1), defer(x2))
+
+
+def greater(x1, x2) -> LazyTensor:
+    return elementwise(np.greater, defer(x1), defer(x2))
+
+
+def greater_equal(x1, x2) -> LazyTensor:
+    return elementwise(np.greater_equal, defer(x1), defer(x2))
+
+
+def equal(x1, x2) -> LazyTensor:
+    return elementwise(np.equal, defer(x1), defer(x2))
+
+
+def not_equal(x1, x2) -> LazyTensor:
+    return elementwise(np.not_equal, defer(x1), defer(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):

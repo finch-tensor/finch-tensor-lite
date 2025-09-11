@@ -48,7 +48,12 @@ element_wise_ufunc_map = {
     np.logical_or: np.logical_or,
     np.logical_xor: np.logical_xor,
     np.logical_not: np.logical_not,
-    # Add more ufuncs as needed
+    np.equal: np.equal,
+    np.not_equal: np.not_equal,
+    np.less: np.less,
+    np.less_equal: np.less_equal,
+    np.greater: np.greater,
+    np.greater_equal: np.greater_equal,
 }
 
 ufunc_map: dict[Any, Any] = {

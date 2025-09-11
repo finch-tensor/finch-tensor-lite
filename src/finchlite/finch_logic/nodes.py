@@ -71,6 +71,7 @@ class Literal(LogicNode):
 
     def __hash__(self):
         val = self.val
+        # TODO: correct hashing for ndarrays
         return id(val) if isinstance(val, np.ndarray) else hash(val)
 
     def __eq__(self, other):
