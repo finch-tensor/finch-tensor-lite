@@ -9,9 +9,9 @@ from ..symbolic import FType, FTyped, ftype
 
 class TensorFType(FType, ABC):
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         """Number of dimensions of the tensor."""
-        return len(self.shape_type)
+        return np.intp(len(self.shape_type))
 
     @property
     @abstractmethod
@@ -21,13 +21,13 @@ class TensorFType(FType, ABC):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def element_type(self) -> Any:
         """Data type of the tensor elements."""
         ...
 
     @property
     @abstractmethod
-    def shape_type(self) -> tuple:
+    def shape_type(self) -> tuple[type, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
         should be an actual tuple, rather than a tuple type, so that it can hold
@@ -46,15 +46,9 @@ class Tensor(FTyped, ABC):
     """
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         """Number of dimensions of the tensor."""
         return self.ftype.ndim
-
-    @property
-    @abstractmethod
-    def shape(self):
-        """Shape of the tensor as a tuple."""
-        ...
 
     @property
     @abstractmethod
@@ -143,7 +137,7 @@ class NDArrayFType(TensorFType):
     This includes the fill value, element type, and shape type.
     """
 
-    def __init__(self, dtype: np.dtype, ndim: int):
+    def __init__(self, dtype: np.dtype, ndim: np.intp):
         self._dtype = dtype
         self._ndim = ndim
 
@@ -159,7 +153,7 @@ class NDArrayFType(TensorFType):
         return f"NDArrayFType(dtype={repr(self._dtype)}, ndim={self._ndim})"
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         return self._ndim
 
     @property
@@ -176,5 +170,14 @@ class NDArrayFType(TensorFType):
 
 
 register_property(
-    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, x.ndim)
+    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, np.intp(x.ndim))
 )
+
+
+class TensorPlaceholder:
+    def __init__(self, dtype):
+        self._dtype = dtype
+
+    @property
+    def dtype(self):
+        return self._dtype

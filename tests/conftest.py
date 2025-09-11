@@ -4,8 +4,8 @@ import pytest
 
 from numpy.random import default_rng
 
+from finchlite import Mode, get_default_scheduler, set_default_scheduler
 from finchlite.finch_logic import Field
-from finchlite.interface import get_default_scheduler, set_default_scheduler
 
 
 @pytest.fixture(scope="session")
@@ -40,7 +40,7 @@ def random_wrapper(rng):
 @pytest.fixture
 def interpreter_scheduler():
     ctx = get_default_scheduler()
-    yield set_default_scheduler(interpret_logic=True)
+    yield set_default_scheduler(mode=Mode.INTERPRET_LOGIC)
     set_default_scheduler(ctx=ctx)
 
 

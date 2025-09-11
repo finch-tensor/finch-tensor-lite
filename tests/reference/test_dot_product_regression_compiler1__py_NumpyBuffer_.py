@@ -1,11 +1,12 @@
 import _operator, builtins
 from numba import njit
 import numpy
+from numpy import int64, float64
 
 
 @njit
-def dot_product(a: builtins.list, b: builtins.list) -> numpy.float64:
-    c: numpy.float64 = 0.0
+def dot_product(a: builtins.list, b: builtins.list) -> float64:
+    c: float64 = 0.0
     a_ = a
     a__arr = a_[0]
     b_ = b
