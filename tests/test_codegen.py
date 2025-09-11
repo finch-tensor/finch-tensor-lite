@@ -1,5 +1,10 @@
+import ctypes
 import operator
+import re
+import subprocess
+import sys
 from collections import namedtuple
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +21,13 @@ from finchlite.codegen import (
     NumbaGenerator,
     NumpyBuffer,
     NumpyBufferFType,
+    SafeBuffer,
+)
+from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.numba_backend import (
+    construct_from_numba,
+    deserialize_from_numba,
+    serialize_to_numba,
 )
 
 
@@ -427,3 +439,280 @@ def test_simple_struct(compiler):
 
     result = mod.simple_struct(p, x)
     assert result == np.float64(9.0)
+
+
+@pytest.mark.parametrize(
+    "size,idx",
+    [(size, idx) for size in range(1, 4) for idx in range(-1, 4)],
+)
+def test_c_load_safebuffer(size, idx):
+    tester = (Path(__file__).parent / "scripts" / "safebufferaccess.py").absolute()
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(tester),
+            "-s",
+            str(size),
+            "load",
+            str(idx),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if 0 <= idx < size:
+        assert result.stdout.strip() == str(idx)
+    else:
+        assert "bounds" in result.stderr
+        assert result.returncode == 1
+
+
+@pytest.mark.parametrize(
+    "size,idx, compiler",
+    [
+        (*params, compiler)
+        for params in [
+            (
+                -1,
+                2,
+            ),
+            (
+                -1,
+                3,
+            ),
+            (
+                0,
+                2,
+            ),
+            (
+                1,
+                2,
+            ),
+            (
+                2,
+                3,
+            ),
+            (
+                2,
+                2,
+            ),
+            (
+                3,
+                2,
+            ),
+        ]
+        for compiler in [asm.AssemblyInterpreter(), NumbaCompiler()]
+    ],
+)
+def test_numba_load_safebuffer(size, idx, compiler):
+    a = np.array(range(size), dtype=np.int64)
+    ab = NumpyBuffer(a)
+    ab = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ftype(ab))
+    ab_slt = asm.Slot("a_", ftype(ab))
+
+    res_var = asm.Variable("val", ab.ftype.element_type)
+
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("finch_access", ab.ftype.element_type),
+                    (ab_v,),
+                    asm.Block(
+                        (
+                            asm.Unpack(ab_slt, ab_v),
+                            asm.Assign(
+                                res_var,
+                                asm.Load(ab_slt, asm.Literal(idx)),
+                            ),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+    access = mod.finch_access
+    # change = mod.finch_change
+    if 0 <= idx < size:
+        assert access(ab) == idx
+    else:
+        with pytest.raises(IndexError):
+            access(ab)
+
+
+@pytest.mark.parametrize(
+    "size,idx,value,compiler",
+    [
+        (*params, compiler)
+        for params in [
+            (-1, 2, 3),
+            (-1, 3, 1434),
+            (0, 2, 3),
+            (1, 2, 3),
+            (2, 3, 3),
+            (2, 2, 3),
+            (3, 2, 3),
+        ]
+        for compiler in [NumbaCompiler(), asm.AssemblyInterpreter()]
+    ],
+)
+def test_numba_store_safebuffer(size, idx, value, compiler):
+    a = np.array(range(size), dtype=np.int64)
+    ab = NumpyBuffer(a)
+    ab = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ftype(ab))
+    ab_slt = asm.Slot("a_", ftype(ab))
+
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("finch_change", ab.ftype.element_type),
+                    (ab_v,),
+                    asm.Block(
+                        (
+                            asm.Unpack(ab_slt, ab_v),
+                            asm.Store(
+                                ab_slt,
+                                asm.Literal(idx),
+                                asm.Literal(value),
+                            ),
+                            asm.Return(asm.Load(ab_slt, asm.Literal(idx))),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+    change = mod.finch_change
+    if 0 <= idx < size:
+        assert change(ab) == value
+    else:
+        with pytest.raises(IndexError):
+            change(ab)
+
+
+@pytest.mark.parametrize(
+    "size,idx,value",
+    [
+        (*params, value)
+        for params in [
+            (
+                -1,
+                2,
+            ),
+            (
+                -1,
+                3,
+            ),
+            (
+                0,
+                2,
+            ),
+            (
+                1,
+                2,
+            ),
+            (
+                2,
+                3,
+            ),
+            (
+                2,
+                2,
+            ),
+            (
+                3,
+                2,
+            ),
+        ]
+        for value in [-1, 1434]
+    ],
+)
+def test_c_store_safebuffer(size, idx, value):
+    tester = (Path(__file__).parent / "scripts" / "safebufferaccess.py").absolute()
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(tester),
+            "-s",
+            str(size),
+            "store",
+            str(idx),
+            str(value),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if 0 <= idx < size:
+        arr = list(map(str, range(size)))
+        arr[idx] = str(value)
+        stdout = result.stdout.strip()
+        stdout = re.sub(r"\s+", " ", stdout)
+        stdout = stdout.replace("[ ", "[")
+        assert stdout == f"[{' '.join(arr)}]"
+    else:
+        assert "bounds" in result.stderr
+        assert result.returncode == 1
+
+
+@pytest.mark.parametrize(
+    "value,np_type,c_type",
+    [
+        (3, np.int64, ctypes.c_int64),
+        (2, np.int32, ctypes.c_int32),
+        (1, np.float32, ctypes.c_float),
+        (1.0, np.float64, ctypes.c_double),
+        (1.2, np.float64, ctypes.c_double),
+    ],
+)
+def test_np_c_serialization(value, np_type, c_type):
+    serialized = serialize_to_c(np_type, np_type(value))
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_c(np_type, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_c(np_type, constructed, serialized) is None
+
+
+@pytest.mark.parametrize(
+    "value,c_type",
+    [
+        (3, ctypes.c_int64),
+        (2, ctypes.c_int32),
+        (1, ctypes.c_float),
+        (1.0, ctypes.c_double),
+        (1.2, ctypes.c_double),
+    ],
+)
+def test_ctypes_c_serialization(value, c_type):
+    cvalue = c_type(value)
+    serialized = serialize_to_c(c_type, cvalue)
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_c(c_type, serialized)
+    assert constructed.value == c_type(value).value
+    assert deserialize_from_c(c_type, constructed, serialized) is None
+
+
+@pytest.mark.parametrize(
+    "value,np_type",
+    [
+        (3, np.int64),
+        (2, np.int32),
+        (1, np.float32),
+        (1.0, np.float64),
+        (1.2, np.float64),
+    ],
+)
+def test_np_numba_serialization(value, np_type):
+    cvalue = np_type(value)
+    serialized = serialize_to_numba(np_type, cvalue)
+    assert serialized == np_type(value)
+    assert isinstance(serialized, np_type)
+    constructed = construct_from_numba(np_type, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_numba(np_type, constructed, serialized) is None
