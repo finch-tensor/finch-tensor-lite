@@ -1,3 +1,4 @@
+from ast import Call
 from dataclasses import dataclass
 from abc import ABC
 from typing import Callable, Self
@@ -31,7 +32,16 @@ class PointwiseNode(Term, ABC):
 
 @dataclass(eq=True, frozen=True)
 class PointwiseAccess(PointwiseNode, TermTree):
-    """Tensor access like a[i, j]."""
+    """
+    PointwiseAccess
+
+    Tensor access like a[i, j].
+
+    Attributes:
+        tensor: The tensor to access.
+        idxs: The indices at which to access the tensor.
+    """
+
     tensor: LogicExpression
     idxs: tuple[Field, ...]  # (Field('i'), Field('j'))
     # Children: None (leaf)
@@ -46,7 +56,17 @@ class PointwiseAccess(PointwiseNode, TermTree):
 
 @dataclass(eq=True, frozen=True)
 class PointwiseOp(PointwiseNode):
-    """Operation like + or *."""
+    """
+    PointwiseOp
+
+    Represents an operation like + or * on pointwise expressions for multiple operands.
+    If operation is not commutative, pointwise node must be binary, with 2 args at most.
+
+    Attributes:
+        op: The function to apply e.g., operator.add
+        args: The arguments to the operation.
+    """
+
     op: Callable  #the function to apply e.g., operator.add
     args: tuple[PointwiseNode, ...]  # Subtrees
     # Children: The args
@@ -80,29 +100,32 @@ class PointwiseLiteral(PointwiseNode):
 #einsum and einsum ast not part of logic IR
 #transform to it's own language
 @dataclass(eq=True, frozen=True)
-class Einsum:
+class Einsum(TermTree):
     """
-    NumPy-style einsum logic node.
+    Einsum
 
-    - inputs: per-argument axis labels as Fields, e.g., ((i,k), (k,j))
-    - output: output axis labels as Fields, e.g., (i,j)
-    - args:   input expressions
+    A einsum operation that maps pointwise expressions and aggregates them.
+
+    Attributes:
+        updateOp: The function to apply to the pointwise expressions (e.g. +=, f=, max=, etc...).
+        input_fields: The indices that are used in the pointwise expression (i.e. i, j, k).
+        output_fields: The indices that are used in the output (i.e. i, j).
+        pointwise_expr: The pointwise expression that is mapped and aggregated.
     """
 
-    isEinProduct: bool
+    updateOp: Callable
 
-    inputs: tuple[tuple[Field, ...], ...]
-    outputs: tuple[Field, ...]
-    args: tuple[LogicExpression, ...]
-
+    input_fields = tuple[Field, ...]    # indicies that are used in the pointwise expression (i.e. i, j, k)
+    output_fields = tuple[Field, ...]   # a subset of input_fields that are used in the output (i.e. i, j)
+    pointwise_expr: PointwiseNode       # the pointwise expression that is aggregated
+    
+    @classmethod
+    def from_children(cls, updateOp: Callable, input_fields: tuple[Field, ...], output_fields: tuple[Field, ...], pointwise_expr: PointwiseNode) -> Self:
+        return cls(updateOp, input_fields, output_fields, pointwise_expr)
+    
     @property
     def children(self):
-        # Treat only args as children in the term tree
-        return list(self.args)
-
-    @property
-    def fields(self) -> list[Field]:
-        return list(self.outputs)
+        return [self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr]
 
 class EinsumTransformer(DefaultLogicOptimizer):
     """
