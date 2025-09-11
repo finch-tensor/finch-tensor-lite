@@ -4,6 +4,7 @@ from typing import Any
 import numpy as np
 
 from ...codegen import NumpyBufferFType
+from ...compile import looplets as lplt
 from ...symbolic import FType, ftype
 from ..fiber_tensor import Level, LevelFType
 
@@ -26,17 +27,18 @@ class ElementLevelFType(LevelFType):
         self._element_type = self.val_format.element_type
         self._fill_value = self._element_type(self._fill_value)
 
-    def __call__(self, shape=()):
+    def __call__(self, shape=(), val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
         Args:
-            fmt: The ftype to be used for the level.
+            shape: Should be always `()`, used for validation.
+            val: The value to store in the ElementLevel instance.
         Returns:
             An instance of ElementLevel.
         """
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
-        return ElementLevel(self)
+        return ElementLevel(self, val)
 
     @property
     def ndim(self):
@@ -62,6 +64,16 @@ class ElementLevelFType(LevelFType):
     def buffer_factory(self):
         return self._buffer_factory
 
+    def unfurl(self):
+        def child_accessor(ctx, idx):
+            pass
+
+        return lplt.Lookup(
+            body=lambda ctx, idx: lplt.Leaf(
+                body=lambda ctx: child_accessor(ctx, idx),
+            )
+        )
+
 
 def element(
     fill_value=None,
@@ -78,6 +90,7 @@ def element(
         element_type: The type of elements stored in the level.
         position_type: The type of positions within the level.
         buffer_factory: The factory used to create buffers for the level.
+        val_format: Format of the value stored in the level.
 
     Returns:
         An instance of ElementLevelFType.

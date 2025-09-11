@@ -10,6 +10,7 @@ import finchlite.finch_logic as logic
 from finchlite.autoschedule import (
     LogicCompiler,
 )
+from finchlite.compile.bufferized_ndarray import BufferizedNDArray
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -46,14 +47,18 @@ def test_tree_regression(file_regression):
             Query(
                 lhs=Alias(name=":A0"),
                 rhs=Table(
-                    tns=logic.Literal(val=np.array([[1, 2], [3, 4]])),
+                    tns=logic.Literal(
+                        val=BufferizedNDArray(np.array([[1, 2], [3, 4]]))
+                    ),
                     idxs=(Field(name=":i0"), Field(name=":i1")),
                 ),
             ),
             Query(
                 lhs=Alias(name=":A1"),
                 rhs=Table(
-                    tns=logic.Literal(val=np.array([[5, 6], [7, 8]])),
+                    tns=logic.Literal(
+                        val=BufferizedNDArray(np.array([[5, 6], [7, 8]]))
+                    ),
                     idxs=(Field(name=":i1"), Field(name=":i2")),
                 ),
             ),
