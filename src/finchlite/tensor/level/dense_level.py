@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from ...compile import looplets as lplt
 from ..fiber_tensor import Level, LevelFType
 
 
@@ -16,7 +17,7 @@ class DenseLevelFType(LevelFType, ABC):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, shape):
+    def __call__(self, shape, val=None):
         """
         Creates an instance of DenseLevel with the given ftype.
         Args:
@@ -24,7 +25,7 @@ class DenseLevelFType(LevelFType, ABC):
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl(shape=shape[1:])
+        lvl = self.lvl(shape[1:], val)
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     @property
@@ -62,6 +63,16 @@ class DenseLevelFType(LevelFType, ABC):
         Returns the ftype of the buffer used for the fibers.
         """
         return self.lvl.buffer_factory
+
+    def unfurl(self):
+        def child_accessor(ctx, idx):
+            self.lvl
+
+        return lplt.Lookup(
+            body=lambda ctx, idx: lplt.Leaf(
+                body=lambda ctx: child_accessor(ctx, idx),
+            )
+        )
 
 
 def dense(lvl, dimension_type=None):

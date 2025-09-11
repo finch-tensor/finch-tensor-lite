@@ -74,6 +74,10 @@ class NumpyBuffer(Buffer):
         arr_str = str(self.arr).replace("\n", "")
         return f"np_buf({arr_str})"
 
+    def __repr__(self):
+        arr_repr = repr(self.arr).replace("\n", "")
+        return f"NumpyBuffer({arr_repr})"
+
 
 class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     """

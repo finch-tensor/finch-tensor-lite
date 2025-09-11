@@ -143,6 +143,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def __repr__(self):
         return f"{self.struct_name}({repr(self.buf_t)})"
 
+    def __call__(self, val: np.ndarray) -> BufferizedNDArray:
+        if val.dtype != self.buf_t.element_type:
+            raise Exception(f"dtype mismatch: {val.dtype} vs {self.element_type}")
+        if val.ndim != self.ndim:
+            raise Exception(f"ndim mismatch: {val.ndim} vs {self.ndim}")
+        return BufferizedNDArray(val)
+
     @property
     def ndim(self) -> np.intp:
         return self._ndim

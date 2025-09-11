@@ -102,6 +102,9 @@ from .tensor import (
     DenseLevelFType,
     ElementLevelFType,
     FiberTensorFType,
+    dense,
+    element,
+    fiber_tensor,
 )
 
 __all__ = [
@@ -152,10 +155,13 @@ __all__ = [
     "cos",
     "cosh",
     "defer",
+    "dense",
     "dimension",
+    "element",
     "element_type",
     "elementwise",
     "expand_dims",
+    "fiber_tensor",
     "fill_value",
     "fisinstance",
     "flatten",
