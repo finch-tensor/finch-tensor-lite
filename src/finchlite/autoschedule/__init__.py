@@ -40,7 +40,6 @@ from .optimize import (
 )
 from .einsum import (
     Einsum,
-    Einprod,
     EinsumTransformer,
     PrintingLogicOptimizer
 )
@@ -50,7 +49,6 @@ __all__ = [
     "Alias",
     "DefaultLogicOptimizer",
     "Einsum",
-    "Einprod",
     "EinsumTransformer",
     "Field",
     "Literal",
