@@ -5,13 +5,12 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.finch_assembly.struct import AssemblyStructFType
-from finchlite.util.print import qual_str
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
+from ..finch_assembly import AssemblyStructFType
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from ..util import qual_str
 
 
 class FinchTensorFType(TensorFType, ABC):

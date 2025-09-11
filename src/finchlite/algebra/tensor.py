@@ -137,10 +137,9 @@ class NDArrayFType(TensorFType):
     This includes the fill value, element type, and shape type.
     """
 
-    def __init__(self, dtype: np.dtype, shape: tuple):
+    def __init__(self, dtype: np.dtype, ndim: np.intp):
         self._dtype = dtype
-        self._ndim = np.intp(len(shape))
-        self._shape = shape
+        self._ndim = ndim
 
     def __eq__(self, other):
         if not isinstance(other, NDArrayFType):
@@ -169,13 +168,9 @@ class NDArrayFType(TensorFType):
     def shape_type(self) -> tuple:
         return tuple(np.int_ for _ in range(self._ndim))
 
-    @property
-    def shape(self) -> tuple:
-        return self._shape
-
 
 register_property(
-    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, x.shape)
+    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, np.intp(x.ndim))
 )
 
 

@@ -316,10 +316,6 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return self.tns.shape_type[self.nind :]
 
     @property
-    def shape(self) -> tuple:
-        return self.tns.shape[self.nind :]
-
-    @property
     def fill_value(self) -> Any:
         return self.tns.fill_value
 

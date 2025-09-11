@@ -433,7 +433,6 @@ def record_tables(
 
 def find_suitable_rep(root, table_vars) -> TensorFType:
     match root:
-        # TODO: take into consideration reorders!
         case MapJoin(Literal(op), args):
             args_suitable_reps = [find_suitable_rep(arg, table_vars) for arg in args]
             dtype = np.dtype(
