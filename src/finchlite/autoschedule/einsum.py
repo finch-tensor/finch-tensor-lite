@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from abc import ABC
 from typing import Callable, Self
 
-from finchlite.finch_logic import LogicExpression, LogicNode, Field, Plan
+from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
+from finchlite.finch_logic.nodes import MapJoin
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
+from finchlite.algebra import is_commutative, identity
 
 
 @dataclass(eq=True, frozen=True)
@@ -40,17 +42,17 @@ class PointwiseAccess(PointwiseNode, TermTree):
         idxs: The indices at which to access the tensor.
     """
 
-    tensor: LogicExpression
+    alias: str
     idxs: tuple[Field, ...]  # (Field('i'), Field('j'))
     # Children: None (leaf)
 
     @classmethod
-    def from_children(cls, tensor: LogicExpression, idxs: tuple[Field, ...]) -> Self:
-        return cls(tensor, idxs)
+    def from_children(cls, alias: str, idxs: tuple[Field, ...]) -> Self:
+        return cls(alias, idxs)
 
     @property
     def children(self):
-        return [self.tensor, *self.idxs]
+        return [self.alias, *self.idxs]
 
 @dataclass(eq=True, frozen=True)
 class PointwiseOp(PointwiseNode):
@@ -61,7 +63,7 @@ class PointwiseOp(PointwiseNode):
     If operation is not commutative, pointwise node must be binary, with 2 args at most.
 
     Attributes:
-        op: The function to apply e.g., operator.add
+        op: The function to apply e.g., operator.add, operator.mul, operator.subtract, operator.div, etc... Must be a callable.
         args: The arguments to the operation.
     """
 
@@ -87,13 +89,12 @@ class PointwiseLiteral(PointwiseNode):
 
     val: float
 
-    @classmethod
-    def from_children(cls, val: float) -> Self:
-        return cls(val)
+    def __hash__(self):
+        return hash(self.val)
 
-    @property
-    def children(self):
-        return [self.val]
+    def __eq__(self, other):
+        return isinstance(other, PointwiseLiteral) and self.val == other.val
+
 
 #einsum and einsum ast not part of logic IR
 #transform to it's own language
@@ -111,19 +112,20 @@ class Einsum(TermTree):
         pointwise_expr: The pointwise expression that is mapped and aggregated.
     """
 
-    updateOp: Callable
+    updateOp: Callable 
 
-    input_fields = tuple[Field, ...]    # indicies that are used in the pointwise expression (i.e. i, j, k)
-    output_fields = tuple[Field, ...]   # a subset of input_fields that are used in the output (i.e. i, j)
-    pointwise_expr: PointwiseNode       # the pointwise expression that is aggregated
+    input_fields: tuple[Field, ...]
+    output_fields: tuple[Field, ...]
+    pointwise_expr: PointwiseNode
+    output_alias: str | None
     
     @classmethod
-    def from_children(cls, updateOp: Callable, input_fields: tuple[Field, ...], output_fields: tuple[Field, ...], pointwise_expr: PointwiseNode) -> Self:
-        return cls(updateOp, input_fields, output_fields, pointwise_expr)
+    def from_children(cls, output_alias: str | None, updateOp: Callable, input_fields: tuple[Field, ...], output_fields: tuple[Field, ...], pointwise_expr: PointwiseNode) -> Self:
+        return cls(output_alias, updateOp, input_fields, output_fields, pointwise_expr)
     
     @property
     def children(self):
-        return [self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr]
+        return [self.output_alias, self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr]
 
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(Plan):
@@ -154,10 +156,43 @@ def make_einsum_plan(bodies: tuple[Einsum | EinsumPlan, ...]) -> EinsumPlan:
     return EinsumPlan(tuple(flat))
 
 class EinsumLowerer:
-    def __call__(self, ex: LogicNode) -> EinsumPlan:
+    def __call__(self, ex: LogicNode) -> EinsumPlan | Einsum:
         match ex:
             case Plan(bodies):
                 return make_einsum_plan(tuple(self(body) for body in bodies))
+            case Query(Alias(name), rhs):
+                rhsEinsum = self(rhs)
+                return Einsum(output_alias=name, updateOp=rhsEinsum.updateOp, input_fields=rhsEinsum.input_fields, output_fields=rhsEinsum.output_fields, pointwise_expr=rhsEinsum.pointwise_expr)
+            case MapJoin(Literal(operation), args):
+                args = [self.lower_to_pointwise(arg) for arg in args]
+                pointwise_expr = self.lower_to_pointwise_op(operation, args)
+                return Einsum(output_alias=None, updateOp=identity, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr)
+            case _:
+                raise Exception(f"Unrecognized logic: {ex}")
+
+    def lower_to_pointwise_op(self, operation: Callable, args: tuple[PointwiseNode, ...]) -> PointwiseOp:
+        # if operation is commutative, we simply pass all the args to the pointwise op since order of args does not matter
+        if is_commutative(operation):
+            return PointwiseOp(operation, args)
+
+        # combine args from left to right (i.e a / b / c -> (a / b) / c)
+        assert len(args) > 1
+        result = PointwiseOp(operation, args[0], args[1])
+        for arg in args[2:]:
+            result = PointwiseOp(operation, result, arg)
+        return result
+
+    # lowers nested mapjoin logic IR nodes into a single pointwise expression
+    def lower_to_pointwise(self, ex: LogicNode) -> PointwiseNode:
+        match ex:
+            case MapJoin(Literal(operation), args):
+                args = [self.lower_to_pointwise(arg) for arg in args]
+                return self.lower_to_pointwise_op(operation, args)
+
+            case Relabel(Alias(name), idxs): # relable is really just a glorified pointwise access
+                return PointwiseAccess(alias=name, idxs=idxs)
+            case Literal(value):
+                return PointwiseLiteral(val=value)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
