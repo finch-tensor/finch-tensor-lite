@@ -45,12 +45,16 @@ class BasicBlock:
             blocks[succ_id].predecessors.append(self.id)
 
     def __repr__(self):
-        return f"BasicBlock(id={self.id}, stmts={self.statements}, succs={self.successors})"
+        return (
+            f"BasicBlock(id={self.id}, stmts={self.statements}, "
+            f"succs={self.successors})"
+        )
 
 
 class CFG:
     def __init__(self, func_name: str):
-        # TODO: also pass argument types to allow fuctions with same names but different signatures
+        # TODO: also pass argument types to allow
+        # fuctions with same names but different signatures
 
         self.block_counter = 0
         self.name = func_name
@@ -71,7 +75,7 @@ class CFG:
         return block
 
 
-class CFGBuilderContext:  # is it required to have a 'main' entry point for a program?
+class CFGBuilder:  # is it required to have a 'main' entry point for a program?
     def __init__(self):
         self.cfgs = {}
         self.current_cfg = None
@@ -104,9 +108,9 @@ class CFGBuilderContext:  # is it required to have a 'main' entry point for a pr
                 self.current_cfg.current_block.add_statement(
                     ("setattr", obj, attr, value)
                 )
-            case Call(Literal(_) as lit, args):
+            case Call(Literal(_) as _lit, args):
                 # TODO: handle it as a statement for now (?)
-                ...
+                raise NotImplementedError(node)
             case Load(buffer, index):
                 self.current_cfg.current_block.add_statement(("load", buffer, index))
             case Store(buffer, index, value):
@@ -206,7 +210,8 @@ class CFGBuilderContext:  # is it required to have a 'main' entry point for a pr
             case Return(value):
                 self.current_cfg.current_block.add_statement(("return", value))
 
-                # when Return is met, make a connection to the EXIT block of function (cfg)
+                # when Return is met,
+                # make a connection to the EXIT block of function (cfg)
                 self.current_cfg.current_block.add_successor(
                     self.current_cfg.exit_block.id, self.current_cfg.blocks
                 )
@@ -217,7 +222,8 @@ class CFGBuilderContext:  # is it required to have a 'main' entry point for a pr
             case Break():
                 self.current_cfg.current_block.add_statement("break")
 
-                # when Break is met, make a connection to the AFTER block of ForLoop/WhileLoop
+                # when Break is met,
+                # make a connection to the AFTER block of ForLoop/WhileLoop
                 self.current_cfg.current_block.add_successor(
                     break_block_id, self.current_cfg.blocks
                 )
@@ -226,8 +232,7 @@ class CFGBuilderContext:  # is it required to have a 'main' entry point for a pr
                 unreachable_block = self.current_cfg.new_block()
                 self.current_cfg.current_block = unreachable_block
             case BufferLoop(_buf, var, body):
-                # TODO: 1) implement BufferLoop printing and then implement this
-                # TODO: 2) implement BufferLoop here
+                # TODO: implement BufferLoop case
                 raise NotImplementedError(node)
             case Function(Variable(_, _), args, body):
                 for arg in args:
@@ -283,3 +288,7 @@ cfgs: {
 
 # TODO: CFG Printer
 class CFGPrinter: ...
+
+
+# TODO: create TestClass to test the CFG builder
+class CFGTest: ...
