@@ -3,7 +3,7 @@ from abc import ABC
 from typing import Callable, Self
 
 from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
-from finchlite.finch_logic.nodes import MapJoin
+from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
 from finchlite.algebra import is_commutative, identity
@@ -127,6 +127,15 @@ class Einsum(TermTree):
     def children(self):
         return [self.output_alias, self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr]
 
+    @classmethod
+    def rename(self, new_alias: str):
+        return Einsum(self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr, new_alias)
+
+    @classmethod
+    def reorder(self, idxs: tuple[int, ...]):
+        new_input_fields = tuple(self.input_fields[i] for i in idxs)
+        return Einsum(self.updateOp, new_input_fields, self.output_fields, self.pointwise_expr, self.output_alias)
+
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(Plan):
     """
@@ -162,11 +171,24 @@ class EinsumLowerer:
                 return make_einsum_plan(tuple(self(body) for body in bodies))
             case Query(Alias(name), rhs):
                 rhsEinsum = self(rhs)
-                return Einsum(output_alias=name, updateOp=rhsEinsum.updateOp, input_fields=rhsEinsum.input_fields, output_fields=rhsEinsum.output_fields, pointwise_expr=rhsEinsum.pointwise_expr)
+                if isinstance(rhsEinsum, EinsumPlan):
+                    raise Exception("Cannot alias an einsum plan.");
+                return rhsEinsum.rename(name)
             case MapJoin(Literal(operation), args):
                 args = [self.lower_to_pointwise(arg) for arg in args]
                 pointwise_expr = self.lower_to_pointwise_op(operation, args)
                 return Einsum(output_alias=None, updateOp=identity, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr)
+            case Reorder(arg, idxs):
+                argEinsum = self(arg)
+                if isinstance(argEinsum, EinsumPlan):
+                    raise Exception("Cannot reorder an einsum plan.");
+                return argEinsum.reorder(idxs)
+            
+            case Produces(arg):
+                argEinsum = self(arg)
+                if isinstance(argEinsum, EinsumPlan):
+                    raise Exception("Cannot produce an einsum plan.");
+                return argEinsum.rename("final_output")
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -188,7 +210,6 @@ class EinsumLowerer:
             case MapJoin(Literal(operation), args):
                 args = [self.lower_to_pointwise(arg) for arg in args]
                 return self.lower_to_pointwise_op(operation, args)
-
             case Relabel(Alias(name), idxs): # relable is really just a glorified pointwise access
                 return PointwiseAccess(alias=name, idxs=idxs)
             case Literal(value):
