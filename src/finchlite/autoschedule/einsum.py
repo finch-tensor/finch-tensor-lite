@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from abc import ABC
+import operator
 from typing import Callable, Self
 
 from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
@@ -7,6 +8,7 @@ from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
 from finchlite.algebra import is_commutative, overwrite, init_value
+from finchlite.symbolic import Context
 
 @dataclass(eq=True, frozen=True)
 class PointwiseNode(Term, ABC):
@@ -28,6 +30,10 @@ class PointwiseNode(Term, ABC):
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         return cls(*children)
+
+    def __str__(self):
+        ctx = EinsumPrinterContext()
+        return ctx.print_pointwise_expr(self)
 
 @dataclass(eq=True, frozen=True)
 class PointwiseAccess(PointwiseNode, TermTree):
@@ -134,6 +140,10 @@ class Einsum(TermTree):
     def reorder(self, idxs: tuple[Field, ...]):
         return Einsum(self.reduceOp, idxs, self.output_fields, self.pointwise_expr, self.output_alias)
 
+    def __str__(self):
+        ctx = EinsumPrinterContext()
+        return ctx.print_einsum(self)
+
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(Plan):
     """
@@ -152,6 +162,10 @@ class EinsumPlan(Plan):
     @property
     def children(self) -> tuple[Einsum, ...]:
         return [*self.bodies, self.returnValue]
+
+    def __str__(self):
+        ctx = EinsumPrinterContext()
+        return ctx(self)
 
 class EinsumLowerer:
     alias_counter: int = 0
@@ -254,3 +268,58 @@ def einsum_scheduler(plan: Plan):
 
     interpreter = EinsumCompiler()
     return interpreter(optimized_prgm)
+
+class EinsumPrinterContext(Context):
+    def print_indicies(self, idxs: tuple[Field, ...]):
+        return ", ".join([str(idx) for idx in idxs])
+    
+    def print_reducer(self, reducer: Callable):
+        str_map = {
+            overwrite: "=",
+            operator.add: "+=",
+            operator.sub: "-=",
+            operator.mul: "*=",
+            operator.div: "/=",
+            operator.truediv: "/=",
+            operator.mod: "%=",
+            operator.pow: "**=",
+            operator.and_: "&=",
+            operator.or_: "|=",
+            operator.xor: "^=",
+            operator.floordiv: "//=",
+            operator.mod: "%=",
+            operator.pow: "**=",
+        }
+        return str_map[reducer]
+
+    def print_pointwise_op(self, op: Callable):
+        str_map = {
+            operator.add: "+",
+            operator.sub: "-",
+            operator.mul: "*",
+            operator.div: "/",
+            operator.truediv: "/",
+            operator.mod: "%",
+            operator.pow: "**",
+        }
+        return str_map[op]
+
+    def print_pointwise_expr(self, pointwise_expr: PointwiseNode):
+        match pointwise_expr:
+            case PointwiseAccess(alias, idxs):
+                return f"{alias}[{self.print_indicies(idxs)}]"
+            case PointwiseOp(op, args):
+                return f"{self.print_pointwise_op(op)}({', '.join(self.print_pointwise_expr(arg) for arg in args)})"
+            case PointwiseLiteral(val):
+                return str(val)
+
+    def print_einsum(self, einsum: Einsum):
+        return f"{einsum.output_alias}[{self.print_indicies(einsum.output_fields)}] {self.print_reducer(einsum.reduceOp)} {self.print_pointwise_expr(einsum.pointwise_expr)}"
+    
+    def print_einsum_plan(self, einsum_plan: EinsumPlan):
+        if einsum_plan.returnValue is None:
+            return "\n".join([self.print_einsum(einsum) for einsum in einsum_plan.bodies])
+        return f"{"\n".join([self.print_einsum(einsum) for einsum in einsum_plan.bodies])}\nreturn {self.print_einsum(einsum_plan.returnValue)}"
+    
+    def __call__(self, prgm: EinsumPlan):
+        return self.print_einsum_plan(prgm)
