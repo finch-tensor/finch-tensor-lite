@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from abc import ABC
 import operator
-import traceback
 from typing import Callable, Self
 
 from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
@@ -9,7 +8,6 @@ from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder, T
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
 from finchlite.algebra import is_commutative, overwrite, init_value
-from finchlite.symbolic import Context
 
 @dataclass(eq=True, frozen=True)
 class PointwiseNode(Term, ABC):
