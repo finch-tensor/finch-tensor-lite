@@ -6,8 +6,7 @@ from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal,
 from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
-from finchlite.algebra import is_commutative, identity
-
+from finchlite.algebra import is_commutative, overwrite, init_value
 
 @dataclass(eq=True, frozen=True)
 class PointwiseNode(Term, ABC):
@@ -112,7 +111,7 @@ class Einsum(TermTree):
         pointwise_expr: The pointwise expression that is mapped and aggregated.
     """
 
-    updateOp: Callable 
+    reduceOp: Callable #technically a reduce operation, much akin to the one in aggregate
 
     input_fields: tuple[Field, ...]
     output_fields: tuple[Field, ...]
@@ -125,16 +124,15 @@ class Einsum(TermTree):
     
     @property
     def children(self):
-        return [self.output_alias, self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr]
+        return [self.output_alias, self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr]
 
     @classmethod
     def rename(self, new_alias: str):
-        return Einsum(self.updateOp, self.input_fields, self.output_fields, self.pointwise_expr, new_alias)
+        return Einsum(self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr, new_alias)
 
     @classmethod
-    def reorder(self, idxs: tuple[int, ...]):
-        new_input_fields = tuple(self.input_fields[i] for i in idxs)
-        return Einsum(self.updateOp, new_input_fields, self.output_fields, self.pointwise_expr, self.output_alias)
+    def reorder(self, idxs: tuple[Field, ...]):
+        return Einsum(self.reduceOp, idxs, self.output_fields, self.pointwise_expr, self.output_alias)
 
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(Plan):
@@ -145,56 +143,79 @@ class EinsumPlan(Plan):
     """
 
     bodies: tuple[Einsum, ...]
+    returnValue: Einsum | None
 
     @classmethod
-    def from_children(cls, bodies: tuple[Einsum, ...]) -> Self:
-        return cls(bodies)
+    def from_children(cls, bodies: tuple[Einsum, ...], returnValue: Einsum | None) -> Self:
+        return cls(bodies, returnValue)
 
     @property
     def children(self) -> tuple[Einsum, ...]:
-        return self.bodies
-
-def make_einsum_plan(bodies: tuple[Einsum | EinsumPlan, ...]) -> EinsumPlan:
-    """Flatten nested EinsumPlans so the resulting tuple contains only Einsum nodes."""
-    flat: list[Einsum] = []
-    for body in bodies:
-        if isinstance(body, EinsumPlan):
-            flat.extend(body.children)
-        else:
-            flat.append(body)
-    return EinsumPlan(tuple(flat))
+        return [*self.bodies, self.returnValue]
 
 class EinsumLowerer:
-    def __call__(self, ex: LogicNode) -> EinsumPlan | Einsum:
+    alias_counter: int = 0
+
+    def __call__(self, prgm: Plan) -> EinsumPlan:
+        return self.compile_plan(prgm)
+
+    def get_next_alias(self) -> str:
+        self.alias_counter += 1
+        return f"einsum_{self.alias_counter}"
+
+    def compile_plan(self, plan: Plan) -> EinsumPlan:
+        einsums = []
+        returnValue = None
+
+        for body in plan.bodies:
+            match body:
+                case Plan(_):
+                    plan = self.compile_plan(body)
+                    if plan.returnValue is not None:
+                        raise Exception("Plans with return values are not statements, but rather are expressions.")
+                    einsums.extend(plan.bodies)
+                case Query(Alias(name), rhs):
+                    einsums.append(self.lower_to_einsum(rhs, einsums).rename(name))
+                case Produces(arg):
+                    if returnValue is not None:
+                        raise Exception("Only one return value is supported.")
+                    returnValue = self.lower_to_einsum(arg, einsums)
+                case _:
+                    einsums.append(self.lower_to_einsum(body, einsums).rename(self.get_next_alias()))
+        
+        return EinsumPlan(tuple(einsums), returnValue)
+
+    def lower_to_einsum(self, ex: LogicNode, einsums: list[Einsum]) -> Einsum:
         match ex:
-            case Plan(bodies):
-                return make_einsum_plan(tuple(self(body) for body in bodies))
-            case Query(Alias(name), rhs):
-                rhsEinsum = self(rhs)
-                if isinstance(rhsEinsum, EinsumPlan):
-                    raise Exception("Cannot alias an einsum plan.");
-                return rhsEinsum.rename(name)
+            case Plan(_):
+                plan = self.compile_plan(ex)
+                einsums.extend(plan.bodies)
+                return plan.returnValue 
             case MapJoin(Literal(operation), args):
-                args = [self.lower_to_pointwise(arg) for arg in args]
+                args = [self.lower_to_pointwise(arg, einsums) for arg in args]
                 pointwise_expr = self.lower_to_pointwise_op(operation, args)
-                return Einsum(output_alias=None, updateOp=identity, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr)
+                return Einsum(reduceOp=overwrite, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr, output_alias=None)
             case Reorder(arg, idxs):
-                argEinsum = self(arg)
-                if isinstance(argEinsum, EinsumPlan):
-                    raise Exception("Cannot reorder an einsum plan.");
-                return argEinsum.reorder(idxs)
-            
-            case Produces(arg):
-                argEinsum = self(arg)
-                if isinstance(argEinsum, EinsumPlan):
-                    raise Exception("Cannot produce an einsum plan.");
-                return argEinsum.rename("final_output")
+                return self.lower_to_einsum(arg, einsums).reorder(idxs)
+            case Aggregate(operation, init, arg, idxs):
+                if init != init_value(operation, type(init)):
+                    raise Exception(f"Init value {init} is not the default value for operation {operation} of type {type(init)}. Non standard init values are not supported.")
+                pointwise_expr = self.lower_to_pointwise(arg, einsums)
+                return Einsum(operation, arg.fields, ex.fields, pointwise_expr, self.get_next_alias(), output_alias=None)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
     def lower_to_pointwise_op(self, operation: Callable, args: tuple[PointwiseNode, ...]) -> PointwiseOp:
         # if operation is commutative, we simply pass all the args to the pointwise op since order of args does not matter
         if is_commutative(operation):
+            args = [] # flatten the args
+            for arg in args:
+                match arg:
+                    case PointwiseOp(op2, _) if op2 == operation:
+                        args.extend(arg.args)
+                    case _:
+                        args.append(arg)
+
             return PointwiseOp(operation, args)
 
         # combine args from left to right (i.e a / b / c -> (a / b) / c)
@@ -205,15 +226,19 @@ class EinsumLowerer:
         return result
 
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
-    def lower_to_pointwise(self, ex: LogicNode) -> PointwiseNode:
+    def lower_to_pointwise(self, ex: LogicNode, einsums: list[Einsum]) -> PointwiseNode:
         match ex:
             case MapJoin(Literal(operation), args):
-                args = [self.lower_to_pointwise(arg) for arg in args]
+                args = [self.lower_to_pointwise(arg, einsums) for arg in args]
                 return self.lower_to_pointwise_op(operation, args)
             case Relabel(Alias(name), idxs): # relable is really just a glorified pointwise access
                 return PointwiseAccess(alias=name, idxs=idxs)
             case Literal(value):
                 return PointwiseLiteral(val=value)
+            case Aggregate(_, _, _, _): # aggregate has to be computed seperatley as it's own einsum
+                aggregate_einsum_alias = self.get_next_alias()
+                einsums.append(self.lower_to_einsum(ex, einsums).rename(aggregate_einsum_alias)) 
+                return PointwiseAccess(alias=aggregate_einsum_alias, idxs=tuple(ex.fields))
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -223,7 +248,6 @@ class EinsumCompiler:
 
     def __call__(self, prgm: Plan):
         return self.el(prgm)
-
 
 def einsum_scheduler(plan: Plan):
     optimized_prgm = optimize(plan)
