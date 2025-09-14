@@ -53,9 +53,6 @@ class BasicBlock:
 
 class CFG:
     def __init__(self, func_name: str):
-        # TODO: also pass argument types to allow
-        # fuctions with same names but different signatures
-
         self.block_counter = 0
         self.name = func_name
         self.blocks = {}
@@ -108,9 +105,10 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                 self.current_cfg.current_block.add_statement(
                     ("setattr", obj, attr, value)
                 )
-            case Call(Literal(_) as _lit, args):
-                # TODO: handle it as a statement for now (?)
-                raise NotImplementedError(node)
+            case Call(Literal(_) as lit, args):
+                self.current_cfg.current_block.add_statement(
+                    ("function_call", lit, args)
+                )
             case Load(buffer, index):
                 self.current_cfg.current_block.add_statement(("load", buffer, index))
             case Store(buffer, index, value):
@@ -207,6 +205,29 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                 )
 
                 self.current_cfg.current_block = after_block
+            case BufferLoop(buf, var, body):
+                init_block = self.current_cfg.current_block
+                init_block.add_statement(("bufferloop_init", buf, var))
+
+                cond_block = self.current_cfg.new_block()
+                init_block.add_successor(cond_block.id, self.current_cfg.blocks)
+                cond_block.add_statement(("bufferloop_init", var, start, end))
+
+                body_block = self.current_cfg.new_block()
+                cond_block.add_successor(body_block, self.current_cfg.blocks)
+
+                after_block = self.current_cfg.new_block()
+                cond_block.add_successor(after_block, self.current_cfg.blocks)
+
+                self.current_cfg.current_block = body_block
+                self(body_block, after_block.id)
+
+                self.current_cfg.current_block.add_statement(("bufferloop_inc", var))
+                self.current_cfg.current_block.add_successor(
+                    cond_block.id, self.current_cfg.blocks
+                )
+
+                self.current_cfg.current_block = after_block
             case Return(value):
                 self.current_cfg.current_block.add_statement(("return", value))
 
@@ -231,9 +252,6 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                 # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
                 self.current_cfg.current_block = unreachable_block
-            case BufferLoop(_buf, var, body):
-                # TODO: implement BufferLoop case
-                raise NotImplementedError(node)
             case Function(Variable(_, _), args, body):
                 for arg in args:
                     match arg:
@@ -261,7 +279,6 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                         end_func_block, self.current_cfg.blocks
                     )
                     self.current_cfg.current_block = end_func_block
-                return None
             case node:
                 raise NotImplementedError(node)
 
