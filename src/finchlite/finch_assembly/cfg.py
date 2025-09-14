@@ -1,5 +1,11 @@
+import json
+import operator
+
+import numpy as np
+
 from .nodes import (
     AssemblyNode,
+    AssemblyPrinterContext,
     Assign,
     Block,
     Break,
@@ -44,10 +50,19 @@ class BasicBlock:
         if self.id not in blocks[succ_id].predecessors:
             blocks[succ_id].predecessors.append(self.id)
 
+    def to_dict(self):
+        """Convert BasicBlock to a dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "statements": [str(stmt) for stmt in self.statements],
+            "successors": self.successors,
+            "predecessors": self.predecessors,
+        }
+
     def __repr__(self):
         return (
-            f"BasicBlock(id={self.id}, stmts={self.statements}, "
-            f"succs={self.successors})"
+            f"BasicBlock(id={self.id}",
+            f"stmts={{self.statements}}, succs={self.successors})",
         )
 
 
@@ -62,7 +77,7 @@ class CFG:
         self.exit_block = self.new_block()
 
         self.current_block = self.new_block()
-        self.entry_block.add_successor(self.current_block, self.blocks)
+        self.entry_block.add_successor(self.current_block.id, self.blocks)
 
     def new_block(self):
         bid = f"{self.name}_{self.block_counter}"
@@ -71,8 +86,32 @@ class CFG:
         self.blocks[bid] = block
         return block
 
+    def to_dict(self):
+        """Convert CFG to a dictionary for JSON serialization."""
+        return {
+            "name": self.name,
+            "entry_block": self.entry_block.id,
+            "exit_block": self.exit_block.id,
+            "blocks": {
+                block_id: block.to_dict() for block_id, block in self.blocks.items()
+            },
+        }
 
-class CFGBuilder:  # is it required to have a 'main' entry point for a program?
+
+class CFGBuilder:
+    """
+    cfgs: {
+        function_0: {
+            basic_block_0: {
+                statements:...,
+                predecessors:...,
+                successors:...,
+            },
+        },
+        ...
+    }
+    """
+
     def __init__(self):
         self.cfgs = {}
         self.current_cfg = None
@@ -84,6 +123,10 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
 
     def build(self, node: AssemblyNode):
         return self(node)
+
+    def to_dict(self):
+        """Convert all CFGs to dictionaries for JSON serialization."""
+        return {cfg_name: cfg.to_dict() for cfg_name, cfg in self.cfgs.items()}
 
     def __call__(self, node: AssemblyNode, break_block_id: str = None):
         match node:
@@ -130,40 +173,45 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                 cond_block = self.current_cfg.current_block
                 cond_block.add_statement(("if_cond", cond))
 
-                then_block = self.current_cfg.new_block()
-                self.current_cfg.current_block = then_block
-                self(body, break_block_id)
-
+                if_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
-                cond_block.add_successor(then_block.id, self.current_cfg.blocks)
+
+                cond_block.add_successor(if_block.id, self.current_cfg.blocks)
                 cond_block.add_successor(after_block.id, self.current_cfg.blocks)
+
+                self.current_cfg.current_block = if_block
+                self(body, break_block_id)
 
                 self.current_cfg.current_block.add_successor(
                     after_block.id, self.current_cfg.blocks
                 )
+
                 self.current_cfg.current_block = after_block
             case IfElse(cond, body, else_body):
                 cond_block = self.current_cfg.current_block
                 cond_block.add_statement(("if_else_cond", cond))
 
-                then_block = self.current_cfg.new_block()
-                self.current_cfg.current_block = then_block
-                self(body, break_block_id)
-
+                if_block = self.current_cfg.new_block()
+                else_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
-                cond_block.add_successor(then_block.id, self.current_cfg.blocks)
-                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
+
+                print("IfElse", if_block.id, else_block.id, after_block.id)
+
+                cond_block.add_successor(if_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(else_block.id, self.current_cfg.blocks)
+
+                self.current_cfg.current_block = if_block
+                self(body, break_block_id)
                 self.current_cfg.current_block.add_successor(
                     after_block.id, self.current_cfg.blocks
                 )
 
-                else_block = self.current_cfg.new_block()
                 self.current_cfg.current_block = else_block
                 self(else_body, break_block_id)
-
                 self.current_cfg.current_block.add_successor(
                     after_block.id, self.current_cfg.blocks
                 )
+
                 self.current_cfg.current_block = after_block
             case WhileLoop(cond, body):
                 cond_block = self.current_cfg.current_block
@@ -191,10 +239,10 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                 cond_block.add_statement(("for_init", var, start, end))
 
                 body_block = self.current_cfg.new_block()
-                cond_block.add_successor(body_block, self.current_cfg.blocks)
+                cond_block.add_successor(body_block.id, self.current_cfg.blocks)
 
                 after_block = self.current_cfg.new_block()
-                cond_block.add_successor(after_block, self.current_cfg.blocks)
+                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
 
                 self.current_cfg.current_block = body_block
                 self(body_block, after_block.id)
@@ -214,10 +262,10 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
                 cond_block.add_statement(("bufferloop_init", var, start, end))
 
                 body_block = self.current_cfg.new_block()
-                cond_block.add_successor(body_block, self.current_cfg.blocks)
+                cond_block.add_successor(body_block.id, self.current_cfg.blocks)
 
                 after_block = self.current_cfg.new_block()
-                cond_block.add_successor(after_block, self.current_cfg.blocks)
+                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
 
                 self.current_cfg.current_block = body_block
                 self(body_block, after_block.id)
@@ -274,38 +322,88 @@ class CFGBuilder:  # is it required to have a 'main' entry point for a program?
 
                     self.current_cfg = self.new_cfg(func.name.name)
                     self(func)
-                    end_func_block = self.current_cfg.new_block()
                     self.current_cfg.current_block.add_successor(
-                        end_func_block, self.current_cfg.blocks
+                        self.current_cfg.exit_block.id, self.current_cfg.blocks
                     )
-                    self.current_cfg.current_block = end_func_block
             case node:
                 raise NotImplementedError(node)
 
         return self.cfgs
 
 
-"""
-cfgs: {
-    main: {
-        main_0: {...statements},
-        main_1: {...statements},
-        main_2: {...statements},
-    },
-    func: {
-        func_0: {...statements},
-        func_1: {...statements},
-    },
-    .
-    .
-    .
-}
-"""
+def test1():
+    printer = AssemblyPrinterContext()
+
+    var = Variable("a", np.int64)
+    root = Module(
+        (
+            Function(
+                Variable("if_else", np.int64),
+                (),
+                Block(
+                    (
+                        Assign(var, Literal(np.int64(5))),
+                        If(
+                            Call(
+                                Literal(operator.eq),
+                                (var, Literal(np.int64(5))),
+                            ),
+                            Block(
+                                (
+                                    Assign(
+                                        var,
+                                        Call(
+                                            Literal(operator.add),
+                                            (var, Literal(np.int64(10))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        IfElse(
+                            Call(
+                                Literal(operator.lt),
+                                (var, Literal(np.int64(15))),
+                            ),
+                            Block(
+                                (
+                                    Assign(
+                                        var,
+                                        Call(
+                                            Literal(operator.sub),
+                                            (var, Literal(np.int64(3))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            Block(
+                                (
+                                    Assign(
+                                        var,
+                                        Call(
+                                            Literal(operator.mul),
+                                            (var, Literal(np.int64(2))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        Return(var),
+                    )
+                ),
+            ),
+        )
+    )
+
+    cfg_builder = CFGBuilder()
+    cfg_builder.build(root)
+
+    printer(root)
+    print(printer.emit())
+    print(50 * "=")
+
+    return cfg_builder.to_dict()
 
 
-# TODO: CFG Printer
-class CFGPrinter: ...
-
-
-# TODO: create TestClass to test the CFG builder
-class CFGTest: ...
+if __name__ == "__main__":
+    print(json.dumps(test1(), indent=4))
