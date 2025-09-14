@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 from ..algebra import element_type, query_property, return_type
@@ -73,7 +73,7 @@ class Literal(NotationExpression):
         return type(self.val)
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"val": self.val})
 
 
 @dataclass(eq=True, frozen=True)
@@ -91,7 +91,7 @@ class Value(NotationExpression):
         return self.type_
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"ex": self.ex, "type_": self.type_})
 
 
 @dataclass(eq=True, frozen=True)
@@ -112,7 +112,9 @@ class Variable(NotationExpression):
         return self.type_
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(
+            type(self).__name__, {"name": self.name, "type_": self.type_}
+        )
 
 
 @dataclass(eq=True, frozen=True)
@@ -379,7 +381,7 @@ class Slot(NotationExpression):
         return self.type
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"name": self.name, "type": self.type})
 
 
 @dataclass(eq=True, frozen=True)

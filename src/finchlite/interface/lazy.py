@@ -26,7 +26,11 @@ from ..algebra import (
     register_property,
     return_type,
 )
-from ..algebra import conjugate as conj
+from ..algebra import (
+    conjugate as conj,
+)
+from ..compile import BufferizedNDArray
+from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -53,7 +57,7 @@ class LazyTensorFType(TensorFType):
     _element_type: Any
     _shape_type: Any
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple):
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: TupleFType):
         self._fill_value = _fill_value
         self._element_type = _element_type
         self._shape_type = _shape_type
@@ -97,7 +101,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=tuple(type(dim) for dim in self.shape),
+            _shape_type=ftype(self._shape),
         )
 
     @property
@@ -306,27 +310,28 @@ class LazyTensor(OverrideTensor):
         return logical_not(self)
 
 
-register_property(np.ndarray, "asarray", "__attr__", lambda x: x)
+register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any) -> Any:
-    """Convert given argument and return np.asarray(arg) for the scalar type input.
+def asarray(arg: Any, format=None) -> Any:
+    """
+    Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
 
     Args:
         arg: The object to be converted.
+        format: The format for the result array.
 
     Returns:
         The array type result of the given object.
     """
-    if hasattr(arg, "asarray"):
-        return arg.asarray()
-
-    try:
+    if format is None:
+        if hasattr(arg, "asarray"):
+            return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
-    except AttributeError:
-        return np.asarray(arg)
+
+    return format(arg)
 
 
 def defer(arr) -> LazyTensor:

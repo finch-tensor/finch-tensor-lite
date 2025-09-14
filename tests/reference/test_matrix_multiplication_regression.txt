@@ -1,7 +1,7 @@
 def matmul(C: BufferizedNDArray(ndim=2), A: BufferizedNDArray(ndim=2), B: BufferizedNDArray(ndim=2)) -> BufferizedNDArray(ndim=2):
-    m: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(A, 0)
-    n: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(B, 1)
-    p: ExtentFType(start=<class 'numpy.int64'>, end=<class 'numpy.int64'>) = dimension(A, 1)
+    m: ExtentFType(start=int64, end=int64) = dimension(A, 0)
+    n: ExtentFType(start=int64, end=int64) = dimension(B, 1)
+    p: ExtentFType(start=int64, end=int64) = dimension(A, 1)
     A_: BufferizedNDArray(ndim=2) = A
     A__stride_0: int64 = getattr(getattr(A_, strides), element_0)
     A__stride_1: int64 = getattr(getattr(A_, strides), element_1)
