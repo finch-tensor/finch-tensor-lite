@@ -336,25 +336,8 @@ class AssemblyInterpreter:
                 return AssemblyInterpreterModule(self, kernels)
             case asm.Print(args):
                 match args:
-                    case asm.Variable():
-                        print(f"{self(args)}")
-                    case _:
-                        if isinstance(args, tuple):
-                            arg_decls = [
-                                f"{self(arg)}"
-                                for arg in args
-                                if isinstance(arg, asm.Variable)
-                            ]
-                            print(arg_decls)
-                        else:
-                            raise NotImplementedError(
-                                f"Unrecognized argument type: {args}"
-                            )
-                return None
-            case asm.Debug(message, args):
-                match args:
                     case asm.Variable(name, _):
-                        print(f"{message} " + f"{name}=" + str(self(args)))
+                        print(f"{name}=" + str(self(args)))
                     case _:
                         if isinstance(args, tuple):
                             arg_decls = [
@@ -362,7 +345,7 @@ class AssemblyInterpreter:
                                 for arg in args
                                 if isinstance(arg, asm.Variable)
                             ]
-                            print(f"{message} " + str(arg_decls))
+                            print(str(arg_decls))
                         else:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {args}"

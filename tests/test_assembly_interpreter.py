@@ -14,7 +14,6 @@ from finchlite.finch_assembly import (  # noqa: F401
     Assign,
     Block,
     Call,
-    Debug,
     Function,
     If,
     IfElse,
@@ -252,9 +251,6 @@ def test_debug_statement(capsys):
                             asm.Print(p_var),
                             asm.Print(x_var),
                             asm.Print((p_var, x_var)),
-                            asm.Debug("p_var: ", p_var),
-                            asm.Debug("x_var: ", x_var),
-                            asm.Debug("All inputs (x_var, p_var): ", (x_var, p_var)),
                             asm.Assign(
                                 res_var,
                                 asm.Call(
@@ -283,12 +279,8 @@ def test_debug_statement(capsys):
                                     ),
                                 ),
                             ),
-                            asm.Debug("res_var: ", res_var),
+                            asm.Print(res_var),
                             asm.Print((p_var, x_var, res_var)),
-                            asm.Debug(
-                                "All variables (x_var, p_var, res_var): ",
-                                (p_var, x_var, res_var),
-                            ),
                             asm.Return(res_var),
                         )
                     ),
@@ -302,16 +294,11 @@ def test_debug_statement(capsys):
 
     capture = capsys.readouterr()
     expected_print = (
-        f"Point(x=np.float64(1.0), y=np.float64(2.0))\n(1, 4)\n"
-        f"['Point(x=np.float64(1.0), y=np.float64(2.0))', '(1, 4)']\n"
-        f"p_var:  {p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))\n"
-        f"x_var:  {x_var_name}=(1, 4)\n"
-        f"All inputs (x_var, p_var):  "
-        f"['{x_var_name}=(1, 4)', "
-        f"'{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))']\n"
-        f"res_var:  {res_var_name}=9.0\n"
-        f"['Point(x=np.float64(1.0), y=np.float64(2.0))', '(1, 4)', '9.0']\n"
-        f"All variables (x_var, p_var, res_var):  "
+        f"{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))\n"
+        f"{x_var_name}=(1, 4)\n"
+        f"['{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))', "
+        f"'{x_var_name}=(1, 4)']\n"
+        f"{res_var_name}=9.0\n"
         f"['{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))', "
         f"'{x_var_name}=(1, 4)', "
         f"'{res_var_name}=9.0']\n"
