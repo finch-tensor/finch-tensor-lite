@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Self
 
-import numpy as np
-
-from ..symbolic import Context, Term, TermTree, literal_repr, ftype
+from ..symbolic import Context, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 
