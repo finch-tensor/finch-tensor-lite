@@ -92,9 +92,6 @@ class LazyTensor(OverrideTensor):
         self._fill_value = fill_value
         self._element_type = element_type
 
-    def __hash__(self):
-        return hash((self.data, self._shape, self._fill_value, self._element_type))
-
     @property
     def ftype(self):
         return LazyTensorFType(

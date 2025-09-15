@@ -6,7 +6,7 @@ from typing import Any, Self
 
 import numpy as np
 
-from ..symbolic import Context, Term, TermTree, literal_repr
+from ..symbolic import Context, Term, TermTree, literal_repr, ftype
 from ..util import qual_str
 
 
@@ -70,15 +70,12 @@ class Literal(LogicNode):
     val: Any
 
     def __hash__(self):
-        val = self.val
-        # TODO: correct hashing for ndarrays
-        return id(val) if isinstance(val, np.ndarray) else hash(val)
+        return hash(ftype(self.val))
 
     def __eq__(self, other):
         if not isinstance(other, Literal):
             return False
-        res = self.val == other.val
-        return res.all() if isinstance(res, np.ndarray) else res
+        return ftype(self.val) == ftype(other.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
