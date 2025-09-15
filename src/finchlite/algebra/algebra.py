@@ -654,3 +654,19 @@ for logical in (
         lambda op, a, b, _logical=logical: bool,
     )
 register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
+
+# Register return types for numpy comparison ufuncs
+for comparison in (
+    np.equal,
+    np.not_equal,
+    np.less,
+    np.less_equal,
+    np.greater,
+    np.greater_equal,
+):
+    register_property(
+        comparison,
+        "__call__",
+        "return_type",
+        lambda op, a, b, _comparison=comparison: bool,
+    )
