@@ -748,7 +748,7 @@ class AssemblyPrinterContext(Context):
                             self.exec(f"{feed}print {arg_decls}")
                         else:
                             raise NotImplementedError(
-                                f"Unrecognized argument type: {arg}"
+                                f"Unrecognized argument type: {args}"
                             )
                 return None
             case Debug(message, args):
