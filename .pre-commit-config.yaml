@@ -10,7 +10,11 @@ repos:
       exclude: ^tests/reference/
     - id: name-tests-test
       args: ["--pytest-test-first"]
-      exclude: ^tests/reference/
+      exclude: |
+          (?x)(
+              ^tests/reference/|
+              ^tests/scripts/
+          )
     - id: no-commit-to-branch
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
