@@ -21,6 +21,7 @@ def test_algebra_selected():
     assert is_distributive(np.logical_and, np.logical_or)
     assert is_distributive(np.logical_and, np.logical_xor)
     assert is_distributive(np.logical_or, np.logical_and)
+    assert is_annihilator(operator.add, math.inf)
     assert is_annihilator(operator.mul, 0)
     assert is_annihilator(operator.or_, True)
     assert is_annihilator(operator.and_, False)

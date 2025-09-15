@@ -453,6 +453,7 @@ def is_annihilator(op, val):
 
 
 for fn, func in [
+    (operator.add, lambda op, val: np.isinf(val)),
     (operator.mul, lambda op, val: val == 0),
     (operator.or_, lambda op, val: bool(val)),
     (operator.and_, lambda op, val: not bool(val)),
