@@ -673,7 +673,13 @@ class AssemblyPrinterContext(Context):
                 self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}")
                 return None
             case BufferLoop(buf, var, body):
-                raise NotImplementedError
+                var_2 = self(var)
+                buf_2 = self(buf)
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                self.exec(f"{feed}for {var_2} in {buf_2}: \n{body_code}")
+                return None
             case WhileLoop(cond, body):
                 cond_code = self(cond)
                 ctx_2 = self.subblock()
