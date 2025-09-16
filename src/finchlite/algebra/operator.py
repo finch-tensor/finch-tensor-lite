@@ -156,7 +156,7 @@ algebra.register_property(
 class TupleFormat:
     """
     Lazy tuple element-type. Does not store component formats;
-    instead calls a provider function each time the tuple is needed.
+    instead calls a format function each time the tuple is needed.
     """
 
     def __init__(self, fmts):
