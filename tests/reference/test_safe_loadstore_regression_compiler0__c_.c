@@ -15,13 +15,13 @@ ssize_t finch_access(struct CNumpyBuffer* a, size_t idx) {
     size_t a__length = a_->length;
     size_t computed = (idx);
     if (computed < 0 || computed >= (a__length)) {
-        fprintf(stderr, "Encountered an index out of bounds error!");
+        fprintf(stderr, "Index out of bounds error!");
         exit(1);
     }
     ssize_t val = (a__data)[computed];
     size_t computed_2 = (idx);
     if (computed_2 < 0 || computed_2 >= (a__length)) {
-        fprintf(stderr, "Encountered an index out of bounds error!");
+        fprintf(stderr, "Index out of bounds error!");
         exit(1);
     }
     ssize_t val2 = (a__data)[computed_2];
@@ -33,7 +33,7 @@ ssize_t finch_change(struct CNumpyBuffer* a, size_t idx, ssize_t val) {
     size_t a__length_2 = a_->length;
     size_t computed_3 = (idx);
     if (computed_3 < 0 || computed_3 >= (a__length_2)) {
-        fprintf(stderr, "Encountered an index out of bounds error!");
+        fprintf(stderr, "Index out of bounds error!");
         exit(1);
     }
     (a__data_2)[computed_3] = val;
