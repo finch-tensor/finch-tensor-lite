@@ -338,6 +338,20 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
+    # TODO: We should unpack arrays before passing them to freeze/thaw
+    # def asm_unpack(self, ctx, var_n, val):
+    #     """
+    #     Unpack the into asm context.
+    #     """
+    #     tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
+    #     nind = asm.Variable(f"{var_n}_nind", self.nind)
+    #     pos = asm.Variable(f"{var_n}_pos", self.pos)
+    #     op = asm.Variable(f"{var_n}_op", self.op)
+    #     ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
+    #     ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
+    #     ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
+    #     return BufferizedNDArrayFields(tns, pos, nind, op)
+
     def asm_repack(self, ctx, lhs, obj):
         """
         Repack the buffer from C context.
