@@ -440,6 +440,7 @@ def test_simple_struct(compiler):
     result = mod.simple_struct(p, x)
     assert result == np.float64(9.0)
 
+
 @pytest.mark.parametrize(
     ["compiler", "extension"],
     [
@@ -499,6 +500,7 @@ def test_safe_loadstore_regression(compiler, extension, file_regression):
     )
     output = compiler(mod)
     file_regression.check(output, extension=extension)
+
 
 @pytest.mark.parametrize(
     "size,idx",
@@ -631,10 +633,10 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
     [
         (*params, value)
         for params in [
-            ( -1, 2),
-            ( 1, 2),
-            ( 2, 3),
-            ( 2, 2),
+            (-1, 2),
+            (1, 2),
+            (2, 3),
+            (2, 2),
         ]
         for value in [-1, 1434]
     ],
