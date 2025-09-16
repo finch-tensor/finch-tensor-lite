@@ -3,6 +3,7 @@ import operator
 
 import numpy as np
 
+from ..codegen import NumpyBuffer
 from .nodes import (
     AssemblyNode,
     AssemblyPrinterContext,
@@ -43,26 +44,26 @@ class BasicBlock:
     def add_statement(self, statement):
         self.statements.append(statement)
 
-    def add_successor(self, succ_id: str, blocks: dict[str, "BasicBlock"]) -> None:
-        if succ_id not in self.successors:
-            self.successors.append(succ_id)
+    def add_successor(self, successor: "BasicBlock") -> None:
+        if successor not in self.successors:
+            self.successors.append(successor)
 
-        if self.id not in blocks[succ_id].predecessors:
-            blocks[succ_id].predecessors.append(self.id)
+        if self not in successor.predecessors:
+            successor.predecessors.append(self)
 
     def to_dict(self):
         """Convert BasicBlock to a dictionary for JSON serialization."""
         return {
             "id": self.id,
             "statements": [str(stmt) for stmt in self.statements],
-            "successors": self.successors,
-            "predecessors": self.predecessors,
+            "successors": [str(block.id) for block in self.successors],
+            "predecessors": [str(block.id) for block in self.predecessors],
         }
 
     def __repr__(self):
         return (
             f"BasicBlock(id={self.id}",
-            f"stmts={{self.statements}}, succs={self.successors})",
+            f"stmts={self.statements}, succs={self.successors})",
         )
 
 
@@ -77,7 +78,7 @@ class CFG:
         self.exit_block = self.new_block()
 
         self.current_block = self.new_block()
-        self.entry_block.add_successor(self.current_block.id, self.blocks)
+        self.entry_block.add_successor(self.current_block)
 
     def new_block(self):
         bid = f"{self.name}_{self.block_counter}"
@@ -176,15 +177,13 @@ class CFGBuilder:
                 if_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                cond_block.add_successor(if_block.id, self.current_cfg.blocks)
-                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(if_block)
+                cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = if_block
                 self(body, break_block_id)
 
-                self.current_cfg.current_block.add_successor(
-                    after_block.id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(after_block)
 
                 self.current_cfg.current_block = after_block
             case IfElse(cond, body, else_body):
@@ -195,22 +194,16 @@ class CFGBuilder:
                 else_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                print("IfElse", if_block.id, else_block.id, after_block.id)
-
-                cond_block.add_successor(if_block.id, self.current_cfg.blocks)
-                cond_block.add_successor(else_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(if_block)
+                cond_block.add_successor(else_block)
 
                 self.current_cfg.current_block = if_block
                 self(body, break_block_id)
-                self.current_cfg.current_block.add_successor(
-                    after_block.id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(after_block)
 
                 self.current_cfg.current_block = else_block
                 self(else_body, break_block_id)
-                self.current_cfg.current_block.add_successor(
-                    after_block.id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(after_block)
 
                 self.current_cfg.current_block = after_block
             case WhileLoop(cond, body):
@@ -220,37 +213,33 @@ class CFGBuilder:
                 body_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                cond_block.add_successor(body_block.id, self.current_cfg.blocks)
-                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(body_block)
+                cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = body_block
                 self(body, after_block.id)
 
-                self.current_cfg.current_block.add_successor(
-                    cond_block.id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(cond_block)
                 self.current_cfg.current_block = after_block
             case ForLoop(var, start, end, body):
                 init_block = self.current_cfg.current_block
                 init_block.add_statement(("for_init", var, start, end))
 
                 cond_block = self.current_cfg.new_block()
-                init_block.add_successor(cond_block.id, self.current_cfg.blocks)
+                body_block = self.current_cfg.new_block()
+                after_block = self.current_cfg.new_block()
+
+                init_block.add_successor(cond_block)
                 cond_block.add_statement(("for_init", var, start, end))
 
-                body_block = self.current_cfg.new_block()
-                cond_block.add_successor(body_block.id, self.current_cfg.blocks)
-
-                after_block = self.current_cfg.new_block()
-                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(body_block)
+                cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = body_block
-                self(body_block, after_block.id)
+                self(body, after_block.id)
 
                 self.current_cfg.current_block.add_statement(("for_inc", var))
-                self.current_cfg.current_block.add_successor(
-                    cond_block.id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(cond_block)
 
                 self.current_cfg.current_block = after_block
             case BufferLoop(buf, var, body):
@@ -258,22 +247,20 @@ class CFGBuilder:
                 init_block.add_statement(("bufferloop_init", buf, var))
 
                 cond_block = self.current_cfg.new_block()
-                init_block.add_successor(cond_block.id, self.current_cfg.blocks)
+                init_block.add_successor(cond_block)
                 cond_block.add_statement(("bufferloop_init", var, start, end))
 
                 body_block = self.current_cfg.new_block()
-                cond_block.add_successor(body_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(body_block)
 
                 after_block = self.current_cfg.new_block()
-                cond_block.add_successor(after_block.id, self.current_cfg.blocks)
+                cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = body_block
                 self(body_block, after_block.id)
 
                 self.current_cfg.current_block.add_statement(("bufferloop_inc", var))
-                self.current_cfg.current_block.add_successor(
-                    cond_block.id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(cond_block)
 
                 self.current_cfg.current_block = after_block
             case Return(value):
@@ -282,7 +269,7 @@ class CFGBuilder:
                 # when Return is met,
                 # make a connection to the EXIT block of function (cfg)
                 self.current_cfg.current_block.add_successor(
-                    self.current_cfg.exit_block.id, self.current_cfg.blocks
+                    self.current_cfg.exit_block
                 )
 
                 # create a block where we going to store all unreachable statements
@@ -305,7 +292,7 @@ class CFGBuilder:
                     match arg:
                         case Variable(name, type):
                             self.current_cfg.current_block.add_statement(
-                                ("func_arg"), name, type
+                                (("func_arg"), name, type)
                             )
                         case _:
                             raise NotImplementedError(
@@ -323,10 +310,12 @@ class CFGBuilder:
                     self.current_cfg = self.new_cfg(func.name.name)
                     self(func)
                     self.current_cfg.current_block.add_successor(
-                        self.current_cfg.exit_block.id, self.current_cfg.blocks
+                        self.current_cfg.exit_block
                     )
             case node:
-                raise NotImplementedError(node)
+                raise NotImplementedError(
+                    f"Unhandled node type: {node.__class__.__name__}"
+                )
 
         return self.cfgs
 
@@ -405,5 +394,80 @@ def test1():
     return cfg_builder.to_dict()
 
 
+def test2():
+    a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float64)
+    b = np.array([5.0, 6.0, 7.0, 8.0], dtype=np.float64)
+
+    # Simple dot product using numpy for expected result
+    c = Variable("c", np.float64)
+    i = Variable("i", np.int64)
+    ab = NumpyBuffer(a)
+    bb = NumpyBuffer(b)
+    ab_v = Variable("a", ab.ftype)
+    ab_slt = Slot("a_", ab.ftype)
+    bb_v = Variable("b", bb.ftype)
+    bb_slt = Slot("b_", bb.ftype)
+
+    root = Module(
+        (
+            Function(
+                Variable("dot_product", np.float64),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                Block(
+                    (
+                        Assign(c, Literal(np.float64(0.0))),
+                        Unpack(ab_slt, ab_v),
+                        Unpack(bb_slt, bb_v),
+                        ForLoop(
+                            i,
+                            Literal(np.int64(0)),
+                            Length(ab_slt),
+                            Block(
+                                (
+                                    Assign(
+                                        c,
+                                        Call(
+                                            Literal(operator.add),
+                                            (
+                                                c,
+                                                Call(
+                                                    Literal(operator.mul),
+                                                    (
+                                                        Load(ab_slt, i),
+                                                        Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        Repack(ab_slt),
+                        Repack(bb_slt),
+                        Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    printer = AssemblyPrinterContext()
+    cfg_builder = CFGBuilder()
+    cfg_builder.build(root)
+
+    printer(root)
+    print(printer.emit())
+    print(50 * "=")
+
+    return cfg_builder.to_dict()
+
+
 if __name__ == "__main__":
     print(json.dumps(test1(), indent=4))
+    print(50 * "=")
+    print(50 * "=")
+    print(json.dumps(test2(), indent=4))
