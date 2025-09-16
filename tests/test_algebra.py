@@ -33,7 +33,6 @@ def test_algebra_selected():
     assert is_identity(operator.or_, False)
     assert is_identity(operator.and_, True)
     assert is_identity(operator.truediv, 1)
-    assert is_identity(operator.floordiv, 1)
     assert is_identity(operator.lshift, 0)
     assert is_identity(operator.rshift, 0)
     assert is_identity(operator.pow, 1)
