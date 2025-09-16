@@ -140,7 +140,7 @@ class CFGBuilder:
         """Convert all CFGs to dictionaries for JSON serialization."""
         return {cfg_name: cfg.to_dict() for cfg_name, cfg in self.cfgs.items()}
 
-    def __call__(self, node: AssemblyNode, break_block_id: str = None):
+    def __call__(self, node: AssemblyNode, break_block: BasicBlock = None):
         match node:
             case Literal(value):
                 self.current_cfg.current_block.add_statement(("literal", value))
@@ -180,7 +180,7 @@ class CFGBuilder:
                 self.current_cfg.current_block.add_statement(("assign", name, val))
             case Block(bodies):
                 for body in bodies:
-                    self(body, break_block_id)
+                    self(body, break_block)
             case If(cond, body):
                 cond_block = self.current_cfg.current_block
                 cond_block.add_statement(("if_cond", cond))
@@ -192,7 +192,7 @@ class CFGBuilder:
                 cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = if_block
-                self(body, break_block_id)
+                self(body, break_block)
 
                 self.current_cfg.current_block.add_successor(after_block)
 
@@ -209,11 +209,11 @@ class CFGBuilder:
                 cond_block.add_successor(else_block)
 
                 self.current_cfg.current_block = if_block
-                self(body, break_block_id)
+                self(body, break_block)
                 self.current_cfg.current_block.add_successor(after_block)
 
                 self.current_cfg.current_block = else_block
-                self(else_body, break_block_id)
+                self(else_body, break_block)
                 self.current_cfg.current_block.add_successor(after_block)
 
                 self.current_cfg.current_block = after_block
@@ -228,7 +228,7 @@ class CFGBuilder:
                 cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = body_block
-                self(body, after_block.id)
+                self(body, after_block)
 
                 self.current_cfg.current_block.add_successor(cond_block)
                 self.current_cfg.current_block = after_block
@@ -247,7 +247,7 @@ class CFGBuilder:
                 cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = body_block
-                self(body, after_block.id)
+                self(body, after_block)
 
                 self.current_cfg.current_block.add_statement(("for_inc", var))
                 self.current_cfg.current_block.add_successor(cond_block)
@@ -268,7 +268,7 @@ class CFGBuilder:
                 cond_block.add_successor(after_block)
 
                 self.current_cfg.current_block = body_block
-                self(body_block, after_block.id)
+                self(body_block, after_block)
 
                 self.current_cfg.current_block.add_statement(("bufferloop_inc", var))
                 self.current_cfg.current_block.add_successor(cond_block)
@@ -291,9 +291,7 @@ class CFGBuilder:
 
                 # when Break is met,
                 # make a connection to the AFTER block of ForLoop/WhileLoop
-                self.current_cfg.current_block.add_successor(
-                    break_block_id, self.current_cfg.blocks
-                )
+                self.current_cfg.current_block.add_successor(break_block)
 
                 # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
