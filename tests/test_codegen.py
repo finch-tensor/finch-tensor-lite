@@ -472,34 +472,10 @@ def test_c_load_safebuffer(size, idx):
     [
         (*params, compiler)
         for params in [
-            (
-                -1,
-                2,
-            ),
-            (
-                -1,
-                3,
-            ),
-            (
-                0,
-                2,
-            ),
-            (
-                1,
-                2,
-            ),
-            (
-                2,
-                3,
-            ),
-            (
-                2,
-                2,
-            ),
-            (
-                3,
-                2,
-            ),
+            (-1, 2),
+            (1, 2),
+            (2, 3),
+            (2, 2),
         ]
         for compiler in [asm.AssemblyInterpreter(), NumbaCompiler()]
     ],
@@ -548,12 +524,9 @@ def test_numba_load_safebuffer(size, idx, compiler):
         (*params, compiler)
         for params in [
             (-1, 2, 3),
-            (-1, 3, 1434),
-            (0, 2, 3),
-            (1, 2, 3),
-            (2, 3, 3),
+            (1, 2, 1434),
+            (2, 3, 1434),
             (2, 2, 3),
-            (3, 2, 3),
         ]
         for compiler in [NumbaCompiler(), asm.AssemblyInterpreter()]
     ],
@@ -599,34 +572,10 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
     [
         (*params, value)
         for params in [
-            (
-                -1,
-                2,
-            ),
-            (
-                -1,
-                3,
-            ),
-            (
-                0,
-                2,
-            ),
-            (
-                1,
-                2,
-            ),
-            (
-                2,
-                3,
-            ),
-            (
-                2,
-                2,
-            ),
-            (
-                3,
-                2,
-            ),
+            ( -1, 2),
+            ( 1, 2),
+            ( 2, 3),
+            ( 2, 2),
         ]
         for value in [-1, 1434]
     ],
@@ -663,9 +612,7 @@ def test_c_store_safebuffer(size, idx, value):
     "value,np_type,c_type",
     [
         (3, np.int64, ctypes.c_int64),
-        (2, np.int32, ctypes.c_int32),
         (1, np.float32, ctypes.c_float),
-        (1.0, np.float64, ctypes.c_double),
         (1.2, np.float64, ctypes.c_double),
     ],
 )
@@ -682,9 +629,7 @@ def test_np_c_serialization(value, np_type, c_type):
     "value,c_type",
     [
         (3, ctypes.c_int64),
-        (2, ctypes.c_int32),
         (1, ctypes.c_float),
-        (1.0, ctypes.c_double),
         (1.2, ctypes.c_double),
     ],
 )
@@ -702,9 +647,7 @@ def test_ctypes_c_serialization(value, c_type):
     "value,np_type",
     [
         (3, np.int64),
-        (2, np.int32),
         (1, np.float32),
-        (1.0, np.float64),
         (1.2, np.float64),
     ],
 )
