@@ -1,7 +1,9 @@
 import json
 import operator
+from abc import ABC, abstractmethod
 
 import numpy as np
+from typing import Dict, List
 
 from ..codegen import NumpyBuffer
 from .nodes import (
@@ -33,6 +35,15 @@ from .nodes import (
     WhileLoop,
 )
 
+"""
+Dr. Willow Ahrens Office Hours Questions
+
+1) What is the best representation for a 'statement'?
+2) What is the first dataflow-analysis that I should do?
+3) Figure out a way to number the actual AST so that I can change it later based on the output from the dataflow
+4) Come up with a way to test CFG Builder in a form of unit tests and test the dataflow analysis output
+5) Am I sure that I'm supposed to make a separate CFG for every function in the Module?
+"""
 
 class BasicBlock:
     def __init__(self, id):
@@ -67,7 +78,7 @@ class BasicBlock:
         )
 
 
-class CFG:
+class ControlFlowGraph:
     def __init__(self, func_name: str):
         self.block_counter = 0
         self.name = func_name
@@ -117,8 +128,8 @@ class CFGBuilder:
         self.cfgs = {}
         self.current_cfg = None
 
-    def new_cfg(self, name: str) -> CFG:
-        new_cfg = CFG(name)
+    def new_cfg(self, name: str) -> ControlFlowGraph:
+        new_cfg = ControlFlowGraph(name)
         self.cfgs[name] = new_cfg
         return new_cfg
 
@@ -320,6 +331,55 @@ class CFGBuilder:
         return self.cfgs
 
 
+class DataFlowAnalysis(ABC):
+    def __init__(self, cfg: ControlFlowGraph):
+        self.cfg = cfg
+        self.inputs = {block: {} for block in cfg.blocks}
+        self.outputs = {block: {} for block in cfg.blocks}
+
+    @abstractmethod
+    def transfer(self, insts, state: Dict) -> List:
+        """
+        Transfer function for the data flow analysis.
+        This should be implemented by subclasses.
+        """
+        ...
+    
+    @abstractmethod
+    def join(self, state_1: Dict, state_2: Dict) -> Dict:
+        """
+        Join function for the data flow analysis.
+        This should be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def direction(self) -> str:
+        """
+        Return the direction of the data flow analysis, either "forward" or "backward".
+        This should be implemented by subclasses.
+        """
+        return "forward"
+    
+    # TODO: change based on my definition of the CFG
+    def analyze(self):
+        """
+        Perform the data flow analysis on the control flow graph.
+        This method initializes the work list and processes each block.
+        """
+        if self.direction() == "forward":
+            work_list = self.cfg.entry[:]
+            while work_list:
+                block = work_list.pop(0)
+                input_state = self.input_states.get(block, {})
+                output_state = self.transfer(block, input_state)
+                if output_state != self.output_states.get(block, {}):
+                    self.output_states[block] = output_state
+                    for successor in block.successors:
+                        if successor not in work_list:
+                            work_list.append(successor)
+
+# TODO: place tests in a separate folder (/tests)
 def test1():
     printer = AssemblyPrinterContext()
 
@@ -392,8 +452,6 @@ def test1():
     print(50 * "=")
 
     return cfg_builder.to_dict()
-
-
 def test2():
     a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float64)
     b = np.array([5.0, 6.0, 7.0, 8.0], dtype=np.float64)
@@ -464,7 +522,6 @@ def test2():
     print(50 * "=")
 
     return cfg_builder.to_dict()
-
 
 if __name__ == "__main__":
     print(json.dumps(test1(), indent=4))
