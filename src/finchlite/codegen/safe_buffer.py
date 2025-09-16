@@ -68,11 +68,10 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
         idx_n = ctx.freshen("computed")
         ctx.exec(
             f"{ctx.feed}size_t {idx_n} = ({ctx(idx)});\n"
-            f"{ctx.feed}if ({idx_n} < 0 || {idx_n} >= ({self.c_length(ctx, buf)}))"
-            "{"
-            f'fprintf(stderr, "Encountered an index out of bounds error!");\n'
-            f"exit(1);\n"
-            "}"
+            f"{ctx.feed}if ({idx_n} < 0 || {idx_n} >= ({self.c_length(ctx, buf)})) {{\n"
+            f'{ctx.feed}    fprintf(stderr, "Encountered an index out of bounds error!");\n'
+            f"{ctx.feed}    exit(1);\n"
+            f"{ctx.feed}}}"
         )
         return asm.Variable(idx_n, ctypes.c_size_t)
 

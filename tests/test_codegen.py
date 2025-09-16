@@ -440,6 +440,65 @@ def test_simple_struct(compiler):
     result = mod.simple_struct(p, x)
     assert result == np.float64(9.0)
 
+@pytest.mark.parametrize(
+    ["compiler", "extension"],
+    [
+        (CGenerator(), ".c"),
+        (NumbaGenerator(), ".py"),
+    ],
+)
+def test_safe_loadstore_regression(compiler, extension, file_regression):
+    a = np.array(range(3), dtype=ctypes.c_int64)
+    ab = NumpyBuffer(a)
+    ab_safe = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ab_safe.ftype)
+    ab_slt = asm.Slot("a_", ab_safe.ftype)
+    idx = asm.Variable("idx", ctypes.c_size_t)
+    val = asm.Variable("val", ctypes.c_int64)
+
+    res_var = asm.Variable("val", ab_safe.ftype.element_type)
+    res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
+    mod = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("finch_access", ab_safe.ftype.element_type),
+                (ab_v, idx),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        # we assign twice like this; this is intentional and
+                        # designed to check correct refreshing.
+                        asm.Assign(
+                            res_var,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Assign(
+                            res_var2,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Return(res_var),
+                    )
+                ),
+            ),
+            asm.Function(
+                asm.Variable("finch_change", ab_safe.ftype.element_type),
+                (ab_v, idx, val),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Store(
+                            ab_slt,
+                            idx,
+                            val,
+                        ),
+                        asm.Return(asm.Literal(ctypes.c_int64(0))),
+                    )
+                ),
+            ),
+        )
+    )
+    output = compiler(mod)
+    file_regression.check(output, extension=extension)
 
 @pytest.mark.parametrize(
     "size,idx",
