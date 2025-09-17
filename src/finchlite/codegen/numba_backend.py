@@ -244,8 +244,10 @@ class NumbaCompiler:
     def __call__(self, prgm: asm.Module):
         numba_code = self.ctx(prgm)
         logger.info(f"Executing Numba code:\n{numba_code}")
+        _globals = globals()
+        _globals |= numba_globals
         try:
-            exec(numba_code, globals(), None)
+            exec(numba_code, _globals, None)
         except Exception as e:
             logger.error(
                 f"Numba compilation failed on the following code:\n"
@@ -258,7 +260,7 @@ class NumbaCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, ret_type), args, _):
-                    kern = globals()[func_name]
+                    kern = _globals[func_name]
                     arg_ts = [arg.result_format for arg in args]
                     kernels[func_name] = NumbaKernel(kern, ret_type, arg_ts)
                 case _:
@@ -562,12 +564,7 @@ class NumbaStackFType(ABC):
 
 
 def _serialize_asm_struct_to_numba(fmt: AssemblyStructFType, obj) -> Any:
-    args = [
-        serialize_to_numba(fmt_s, getattr(obj, name))
-        if isinstance(fmt_s, NumbaBufferFType | AssemblyStructFType | tuple)
-        else getattr(obj, name)
-        for (name, fmt_s) in fmt.struct_fields
-    ]
+    args = [getattr(obj, name) for (name, _) in fmt.struct_fields]
     return numba_type(fmt)(*args)
 
 
@@ -598,6 +595,7 @@ register_property(
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
+numba_globals: dict[str, Any] = {}
 
 
 def struct_numba_type(fmt: AssemblyStructFType):
@@ -608,23 +606,7 @@ def struct_numba_type(fmt: AssemblyStructFType):
     if fmt in numba_structs:
         return numba_structs[fmt]
 
-    spec = []
-    for name, field in fmt.struct_fields:
-        if hasattr(field, "numba_jitclass_type"):
-            f = field.numba_jitclass_type()
-        elif inspect.isclass(field) and issubclass(field, np.generic):
-            f = numba.from_dtype(field)
-        elif np.isscalar(field):
-            f = numba.typeof(field)
-        elif isinstance(field, tuple):
-            f = struct_numba_type(ftype(field))
-        else:
-            f = numba_type(field)
-
-        if hasattr(f, "class_type") and isinstance(f.class_type, numba.types.ClassType):
-            f = f.class_type.instance_type
-
-        spec.append((name, f))
+    spec = [(name, numba_type(field_type)) for (name, field_type) in fmt.struct_fields]
 
     class_name = numba_structnames.freshen("Numba", fmt.struct_name)
     # Dynamically define __init__ based on spec, unrolling the arguments
@@ -648,7 +630,7 @@ def struct_numba_type(fmt: AssemblyStructFType):
     exec(class_src, ns)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[fmt] = new_struct
-    globals()[new_struct.__name__] = new_struct
+    numba_globals[new_struct.__name__] = new_struct
     return new_struct
 
 

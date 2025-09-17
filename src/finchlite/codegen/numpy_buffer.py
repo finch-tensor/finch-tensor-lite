@@ -190,18 +190,10 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         Construct a NumpyBuffer from a C-compatible structure.
         """
-        self.arr = c_buffer.contents.arr
-        return NumpyBuffer(self.arr)
+        return NumpyBuffer(c_buffer.contents.arr)
 
     def numba_type(self):
         return list[np.ndarray]
-
-    def numba_jitclass_type(self):
-        import numba
-
-        return numba.types.ListType(
-            numba.types.Array(numba.from_dtype(self._dtype), 1, "C")
-        )
 
     def numba_length(self, ctx, buf):
         arr = buf.obj.arr
