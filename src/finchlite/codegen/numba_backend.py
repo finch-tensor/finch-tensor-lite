@@ -564,7 +564,9 @@ class NumbaStackFType(ABC):
 
 
 def _serialize_asm_struct_to_numba(fmt: AssemblyStructFType, obj) -> Any:
-    args = [getattr(obj, name) for (name, _) in fmt.struct_fields]
+    args = [
+        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
+    ]
     return numba_type(fmt)(*args)
 
 

@@ -12,11 +12,8 @@ from .. import finch_notation as ntn
 from ..algebra import Tensor
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..codegen.numba_backend import (
-    NumbaArgumentFType,
-    deserialize_from_numba,
     numba_globals,
     numba_type,
-    serialize_to_numba,
 )
 from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import ftype
@@ -115,7 +112,7 @@ class BufferizedNDArrayFields(NamedTuple):
     buf_s: asm.Slot
 
 
-class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType, NumbaArgumentFType):
+class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     """
     A ftype for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
@@ -238,26 +235,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType, NumbaArgumen
             )
         )
 
-    def serialize_to_numba(self, obj: BufferizedNDArray):
-        assert self.ndim == obj.ndim
-        numba_class = self.numba_type()
-        return numba_class(
-            serialize_to_numba(self.buf_t, obj.buf),
-            self.ndim,
-            serialize_to_numba(self.shape_t, obj.shape),
-            serialize_to_numba(self.strides_t, obj.strides),
-        )
-
     def numba_type(self):
-        return self._get_numba_class(
-            self.buf_t, self.ndim, self.shape_t, self.strides_t
-        )
+        return self._get_numba_class(self.buf_t, self.shape_t, self.strides_t)
 
     @staticmethod
     @lru_cache
     def _get_numba_class(
         buf_t: NumpyBufferFType,
-        ndim: np.intp,
         shape_t: TupleFType,
         strides_t: TupleFType,
     ) -> type:
@@ -268,7 +252,6 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType, NumbaArgumen
                     numba.types.Array(numba.from_dtype(buf_t.element_type), 1, "C")
                 ),
             ),
-            ("ndim", numba_type(type(ndim))),
             ("shape", numba_type(shape_t).class_type.instance_type),
             ("strides", numba_type(strides_t).class_type.instance_type),
         ]
@@ -277,16 +260,15 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType, NumbaArgumen
             return "_".join(np.dtype(t).char for t in types)
 
         class_name = (
-            f"Numba_BufferizedNDArray_{np.dtype(buf_t.element_type).char}_{ndim}_"
+            f"Numba_BufferizedNDArray_{np.dtype(buf_t.element_type).char}_"
             f"sh_{_str_format(shape_t.struct_fieldformats)}_"
             f"str_{_str_format(strides_t.struct_fieldformats)}"
         )
         class_src = dedent(
             f"""\
             class {class_name}:
-                def __init__(self, buf, ndim, shape, strides):
+                def __init__(self, buf, shape, strides):
                     self.buf = buf
-                    self.ndim = ndim
                     self.shape = shape
                     self.strides = strides
                 @staticmethod
@@ -299,13 +281,6 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType, NumbaArgumen
         new_struct = numba.experimental.jitclass(ns[class_name], spec)
         numba_globals[new_struct.__name__] = new_struct
         return new_struct
-
-    def deserialize_from_numba(self, obj: BufferizedNDArray, numba_buffer) -> None:
-        assert obj.ndim == numba_buffer.ndim
-        deserialize_from_numba(self.buf_t, obj.buf, numba_buffer.buf)
-        deserialize_from_numba(self.shape_t, obj.shape, numba_buffer.shape)
-        deserialize_from_numba(self.strides_t, obj.strides, numba_buffer.strides)
-        return
 
 
 class BufferizedNDArrayAccessor(Tensor):
