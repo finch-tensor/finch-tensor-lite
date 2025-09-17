@@ -3,11 +3,17 @@ import operator
 import numpy as np
 
 import finchlite.finch_logic as logic
-from finchlite.algebra.tensor import NDArrayFType
 from finchlite.autoschedule import (
     LogicCompiler,
 )
+from finchlite.codegen.numpy_buffer import NumpyBufferFType
 from finchlite.compile import dimension
+from finchlite.compile.bufferized_ndarray import (
+    BufferizedNDArray,
+    BufferizedNDArrayFType,
+)
+from finchlite.compile.lower import ExtentFType
+from finchlite.finch_assembly.struct import TupleFType
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -42,6 +48,7 @@ from finchlite.finch_notation import (
     Variable,
 )
 from finchlite.finch_notation.nodes import Repack
+from finchlite.interface.fuse import provision_tensors
 
 
 def test_logic_compiler():
@@ -50,14 +57,18 @@ def test_logic_compiler():
             Query(
                 lhs=Alias(name=":A0"),
                 rhs=Table(
-                    tns=logic.Literal(val=np.array([[1, 2], [3, 4]])),
+                    tns=logic.Literal(
+                        val=BufferizedNDArray(np.array([[1, 2], [3, 4]]))
+                    ),
                     idxs=(Field(name=":i0"), Field(name=":i1")),
                 ),
             ),
             Query(
                 lhs=Alias(name=":A1"),
                 rhs=Table(
-                    tns=logic.Literal(val=np.array([[5, 6], [7, 8]])),
+                    tns=logic.Literal(
+                        val=BufferizedNDArray(np.array([[5, 6], [7, 8]]))
+                    ),
                     idxs=(Field(name=":i1"), Field(name=":i2")),
                 ),
             ),
@@ -106,104 +117,127 @@ def test_logic_compiler():
         )
     )
 
+    bufferized_ndarray_ftype = BufferizedNDArrayFType(
+        buf_t=NumpyBufferFType(np.dtype(int)),
+        ndim=np.intp(2),
+        strides_t=TupleFType.from_tuple((np.intp, np.intp)),
+    )
+
     expected_program = Module(
         funcs=(
             Function(
-                name=Variable(name="func", type_=np.ndarray),
+                name=Variable(name="func", type_=bufferized_ndarray_ftype),
                 args=(
-                    Variable(name=":A0", type_=NDArrayFType(np.dtype(int), 2)),
-                    Variable(name=":A1", type_=NDArrayFType(np.dtype(int), 2)),
-                    Variable(name=":A2", type_=NDArrayFType(np.dtype(int), 2)),
+                    Variable(name=":A0", type_=bufferized_ndarray_ftype),
+                    Variable(name=":A1", type_=bufferized_ndarray_ftype),
+                    Variable(name=":A2", type_=bufferized_ndarray_ftype),
                 ),
                 body=Block(
                     bodies=(
                         Assign(
-                            lhs=Variable(name=":i0_size", type_=int),
+                            lhs=Variable(
+                                name=":i0_size", type_=ExtentFType(np.intp, np.intp)
+                            ),
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
                                     Variable(
                                         name=":A0",
-                                        type_=NDArrayFType(np.dtype(int), 2),
+                                        type_=bufferized_ndarray_ftype,
                                     ),
                                     Literal(val=0),
                                 ),
                             ),
                         ),
                         Assign(
-                            lhs=Variable(name=":i1_size", type_=int),
+                            lhs=Variable(
+                                name=":i1_size", type_=ExtentFType(np.intp, np.intp)
+                            ),
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
                                     Variable(
                                         name=":A0",
-                                        type_=NDArrayFType(np.dtype(int), 2),
+                                        type_=bufferized_ndarray_ftype,
                                     ),
                                     Literal(val=1),
                                 ),
                             ),
                         ),
                         Assign(
-                            lhs=Variable(name=":i2_size", type_=int),
+                            lhs=Variable(
+                                name=":i2_size", type_=ExtentFType(np.intp, np.intp)
+                            ),
                             rhs=Call(
                                 op=Literal(val=dimension),
                                 args=(
                                     Variable(
                                         name=":A1",
-                                        type_=NDArrayFType(np.dtype(int), 2),
+                                        type_=bufferized_ndarray_ftype,
                                     ),
                                     Literal(val=1),
                                 ),
                             ),
                         ),
                         Unpack(
-                            Slot(name=":A0_slot", type=NDArrayFType(np.dtype(int), 2)),
-                            Variable(name=":A0", type_=NDArrayFType(np.dtype(int), 2)),
+                            Slot(name=":A0_slot", type=bufferized_ndarray_ftype),
+                            Variable(name=":A0", type_=bufferized_ndarray_ftype),
                         ),
                         Unpack(
-                            Slot(name=":A1_slot", type=NDArrayFType(np.dtype(int), 2)),
-                            Variable(name=":A1", type_=NDArrayFType(np.dtype(int), 2)),
+                            Slot(name=":A1_slot", type=bufferized_ndarray_ftype),
+                            Variable(name=":A1", type_=bufferized_ndarray_ftype),
                         ),
                         Unpack(
-                            Slot(name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)),
-                            Variable(name=":A2", type_=NDArrayFType(np.dtype(int), 2)),
+                            Slot(name=":A2_slot", type=bufferized_ndarray_ftype),
+                            Variable(name=":A2", type_=bufferized_ndarray_ftype),
                         ),
                         Declare(
-                            tns=Slot(
-                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)
-                            ),
+                            tns=Slot(name=":A2_slot", type=bufferized_ndarray_ftype),
                             init=Literal(val=0),
                             op=Literal(val=operator.add),
                             shape=(
-                                Variable(name=":i0_size", type_=int),
-                                Variable(name=":i2_size", type_=int),
+                                Variable(
+                                    name=":i0_size", type_=ExtentFType(np.intp, np.intp)
+                                ),
+                                Variable(
+                                    name=":i2_size", type_=ExtentFType(np.intp, np.intp)
+                                ),
                             ),
                         ),
                         Loop(
-                            idx=Variable(name=":i2", type_=int),
-                            ext=Variable(name=":i2_size", type_=int),
+                            idx=Variable(name=":i0", type_=np.intp),
+                            ext=Variable(
+                                name=":i0_size", type_=ExtentFType(np.intp, np.intp)
+                            ),
                             body=Loop(
-                                idx=Variable(name=":i1", type_=int),
-                                ext=Variable(name=":i1_size", type_=int),
+                                idx=Variable(name=":i1", type_=np.intp),
+                                ext=Variable(
+                                    name=":i1_size", type_=ExtentFType(np.intp, np.intp)
+                                ),
                                 body=Loop(
-                                    idx=Variable(name=":i0", type_=int),
-                                    ext=Variable(name=":i0_size", type_=int),
+                                    idx=Variable(name=":i2", type_=np.intp),
+                                    ext=Variable(
+                                        name=":i2_size",
+                                        type_=ExtentFType(np.intp, np.intp),
+                                    ),
                                     body=Block(
                                         bodies=(
                                             Increment(
                                                 lhs=Access(
                                                     tns=Slot(
                                                         name=":A2_slot",
-                                                        type=NDArrayFType(
-                                                            np.dtype(int), 2
-                                                        ),
+                                                        type=bufferized_ndarray_ftype,
                                                     ),
                                                     mode=Update(
                                                         op=Literal(val=operator.add)
                                                     ),
                                                     idxs=(
-                                                        Variable(name=":i0", type_=int),
-                                                        Variable(name=":i2", type_=int),
+                                                        Variable(
+                                                            name=":i0", type_=np.intp
+                                                        ),
+                                                        Variable(
+                                                            name=":i2", type_=np.intp
+                                                        ),
                                                     ),
                                                 ),
                                                 rhs=Call(
@@ -213,19 +247,17 @@ def test_logic_compiler():
                                                             arg=Access(
                                                                 tns=Slot(
                                                                     name=":A0_slot",
-                                                                    type=NDArrayFType(
-                                                                        np.dtype(int), 2
-                                                                    ),
+                                                                    type=bufferized_ndarray_ftype,
                                                                 ),
                                                                 mode=Read(),
                                                                 idxs=(
                                                                     Variable(
                                                                         name=":i0",
-                                                                        type_=int,
+                                                                        type_=np.intp,
                                                                     ),
                                                                     Variable(
                                                                         name=":i1",
-                                                                        type_=int,
+                                                                        type_=np.intp,
                                                                     ),
                                                                 ),
                                                             )
@@ -234,19 +266,17 @@ def test_logic_compiler():
                                                             arg=Access(
                                                                 tns=Slot(
                                                                     name=":A1_slot",
-                                                                    type=NDArrayFType(
-                                                                        np.dtype(int), 2
-                                                                    ),
+                                                                    type=bufferized_ndarray_ftype,
                                                                 ),
                                                                 mode=Read(),
                                                                 idxs=(
                                                                     Variable(
                                                                         name=":i1",
-                                                                        type_=int,
+                                                                        type_=np.intp,
                                                                     ),
                                                                     Variable(
                                                                         name=":i2",
-                                                                        type_=int,
+                                                                        type_=np.intp,
                                                                     ),
                                                                 ),
                                                             )
@@ -260,39 +290,23 @@ def test_logic_compiler():
                             ),
                         ),
                         Freeze(
-                            tns=Slot(
-                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)
-                            ),
+                            tns=Slot(name=":A2_slot", type=bufferized_ndarray_ftype),
                             op=Literal(val=operator.add),
                         ),
                         Repack(
-                            val=Slot(
-                                name=":A0_slot", type=NDArrayFType(np.dtype(int), 2)
-                            ),
-                            obj=Variable(
-                                name=":A0", type_=NDArrayFType(np.dtype(int), 2)
-                            ),
+                            val=Slot(name=":A0_slot", type=bufferized_ndarray_ftype),
+                            obj=Variable(name=":A0", type_=bufferized_ndarray_ftype),
                         ),
                         Repack(
-                            val=Slot(
-                                name=":A1_slot", type=NDArrayFType(np.dtype(int), 2)
-                            ),
-                            obj=Variable(
-                                name=":A1", type_=NDArrayFType(np.dtype(int), 2)
-                            ),
+                            val=Slot(name=":A1_slot", type=bufferized_ndarray_ftype),
+                            obj=Variable(name=":A1", type_=bufferized_ndarray_ftype),
                         ),
                         Repack(
-                            val=Slot(
-                                name=":A2_slot", type=NDArrayFType(np.dtype(int), 2)
-                            ),
-                            obj=Variable(
-                                name=":A2", type_=NDArrayFType(np.dtype(int), 2)
-                            ),
+                            val=Slot(name=":A2_slot", type=bufferized_ndarray_ftype),
+                            obj=Variable(name=":A2", type_=bufferized_ndarray_ftype),
                         ),
                         Return(
-                            val=Variable(
-                                name=":A2", type_=NDArrayFType(np.dtype(int), 2)
-                            )
+                            val=Variable(name=":A2", type_=bufferized_ndarray_ftype)
                         ),
                     )
                 ),
@@ -305,10 +319,10 @@ def test_logic_compiler():
     assert program == expected_program
 
     mod = NotationInterpreter()(program)
-    args = [tables[logic.Alias(arg.name)].tns.val for arg in program.funcs[0].args]
 
+    args = provision_tensors(program, tables)
     result = mod.func(*args)
 
-    expected = np.matmul(args[0], args[1], dtype=float)
+    expected = np.matmul(args[0].to_numpy(), args[1].to_numpy(), dtype=float)
 
-    np.testing.assert_equal(result, expected)
+    np.testing.assert_equal(result.to_numpy(), expected)

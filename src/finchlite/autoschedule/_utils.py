@@ -1,19 +1,23 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 
 def intersect(x1: Iterable, x2: Iterable) -> tuple:
     return tuple(x for x in x1 if x in x2)
 
 
-def is_subsequence(x1: tuple, x2: tuple) -> bool:
-    return x1 == tuple(x for x in x2 if x in x1)
+def extend_uniqe(x1: Iterable, x2: Iterable) -> tuple:
+    return tuple(x1) + setdiff(x2, x1)
 
 
-def setdiff(x1: tuple, x2: tuple) -> tuple:
+def is_subsequence(x1: Iterable, x2: Iterable) -> bool:
+    return tuple(x1) == tuple(x for x in x2 if x in x1)
+
+
+def setdiff(x1: Iterable, x2: Iterable) -> tuple:
     return tuple([x for x in x1 if x not in x2])
 
 
-def with_subsequence(x1: tuple, x2: tuple) -> tuple:
+def with_subsequence(x1: Sequence, x2: Iterable) -> tuple:
     res = list(x2)
     indices = [idx for idx, val in enumerate(x2) if val in x1]
     for idx, i in enumerate(indices):

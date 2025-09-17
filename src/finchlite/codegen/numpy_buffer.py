@@ -92,6 +92,9 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     def __str__(self):
         return f"np_buf_t({qual_str(self._dtype)})"
 
+    def __repr__(self):
+        return f"NumpyBufferFType({qual_str(self._dtype)})"
+
     @property
     def length_type(self):
         """
@@ -187,8 +190,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         Construct a NumpyBuffer from a C-compatible structure.
         """
-        self.arr = c_buffer.contents.arr
-        return NumpyBuffer(self.arr)
+        return NumpyBuffer(c_buffer.contents.arr)
 
     def numba_type(self):
         return list[np.ndarray]
@@ -229,7 +231,9 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         Serialize the NumPy buffer to a Numba-compatible object.
         """
-        return [obj.arr]
+        import numba
+
+        return numba.typed.List([obj.arr])
 
     def deserialize_from_numba(self, obj, numba_buffer):
         obj.arr = numba_buffer[0]

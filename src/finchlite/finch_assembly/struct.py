@@ -1,4 +1,9 @@
 from abc import ABC, abstractmethod
+from functools import lru_cache
+from textwrap import dedent
+from typing import Any
+
+import numba
 
 from ..algebra import register_property
 from ..symbolic import FType, ftype
@@ -7,35 +12,78 @@ from ..symbolic import FType, ftype
 class AssemblyStructFType(FType, ABC):
     @property
     @abstractmethod
-    def struct_name(self): ...
+    def struct_name(self) -> str: ...
 
     @property
     @abstractmethod
-    def struct_fields(self): ...
+    def struct_fields(self) -> list[tuple[str, Any]]: ...
+
+    def numba_type(self) -> type:
+        """
+        Method for registering and caching Numba jitclass.
+        """
+        from ..codegen.numba_backend import (
+            numba_globals,
+            numba_structnames,
+            numba_structs,
+            numba_type,
+        )
+
+        if self in numba_structs:
+            return numba_structs[self]
+
+        spec = [
+            (name, numba_type(field_type)) for (name, field_type) in self.struct_fields
+        ]
+
+        class_name = numba_structnames.freshen("Numba", self.struct_name)
+        # Dynamically define __init__ based on spec, unrolling the arguments
+        field_names = [name for name, _ in spec]
+        # Build the argument list for __init__
+        arg_list = ", ".join(field_names)
+        # Build the body of __init__ to assign each argument to self
+        body = "; ".join([f"self.{name} = {name}" for name in field_names])
+        # Compose the full class source
+        class_src = dedent(
+            f"""\
+            class {class_name}:
+                def __init__(self, {arg_list}):
+                    {body if body else "pass"}
+                @staticmethod
+                def numba_name():
+                    return '{class_name}'
+            """
+        )
+        ns: dict[str, object] = {}
+        exec(class_src, ns)
+        new_struct = numba.experimental.jitclass(ns[class_name], spec)
+        numba_structs[self] = new_struct
+        numba_globals[new_struct.__name__] = new_struct
+        return new_struct
 
     @property
-    def is_mutable(self):
+    def is_mutable(self) -> bool:
         return False
 
-    def struct_getattr(self, obj, attr):
+    def struct_getattr(self, obj, attr) -> Any:
         return getattr(obj, attr)
 
-    def struct_setattr(self, obj, attr, value):
+    def struct_setattr(self, obj, attr, value) -> None:
         setattr(obj, attr, value)
         return
 
     @property
-    def struct_fieldnames(self):
+    def struct_fieldnames(self) -> list[str]:
         return [name for (name, _) in self.struct_fields]
 
     @property
-    def struct_fieldformats(self):
+    def struct_fieldformats(self) -> list[Any]:
         return [type_ for (_, type_) in self.struct_fields]
 
-    def struct_hasattr(self, attr):
+    def struct_hasattr(self, attr: str) -> bool:
         return attr in dict(self.struct_fields)
 
-    def struct_attrtype(self, attr):
+    def struct_attrtype(self, attr: str) -> Any:
         return dict(self.struct_fields)[attr]
 
 
@@ -51,6 +99,9 @@ class NamedTupleFType(AssemblyStructFType):
             and self.struct_fields == other.struct_fields
         )
 
+    def __len__(self):
+        return len(self._struct_fields)
+
     def __hash__(self):
         return hash((self.struct_name, tuple(self.struct_fields)))
 
@@ -64,9 +115,9 @@ class NamedTupleFType(AssemblyStructFType):
 
 
 class TupleFType(AssemblyStructFType):
-    def __init__(self, name, struct_fieldformats):
-        self._struct_name = name
-        self._struct_formats = struct_fieldformats
+    def __init__(self, struct_name, struct_formats):
+        self._struct_name = struct_name
+        self._struct_formats = struct_formats
 
     def __eq__(self, other):
         return (
@@ -74,6 +125,9 @@ class TupleFType(AssemblyStructFType):
             and self.struct_name == other.struct_name
             and self._struct_formats == other._struct_formats
         )
+
+    def __len__(self):
+        return len(self._struct_formats)
 
     def struct_getattr(self, obj, attr):
         index = list(self.struct_fieldnames).index(attr)
@@ -95,6 +149,11 @@ class TupleFType(AssemblyStructFType):
     def struct_fields(self):
         return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
 
+    @staticmethod
+    @lru_cache
+    def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
+        return TupleFType("tuple", types)
+
 
 def tupleformat(x):
     if hasattr(type(x), "_fields"):
@@ -105,7 +164,7 @@ def tupleformat(x):
                 for fieldname in type(x)._fields
             ],
         )
-    return TupleFType(type(x).__name__, [type(elem) for elem in x])
+    return TupleFType.from_tuple(tuple([type(elem) for elem in x]))
 
 
 register_property(tuple, "ftype", "__attr__", tupleformat)
