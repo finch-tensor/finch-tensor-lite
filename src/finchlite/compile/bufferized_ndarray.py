@@ -225,13 +225,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ctx.exec(asm.Repack(obj.buf_s))
         return
 
-    def construct_from_numba(self, numba_buffer):
-        """
-        Construct a NumpyBuffer from a Numba-compatible object.
-        """
+    def __call__(self, numba_buffer):
         return BufferizedNDArray(
             numba_buffer.buf[0].reshape(
-                (numba_buffer.shape.element_0, numba_buffer.shape.element_1)
+                tuple(
+                    getattr(numba_buffer.shape, f)
+                    for (f, _) in self.shape_t.struct_fields
+                )
             )
         )
 
