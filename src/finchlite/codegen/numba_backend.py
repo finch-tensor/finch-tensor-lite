@@ -2,7 +2,6 @@ import inspect
 import logging
 import operator
 from abc import ABC, abstractmethod
-from textwrap import dedent
 from typing import Any
 
 import numpy as np
@@ -600,50 +599,6 @@ numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {}
 
 
-def struct_numba_type(fmt: AssemblyStructFType):
-    """
-    Creates Numba jitclasses for struct formats.
-    """
-
-    if fmt in numba_structs:
-        return numba_structs[fmt]
-
-    spec = [(name, numba_type(field_type)) for (name, field_type) in fmt.struct_fields]
-
-    class_name = numba_structnames.freshen("Numba", fmt.struct_name)
-    # Dynamically define __init__ based on spec, unrolling the arguments
-    field_names = [name for name, _ in spec]
-    # Build the argument list for __init__
-    arg_list = ", ".join(field_names)
-    # Build the body of __init__ to assign each argument to self
-    body = "; ".join([f"self.{name} = {name}" for name in field_names])
-    # Compose the full class source
-    class_src = dedent(
-        f"""\
-        class {class_name}:
-            def __init__(self, {arg_list}):
-                {body if body else "pass"}
-            @staticmethod
-            def numba_name():
-                return '{class_name}'
-        """
-    )
-    ns: dict[str, object] = {}
-    exec(class_src, ns)
-    new_struct = numba.experimental.jitclass(ns[class_name], spec)
-    numba_structs[fmt] = new_struct
-    numba_globals[new_struct.__name__] = new_struct
-    return new_struct
-
-
-register_property(
-    AssemblyStructFType,
-    "numba_type",
-    "__attr__",
-    struct_numba_type,
-)
-
-
 def struct_numba_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
     return f"{obj}.{attr}"
 
@@ -685,10 +640,7 @@ register_property(
 def serialize_tuple_to_numba(fmt, obj):
     if not isinstance(fmt, AssemblyStructFType):
         fmt = ftype(fmt)
-    if fmt in numba_structs:
-        return numba_structs[fmt](*obj)
-
-    raise Exception(f"There is no jitclass for: {fmt}")
+    return fmt.numba_type()(*obj)
 
 
 register_property(

@@ -1,5 +1,4 @@
 import operator
-from functools import lru_cache
 from textwrap import dedent
 from typing import Any, NamedTuple
 
@@ -13,6 +12,7 @@ from ..algebra import Tensor
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..codegen.numba_backend import (
     numba_globals,
+    numba_structs,
     numba_type,
 )
 from ..finch_assembly import AssemblyStructFType, TupleFType
@@ -235,34 +235,28 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             )
         )
 
-    def numba_type(self):
-        return self._get_numba_class(self.buf_t, self.shape_t, self.strides_t)
+    def numba_type(self) -> type:
+        if self in numba_structs:
+            return numba_structs[self]
 
-    @staticmethod
-    @lru_cache
-    def _get_numba_class(
-        buf_t: NumpyBufferFType,
-        shape_t: TupleFType,
-        strides_t: TupleFType,
-    ) -> type:
         spec = [
             (
                 "buf",
                 numba.types.ListType(
-                    numba.types.Array(numba.from_dtype(buf_t.element_type), 1, "C")
+                    numba.types.Array(numba.from_dtype(self.buf_t.element_type), 1, "C")
                 ),
             ),
-            ("shape", numba_type(shape_t).class_type.instance_type),
-            ("strides", numba_type(strides_t).class_type.instance_type),
+            ("shape", numba_type(self.shape_t).class_type.instance_type),
+            ("strides", numba_type(self.strides_t).class_type.instance_type),
         ]
 
         def _str_format(types: list[type]) -> str:
             return "_".join(np.dtype(t).char for t in types)
 
         class_name = (
-            f"Numba_BufferizedNDArray_{np.dtype(buf_t.element_type).char}_"
-            f"sh_{_str_format(shape_t.struct_fieldformats)}_"
-            f"str_{_str_format(strides_t.struct_fieldformats)}"
+            f"Numba_BufferizedNDArray_{np.dtype(self.buf_t.element_type).char}_"
+            f"sh_{_str_format(self.shape_t.struct_fieldformats)}_"
+            f"str_{_str_format(self.strides_t.struct_fieldformats)}"
         )
         class_src = dedent(
             f"""\
@@ -279,6 +273,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ns: dict[str, object] = {}
         exec(class_src, ns)
         new_struct = numba.experimental.jitclass(ns[class_name], spec)
+        numba_structs[self] = new_struct
         numba_globals[new_struct.__name__] = new_struct
         return new_struct
 
