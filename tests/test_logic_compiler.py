@@ -48,7 +48,7 @@ from finchlite.finch_notation import (
     Variable,
 )
 from finchlite.finch_notation.nodes import Repack
-from finchlite.interface.fuse import provision_tensor_placeholders
+from finchlite.interface.fuse import provision_tensors
 
 
 def test_logic_compiler():
@@ -320,7 +320,7 @@ def test_logic_compiler():
 
     mod = NotationInterpreter()(program)
 
-    args = provision_tensor_placeholders(program, tables)
+    args = provision_tensors(program, tables)
     result = mod.func(*args)
 
     expected = np.matmul(args[0].to_numpy(), args[1].to_numpy(), dtype=float)

@@ -105,7 +105,7 @@ def set_default_scheduler(
         def fn_compile(plan):
             prgm, tables = optimizer(plan)
             mod = ntn_interp(prgm)
-            args = provision_tensor_placeholders(prgm, tables)
+            args = provision_tensors(prgm, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -119,7 +119,7 @@ def set_default_scheduler(
             ntn_prgm, tables = optimizer(plan)
             asm_prgm = notation_compiler(ntn_prgm)
             mod = asm_interp(asm_prgm)
-            args = provision_tensor_placeholders(asm_prgm, tables)
+            args = provision_tensors(asm_prgm, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -137,7 +137,7 @@ def set_default_scheduler(
             asm_prgm = notation_compiler(ntn_prgm)
             # print("Assembler: \n", asm_prgm)
             mod = numba_compiler(asm_prgm)
-            args = provision_tensor_placeholders(asm_prgm, tables)
+            args = provision_tensors(asm_prgm, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -157,9 +157,7 @@ def get_default_scheduler():
     return _DEFAULT_SCHEDULER
 
 
-def provision_tensor_placeholders(
-    prgm: Any, tables: dict[Alias, Table]
-) -> list[Tensor]:
+def provision_tensors(prgm: Any, tables: dict[Alias, Table]) -> list[Tensor]:
     args: list[Tensor] = []
     dims_dict: dict[Field, int] = {}
     for arg in prgm.funcs[0].args:
