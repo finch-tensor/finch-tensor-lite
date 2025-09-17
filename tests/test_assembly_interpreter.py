@@ -294,13 +294,10 @@ def test_debug_statement(capsys):
 
     capture = capsys.readouterr()
     expected_print = (
-        f"{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))\n"
-        f"{x_var_name}=(1, 4)\n"
-        f"['{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))', "
-        f"'{x_var_name}=(1, 4)']\n"
-        f"{res_var_name}=9.0\n"
-        f"['{p_var_name}=Point(x=np.float64(1.0), y=np.float64(2.0))', "
-        f"'{x_var_name}=(1, 4)', "
-        f"'{res_var_name}=9.0']\n"
+        "Point(x=np.float64(1.0), y=np.float64(2.0))\n"
+        "(1, 4)\n"
+        "Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) \n"
+        "9.0\n"
+        "Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) 9.0 \n"
     )
     assert capture.out == expected_print
