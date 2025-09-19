@@ -36,14 +36,19 @@ from .nodes import (
 )
 
 """
-Dr. Willow Ahrens Office Hours Questions
-
 1) What is the best representation for a 'statement'?
+    Just the assembly nodes in a list
+
 2) What is the first dataflow-analysis that I should do?
+    dead-code elimination
+
 3) Figure out a way to number the actual AST so that I can change it later based on the output from the dataflow
+    create an ID Assembly Node and create a copy of the original AST and add ID assembly nodes to the copied AST (Annotated AST)
+    
 4) Come up with a way to test CFG Builder in a form of unit tests and test the dataflow analysis output
-5) Am I sure that I'm supposed to make a separate CFG for every function in the Module?
 """
+
+# TODO: create an ID Assembly Node and create a copy of the original AST and add ID assembly nodes to the copied AST (Annotated AST)
 
 class BasicBlock:
     def __init__(self, id):
