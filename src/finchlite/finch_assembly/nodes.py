@@ -102,6 +102,31 @@ class Variable(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class SSAVariable(AssemblyExpression):
+    """
+    Represents an SSA form of Variable assembly node that refers to variable
+    named `name`, with type `type`, and has ID `id`.
+
+    Attributes:
+        name: The name of the variable that it references.
+        type: The type of the variable that it references.
+        id: The ID of the variable
+    """
+
+    name: str
+    type: Any
+    id: int
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.type
+
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
+
+
+@dataclass(eq=True, frozen=True)
 class Stack(AssemblyExpression):
     """
     A logical AST expression representing an object using a set `obj` of
@@ -709,3 +734,73 @@ class AssemblyPrinterContext(Context):
                 return None
             case node:
                 raise NotImplementedError(node)
+
+
+class NumberedASTGenerator:
+    """
+    NumberedASTGenerator deep copies the Finch Assembly AST and each variables
+    its definiton number in a form of an SSAVariable
+    """
+
+    def __init__(self):
+        self.counters = {}
+
+    def __call__(self, node: AssemblyNode):
+        match node:
+            case Literal(val):
+                return Literal(val)
+            case Variable(name, type_):
+                counter = self.counters.get(name, 0)
+                self.counters[name] = counter + 1
+                return SSAVariable(name, type_, counter)
+            case Slot(name, type_):
+                return Slot(name, type_)
+            case Stack(obj, type_):
+                return Stack(self(obj), type_)
+            case Assign(lhs, rhs):
+                return Assign(self(lhs), self(rhs))
+            case GetAttr(obj, attr):
+                return GetAttr(self(obj), self(attr))
+            case SetAttr(obj, attr, value):
+                return SetAttr(self(obj), self(attr), self(value))
+            case Call(op, args):
+                return Call(self(op), tuple(self(a) for a in args))
+            case Load(buffer, index):
+                return Load(self(buffer), self(index))
+            case Store(buffer, index, value):
+                return Store(self(buffer), self(index), self(value))
+            case Resize(buffer, new_size):
+                return Resize(self(buffer), self(new_size))
+            case Length(buffer):
+                return Length(self(buffer))
+            case ForLoop(var, start, end, body):
+                return ForLoop(self(var), self(start), self(end), self(body))
+            case BufferLoop(buffer, var, body):
+                return BufferLoop(self(buffer), self(var), self(body))
+            case WhileLoop(condition, body):
+                return WhileLoop(self(condition), self(body))
+            case If(condition, body):
+                return If(self(condition), self(body))
+            case IfElse(condition, body, else_body):
+                return IfElse(self(condition), self(body), self(else_body))
+            case Function(name, args, body):
+                return Function(
+                    self(name), tuple(self(arg) for arg in args), self(body)
+                )
+            case Return(val):
+                return Return(self(val))
+            case Break():
+                return Break()
+            case Block(bodies):
+                return Block(tuple(self(b) for b in bodies))
+            case Module(funcs):
+                return Module(tuple(self(f) for f in funcs))
+            case Unpack(lhs, rhs):
+                return Unpack(self(lhs), self(rhs))
+            case Repack(val):
+                return Repack(self(val))
+            case node:
+                raise NotImplementedError(node)
+
+    def clone(self, node: AssemblyNode):
+        return self(node)
