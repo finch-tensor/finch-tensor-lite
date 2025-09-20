@@ -1,10 +1,10 @@
+import math
 import operator
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import math
 
 import finchlite.finch_notation as ntn
 from finchlite.compile import dimension
@@ -28,6 +28,7 @@ class DC:
         value: Estimated number of distinct combinations for `to_indices`
             given the fixed `from_indices`.
     """
+
     from_indices: frozenset[str]
     to_indices: frozenset[str]
     value: float
@@ -41,6 +42,7 @@ class DCStats(TensorStats):
     summarize how index sets relate. These DCs can be used to estimate the
     number of non-fill values without materializing sparse coordinates.
     """
+
     def __init__(self, tensor: Any, fields: Iterable[str]):
         """
         Initialize DCStats from a tensor and its axis names, build the TensorDef,
