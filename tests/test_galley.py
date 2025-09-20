@@ -269,48 +269,64 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
 
 
 @pytest.mark.parametrize(
-    "tensor, fields",
+    "dims, dcs, expected_dcs",
     [
-        (np.array([0, 1, 0, 1, 1], dtype=int), ["i"]),
-        (np.zeros((5,), dtype=int), ["i"]),
-        (np.ones((5,), dtype=int), ["i"]),
-        (np.array([[1, 0, 1], [0, 0, 0], [1, 1, 0]], dtype=int), ["i", "j"]),
-        (np.zeros((3, 3), dtype=int), ["i", "j"]),
-        (np.ones((3, 3), dtype=int), ["i", "j"]),
         (
-            np.array(
-                [
-                    [[1, 0], [0, 0]],
-                    [[0, 1], [1, 0]],
-                ],
-                dtype=int,
-            ),
-            ["i", "j", "k"],
+            {"i": 1000, "j": 1000},
+            [
+                DC(frozenset(["i"]), frozenset(["j"]), 5),
+                DC(frozenset(["j"]), frozenset(["i"]), 25),
+                DC(frozenset(),      frozenset(["i", "j"]), 50),
+            ],
+            50,
         ),
-        (np.zeros((2, 2, 2), dtype=int), ["i", "j", "k"]),
-        (np.ones((2, 2, 2), dtype=int), ["i", "j", "k"]),
-        (
-            np.array(
-                [
-                    [
-                        [[1, 0], [0, 0]],
-                        [[0, 0], [0, 1]],
-                    ],
-                    [
-                        [[0, 0], [1, 0]],
-                        [[0, 0], [0, 0]],
-                    ],
-                ],
-                dtype=int,
-            ),
-            ["i", "j", "k", "l"],
-        ),
-        (np.zeros((2, 3, 1, 4), dtype=int), ["i", "j", "k", "l"]),
-        (np.ones((2, 2, 2, 2), dtype=int), ["i", "j", "k", "l"]),
-    ],
+    ]
 )
-def test_estimate_nnz(tensor, fields):
-    stats = DCStats(tensor, fields)
-    estimated = stats.estimate_non_fill_values()
-    expected = float(np.count_nonzero(tensor))
-    assert estimated == expected
+def test_single_tensor_card(dims, dcs, expected_dcs):
+    stat = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat.tensordef = TensorDef(frozenset(["i", "j"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_dcs
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_dcs",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+            ],
+            50 * 5,
+        ),
+    ]
+)
+
+def test_1_join_DC_Card(dims, dcs, expected_dcs):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_dcs
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_dcs",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000, "l": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["l"]), 5),
+            ],
+            50 * 5 * 5,
+        ),
+    ]
+)
+
+def test_2_join_DC_Card(dims, dcs, expected_dcs):
+    stat = DCStats(np.zeros((1, 1, 1, 1), dtype=int), ["i", "j", "k", "l"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k", "l"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_dcs
+
+
