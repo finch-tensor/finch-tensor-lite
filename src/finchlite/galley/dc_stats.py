@@ -1018,7 +1018,7 @@ class DCStats(TensorStats):
         """
         idx = frozenset(self.fields)
         if len(idx) == 0:
-            return float()
+            return 0.0
 
         best: dict[frozenset[str], float] = {frozenset(): 1.0}
         frontier: set[frozenset[str]] = {frozenset()}
