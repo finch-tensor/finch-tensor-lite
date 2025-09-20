@@ -1017,8 +1017,8 @@ class DCStats(TensorStats):
             the estimated number of non-fill values using DCs.
         """
         idx = frozenset(self.fields)
-        if not idx:
-            return 1.0
+        if len(idx) == 0:
+            return float()
 
         best: dict[frozenset[str], float] = {frozenset(): 1.0}
         frontier: set[frozenset[str]] = {frozenset()}
@@ -1040,7 +1040,7 @@ class DCStats(TensorStats):
                         if min(current_bound, best.get(y, float("inf"))) > y_weight:
                             best[y] = y_weight
                             new_frontier.add(y)
-            if not new_frontier:
+            if len(new_frontier) == 0:
                 break
             frontier = new_frontier
 
@@ -1048,4 +1048,4 @@ class DCStats(TensorStats):
         for node, weight in best.items():
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
-        return float(min_weight)
+        return min_weight
