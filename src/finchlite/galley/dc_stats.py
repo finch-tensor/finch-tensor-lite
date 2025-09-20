@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+import math
 
 import finchlite.finch_notation as ntn
 from finchlite.compile import dimension
@@ -17,13 +18,34 @@ from .tensor_stats import TensorStats
 
 @dataclass(frozen=True)
 class DC:
+    """
+    A degree constraint (DC) record representing structural cardinality
+
+    Attributes:
+        from_indices: Conditioning index names.
+        to_indices: Index names whose distinct combinations are counted
+            when `from_indices` are fixed.
+        value: Estimated number of distinct combinations for `to_indices`
+            given the fixed `from_indices`.
+    """
     from_indices: frozenset[str]
     to_indices: frozenset[str]
     value: float
 
 
 class DCStats(TensorStats):
+    """
+    Structural statistics derived from a tensor using degree constraint (DCs).
+
+    DCStats scans a tensor and computes degree constraint (DC) records that
+    summarize how index sets relate. These DCs can be used to estimate the
+    number of non-fill values without materializing sparse coordinates.
+    """
     def __init__(self, tensor: Any, fields: Iterable[str]):
+        """
+        Initialize DCStats from a tensor and its axis names, build the TensorDef,
+        and compute degree constraint (DC) records from the tensor’s structure.
+        """
         self.tensordef = TensorDef.from_tensor(tensor, fields)
         self.fields = list(fields)
         self.tensor = np.asarray(tensor)
@@ -34,6 +56,20 @@ class DCStats(TensorStats):
         return None
 
     def _structure_to_dcs(self) -> set[DC]:
+        """
+        Dispatch DC extraction based on tensor dimensionality.
+
+        Returns:
+            set[DC]: One of the following, depending on `self.tensor.ndim`:
+                • Empty set, if the tensor is empty (`self.tensor.size == 0`)
+                • 1D → _vector_structure_to_dcs()
+                • 2D → _matrix_structure_to_dcs()
+                • 3D → _3d_structure_to_dcs()
+                • 4D → _4d_structure_to_dcs()
+
+        Raises:
+            NotImplementedError: If dimensionality is not in {1, 2, 3, 4}.
+        """
         if self.tensor.size == 0:
             return set()
 
@@ -50,8 +86,11 @@ class DCStats(TensorStats):
 
     def _vector_structure_to_dcs(self) -> set[DC]:
         """
-        Build a Finch Notation program that counts non-fill entries in a 1-D tensor,
-        execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes the structural
+        relationships within a one-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 1-D tensor.
         """
         A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
@@ -104,8 +143,11 @@ class DCStats(TensorStats):
 
     def _matrix_structure_to_dcs(self) -> set[DC]:
         """
-        Build a Finch Notation program that extracts structural dependencies
-        from a 2-D tensor, execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes the structural
+        relationships within a two-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 2-D tensor.
         """
 
         A = ntn.Variable("A", np.ndarray)
@@ -301,8 +343,11 @@ class DCStats(TensorStats):
 
     def _3d_structure_to_dcs(self) -> set[DC]:
         """
-        Build a Finch Notation program that extracts structural dependencies
-        from a 3-D tensor, execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes structural
+        relationships within a three-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 3-D tensor.
         """
         A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
@@ -587,8 +632,11 @@ class DCStats(TensorStats):
 
     def _4d_structure_to_dcs(self) -> set[DC]:
         """
-        Build a Finch Notation program that extracts structural dependencies
-        from a 4-D tensor, execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes structural
+        relationships within a four-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 4-D tensor.
         """
         A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
@@ -1013,8 +1061,15 @@ class DCStats(TensorStats):
 
     def estimate_non_fill_values(self) -> float:
         """
-        Return:
-            the estimated number of non-fill values using DCs.
+        Estimate the number of non-fill values using DCs.
+
+        This uses the stored degree constraint (DC) as multiplicative factors to
+        grow coverage over the target indices and finds the smallest product that
+        covers all target indices. The result is clamped by the tensor’s dense
+        capacity (the product of the target dimensions).
+
+        Returns:
+            the estimated number of non-fill entries in the tensor.
         """
         idx = frozenset(self.fields)
         if len(idx) == 0:
@@ -1024,7 +1079,7 @@ class DCStats(TensorStats):
         frontier: set[frozenset[str]] = {frozenset()}
 
         while True:
-            current_bound = best.get(idx, float("inf"))
+            current_bound = best.get(idx, math.inf)
             new_frontier: set[frozenset[str]] = set()
 
             for node in frontier:
@@ -1037,7 +1092,7 @@ class DCStats(TensorStats):
                             y_weight = float(2**64)
                         else:
                             y_weight = best[node] * dc.value
-                        if min(current_bound, best.get(y, float("inf"))) > y_weight:
+                        if min(current_bound, best.get(y, math.inf)) > y_weight:
                             best[y] = y_weight
                             new_frontier.add(y)
             if len(new_frontier) == 0:
