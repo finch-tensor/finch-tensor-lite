@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Callable
 from typing import Any
 
 import numpy as np
@@ -148,3 +148,66 @@ class TensorDef:
             if prod == 0 or prod > np.iinfo(np.int64).max:
                 return float("inf")
         return float(prod)
+
+    @staticmethod
+    def mapjoin(op: Callable, *args:"TensorDef") -> "TensorDef":
+        """
+        Merge multiple TensorDef objects into a single tensor definition.
+
+        This method takes any number of TensorDef objects and produces a new
+        TensorDef whose index set is the union of all input indices. The dimension
+        size for each axis is copied from the first input that contains that axis,
+        and the fill value is computed by applying the operator `op` across all
+        input fill values.
+
+        Returns:
+            TensorDef: A new TensorDef representing the merged tensor.
+        """
+        new_fill_value = op(*(s.fill_value for s in args))
+        new_index_set = set().union(*(s.index_set for s in args))
+        new_dim_sizes: dict = {}
+        for index in new_index_set:
+            for s in args:
+                if index in s.index_set:
+                    new_dim_sizes[index] = s.dim_sizes[index]
+                    break
+        assert set(new_dim_sizes.keys()) == new_index_set
+        return TensorDef(
+        new_index_set, new_dim_sizes, new_fill_value
+        )
+
+# function reduce_tensor_def(op, init, reduce_indices::StableSet{IndexExpr}, def::TensorDef)
+#     op = op isa PlanNode ? op.val : op
+#     init = init isa PlanNode ? init.val : init
+#     if isnothing(init)
+#         if isnothing(op) && isnothing(init)
+#             init = def.fill_val
+#         elseif isidentity(op, def.fill_val) || isidempotent(op)
+#             init = op(def.fill_val, def.fill_val)
+#         elseif op == +
+#             init = def.fill_val * prod([def.dim_sizes[x] for x in reduce_indices])
+#         elseif op == *
+#             init = def.fill_val^prod([def.dim_sizes[x] for x in reduce_indices])
+#         else
+#             # This is going to be VERY SLOW. Should raise a warning about reductions over non-identity fill values.
+#             # Depending on the semantics of reductions, we might be able to do this faster.
+#             println(
+#                 "Warning: A reduction can take place over a tensor whose fill value is not the reduction operator's identity. \\
+#                         This can result in a large slowdown as the new fill is calculated.",
+#             )
+#             init = op(
+#                 [
+#                     def.fill_val for
+#                     _ in prod([def.dim_sizes[x] for x in reduce_indices])
+#                 ]...,
+#             )
+#         end
+#     end
+#     @assert !isnothing(init)
+#     new_index_set = setdiff(def.index_set, reduce_indices)
+#     new_dim_sizes = OrderedDict{IndexExpr,Float64}()
+#     for index in new_index_set
+#         new_dim_sizes[index] = def.dim_sizes[index]
+#     end
+#     return TensorDef(new_index_set, new_dim_sizes, init, nothing, nothing, nothing)
+# end

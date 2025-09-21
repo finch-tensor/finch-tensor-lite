@@ -2,8 +2,10 @@ import math
 import operator
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, Type
+from numpy.typing import NDArray
 
+from collections.abc import Callable
 import numpy as np
 
 import finchlite.finch_notation as ntn
@@ -42,6 +44,7 @@ class DCStats(TensorStats):
     summarize how index sets relate. These DCs can be used to estimate the
     number of non-fill values without materializing sparse coordinates.
     """
+    tensor: Optional[NDArray[np.generic]]
 
     def __init__(self, tensor: Any, fields: Iterable[str]):
         """
@@ -52,6 +55,18 @@ class DCStats(TensorStats):
         self.fields = list(fields)
         self.tensor = np.asarray(tensor)
         self.dcs = self._structure_to_dcs()
+
+    @classmethod
+    def from_def(cls: Type["DCStats"], tensordef: TensorDef, dcs: set["DC"]) -> "DCStats":
+        """
+        Build DCStats directly from a TensorDef and an existing DC set.
+        """
+        self = object.__new__(cls)
+        self.tensordef = tensordef.copy()
+        self.fields = list(self.tensordef.index_set)
+        self.tensor = None
+        self.dcs = set(dcs)
+        return self
 
     @classmethod
     def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
@@ -72,10 +87,11 @@ class DCStats(TensorStats):
         Raises:
             NotImplementedError: If dimensionality is not in {1, 2, 3, 4}.
         """
-        if self.tensor.size == 0:
+        arr = self.tensor
+        if arr is None or arr.size == 0:
             return set()
 
-        ndim = self.tensor.ndim
+        ndim = arr.ndim
         if ndim == 1:
             return self._vector_structure_to_dcs()
         if ndim == 2:
@@ -1048,6 +1064,93 @@ class DCStats(TensorStats):
                 float(d_ijkw),
             ),
         }
+
+    @staticmethod
+    def _merge_dc_join(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+        """
+        Merge DCs for join-like operators
+
+        Args:
+            new_def: The merged TensorDef produced by TensorDef.mapjoin(...).
+            all_stats: DCStats inputs whose DC sets are to be merged.
+
+        Returns:
+            A new DCStats built on `new_def` with DCs:
+            For every key (X, Y) that appears in at least one input, set
+            d_out(X, Y) to the smallest of the values provided for that key
+            by the inputs that define it.
+        """
+        if len(all_stats) == 1:
+            return DCStats.from_def(new_def, set(all_stats[0].dcs))
+
+        new_dc: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+        for stats in all_stats:
+            for dc in stats.dcs:
+                dc_key = (dc.from_indices, dc.to_indices)
+                current_dc = new_dc.get(dc_key, math.inf)
+                if dc.value < current_dc:
+                    new_dc[dc_key] = dc.value
+
+        new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
+        return DCStats.from_def(new_def, new_stats)
+
+    # def _merge_dc_union(new_def: "TensorDef", stats_list: list["DCStats"]) -> "DCStats":
+    #     """
+    #     Julia: merge_tensor_stats_union for DCStats
+    #     Steps:
+    #     1) For each arg, copy its DCs into a local dict keyed by (X,Y).
+    #     2) Let Z = new_def.axes divided by arg.axes. For each DC (X,Y) also insert an
+    #         extended DC (X, Y ∪ Z) with value d * |Z| (if not already present,
+    #         take min with existing).
+    #     3) Track all keys seen across args; keep only keys that are seen in ALL args.
+    #     4) For those keys, sum the per-arg values; clamp by capacity of Y
+    #         and by a hard limit (typemax(UInt) in Julia; we use 2**64-1).
+    #     """
+    #     if len(stats_list) == 1:
+    #         return DCStats.from_def(new_def, set(stats_list[0].dcs))
+
+    #     # Per-arg dicts and a counter of how many args produced each key
+    #     per_arg: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
+    #     key_counts: dict[tuple[frozenset[str], frozenset[str]], int] = {}
+
+    #     for s in stats_list:
+    #         dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+    #         Z = frozenset(new_def.index_set - s.index_set)
+    #         Z_space = new_def.get_dim_space_size(Z)
+
+    #         # Copy original DCs; record presence
+    #         for dc in s.dcs:
+    #             key = DCStats._dc_key(dc)
+    #             dcs[key] = float(dc.value)
+    #             key_counts[key] = key_counts.get(key, 0) + 1
+
+    #         # Extend to cover missing axes Z (like Julia's ext_dc_key)
+    #         if Z:
+    #             for dc in s.dcs:
+    #                 key = DCStats._dc_key(dc)
+    #                 X, Y = key
+    #                 ext_key = (X, frozenset(Y | Z))
+    #                 cur = dcs.get(ext_key, float("inf"))
+    #                 cand = float(dc.value) * Z_space
+    #                 dcs[ext_key] = min(cur, cand)
+    #                 key_counts[ext_key] = key_counts.get(ext_key, 0) + 1
+
+    #         per_arg.append(dcs)
+
+    #     # Keep only keys inferable from ALL inputs; sum and clamp
+    #     MAXU64 = float(2**64 - 1)
+    #     merged: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+    #     for key, count in key_counts.items():
+    #         if count == len(stats_list):
+    #             total = sum(d.get(key, 0.0) for d in per_arg)
+    #             X, Y = key
+    #             if Y.issubset(new_def.index_set):
+    #                 total = min(total, new_def.get_dim_space_size(Y))
+    #             total = min(total, MAXU64)
+    #             merged[key] = total
+
+    #     out = {DC(X, Y, d) for (X, Y), d in merged.items()}
+    #     return DCStats.from_def(new_def, out)
 
     @staticmethod
     def mapjoin(op, *args, **kwargs):
