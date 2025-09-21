@@ -2,11 +2,10 @@ import math
 import operator
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Optional, Type
-from numpy.typing import NDArray
+from typing import Any
 
-from collections.abc import Callable
 import numpy as np
+from numpy.typing import NDArray
 
 import finchlite.finch_notation as ntn
 from finchlite.compile import dimension
@@ -44,7 +43,8 @@ class DCStats(TensorStats):
     summarize how index sets relate. These DCs can be used to estimate the
     number of non-fill values without materializing sparse coordinates.
     """
-    tensor: Optional[NDArray[np.generic]]
+
+    tensor: NDArray[np.generic] | None
 
     def __init__(self, tensor: Any, fields: Iterable[str]):
         """
@@ -57,7 +57,9 @@ class DCStats(TensorStats):
         self.dcs = self._structure_to_dcs()
 
     @classmethod
-    def from_def(cls: Type["DCStats"], tensordef: TensorDef, dcs: set["DC"]) -> "DCStats":
+    def from_def(
+        cls: type["DCStats"], tensordef: TensorDef, dcs: set["DC"]
+    ) -> "DCStats":
         """
         Build DCStats directly from a TensorDef and an existing DC set.
         """

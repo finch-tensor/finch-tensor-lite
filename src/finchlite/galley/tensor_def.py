@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping, Callable
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -150,7 +150,7 @@ class TensorDef:
         return float(prod)
 
     @staticmethod
-    def mapjoin(op: Callable, *args:"TensorDef") -> "TensorDef":
+    def mapjoin(op: Callable, *args: "TensorDef") -> "TensorDef":
         """
         Merge multiple TensorDef objects into a single tensor definition.
 
@@ -172,16 +172,13 @@ class TensorDef:
                     new_dim_sizes[index] = s.dim_sizes[index]
                     break
         assert set(new_dim_sizes.keys()) == new_index_set
-        return TensorDef(
-        new_index_set, new_dim_sizes, new_fill_value
-        )
+        return TensorDef(new_index_set, new_dim_sizes, new_fill_value)
+
 
 # function reduce_tensor_def(op, init, reduce_indices::StableSet{IndexExpr}, def::TensorDef)
 #     op = op isa PlanNode ? op.val : op
 #     init = init isa PlanNode ? init.val : init
 #     if isnothing(init)
-#         if isnothing(op) && isnothing(init)
-#             init = def.fill_val
 #         elseif isidentity(op, def.fill_val) || isidempotent(op)
 #             init = op(def.fill_val, def.fill_val)
 #         elseif op == +

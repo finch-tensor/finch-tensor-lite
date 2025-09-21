@@ -1,5 +1,7 @@
-import pytest
 import operator as op
+
+import pytest
+
 import numpy as np
 
 from finchlite.galley.dc_stats import DC, DCStats
@@ -54,6 +56,7 @@ def test_add_dummy_idx():
     td3 = td2.add_dummy_idx("j")
     assert td3.index_set == {"i", "j"}
 
+
 @pytest.mark.parametrize(
     "defs, func, expected_axes, expected_dims, expected_fill",
     [
@@ -99,6 +102,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
     assert out.index_set == expected_axes
     assert out.dim_sizes == expected_dims
     assert out.fill_value == expected_fill
+
 
 # @pytest.mark.parametrize(
 #     "index_set, dim_sizes, fill_value, reduce_fields, expected_axes, expected_dims, expected_fill",
@@ -460,6 +464,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
+
 @pytest.mark.parametrize(
     "dims, dcs_list, expected_dcs",
     [
@@ -467,25 +472,35 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
         (
             {"i": 1000},
             [
-                {DC(frozenset(), frozenset({"i"}), 5.0),
-                 DC(frozenset({"i"}), frozenset({"i"}), 1.0)}
+                {
+                    DC(frozenset(), frozenset({"i"}), 5.0),
+                    DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                }
             ],
-            {DC(frozenset(), frozenset({"i"}), 5.0),
-             DC(frozenset({"i"}), frozenset({"i"}), 1.0)},
+            {
+                DC(frozenset(), frozenset({"i"}), 5.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+            },
         ),
         # 2) Two inputs: overlap takes min; unique keys are preserved
         (
             {"i": 1000},
             [
-                {DC(frozenset(), frozenset({"i"}), 5.0),
-                 DC(frozenset({"i"}), frozenset({"i"}), 1.0)},
-                {DC(frozenset(), frozenset({"i"}), 2.0),
-                 DC(frozenset({"i"}), frozenset({"i"}), 3.0),
-                 DC(frozenset(), frozenset(), 7.0)},
+                {
+                    DC(frozenset(), frozenset({"i"}), 5.0),
+                    DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                },
+                {
+                    DC(frozenset(), frozenset({"i"}), 2.0),
+                    DC(frozenset({"i"}), frozenset({"i"}), 3.0),
+                    DC(frozenset(), frozenset(), 7.0),
+                },
             ],
-            {DC(frozenset(), frozenset({"i"}), 2.0),
-             DC(frozenset({"i"}), frozenset({"i"}), 1.0),
-             DC(frozenset(), frozenset(), 7.0)},
+            {
+                DC(frozenset(), frozenset({"i"}), 2.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                DC(frozenset(), frozenset(), 7.0),
+            },
         ),
     ],
 )
@@ -503,6 +518,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     assert out.tensordef.index_set == {"i"}
     assert out.tensordef.dim_sizes == dims
     assert out.dcs == expected_dcs
+
 
 # @pytest.mark.parametrize(
 #     "dims, dcs, expected_nnz",
