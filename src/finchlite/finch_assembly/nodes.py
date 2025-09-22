@@ -616,10 +616,15 @@ class AssemblyPrinterContext(Context):
         match prgm:
             case Literal(value):
                 return qual_str(value)
+            case TaggedVariable(Variable(name, _), id):
+                return f"{name}_{id}"
             case Variable(name, _):
                 return str(name)
             case Assign(Variable(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
+                return None
+            case Assign(TaggedVariable(Variable(var_n, var_t), id), val):
+                self.exec(f"{feed}{var_n}_{id}: {qual_str(var_t)} = {self(val)}")
                 return None
             case GetAttr(obj, attr):
                 return f"getattr({obj}, {attr})"
@@ -714,6 +719,26 @@ class AssemblyPrinterContext(Context):
                     f"{body_code}\n"
                 )
                 return None
+            case Function(TaggedVariable(Variable(func_name, return_t), id), args, body):
+                ctx_2 = self.subblock()
+                arg_decls = []
+                for arg in args:
+                    match arg:
+                        case TaggedVariable(Variable(name, t), id):
+                            arg_decls.append(f"{name}_{id}: {qual_str(t)}")
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {arg}"
+                            )
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                feed = self.feed
+                self.exec(
+                    f"{feed}def {func_name}_{id}({', '.join(arg_decls)}) -> "
+                    f"{qual_str(return_t)}:\n"
+                    f"{body_code}\n"
+                )
+                return None
             case Return(value):
                 self.exec(f"{feed}return {self(value)}")
                 return None
@@ -743,9 +768,9 @@ def number_assembly_ast(root: AssemblyNode) -> AssemblyNode:
 
     def rule(node):
         match node:
-            case Variable(name, type_):
+            case Variable(name, _) as var:
                 idx = counters.get(name, 0)
                 counters[name] = idx + 1
-                return TaggedVariable(Variable(name, type_), idx)
+                return TaggedVariable(var, idx)
 
     return Rewrite(PostWalk(rule))(root)
