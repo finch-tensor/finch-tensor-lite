@@ -116,7 +116,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         "expected_fill",
     ),
     [
-        # ── addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
+        # addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
         (
             op.add,
             ["i", "j", "k"],
@@ -127,7 +127,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
             {"i": 10.0, "k": 3.0},
             0.5 * 5,
         ),
-        # ── addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
+        # addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
         (
             op.add,
             ["a", "b", "c", "d"],
@@ -138,7 +138,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
             {"a": 2.0, "c": 8.0},
             7.0 * (4 * 16),
         ),
-        # ── addition: no-op when reduce set is empty (n = 1) → fill unchanged
+        # addition: no-op when reduce set is empty (n = 1) → fill unchanged
         (
             op.add,
             ["x", "y"],
@@ -149,7 +149,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
             {"x": 3.0, "y": 9.0},
             1.0,
         ),
-        # ── addition: missing axis in reduce set → nothing reduced → fill unchanged
+        # addition: missing axis in reduce set → nothing reduced → fill unchanged
         (
             op.add,
             ["i", "j"],
@@ -160,7 +160,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
             {"i": 5.0, "j": 6.0},
             0.0,
         ),
-        # ── multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
+        # multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
         (
             op.mul,
             ["i", "j"],
@@ -171,7 +171,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
             {"i": 2.0},
             8.0,
         ),
-        # ── idempotent op: reduce entire axis → empty shape
+        # idempotent op: reduce entire axis → empty shape
         (
             min,
             ["i"],
@@ -532,7 +532,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
 @pytest.mark.parametrize(
     "dims, dcs_list, expected_dcs",
     [
-        # 1) Single input passthrough
+        # Single input passthrough
         (
             {"i": 1000},
             [
@@ -546,7 +546,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
                 DC(frozenset({"i"}), frozenset({"i"}), 1.0),
             },
         ),
-        # 2) Two inputs: overlap takes min; unique keys are preserved
+        # Two inputs: overlap takes min; unique keys are preserved
         (
             {"i": 1000},
             [
