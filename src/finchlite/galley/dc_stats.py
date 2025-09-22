@@ -43,8 +43,7 @@ class DCStats(TensorStats):
     summarize how index sets relate. These DCs can be used to estimate the
     number of non-fill values without materializing sparse coordinates.
     """
-
-    tensor: NDArray[np.generic] | None
+    tensor: Optional[NDArray[np.generic]]
 
     def __init__(self, tensor: Any, fields: Iterable[str]):
         """
@@ -57,9 +56,7 @@ class DCStats(TensorStats):
         self.dcs = self._structure_to_dcs()
 
     @classmethod
-    def from_def(
-        cls: type["DCStats"], tensordef: TensorDef, dcs: set["DC"]
-    ) -> "DCStats":
+    def from_def(cls: Type["DCStats"], tensordef: TensorDef, dcs: set["DC"]) -> "DCStats":
         """
         Build DCStats directly from a TensorDef and an existing DC set.
         """
@@ -1095,64 +1092,6 @@ class DCStats(TensorStats):
 
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
         return DCStats.from_def(new_def, new_stats)
-
-    # def _merge_dc_union(new_def: "TensorDef", stats_list: list["DCStats"]) -> "DCStats":
-    #     """
-    #     Julia: merge_tensor_stats_union for DCStats
-    #     Steps:
-    #     1) For each arg, copy its DCs into a local dict keyed by (X,Y).
-    #     2) Let Z = new_def.axes divided by arg.axes. For each DC (X,Y) also insert an
-    #         extended DC (X, Y ∪ Z) with value d * |Z| (if not already present,
-    #         take min with existing).
-    #     3) Track all keys seen across args; keep only keys that are seen in ALL args.
-    #     4) For those keys, sum the per-arg values; clamp by capacity of Y
-    #         and by a hard limit (typemax(UInt) in Julia; we use 2**64-1).
-    #     """
-    #     if len(stats_list) == 1:
-    #         return DCStats.from_def(new_def, set(stats_list[0].dcs))
-
-    #     # Per-arg dicts and a counter of how many args produced each key
-    #     per_arg: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
-    #     key_counts: dict[tuple[frozenset[str], frozenset[str]], int] = {}
-
-    #     for s in stats_list:
-    #         dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
-    #         Z = frozenset(new_def.index_set - s.index_set)
-    #         Z_space = new_def.get_dim_space_size(Z)
-
-    #         # Copy original DCs; record presence
-    #         for dc in s.dcs:
-    #             key = DCStats._dc_key(dc)
-    #             dcs[key] = float(dc.value)
-    #             key_counts[key] = key_counts.get(key, 0) + 1
-
-    #         # Extend to cover missing axes Z (like Julia's ext_dc_key)
-    #         if Z:
-    #             for dc in s.dcs:
-    #                 key = DCStats._dc_key(dc)
-    #                 X, Y = key
-    #                 ext_key = (X, frozenset(Y | Z))
-    #                 cur = dcs.get(ext_key, float("inf"))
-    #                 cand = float(dc.value) * Z_space
-    #                 dcs[ext_key] = min(cur, cand)
-    #                 key_counts[ext_key] = key_counts.get(ext_key, 0) + 1
-
-    #         per_arg.append(dcs)
-
-    #     # Keep only keys inferable from ALL inputs; sum and clamp
-    #     MAXU64 = float(2**64 - 1)
-    #     merged: dict[tuple[frozenset[str], frozenset[str]], float] = {}
-    #     for key, count in key_counts.items():
-    #         if count == len(stats_list):
-    #             total = sum(d.get(key, 0.0) for d in per_arg)
-    #             X, Y = key
-    #             if Y.issubset(new_def.index_set):
-    #                 total = min(total, new_def.get_dim_space_size(Y))
-    #             total = min(total, MAXU64)
-    #             merged[key] = total
-
-    #     out = {DC(X, Y, d) for (X, Y), d in merged.items()}
-    #     return DCStats.from_def(new_def, out)
 
     @staticmethod
     def mapjoin(op, *args, **kwargs):
