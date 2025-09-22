@@ -719,7 +719,9 @@ class AssemblyPrinterContext(Context):
                     f"{body_code}\n"
                 )
                 return None
-            case Function(TaggedVariable(Variable(func_name, return_t), id), args, body):
+            case Function(
+                TaggedVariable(Variable(func_name, return_t), id), args, body
+            ):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:

@@ -213,6 +213,7 @@ def test_asm_printer_if(file_regression):
 
     file_regression.check(str(root), extension=".txt")
 
+
 def test_tagged_asm_printer_if(file_regression):
     var = asm.Variable("a", np.int64)
     root = asm.Module(
@@ -337,6 +338,7 @@ def test_asm_printer_dot(file_regression):
     )
 
     file_regression.check(str(prgm), extension=".txt")
+
 
 def test_tagged_asm_printer_dot(file_regression):
     c = asm.Variable("c", np.float64)
