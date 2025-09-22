@@ -970,7 +970,7 @@ def pow(x1, x2) -> LazyTensor:
 
 
 def remainder(x1, x2) -> LazyTensor:
-    return elementwise(np.remaider, defer(x1), defer(x2))
+    return elementwise(np.remainder, defer(x1), defer(x2))
 
 
 def conjugate(x) -> LazyTensor:
