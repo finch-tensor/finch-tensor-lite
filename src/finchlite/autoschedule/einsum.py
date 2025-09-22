@@ -7,7 +7,7 @@ from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal,
 from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder, Table
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
-from finchlite.algebra import is_commutative, overwrite, init_value
+from finchlite.algebra import is_commutative, overwrite, init_value, promote_max, promote_min
 
 @dataclass(eq=True, frozen=True)
 class PointwiseNode(Term, ABC):
@@ -311,6 +311,8 @@ class EinsumPrinterContext:
             operator.floordiv: "//=",
             operator.mod: "%=",
             operator.pow: "**=",
+            promote_max: "max=",
+            promote_min: "min=",
         }
         return str_map[reducer]
 
