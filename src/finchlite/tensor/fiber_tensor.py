@@ -103,7 +103,7 @@ Tp = TypeVar("Tp")
 
 
 @dataclass
-class FiberTensor(Generic[Tp], Tensor):
+class FiberTensor(Tensor, Generic[Tp]):
     """
     A class representing a tensor with fiber structure.
 
