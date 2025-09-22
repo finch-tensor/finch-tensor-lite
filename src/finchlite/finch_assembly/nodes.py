@@ -620,11 +620,16 @@ class AssemblyPrinterContext(Context):
                 return f"{name}_{id}"
             case Variable(name, _):
                 return str(name)
-            case Assign(Variable(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
-                return None
-            case Assign(TaggedVariable(Variable(var_n, var_t), id), val):
-                self.exec(f"{feed}{var_n}_{id}: {qual_str(var_t)} = {self(val)}")
+            case Assign(lhs, val):
+                match lhs:
+                    case Variable(var_n, var_t):
+                        self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
+                    case TaggedVariable(Variable(var_n, var_t), id):
+                        self.exec(
+                            f"{feed}{var_n}_{id}: {qual_str(var_t)} = {self(val)}"
+                        )
+                    case _:
+                        raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
             case GetAttr(obj, attr):
                 return f"getattr({obj}, {attr})"
@@ -699,13 +704,15 @@ class AssemblyPrinterContext(Context):
                     f"{feed}if {cond_code}:\n{body_code}\n{feed}else:\n{else_body_code}"
                 )
                 return None
-            case Function(Variable(func_name, return_t), args, body):
+            case Function(name, args, body):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:
                     match arg:
-                        case Variable(name, t):
-                            arg_decls.append(f"{name}: {qual_str(t)}")
+                        case Variable(arg_name, t):
+                            arg_decls.append(f"{arg_name}: {qual_str(t)}")
+                        case TaggedVariable(Variable(arg_name, t), id):
+                            arg_decls.append(f"{arg_name}_{id}: {qual_str(t)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -713,30 +720,19 @@ class AssemblyPrinterContext(Context):
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 feed = self.feed
+
+                match name:
+                    case Variable(func_name, return_t):
+                        func_decl = f"{func_name}"
+                    case TaggedVariable(Variable(func_name, return_t), id):
+                        func_decl = f"{func_name}_{id}"
+                    case _:
+                        raise NotImplementedError(
+                            f"Unrecognized function name type: {name}"
+                        )
+
                 self.exec(
-                    f"{feed}def {func_name}({', '.join(arg_decls)}) -> "
-                    f"{qual_str(return_t)}:\n"
-                    f"{body_code}\n"
-                )
-                return None
-            case Function(
-                TaggedVariable(Variable(func_name, return_t), id), args, body
-            ):
-                ctx_2 = self.subblock()
-                arg_decls = []
-                for arg in args:
-                    match arg:
-                        case TaggedVariable(Variable(name, t), id):
-                            arg_decls.append(f"{name}_{id}: {qual_str(t)}")
-                        case _:
-                            raise NotImplementedError(
-                                f"Unrecognized argument type: {arg}"
-                            )
-                ctx_2(body)
-                body_code = ctx_2.emit()
-                feed = self.feed
-                self.exec(
-                    f"{feed}def {func_name}_{id}({', '.join(arg_decls)}) -> "
+                    f"{feed}def {func_decl}({', '.join(arg_decls)}) -> "
                     f"{qual_str(return_t)}:\n"
                     f"{body_code}\n"
                 )
