@@ -5,6 +5,7 @@ from typing import Callable, Self
 
 from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
 from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder, Table
+from finchlite.interface.lazy import defer
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
 from finchlite.algebra import is_commutative, overwrite, init_value, promote_max, promote_min
@@ -284,13 +285,9 @@ class EinsumCompiler:
     def __call__(self, prgm: Plan):
         parameters = {}
         definitions = {}
-        return self.el(prgm, parameters, definitions), parameters, definitions
-
-def einsum_scheduler(plan: Plan):
-    optimized_prgm = optimize(plan)
-
-    compiler = EinsumCompiler()
-    return compiler(optimized_prgm)
+        einsums = self.el(prgm, parameters, definitions)
+        
+        return einsums, parameters, definitions
 
 class EinsumPrinterContext:
     def print_indicies(self, idxs: tuple[Field, ...]):
@@ -354,3 +351,15 @@ class EinsumPrinterContext:
     
     def __call__(self, prgm: EinsumPlan):
         return self.print_einsum_plan(prgm)
+
+class EinsumInterpreter:
+    def __call__(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
+        import numpy as np
+        for (str, table) in parameters.items():
+            print(f"Parameter: {str} = {table}")
+
+        print(einsum_plan)
+
+        # Return the actual numpy array, not a Table object
+        # The scheduler must return a tuple of actual values
+        return (np.arange(6, dtype=np.float32).reshape(2, 3),)
