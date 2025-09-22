@@ -149,6 +149,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         data = ctx.freshen(var_n, "data")
         length = ctx.freshen(var_n, "length")
         t = ctx.ctype_name(c_type(self._dtype))
+        ctx.add_header("#include <stddef.h>")
         ctx.exec(
             f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
             f"{ctx.feed}size_t {length} = {ctx(val)}->length;"

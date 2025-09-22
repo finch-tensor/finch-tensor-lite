@@ -65,6 +65,7 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
     def _c_check(self, ctx, buf, idx):
         ctx.add_header("#include <stdio.h>")
         ctx.add_header("#include <stdlib.h>")
+        ctx.add_header("#include <stddef.h>")
         idx_n = ctx.freshen("computed")
         ctx.exec(
             f"{ctx.feed}size_t {idx_n} = ({ctx(idx)});\n"
