@@ -104,38 +104,102 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
     assert out.fill_value == expected_fill
 
 
-# @pytest.mark.parametrize(
-#     "index_set, dim_sizes, fill_value, reduce_fields, expected_axes, expected_dims, expected_fill",
-#     [
-#         # drop one axis
-#         (["i", "j", "k"], {"i": 10.0, "j": 5.0, "k": 3.0}, 0.5,
-#          ["j"],
-#          {"i", "k"}, {"i": 10.0, "k": 3.0}, 0.5),
+@pytest.mark.parametrize(
+    (
+        "op_func",
+        "index_set",
+        "dim_sizes",
+        "fill_value",
+        "reduce_fields",
+        "expected_axes",
+        "expected_dims",
+        "expected_fill",
+    ),
+    [
+        # ── addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
+        (
+            op.add,
+            ["i", "j", "k"],
+            {"i": 10.0, "j": 5.0, "k": 3.0},
+            0.5,
+            ["j"],
+            {"i", "k"},
+            {"i": 10.0, "k": 3.0},
+            0.5 * 5,
+        ),
+        # ── addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
+        (
+            op.add,
+            ["a", "b", "c", "d"],
+            {"a": 2.0, "b": 4.0, "c": 8.0, "d": 16.0},
+            7.0,
+            ["b", "d"],
+            {"a", "c"},
+            {"a": 2.0, "c": 8.0},
+            7.0 * (4 * 16),
+        ),
+        # ── addition: no-op when reduce set is empty (n = 1) → fill unchanged
+        (
+            op.add,
+            ["x", "y"],
+            {"x": 3.0, "y": 9.0},
+            1.0,
+            [],
+            {"x", "y"},
+            {"x": 3.0, "y": 9.0},
+            1.0,
+        ),
+        # ── addition: missing axis in reduce set → nothing reduced → fill unchanged
+        (
+            op.add,
+            ["i", "j"],
+            {"i": 5.0, "j": 6.0},
+            0.0,
+            ["z"],
+            {"i", "j"},
+            {"i": 5.0, "j": 6.0},
+            0.0,
+        ),
+        # ── multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
+        (
+            op.mul,
+            ["i", "j"],
+            {"i": 2.0, "j": 3.0},
+            2.0,
+            ["j"],
+            {"i"},
+            {"i": 2.0},
+            8.0,
+        ),
+        # ── idempotent op: reduce entire axis → empty shape
+        (
+            min,
+            ["i"],
+            {"i": 4.0},
+            7.0,
+            ["i"],
+            set(),
+            {},
+            7.0,
+        ),
+    ],
+)
+def test_tensordef_aggregate(
+    op_func,
+    index_set,
+    dim_sizes,
+    fill_value,
+    reduce_fields,
+    expected_axes,
+    expected_dims,
+    expected_fill,
+):
+    d = TensorDef(index_set=index_set, dim_sizes=dim_sizes, fill_value=fill_value)
+    out = TensorDef.aggregate(op_func, None, reduce_fields, d)
 
-#         # drop multiple axes
-#         (["a", "b", "c", "d"], {"a": 2.0, "b": 4.0, "c": 8.0, "d": 16.0}, 7.0,
-#          ["b", "d"],
-#          {"a", "c"}, {"a": 2.0, "c": 8.0}, 7.0),
-
-#         # no-op when reduce set is empty
-#         (["x", "y"], {"x": 3.0, "y": 9.0}, 1.0,
-#          [],
-#          {"x", "y"}, {"x": 3.0, "y": 9.0}, 1.0),
-
-#         # missing axis in reduce set → no change
-#         (["i", "j"], {"i": 5.0, "j": 6.0}, 0.0,
-#          ["z"],
-#          {"i", "j"}, {"i": 5.0, "j": 6.0}, 0.0),
-#     ],
-# )
-# def test_tensordef_aggregate_param(index_set, dim_sizes, fill_value,
-#                                    reduce_fields, expected_axes,
-#                                    expected_dims, expected_fill):
-#     d = TensorDef(index_set=index_set, dim_sizes=dim_sizes, fill_value=fill_value)
-#     out = TensorDef.aggregate(op.add, reduce_fields, d)
-#     assert out.index_set == expected_axes
-#     assert out.dim_sizes == expected_dims
-#     assert out.fill_value == expected_fill
+    assert out.index_set == expected_axes
+    assert out.dim_sizes == expected_dims
+    assert out.fill_value == expected_fill
 
 
 # ─────────────────────────────── DenseStats tests ─────────────────────────────
@@ -518,189 +582,3 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     assert out.tensordef.index_set == {"i"}
     assert out.tensordef.dim_sizes == dims
     assert out.dcs == expected_dcs
-
-
-# @pytest.mark.parametrize(
-#     "dims, dcs, expected_nnz",
-#     [
-#         (
-#             {"i": 1000, "j": 1000, "k": 1000},
-#             [
-#                 DC(frozenset(), frozenset(["i", "j"]), 50),
-#                 DC(frozenset(["i"]), frozenset(["j"]), 5),
-#                 DC(frozenset(["j"]), frozenset(["i"]), 5),
-#                 DC(frozenset(), frozenset(["j", "k"]), 50),
-#                 DC(frozenset(["j"]), frozenset(["k"]), 5),
-#                 DC(frozenset(["k"]), frozenset(["j"]), 5),
-#                 DC(frozenset(), frozenset(["i", "k"]), 50),
-#                 DC(frozenset(["i"]), frozenset(["k"]), 5),
-#                 DC(frozenset(["k"]), frozenset(["i"]), 5),
-#             ],
-#             1,
-#         ),
-#     ],
-# )
-# def test_full_reduce_dc_card(dims, dcs, expected_nnz):
-#     stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
-#     stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
-#     stat.dcs = set(dcs)
-#     reduce_stats = DCStats.aggregate(op.add, 0.0, {"i", "j", "k"}, stat)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-# @pytest.mark.parametrize(
-#     "dims, dcs, expected_nnz",
-#     [
-#         (
-#             {"i": 1000, "j": 1000, "k": 1000},
-#             [
-#                 DC(frozenset(), frozenset(["i", "j"]), 1),
-#                 DC(frozenset(["i"]), frozenset(["j"]), 1),
-#                 DC(frozenset(["j"]), frozenset(["i"]), 1),
-#                 DC(frozenset(), frozenset(["j", "k"]), 50),
-#                 DC(frozenset(["j"]), frozenset(["k"]), 5),
-#                 DC(frozenset(["k"]), frozenset(["j"]), 5),
-#                 DC(frozenset(), frozenset(["i", "k"]), 50),
-#                 DC(frozenset(["i"]), frozenset(["k"]), 5),
-#                 DC(frozenset(["k"]), frozenset(["i"]), 5),
-#             ],
-#             5,
-#         ),
-#     ],
-# )
-# def test_2_attr_reduce_dc_card(dims, dcs, expected_nnz):
-#     stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
-#     stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
-#     stat.dcs = set(dcs)
-#     reduce_stats = aggregate(operator.add, 0.0, {"i", "j", "k"}, stat)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-# @pytest.mark.parametrize(
-#     "dims, dcs1, dcs2, expected_nnz",
-#     [
-#         (
-#             {"i": 1000},
-#             [
-#                 DC(frozenset(), frozenset(["i"]), 1),
-#             ],
-#             [
-#                 DC(frozenset(), frozenset(["i"]), 1),
-#             ],
-#             2,
-#         ),
-#     ],
-# )
-# def test_1d_disjunction_dc_card(dims, dcs1, dcs2, expected_nnz):
-#     stat_1 = DCStats(np.zeros((1), dtype=int), ["i"])
-#     stat_1.tensordef = TensorDef(frozenset(["i"]), dims, 0)
-#     stat_1.dcs = set(dcs1)
-
-#     stat_2 = DCStats(np.zeros((1), dtype=int), ["i"])
-#     stat_2.tensordef = TensorDef(frozenset(["i"]), dims, 0)
-#     stat_2.dcs = set(dcs2)
-#     reduce_stats = DCStats.mapjoin(op.add, stat_1, stat_2)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-# @pytest.mark.parametrize(
-#     "dims, dcs1, dcs2, expected_nnz",
-#     [
-#         (
-#             {"i": 1000, "j": 100},
-#             [
-#                 DC(frozenset(), frozenset([1, 2]), 1),
-#             ],
-#             [
-#                 DC(frozenset(), frozenset([1, 2]), 1),
-#             ],
-#             2,
-#         ),
-#     ],
-# )
-# def test_2d_disjunction_dc_card(dims, dcs1, dcs2, expected_nnz):
-#     stat_1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
-#     stat_1.tensordef = TensorDef(frozenset(["i", "j"]), dims, 0)
-#     stat_1.dcs = set(dcs1)
-
-#     stat_2 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
-#     stat_2.tensordef = TensorDef(frozenset(["i", "j"]), dims, 0)
-#     stat_2.dcs = set(dcs2)
-#     reduce_stats = DCStats.mapjoin(op.add, stat_1, stat_2)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-# @pytest.mark.parametrize(
-#     "dims, dcs1, dims2, dcs2, expected_nnz",
-#     [
-#         (
-#             {"i": 1000},
-#             [
-#                 DC(frozenset(), frozenset([1]), 5),
-#             ],
-#             {"j": 100},
-#             [
-#                 DC(frozenset(), frozenset([2]), 10),
-#             ],
-#             10 * 1000 + 5 * 100,
-#         ),
-#     ],
-# )
-# def test_2d_disjoint_disjunction_dc_card(dims, dcs1, dcs2, expected_nnz):
-#     stat_1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
-#     stat_1.tensordef = TensorDef(frozenset(["i"]), dims, 0)
-#     stat_1.dcs = set(dcs1)
-
-#     stat_2 = DCStats(np.zeros((1, 1), dtype=int), ["i"])
-#     stat_2.tensordef = TensorDef(frozenset(["i", "j"]), dims, 0)
-#     stat_2.dcs = set(dcs2)
-#     reduce_stats = mapjoin(operator.add, stat_1, stat_2)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-# @pytest.mark.parametrize(
-#     "dims1, dcs1, dims2, dcs2, expected_nnz",
-#     [
-#         (
-#             {"i": 1000, "j": 100},
-#             {DC(frozenset(), frozenset(["i", "j"]), 5.0)},
-#             {"j": 100, "k": 1000},
-#             {DC(frozenset(), frozenset(["j", "k"]), 10.0)},
-#             10 * 1000 + 5 * 1000,
-#         ),
-#     ],
-# )
-# def test_3d_disjoint_disjunction_dc_card(dims1, dims2, dcs1, dcs2, expected_nnz):
-#     stat_1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
-#     stat_1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 0)
-#     stat_1.dcs = set(dcs1)
-
-#     stat_2 = DCStats(np.zeros((1, 1), dtype=int), ["j", "k"])
-#     stat_2.tensordef = TensorDef(frozenset(["j", "k"]), dims2, 0)
-#     stat_2.dcs = set(dcs2)
-#     reduce_stats = mapjoin(operator.add, stat_1, stat_2)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-# @pytest.mark.parametrize(
-#     "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
-#     [
-#         (
-#             {"i": 1000, "j": 100},
-#             DC(frozenset(), frozenset([1, 2]), 5),
-#             {"j": 100, "k": 1000},
-#             DC(frozenset(), frozenset([2, 3]), 10),
-#             {"i": 1000, "j": 100, "k": 1000},
-#             DC(frozenset(), frozenset([1, 2, 3]), 10),
-#             10,
-#         ),
-#     ],
-# )
-# def test_mixture_disjunction_conjunction_dc_card(dims1, dims2, dims3, dcs1, dcs2, dcs3, expected_nnz):
-#     stat_1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
-#     stat_1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 0)
-#     stat_1.dcs = set(dcs1)
-
-#     stat_2 = DCStats(np.zeros((1, 1), dtype=int), ["j", "k"])
-#     stat_2.tensordef = TensorDef(frozenset(["j", "k"]), dims2, 0)
-#     stat_2.dcs = set(dcs2)
-
-#     stat_3 = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
-#     stat_3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 0)
-#     stat_3.dcs = set(dcs3)
-#     reduce_stats = mapjoin(operator.mul, stat_1, stat_2, stat_3)
-#     assert reduce_stats.estimate_non_fill_values() == expected_nnz

@@ -40,6 +40,8 @@ def test_algebra_selected():
     assert is_identity(np.logaddexp, -math.inf)
     assert is_identity(np.logical_or, False)
     assert is_identity(np.logical_and, True)
+    assert is_identity(max, -math.inf)
+    assert is_identity(min, math.inf)
     assert is_associative(operator.add)
     assert is_associative(operator.mul)
     assert is_associative(np.logical_and)

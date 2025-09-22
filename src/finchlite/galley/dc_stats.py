@@ -43,7 +43,8 @@ class DCStats(TensorStats):
     summarize how index sets relate. These DCs can be used to estimate the
     number of non-fill values without materializing sparse coordinates.
     """
-    tensor: Optional[NDArray[np.generic]]
+
+    tensor: NDArray[np.generic] | None
 
     def __init__(self, tensor: Any, fields: Iterable[str]):
         """
@@ -56,7 +57,9 @@ class DCStats(TensorStats):
         self.dcs = self._structure_to_dcs()
 
     @classmethod
-    def from_def(cls: Type["DCStats"], tensordef: TensorDef, dcs: set["DC"]) -> "DCStats":
+    def from_def(
+        cls: type["DCStats"], tensordef: TensorDef, dcs: set["DC"]
+    ) -> "DCStats":
         """
         Build DCStats directly from a TensorDef and an existing DC set.
         """

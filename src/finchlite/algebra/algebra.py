@@ -376,6 +376,8 @@ register_property(
 )
 register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
 register_property(np.logical_or, "__call__", "is_identity", lambda op, val: not val)
+register_property(min, "__call__", "is_identity", lambda op, val: val == math.inf)
+register_property(max, "__call__", "is_identity", lambda op, val: val == -math.inf)
 
 
 def is_distributive(op, other_op):
