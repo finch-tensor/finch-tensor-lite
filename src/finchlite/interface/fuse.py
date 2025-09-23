@@ -51,7 +51,6 @@ Performance:
 """
 
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
-from ..autoschedule.einsum import EinsumCompiler, EinsumInterpreter
 from ..finch_logic import Alias, FinchLogicInterpreter, Plan, Produces, Query
 from ..finch_notation import NotationInterpreter
 from ..symbolic import gensym
@@ -60,22 +59,13 @@ from .lazy import defer
 _DEFAULT_SCHEDULER = None
 
 
-def set_default_scheduler(*, ctx=None, interpret_logic=False, interpret_einsum=False):
+def set_default_scheduler(*, ctx=None, interpret_logic=False):
     global _DEFAULT_SCHEDULER
 
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
     elif interpret_logic:
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
-    elif interpret_einsum:
-        optimizer = DefaultLogicOptimizer(EinsumCompiler())
-        einsum_interpreter = EinsumInterpreter()
-
-        def fn_compile(plan):
-            einsums, parameters, _ = optimizer(plan)
-            return einsum_interpreter(einsums, parameters)
-
-        _DEFAULT_SCHEDULER = fn_compile
     else:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         ntn_interp = NotationInterpreter()

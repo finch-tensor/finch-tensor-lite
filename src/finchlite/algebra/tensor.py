@@ -6,7 +6,6 @@ import numpy as np
 from ..algebra import register_property
 from ..symbolic import FType, FTyped, ftype
 
-
 class TensorFType(FType, ABC):
     @property
     def ndim(self) -> int:

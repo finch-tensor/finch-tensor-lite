@@ -8,7 +8,6 @@ from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
 
-
 class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
@@ -208,11 +207,21 @@ class EagerTensor(OverrideTensor, ABC):
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
+def get_eager_scheduler(*args):
+    from finchlite.autoschedule.sparse_tensor import SparseTensor
+    from finchlite.autoschedule import EinsumScheduler, DefaultLogicOptimizer, EinsumCompiler
+
+    for arg in args:
+        if isinstance(arg, SparseTensor):
+            return DefaultLogicOptimizer(EinsumScheduler(EinsumCompiler()))
+
+    return None
+
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
         return lazy.permute_dims(arg, axis=axis)
-    return compute(lazy.permute_dims(arg, axis=axis))
+    return compute(lazy.permute_dims(arg, axis=axis), ctx=get_eager_scheduler(arg))
 
 
 def expand_dims(
@@ -222,7 +231,7 @@ def expand_dims(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.expand_dims(x, axis=axis)
-    return compute(lazy.expand_dims(x, axis=axis))
+    return compute(lazy.expand_dims(x, axis=axis), ctx=get_eager_scheduler(x))
 
 
 def squeeze(
@@ -232,7 +241,7 @@ def squeeze(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.squeeze(x, axis=axis)
-    return compute(lazy.squeeze(x, axis=axis))
+    return compute(lazy.squeeze(x, axis=axis), ctx=get_eager_scheduler(x))
 
 
 def reduce(
@@ -248,7 +257,8 @@ def reduce(
     if isinstance(x, lazy.LazyTensor):
         return lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init)
     return compute(
-        lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init)
+        lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init),
+        ctx=get_eager_scheduler(x)
     )
 
 
@@ -262,7 +272,7 @@ def sum(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.sum(x, axis=axis, dtype=dtype, keepdims=keepdims)
-    return compute(lazy.sum(x, axis=axis, dtype=dtype, keepdims=keepdims))
+    return compute(lazy.sum(x, axis=axis, dtype=dtype, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def prod(
@@ -275,49 +285,48 @@ def prod(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims)
-    return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
+    return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def elementwise(f: Callable, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
-    return compute(lazy.elementwise(f, *args))
-
+    return compute(lazy.elementwise(f, *args), ctx=get_eager_scheduler(*args))
 
 def add(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.add(x1, x2)
-    return compute(lazy.add(x1, x2))
+    return compute(lazy.add(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def subtract(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.subtract(x1, x2)
-    return compute(lazy.subtract(x1, x2))
+    return compute(lazy.subtract(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def multiply(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.multiply(x1, x2)
-    return compute(lazy.multiply(x1, x2))
+    return compute(lazy.multiply(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def abs(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.abs(x)
-    return compute(lazy.abs(x))
+    return compute(lazy.abs(x), ctx=get_eager_scheduler(x))
 
 
 def positive(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.positive(x)
-    return compute(lazy.positive(x))
+    return compute(lazy.positive(x), ctx=get_eager_scheduler(x))
 
 
 def negative(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.negative(x)
-    return compute(lazy.negative(x))
+    return compute(lazy.negative(x), ctx=get_eager_scheduler(x))
 
 
 def matmul(x1, x2, /):
@@ -330,7 +339,7 @@ def matmul(x1, x2, /):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.matmul(x1, x2)
     c = lazy.matmul(x1, x2)
-    return compute(c)
+    return compute(c, ctx=get_eager_scheduler(x1, x2))
 
 
 def matrix_transpose(x, /):
@@ -339,67 +348,67 @@ def matrix_transpose(x, /):
     """
     if isinstance(x, lazy.LazyTensor):
         return lazy.matrix_transpose(x)
-    return compute(lazy.matrix_transpose(x))
+    return compute(lazy.matrix_transpose(x), ctx=get_eager_scheduler(x))
 
 
 def bitwise_inverse(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.bitwise_inverse(x)
-    return compute(lazy.bitwise_inverse(x))
+    return compute(lazy.bitwise_inverse(x), ctx=get_eager_scheduler(x))
 
 
 def bitwise_and(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_and(x1, x2)
-    return compute(lazy.bitwise_and(x1, x2))
+    return compute(lazy.bitwise_and(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def bitwise_left_shift(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_left_shift(x1, x2)
-    return compute(lazy.bitwise_left_shift(x1, x2))
+    return compute(lazy.bitwise_left_shift(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def bitwise_or(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_or(x1, x2)
-    return compute(lazy.bitwise_or(x1, x2))
+    return compute(lazy.bitwise_or(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def bitwise_right_shift(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_right_shift(x1, x2)
-    return compute(lazy.bitwise_right_shift(x1, x2))
+    return compute(lazy.bitwise_right_shift(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def bitwise_xor(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.bitwise_xor(x1, x2)
-    return compute(lazy.bitwise_xor(x1, x2))
+    return compute(lazy.bitwise_xor(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def truediv(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.truediv(x1, x2)
-    return compute(lazy.truediv(x1, x2))
+    return compute(lazy.truediv(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def floordiv(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.floordiv(x1, x2)
-    return compute(lazy.floordiv(x1, x2))
+    return compute(lazy.floordiv(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def mod(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.mod(x1, x2)
-    return compute(lazy.mod(x1, x2))
+    return compute(lazy.mod(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def pow(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.pow(x1, x2)
-    return compute(lazy.pow(x1, x2))
+    return compute(lazy.pow(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
@@ -411,7 +420,7 @@ def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
     """
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.tensordot(x1, x2, axes=axes)
-    return compute(lazy.tensordot(x1, x2, axes=axes))
+    return compute(lazy.tensordot(x1, x2, axes=axes), ctx=get_eager_scheduler(x1, x2))
 
 
 def vecdot(x1, x2, /, *, axis=-1):
@@ -434,31 +443,31 @@ def vecdot(x1, x2, /, *, axis=-1):
     """
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.vecdot(x1, x2, axis=axis)
-    return compute(lazy.vecdot(x1, x2, axis=axis))
+    return compute(lazy.vecdot(x1, x2, axis=axis), ctx=get_eager_scheduler(x1, x2))
 
 
 def any(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.any(x, axis=axis, keepdims=keepdims)
-    return compute(lazy.any(x, axis=axis, keepdims=keepdims))
+    return compute(lazy.any(x, axis=axis, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def all(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.all(x, axis=axis, keepdims=keepdims)
-    return compute(lazy.all(x, axis=axis, keepdims=keepdims))
+    return compute(lazy.all(x, axis=axis, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.min(x, axis=axis, keepdims=keepdims)
-    return compute(lazy.min(x, axis=axis, keepdims=keepdims))
+    return compute(lazy.min(x, axis=axis, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.max(x, axis=axis, keepdims=keepdims)
-    return compute(lazy.max(x, axis=axis, keepdims=keepdims))
+    return compute(lazy.max(x, axis=axis, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 # manipulation functions:
@@ -484,7 +493,7 @@ def broadcast_to(x, /, shape: Sequence[int]):
     shape = tuple(shape)  # Ensure shape is a tuple for consistency
     if isinstance(x, lazy.LazyTensor):
         return lazy.broadcast_to(x, shape=shape)
-    return compute(lazy.broadcast_to(x, shape=shape))
+    return compute(lazy.broadcast_to(x, shape=shape), ctx=get_eager_scheduler(x))
 
 
 def broadcast_arrays(*args):
@@ -505,7 +514,7 @@ def broadcast_arrays(*args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.broadcast_arrays(*args)
     # compute can take in a list of LazyTensors
-    return compute(lazy.broadcast_arrays(*args))
+    return compute(lazy.broadcast_arrays(*args), ctx=get_eager_scheduler(*args))
 
 
 def concat(arrays: tuple | list, /, *, axis: int | None = 0):
@@ -528,7 +537,7 @@ def concat(arrays: tuple | list, /, *, axis: int | None = 0):
     """
     if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
         return lazy.concat(arrays, axis=axis)
-    return compute(lazy.concat(arrays, axis=axis))
+    return compute(lazy.concat(arrays, axis=axis), ctx=get_eager_scheduler(*arrays))
 
 
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
@@ -549,7 +558,7 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     """
     if isinstance(x, lazy.LazyTensor):
         return lazy.moveaxis(x, source, destination)
-    return compute(lazy.moveaxis(x, source, destination))
+    return compute(lazy.moveaxis(x, source, destination), ctx=get_eager_scheduler(x))
 
 
 def stack(arrays: Sequence, /, *, axis: int = 0):
@@ -570,7 +579,7 @@ def stack(arrays: Sequence, /, *, axis: int = 0):
     """
     if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
         return lazy.stack(arrays, axis=axis)
-    return compute(lazy.stack(arrays, axis=axis))
+    return compute(lazy.stack(arrays, axis=axis), ctx=get_eager_scheduler(*arrays))
 
 
 def split_dims(x, axis: int, shape: tuple):
@@ -603,7 +612,7 @@ def split_dims(x, axis: int, shape: tuple):
     """
     if isinstance(x, lazy.LazyTensor):
         return lazy.split_dims(x, axis, shape)
-    return compute(lazy.split_dims(x, axis, shape))
+    return compute(lazy.split_dims(x, axis, shape), ctx=get_eager_scheduler(x))
 
 
 def combine_dims(x, axes: tuple[int, ...]):
@@ -638,7 +647,7 @@ def combine_dims(x, axes: tuple[int, ...]):
     """
     if isinstance(x, lazy.LazyTensor):
         return lazy.combine_dims(x, axes)
-    return compute(lazy.combine_dims(x, axes))
+    return compute(lazy.combine_dims(x, axes), ctx=get_eager_scheduler(x))
 
 
 def flatten(x):
@@ -665,146 +674,146 @@ def flatten(x):
     """
     if isinstance(x, lazy.LazyTensor):
         return lazy.flatten(x)
-    return compute(lazy.flatten(x))
+    return compute(lazy.flatten(x), ctx=get_eager_scheduler(x))
 
 
 # trigonometric functions:
 def sin(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.sin(x)
-    return compute(lazy.sin(x))
+    return compute(lazy.sin(x), ctx=get_eager_scheduler(x))
 
 
 def sinh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.sinh(x)
-    return compute(lazy.sinh(x))
+    return compute(lazy.sinh(x), ctx=get_eager_scheduler(x))
 
 
 def cos(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.cos(x)
-    return compute(lazy.cos(x))
+    return compute(lazy.cos(x), ctx=get_eager_scheduler(x))
 
 
 def cosh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.cosh(x)
-    return compute(lazy.cosh(x))
+    return compute(lazy.cosh(x), ctx=get_eager_scheduler(x))
 
 
 def tan(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.tan(x)
-    return compute(lazy.tan(x))
+    return compute(lazy.tan(x), ctx=get_eager_scheduler(x))
 
 
 def tanh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.tanh(x)
-    return compute(lazy.tanh(x))
+    return compute(lazy.tanh(x), ctx=get_eager_scheduler(x))
 
 
 def asin(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.asin(x)
-    return compute(lazy.asin(x))
+    return compute(lazy.asin(x), ctx=get_eager_scheduler(x))
 
 
 def asinh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.asinh(x)
-    return compute(lazy.asinh(x))
+    return compute(lazy.asinh(x), ctx=get_eager_scheduler(x))
 
 
 def acos(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.acos(x)
-    return compute(lazy.acos(x))
+    return compute(lazy.acos(x), ctx=get_eager_scheduler(x))
 
 
 def acosh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.acosh(x)
-    return compute(lazy.acosh(x))
+    return compute(lazy.acosh(x), ctx=get_eager_scheduler(x))
 
 
 def atan(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.atan(x)
-    return compute(lazy.atan(x))
+    return compute(lazy.atan(x), ctx=get_eager_scheduler(x))
 
 
 def atanh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.atanh(x)
-    return compute(lazy.atanh(x))
+    return compute(lazy.atanh(x), ctx=get_eager_scheduler(x))
 
 
 def atan2(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.atan2(x1, x2)
-    return compute(lazy.atan2(x1, x2))
+    return compute(lazy.atan2(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def log(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.log(x)
-    return compute(lazy.log(x))
+    return compute(lazy.log(x), ctx=get_eager_scheduler(x))
 
 
 def log1p(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.log1p(x)
-    return compute(lazy.log1p(x))
+    return compute(lazy.log1p(x), ctx=get_eager_scheduler(x))
 
 
 def log2(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.log2(x)
-    return compute(lazy.log2(x))
+    return compute(lazy.log2(x), ctx=get_eager_scheduler(x))
 
 
 def log10(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.log10(x)
-    return compute(lazy.log10(x))
+    return compute(lazy.log10(x), ctx=get_eager_scheduler(x))
 
 
 def logaddexp(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logaddexp(x1, x2)
-    return compute(lazy.logaddexp(x1, x2))
+    return compute(lazy.logaddexp(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def logical_and(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logical_and(x1, x2)
-    return compute(lazy.logical_and(x1, x2))
+    return compute(lazy.logical_and(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def logical_or(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logical_or(x1, x2)
-    return compute(lazy.logical_or(x1, x2))
+    return compute(lazy.logical_or(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def logical_xor(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logical_xor(x1, x2)
-    return compute(lazy.logical_xor(x1, x2))
+    return compute(lazy.logical_xor(x1, x2), ctx=get_eager_scheduler(x1, x2))
 
 
 def logical_not(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.logical_not(x)
-    return compute(lazy.logical_not(x))
+    return compute(lazy.logical_not(x), ctx=get_eager_scheduler(x))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.mean(x, axis=axis, keepdims=keepdims)
-    return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+    return compute(lazy.mean(x, axis=axis, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def var(
@@ -817,7 +826,7 @@ def var(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.var(x, axis=axis, correction=correction, keepdims=keepdims)
-    return compute(lazy.var(x, axis=axis, correction=correction, keepdims=keepdims))
+    return compute(lazy.var(x, axis=axis, correction=correction, keepdims=keepdims), ctx=get_eager_scheduler(x))
 
 
 def std(
@@ -830,4 +839,4 @@ def std(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
-    return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
+    return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims), ctx=get_eager_scheduler(x))

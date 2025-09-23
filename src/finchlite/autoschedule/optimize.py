@@ -6,7 +6,7 @@ from itertools import chain as join_chains
 from typing import TypeVar, overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
-from finchlite.autoschedule.einsum import EinsumCompiler
+#from finchlite.autoschedule.einsum import EinsumCompiler
 
 from ..finch_logic import (
     Aggregate,
@@ -774,10 +774,7 @@ def materialize_squeeze_expand_productions(root):
 
 
 class DefaultLogicOptimizer:
-    def __init__(self, ctx: LogicCompiler):
-        self.ctx = ctx
-
-    def __init__(self, ctx: EinsumCompiler):
+    def __init__(self, ctx):
         self.ctx = ctx
 
     def __call__(self, prgm: LogicNode):
