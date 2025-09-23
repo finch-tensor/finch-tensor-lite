@@ -228,7 +228,6 @@ class TensorDef:
                     acc = op(acc, d.fill_value)
                 init = acc
 
-        assert init is not None
         new_dim_sizes = OrderedDict(
             (ax, d.dim_sizes[ax]) for ax in d.dim_sizes if ax not in red_set
         )
