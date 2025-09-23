@@ -104,8 +104,10 @@ class Variable(AssemblyExpression):
 @dataclass(eq=True, frozen=True)
 class TaggedVariable(AssemblyExpression):
     """
-    Represents an SSA form of Variable assembly node that refers to variable
-    named `name`, with type `type`, and has ID `id`.
+    Represents a numbered Variable assembly node that refers to variable
+    named `name`, with type `type`, and has ID `id`. Used in the the
+    representation of programs which need to distinguish between multiple
+    uses of the same variable, such as SSA or numbered occurrence forms.
 
     Attributes:
         variable: The variable that it references.
