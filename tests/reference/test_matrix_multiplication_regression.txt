@@ -1,18 +1,18 @@
-def matmul(C: BufferizedNDArray_d_shape_l_l_strides_l_l, A: BufferizedNDArray_d_shape_l_l_strides_l_l, B: BufferizedNDArray_d_shape_l_l_strides_l_l) -> BufferizedNDArray_d_shape_l_l_strides_l_l:
+def matmul(C: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64, A: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64, B: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64) -> BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64:
     m: ExtentFType(start=int64, end=int64) = dimension(A, 0)
     n: ExtentFType(start=int64, end=int64) = dimension(B, 1)
     p: ExtentFType(start=int64, end=int64) = dimension(A, 1)
-    A_: BufferizedNDArray_d_shape_l_l_strides_l_l = A
+    A_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = A
     A__stride_0: int64 = getattr(getattr(A_, strides), element_0)
     A__stride_1: int64 = getattr(getattr(A_, strides), element_1)
     A__buf: np_buf_t(float64) = getattr(A_, buf)
     A__buf_slot: np_buf_t(float64) = unpack(A__buf)
-    B_: BufferizedNDArray_d_shape_l_l_strides_l_l = B
+    B_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = B
     B__stride_0: int64 = getattr(getattr(B_, strides), element_0)
     B__stride_1: int64 = getattr(getattr(B_, strides), element_1)
     B__buf: np_buf_t(float64) = getattr(B_, buf)
     B__buf_slot: np_buf_t(float64) = unpack(B__buf)
-    C_: BufferizedNDArray_d_shape_l_l_strides_l_l = C
+    C_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = C
     C__stride_0: int64 = getattr(getattr(C_, strides), element_0)
     C__stride_1: int64 = getattr(getattr(C_, strides), element_1)
     C__buf: np_buf_t(float64) = getattr(C_, buf)
@@ -33,5 +33,5 @@ def matmul(C: BufferizedNDArray_d_shape_l_l_strides_l_l, A: BufferizedNDArray_d_
                 c_ij: float64 = mul(a_ik, b_kj)
                 store(slot(C__buf_slot, np_buf_t(float64)), j__pos_2, add(load(slot(C__buf_slot, np_buf_t(float64)), j__pos_2), c_ij))
     repack(C__buf_slot)
-    matmul_return: BufferizedNDArray_d_shape_l_l_strides_l_l = C
+    matmul_return: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = C
     return matmul_return
