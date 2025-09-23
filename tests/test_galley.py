@@ -1,4 +1,4 @@
-from operator import add, mul
+import operator as op
 
 import pytest
 
@@ -57,6 +57,151 @@ def test_add_dummy_idx():
     assert td3.index_set == {"i", "j"}
 
 
+@pytest.mark.parametrize(
+    "defs, func, expected_axes, expected_dims, expected_fill",
+    [
+        # union of axes; first-wins on dim size; add fills
+        (
+            [
+                ({"i", "j"}, {"i": 10.0, "j": 5.0}, 2.0),
+                ({"i", "k"}, {"i": 20.0, "k": 7.0}, 3.0),
+            ],
+            op.add,
+            {"i", "j", "k"},
+            {"i": 10.0, "j": 5.0, "k": 7.0},
+            5.0,
+        ),
+        # same axes: max over fills; first-wins on size still applies
+        (
+            [
+                ({"i"}, {"i": 6.0}, 2.0),
+                ({"i"}, {"i": 9.0}, 4.0),
+            ],
+            max,
+            {"i"},
+            {"i": 6.0},
+            4.0,
+        ),
+        # three defs; sum fills via variadic callable
+        (
+            [
+                ({"i"}, {"i": 5.0}, 1.0),
+                ({"i"}, {"i": 5.0}, 2.0),
+                ({"i"}, {"i": 5.0}, 3.0),
+            ],
+            lambda *xs: sum(xs),
+            {"i"},
+            {"i": 5.0},
+            6.0,
+        ),
+    ],
+)
+def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
+    objs = [TensorDef(ax, dims, fv) for (ax, dims, fv) in defs]
+    out = TensorDef.mapjoin(func, *objs)
+    assert out.index_set == expected_axes
+    assert out.dim_sizes == expected_dims
+    assert out.fill_value == expected_fill
+
+
+@pytest.mark.parametrize(
+    (
+        "op_func",
+        "index_set",
+        "dim_sizes",
+        "fill_value",
+        "reduce_fields",
+        "expected_axes",
+        "expected_dims",
+        "expected_fill",
+    ),
+    [
+        # addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
+        (
+            op.add,
+            ["i", "j", "k"],
+            {"i": 10.0, "j": 5.0, "k": 3.0},
+            0.5,
+            ["j"],
+            {"i", "k"},
+            {"i": 10.0, "k": 3.0},
+            0.5 * 5,
+        ),
+        # addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
+        (
+            op.add,
+            ["a", "b", "c", "d"],
+            {"a": 2.0, "b": 4.0, "c": 8.0, "d": 16.0},
+            7.0,
+            ["b", "d"],
+            {"a", "c"},
+            {"a": 2.0, "c": 8.0},
+            7.0 * (4 * 16),
+        ),
+        # addition: no-op when reduce set is empty (n = 1) → fill unchanged
+        (
+            op.add,
+            ["x", "y"],
+            {"x": 3.0, "y": 9.0},
+            1.0,
+            [],
+            {"x", "y"},
+            {"x": 3.0, "y": 9.0},
+            1.0,
+        ),
+        # addition: missing axis in reduce set → nothing reduced → fill unchanged
+        (
+            op.add,
+            ["i", "j"],
+            {"i": 5.0, "j": 6.0},
+            0.0,
+            ["z"],
+            {"i", "j"},
+            {"i": 5.0, "j": 6.0},
+            0.0,
+        ),
+        # multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
+        (
+            op.mul,
+            ["i", "j"],
+            {"i": 2.0, "j": 3.0},
+            2.0,
+            ["j"],
+            {"i"},
+            {"i": 2.0},
+            8.0,
+        ),
+        # idempotent op: reduce entire axis → empty shape
+        (
+            min,
+            ["i"],
+            {"i": 4.0},
+            7.0,
+            ["i"],
+            set(),
+            {},
+            7.0,
+        ),
+    ],
+)
+def test_tensordef_aggregate(
+    op_func,
+    index_set,
+    dim_sizes,
+    fill_value,
+    reduce_fields,
+    expected_axes,
+    expected_dims,
+    expected_fill,
+):
+    d = TensorDef(index_set=index_set, dim_sizes=dim_sizes, fill_value=fill_value)
+    out = TensorDef.aggregate(op_func, None, reduce_fields, d)
+
+    assert out.index_set == expected_axes
+    assert out.dim_sizes == expected_dims
+    assert out.fill_value == expected_fill
+
+
 # ─────────────────────────────── DenseStats tests ─────────────────────────────
 
 
@@ -90,7 +235,7 @@ def test_mapjoin_mul_and_add():
     dsa = DenseStats(A, ["i", "j"])
     dsb = DenseStats(B, ["j", "k"])
 
-    dsm = DenseStats.mapjoin(mul, dsa, dsb)
+    dsm = DenseStats.mapjoin(op.mul, dsa, dsb)
     assert dsm.index_set == {"i", "j", "k"}
     assert dsm.get_dim_size("i") == 2.0
     assert dsm.get_dim_size("j") == 3.0
@@ -98,7 +243,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.fill_value == 0.0
 
     dsa2 = DenseStats(2 * A, ["i", "j"])
-    ds_sum = DenseStats.mapjoin(add, dsa, dsa2)
+    ds_sum = DenseStats.mapjoin(op.add, dsa, dsa2)
     assert ds_sum.fill_value == 1 + 2
 
 
@@ -269,48 +414,171 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
 
 
 @pytest.mark.parametrize(
-    "tensor, fields",
+    "dims, dcs, expected_nnz",
     [
-        (np.array([0, 1, 0, 1, 1], dtype=int), ["i"]),
-        (np.zeros((5,), dtype=int), ["i"]),
-        (np.ones((5,), dtype=int), ["i"]),
-        (np.array([[1, 0, 1], [0, 0, 0], [1, 1, 0]], dtype=int), ["i", "j"]),
-        (np.zeros((3, 3), dtype=int), ["i", "j"]),
-        (np.ones((3, 3), dtype=int), ["i", "j"]),
         (
-            np.array(
-                [
-                    [[1, 0], [0, 0]],
-                    [[0, 1], [1, 0]],
-                ],
-                dtype=int,
-            ),
-            ["i", "j", "k"],
+            {"i": 1000, "j": 1000},
+            [
+                DC(frozenset(["i"]), frozenset(["j"]), 5),
+                DC(frozenset(["j"]), frozenset(["i"]), 25),
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+            ],
+            50,
         ),
-        (np.zeros((2, 2, 2), dtype=int), ["i", "j", "k"]),
-        (np.ones((2, 2, 2), dtype=int), ["i", "j", "k"]),
-        (
-            np.array(
-                [
-                    [
-                        [[1, 0], [0, 0]],
-                        [[0, 0], [0, 1]],
-                    ],
-                    [
-                        [[0, 0], [1, 0]],
-                        [[0, 0], [0, 0]],
-                    ],
-                ],
-                dtype=int,
-            ),
-            ["i", "j", "k", "l"],
-        ),
-        (np.zeros((2, 3, 1, 4), dtype=int), ["i", "j", "k", "l"]),
-        (np.ones((2, 2, 2, 2), dtype=int), ["i", "j", "k", "l"]),
     ],
 )
-def test_estimate_nnz(tensor, fields):
-    stats = DCStats(tensor, fields)
-    estimated = stats.estimate_non_fill_values()
-    expected = float(np.count_nonzero(tensor))
-    assert estimated == expected
+def test_single_tensor_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat.tensordef = TensorDef(frozenset(["i", "j"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+            ],
+            50 * 5,
+        ),
+    ],
+)
+def test_1_join_dc_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000, "l": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["l"]), 5),
+            ],
+            50 * 5 * 5,
+        ),
+    ],
+)
+def test_2_join_dc_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1, 1), dtype=int), ["i", "j", "k", "l"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k", "l"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+                DC(frozenset(["i"]), frozenset(["j"]), 5),
+                DC(frozenset(["j"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset(["j", "k"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["j"]), 5),
+                DC(frozenset(), frozenset(["i", "k"]), 50),
+                DC(frozenset(["i"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["i"]), 5),
+            ],
+            50 * 5,
+        ),
+    ],
+)
+def test_triangle_dc_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 1),
+                DC(frozenset(["i"]), frozenset(["j"]), 1),
+                DC(frozenset(["j"]), frozenset(["i"]), 1),
+                DC(frozenset(), frozenset(["j", "k"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["j"]), 5),
+                DC(frozenset(), frozenset(["i", "k"]), 50),
+                DC(frozenset(["i"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["i"]), 5),
+            ],
+            1 * 5,
+        ),
+    ],
+)
+def test_triangle_small_dc_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.dcs = set(dcs)
+    assert stat.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs_list, expected_dcs",
+    [
+        # Single input passthrough
+        (
+            {"i": 1000},
+            [
+                {
+                    DC(frozenset(), frozenset({"i"}), 5.0),
+                    DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                }
+            ],
+            {
+                DC(frozenset(), frozenset({"i"}), 5.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+            },
+        ),
+        # Two inputs: overlap takes min; unique keys are preserved
+        (
+            {"i": 1000},
+            [
+                {
+                    DC(frozenset(), frozenset({"i"}), 5.0),
+                    DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                },
+                {
+                    DC(frozenset(), frozenset({"i"}), 2.0),
+                    DC(frozenset({"i"}), frozenset({"i"}), 3.0),
+                    DC(frozenset(), frozenset(), 7.0),
+                },
+            ],
+            {
+                DC(frozenset(), frozenset({"i"}), 2.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                DC(frozenset(), frozenset(), 7.0),
+            },
+        ),
+    ],
+)
+def test_merge_dc_join(dims, dcs_list, expected_dcs):
+    stats_objs = []
+    for dcs in dcs_list:
+        s = DCStats(np.zeros((1,), dtype=int), ["i"])
+        s.tensordef = TensorDef(frozenset({"i"}), dims, 0)
+        s.dcs = set(dcs)
+        stats_objs.append(s)
+
+    new_def = TensorDef(frozenset({"i"}), dims, 0)
+    out = DCStats._merge_dc_join(new_def, stats_objs)
+
+    assert out.tensordef.index_set == {"i"}
+    assert out.tensordef.dim_sizes == dims
+    assert out.dcs == expected_dcs
