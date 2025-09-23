@@ -1,9 +1,7 @@
 import json
 import operator
-from abc import ABC, abstractmethod
 
 import numpy as np
-from typing import Dict, List
 
 from ..codegen import NumpyBuffer
 from .nodes import (
@@ -34,21 +32,6 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
-
-"""
-1) What is the best representation for a 'statement'?
-    Just the assembly nodes in a list
-
-2) What is the first dataflow-analysis that I should do?
-    dead-code elimination
-
-3) Figure out a way to number the actual AST so that I can change it later based on the output from the dataflow
-    create an ID Assembly Node and create a copy of the original AST and add ID assembly nodes to the copied AST (Annotated AST)
-    
-4) Come up with a way to test CFG Builder in a form of unit tests and test the dataflow analysis output
-"""
-
-# TODO: create an ID Assembly Node and create a copy of the original AST and add ID assembly nodes to the copied AST (Annotated AST)
 
 class BasicBlock:
     def __init__(self, id):
@@ -114,6 +97,9 @@ class ControlFlowGraph:
             },
         }
 
+# TODO: add TaggedVariable to CFGBuilder
+# TODO: represent statements as assembly nodes instead of tuples with random data
+# TODO: 
 
 class CFGBuilder:
     """
@@ -333,56 +319,7 @@ class CFGBuilder:
 
         return self.cfgs
 
-
-class DataFlowAnalysis(ABC):
-    def __init__(self, cfg: ControlFlowGraph):
-        self.cfg = cfg
-        self.inputs = {block: {} for block in cfg.blocks}
-        self.outputs = {block: {} for block in cfg.blocks}
-
-    @abstractmethod
-    def transfer(self, insts, state: Dict) -> List:
-        """
-        Transfer function for the data flow analysis.
-        This should be implemented by subclasses.
-        """
-        ...
-    
-    @abstractmethod
-    def join(self, state_1: Dict, state_2: Dict) -> Dict:
-        """
-        Join function for the data flow analysis.
-        This should be implemented by subclasses.
-        """
-        ...
-
-    @abstractmethod
-    def direction(self) -> str:
-        """
-        Return the direction of the data flow analysis, either "forward" or "backward".
-        This should be implemented by subclasses.
-        """
-        return "forward"
-    
-    # TODO: change based on my definition of the CFG
-    def analyze(self):
-        """
-        Perform the data flow analysis on the control flow graph.
-        This method initializes the work list and processes each block.
-        """
-        if self.direction() == "forward":
-            work_list = self.cfg.entry[:]
-            while work_list:
-                block = work_list.pop(0)
-                input_state = self.input_states.get(block, {})
-                output_state = self.transfer(block, input_state)
-                if output_state != self.output_states.get(block, {}):
-                    self.output_states[block] = output_state
-                    for successor in block.successors:
-                        if successor not in work_list:
-                            work_list.append(successor)
-
-# TODO: place tests in a separate folder (/tests)
+# TODO: create pytest tests in tests/ to stop running this (current) file
 def test1():
     printer = AssemblyPrinterContext()
 
