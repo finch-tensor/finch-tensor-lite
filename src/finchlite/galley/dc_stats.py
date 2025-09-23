@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 
 import finchlite.finch_notation as ntn
 from finchlite.compile import dimension
@@ -44,29 +43,21 @@ class DCStats(TensorStats):
     number of non-fill values without materializing sparse coordinates.
     """
 
-    tensor: NDArray[np.generic] | None
-
     def __init__(self, tensor: Any, fields: Iterable[str]):
         """
         Initialize DCStats from a tensor and its axis names, build the TensorDef,
         and compute degree constraint (DC) records from the tensor’s structure.
         """
         self.tensordef = TensorDef.from_tensor(tensor, fields)
-        self.fields = list(fields)
-        self.tensor = np.asarray(tensor)
-        self.dcs = self._structure_to_dcs()
+        self.dcs = self._structure_to_dcs(tensor)
 
-    @classmethod
-    def from_def(
-        cls: type["DCStats"], tensordef: TensorDef, dcs: set["DC"]
-    ) -> "DCStats":
+    @staticmethod
+    def from_def(tensordef: TensorDef, dcs: set[DC]) -> "DCStats":
         """
         Build DCStats directly from a TensorDef and an existing DC set.
         """
-        self = object.__new__(cls)
+        self = object.__new__(DCStats)
         self.tensordef = tensordef.copy()
-        self.fields = list(self.tensordef.index_set)
-        self.tensor = None
         self.dcs = set(dcs)
         return self
 
@@ -74,7 +65,7 @@ class DCStats(TensorStats):
     def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
         return None
 
-    def _structure_to_dcs(self) -> set[DC]:
+    def _structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Dispatch DC extraction based on tensor dimensionality.
 
@@ -89,22 +80,21 @@ class DCStats(TensorStats):
         Raises:
             NotImplementedError: If dimensionality is not in {1, 2, 3, 4}.
         """
-        arr = self.tensor
-        if arr is None or arr.size == 0:
+        if arr is None or getattr(arr, "size", 0) == 0:
             return set()
 
-        ndim = arr.ndim
+        ndim = getattr(arr, "ndim", None)
         if ndim == 1:
-            return self._vector_structure_to_dcs()
+            return self._vector_structure_to_dcs(arr)
         if ndim == 2:
-            return self._matrix_structure_to_dcs()
+            return self._matrix_structure_to_dcs(arr)
         if ndim == 3:
-            return self._3d_structure_to_dcs()
+            return self._3d_structure_to_dcs(arr)
         if ndim == 4:
-            return self._4d_structure_to_dcs()
+            return self._4d_structure_to_dcs(arr)
         raise NotImplementedError(f"DC analysis not implemented for {ndim}D tensors")
 
-    def _vector_structure_to_dcs(self) -> set[DC]:
+    def _vector_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes the structural
         relationships within a one-dimensional tensor.
@@ -156,12 +146,12 @@ class DCStats(TensorStats):
         )
 
         mod = ntn.NotationInterpreter()(prgm)
-        cnt = mod.vector_structure_to_dcs(self.tensor)
-        result = self.fields[0]
+        cnt = mod.vector_structure_to_dcs(arr)
+        result = next(iter(self.tensordef.dim_sizes))
 
         return {DC(frozenset(), frozenset([result]), float(cnt))}
 
-    def _matrix_structure_to_dcs(self) -> set[DC]:
+    def _matrix_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes the structural
         relationships within a two-dimensional tensor.
@@ -350,9 +340,10 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        d_ij = mod.matrix_total_nnz(self.tensor)
-        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(self.tensor)
-        i_result, j_result = self.fields
+        d_ij = mod.matrix_total_nnz(arr)
+        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr)
+        i_result, j_result = tuple(self.tensordef.dim_sizes)
+
         return {
             DC(frozenset(), frozenset([i_result, j_result]), float(d_ij)),
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
@@ -361,7 +352,7 @@ class DCStats(TensorStats):
             DC(frozenset([j_result]), frozenset([i_result, j_result]), float(d_j_i_)),
         }
 
-    def _3d_structure_to_dcs(self) -> set[DC]:
+    def _3d_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes structural
         relationships within a three-dimensional tensor.
@@ -635,11 +626,9 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        d_ijk = mod._3d_total_nnz(self.tensor)
-        d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(
-            self.tensor
-        )
-        i_result, j_result, k_result = self.fields
+        d_ijk = mod._3d_total_nnz(arr)
+        d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(arr)
+        i_result, j_result, k_result = tuple(self.tensordef.dim_sizes)
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
             DC(frozenset(), frozenset([j_result]), float(d_j_)),
@@ -650,7 +639,7 @@ class DCStats(TensorStats):
             DC(frozenset([]), frozenset([i_result, j_result, k_result]), float(d_ijk)),
         }
 
-    def _4d_structure_to_dcs(self) -> set[DC]:
+    def _4d_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes structural
         relationships within a four-dimensional tensor.
@@ -1029,12 +1018,12 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        d_ijkw = mod._4d_total_nnz(self.tensor)
+        d_ijkw = mod._4d_total_nnz(arr)
         d_i_, d_i_jkw_, d_j_, d_j_ikw_, d_k_, d_k_ijw_, d_w_, d_w_ijk_ = (
-            mod._4d_structure_to_dcs(self.tensor)
+            mod._4d_structure_to_dcs(arr)
         )
 
-        i_result, j_result, k_result, w_result = self.fields
+        i_result, j_result, k_result, w_result = tuple(self.tensordef.dim_sizes)
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
             DC(frozenset(), frozenset([j_result]), float(d_j_)),
@@ -1120,7 +1109,7 @@ class DCStats(TensorStats):
         Returns:
             the estimated number of non-fill entries in the tensor.
         """
-        idx = frozenset(self.fields)
+        idx: frozenset[str] = frozenset(self.tensordef.dim_sizes.keys())
         if len(idx) == 0:
             return 0.0
 
