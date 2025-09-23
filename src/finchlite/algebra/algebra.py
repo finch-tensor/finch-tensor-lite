@@ -380,9 +380,6 @@ register_property(
 )
 register_property(operator.and_, "__call__", "is_identity", lambda op, val: bool(val))
 register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(
-    operator.floordiv, "__call__", "is_identity", lambda op, val: val == 1
-)
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
@@ -391,6 +388,8 @@ register_property(
 )
 register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
 register_property(np.logical_or, "__call__", "is_identity", lambda op, val: not val)
+register_property(min, "__call__", "is_identity", lambda op, val: val == math.inf)
+register_property(max, "__call__", "is_identity", lambda op, val: val == -math.inf)
 
 
 def is_distributive(op, other_op):
@@ -467,23 +466,16 @@ def is_annihilator(op, val):
     return query_property(op, "__call__", "is_annihilator", val)
 
 
-for op, func in [
+for fn, func in [
     (operator.add, lambda op, val: np.isinf(val)),
     (operator.mul, lambda op, val: val == 0),
     (operator.or_, lambda op, val: bool(val)),
     (operator.and_, lambda op, val: not bool(val)),
+    (np.logaddexp, lambda op, val: val == math.inf),
+    (np.logical_and, lambda op, val: not bool(val)),
+    (np.logical_or, lambda op, val: bool(val)),
 ]:
-    register_property(op, "__call__", "is_annihilator", func)
-
-register_property(
-    np.logaddexp, "__call__", "is_annihilator", lambda op, val: val == math.inf
-)
-register_property(
-    np.logical_and, "__call__", "is_annihilator", lambda op, val: not bool(val)
-)
-register_property(
-    np.logical_or, "__call__", "is_annihilator", lambda op, val: bool(val)
-)
+    register_property(fn, "__call__", "is_annihilator", func)
 
 
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
@@ -613,6 +605,40 @@ for t in StableNumber.__args__:
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
+
+def is_idempotent(op: Any) -> bool:
+    """
+    Returns whether the given operator is idempotent over the argument domain,
+    i.e., op(x, x) == x.
+
+    Args:
+        op: The operator/function to check.
+
+    Returns:
+        True if the operator is known to be idempotent, False otherwise.
+    """
+    return query_property(op, "__call__", "is_idempotent")
+
+
+for fn in [
+    operator.and_,
+    operator.or_,
+    np.logical_and,
+    np.logical_or,
+    min,
+    max,
+]:
+    register_property(fn, "__call__", "is_idempotent", lambda op: True)
+
+for fn in [
+    operator.add,
+    operator.mul,
+    operator.xor,
+    np.logical_xor,
+    np.logaddexp,
+]:
+    register_property(fn, "__call__", "is_idempotent", lambda op: False)
+
 for unary in (
     np.sin,
     np.cos,
@@ -676,3 +702,19 @@ for logical in (
         lambda op, a, b, _logical=logical: bool,
     )
 register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
+
+# Register return types for numpy comparison ufuncs
+for comparison in (
+    np.equal,
+    np.not_equal,
+    np.less,
+    np.less_equal,
+    np.greater,
+    np.greater_equal,
+):
+    register_property(
+        comparison,
+        "__call__",
+        "return_type",
+        lambda op, a, b, _comparison=comparison: bool,
+    )

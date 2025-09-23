@@ -204,6 +204,24 @@ class EagerTensor(OverrideTensor, ABC):
     def __logical_not__(self):
         return logical_not(self)
 
+    def __lt__(self, other):
+        return less(self, other)
+
+    def __le__(self, other):
+        return less_equal(self, other)
+
+    def __gt__(self, other):
+        return greater(self, other)
+
+    def __ge__(self, other):
+        return greater_equal(self, other)
+
+    def __eq__(self, other):
+        return equal(self, other)
+
+    def __ne__(self, other):
+        return not_equal(self, other)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -808,6 +826,42 @@ def logical_not(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.logical_not(x)
     return compute(lazy.logical_not(x), ctx=get_eager_scheduler(x))
+
+
+def less(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.less(x1, x2)
+    return compute(lazy.less(x1, x2))
+
+
+def less_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.less_equal(x1, x2)
+    return compute(lazy.less_equal(x1, x2))
+
+
+def greater(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.greater(x1, x2)
+    return compute(lazy.greater(x1, x2))
+
+
+def greater_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.greater_equal(x1, x2)
+    return compute(lazy.greater_equal(x1, x2))
+
+
+def equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.equal(x1, x2)
+    return compute(lazy.equal(x1, x2))
+
+
+def not_equal(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.not_equal(x1, x2)
+    return compute(lazy.not_equal(x1, x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):

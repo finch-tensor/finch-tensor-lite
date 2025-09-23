@@ -8,6 +8,7 @@ from finchlite.algebra import (
     is_annihilator,
     is_associative,
     is_distributive,
+    is_idempotent,
     is_identity,
 )
 
@@ -33,13 +34,14 @@ def test_algebra_selected():
     assert is_identity(operator.or_, False)
     assert is_identity(operator.and_, True)
     assert is_identity(operator.truediv, 1)
-    assert is_identity(operator.floordiv, 1)
     assert is_identity(operator.lshift, 0)
     assert is_identity(operator.rshift, 0)
     assert is_identity(operator.pow, 1)
     assert is_identity(np.logaddexp, -math.inf)
     assert is_identity(np.logical_or, False)
     assert is_identity(np.logical_and, True)
+    assert is_identity(max, -math.inf)
+    assert is_identity(min, math.inf)
     assert is_associative(operator.add)
     assert is_associative(operator.mul)
     assert is_associative(np.logical_and)
@@ -53,3 +55,14 @@ def test_algebra_selected():
     assert init_value(np.logical_and, bool) is True
     assert init_value(np.logical_or, bool) is False
     assert init_value(np.logical_xor, bool) is False
+    assert is_idempotent(operator.and_)
+    assert is_idempotent(operator.or_)
+    assert is_idempotent(np.logical_and)
+    assert is_idempotent(np.logical_or)
+    assert is_idempotent(min)
+    assert is_idempotent(max)
+    assert is_idempotent(operator.add) is False
+    assert is_idempotent(operator.mul) is False
+    assert is_idempotent(operator.xor) is False
+    assert is_idempotent(np.logical_xor) is False
+    assert is_idempotent(np.logaddexp) is False
