@@ -1,18 +1,18 @@
-def matmul(C: BufferizedNDArray(ndim=2), A: BufferizedNDArray(ndim=2), B: BufferizedNDArray(ndim=2)) -> BufferizedNDArray(ndim=2):
+def matmul(C: BufferizedNDArray_d_shape_l_l_strides_l_l, A: BufferizedNDArray_d_shape_l_l_strides_l_l, B: BufferizedNDArray_d_shape_l_l_strides_l_l) -> BufferizedNDArray_d_shape_l_l_strides_l_l:
     m: ExtentFType(start=int64, end=int64) = dimension(A, 0)
     n: ExtentFType(start=int64, end=int64) = dimension(B, 1)
     p: ExtentFType(start=int64, end=int64) = dimension(A, 1)
-    A_: BufferizedNDArray(ndim=2) = A
+    A_: BufferizedNDArray_d_shape_l_l_strides_l_l = A
     A__stride_0: int64 = getattr(getattr(A_, strides), element_0)
     A__stride_1: int64 = getattr(getattr(A_, strides), element_1)
     A__buf: np_buf_t(float64) = getattr(A_, buf)
     A__buf_slot: np_buf_t(float64) = unpack(A__buf)
-    B_: BufferizedNDArray(ndim=2) = B
+    B_: BufferizedNDArray_d_shape_l_l_strides_l_l = B
     B__stride_0: int64 = getattr(getattr(B_, strides), element_0)
     B__stride_1: int64 = getattr(getattr(B_, strides), element_1)
     B__buf: np_buf_t(float64) = getattr(B_, buf)
     B__buf_slot: np_buf_t(float64) = unpack(B__buf)
-    C_: BufferizedNDArray(ndim=2) = C
+    C_: BufferizedNDArray_d_shape_l_l_strides_l_l = C
     C__stride_0: int64 = getattr(getattr(C_, strides), element_0)
     C__stride_1: int64 = getattr(getattr(C_, strides), element_1)
     C__buf: np_buf_t(float64) = getattr(C_, buf)
@@ -33,5 +33,5 @@ def matmul(C: BufferizedNDArray(ndim=2), A: BufferizedNDArray(ndim=2), B: Buffer
                 c_ij: float64 = mul(a_ik, b_kj)
                 store(slot(C__buf_slot, np_buf_t(float64)), j__pos_2, add(load(slot(C__buf_slot, np_buf_t(float64)), j__pos_2), c_ij))
     repack(C__buf_slot)
-    matmul_return: BufferizedNDArray(ndim=2) = C
+    matmul_return: BufferizedNDArray_d_shape_l_l_strides_l_l = C
     return matmul_return

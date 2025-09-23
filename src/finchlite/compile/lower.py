@@ -158,6 +158,9 @@ class ExtentFType(AssemblyStructFType):
     def struct_fields(self):
         return [("start", np.intp), ("end", np.intp)]
 
+    def __call__(self, *args):
+        raise TypeError(f"{self.struct_name} is not callable")
+
     def get_start(self, ext):
         return asm.GetAttr(ext, asm.Literal("start"))
 

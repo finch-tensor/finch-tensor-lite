@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from functools import lru_cache
 from textwrap import dedent
 from typing import Any
@@ -18,24 +19,27 @@ class AssemblyStructFType(FType, ABC):
     @abstractmethod
     def struct_fields(self) -> list[tuple[str, Any]]: ...
 
-    def numba_type(self) -> type:
+    @abstractmethod
+    def __call__(self, *args): ...
+
+    def numba_type(self):
         """
         Method for registering and caching Numba jitclass.
         """
         from ..codegen.numba_backend import (
             numba_globals,
+            numba_jitclass_type,
             numba_structnames,
             numba_structs,
-            numba_type,
         )
 
         if self in numba_structs:
             return numba_structs[self]
 
         spec = [
-            (name, numba_type(field_type)) for (name, field_type) in self.struct_fields
+            (name, numba_jitclass_type(field_type))
+            for (name, field_type) in self.struct_fields
         ]
-
         class_name = numba_structnames.freshen("Numba", self.struct_name)
         # Dynamically define __init__ based on spec, unrolling the arguments
         field_names = [name for name, _ in spec]
@@ -60,6 +64,9 @@ class AssemblyStructFType(FType, ABC):
         numba_structs[self] = new_struct
         numba_globals[new_struct.__name__] = new_struct
         return new_struct
+
+    def numba_jitclass_type(self) -> numba.types.Type:
+        return self.numba_type().class_type.instance_type
 
     @property
     def is_mutable(self) -> bool:
@@ -113,6 +120,13 @@ class NamedTupleFType(AssemblyStructFType):
     def struct_fields(self):
         return self._struct_fields
 
+    def __call__(self, *args):
+        assert all(
+            isinstance(a, f)
+            for a, f in zip(args, self.struct_fieldformats, strict=False)
+        )
+        return namedtuple(self.struct_name, self.struct_fieldnames)(args)
+
 
 class TupleFType(AssemblyStructFType):
     def __init__(self, struct_name, struct_formats):
@@ -148,6 +162,13 @@ class TupleFType(AssemblyStructFType):
     @property
     def struct_fields(self):
         return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
+
+    def __call__(self, *args):
+        assert all(
+            isinstance(a, f)
+            for a, f in zip(args, self.struct_fieldformats, strict=False)
+        )
+        return tuple(args)
 
     @staticmethod
     @lru_cache

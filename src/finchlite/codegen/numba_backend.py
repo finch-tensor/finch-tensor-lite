@@ -1,4 +1,3 @@
-import inspect
 import logging
 import operator
 from abc import ABC, abstractmethod
@@ -28,9 +27,37 @@ def numba_type(t):
     """
     if hasattr(t, "numba_type"):
         return t.numba_type()
-    if inspect.isclass(t) and issubclass(t, np.generic):
-        return numba.from_dtype(t)
     return query_property(t, "numba_type", "__attr__")
+
+
+def numba_jitclass_type(t):
+    """
+    Returns the Numba jitclass spec type/ftype after serialization.
+
+    Args:
+        t: The Python type/ftype.
+
+    Returns:
+        The corresponding Numba jitclass spec type.
+    """
+    if hasattr(t, "numba_jitclass_type"):
+        return t.numba_jitclass_type()
+    return query_property(t, "numba_jitclass_type", "__attr__")
+
+
+register_property(
+    np.generic,
+    "numba_type",
+    "__attr__",
+    lambda t: numba.from_dtype(t),
+)
+
+register_property(
+    np.generic,
+    "numba_jitclass_type",
+    "__attr__",
+    lambda t: numba.from_dtype(t),
+)
 
 
 class NumbaArgumentFType(ABC):
@@ -135,7 +162,7 @@ def construct_from_numba(fmt, numba_obj):
     if hasattr(fmt, "construct_from_numba"):
         return fmt.construct_from_numba(numba_obj)
     try:
-        return query_property(fmt, "construct_from_numba", "__attr__")(numba_obj)
+        return query_property(fmt, "construct_from_numba", "__attr__", numba_obj)
     except NotImplementedError:
         return fmt(numba_obj)
 
@@ -144,14 +171,14 @@ register_property(
     type(None),
     "construct_from_numba",
     "__attr__",
-    lambda numba_obj: None,
+    lambda fmt, numba_obj: None,
 )
 
 register_property(
     np.generic,
     "construct_from_numba",
     "__attr__",
-    lambda numba_obj: numba_obj,
+    lambda fmt, numba_obj: fmt(numba_obj),
 )
 
 
@@ -227,11 +254,9 @@ class NumbaKernel:
             self.arg_types, args, serial_args, strict=False
         ):
             deserialize_from_numba(arg_type, arg, serial_arg)
-        if hasattr(self.ret_type, "construct_from_numba"):
-            return construct_from_numba(self.ret_type, res)
         if self.ret_type is type(None):
             return None
-        return self.ret_type(res)
+        return construct_from_numba(self.ret_type, res)
 
 
 class NumbaCompiler:
@@ -625,8 +650,11 @@ register_property(
 
 
 def struct_construct_from_numba(fmt: AssemblyStructFType, numba_struct):
-    args = [getattr(numba_struct, name) for (name, _) in fmt.struct_fields]
-    return fmt.__class__(*args)
+    args = [
+        construct_from_numba(field_type, getattr(numba_struct, name))
+        for (name, field_type) in fmt.struct_fields
+    ]
+    return fmt(*args)
 
 
 register_property(

@@ -1,20 +1,12 @@
 import operator
-from textwrap import dedent
 from typing import Any, NamedTuple
 
 import numpy as np
-
-import numba
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor
 from ..codegen import NumpyBuffer, NumpyBufferFType
-from ..codegen.numba_backend import (
-    numba_globals,
-    numba_structs,
-    numba_type,
-)
 from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import ftype
 from . import looplets as lplt
@@ -22,14 +14,28 @@ from .lower import FinchTensorFType
 
 
 class BufferizedNDArray(Tensor):
-    def __init__(self, arr: np.ndarray):
-        itemsize = arr.dtype.itemsize
-        for stride in arr.strides:
-            if stride % itemsize != 0:
-                raise ValueError("Array must be aligned to multiple of itemsize")
-        self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
-        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
-        self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
+    def __init__(
+        self,
+        arr: np.ndarray | NumpyBuffer,
+        shape: tuple[np.integer, ...] | None = None,
+        strides: tuple[np.integer, ...] | None = None,
+    ):
+        self._shape: tuple[np.integer, ...]
+        self.strides: tuple[np.integer, ...]
+        if shape is None and strides is None and isinstance(arr, np.ndarray):
+            itemsize = arr.dtype.itemsize
+            for stride in arr.strides:
+                if stride % itemsize != 0:
+                    raise ValueError("Array must be aligned to multiple of itemsize")
+            self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
+            self._shape = tuple(np.intp(s) for s in arr.shape)
+            self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
+        elif shape is not None and strides is not None and isinstance(arr, NumpyBuffer):
+            self.strides = strides
+            self._shape = shape
+            self.buf = arr
+        else:
+            raise Exception("Invalid constructor arguments")
 
     def to_numpy(self):
         """
@@ -120,7 +126,14 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     @property
     def struct_name(self):
-        return "BufferizedNDArray"
+        def str_format(types):
+            return "_".join(np.dtype(t).char for t in types)
+
+        return (
+            f"BufferizedNDArray_{np.dtype(self.buf_t.element_type).char}_"
+            f"shape_{str_format(self.shape_t.struct_fieldformats)}_"
+            f"strides_{str_format(self.strides_t.struct_fieldformats)}"
+        )
 
     @property
     def struct_fields(self):
@@ -145,7 +158,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return hash((self.buf_t, self._ndim))
 
     def __str__(self):
-        return f"{self.struct_name}(ndim={self.ndim})"
+        return str(self.struct_name)
 
     def __repr__(self):
         return f"{self.struct_name}({repr(self.buf_t)})"
@@ -225,57 +238,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ctx.exec(asm.Repack(obj.buf_s))
         return
 
-    def __call__(self, numba_buffer):
-        return BufferizedNDArray(
-            numba_buffer.buf[0].reshape(
-                tuple(
-                    getattr(numba_buffer.shape, f)
-                    for (f, _) in self.shape_t.struct_fields
-                )
-            )
-        )
-
-    def numba_type(self) -> type:
-        if self in numba_structs:
-            return numba_structs[self]
-
-        spec = [
-            (
-                "buf",
-                numba.types.ListType(
-                    numba.types.Array(numba.from_dtype(self.buf_t.element_type), 1, "C")
-                ),
-            ),
-            ("shape", numba_type(self.shape_t).class_type.instance_type),
-            ("strides", numba_type(self.strides_t).class_type.instance_type),
-        ]
-
-        def _str_format(types: list[type]) -> str:
-            return "_".join(np.dtype(t).char for t in types)
-
-        class_name = (
-            f"Numba_BufferizedNDArray_{np.dtype(self.buf_t.element_type).char}_"
-            f"sh_{_str_format(self.shape_t.struct_fieldformats)}_"
-            f"str_{_str_format(self.strides_t.struct_fieldformats)}"
-        )
-        class_src = dedent(
-            f"""\
-            class {class_name}:
-                def __init__(self, buf, shape, strides):
-                    self.buf = buf
-                    self.shape = shape
-                    self.strides = strides
-                @staticmethod
-                def numba_name():
-                    return '{class_name}'
-            """
-        )
-        ns: dict[str, object] = {}
-        exec(class_src, ns)
-        new_struct = numba.experimental.jitclass(ns[class_name], spec)
-        numba_structs[self] = new_struct
-        numba_globals[new_struct.__name__] = new_struct
-        return new_struct
+    def __call__(
+        self,
+        buf: NumpyBuffer,
+        shape: tuple[np.integer, ...],
+        strides: tuple[np.integer, ...],
+    ) -> BufferizedNDArray:
+        return BufferizedNDArray(buf, shape, strides)
 
 
 class BufferizedNDArrayAccessor(Tensor):

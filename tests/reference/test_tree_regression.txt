@@ -1,10 +1,10 @@
-def func(:A0: BufferizedNDArray(ndim=2), :A1: BufferizedNDArray(ndim=2), :A2: BufferizedNDArray(ndim=2)) -> BufferizedNDArray(ndim=2):
+def func(:A0: BufferizedNDArray_l_shape_l_l_strides_l_l, :A1: BufferizedNDArray_l_shape_l_l_strides_l_l, :A2: BufferizedNDArray_l_shape_l_l_strides_l_l) -> BufferizedNDArray_l_shape_l_l_strides_l_l:
     :i0_size: ExtentFType(start=int64, end=int64) = dimension(:A0, 0)
     :i1_size: ExtentFType(start=int64, end=int64) = dimension(:A0, 1)
     :i2_size: ExtentFType(start=int64, end=int64) = dimension(:A1, 1)
-    :A0_slot: BufferizedNDArray(ndim=2) = unpack(:A0)
-    :A1_slot: BufferizedNDArray(ndim=2) = unpack(:A1)
-    :A2_slot: BufferizedNDArray(ndim=2) = unpack(:A2)
+    :A0_slot: BufferizedNDArray_l_shape_l_l_strides_l_l = unpack(:A0)
+    :A1_slot: BufferizedNDArray_l_shape_l_l_strides_l_l = unpack(:A1)
+    :A2_slot: BufferizedNDArray_l_shape_l_l_strides_l_l = unpack(:A2)
     declare(:A2_slot, 0, add, [':i0_size', ':i2_size'])
     loop(:i0, :i0_size):
         loop(:i1, :i1_size):
