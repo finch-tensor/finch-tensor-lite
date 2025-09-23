@@ -371,6 +371,7 @@ register_property(operator.truediv, "__call__", "is_identity", lambda op, val: v
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
+register_property(np.divide, "__call__", "is_identity", lambda op, val: val == 1)
 register_property(
     np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
 )
@@ -632,8 +633,13 @@ for unary in (
     )
 
 for binary_op in (
+    np.divide,
+    np.remainder,
+    np.hypot,
     np.atan2,
     np.logaddexp,
+    np.copysign,
+    np.nextafter,
 ):
     register_property(
         binary_op,
