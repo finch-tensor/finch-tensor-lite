@@ -8,7 +8,9 @@ from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder, T
 from finchlite.interface.lazy import defer
 from finchlite.symbolic import Term, TermTree
 from finchlite.autoschedule import optimize
-from finchlite.algebra import is_commutative, overwrite, init_value, promote_max, promote_min
+from finchlite.algebra import is_commutative, overwrite, init_value, promote_max, promote_min, TensorFType, register_property
+from finchlite.interface.eager import EagerTensor
+import numpy as np
 
 @dataclass(eq=True, frozen=True)
 class PointwiseNode(Term, ABC):
@@ -351,6 +353,74 @@ class EinsumPrinterContext:
     
     def __call__(self, prgm: EinsumPlan):
         return self.print_einsum_plan(prgm)
+
+class SparseTensorFType(TensorFType):
+    def __init__(self, shape: tuple, element_type: type, fill_value):
+        self.shape = shape
+        self.element_type = element_type
+        self.fill_value = fill_value
+    
+    def __eq__(self, other):
+        if not isinstance(other, SparseTensorFType):
+            return False
+        return self.shape == other.shape and self.element_type == other.element_type and self.fill_value == other.fill_value
+    
+    def __hash__(self):
+        return hash((self.shape, self.element_type, self.fill_value))
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+    
+    @property
+    def shape_type(self):
+        return self.shape
+    
+    @property
+    def fill_value(self):
+        return self.fill_value
+
+# currently implemented with COO tensor
+class SparseTensor(EagerTensor):
+    def __init__(self, coords: tuple, data: np.ndarray, shape: tuple, element_type=None, fill_value=0.0):
+        self.coords = coords
+        self.data = data
+        self.shape = shape
+        self.element_type = element_type
+        self.fill_value = fill_value
+
+    # converts an eager tensor to a sparse tensor
+    @classmethod
+    def from_dense_tensor(cls, dense_tensor: EagerTensor):
+        coords = np.where(dense_tensor.data != dense_tensor.fill_value)
+        data = dense_tensor.data[coords]
+        shape = dense_tensor.shape
+        element_type = dense_tensor.element_type
+        fill_value = dense_tensor.fill_value
+        return cls(coords, data, shape, element_type, fill_value)
+
+    @property
+    def ftype(self):
+        return SparseTensorFType(self.shape, self.element_type, self.fill_value)
+
+    @property
+    def shape(self):
+        return self.shape
+    
+    # calculates the ratio of non-zero elements to the total number of elements
+    @property
+    def density(self):
+        return len(self.data) / np.prod(self.shape)
+
+    def __getitem__(self, idx):
+        if not isinstance(idx, tuple):
+            raise ValueError("Index must be a tuple")
+        
+        if len(idx) != self.ndim:
+            raise ValueError(f"Index must have {self.ndim} dimensions")
+        
+        #return the first element that matches the index
+        return self.data[np.all(self.coords == idx, axis=1)][0]
 
 class EinsumInterpreter:
     def __call__(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
