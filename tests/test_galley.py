@@ -582,3 +582,82 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     assert out.tensordef.index_set == {"i"}
     assert out.tensordef.dim_sizes == dims
     assert out.dcs == expected_dcs
+
+@pytest.mark.parametrize(
+    "new_dims, inputs, expected_dcs",
+    [
+        # Single input passthrough
+        (
+            {"i": 1000},
+            [
+                (
+                    {"i"},
+                    {
+                        DC(frozenset(), frozenset({"i"}), 5.0),
+                        DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                    },
+                )
+            ],
+            {
+                DC(frozenset(), frozenset({"i"}), 5.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+            },
+        ),
+        # Two inputs, same axes: overlap SUMs; keys not in all inputs are dropped
+        (
+            {"i": 1000},
+            [
+                (
+                    {"i"},
+                    {
+                        DC(frozenset(), frozenset({"i"}), 5.0),
+                        DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                    },
+                ),
+                (
+                    {"i"},
+                    {
+                        DC(frozenset(), frozenset({"i"}), 2.0),
+                        DC(frozenset({"i"}), frozenset({"i"}), 3.0),
+                        DC(frozenset(), frozenset(), 7.0),  # unique to this input -> dropped
+                    },
+                ),
+            ],
+            {
+                DC(frozenset(), frozenset({"i"}), 7.0),  # 5 + 2
+                DC(frozenset({"i"}), frozenset({"i"}), 4.0),  # 1 + 3
+            },
+        ),
+        # Lifting across extra axes (Z) + consensus then SUM
+        (
+            {"i": 10, "j": 4},
+            [
+                ({"i"}, {DC(frozenset(), frozenset({"i"}), 3.0)}),
+                ({"j"}, {DC(frozenset(), frozenset({"j"}), 2.0)}),
+            ],
+            {DC(frozenset(), frozenset({"i", "j"}), 32.0)},  # 12 + 20 (≤ capacity 40)
+        ),
+        # Clamp by dense capacity of Y
+        (
+            {"i": 5},
+            [
+                ({"i"}, {DC(frozenset(), frozenset({"i"}), 7.0)}),
+                ({"i"}, {DC(frozenset(), frozenset({"i"}), 9.0)}),
+            ],
+            {DC(frozenset(), frozenset({"i"}), 5.0)},
+        ),
+    ],
+)
+def test_merge_dc_union(new_dims, inputs, expected_dcs):
+    stats_objs = []
+    for idx_set, dcs in inputs:
+        td = TensorDef(frozenset(idx_set), {k: new_dims[k] for k in idx_set}, 0)
+        s = DCStats.from_def(td, set(dcs))
+        stats_objs.append(s)
+
+    new_def = TensorDef(frozenset(new_dims.keys()), new_dims, 0)
+    out = DCStats._merge_dc_union(new_def, stats_objs)
+
+    assert out.tensordef.index_set == set(new_dims.keys())
+    assert dict(out.tensordef.dim_sizes) == new_dims
+    assert out.dcs == expected_dcs

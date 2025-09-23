@@ -1,6 +1,7 @@
 import math
 import operator
-from collections.abc import Iterable
+from collections.abc import Iterable, Callable
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -1083,6 +1084,53 @@ class DCStats(TensorStats):
                     new_dc[dc_key] = dc.value
 
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
+        return DCStats.from_def(new_def, new_stats)
+
+    @staticmethod
+    def _merge_dc_union(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+        '''
+        Merge DCs for union-like operators.
+
+        Args:
+            new_def: The output TensorDef produced by TensorDef.mapjoin(...).
+            all_stats: The DCStats inputs to merge.
+
+        Returns:
+            A new DCStats built on `new_def` whose DC set reflects union semantics.
+            If there is only one input, this returns a copy of its DCs attached to
+            `new_def`.
+        '''
+        if len(all_stats) == 1:
+            return DCStats.from_def(new_def, set(all_stats[0].dcs))
+
+        dc_keys: Counter[tuple[frozenset[str], frozenset[str]]] = Counter()
+        stats_dcs: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
+        for stats in all_stats:
+            dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+            Z = new_def.index_set - stats.tensordef.index_set
+            Z_dim_size = new_def.get_dim_space_size(Z)
+            for dc in stats.dcs:
+                new_key = (dc.from_indices, dc.to_indices)
+                dcs[new_key] = dc.value
+                dc_keys[new_key] += 1
+
+                ext_dc_key = (dc.from_indices, dc.to_indices | frozenset(Z))
+                if ext_dc_key not in dcs:
+                    dc_keys[ext_dc_key] += 1
+                prev = dcs.get(ext_dc_key, math.inf)
+                dcs[ext_dc_key] = min(prev, dc.value * Z_dim_size)
+            stats_dcs.append(dcs)
+
+        new_dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+        for key, count in dc_keys.items():
+            if count == len(all_stats):
+                total = sum(d.get(key, 0.0) for d in stats_dcs)
+                X, Y = key
+                if Y.issubset(new_def.index_set):
+                    total = min(total, new_def.get_dim_space_size(Y))
+                new_dcs[key] = min(float(2**64), total)
+
+        new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
