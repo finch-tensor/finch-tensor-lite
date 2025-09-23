@@ -81,6 +81,9 @@ class SparseTensor(EagerTensor):
             return self.data[matching_indices[0]]
         return 0
 
+    def __str__(self):
+        return f"SparseTensor(data={self.data}, coords={self.coords}, shape={self.shape}, element_type={self._element_type})"
+
     def to_dense(self) -> np.ndarray:
         dense_tensor = np.zeros(self.shape, dtype=self._element_type)
         for i in range(self.coords.shape[0]):
