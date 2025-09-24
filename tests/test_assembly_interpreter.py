@@ -228,7 +228,7 @@ def test_simple_struct():
     assert result == 9.0
 
 
-def test_debug_statement(capsys):
+def test_debug_statement(capsys, file_regression):
     p_var_name = "p"
     x_var_name = "x"
     res_var_name = "res"
@@ -292,12 +292,5 @@ def test_debug_statement(capsys):
     result = mod.simple_struct(p, x)
     assert result == 9.0
 
-    capture = capsys.readouterr()
-    expected_print = (
-        "Point(x=np.float64(1.0), y=np.float64(2.0)) \n"
-        "(1, 4) \n"
-        "Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) \n"
-        "9.0 \n"
-        "Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) 9.0 \n"
-    )
-    assert capture.out == expected_print
+    capture = capsys.readouterr().out
+    file_regression.check(capture, extension=".txt")
