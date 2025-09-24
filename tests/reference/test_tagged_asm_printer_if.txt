@@ -1,0 +1,9 @@
+def if_else_0() -> int64:
+    a_0: int64 = 5
+    if eq(a_1, 5):
+        a_2: int64 = add(a_3, 10)
+    if lt(a_4, 15):
+        a_5: int64 = sub(a_6, 3)
+    else:
+        a_7: int64 = mul(a_8, 2)
+    return a_9

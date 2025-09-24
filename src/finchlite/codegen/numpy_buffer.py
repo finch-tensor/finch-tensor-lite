@@ -3,6 +3,8 @@ from typing import NamedTuple
 
 import numpy as np
 
+import numba
+
 from ..finch_assembly import Buffer
 from ..util import qual_str
 from .c import CBufferFType, CStackFType, c_type
@@ -91,6 +93,9 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
 
     def __str__(self):
         return f"np_buf_t({qual_str(self._dtype)})"
+
+    def __repr__(self):
+        return f"NumpyBufferFType({qual_str(self._dtype)})"
 
     @property
     def length_type(self):
@@ -188,11 +193,15 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         Construct a NumpyBuffer from a C-compatible structure.
         """
-        self.arr = c_buffer.contents.arr
-        return NumpyBuffer(self.arr)
+        return NumpyBuffer(c_buffer.contents.arr)
 
-    def numba_type(self):
+    def numba_type(self) -> type:
         return list[np.ndarray]
+
+    def numba_jitclass_type(self) -> numba.types.Type:
+        return numba.types.ListType(
+            numba.types.Array(numba.from_dtype(self.element_type), 1, "C")
+        )
 
     def numba_length(self, ctx, buf):
         arr = buf.obj.arr
@@ -230,7 +239,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         Serialize the NumPy buffer to a Numba-compatible object.
         """
-        return [obj.arr]
+        return numba.typed.List([obj.arr])
 
     def deserialize_from_numba(self, obj, numba_buffer):
         obj.arr = numba_buffer[0]

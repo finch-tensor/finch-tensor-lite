@@ -103,7 +103,7 @@ Tp = TypeVar("Tp")
 
 
 @dataclass
-class FiberTensor(Generic[Tp], Tensor):
+class FiberTensor(Tensor, Generic[Tp]):
     """
     A class representing a tensor with fiber structure.
 
@@ -228,4 +228,5 @@ def tensor(lvl: LevelFType, position_type: type | None = None):
         An instance of FiberTensorFType.
     """
     # mypy does not understand that dataclasses generate __hash__ and __eq__
+    # https://github.com/python/mypy/issues/19799
     return FiberTensorFType(lvl, position_type)  # type: ignore[abstract]
