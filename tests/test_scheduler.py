@@ -200,11 +200,11 @@ def test_pretty_labels():
     )
     expected = Plan(
         (
-            Field(":i0"),
-            Alias(":A0"),
-            Alias(":A1"),
-            Subquery(Alias(":A0"), Field(":i0")),
-            Subquery(Alias(":A1"), Field(":i0")),
+            Field("i0"),
+            Alias("A0"),
+            Alias("A1"),
+            Subquery(Alias("A0"), Field("i0")),
+            Subquery(Alias("A1"), Field("i0")),
         )
     )
 
@@ -846,11 +846,11 @@ def test_scheduler_e2e_sddmm():
 
     expected_plan = Plan(
         (
-            Query(Alias(":A0"), Table(Literal(a), (Field(":i0"), Field(":i1")))),
-            Query(Alias(":A1"), Table(Literal(b), (Field(":i1"), Field(":i2")))),
-            Query(Alias(":A2"), Table(Literal(s), (Field(":i0"), Field(":i2")))),
+            Query(Alias("A0"), Table(Literal(a), (Field("i0"), Field("i1")))),
+            Query(Alias("A1"), Table(Literal(b), (Field("i1"), Field("i2")))),
+            Query(Alias("A2"), Table(Literal(s), (Field("i0"), Field("i2")))),
             Query(
-                Alias(":A3"),
+                Alias("A3"),
                 Aggregate(
                     Literal(add),
                     Literal(0),
@@ -864,34 +864,34 @@ def test_scheduler_e2e_sddmm():
                                         (
                                             Reorder(
                                                 Relabel(
-                                                    Alias(":A0"),
-                                                    (Field(":i0"), Field(":i1")),
+                                                    Alias("A0"),
+                                                    (Field("i0"), Field("i1")),
                                                 ),
-                                                (Field(":i0"), Field(":i1")),
+                                                (Field("i0"), Field("i1")),
                                             ),
                                             Reorder(
                                                 Relabel(
-                                                    Alias(":A1"),
-                                                    (Field(":i1"), Field(":i2")),
+                                                    Alias("A1"),
+                                                    (Field("i1"), Field("i2")),
                                                 ),
-                                                (Field(":i1"), Field(":i2")),
+                                                (Field("i1"), Field("i2")),
                                             ),
                                         ),
                                     ),
-                                    (Field(":i0"), Field(":i1"), Field(":i2")),
+                                    (Field("i0"), Field("i1"), Field("i2")),
                                 ),
                                 Reorder(
-                                    Relabel(Alias(":A2"), (Field(":i0"), Field(":i2"))),
-                                    (Field(":i0"), Field(":i2")),
+                                    Relabel(Alias("A2"), (Field("i0"), Field("i2"))),
+                                    (Field("i0"), Field("i2")),
                                 ),
                             ),
                         ),
-                        (Field(":i0"), Field(":i1"), Field(":i2")),
+                        (Field("i0"), Field("i1"), Field("i2")),
                     ),
-                    (Field(":i1"),),
+                    (Field("i1"),),
                 ),
             ),
-            Plan((Produces((Alias(":A3"),)),)),
+            Plan((Produces((Alias("A3"),)),)),
         )
     )
 
