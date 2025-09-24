@@ -38,11 +38,21 @@ from .optimize import (
     push_fields,
     set_loop_order,
 )
+from .einsum import (
+    Einsum,
+    EinsumPlan,
+    EinsumCompiler,
+    EinsumScheduler
+)
 
 __all__ = [
     "Aggregate",
     "Alias",
     "DefaultLogicOptimizer",
+    "Einsum",
+    "EinsumPlan",
+    "EinsumCompiler",
+    "EinsumScheduler",
     "Field",
     "Literal",
     "LogicCompiler",
@@ -51,6 +61,7 @@ __all__ = [
     "PostOrderDFS",
     "PostWalk",
     "PreWalk",
+    "PrintingLogicOptimizer",
     "Produces",
     "Query",
     "Reformat",
