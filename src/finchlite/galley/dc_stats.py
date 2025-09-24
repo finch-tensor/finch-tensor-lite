@@ -63,22 +63,6 @@ class DCStats(TensorStats):
         self.dcs = set(dcs)
         return self
 
-    @classmethod
-    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
-        return None
-
-    def bitset_to_idxs(self, bitset):
-        """
-        Map a set/frozenset of 1-based positions -> axis-name labels, using
-        the current tensordef order. No stored maps required.
-        """
-        return frozenset(
-            list(self.tensordef.dim_sizes.keys())[int(pos) - 1]
-            for pos in bitset
-            if isinstance(pos, (int, np.integer))
-            and 1 <= int(pos) <= len(list(self.tensordef.dim_sizes.keys()))
-        )
-
     def _structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Dispatch DC extraction based on tensor dimensionality.
