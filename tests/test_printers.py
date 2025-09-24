@@ -1,4 +1,3 @@
-import json
 import operator
 
 import numpy as np
@@ -348,7 +347,7 @@ def test_asm_cfg_printer_if(file_regression):
     cfg_builder = CFGBuilder()
     cfg_builder.build(root)
 
-    file_regression.check(json.dumps(cfg_builder.to_dict(), indent=4), extension=".txt")
+    file_regression.check(str(cfg_builder), extension=".txt")
 
 
 def test_asm_printer_dot(file_regression):
@@ -533,4 +532,4 @@ def test_asm_cfg_printer_dot(file_regression):
     cfg_builder = CFGBuilder()
     cfg_builder.build(prgm)
 
-    file_regression.check(json.dumps(cfg_builder.to_dict(), indent=4), extension=".txt")
+    file_regression.check(str(cfg_builder), extension=".txt")

@@ -27,8 +27,6 @@ from .nodes import (
 )
 
 
-# TODO: make a proper __str__ or __repr__ function for BasicBlock, ControlFlowGraph,
-# CFGBuilder
 class BasicBlock:
     """A basic block of FinchAssembly Control Flow Graph."""
 
@@ -57,11 +55,10 @@ class BasicBlock:
             "predecessors": [str(block.id) for block in self.predecessors],
         }
 
-    def __repr__(self):
-        return (
-            f"BasicBlock(id={self.id}",
-            f"stmts={self.statements}, succs={self.successors})",
-        )
+    def __str__(self):
+        import json as _json
+
+        return _json.dumps(self.to_dict(), indent=4)
 
 
 class ControlFlowGraph:
@@ -70,7 +67,7 @@ class ControlFlowGraph:
     def __init__(self, func_name: str):
         self.block_counter = 0
         self.name = func_name
-        self.blocks = {}
+        self.blocks: dict[str, BasicBlock] = {}
 
         # initialize ENTRY and EXIT blocks
         self.entry_block = self.new_block()
@@ -97,14 +94,18 @@ class ControlFlowGraph:
             },
         }
 
+    def __str__(self):
+        import json as _json
 
-# TODO: delete empty Basic Blocks after CFGBuilder is done
+        return _json.dumps(self.to_dict(), indent=4)
+
+
 class CFGBuilder:
     """Incrementally builds control-flow graphs for Finch Assembly IR."""
 
     def __init__(self):
         self.cfgs: dict[str, ControlFlowGraph] = {}
-        self.current_cfg: ControlFlowGraph | None = None
+        self.current_cfg: ControlFlowGraph
 
     def new_cfg(self, name: str) -> ControlFlowGraph:
         new_cfg = ControlFlowGraph(name)
@@ -118,7 +119,12 @@ class CFGBuilder:
         """Convert all CFGs to dictionaries for JSON serialization."""
         return {cfg_name: cfg.to_dict() for cfg_name, cfg in self.cfgs.items()}
 
-    def __call__(self, node: AssemblyNode, break_block: BasicBlock = None):
+    def __str__(self):
+        import json as _json
+
+        return _json.dumps(self.to_dict(), indent=4)
+
+    def __call__(self, node: AssemblyNode, break_block: BasicBlock | None = None):
         match node:
             case (
                 Literal()
@@ -238,12 +244,7 @@ class CFGBuilder:
                 self.current_cfg.current_block = unreachable_block
             case Break():
                 self.current_cfg.current_block.add_statement(Break())
-
-                # when Break is met,
-                # make a connection to the AFTER block of ForLoop/WhileLoop
                 self.current_cfg.current_block.add_successor(break_block)
-
-                # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
                 self.current_cfg.current_block = unreachable_block
             case Function(_, args, body):
@@ -264,13 +265,18 @@ class CFGBuilder:
                             f"Unrecognized function type: {type(func)}"
                         )
 
-                    # func.name is a TaggedVariable
-                    self.current_cfg = self.new_cfg(func.name.variable.name)
+                    func_name = (
+                        func.name.variable.name
+                        if hasattr(func.name, "variable")
+                        else func.name.name
+                    )
+
+                    self.current_cfg = self.new_cfg(func_name)
                     self(func)
                     self.current_cfg.current_block.add_successor(
                         self.current_cfg.exit_block
                     )
             case node:
-                raise NotImplementedError(f"Unhandled node type: {node}")
+                raise NotImplementedError(node)
 
         return self.cfgs
