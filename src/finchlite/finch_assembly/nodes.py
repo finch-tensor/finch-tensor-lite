@@ -771,21 +771,15 @@ class AssemblyPrinterContext(Context):
                     self(func)
                 return None
             case Print(args):
-                match args:
-                    case Variable(name, _):
-                        self.exec(f"{feed}print {args}")
-                    case _:
-                        if isinstance(args, tuple):
-                            arg_decls = [
-                                f"{self(arg)}"
-                                for arg in args
-                                if isinstance(arg, Variable)
-                            ]
-                            self.exec(f"{feed}print {arg_decls}")
-                        else:
-                            raise NotImplementedError(
-                                f"Unrecognized argument type: {args}"
-                            )
+                if isinstance(args, tuple):
+                    arg_decls = [
+                        f"{self(arg)}" for arg in args if isinstance(arg, Variable)
+                    ]
+                    self.exec(f"{feed}print {arg_decls}")
+                else:
+                    raise NotImplementedError(
+                        f"Unrecognized argument type: {args}, should be Tuple."
+                    )
                 return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")

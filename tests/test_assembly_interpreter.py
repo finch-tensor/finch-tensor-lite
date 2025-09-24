@@ -248,8 +248,8 @@ def test_debug_statement(capsys):
                     (p_var, x_var),
                     asm.Block(
                         (
-                            asm.Print(p_var),
-                            asm.Print(x_var),
+                            asm.Print((p_var,)),
+                            asm.Print((x_var,)),
                             asm.Print((p_var, x_var)),
                             asm.Assign(
                                 res_var,
@@ -279,7 +279,7 @@ def test_debug_statement(capsys):
                                     ),
                                 ),
                             ),
-                            asm.Print(res_var),
+                            asm.Print((res_var,)),
                             asm.Print((p_var, x_var, res_var)),
                             asm.Return(res_var),
                         )
@@ -294,10 +294,10 @@ def test_debug_statement(capsys):
 
     capture = capsys.readouterr()
     expected_print = (
-        "Point(x=np.float64(1.0), y=np.float64(2.0))\n"
-        "(1, 4)\n"
+        "Point(x=np.float64(1.0), y=np.float64(2.0)) \n"
+        "(1, 4) \n"
         "Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) \n"
-        "9.0\n"
+        "9.0 \n"
         "Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) 9.0 \n"
     )
     assert capture.out == expected_print
