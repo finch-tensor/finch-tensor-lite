@@ -1,11 +1,19 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
+from ... import finch_assembly as asm
 from ...codegen import NumpyBufferFType
 from ...symbolic import FType, ftype
-from ..fiber_tensor import Level, LevelFType
+from ..fiber_tensor import FiberTensorFields, Level, LevelFType
+
+
+class ElementLevelFields(NamedTuple):
+    tns: FiberTensorFields
+    nind: int
+    pos: asm.AssemblyNode
+    op: Any
 
 
 @dataclass(unsafe_hash=True)
@@ -26,17 +34,21 @@ class ElementLevelFType(LevelFType):
         self._element_type = self.val_format.element_type
         self._fill_value = self._element_type(self._fill_value)
 
-    def __call__(self, shape=()):
+    def __call__(self, shape=(), val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
         Args:
-            fmt: The ftype to be used for the level.
+            shape: Should be always `()`, used for validation.
+            val: The value to store in the ElementLevel instance.
         Returns:
             An instance of ElementLevel.
         """
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
-        return ElementLevel(self)
+        return ElementLevel(self, val)
+
+    def __str__(self):
+        return f"ElementLevelFType(fv={self.fill_value})"
 
     @property
     def ndim(self):
@@ -62,6 +74,25 @@ class ElementLevelFType(LevelFType):
     def buffer_factory(self):
         return self._buffer_factory
 
+    def lower_unwrap(self, ctx, obj):
+        return asm.Load(obj.tns.buf_s, obj.pos)
+
+    def lower_increment(self, ctx, obj, val):
+        lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
+        ctx.exec(
+            asm.Store(
+                obj.tns.buf_s,
+                lowered_pos,
+                asm.Call(
+                    asm.Literal(obj.op.val),
+                    [asm.Load(obj.tns.buf_s, lowered_pos), val],
+                ),
+            )
+        )
+
+    def get_fields_class(self, tns, nind, pos, op):
+        return ElementLevelFields(tns, nind, pos, op)
+
 
 def element(
     fill_value=None,
@@ -78,6 +109,7 @@ def element(
         element_type: The type of elements stored in the level.
         position_type: The type of positions within the level.
         buffer_factory: The factory used to create buffers for the level.
+        val_format: Format of the value stored in the level.
 
     Returns:
         An instance of ElementLevelFType.
@@ -99,6 +131,7 @@ class ElementLevel(Level):
 
     _format: ElementLevelFType
     val: Any | None = None
+    pos: asm.AssemblyNode | None = None
 
     def __post_init__(self):
         if self.val is None:
@@ -111,3 +144,6 @@ class ElementLevel(Level):
     @property
     def ftype(self):
         return self._format
+
+    def with_pos(self, pos: asm.AssemblyNode) -> "ElementLevel":
+        return ElementLevel(self._format, self.val, pos)
