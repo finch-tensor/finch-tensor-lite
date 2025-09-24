@@ -7,10 +7,6 @@ from .tensor_stats import TensorStats
 
 class DenseStats(TensorStats):
     @classmethod
-    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
-        return None
-
-    @classmethod
     def from_def(cls, d: TensorDef) -> Self:
         ds = object.__new__(cls)
         ds.tensordef = d.copy()
