@@ -115,12 +115,12 @@ def pretty_labels(root: LogicNode) -> LogicNode:
     def rule_0(node):
         match node:
             case Field() as f:
-                return fields.setdefault(f, Field(f":i{len(fields)}"))
+                return fields.setdefault(f, Field(f"i{len(fields)}"))
 
     def rule_1(node):
         match node:
             case Alias() as a:
-                return aliases.setdefault(a, Alias(f":A{len(aliases)}"))
+                return aliases.setdefault(a, Alias(f"A{len(aliases)}"))
 
     return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
 
