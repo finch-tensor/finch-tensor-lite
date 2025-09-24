@@ -442,13 +442,13 @@ def test_simple_struct(compiler):
 
 
 @pytest.mark.parametrize(
-    ["compiler", "extension"],
+    ["compiler", "extension", "platform"],
     [
-        (CGenerator(), ".c"),
-        (NumbaGenerator(), ".py"),
+        (CGenerator(), ".c", "any"),
+        (NumbaGenerator(), ".py", "win" if sys.platform == "win32" else "any"),
     ],
 )
-def test_safe_loadstore_regression(compiler, extension, file_regression):
+def test_safe_loadstore_regression(compiler, extension, platform, file_regression):
     a = np.array(range(3), dtype=ctypes.c_int64)
     ab = NumpyBuffer(a)
     ab_safe = SafeBuffer(ab)
