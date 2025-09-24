@@ -4,14 +4,18 @@ from finchlite import (
     DenseLevelFType,
     ElementLevelFType,
     FiberTensorFType,
+    NumpyBuffer,
     NumpyBufferFType,
+    dense,
+    element,
+    fiber_tensor,
 )
 
 
 def test_fiber_tensor_attributes():
     fmt = FiberTensorFType(DenseLevelFType(ElementLevelFType(0.0)))
     shape = (3,)
-    a = fmt(shape)
+    a = fmt(shape=shape)
 
     # Check shape attribute
     assert a.shape == shape
@@ -33,3 +37,11 @@ def test_fiber_tensor_attributes():
 
     # Check buffer_format exists
     assert a.buffer_factory == NumpyBufferFType
+
+
+def test_fiber_tensor():
+    fmt = fiber_tensor(
+        dense(dense(element(np.int64(0), np.int64, np.intp, NumpyBufferFType)))
+    )
+
+    fmt(shape=(3, 4), val=NumpyBuffer(np.arange(12)))

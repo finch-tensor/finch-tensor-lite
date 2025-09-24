@@ -377,7 +377,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         """
         Repack the buffer from C context.
         """
-        (self.tns.asm_repack(ctx, lhs.tns, obj.tns),)
+        self.tns.asm_repack(ctx, lhs.tns, obj.tns)
         ctx.exec(
             asm.Block(
                 asm.SetAttr(lhs, "tns", obj.tns),
