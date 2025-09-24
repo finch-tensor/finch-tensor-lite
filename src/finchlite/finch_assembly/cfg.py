@@ -1,12 +1,5 @@
-import json
-import operator
-
-import numpy as np
-
-from ..codegen import NumpyBuffer
 from .nodes import (
     AssemblyNode,
-    AssemblyPrinterContext,
     Assign,
     Block,
     Break,
@@ -28,12 +21,17 @@ from .nodes import (
     Slot,
     Stack,
     Store,
+    TaggedVariable,
     Unpack,
-    Variable,
     WhileLoop,
 )
 
+
+# TODO: make a proper __str__ or __repr__ function for BasicBlock, ControlFlowGraph,
+# CFGBuilder
 class BasicBlock:
+    """A basic block of FinchAssembly Control Flow Graph."""
+
     def __init__(self, id):
         self.id = id
         self.statements = []
@@ -67,6 +65,8 @@ class BasicBlock:
 
 
 class ControlFlowGraph:
+    """Control-Flow Graph (CFG) for a single FinchAssembly function."""
+
     def __init__(self, func_name: str):
         self.block_counter = 0
         self.name = func_name
@@ -97,27 +97,14 @@ class ControlFlowGraph:
             },
         }
 
-# TODO: add TaggedVariable to CFGBuilder
-# TODO: represent statements as assembly nodes instead of tuples with random data
-# TODO: 
 
+# TODO: delete empty Basic Blocks after CFGBuilder is done
 class CFGBuilder:
-    """
-    cfgs: {
-        function_0: {
-            basic_block_0: {
-                statements:...,
-                predecessors:...,
-                successors:...,
-            },
-        },
-        ...
-    }
-    """
+    """Incrementally builds control-flow graphs for Finch Assembly IR."""
 
     def __init__(self):
-        self.cfgs = {}
-        self.current_cfg = None
+        self.cfgs: dict[str, ControlFlowGraph] = {}
+        self.current_cfg: ControlFlowGraph | None = None
 
     def new_cfg(self, name: str) -> ControlFlowGraph:
         new_cfg = ControlFlowGraph(name)
@@ -133,72 +120,52 @@ class CFGBuilder:
 
     def __call__(self, node: AssemblyNode, break_block: BasicBlock = None):
         match node:
-            case Literal(value):
-                self.current_cfg.current_block.add_statement(("literal", value))
-            case Unpack(lhs, rhs):
-                self.current_cfg.current_block.add_statement(("unpack", lhs, rhs))
-            case Repack(val):
-                self.current_cfg.current_block.add_statement(("repack", val))
-            case Resize(buffer, new_size):
-                self.current_cfg.current_block.add_statement(
-                    ("resize", buffer, new_size)
-                )
-            case Variable(name, type):
-                self.current_cfg.current_block.add_statement(("variable", name, type))
-            case GetAttr(obj, attr):
-                self.current_cfg.current_block.add_statement(("getattr", obj, attr))
-            case SetAttr(obj, attr, value):
-                self.current_cfg.current_block.add_statement(
-                    ("setattr", obj, attr, value)
-                )
-            case Call(Literal(_) as lit, args):
-                self.current_cfg.current_block.add_statement(
-                    ("function_call", lit, args)
-                )
-            case Load(buffer, index):
-                self.current_cfg.current_block.add_statement(("load", buffer, index))
-            case Store(buffer, index, value):
-                self.current_cfg.current_block.add_statement(
-                    ("store", buffer, index, value)
-                )
-            case Length(buffer):
-                self.current_cfg.current_block.add_statement(("length", buffer))
-            case Slot(name, type):
-                self.current_cfg.current_block.add_statement(("slot", name, type))
-            case Stack(obj, type):
-                self.current_cfg.current_block.add_statement(("stack", obj, type))
-            case Assign(Variable(name, _), val):
-                self.current_cfg.current_block.add_statement(("assign", name, val))
+            case (
+                Literal()
+                | Unpack()
+                | Repack()
+                | Resize()
+                | TaggedVariable()
+                | GetAttr()
+                | SetAttr()
+                | Call()
+                | Load()
+                | Store()
+                | Length()
+                | Slot()
+                | Stack()
+                | Assign()
+            ):
+                self.current_cfg.current_block.add_statement(node)
             case Block(bodies):
                 for body in bodies:
                     self(body, break_block)
             case If(cond, body):
-                cond_block = self.current_cfg.current_block
-                cond_block.add_statement(("if_cond", cond))
+                before_block = self.current_cfg.current_block
 
                 if_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                cond_block.add_successor(if_block)
-                cond_block.add_successor(after_block)
+                before_block.add_successor(if_block)
+                before_block.add_successor(after_block)
 
+                if_block.add_statement(cond)
                 self.current_cfg.current_block = if_block
                 self(body, break_block)
 
                 self.current_cfg.current_block.add_successor(after_block)
-
                 self.current_cfg.current_block = after_block
             case IfElse(cond, body, else_body):
-                cond_block = self.current_cfg.current_block
-                cond_block.add_statement(("if_else_cond", cond))
+                before_block = self.current_cfg.current_block
 
                 if_block = self.current_cfg.new_block()
                 else_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                cond_block.add_successor(if_block)
-                cond_block.add_successor(else_block)
+                before_block.add_successor(if_block)
+                before_block.add_successor(else_block)
 
+                if_block.add_statement(cond)
                 self.current_cfg.current_block = if_block
                 self(body, break_block)
                 self.current_cfg.current_block.add_successor(after_block)
@@ -209,64 +176,56 @@ class CFGBuilder:
 
                 self.current_cfg.current_block = after_block
             case WhileLoop(cond, body):
-                cond_block = self.current_cfg.current_block
-                cond_block.add_statement(("while_cond", cond))
+                before_block = self.current_cfg.current_block
 
                 body_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                cond_block.add_successor(body_block)
-                cond_block.add_successor(after_block)
+                before_block.add_successor(body_block)
+                before_block.add_successor(after_block)
 
+                body_block.add_statement(cond)
                 self.current_cfg.current_block = body_block
                 self(body, after_block)
 
-                self.current_cfg.current_block.add_successor(cond_block)
+                self.current_cfg.current_block.add_successor(before_block)
                 self.current_cfg.current_block = after_block
-            case ForLoop(var, start, end, body):
-                init_block = self.current_cfg.current_block
-                init_block.add_statement(("for_init", var, start, end))
+            case ForLoop(var, _start, _var, body):
+                before_block = self.current_cfg.current_block
 
-                cond_block = self.current_cfg.new_block()
                 body_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
 
-                init_block.add_successor(cond_block)
-                cond_block.add_statement(("for_init", var, start, end))
+                before_block.add_successor(body_block)
+                before_block.add_successor(after_block)
 
-                cond_block.add_successor(body_block)
-                cond_block.add_successor(after_block)
-
+                # TODO: figure out a RIGHT way to represent 'ForLoop' initialization
+                # statement
+                body_block.add_statement(Assign(var, var))
                 self.current_cfg.current_block = body_block
                 self(body, after_block)
 
-                self.current_cfg.current_block.add_statement(("for_inc", var))
-                self.current_cfg.current_block.add_successor(cond_block)
-
+                self.current_cfg.current_block.add_successor(body_block)
                 self.current_cfg.current_block = after_block
-            case BufferLoop(buf, var, body):
-                init_block = self.current_cfg.current_block
-                init_block.add_statement(("bufferloop_init", buf, var))
-
-                cond_block = self.current_cfg.new_block()
-                init_block.add_successor(cond_block)
-                cond_block.add_statement(("bufferloop_init", var, start, end))
+            case BufferLoop(_buf, var, body):
+                before_block = self.current_cfg.current_block
 
                 body_block = self.current_cfg.new_block()
-                cond_block.add_successor(body_block)
-
                 after_block = self.current_cfg.new_block()
-                cond_block.add_successor(after_block)
 
+                before_block.add_successor(body_block)
+                before_block.add_successor(after_block)
+
+                # TODO: figure out a RIGHT way to represent 'BufferLoop' initialization
+                # statement
+                body_block.add_statement(Assign(var, var))
                 self.current_cfg.current_block = body_block
-                self(body_block, after_block)
+                self(body, after_block)
 
-                self.current_cfg.current_block.add_statement(("bufferloop_inc", var))
-                self.current_cfg.current_block.add_successor(cond_block)
-
+                self.current_cfg.current_block.add_successor(body_block)
                 self.current_cfg.current_block = after_block
             case Return(value):
-                self.current_cfg.current_block.add_statement(("return", value))
+                self.current_cfg.current_block.add_statement(Return(value))
 
                 # when Return is met,
                 # make a connection to the EXIT block of function (cfg)
@@ -278,7 +237,7 @@ class CFGBuilder:
                 unreachable_block = self.current_cfg.new_block()
                 self.current_cfg.current_block = unreachable_block
             case Break():
-                self.current_cfg.current_block.add_statement("break")
+                self.current_cfg.current_block.add_statement(Break())
 
                 # when Break is met,
                 # make a connection to the AFTER block of ForLoop/WhileLoop
@@ -287,13 +246,11 @@ class CFGBuilder:
                 # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
                 self.current_cfg.current_block = unreachable_block
-            case Function(Variable(_, _), args, body):
+            case Function(_, args, body):
                 for arg in args:
                     match arg:
-                        case Variable(name, type):
-                            self.current_cfg.current_block.add_statement(
-                                (("func_arg"), name, type)
-                            )
+                        case TaggedVariable():
+                            self.current_cfg.current_block.add_statement(arg)
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -307,164 +264,13 @@ class CFGBuilder:
                             f"Unrecognized function type: {type(func)}"
                         )
 
-                    self.current_cfg = self.new_cfg(func.name.name)
+                    # func.name is a TaggedVariable
+                    self.current_cfg = self.new_cfg(func.name.variable.name)
                     self(func)
                     self.current_cfg.current_block.add_successor(
                         self.current_cfg.exit_block
                     )
             case node:
-                raise NotImplementedError(
-                    f"Unhandled node type: {node.__class__.__name__}"
-                )
+                raise NotImplementedError(f"Unhandled node type: {node}")
 
         return self.cfgs
-
-# TODO: create pytest tests in tests/ to stop running this (current) file
-def test1():
-    printer = AssemblyPrinterContext()
-
-    var = Variable("a", np.int64)
-    root = Module(
-        (
-            Function(
-                Variable("if_else", np.int64),
-                (),
-                Block(
-                    (
-                        Assign(var, Literal(np.int64(5))),
-                        If(
-                            Call(
-                                Literal(operator.eq),
-                                (var, Literal(np.int64(5))),
-                            ),
-                            Block(
-                                (
-                                    Assign(
-                                        var,
-                                        Call(
-                                            Literal(operator.add),
-                                            (var, Literal(np.int64(10))),
-                                        ),
-                                    ),
-                                )
-                            ),
-                        ),
-                        IfElse(
-                            Call(
-                                Literal(operator.lt),
-                                (var, Literal(np.int64(15))),
-                            ),
-                            Block(
-                                (
-                                    Assign(
-                                        var,
-                                        Call(
-                                            Literal(operator.sub),
-                                            (var, Literal(np.int64(3))),
-                                        ),
-                                    ),
-                                )
-                            ),
-                            Block(
-                                (
-                                    Assign(
-                                        var,
-                                        Call(
-                                            Literal(operator.mul),
-                                            (var, Literal(np.int64(2))),
-                                        ),
-                                    ),
-                                )
-                            ),
-                        ),
-                        Return(var),
-                    )
-                ),
-            ),
-        )
-    )
-
-    cfg_builder = CFGBuilder()
-    cfg_builder.build(root)
-
-    printer(root)
-    print(printer.emit())
-    print(50 * "=")
-
-    return cfg_builder.to_dict()
-def test2():
-    a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float64)
-    b = np.array([5.0, 6.0, 7.0, 8.0], dtype=np.float64)
-
-    # Simple dot product using numpy for expected result
-    c = Variable("c", np.float64)
-    i = Variable("i", np.int64)
-    ab = NumpyBuffer(a)
-    bb = NumpyBuffer(b)
-    ab_v = Variable("a", ab.ftype)
-    ab_slt = Slot("a_", ab.ftype)
-    bb_v = Variable("b", bb.ftype)
-    bb_slt = Slot("b_", bb.ftype)
-
-    root = Module(
-        (
-            Function(
-                Variable("dot_product", np.float64),
-                (
-                    ab_v,
-                    bb_v,
-                ),
-                Block(
-                    (
-                        Assign(c, Literal(np.float64(0.0))),
-                        Unpack(ab_slt, ab_v),
-                        Unpack(bb_slt, bb_v),
-                        ForLoop(
-                            i,
-                            Literal(np.int64(0)),
-                            Length(ab_slt),
-                            Block(
-                                (
-                                    Assign(
-                                        c,
-                                        Call(
-                                            Literal(operator.add),
-                                            (
-                                                c,
-                                                Call(
-                                                    Literal(operator.mul),
-                                                    (
-                                                        Load(ab_slt, i),
-                                                        Load(bb_slt, i),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                )
-                            ),
-                        ),
-                        Repack(ab_slt),
-                        Repack(bb_slt),
-                        Return(c),
-                    )
-                ),
-            ),
-        )
-    )
-
-    printer = AssemblyPrinterContext()
-    cfg_builder = CFGBuilder()
-    cfg_builder.build(root)
-
-    printer(root)
-    print(printer.emit())
-    print(50 * "=")
-
-    return cfg_builder.to_dict()
-
-if __name__ == "__main__":
-    print(json.dumps(test1(), indent=4))
-    print(50 * "=")
-    print(50 * "=")
-    print(json.dumps(test2(), indent=4))
