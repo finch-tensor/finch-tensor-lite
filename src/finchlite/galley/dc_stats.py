@@ -1,13 +1,14 @@
 import math
 import operator
-from collections.abc import Iterable, Callable
 from collections import Counter
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
 import finchlite.finch_notation as ntn
+from finchlite.algebra import is_annihilator
 from finchlite.compile import dimension
 from finchlite.finch_notation.nodes import (
     Literal,
@@ -65,6 +66,18 @@ class DCStats(TensorStats):
     @classmethod
     def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
         return None
+
+    def bitset_to_idxs(self, bitset):
+        """
+        Map a set/frozenset of 1-based positions -> axis-name labels, using
+        the current tensordef order. No stored maps required.
+        """
+        return frozenset(
+            list(self.tensordef.dim_sizes.keys())[int(pos) - 1]
+            for pos in bitset
+            if isinstance(pos, (int, np.integer))
+            and 1 <= int(pos) <= len(list(self.tensordef.dim_sizes.keys()))
+        )
 
     def _structure_to_dcs(self, arr: Any) -> set[DC]:
         """
@@ -1088,7 +1101,7 @@ class DCStats(TensorStats):
 
     @staticmethod
     def _merge_dc_union(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
-        '''
+        """
         Merge DCs for union-like operators.
 
         Args:
@@ -1099,7 +1112,7 @@ class DCStats(TensorStats):
             A new DCStats built on `new_def` whose DC set reflects union semantics.
             If there is only one input, this returns a copy of its DCs attached to
             `new_def`.
-        '''
+        """
         if len(all_stats) == 1:
             return DCStats.from_def(new_def, set(all_stats[0].dcs))
 
@@ -1134,8 +1147,48 @@ class DCStats(TensorStats):
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
-    def mapjoin(op, *args, **kwargs):
-        pass
+    def mapjoin(op: Callable[..., Any], *all_stats: "TensorStats") -> "TensorStats":
+        """
+        Merge DC statistics for an elementwise binary operation.
+
+        Args:
+            op: The elementwise operator (e.g., operator.add, operator.mul).
+            all_stats: Input statistics objects to be merged. Must be DCStats at runtime
+
+        Returns:
+            A DCStats instance whose TensorDef is the union of input dims and whose DC
+            set reflects the operator semantics:
+            - If every informative argument is *join-like* (its fill is an annihilator
+                for `op`), merge with join rules (take minima over matching DC keys).
+            - If every informative argument is *union-like* (fill not an annihilator),
+                merge with union rules (infer/extend DCs to missing dims, sum compatible
+                DCs, clamp by dense capacity).
+            - If mixed, and the join-like arguments cover all output indices, prefer
+                join merge; otherwise perform union merge over all arguments.
+        """
+        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
+        join_like_args: list[TensorStats] = []
+        union_like_args: list[TensorStats] = []
+        for stats in all_stats:
+            if len(stats.tensordef.index_set) == 0:
+                continue
+            if is_annihilator(op, stats.tensordef.fill_value):
+                join_like_args.append(stats)
+            else:
+                union_like_args.append(stats)
+        join_like_dc: list[DCStats] = cast(list["DCStats"], join_like_args)
+        union_like_dc: list[DCStats] = cast(list["DCStats"], union_like_args)
+
+        if len(union_like_args) == 0 and len(join_like_args) == 0:
+            return DCStats.from_def(new_def, set())
+        if len(union_like_args) == 0:
+            return DCStats._merge_dc_join(new_def, join_like_dc)
+        if len(join_like_args) == 0:
+            return DCStats._merge_dc_union(new_def, union_like_dc)
+        join_cover = set().union(*(s.tensordef.index_set for s in join_like_dc))
+        if join_cover == new_def.index_set:
+            return DCStats._merge_dc_join(new_def, join_like_dc)
+        return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
 
     @staticmethod
     def aggregate(op, dims, *args, **kwargs):
