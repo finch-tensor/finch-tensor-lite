@@ -109,6 +109,7 @@ register_property(
 def assembly_struct_numba_jitclass_type(ftype_) -> numba.types.Type:
     return numba_type(ftype_).class_type.instance_type
 
+
 register_property(
     np.generic,
     "numba_jitclass_type",
