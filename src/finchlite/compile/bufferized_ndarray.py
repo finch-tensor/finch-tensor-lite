@@ -6,7 +6,7 @@ import numpy as np
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor
-from ..codegen import NumpyBuffer
+from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import ftype
 from . import looplets as lplt
@@ -14,14 +14,28 @@ from .lower import FinchTensorFType
 
 
 class BufferizedNDArray(Tensor):
-    def __init__(self, arr: np.ndarray):
-        itemsize = arr.dtype.itemsize
-        for stride in arr.strides:
-            if stride % itemsize != 0:
-                raise ValueError("Array must be aligned to multiple of itemsize")
-        self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
-        self._shape = tuple(np.asarray(s)[()] for s in arr.shape)
-        self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
+    def __init__(
+        self,
+        arr: np.ndarray | NumpyBuffer,
+        shape: tuple[np.integer, ...] | None = None,
+        strides: tuple[np.integer, ...] | None = None,
+    ):
+        self._shape: tuple[np.integer, ...]
+        self.strides: tuple[np.integer, ...]
+        if shape is None and strides is None and isinstance(arr, np.ndarray):
+            itemsize = arr.dtype.itemsize
+            for stride in arr.strides:
+                if stride % itemsize != 0:
+                    raise ValueError("Array must be aligned to multiple of itemsize")
+            self.strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
+            self._shape = tuple(np.intp(s) for s in arr.shape)
+            self.buf = NumpyBuffer(arr.reshape(-1, copy=False))
+        elif shape is not None and strides is not None and isinstance(arr, NumpyBuffer):
+            self.strides = strides
+            self._shape = shape
+            self.buf = arr
+        else:
+            raise Exception("Invalid constructor arguments")
 
     def to_numpy(self):
         """
@@ -35,13 +49,15 @@ class BufferizedNDArray(Tensor):
         """
         Returns the ftype of the buffer, which is a BufferizedNDArrayFType.
         """
-        return BufferizedNDArrayFType(
-            ftype(self.buf), np.intp(len(self.strides)), ftype(self.strides)
-        )
+        return BufferizedNDArrayFType(ftype(self.buf), self.ndim, ftype(self.strides))
 
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def ndim(self):
+        return np.intp(len(self._shape))
 
     def declare(self, init, op, shape):
         """
@@ -58,7 +74,6 @@ class BufferizedNDArray(Tensor):
                 raise ValueError(
                     f"Invalid dimension end value {dim.end} for ndarray declaration."
                 )
-        shape = tuple(dim.end for dim in shape)
         for i in range(self.buf.length()):
             self.buf.store(i, init)
         return self
@@ -78,7 +93,7 @@ class BufferizedNDArray(Tensor):
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
-            index = np.dot(index, self.strides)
+            index = 0 if index == () else np.dot(index, self.strides)
         return self.buf.load(index)
 
     def __setitem__(self, index, value):
@@ -89,6 +104,12 @@ class BufferizedNDArray(Tensor):
         if isinstance(index, tuple):
             index = np.ravel_multi_index(index, self._shape)
         self.buf.store(index, value)
+
+    def __str__(self):
+        return f"BufferizedNDArray(shape={self.shape})"
+
+    def __repr__(self):
+        return f"BufferizedNDArray(shape={self.shape})"
 
 
 class BufferizedNDArrayFields(NamedTuple):
@@ -105,50 +126,64 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     @property
     def struct_name(self):
-        return "BufferizedNDArray"
+        def str_format(types):
+            return "_".join(
+                f"{np.dtype(t).kind}{np.dtype(t).itemsize * 8}" for t in types
+            )
+
+        dt = np.dtype(self.buf_t.element_type)
+        return (
+            f"BufferizedNDArray_{dt.kind}{dt.itemsize * 8}_"
+            f"shape_{str_format(self.shape_t.struct_fieldformats)}_"
+            f"strides_{str_format(self.strides_t.struct_fieldformats)}"
+        )
 
     @property
     def struct_fields(self):
         return [
-            ("buf", self.buf),
-            ("_ndim", self._ndim),
-            ("strides", self._strides),
+            ("buf", self.buf_t),
+            ("shape", self.shape_t),
+            ("strides", self.strides_t),
         ]
 
-    def __init__(self, buf, ndim: int, strides: TupleFType):
-        self.buf = buf
+    def __init__(self, buf_t: NumpyBufferFType, ndim: np.intp, strides_t: TupleFType):
+        self.buf_t = buf_t
         self._ndim = ndim
-        self._strides = strides
+        self.shape_t = strides_t  # assuming shape is the same type as strides
+        self.strides_t = strides_t
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
             return False
-        return self.buf == other.buf and self._ndim == other._ndim
+        return self.buf_t == other.buf_t and self._ndim == other._ndim
 
     def __hash__(self):
-        return hash((self.buf, self._ndim))
+        return hash((self.buf_t, self._ndim))
 
     def __str__(self):
-        return f"{self.struct_name}(ndim={self.ndim})"
+        return str(self.struct_name)
+
+    def __repr__(self):
+        return f"{self.struct_name}({repr(self.buf_t)})"
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         return self._ndim
 
     @property
     def fill_value(self) -> Any:
-        return np.zeros((), dtype=self.buf.dtype)[()]
+        return np.zeros((), dtype=self.buf_t.element_type)[()]
 
     @property
     def element_type(self):
-        return self.buf.element_type
+        return self.buf_t.element_type
 
     @property
     def shape_type(self) -> tuple:
-        return tuple(np.int_ for _ in range(self._ndim))
+        return tuple(np.intp for _ in range(self._ndim))
 
     def lower_declare(self, ctx, tns, init, op, shape):
-        i_var = asm.Variable("i", self.buf.length_type)
+        i_var = asm.Variable("i", self.buf_t.length_type)
         body = asm.Store(
             tns.obj.buf_s,
             i_var,
@@ -170,9 +205,9 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         if isinstance(mode, ntn.Update):
             op = mode.op
         tns = ctx.resolve(tns).obj
-        acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf.length_type, op)
+        acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf_t.length_type, op)
         obj = BufferizedNDArrayAccessorFields(
-            tns, 0, asm.Literal(self.buf.length_type(0)), op
+            tns, 0, asm.Literal(self.buf_t.length_type(0)), op
         )
         return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
 
@@ -186,15 +221,15 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         """
         stride = []
         for i in range(self._ndim):
-            stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf.length_type)
+            stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf_t.length_type)
             stride.append(stride_i)
             stride_e = asm.GetAttr(val, asm.Literal("strides"))
             stride_i_e = asm.GetAttr(stride_e, asm.Literal(f"element_{i}"))
             ctx.exec(asm.Assign(stride_i, stride_i_e))
-        buf = asm.Variable(f"{var_n}_buf", self.buf)
+        buf = asm.Variable(f"{var_n}_buf", self.buf_t)
         buf_e = asm.GetAttr(val, asm.Literal("buf"))
         ctx.exec(asm.Assign(buf, buf_e))
-        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf)
+        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf_t)
         ctx.exec(asm.Unpack(buf_s, buf))
 
         return BufferizedNDArrayFields(tuple(stride), buf, buf_s)
@@ -206,6 +241,14 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ctx.exec(asm.Repack(obj.buf_s))
         return
 
+    def __call__(
+        self,
+        buf: NumpyBuffer,
+        shape: tuple[np.integer, ...],
+        strides: tuple[np.integer, ...],
+    ) -> BufferizedNDArray:
+        return BufferizedNDArray(buf, shape, strides)
+
 
 class BufferizedNDArrayAccessor(Tensor):
     """
@@ -216,7 +259,7 @@ class BufferizedNDArrayAccessor(Tensor):
     def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
-            pos = ftype(self.tns).buf.length_type(0)
+            pos = ftype(self.tns).buf_t.length_type(0)
         self.pos = pos
         self.op = op
         if nind is None:
@@ -286,7 +329,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return hash((self.tns, self.nind, self.pos, self.op))
 
     @property
-    def ndim(self) -> int:
+    def ndim(self) -> np.intp:
         return self.tns.ndim - self.nind
 
     @property
@@ -316,6 +359,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
+    # TODO: We should unpack arrays before passing them to freeze/thaw
     # def asm_unpack(self, ctx, var_n, val):
     #     """
     #     Unpack the into asm context.

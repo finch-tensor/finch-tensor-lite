@@ -24,9 +24,14 @@ from .eager import (
     cos,
     cosh,
     elementwise,
+    equal,
     expand_dims,
     flatten,
     floordiv,
+    greater,
+    greater_equal,
+    less,
+    less_equal,
     log,
     log1p,
     log2,
@@ -45,6 +50,7 @@ from .eager import (
     moveaxis,
     multiply,
     negative,
+    not_equal,
     permute_dims,
     positive,
     pow,
@@ -65,13 +71,22 @@ from .eager import (
     var,
     vecdot,
 )
-from .fuse import compute, fuse, fused, get_default_scheduler, set_default_scheduler
-from .lazy import LazyTensor, argmax, argmin, asarray, defer
+
+from .fuse import (
+    Mode,
+    compute,
+    fuse,
+    fused,
+    get_default_scheduler,
+    set_default_scheduler,
+)
+from .lazy import LazyTensor, asarray, defer, argmax, argmin
 from .scalar import Scalar, ScalarFType
 
 __all__ = [
     "EagerTensor",
     "LazyTensor",
+    "Mode",
     "Scalar",
     "ScalarFType",
     "abs",
@@ -103,12 +118,17 @@ __all__ = [
     "cosh",
     "defer",
     "elementwise",
+    "equal",
     "expand_dims",
     "flatten",
     "floordiv",
     "fuse",
     "fused",
     "get_default_scheduler",
+    "greater",
+    "greater_equal",
+    "less",
+    "less_equal",
     "log",
     "log1p",
     "log2",
@@ -127,6 +147,7 @@ __all__ = [
     "moveaxis",
     "multiply",
     "negative",
+    "not_equal",
     "permute_dims",
     "positive",
     "pow",
