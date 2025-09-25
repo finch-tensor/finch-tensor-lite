@@ -673,6 +673,70 @@ def prod(
     return reduce(operator.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
+#######################################
+class LazyIndices:
+    def __init__(self, shape):
+        self.shape = shape
+
+    def __getitem__(self, idxs):
+        flat_index = idxs[0]
+        for i in range(1, len(self.shape)):
+            flat_index = flat_index * self.shape[i] + idxs[i]
+        return flat_index
+
+
+def last(tup):
+    return tup[-1]
+
+
+def argmin(x, axis=None):
+    x = defer(x)
+    shape = x.shape
+
+    if axis is None:
+        indices = LazyIndices(shape)
+
+    else:
+        broadcast_indices = LazyTensor(
+            "i",
+            shape=(x.shape[axis],),
+            fill_value=x.fill_value,
+            element_type=x.element_type,
+        )
+        indices = expand_dims(
+            broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
+        )
+    # tuple(range(len(notin_a), len(notin_a) + len(axes_a)))
+    paired = elementwise(tuple, x, indices)
+    reduced = reduce(operator.minby, paired, axis=axis, init=(float("inf"), 0))
+
+    return elementwise(last, reduced)
+
+
+def argmax(x, axis=None):
+    x = defer(x)
+    shape = x.shape
+
+    if axis is None:
+        indices = LazyIndices(shape)
+
+    else:
+        broadcast_indices = LazyTensor(
+            "i",
+            shape=(x.shape[axis],),
+            fill_value=x.fill_value,
+            element_type=x.element_type,
+        )
+        indices = expand_dims(
+            broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
+        )
+
+    paired = elementwise(tuple, x, indices)
+    reduced = reduce(operator.maxby, paired, axis=axis, init=(float("inf"), 0))
+
+    return elementwise(last, reduced)
+
+
 def any(
     x,
     /,

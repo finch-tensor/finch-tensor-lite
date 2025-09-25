@@ -290,6 +290,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         finchlite.defer,
     ],
 )
+######################
 @pytest.mark.parametrize(
     "ops, np_op",
     [
@@ -299,6 +300,8 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         ((finchlite.all, np.all), np.all),
         ((finchlite.min, np.min), np.min),
         ((finchlite.max, np.max), np.max),
+        ((finchlite.argmin, np.argmin), np.argmin),
+        ((finchlite.argmax, np.argmax), np.argmax),
         ((finchlite.mean, np.mean), np.mean),
         ((finchlite.std, np.std), np.std),
         ((finchlite.var, np.var), np.var),
@@ -313,6 +316,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         (0, 1),
     ],
 )
+########################
 def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     wa = a_wrap(a)
 
