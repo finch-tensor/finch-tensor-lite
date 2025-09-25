@@ -1,0 +1,5 @@
+Point(x=np.float64(1.0), y=np.float64(2.0)) 
+(1, 4) 
+Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) 
+9.0 
+Point(x=np.float64(1.0), y=np.float64(2.0)) (1, 4) 9.0 

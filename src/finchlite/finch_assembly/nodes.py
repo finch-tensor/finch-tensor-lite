@@ -589,6 +589,23 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree):
+    """
+    Print values of give variables.
+
+    Attributes:
+        args: list of variables to be printed.
+    """
+
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
+
+
 class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -752,6 +769,12 @@ class AssemblyPrinterContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
+                return None
+            case Print(args):
+                arg_decls = [
+                    f"{self(arg)}" for arg in args if isinstance(arg, Variable)
+                ]
+                self.exec(f"{feed}print {arg_decls}")
                 return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
