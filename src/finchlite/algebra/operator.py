@@ -17,6 +17,15 @@ def ifelse(a, b, c):
     return a if c else b
 
 
+# Assuming we are passing tuples which are values and its corresponding indices
+def minby(a, b):
+    return a if a[0] <= b[0] else b
+
+
+def maxby(a, b):
+    return a if a[0] >= b[0] else b
+
+
 def promote_min(a, b):
     cast = algebra.promote_type(a, b)
     return cast(min(a, b))

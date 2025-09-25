@@ -71,6 +71,7 @@ from .eager import (
     var,
     vecdot,
 )
+
 from .fuse import (
     Mode,
     compute,
@@ -79,7 +80,7 @@ from .fuse import (
     get_default_scheduler,
     set_default_scheduler,
 )
-from .lazy import LazyTensor, asarray, defer
+from .lazy import LazyTensor, asarray, defer, argmax, argmin
 from .scalar import Scalar, ScalarFType
 
 __all__ = [
@@ -94,6 +95,8 @@ __all__ = [
     "add",
     "all",
     "any",
+    "argmax",
+    "argmin",
     "asarray",
     "asin",
     "asinh",
