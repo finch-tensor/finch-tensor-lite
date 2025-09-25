@@ -336,16 +336,11 @@ class AssemblyInterpreter:
                             )
                 return AssemblyInterpreterModule(self, kernels)
             case asm.Print(args):
-                if isinstance(args, tuple):
-                    args_value_str = ""
-                    for arg in args:
-                        if isinstance(arg, asm.Variable):
-                            args_value_str = args_value_str + f"{self(arg)} "
-                    print(args_value_str, file=sys.stdout)
-                else:
-                    raise NotImplementedError(
-                        f"Unrecognized argument type: {args}, should be Tuple."
-                    )
+                args_value_str = ""
+                for arg in args:
+                    if isinstance(arg, asm.Variable):
+                        args_value_str = args_value_str + f"{self(arg)} "
+                print(args_value_str, file=sys.stdout)
                 return None
             case asm.Stack(val):
                 raise NotImplementedError(
