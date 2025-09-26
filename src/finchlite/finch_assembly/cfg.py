@@ -73,9 +73,6 @@ class ControlFlowGraph:
         self.entry_block = self.new_block()
         self.exit_block = self.new_block()
 
-        self.current_block = self.new_block()
-        self.entry_block.add_successor(self.current_block)
-
     def new_block(self):
         bid = f"{self.name}_{self.block_counter}"
         self.block_counter += 1
@@ -105,10 +102,13 @@ class CFGBuilder:
 
     def __init__(self):
         self.cfgs: dict[str, ControlFlowGraph] = {}
+        self.current_block = None
         self.current_cfg: ControlFlowGraph
 
     def new_cfg(self, name: str) -> ControlFlowGraph:
         new_cfg = ControlFlowGraph(name)
+        self.current_block = new_cfg.new_block()
+        new_cfg.entry_block.add_successor(self.current_block)
         self.cfgs[name] = new_cfg
         return new_cfg
 
@@ -142,12 +142,12 @@ class CFGBuilder:
                 | Stack()
                 | Assign()
             ):
-                self.current_cfg.current_block.add_statement(node)
+                self.current_block.add_statement(node)
             case Block(bodies):
                 for body in bodies:
                     self(body, break_block)
             case If(cond, body):
-                before_block = self.current_cfg.current_block
+                before_block = self.current_block
 
                 if_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
@@ -156,13 +156,13 @@ class CFGBuilder:
                 before_block.add_successor(after_block)
 
                 if_block.add_statement(cond)
-                self.current_cfg.current_block = if_block
+                self.current_block = if_block
                 self(body, break_block)
 
-                self.current_cfg.current_block.add_successor(after_block)
-                self.current_cfg.current_block = after_block
+                self.current_block.add_successor(after_block)
+                self.current_block = after_block
             case IfElse(cond, body, else_body):
-                before_block = self.current_cfg.current_block
+                before_block = self.current_block
 
                 if_block = self.current_cfg.new_block()
                 else_block = self.current_cfg.new_block()
@@ -172,17 +172,17 @@ class CFGBuilder:
                 before_block.add_successor(else_block)
 
                 if_block.add_statement(cond)
-                self.current_cfg.current_block = if_block
+                self.current_block = if_block
                 self(body, break_block)
-                self.current_cfg.current_block.add_successor(after_block)
+                self.current_block.add_successor(after_block)
 
-                self.current_cfg.current_block = else_block
+                self.current_block = else_block
                 self(else_body, break_block)
-                self.current_cfg.current_block.add_successor(after_block)
+                self.current_block.add_successor(after_block)
 
-                self.current_cfg.current_block = after_block
+                self.current_block = after_block
             case WhileLoop(cond, body):
-                before_block = self.current_cfg.current_block
+                before_block = self.current_block
 
                 body_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
@@ -191,13 +191,13 @@ class CFGBuilder:
                 before_block.add_successor(after_block)
 
                 body_block.add_statement(cond)
-                self.current_cfg.current_block = body_block
+                self.current_block = body_block
                 self(body, after_block)
 
-                self.current_cfg.current_block.add_successor(before_block)
-                self.current_cfg.current_block = after_block
+                self.current_block.add_successor(before_block)
+                self.current_block = after_block
             case ForLoop(var, _start, _var, body):
-                before_block = self.current_cfg.current_block
+                before_block = self.current_block
 
                 body_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
@@ -208,13 +208,13 @@ class CFGBuilder:
                 # TODO: figure out a RIGHT way to represent 'ForLoop' initialization
                 # statement
                 body_block.add_statement(Assign(var, var))
-                self.current_cfg.current_block = body_block
+                self.current_block = body_block
                 self(body, after_block)
 
-                self.current_cfg.current_block.add_successor(body_block)
-                self.current_cfg.current_block = after_block
+                self.current_block.add_successor(body_block)
+                self.current_block = after_block
             case BufferLoop(_buf, var, body):
-                before_block = self.current_cfg.current_block
+                before_block = self.current_block
 
                 body_block = self.current_cfg.new_block()
                 after_block = self.current_cfg.new_block()
@@ -225,33 +225,33 @@ class CFGBuilder:
                 # TODO: figure out a RIGHT way to represent 'BufferLoop' initialization
                 # statement
                 body_block.add_statement(Assign(var, var))
-                self.current_cfg.current_block = body_block
+                self.current_block = body_block
                 self(body, after_block)
 
-                self.current_cfg.current_block.add_successor(body_block)
-                self.current_cfg.current_block = after_block
+                self.current_block.add_successor(body_block)
+                self.current_block = after_block
             case Return(value):
-                self.current_cfg.current_block.add_statement(Return(value))
+                self.current_block.add_statement(Return(value))
 
                 # when Return is met,
                 # make a connection to the EXIT block of function (cfg)
-                self.current_cfg.current_block.add_successor(
+                self.current_block.add_successor(
                     self.current_cfg.exit_block
                 )
 
                 # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
-                self.current_cfg.current_block = unreachable_block
+                self.current_block = unreachable_block
             case Break():
-                self.current_cfg.current_block.add_statement(Break())
-                self.current_cfg.current_block.add_successor(break_block)
+                self.current_block.add_statement(Break())
+                self.current_block.add_successor(break_block)
                 unreachable_block = self.current_cfg.new_block()
-                self.current_cfg.current_block = unreachable_block
+                self.current_block = unreachable_block
             case Function(_, args, body):
                 for arg in args:
                     match arg:
                         case TaggedVariable():
-                            self.current_cfg.current_block.add_statement(arg)
+                            self.current_block.add_statement(arg)
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -273,7 +273,7 @@ class CFGBuilder:
 
                     self.current_cfg = self.new_cfg(func_name)
                     self(func)
-                    self.current_cfg.current_block.add_successor(
+                    self.current_block.add_successor(
                         self.current_cfg.exit_block
                     )
             case node:
