@@ -7,7 +7,7 @@ import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
-from finchlite.finch_assembly.cfg import CFGBuilder
+from finchlite.finch_assembly.cfg_builder import CFGBuilder
 
 
 def test_log_printer(file_regression):
