@@ -144,6 +144,3 @@ class ElementLevel(Level):
     @property
     def ftype(self):
         return self._format
-
-    def with_pos(self, pos: asm.AssemblyNode) -> "ElementLevel":
-        return ElementLevel(self._format, self.val, pos)
