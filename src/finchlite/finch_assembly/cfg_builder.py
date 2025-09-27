@@ -210,11 +210,14 @@ class CFGBuilder:
                             f"Unrecognized function type: {type(func)}"
                         )
 
-                    func_name = (
-                        func.name.variable.name
-                        if hasattr(func.name, "variable")
-                        else func.name.name
-                    )
+                    if isinstance(func.name, TaggedVariable):
+                        func_name = func.name.variable.name
+                    elif isinstance(func.name, Variable):
+                        func_name = func.name.name
+                    else:
+                        raise NotImplementedError(
+                            f"Unrecognized function name type: {type(func.name)}"
+                        )
 
                     self.current_cfg = self.new_cfg(func_name)
                     self(func)
