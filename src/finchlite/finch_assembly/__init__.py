@@ -1,4 +1,5 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
+from .cfg_builder import CFGBuilder
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -47,6 +48,7 @@ __all__ = [
     "Buffer",
     "BufferFType",
     "BufferLoop",
+    "CFGBuilder",
     "Call",
     "ForLoop",
     "Function",
