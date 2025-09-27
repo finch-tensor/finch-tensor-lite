@@ -1,7 +1,9 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
+from .cfg_builder import CFGBuilder
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
+    Assert,
     Assign,
     Block,
     Break,
@@ -39,12 +41,14 @@ __all__ = [
     "AssemblyStructFType",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
+    "Assert",
     "Assign",
     "Block",
     "Break",
     "Buffer",
     "BufferFType",
     "BufferLoop",
+    "CFGBuilder",
     "Call",
     "ForLoop",
     "Function",
