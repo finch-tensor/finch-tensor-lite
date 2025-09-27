@@ -5,9 +5,9 @@ import numpy as np
 import finchlite.finch_assembly as asm
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
-from finchlite.dataflow.cfg import CFGPrinterContext
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
+from finchlite.dataflow.cfg import CFGPrinterContext
 from finchlite.finch_assembly.cfg_builder import CFGBuilder
 
 

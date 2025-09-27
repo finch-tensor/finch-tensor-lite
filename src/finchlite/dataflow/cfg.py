@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any
+from typing import Any
 
 
 class BasicBlock:
@@ -44,32 +44,32 @@ class ControlFlowGraph:
 class CFGPrinterContext:
     def __init__(self, indent: int = 4):
         self.indent = indent
-    
+
     def print(self, cfgs: dict) -> str:
         all_cfgs = {}
-        
+
         for cfg in cfgs.values():
             all_cfgs[cfg.name] = self.cfg_to_dict(cfg)
         return json.dumps(all_cfgs, indent=self.indent, ensure_ascii=False)
-    
-    def cfg_to_dict(self, cfg: ControlFlowGraph) -> Dict[str, Any]:
+
+    def cfg_to_dict(self, cfg: ControlFlowGraph) -> dict[str, Any]:
         blocks_dict = {}
-        
+
         # Convert each block to dictionary format
         for block_id, block in cfg.blocks.items():
             blocks_dict[block_id] = self.block_to_dict(block)
-        
+
         return {
             "name": cfg.name,
             "entry_block": cfg.entry_block.id,
             "exit_block": cfg.exit_block.id,
-            "blocks": blocks_dict
+            "blocks": blocks_dict,
         }
-    
-    def block_to_dict(self, block: BasicBlock) -> Dict[str, Any]:
+
+    def block_to_dict(self, block: BasicBlock) -> dict[str, Any]:
         return {
             "id": block.id,
             "statements": [str(stmt) for stmt in block.statements],
             "successors": [succ.id for succ in block.successors],
-            "predecessors": [pred.id for pred in block.predecessors]
+            "predecessors": [pred.id for pred in block.predecessors],
         }
