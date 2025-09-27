@@ -1,5 +1,8 @@
+import operator
+
 from .nodes import (
     AssemblyNode,
+    Assert,
     Assign,
     Block,
     Break,
@@ -141,6 +144,7 @@ class CFGBuilder:
                 | Slot()
                 | Stack()
                 | Assign()
+                | Assert()
             ):
                 self.current_block.add_statement(node)
             case Block(bodies):
@@ -158,12 +162,20 @@ class CFGBuilder:
                 before_block.add_successor(if_block)
                 before_block.add_successor(else_block)
 
-                if_block.add_statement(cond)
                 self.current_block = if_block
+                self.current_block.add_statement(Assert(cond))
                 self(body, break_block)
                 self.current_block.add_successor(after_block)
 
                 self.current_block = else_block
+                self.current_block.add_statement(
+                    Assert(
+                        Call(
+                            Literal(operator.not_),
+                            (cond,),
+                        )
+                    )
+                )
                 self(else_body, break_block)
                 self.current_block.add_successor(after_block)
 
@@ -177,13 +189,13 @@ class CFGBuilder:
                 before_block.add_successor(body_block)
                 before_block.add_successor(after_block)
 
-                body_block.add_statement(cond)
                 self.current_block = body_block
+                self.current_block.add_statement(Assert(cond))
                 self(body, after_block)
 
                 self.current_block.add_successor(before_block)
                 self.current_block = after_block
-            case ForLoop(var, _start, _var, body):
+            case ForLoop(var, _start, _end, body):
                 before_block = self.current_block
 
                 body_block = self.current_cfg.new_block()
@@ -222,9 +234,7 @@ class CFGBuilder:
 
                 # when Return is met,
                 # make a connection to the EXIT block of function (cfg)
-                self.current_block.add_successor(
-                    self.current_cfg.exit_block
-                )
+                self.current_block.add_successor(self.current_cfg.exit_block)
 
                 # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
@@ -260,9 +270,7 @@ class CFGBuilder:
 
                     self.current_cfg = self.new_cfg(func_name)
                     self(func)
-                    self.current_block.add_successor(
-                        self.current_cfg.exit_block
-                    )
+                    self.current_block.add_successor(self.current_cfg.exit_block)
             case node:
                 raise NotImplementedError(node)
 

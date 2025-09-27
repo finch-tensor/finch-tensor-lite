@@ -37,7 +37,7 @@
             "if_else_3": {
                 "id": "if_else_3",
                 "statements": [
-                    "eq(a_1, 5)",
+                    "assert(eq(a_1, 5))",
                     "a_2: int64 = add(a_3, 10)"
                 ],
                 "successors": [
@@ -49,7 +49,9 @@
             },
             "if_else_4": {
                 "id": "if_else_4",
-                "statements": [],
+                "statements": [
+                    "assert(not_(eq(a_1, 5)))"
+                ],
                 "successors": [
                     "if_else_5"
                 ],
@@ -72,7 +74,7 @@
             "if_else_6": {
                 "id": "if_else_6",
                 "statements": [
-                    "lt(a_4, 15)",
+                    "assert(lt(a_4, 15))",
                     "a_5: int64 = sub(a_6, 3)"
                 ],
                 "successors": [
@@ -85,6 +87,7 @@
             "if_else_7": {
                 "id": "if_else_7",
                 "statements": [
+                    "assert(not_(lt(a_4, 15)))",
                     "a_7: int64 = mul(a_8, 2)"
                 ],
                 "successors": [

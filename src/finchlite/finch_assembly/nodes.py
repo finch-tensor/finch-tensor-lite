@@ -465,6 +465,24 @@ class If(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
+class Assert(AssemblyTree):
+    """
+    Represents an assert node which asserts that expression is true.
+    Used in the dataflow analysis to assert conditions in conditionals and loops.
+
+    Attributes:
+        exp: Expression which is being asserted.
+    """
+
+    exp: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.exp]
+
+
+@dataclass(eq=True, frozen=True)
 class IfElse(AssemblyTree):
     """
     Represents an if-else statement that executes the body if the condition
@@ -618,6 +636,8 @@ class AssemblyPrinterContext(Context):
         match prgm:
             case Literal(value):
                 return qual_str(value)
+            case Assert(exp):
+                return f"assert({self(exp)})"
             case TaggedVariable(Variable(name, _), id):
                 return f"{name}_{id}"
             case Variable(name, _):

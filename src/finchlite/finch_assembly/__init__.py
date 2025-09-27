@@ -2,6 +2,7 @@ from .buffer import Buffer, BufferFType, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
+    Assert,
     Assign,
     Block,
     Break,
@@ -39,6 +40,7 @@ __all__ = [
     "AssemblyStructFType",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
+    "Assert",
     "Assign",
     "Block",
     "Break",
