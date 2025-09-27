@@ -17,8 +17,8 @@
                 "statements": [],
                 "successors": [],
                 "predecessors": [
-                    "if_else_7",
-                    "if_else_8"
+                    "if_else_8",
+                    "if_else_9"
                 ]
             },
             "if_else_2": {
@@ -41,7 +41,7 @@
                     "a_2: int64 = add(a_3, 10)"
                 ],
                 "successors": [
-                    "if_else_4"
+                    "if_else_5"
                 ],
                 "predecessors": [
                     "if_else_2"
@@ -51,41 +51,51 @@
                 "id": "if_else_4",
                 "statements": [],
                 "successors": [
-                    "if_else_5",
-                    "if_else_6"
+                    "if_else_5"
                 ],
                 "predecessors": [
-                    "if_else_2",
-                    "if_else_3"
+                    "if_else_2"
                 ]
             },
             "if_else_5": {
                 "id": "if_else_5",
-                "statements": [
-                    "lt(a_4, 15)",
-                    "a_5: int64 = sub(a_6, 3)"
-                ],
+                "statements": [],
                 "successors": [
+                    "if_else_6",
                     "if_else_7"
                 ],
                 "predecessors": [
+                    "if_else_3",
                     "if_else_4"
                 ]
             },
             "if_else_6": {
                 "id": "if_else_6",
                 "statements": [
-                    "a_7: int64 = mul(a_8, 2)"
+                    "lt(a_4, 15)",
+                    "a_5: int64 = sub(a_6, 3)"
                 ],
                 "successors": [
-                    "if_else_7"
+                    "if_else_8"
                 ],
                 "predecessors": [
-                    "if_else_4"
+                    "if_else_5"
                 ]
             },
             "if_else_7": {
                 "id": "if_else_7",
+                "statements": [
+                    "a_7: int64 = mul(a_8, 2)"
+                ],
+                "successors": [
+                    "if_else_8"
+                ],
+                "predecessors": [
+                    "if_else_5"
+                ]
+            },
+            "if_else_8": {
+                "id": "if_else_8",
                 "statements": [
                     "return a_9"
                 ],
@@ -93,12 +103,12 @@
                     "if_else_1"
                 ],
                 "predecessors": [
-                    "if_else_5",
-                    "if_else_6"
+                    "if_else_6",
+                    "if_else_7"
                 ]
             },
-            "if_else_8": {
-                "id": "if_else_8",
+            "if_else_9": {
+                "id": "if_else_9",
                 "statements": [],
                 "successors": [
                     "if_else_1"

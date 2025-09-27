@@ -147,20 +147,7 @@ class CFGBuilder:
                 for body in bodies:
                     self(body, break_block)
             case If(cond, body):
-                before_block = self.current_block
-
-                if_block = self.current_cfg.new_block()
-                after_block = self.current_cfg.new_block()
-
-                before_block.add_successor(if_block)
-                before_block.add_successor(after_block)
-
-                if_block.add_statement(cond)
-                self.current_block = if_block
-                self(body, break_block)
-
-                self.current_block.add_successor(after_block)
-                self.current_block = after_block
+                self(IfElse(cond, body, Block()))
             case IfElse(cond, body, else_body):
                 before_block = self.current_block
 
