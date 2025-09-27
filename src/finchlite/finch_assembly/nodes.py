@@ -219,7 +219,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable | Stack
+    lhs: TaggedVariable | Variable | Stack
     rhs: AssemblyExpression
 
     @property

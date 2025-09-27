@@ -1,5 +1,7 @@
 import operator
 
+import numpy as np
+
 from ..dataflow.cfg import BasicBlock, ControlFlowGraph
 from .nodes import (
     AssemblyNode,
@@ -27,6 +29,7 @@ from .nodes import (
     Store,
     TaggedVariable,
     Unpack,
+    Variable,
     WhileLoop,
 )
 
@@ -38,6 +41,7 @@ class CFGBuilder:
         self.cfgs: dict[str, ControlFlowGraph] = {}
         self.current_block = None
         self.current_cfg: ControlFlowGraph
+        self.loop_counter_id = 0
 
     def new_cfg(self, name: str) -> ControlFlowGraph:
         new_cfg = ControlFlowGraph(name)
@@ -73,7 +77,7 @@ class CFGBuilder:
                 for body in bodies:
                     self(body, break_block)
             case If(cond, body):
-                self(IfElse(cond, body, Block()))
+                self(IfElse(cond, body, Block()), break_block)
             case IfElse(cond, body, else_body):
                 before_block = self.current_block
 
@@ -117,48 +121,64 @@ class CFGBuilder:
 
                 self.current_block.add_successor(before_block)
                 self.current_block = after_block
-            case ForLoop(var, _start, _end, body):
+            case ForLoop(var, start, end, body):
                 before_block = self.current_block
 
-                body_block = self.current_cfg.new_block()
-                after_block = self.current_cfg.new_block()
+                # create fictitious variable
+                fic_var = TaggedVariable(
+                    Variable("for_loop_counter", np.int64), self.loop_counter_id
+                )
+                before_block.add_statement(Assign(fic_var, start))
 
-                before_block.add_successor(body_block)
-                before_block.add_successor(after_block)
+                # create while loop condition: j < end
+                loop_condition = Call(Literal(operator.lt), (fic_var, end))
 
-                # TODO: figure out a RIGHT way to represent 'ForLoop' initialization
-                # statement
-                body_block.add_statement(Assign(var, var))
-                self.current_block = body_block
-                self(body, after_block)
+                # create loop body with i = j assignment and increment
+                loop_body = Block(
+                    (
+                        Assign(var, fic_var),
+                        body,
+                        Assign(
+                            fic_var,
+                            Call(
+                                Literal(operator.add),
+                                (fic_var, Literal(1)),
+                            ),
+                        ),
+                    )
+                )
 
-                self.current_block.add_successor(body_block)
-                self.current_block = after_block
-            case BufferLoop(_buf, var, body):
+                self(WhileLoop(loop_condition, loop_body), break_block)
+            case BufferLoop(buf, var, body):
                 before_block = self.current_block
 
-                body_block = self.current_cfg.new_block()
-                after_block = self.current_cfg.new_block()
+                fic_var = TaggedVariable(
+                    Variable("buffer_loop_counter", np.int64), self.loop_counter_id
+                )
+                before_block.add_statement(Assign(fic_var, Literal(0)))
 
-                before_block.add_successor(body_block)
-                before_block.add_successor(after_block)
+                # create while loop condition: i < length(buf)
+                loop_condition = Call(Literal(operator.lt), (fic_var, Length(buf)))
 
-                # TODO: figure out a RIGHT way to represent 'BufferLoop' initialization
-                # statement
-                body_block.add_statement(Assign(var, var))
-                self.current_block = body_block
-                self(body, after_block)
+                # create loop body with var = buf[i] assignment and increment
+                loop_body = Block(
+                    (
+                        Assign(var, Load(buf, fic_var)),
+                        body,
+                        Assign(
+                            fic_var,
+                            Call(
+                                Literal(operator.add),
+                                (fic_var, Literal(1)),
+                            ),
+                        ),
+                    )
+                )
 
-                self.current_block.add_successor(body_block)
-                self.current_block = after_block
+                self(WhileLoop(loop_condition, loop_body), break_block)
             case Return(value):
                 self.current_block.add_statement(Return(value))
-
-                # when Return is met,
-                # make a connection to the EXIT block of function (cfg)
                 self.current_block.add_successor(self.current_cfg.exit_block)
-
-                # create a block where we going to store all unreachable statements
                 unreachable_block = self.current_cfg.new_block()
                 self.current_block = unreachable_block
             case Break():

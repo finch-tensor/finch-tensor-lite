@@ -28,28 +28,31 @@
                     "b_0",
                     "c_0: float64 = 0.0",
                     "a_: np_buf_t(float64) = unpack(a_1)",
-                    "b_: np_buf_t(float64) = unpack(b_1)"
+                    "b_: np_buf_t(float64) = unpack(b_1)",
+                    "for_loop_counter_0: int64 = 0"
                 ],
                 "successors": [
                     "dot_product_3",
                     "dot_product_4"
                 ],
                 "predecessors": [
-                    "dot_product_0"
+                    "dot_product_0",
+                    "dot_product_3"
                 ]
             },
             "dot_product_3": {
                 "id": "dot_product_3",
                 "statements": [
-                    "i_0: int64 = i_0",
-                    "c_1: float64 = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))"
+                    "assert(lt(for_loop_counter_0, length(slot(a_, np_buf_t(float64)))))",
+                    "i_0: int64 = for_loop_counter_0",
+                    "c_1: float64 = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))",
+                    "for_loop_counter_0: int64 = add(for_loop_counter_0, 1)"
                 ],
                 "successors": [
-                    "dot_product_3"
+                    "dot_product_2"
                 ],
                 "predecessors": [
-                    "dot_product_2",
-                    "dot_product_3"
+                    "dot_product_2"
                 ]
             },
             "dot_product_4": {
