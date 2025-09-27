@@ -49,15 +49,6 @@ class CFGBuilder:
     def build(self, node: AssemblyNode):
         return self(node)
 
-    def to_dict(self):
-        """Convert all CFGs to dictionaries for JSON serialization."""
-        return {cfg_name: cfg.to_dict() for cfg_name, cfg in self.cfgs.items()}
-
-    def __str__(self):
-        import json as _json
-
-        return _json.dumps(self.to_dict(), indent=4)
-
     def __call__(self, node: AssemblyNode, break_block: BasicBlock | None = None):
         match node:
             case (

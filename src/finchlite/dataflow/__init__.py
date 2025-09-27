@@ -1,7 +1,8 @@
-from .cfg import BasicBlock, ControlFlowGraph
+from .cfg import BasicBlock, ControlFlowGraph, CFGPrinterContext
 
 
 __all__ = [
     "BasicBlock",
-    "ControlFlowGraph"
+    "ControlFlowGraph",
+    "CFGPrinterContext",
 ]

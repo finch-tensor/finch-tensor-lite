@@ -1,3 +1,7 @@
+import json
+from typing import Dict, Any
+
+
 class BasicBlock:
     """A basic block of FinchAssembly Control Flow Graph."""
 
@@ -17,20 +21,6 @@ class BasicBlock:
         if self not in successor.predecessors:
             successor.predecessors.append(self)
 
-    def to_dict(self):
-        """Convert BasicBlock to a dictionary for JSON serialization."""
-        return {
-            "id": self.id,
-            "statements": [str(stmt) for stmt in self.statements],
-            "successors": [str(block.id) for block in self.successors],
-            "predecessors": [str(block.id) for block in self.predecessors],
-        }
-
-    def __str__(self):
-        import json as _json
-
-        return _json.dumps(self.to_dict(), indent=4)
-
 
 class ControlFlowGraph:
     """Control-Flow Graph (CFG) for a single FinchAssembly function."""
@@ -40,7 +30,6 @@ class ControlFlowGraph:
         self.name = func_name
         self.blocks: dict[str, BasicBlock] = {}
 
-        # initialize ENTRY and EXIT blocks
         self.entry_block = self.new_block()
         self.exit_block = self.new_block()
 
@@ -51,18 +40,36 @@ class ControlFlowGraph:
         self.blocks[bid] = block
         return block
 
-    def to_dict(self):
-        """Convert CFG to a dictionary for JSON serialization."""
+
+class CFGPrinterContext:
+    def __init__(self, indent: int = 4):
+        self.indent = indent
+    
+    def print(self, cfgs: dict) -> str:
+        all_cfgs = {}
+        
+        for cfg in cfgs.values():
+            all_cfgs[cfg.name] = self.cfg_to_dict(cfg)
+        return json.dumps(all_cfgs, indent=self.indent, ensure_ascii=False)
+    
+    def cfg_to_dict(self, cfg: ControlFlowGraph) -> Dict[str, Any]:
+        blocks_dict = {}
+        
+        # Convert each block to dictionary format
+        for block_id, block in cfg.blocks.items():
+            blocks_dict[block_id] = self.block_to_dict(block)
+        
         return {
-            "name": self.name,
-            "entry_block": self.entry_block.id,
-            "exit_block": self.exit_block.id,
-            "blocks": {
-                block_id: block.to_dict() for block_id, block in self.blocks.items()
-            },
+            "name": cfg.name,
+            "entry_block": cfg.entry_block.id,
+            "exit_block": cfg.exit_block.id,
+            "blocks": blocks_dict
         }
-
-    def __str__(self):
-        import json as _json
-
-        return _json.dumps(self.to_dict(), indent=4)
+    
+    def block_to_dict(self, block: BasicBlock) -> Dict[str, Any]:
+        return {
+            "id": block.id,
+            "statements": [str(stmt) for stmt in block.statements],
+            "successors": [succ.id for succ in block.successors],
+            "predecessors": [pred.id for pred in block.predecessors]
+        }
