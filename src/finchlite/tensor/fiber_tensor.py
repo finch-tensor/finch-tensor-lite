@@ -174,7 +174,7 @@ class FiberTensorFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFType(FinchTensorFType):
+class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     """
     An abstract base class representing the ftype of a fiber tensor.
 
@@ -184,6 +184,18 @@ class FiberTensorFType(FinchTensorFType):
 
     lvl: LevelFType
     _position_type: type | None = None
+
+    @property
+    def struct_name(self):
+        # TODO
+        # dt = np.dtype(self.buf_t.element_type)
+        return "FiberTensorFType"
+
+    @property
+    def struct_fields(self):
+        return [
+            ("lvl", self.lvl),
+        ]
 
     def __post_init__(self):
         if self._position_type is None:

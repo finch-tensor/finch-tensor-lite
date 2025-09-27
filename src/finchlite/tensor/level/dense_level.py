@@ -141,6 +141,3 @@ class DenseLevel(Level):
     @property
     def ftype(self):
         return self._format
-
-    def with_pos(self, pos: asm.AssemblyNode) -> "DenseLevel":
-        return DenseLevel(self._format, self.lvl, self.dimension, pos)
