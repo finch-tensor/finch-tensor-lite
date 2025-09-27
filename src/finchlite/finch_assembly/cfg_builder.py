@@ -50,6 +50,11 @@ class CFGBuilder:
         self.cfgs[name] = new_cfg
         return new_cfg
 
+    def get_loop_counter_id(self):
+        current_id = self.loop_counter_id
+        self.loop_counter_id += 1
+        return current_id
+
     def build(self, node: AssemblyNode):
         return self(node)
 
@@ -126,7 +131,7 @@ class CFGBuilder:
 
                 # create fictitious variable
                 fic_var = TaggedVariable(
-                    Variable("for_loop_counter", np.int64), self.loop_counter_id
+                    Variable("for_loop_counter", np.int64), self.get_loop_counter_id()
                 )
                 before_block.add_statement(Assign(fic_var, start))
 
@@ -142,7 +147,7 @@ class CFGBuilder:
                             fic_var,
                             Call(
                                 Literal(operator.add),
-                                (fic_var, Literal(1)),
+                                (fic_var, Literal(np.int64(1))),
                             ),
                         ),
                     )
@@ -153,9 +158,10 @@ class CFGBuilder:
                 before_block = self.current_block
 
                 fic_var = TaggedVariable(
-                    Variable("buffer_loop_counter", np.int64), self.loop_counter_id
+                    Variable("buffer_loop_counter", np.int64),
+                    self.get_loop_counter_id(),
                 )
-                before_block.add_statement(Assign(fic_var, Literal(0)))
+                before_block.add_statement(Assign(fic_var, Literal(np.int64(0))))
 
                 # create while loop condition: i < length(buf)
                 loop_condition = Call(Literal(operator.lt), (fic_var, Length(buf)))
@@ -169,7 +175,7 @@ class CFGBuilder:
                             fic_var,
                             Call(
                                 Literal(operator.add),
-                                (fic_var, Literal(1)),
+                                (fic_var, Literal(np.int64(1))),
                             ),
                         ),
                     )
