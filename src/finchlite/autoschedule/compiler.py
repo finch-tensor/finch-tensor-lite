@@ -14,7 +14,7 @@ from ..algebra import (
     return_type,
 )
 from ..codegen import NumpyBufferFType
-from ..compile import BufferizedNDArrayFType, ExtentFType, dimension
+from ..compile import ExtentFType, dimension
 from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
@@ -204,7 +204,7 @@ class LogicLowerer:
                 return ntn.Assign(
                     ntn.Variable(
                         name,
-                        BufferizedNDArrayFType(
+                        type(val)(
                             NumpyBufferFType(val.dtype),
                             val.ndim,
                             TupleFType.from_tuple(val.shape_type),
@@ -484,12 +484,12 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                 )
             )
 
-            return BufferizedNDArrayFType(
-                buf_t=NumpyBufferFType(dtype),
-                ndim=np.intp(len(result_fields)),
-                strides_t=TupleFType.from_tuple(
-                    tuple(field_type_map[f] for f in result_fields)
-                ),
+            # TODO: infer result rep from args
+            result_rep = type(args_suitable_reps_fields[0][0])
+            return result_rep(
+                NumpyBufferFType(dtype),
+                np.intp(len(result_fields)),
+                TupleFType.from_tuple(tuple(field_type_map[f] for f in result_fields)),
             )
         case Aggregate(Literal(op), init, arg, idxs):
             init_suitable_rep = find_suitable_rep(init, table_vars)
@@ -504,10 +504,8 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                 for f, st in zip(arg.fields, arg_suitable_rep.shape_type, strict=True)
                 if f not in idxs
             )
-            return BufferizedNDArrayFType(
-                buf_t=buf_t,
-                ndim=np.intp(len(strides_t)),
-                strides_t=TupleFType.from_tuple(strides_t),
+            return type(arg_suitable_rep)(
+                buf_t, np.intp(len(strides_t)), TupleFType.from_tuple(strides_t)
             )
         case LogicTree() as tree:
             for child in tree.children:
