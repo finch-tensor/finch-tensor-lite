@@ -690,13 +690,9 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     [
         (
             {"i": 1000, "j": 1000},
-            [
-                DC(frozenset(), frozenset([1, 2]), 1)
-            ],
+            [DC(frozenset(), frozenset([1, 2]), 1)],
             {"i": 1000, "j": 1000},
-            [
-                DC(frozenset(), frozenset([1, 2]), 1)
-            ],
+            [DC(frozenset(), frozenset([1, 2]), 1)],
             2,
         ),
     ],
@@ -718,13 +714,9 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     [
         (
             {"i": 1000},
-            [
-                DC(frozenset(), frozenset([1]), 5)
-            ],
+            [DC(frozenset(), frozenset([1]), 5)],
             {"j": 100},
-            [
-                DC(frozenset(), frozenset([2]), 10)
-            ],
+            [DC(frozenset(), frozenset([2]), 10)],
             10 * 1000 + 5 * 100,
         ),
     ],
@@ -740,18 +732,15 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
+
 @pytest.mark.parametrize(
     "dims1, dcs1, dims2, dcs2, expected_nnz",
     [
         (
             {"i": 1000, "j": 100},
-            [
-                DC(frozenset(), frozenset([1, 2]), 5)
-            ],
+            [DC(frozenset(), frozenset([1, 2]), 5)],
             {"j": 100, "k": 1000},
-            [
-                DC(frozenset(), frozenset([2, 3]), 10)
-            ],
+            [DC(frozenset(), frozenset([2, 3]), 10)],
             10 * 1000 + 5 * 1000,
         ),
     ],
@@ -763,33 +752,29 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
 
     stat2 = DCStats(np.zeros((1, 1), dtype=int), ["j", "k"])
     stat2.tensordef = TensorDef(frozenset(["j", "k"]), {"j": 100, "k": 1000}, 0)
-    stat2.dcs = { DC(frozenset(), frozenset([2, 3]), 10) }
+    stat2.dcs = {DC(frozenset(), frozenset([2, 3]), 10)}
 
     reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
 
 @pytest.mark.parametrize(
     "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
     [
         (
             {"i": 1000, "j": 100},
-            [
-                DC(frozenset(), frozenset([1, 2]), 5)
-            ],
+            [DC(frozenset(), frozenset([1, 2]), 5)],
             {"j": 100, "k": 1000},
-            [
-                DC(frozenset(), frozenset([2, 3]), 10)
-            ],
+            [DC(frozenset(), frozenset([2, 3]), 10)],
             {"i": 1000, "j": 100, "k": 1000},
-            [
-                DC(frozenset(), frozenset([1, 2, 3]), 10)
-            ],
+            [DC(frozenset(), frozenset([1, 2, 3]), 10)],
             10,
         ),
     ],
 )
-def test_misture_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, dims3, dcs3,
-expected_nnz):
+def test_mixture_disjoint_disjunction_dc_card(
+    dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
+):
     stat1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
     stat1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 0)
     stat1.dcs = set(dcs1)

@@ -1,9 +1,9 @@
 import math
 import operator
-from collections import Counter, OrderedDict
+from collections import Counter
 from collections.abc import Callable, Iterable, Sequence, Set
 from dataclasses import dataclass
-from typing import Any, cast, Iterable, Hashable, Mapping
+from typing import Any, cast
 
 import numpy as np
 
@@ -35,12 +35,13 @@ class DC:
     to_indices: frozenset[str]
     value: float
 
-def _normalized_dcs(stats: "DCStats", axes: Sequence[str]) -> Set["DC"]:
+
+def _unify_dc_ints(stats: "DCStats", axes: Sequence[str]) -> Set["DC"]:
     axes = list(axes)
     axes_set = set(axes)
     n = len(axes)
 
-    items: list["DC"] = []
+    items: list[DC] = []
     for dc in stats.dcs:
         from_out: list[str] = []
         for x in dc.from_indices:
@@ -66,6 +67,7 @@ def _normalized_dcs(stats: "DCStats", axes: Sequence[str]) -> Set["DC"]:
 
         items.append(DC(frozenset(from_out), frozenset(to_out), float(dc.value)))
     return set(items)
+
 
 class DCStats(TensorStats):
     """
@@ -1101,12 +1103,14 @@ class DCStats(TensorStats):
             by the inputs that define it.
         """
         if len(all_stats) == 1:
-            norm = _normalized_dcs(all_stats[0], tuple(sorted(new_def.dim_sizes.keys())))
+            norm = _unify_dc_ints(
+                all_stats[0], tuple(sorted(new_def.dim_sizes.keys()))
+            )
             return DCStats.from_def(new_def, set(norm))
 
         new_dc: dict[tuple[frozenset[str], frozenset[str]], float] = {}
         for stats in all_stats:
-            for dc in _normalized_dcs(stats, tuple(sorted(new_def.dim_sizes.keys()))):
+            for dc in _unify_dc_ints(stats, tuple(sorted(new_def.dim_sizes.keys()))):
                 dc_key = (dc.from_indices, dc.to_indices)
                 current_dc = new_dc.get(dc_key, math.inf)
                 if dc.value < current_dc:
@@ -1130,7 +1134,9 @@ class DCStats(TensorStats):
             `new_def`.
         """
         if len(all_stats) == 1:
-            norm = _normalized_dcs(all_stats[0], tuple(sorted(new_def.dim_sizes.keys())))
+            norm = _unify_dc_ints(
+                all_stats[0], tuple(sorted(new_def.dim_sizes.keys()))
+            )
             return DCStats.from_def(new_def, set(norm))
 
         dc_keys: Counter[tuple[frozenset[str], frozenset[str]]] = Counter()
@@ -1139,7 +1145,7 @@ class DCStats(TensorStats):
             dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
             Z = new_def.index_set - stats.tensordef.index_set
             Z_dim_size = new_def.get_dim_space_size(Z)
-            for dc in _normalized_dcs(stats, tuple(sorted(new_def.dim_sizes.keys()))):
+            for dc in _unify_dc_ints(stats, tuple(sorted(new_def.dim_sizes.keys()))):
                 new_key = (dc.from_indices, dc.to_indices)
                 dcs[new_key] = dc.value
                 dc_keys[new_key] += 1
@@ -1232,7 +1238,7 @@ class DCStats(TensorStats):
             return 0.0
 
         axes_out = tuple(sorted(self.tensordef.dim_sizes.keys()))
-        normalized_dcs = list(_normalized_dcs(self, list(axes_out)))
+        unify_dcs = list(_unify_dc_ints(self, list(axes_out)))
 
         best: dict[frozenset[str], float] = {frozenset(): 1.0}
         frontier: set[frozenset[str]] = {frozenset()}
@@ -1242,7 +1248,7 @@ class DCStats(TensorStats):
             new_frontier: set[frozenset[str]] = set()
 
             for node in frontier:
-                for dc in normalized_dcs:
+                for dc in unify_dcs:
                     if node.issuperset(dc.from_indices):
                         y = node.union(dc.to_indices)
                         if best[node] > float(2 ** (64 - 2)) or float(dc.value) > float(

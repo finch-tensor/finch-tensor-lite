@@ -2,8 +2,8 @@ import math
 import operator
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any
 from functools import reduce
+from typing import Any
 
 import numpy as np
 

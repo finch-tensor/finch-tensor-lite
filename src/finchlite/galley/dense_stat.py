@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable
-from typing import Any, Self
+from typing import Self
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
