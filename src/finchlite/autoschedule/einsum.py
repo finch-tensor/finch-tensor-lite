@@ -101,7 +101,7 @@ class PointwiseOp(PointwiseNode):
 
     op: Callable  #the function to apply e.g., operator.add
     args: tuple[PointwiseNode, ...]  # Subtrees
-    input_fields: tuple[tuple[Field, ...], ...] 
+    #input_fields: tuple[tuple[Field, ...], ...] 
     # Children: The args
 
     @classmethod
@@ -382,7 +382,7 @@ class EinsumPrinterContext:
     def __call__(self, prgm: EinsumPlan):
         return self.print_einsum_plan(prgm)
 
-class EinsumCompiler:
+class EinsumInterpreter:
     def __call__(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
         return self.print(einsum_plan, parameters)
 
@@ -396,7 +396,7 @@ class EinsumCompiler:
 class EinsumScheduler:
     def __init__(self, ctx: EinsumCompiler):
         self.ctx = ctx
-        self.interpret = EinsumCompiler()
+        self.interpret = EinsumInterpreter()
 
     def __call__(self, prgm: LogicNode):
         einsum_plan, parameters, _ = self.ctx(prgm)
