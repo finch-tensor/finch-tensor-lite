@@ -3,6 +3,7 @@ import operator
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
+from functools import reduce
 
 import numpy as np
 
@@ -165,7 +166,7 @@ class TensorDef:
         Returns:
             TensorDef: A new TensorDef representing the merged tensor.
         """
-        new_fill_value = op(*(s.fill_value for s in args))
+        new_fill_value = reduce(op, [s.fill_value for s in args])
         new_index_set = set().union(*(s.index_set for s in args))
         new_dim_sizes: dict = {}
         for index in new_index_set:
