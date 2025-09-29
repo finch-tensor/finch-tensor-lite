@@ -147,24 +147,28 @@ class Einsum(TermTree):
 
     reduceOp: Callable #technically a reduce operation, much akin to the one in aggregate
 
-    input_fields: tuple[Field, ...] #redundant remove later
+    #input_fields: tuple[Field, ...] #redundant remove later
     output_fields: tuple[Field, ...]
     pointwise_expr: PointwiseNode
     output_alias: str | None
     
     @classmethod
     def from_children(cls, output_alias: str | None, updateOp: Callable, input_fields: tuple[Field, ...], output_fields: tuple[Field, ...], pointwise_expr: PointwiseNode) -> Self:
-        return cls(output_alias, updateOp, input_fields, output_fields, pointwise_expr)
+        #return cls(output_alias, updateOp, input_fields, output_fields, pointwise_expr)
+        return cls(output_alias, updateOp, output_fields, pointwise_expr)
     
     @property
     def children(self):
-        return [self.output_alias, self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr]
+        #return [self.output_alias, self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr]
+        return [self.output_alias, self.reduceOp, self.output_fields, self.pointwise_expr]
 
     def rename(self, new_alias: str):
-        return Einsum(self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr, new_alias)
+        #return Einsum(self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr, new_alias)
+        return Einsum(self.reduceOp, self.output_fields, self.pointwise_expr, new_alias)
 
     def reorder(self, idxs: tuple[Field, ...]):
-        return Einsum(self.reduceOp, idxs, self.output_fields, self.pointwise_expr, self.output_alias)
+        #return Einsum(self.reduceOp, idxs, self.output_fields, self.pointwise_expr, self.output_alias)
+        return Einsum(self.reduceOp, self.output_fields, self.pointwise_expr, self.output_alias)
 
     def __str__(self):
         ctx = EinsumPrinterContext()
@@ -256,14 +260,16 @@ class EinsumLowerer:
             case MapJoin(Literal(operation), args):
                 args = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
                 pointwise_expr = self.lower_to_pointwise_op(operation, args)
-                return Einsum(reduceOp=overwrite, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr, output_alias=None)
+                #return Einsum(reduceOp=overwrite, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr, output_alias=None)
+                return Einsum(reduceOp=overwrite, output_fields=ex.fields, pointwise_expr=pointwise_expr, output_alias=None)
             case Reorder(arg, idxs):
                 return self.lower_to_einsum(arg, einsums, parameters, definitions).reorder(idxs)
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
                     raise Exception(f"Init value {init} is not the default value for operation {operation} of type {type(init)}. Non standard init values are not supported.")
                 pointwise_expr = self.lower_to_pointwise(arg, einsums, parameters, definitions)
-                return Einsum(operation, arg.fields, ex.fields, pointwise_expr, self.get_next_alias())
+                #return Einsum(operation, arg.fields, ex.fields, pointwise_expr, self.get_next_alias())
+                return Einsum(operation, ex.fields, pointwise_expr, self.get_next_alias())
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -310,11 +316,26 @@ class EinsumCompiler:
     def __init__(self):
         self.el = EinsumLowerer()
 
+    def optimize_einsum(self, einsum_plan: EinsumPlan) -> EinsumPlan:
+        def optimize_sparse_einsum(einsum: Einsum, extra_ops: list[Einsum]) -> Einsum:
+            #match einsum:
+            #    case Einsum(reduceOp=add, pointwise)
+
+            return einsum
+
+        optimized_einsums = []
+        for einsum in einsum_plan.bodies:
+            optimized_einsums.append(optimize_sparse_einsum(einsum, optimized_einsums))
+
+        optimized_return = optimize_sparse_einsum(einsum_plan.returnValues[0], optimized_einsums)
+        return EinsumPlan(tuple(optimize_sparse_einsum), optimized_return)
+
     def __call__(self, prgm: Plan):
         parameters = {}
         definitions = {}
         einsum_plan = self.el(prgm, parameters, definitions)
-        
+        einsum_plan = self.optimize_einsum(einsum_plan)
+
         return einsum_plan, parameters, definitions
 
 class EinsumPrinterContext:
