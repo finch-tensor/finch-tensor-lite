@@ -59,6 +59,33 @@ class PointwiseAccess(PointwiseNode, TermTree):
     def children(self):
         return [self.alias, *self.idxs]
 
+
+@dataclass(eq=True, frozen=True)
+class PointwiseIndirectCOOAccess(PointwiseNode, TermTree):
+    """
+    PointwiseIndirectCOOAccess
+
+    Tensor access like a[i, j] but for sparse tensors. So in reality it's like a[COO_coords[i]] = ...
+
+    Attributes:
+        tensor: The tensor to access.
+        coo_coords: The COO coordinates at which to access the tensor (this is also a tensor).
+        idxs: The indices at which to access the tensor.
+    """
+
+    alias: str
+    coo_coord_alias: str
+    idx: Field #only one index is needed to access the COO coord tensor
+    # Children: None (leaf)
+
+    @classmethod
+    def from_children(cls, alias: str, coo_coord_alias: str, idx: Field) -> Self:
+        return cls(alias, coo_coord_alias, idx)
+
+    @property
+    def children(self):
+        return [self.alias, self.coo_coord_alias, self.idx]
+
 @dataclass(eq=True, frozen=True)
 class PointwiseOp(PointwiseNode):
     """
@@ -334,6 +361,8 @@ class EinsumPrinterContext:
         match pointwise_expr:
             case PointwiseAccess(alias, idxs):
                 return f"{alias}[{self.print_indicies(idxs)}]"
+            case PointwiseIndirectCOOAccess(alias, coo_coord_alias, idx):
+                return f"{alias}[{coo_coord_alias}[{self.print_indicies((idx, ))}]]"
             case PointwiseOp(_, __):
                 return self.print_pointwise_op(pointwise_expr)
             case PointwiseLiteral(val):
@@ -363,35 +392,6 @@ class EinsumCompiler:
         
         print(einsum_plan)
         return (np.arange(6, dtype=np.float32).reshape(2, 3),)
-
-    def pointwise_to_numpy(self, pointwise_expr: PointwiseNode, alias_values: dict[str, Tensor]) -> Tensor:
-        match pointwise_expr:
-            case PointwiseAccess(alias, idxs):
-                return alias_values[alias][idxs]
-            case PointwiseOp(op, args):
-                match op:
-                    case operator
-                    case _: 
-                        raise NotImplementedError(f"Operation {op} not implemented")
-            case PointwiseLiteral(val):
-                return val
-        raise NotImplementedError(f"Pointwise expression {pointwise_expr} not implemented")
-
-    def einsum_to_numpy(self, einsum: Einsum, alias_values: dict[str, Tensor]) -> Tensor:
-        pass
-
-    def plan_to_numpy(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]) -> tuple[Tensor, ...]:
-        alias_values = dict()
-        for (str, table) in parameters.items():
-            alias_values[str] = table.tns
-
-        for einsum in einsum_plan.bodies:
-            alias_values[einsum.output_alias] = self.einsum_to_numpy(einsum, alias_values)
-        
-        return [
-            (alias_values[return_value] if isinstance(return_value, str) else self.einsum_to_numpy(return_value, alias_values)) 
-            for return_value in einsum_plan.returnValues
-        ]
 
 class EinsumScheduler:
     def __init__(self, ctx: EinsumCompiler):

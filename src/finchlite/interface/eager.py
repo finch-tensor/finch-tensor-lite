@@ -264,9 +264,7 @@ def reduce(
     if isinstance(x, lazy.LazyTensor):
         return lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init)
     return compute(
-        lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init),
-            ctx=get_eager_scheduler(x)
-    )
+        lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init))
 
 
 def sum(
