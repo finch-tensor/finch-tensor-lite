@@ -127,6 +127,19 @@ algebra.register_property(
 )
 
 
+# Confirm if sing tuple implementation is correct
+def last(tup):
+    return tup[-1]
+
+
+algebra.register_property(
+    last,
+    "__call__",
+    "return_type",
+    lambda op, tup: tup[-1],
+)
+
+
 def first_arg(*args):
     """
     Returns the first argument passed to it.

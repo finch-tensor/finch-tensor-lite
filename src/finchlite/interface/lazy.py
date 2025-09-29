@@ -19,6 +19,7 @@ from ..algebra import (
     fixpoint_type,
     identity,
     init_value,
+    last,
     promote_max,
     promote_min,
     promote_type,
@@ -92,7 +93,7 @@ class LazyTensor(OverrideTensor):
         self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
     ):
         self.data = data
-        self._shape = shape
+        self.m = shape
         self._fill_value = fill_value
         self._element_type = element_type
 
@@ -110,7 +111,7 @@ class LazyTensor(OverrideTensor):
         Returns the shape of the LazyTensor as a tuple.
         The shape is determined by the data and is a static property.
         """
-        return self._shape
+        return self.shape
 
     def override_module(self):
         return sys.modules[__name__]
@@ -697,19 +698,44 @@ def prod(
 
 
 #######################################
-class LazyIndices:
+
+
+@dataclass(frozen=True)
+class LinearIndicesTensorFType(TensorFType):
+    _shape_type: tuple[type, ...]
+    _element_type: Any = int
+    _fill_value: Any = 0
+
+    @property
+    def shape_type(self) -> tuple[type, ...]:
+        return self._shape_type
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+
+class LinearIndicesTensor(Tensor):
     def __init__(self, shape):
-        self.shape = shape
+        self.shape_ = shape
 
     def __getitem__(self, idxs):
         flat_index = idxs[0]
-        for i in range(1, len(self.shape)):
-            flat_index = flat_index * self.shape[i] + idxs[i]
+        for i in range(1, self.ndim):
+            flat_index = flat_index * self.shape_[i] + idxs[i]
         return flat_index
 
+    @property
+    def shape(self):
+        return self.shape_
 
-def last(tup):
-    return tup[-1]
+    @property
+    def ftype(self):
+        return LinearIndicesTensorFType(self.shape, int, 0)
 
 
 def argmin(x, axis=None):
@@ -717,7 +743,7 @@ def argmin(x, axis=None):
     shape = x.shape
 
     if axis is None:
-        indices = LazyIndices(shape)
+        indices = LinearIndicesTensor(shape)
 
     else:
         broadcast_indices = LazyTensor(
@@ -729,7 +755,7 @@ def argmin(x, axis=None):
         indices = expand_dims(
             broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
         )
-    # tuple(range(len(notin_a), len(notin_a) + len(axes_a)))
+
     paired = elementwise(tuple, x, indices)
     reduced = reduce(operator.minby, paired, axis=axis, init=(float("inf"), 0))
 
@@ -741,7 +767,7 @@ def argmax(x, axis=None):
     shape = x.shape
 
     if axis is None:
-        indices = LazyIndices(shape)
+        indices = LinearIndicesTensor(shape)
 
     else:
         broadcast_indices = LazyTensor(
@@ -1229,6 +1255,7 @@ class ConcatTensor(Tensor):
         `fill_value` is taken from the first tensor.
         `element_type` is casted according to array_api specification.
         """
+
         self._ndim = len(tensor.shape)
 
         shape_without_axis = tensor.shape[:axis] + tensor.shape[axis + 1 :]
