@@ -3,6 +3,7 @@ from abc import ABC
 import operator
 from typing import Callable, Self
 
+from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
 from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder, Table
 from finchlite.symbolic import Term, TermTree
@@ -73,6 +74,7 @@ class PointwiseOp(PointwiseNode):
 
     op: Callable  #the function to apply e.g., operator.add
     args: tuple[PointwiseNode, ...]  # Subtrees
+    input_fields: tuple[tuple[Field, ...], ...] 
     # Children: The args
 
     @classmethod
@@ -118,7 +120,7 @@ class Einsum(TermTree):
 
     reduceOp: Callable #technically a reduce operation, much akin to the one in aggregate
 
-    input_fields: tuple[Field, ...]
+    input_fields: tuple[Field, ...] #redundant remove later
     output_fields: tuple[Field, ...]
     pointwise_expr: PointwiseNode
     output_alias: str | None
@@ -351,19 +353,51 @@ class EinsumPrinterContext:
     def __call__(self, prgm: EinsumPlan):
         return self.print_einsum_plan(prgm)
 
+class EinsumCompiler:
+    def __call__(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
+        return self.print(einsum_plan, parameters)
+
+    def print(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
+        for (str, table) in parameters.items():
+            print(f"Parameter: {str} = {table}")
+        
+        print(einsum_plan)
+        return (np.arange(6, dtype=np.float32).reshape(2, 3),)
+
+    def pointwise_to_numpy(self, pointwise_expr: PointwiseNode, alias_values: dict[str, Tensor]) -> Tensor:
+        match pointwise_expr:
+            case PointwiseAccess(alias, idxs):
+                return alias_values[alias][idxs]
+            case PointwiseOp(op, args):
+                match op:
+                    case operator
+                    case _: 
+                        raise NotImplementedError(f"Operation {op} not implemented")
+            case PointwiseLiteral(val):
+                return val
+        raise NotImplementedError(f"Pointwise expression {pointwise_expr} not implemented")
+
+    def einsum_to_numpy(self, einsum: Einsum, alias_values: dict[str, Tensor]) -> Tensor:
+        pass
+
+    def plan_to_numpy(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]) -> tuple[Tensor, ...]:
+        alias_values = dict()
+        for (str, table) in parameters.items():
+            alias_values[str] = table.tns
+
+        for einsum in einsum_plan.bodies:
+            alias_values[einsum.output_alias] = self.einsum_to_numpy(einsum, alias_values)
+        
+        return [
+            (alias_values[return_value] if isinstance(return_value, str) else self.einsum_to_numpy(return_value, alias_values)) 
+            for return_value in einsum_plan.returnValues
+        ]
+
 class EinsumScheduler:
     def __init__(self, ctx: EinsumCompiler):
         self.ctx = ctx
+        self.interpret = EinsumCompiler()
 
     def __call__(self, prgm: LogicNode):
         einsum_plan, parameters, _ = self.ctx(prgm)
         return self.interpret(einsum_plan, parameters)
-
-    def interpret(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
-        import numpy as np
-        for (str, table) in parameters.items():
-            print(f"Parameter: {str} = {table}")
-
-        print(einsum_plan)
-
-        return (np.arange(6, dtype=np.float32).reshape(2, 3),)
