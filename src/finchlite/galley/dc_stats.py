@@ -36,7 +36,7 @@ class DC:
     value: float
 
 
-def _unify_dc_ints(stats: "DCStats", axes: Sequence[str]) -> Set["DC"]:
+def unify_dc_ints(stats: "DCStats", axes: Sequence[str]) -> Set["DC"]:
     axes = list(axes)
     axes_set = set(axes)
     n = len(axes)
@@ -1103,14 +1103,14 @@ class DCStats(TensorStats):
             by the inputs that define it.
         """
         if len(all_stats) == 1:
-            norm = _unify_dc_ints(
+            norm = unify_dc_ints(
                 all_stats[0], tuple(sorted(new_def.dim_sizes.keys()))
             )
             return DCStats.from_def(new_def, set(norm))
 
         new_dc: dict[tuple[frozenset[str], frozenset[str]], float] = {}
         for stats in all_stats:
-            for dc in _unify_dc_ints(stats, tuple(sorted(new_def.dim_sizes.keys()))):
+            for dc in unify_dc_ints(stats, tuple(sorted(new_def.dim_sizes.keys()))):
                 dc_key = (dc.from_indices, dc.to_indices)
                 current_dc = new_dc.get(dc_key, math.inf)
                 if dc.value < current_dc:
@@ -1134,33 +1134,46 @@ class DCStats(TensorStats):
             `new_def`.
         """
         if len(all_stats) == 1:
-            norm = _unify_dc_ints(
+            norm = unify_dc_ints(
                 all_stats[0], tuple(sorted(new_def.dim_sizes.keys()))
             )
             return DCStats.from_def(new_def, set(norm))
 
         dc_keys: Counter[tuple[frozenset[str], frozenset[str]]] = Counter()
-        stats_dcs: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
+        per_stats_all: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
+        per_stats_direct: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
         for stats in all_stats:
-            dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+            dcs_all: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+            dcs_direct: dict[tuple[frozenset[str], frozenset[str]], float] = {}
             Z = new_def.index_set - stats.tensordef.index_set
             Z_dim_size = new_def.get_dim_space_size(Z)
-            for dc in _unify_dc_ints(stats, tuple(sorted(new_def.dim_sizes.keys()))):
+            for dc in unify_dc_ints(stats, tuple(sorted(new_def.dim_sizes.keys()))):
                 new_key = (dc.from_indices, dc.to_indices)
-                dcs[new_key] = dc.value
+                dcs_all[new_key] = float(dc.value)
+                dcs_direct[new_key] = float(dc.value)
                 dc_keys[new_key] += 1
+                ext_key = (dc.from_indices, dc.to_indices | frozenset(Z))
+                if ext_key not in dcs_all:
+                    dc_keys[ext_key] += 1
+                prev = dcs_all.get(ext_key, math.inf)
+                dcs_all[ext_key] = min(prev, float(dc.value) * Z_dim_size)
 
-                ext_dc_key = (dc.from_indices, dc.to_indices | frozenset(Z))
-                if ext_dc_key not in dcs:
-                    dc_keys[ext_dc_key] += 1
-                prev = dcs.get(ext_dc_key, math.inf)
-                dcs[ext_dc_key] = min(prev, dc.value * Z_dim_size)
-            stats_dcs.append(dcs)
+            per_stats_all.append(dcs_all)
+            per_stats_direct.append(dcs_direct)
 
         new_dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
         for key, count in dc_keys.items():
             if count == len(all_stats):
-                total = sum(d.get(key, 0.0) for d in stats_dcs)
+                total = sum(all.get(key, 0.0) for all in per_stats_all)
+                extended = False
+                direct_vals: list[float] = []
+                for all, dir in zip(per_stats_all, per_stats_direct):
+                    if key in dir:
+                        direct_vals.append(dir[key])
+                    elif key in all:
+                        extended = True
+                if extended and direct_vals:
+                    total = min(total, min(direct_vals))
                 X, Y = key
                 if Y.issubset(new_def.index_set):
                     total = min(total, new_def.get_dim_space_size(Y))
@@ -1238,7 +1251,7 @@ class DCStats(TensorStats):
             return 0.0
 
         axes_out = tuple(sorted(self.tensordef.dim_sizes.keys()))
-        unify_dcs = list(_unify_dc_ints(self, list(axes_out)))
+        unify_dcs = list(unify_dc_ints(self, list(axes_out)))
 
         best: dict[frozenset[str], float] = {frozenset(): 1.0}
         frontier: set[frozenset[str]] = {frozenset()}
