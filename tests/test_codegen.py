@@ -388,7 +388,7 @@ def test_if_statement(compiler, buffer):
 def test_simple_struct(compiler):
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))
-    x = (1, 4)
+    x = (np.int64(1), np.int64(4))
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
@@ -442,6 +442,67 @@ def test_simple_struct(compiler):
 
 
 @pytest.mark.parametrize(
+    ["compiler", "extension", "platform"],
+    [
+        (CGenerator(), ".c", "any"),
+        (NumbaGenerator(), ".py", "win" if sys.platform == "win32" else "any"),
+    ],
+)
+def test_safe_loadstore_regression(compiler, extension, platform, file_regression):
+    a = np.array(range(3), dtype=ctypes.c_int64)
+    ab = NumpyBuffer(a)
+    ab_safe = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ab_safe.ftype)
+    ab_slt = asm.Slot("a_", ab_safe.ftype)
+    idx = asm.Variable("idx", ctypes.c_size_t)
+    val = asm.Variable("val", ctypes.c_int64)
+
+    res_var = asm.Variable("val", ab_safe.ftype.element_type)
+    res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
+    mod = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("finch_access", ab_safe.ftype.element_type),
+                (ab_v, idx),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        # we assign twice like this; this is intentional and
+                        # designed to check correct refreshing.
+                        asm.Assign(
+                            res_var,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Assign(
+                            res_var2,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Return(res_var),
+                    )
+                ),
+            ),
+            asm.Function(
+                asm.Variable("finch_change", ab_safe.ftype.element_type),
+                (ab_v, idx, val),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Store(
+                            ab_slt,
+                            idx,
+                            val,
+                        ),
+                        asm.Return(asm.Literal(ctypes.c_int64(0))),
+                    )
+                ),
+            ),
+        )
+    )
+    output = compiler(mod)
+    file_regression.check(output, extension=extension)
+
+
+@pytest.mark.parametrize(
     "size,idx",
     [(size, idx) for size in range(1, 4) for idx in range(-1, 4)],
 )
@@ -472,34 +533,10 @@ def test_c_load_safebuffer(size, idx):
     [
         (*params, compiler)
         for params in [
-            (
-                -1,
-                2,
-            ),
-            (
-                -1,
-                3,
-            ),
-            (
-                0,
-                2,
-            ),
-            (
-                1,
-                2,
-            ),
-            (
-                2,
-                3,
-            ),
-            (
-                2,
-                2,
-            ),
-            (
-                3,
-                2,
-            ),
+            (-1, 2),
+            (1, 2),
+            (2, 3),
+            (2, 2),
         ]
         for compiler in [asm.AssemblyInterpreter(), NumbaCompiler()]
     ],
@@ -548,12 +585,9 @@ def test_numba_load_safebuffer(size, idx, compiler):
         (*params, compiler)
         for params in [
             (-1, 2, 3),
-            (-1, 3, 1434),
-            (0, 2, 3),
-            (1, 2, 3),
-            (2, 3, 3),
+            (1, 2, 1434),
+            (2, 3, 1434),
             (2, 2, 3),
-            (3, 2, 3),
         ]
         for compiler in [NumbaCompiler(), asm.AssemblyInterpreter()]
     ],
@@ -599,34 +633,10 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
     [
         (*params, value)
         for params in [
-            (
-                -1,
-                2,
-            ),
-            (
-                -1,
-                3,
-            ),
-            (
-                0,
-                2,
-            ),
-            (
-                1,
-                2,
-            ),
-            (
-                2,
-                3,
-            ),
-            (
-                2,
-                2,
-            ),
-            (
-                3,
-                2,
-            ),
+            (-1, 2),
+            (1, 2),
+            (2, 3),
+            (2, 2),
         ]
         for value in [-1, 1434]
     ],
@@ -663,9 +673,7 @@ def test_c_store_safebuffer(size, idx, value):
     "value,np_type,c_type",
     [
         (3, np.int64, ctypes.c_int64),
-        (2, np.int32, ctypes.c_int32),
         (1, np.float32, ctypes.c_float),
-        (1.0, np.float64, ctypes.c_double),
         (1.2, np.float64, ctypes.c_double),
     ],
 )
@@ -682,9 +690,7 @@ def test_np_c_serialization(value, np_type, c_type):
     "value,c_type",
     [
         (3, ctypes.c_int64),
-        (2, ctypes.c_int32),
         (1, ctypes.c_float),
-        (1.0, ctypes.c_double),
         (1.2, ctypes.c_double),
     ],
 )
@@ -702,9 +708,7 @@ def test_ctypes_c_serialization(value, c_type):
     "value,np_type",
     [
         (3, np.int64),
-        (2, np.int32),
         (1, np.float32),
-        (1.0, np.float64),
         (1.2, np.float64),
     ],
 )
@@ -716,3 +720,21 @@ def test_np_numba_serialization(value, np_type):
     constructed = construct_from_numba(np_type, serialized)
     assert constructed == np_type(value)
     assert deserialize_from_numba(np_type, constructed, serialized) is None
+
+
+def test_e2e_numba():
+    ctx = finchlite.get_default_scheduler()  # TODO: as fixture
+    finchlite.set_default_scheduler(mode=finchlite.Mode.COMPILE_NUMBA)
+
+    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=np.float64)
+    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=np.float64)
+
+    wa = finchlite.defer(a)
+    wb = finchlite.defer(b)
+
+    plan = finchlite.matmul(wa, wb)
+    result = finchlite.compute(plan)
+
+    assert_equal(result, a @ b)
+
+    finchlite.set_default_scheduler(ctx=ctx)

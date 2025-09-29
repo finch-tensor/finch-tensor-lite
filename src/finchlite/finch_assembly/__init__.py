@@ -23,9 +23,11 @@ from .nodes import (
     Slot,
     Stack,
     Store,
+    TaggedVariable,
     Unpack,
     Variable,
     WhileLoop,
+    number_assembly_ast,
 )
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError
@@ -61,10 +63,12 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
+    "TaggedVariable",
     "TupleFType",
     "Unpack",
     "Variable",
     "WhileLoop",
     "element_type",
     "length_type",
+    "number_assembly_ast",
 ]

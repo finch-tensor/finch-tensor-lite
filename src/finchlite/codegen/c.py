@@ -202,6 +202,7 @@ for t in (
     )
     # construction from c is just the identity.
     register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
+    register_property(t, "numba_type", "__attr__", lambda t: t)
 
 register_property(
     np.generic,
@@ -529,24 +530,25 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_wchar: ("wchar_t", ["wchar.h"]),
     ctypes.c_byte: ("char", []),
     ctypes.c_ubyte: ("unsigned char", []),
-    ctypes.c_short: ("short", []),
-    ctypes.c_ushort: ("unsigned short", []),
-    ctypes.c_int: ("int", []),
     ctypes.c_int8: ("int8_t", ["stdint.h"]),
     ctypes.c_int16: ("int16_t", ["stdint.h"]),
     ctypes.c_int32: ("int32_t", ["stdint.h"]),
     ctypes.c_int64: ("int64_t", ["stdint.h"]),
-    ctypes.c_uint: ("unsigned int", []),
     ctypes.c_uint8: ("uint8_t", ["stdint.h"]),
     ctypes.c_uint16: ("uint16_t", ["stdint.h"]),
     ctypes.c_uint32: ("uint32_t", ["stdint.h"]),
     ctypes.c_uint64: ("uint64_t", ["stdint.h"]),
-    ctypes.c_long: ("long", []),
-    ctypes.c_ulong: ("unsigned long", []),
-    ctypes.c_longlong: ("long long", []),
-    ctypes.c_ulonglong: ("unsigned long long", []),
-    ctypes.c_size_t: ("size_t", ["stddef.h"]),
-    ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
+    # use standard types instead of aliases
+    # ctypes.c_short: ("short", []),
+    # ctypes.c_ushort: ("unsigned short", []),
+    # ctypes.c_int: ("int", []),
+    # ctypes.c_uint: ("unsigned int", []),
+    # ctypes.c_long: ("long", []),
+    # ctypes.c_ulong: ("unsigned long", []),
+    # ctypes.c_longlong: ("long long", []),
+    # ctypes.c_ulonglong: ("unsigned long long", []),
+    # ctypes.c_size_t: ("size_t", ["stddef.h"]),
+    # ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
     ctypes.c_float: ("float", []),
     ctypes.c_double: ("double", []),
     ctypes.c_char_p: ("char*", []),
@@ -1066,7 +1068,7 @@ register_property(
 
 
 def struct_construct_from_c(fmt: AssemblyStructFType, c_struct):
-    args = [getattr(c_struct, name) for (name, _) in fmt.struct_fieldnames]
+    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return fmt.__class__(*args)
 
 
