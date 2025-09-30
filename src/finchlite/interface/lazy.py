@@ -102,7 +102,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=ftype(self._shape),
+            _shape_type=tuple(type(dim) for dim in self.shape),
         )
 
     @property
