@@ -8,7 +8,6 @@ from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
 
-
 class EagerTensor(OverrideTensor, ABC):
     def override_module(self):
         return sys.modules[__name__]
@@ -226,7 +225,6 @@ class EagerTensor(OverrideTensor, ABC):
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
-
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
         return lazy.permute_dims(arg, axis=axis)
@@ -266,8 +264,7 @@ def reduce(
     if isinstance(x, lazy.LazyTensor):
         return lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init)
     return compute(
-        lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init)
-    )
+        lazy.reduce(op, x, axis=axis, dtype=dtype, keepdims=keepdims, init=init))
 
 
 def sum(
@@ -288,7 +285,7 @@ def prod(
     /,
     *,
     axis: int | tuple[int, ...] | None = None,
-    dtype=None,
+    dtype=None, 
     keepdims: bool = False,
 ):
     if isinstance(x, lazy.LazyTensor):
@@ -300,7 +297,6 @@ def elementwise(f: Callable, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
     return compute(lazy.elementwise(f, *args))
-
 
 def add(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
