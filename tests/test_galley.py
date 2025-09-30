@@ -757,6 +757,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
+
 @pytest.mark.parametrize(
     "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
     [
@@ -767,7 +768,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
             [DC(frozenset(), frozenset(["j", "k"]), 10)],
             {"i": 1000, "j": 100, "k": 1000},
             [DC(frozenset(), frozenset(["i", "j", "k"]), 10)],
-            10*1000+5*1000+10,
+            10 * 1000 + 5 * 1000 + 10,
         ),
     ],
 )
