@@ -19,7 +19,6 @@ from .galley import (
 from .interface import (
     EagerTensor,
     LazyTensor,
-    Mode,
     Scalar,
     abs,
     acos,

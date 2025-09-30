@@ -31,7 +31,6 @@ from ..algebra import (
     conjugate as conj,
 )
 from ..compile import BufferizedNDArray
-from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -58,7 +57,7 @@ class LazyTensorFType(TensorFType):
     _element_type: Any
     _shape_type: Any
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: TupleFType):
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple):
         self._fill_value = _fill_value
         self._element_type = _element_type
         self._shape_type = _shape_type
@@ -93,7 +92,7 @@ class LazyTensor(OverrideTensor):
         self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
     ):
         self.data = data
-        self.m = shape
+        self._shape = shape
         self._fill_value = fill_value
         self._element_type = element_type
 
@@ -102,7 +101,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=tuple(type(dim) for dim in self.shape),
+            _shape_type=ftype(self._shape),
         )
 
     @property
@@ -111,7 +110,7 @@ class LazyTensor(OverrideTensor):
         Returns the shape of the LazyTensor as a tuple.
         The shape is determined by the data and is a static property.
         """
-        return self.shape
+        return self._shape
 
     def override_module(self):
         return sys.modules[__name__]
@@ -735,7 +734,8 @@ class LinearIndicesTensor(Tensor):
 
     @property
     def ftype(self):
-        return LinearIndicesTensorFType(self.shape, int, 0)
+        shape_type = tuple(type(dim) for dim in self.shape)
+        return LinearIndicesTensorFType(shape_type, int, 0)
 
 
 def argmin(x, axis=None):
