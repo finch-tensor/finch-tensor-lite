@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..dataflow.cfg import BasicBlock, ControlFlowGraph
+from ..symbolic.cfg import BasicBlock, ControlFlowGraph
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -24,8 +24,6 @@ from .nodes import (
     Resize,
     Return,
     SetAttr,
-    Slot,
-    Stack,
     Store,
     TaggedVariable,
     Unpack,
@@ -72,8 +70,6 @@ class CFGBuilder:
                 | Load()
                 | Store()
                 | Length()
-                | Slot()
-                | Stack()
                 | Assign()
                 | Assert()
             ):
@@ -126,6 +122,14 @@ class CFGBuilder:
 
                 self.current_block.add_successor(before_block)
                 self.current_block = after_block
+                self.current_block.add_statement(
+                    Assert(
+                        Call(
+                            Literal(operator.not_),
+                            (cond,),
+                        )
+                    )
+                )
             case ForLoop(var, start, end, body):
                 before_block = self.current_block
 

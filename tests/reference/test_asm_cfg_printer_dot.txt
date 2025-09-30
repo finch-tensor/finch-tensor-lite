@@ -1,82 +1,26 @@
-{
-    "dot_product": {
-        "name": "dot_product",
-        "entry_block": "dot_product_0",
-        "exit_block": "dot_product_1",
-        "blocks": {
-            "dot_product_0": {
-                "id": "dot_product_0",
-                "statements": [],
-                "successors": [
-                    "dot_product_2"
-                ],
-                "predecessors": []
-            },
-            "dot_product_1": {
-                "id": "dot_product_1",
-                "statements": [],
-                "successors": [],
-                "predecessors": [
-                    "dot_product_4",
-                    "dot_product_5"
-                ]
-            },
-            "dot_product_2": {
-                "id": "dot_product_2",
-                "statements": [
-                    "a_0",
-                    "b_0",
-                    "c_0: float64 = 0.0",
-                    "a_: np_buf_t(float64) = unpack(a_1)",
-                    "b_: np_buf_t(float64) = unpack(b_1)",
-                    "for_loop_counter_0: int64 = 0"
-                ],
-                "successors": [
-                    "dot_product_3",
-                    "dot_product_4"
-                ],
-                "predecessors": [
-                    "dot_product_0",
-                    "dot_product_3"
-                ]
-            },
-            "dot_product_3": {
-                "id": "dot_product_3",
-                "statements": [
-                    "assert(lt(for_loop_counter_0, length(slot(a_, np_buf_t(float64)))))",
-                    "i_0: int64 = for_loop_counter_0",
-                    "c_1: float64 = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))",
-                    "for_loop_counter_0: int64 = add(for_loop_counter_0, 1)"
-                ],
-                "successors": [
-                    "dot_product_2"
-                ],
-                "predecessors": [
-                    "dot_product_2"
-                ]
-            },
-            "dot_product_4": {
-                "id": "dot_product_4",
-                "statements": [
-                    "repack(a_)",
-                    "repack(b_)",
-                    "return c_3"
-                ],
-                "successors": [
-                    "dot_product_1"
-                ],
-                "predecessors": [
-                    "dot_product_2"
-                ]
-            },
-            "dot_product_5": {
-                "id": "dot_product_5",
-                "statements": [],
-                "successors": [
-                    "dot_product_1"
-                ],
-                "predecessors": []
-            }
-        }
-    }
-}
+dot_product: #entry=dot_product_0, #exit=dot_product_1
+    dot_product_0: #preds=[]
+
+    dot_product_1: #preds=[dot_product_4, dot_product_5]
+
+    dot_product_2: #preds=[dot_product_0, dot_product_3]
+        a_0
+        b_0
+        c_0: float64 = 0.0
+        a_: np_buf_t(float64) = unpack(a_1)
+        b_: np_buf_t(float64) = unpack(b_1)
+        for_loop_counter_0: int64 = 0
+
+    dot_product_3: #preds=[dot_product_2]
+        assert(lt(for_loop_counter_0, length(slot(a_, np_buf_t(float64)))))
+        i_0: int64 = for_loop_counter_0
+        c_1: float64 = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))
+        for_loop_counter_0: int64 = add(for_loop_counter_0, 1)
+
+    dot_product_4: #preds=[dot_product_2]
+        assert(not_(lt(for_loop_counter_0, length(slot(a_, np_buf_t(float64))))))
+        repack(a_)
+        repack(b_)
+        return c_3
+
+    dot_product_5: #preds=[]
