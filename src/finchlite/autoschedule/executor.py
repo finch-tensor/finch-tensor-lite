@@ -3,10 +3,10 @@ from .compiler import LogicCompiler
 
 
 class LogicExecutor:
-    def __init__(self, ctx, verbose=False):
+    def __init__(self, ctx: LogicCompiler, verbose: bool = False):
         self.ctx: LogicCompiler = ctx
-        self.codes = {}
-        self.verbose = verbose
+        self.codes: dict = {}
+        self.verbose: bool = verbose
 
     def __call__(self, prgm):
         prgm_structure = prgm
