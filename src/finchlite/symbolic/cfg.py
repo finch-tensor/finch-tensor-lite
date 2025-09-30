@@ -57,17 +57,13 @@ class ControlFlowGraph:
         self.blocks[bid] = block
         return block
 
-    def print(self) -> str:
+    def __str__(self) -> str:
         """Print the CFG in LLVM style format."""
         blocks = list(self.blocks.values())
 
         # Use list comprehension with join for better performance
         block_strings = [str(block) for block in blocks]
         return "\n\n".join(block_strings)
-
-    def __str__(self) -> str:
-        """String representation using LLVM-style pretty printing."""
-        return self.print()
 
 
 class CFGPrinterContext:
