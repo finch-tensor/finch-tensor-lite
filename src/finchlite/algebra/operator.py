@@ -17,6 +17,15 @@ def ifelse(a, b, c):
     return a if c else b
 
 
+# Assuming we are passing tuples which are values and its corresponding indices
+def minby(a, b):
+    return a if a[0] <= b[0] else b
+
+
+def maxby(a, b):
+    return a if a[0] >= b[0] else b
+
+
 def promote_min(a, b):
     cast = algebra.promote_type(a, b)
     return cast(min(a, b))
@@ -115,6 +124,19 @@ algebra.register_property(
     "__call__",
     "return_type",
     lambda op, x, y: y,
+)
+
+
+# Confirm if sing tuple implementation is correct
+def last(tup):
+    return tup[-1]
+
+
+algebra.register_property(
+    last,
+    "__call__",
+    "return_type",
+    lambda op, tup: tup[-1],
 )
 
 
