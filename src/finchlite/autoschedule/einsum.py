@@ -35,7 +35,7 @@ class PointwiseNode(Term, ABC):
         ctx = EinsumPrinterContext()
         return ctx.print_pointwise_expr(self)
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class PointwiseNamedField(PointwiseNode):
     """
     PointwiseNamedFiled
@@ -184,18 +184,18 @@ class Einsum(PointwiseNode, TermTree):
     pointwise_expr: PointwiseNode
     
     @classmethod
-    def from_children(cls, reduceOp: Callable, output_fields: tuple[PointwiseNode, ...], pointwise_expr: PointwiseNode, output: PointwiseNode) -> Self:
-        return cls(reduceOp, output_fields, pointwise_expr, output)
+    def from_children(cls, reduceOp: Callable, output: PointwiseNode, output_fields: tuple[PointwiseNode, ...], pointwise_expr: PointwiseNode) -> Self:
+        return cls(reduceOp, output, output_fields, pointwise_expr)
     
     @property
     def children(self):
-        return [self.reduceOp, self.output_fields, self.pointwise_expr, self.output]
+        return [self.reduceOp, self.output, self.output_fields, self.pointwise_expr]
 
     def rename(self, new_alias: str):
-        return Einsum(self.reduceOp, self.output_fields, self.pointwise_expr, PointwiseNamedField(new_alias))
+        return Einsum(self.reduceOp, PointwiseNamedField(new_alias), self.output_fields, self.pointwise_expr)
 
     def reorder(self, idxs: tuple[Field, ...]):
-        return Einsum(self.reduceOp, tuple(PointwiseNamedField(idx.name) for idx in idxs), self.pointwise_expr, self.output)
+        return Einsum(self.reduceOp, self.output, tuple(PointwiseNamedField(idx.name) for idx in idxs), self.pointwise_expr)
 
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(Plan):
@@ -224,6 +224,7 @@ class EinsumLowerer:
     alias_counter: int = 0
 
     def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
+
         parameters = {}
         definitions = {}
         return self.compile_plan(prgm, parameters, definitions), parameters
@@ -243,16 +244,17 @@ class EinsumLowerer:
         for body in plan.bodies:
             match body:
                 case Plan(_):
-                    raise Exception("Plans within plans are not supported.")
+                    inner_plan = self.compile_plan(body, parameters, definitions)
+                    einsums.extend(inner_plan.bodies)
+                    break
                 case Query(Alias(name), Table(_, _)):
                     parameters[name] = body.rhs
                 case Query(Alias(name), rhs):
                     einsums.append(self.rename_einsum(self.lower_to_einsum(rhs, einsums, parameters, definitions), name, definitions))
                 case Produces(args):
-                    if returnValue:
-                        raise Exception("Cannot invoke return more than once.")
                     for arg in args:
                         returnValue.append(PointwiseNamedField(arg.name) if isinstance(arg, Alias) else self.lower_to_einsum(arg, einsums, parameters, definitions))
+                    break
                 case _:
                     einsums.append(self.rename_einsum(self.lower_to_einsum(body, einsums, parameters, definitions), self.get_next_alias(), definitions))
         
@@ -265,14 +267,14 @@ class EinsumLowerer:
             case MapJoin(Literal(operation), args):
                 args = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
                 pointwise_expr = self.lower_to_pointwise_op(operation, args)
-                return Einsum(reduceOp=overwrite, output_fields=tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr=pointwise_expr, output=PointwiseNamedField(self.get_next_alias()))
+                return Einsum(reduceOp=overwrite, output=PointwiseNamedField(self.get_next_alias()), output_fields=tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr=pointwise_expr)
             case Reorder(arg, idxs):
                 return self.lower_to_einsum(arg, einsums, parameters, definitions).reorder(idxs)
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
                     raise Exception(f"Init value {init} is not the default value for operation {operation} of type {type(init)}. Non standard init values are not supported.")
                 pointwise_expr = self.lower_to_pointwise(arg, einsums, parameters, definitions)
-                return Einsum(operation, tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr, PointwiseNamedField(self.get_next_alias()))
+                return Einsum(operation, PointwiseNamedField(self.get_next_alias()), tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -398,12 +400,10 @@ class EinsumCompiler:
     def __init__(self):
         self.el = EinsumLowerer()
 
-    def __call__(self, prgm: EinsumPlan):
-        parameters = {}
-        definitions = {}
-        einsum_plan = self.el(prgm, parameters, definitions)
+    def __call__(self, prgm: Plan):
+        einsum_plan, parameters = self.el(prgm)
 
-        return einsum_plan, parameters, definitions
+        return einsum_plan, parameters
 
 class EinsumScheduler:
     def __init__(self, ctx: EinsumCompiler):
@@ -411,5 +411,5 @@ class EinsumScheduler:
         self.interpret = EinsumInterpreter()
 
     def __call__(self, prgm: LogicNode):
-        einsum_plan, parameters, _ = self.ctx(prgm)
+        einsum_plan, parameters = self.ctx(prgm)
         return self.interpret(einsum_plan, parameters)
