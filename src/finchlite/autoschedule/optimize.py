@@ -217,7 +217,7 @@ def propagate_map_queries(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(rule_2))(root)
 
 
-def propagate_map_queries_backward(root):
+def propagate_map_queries_backward(root: LogicNode) -> LogicNode:
     def rule_0(ex):
         match ex:
             case Aggregate(op, init, arg, ()):
@@ -318,15 +318,15 @@ def propagate_copy_queries(root):
     return Rewrite(PostWalk(Chain([lambda node: copies.get(node), rule_0])))(root)
 
 
-def propagate_into_reformats(root):
+def propagate_into_reformats(root: LogicNode) -> LogicNode:
     @dataclass
     class Entry:
         node: Query
         node_pos: int
-        matched: Query | None = None
+        matched: Query[LogicNode, Reformat] | None = None
         matched_pos: int | None = None
 
-    def rule_0(ex):
+    def rule_0(ex: LogicNode) -> LogicNode | None:
         match ex:
             case Plan(bodies):
                 queries: list[Entry] = []
@@ -342,17 +342,17 @@ def propagate_into_reformats(root):
                             queries.append(Entry(q, idx))
 
                 for q in queries[::-1]:
-                    if q.matched is not None:
-                        bodies = list(bodies)
-                        bodies.pop(q.matched_pos)
+                    if q.matched is not None and q.matched_pos is not None:
+                        new_bodies = list(bodies)
+                        new_bodies.pop(q.matched_pos)
                         if q.node.lhs not in PostOrderDFS(
-                            Plan(bodies[q.node_pos + 1 :])
+                            Plan(tuple(new_bodies[q.node_pos + 1 :]))
                         ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
-                            bodies[q.node_pos] = Query(
+                            new_bodies[q.node_pos] = Query(
                                 q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
                             )
-                            return Plan(tuple(bodies))
-                return None
+                            return Plan(tuple(new_bodies))
+        return None
 
     return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
@@ -657,7 +657,7 @@ def set_loop_order(node: LogicNode) -> LogicNode:
     return _set_loop_order(node, {})
 
 
-def concordize(root):
+def concordize(root: LogicNode) -> LogicNode:
     needed_swizzles: dict[Alias, dict[tuple[Field, ...], Alias]] = {}
     namespace = Namespace()
     # update namespace
@@ -710,7 +710,7 @@ def concordize(root):
             raise Exception(f"Invalid root: {root}")
 
 
-def normalize_names(root):
+def normalize_names(root: LogicNode) -> LogicNode:
     namespace: Namespace = Namespace()
     scope_dict: dict[str, str] = {}
 

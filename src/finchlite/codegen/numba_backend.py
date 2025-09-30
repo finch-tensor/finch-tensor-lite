@@ -16,6 +16,12 @@ from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 logger = logging.getLogger(__name__)
 
 
+# Cache for Numba structs
+numba_structs: dict[Any, Any] = {}
+numba_structnames = Namespace()
+numba_globals: dict[str, Any] = {}
+
+
 def numba_type(t):
     """
     Returns the Numba type/ftype after serialization.
@@ -54,7 +60,7 @@ register_property(
 )
 
 
-def assembly_struct_numba_type(ftype_):
+def assembly_struct_numba_type(ftype_: Any) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
@@ -682,11 +688,6 @@ register_property(
     "__attr__",
     _deserialize_asm_struct_from_numba,
 )
-
-# Cache for Numba structs
-numba_structs: dict[Any, Any] = {}
-numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {}
 
 
 def struct_numba_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
