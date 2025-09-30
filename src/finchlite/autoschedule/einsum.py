@@ -35,6 +35,24 @@ class PointwiseNode(Term, ABC):
         ctx = EinsumPrinterContext()
         return ctx.print_pointwise_expr(self)
 
+@dataclass
+class PointwiseNamedField(PointwiseNode):
+    """
+    PointwiseNamedFiled
+
+    Could be an alias to a tensor, could be a named field in an index array
+    """
+
+    name: str
+
+    @classmethod
+    def from_children(cls, name: str):
+        return cls(name)
+    
+    @property
+    def children(self):
+        return [self.name]
+
 @dataclass(eq=True, frozen=True)
 class PointwiseAccess(PointwiseNode, TermTree):
     """
@@ -47,44 +65,59 @@ class PointwiseAccess(PointwiseNode, TermTree):
         idxs: The indices at which to access the tensor.
     """
 
-    alias: str
-    idxs: tuple[Field, ...]  # (Field('i'), Field('j'))
+    alias: PointwiseNode
+    idxs: tuple[PointwiseNode, ...]  # (Field('i'), Field('j'))
     # Children: None (leaf)
 
     @classmethod
-    def from_children(cls, alias: str, idxs: tuple[Field, ...]) -> Self:
+    def from_children(cls, alias: PointwiseNode, *idxs: tuple[PointwiseNode, ...]) -> Self:
         return cls(alias, idxs)
 
     @property
     def children(self):
-        return [self.alias, self.idxs]
-
+        return [self.alias, *self.idxs]
 
 @dataclass(eq=True, frozen=True)
-class PointwiseIndirectCOOAccess(PointwiseNode, TermTree):
+class GetSparseCoordArray(PointwiseNode, TermTree):
     """
-    PointwiseIndirectCOOAccess
+    GetSparseCoordArray
 
-    Tensor access like a[i, j] but for sparse tensors. So in reality it's like a[COO_coords[i]] = ...
+    Gets the coordinate array of a sparse tensor stored in COO form
 
     Attributes:
-        tensor: The tensor to access.
-        coo_coords: The COO coordinates at which to access the tensor (this is also a tensor).
-        idxs: The indices at which to access the tensor.
+        sparse_tensro: The sparse tensor to access
     """
 
-    alias: str
-    coo_coord_alias: str
-    idx: Field #only one index is needed to access the COO coord tensor
-    # Children: None (leaf)
+    sparse_tensor: PointwiseNode
 
     @classmethod
-    def from_children(cls, alias: str, coo_coord_alias: str, idx: Field) -> Self:
-        return cls(alias, coo_coord_alias, idx)
-
+    def from_children(cls, sparse_tensor: PointwiseNode):
+        return cls(sparse_tensor)
+    
     @property
     def children(self):
-        return [self.alias, self.coo_coord_alias, self.idx]
+        return [self.sparse_tensor]
+
+@dataclass(eq=True, frozen=True)
+class GetSparseValueArray(PointwiseNode, TermTree):
+    """
+    GetSparseValueArray
+
+    Gets the value array of a sparse tensor stored in COO form
+    
+    Attributes:
+        sparse_tensro: The sparse tensor to access
+    """
+
+    sparse_tensor: PointwiseNode
+
+    @classmethod
+    def from_children(cls, sparse_tensor: PointwiseNode):
+        return cls(sparse_tensor)
+    
+    @property
+    def children(self):
+        return [self.sparse_tensor]
 
 @dataclass(eq=True, frozen=True)
 class PointwiseOp(PointwiseNode, TermTree):
@@ -128,35 +161,10 @@ class PointwiseLiteral(PointwiseNode):
     def __eq__(self, other):
         return isinstance(other, PointwiseLiteral) and self.val == other.val
 
-@dataclass(eq=True, frozen=True)
-class EinsumPlanStatement(Term, ABC):
-    """
-    EinsumPlanStatement
-
-    Represents an AST node in the Einsum Plan IR
-    """
-    
-    @classmethod
-    def head(cls):
-        """Returns the head of the node."""
-        return cls
-
-    @classmethod
-    def make_term(cls, head, *children: Term) -> Self:
-        return head.from_children(*children)
-        
-    @classmethod
-    def from_children(cls, *children: Term) -> Self:
-        return cls(*children)
-
-    def __str__(self):
-        ctx = EinsumPrinterContext()
-        return ctx.print_einsum_plan_statement(self)
-
 #einsum and einsum ast not part of logic IR
 #transform to it's own language
 @dataclass(eq=True, frozen=True)
-class Einsum(EinsumPlanStatement, TermTree):
+class Einsum(TermTree):
     """
     Einsum
 
@@ -171,78 +179,37 @@ class Einsum(EinsumPlanStatement, TermTree):
 
     reduceOp: Callable #technically a reduce operation, much akin to the one in aggregate
 
-    #input_fields: tuple[Field, ...] #redundant remove later
-    output_fields: tuple[Field, ...]
+    output: PointwiseNode
+    output_fields: tuple[PointwiseNode, ...]
     pointwise_expr: PointwiseNode
-
-    output_alias: str | None
-    indirect_coo_alias: str | None
     
     @classmethod
-    def from_children(cls, reduceOp: Callable, output_fields: tuple[Field, ...], pointwise_expr: PointwiseNode, output_alias: str | None, indirect_coo_alias: str | None) -> Self:
-        #return cls(output_alias, updateOp, input_fields, output_fields, pointwise_expr)
-        return cls(reduceOp, output_fields, pointwise_expr, output_alias, indirect_coo_alias)
+    def from_children(cls, reduceOp: Callable, output_fields: tuple[PointwiseNode, ...], pointwise_expr: PointwiseNode, output: PointwiseNode) -> Self:
+        return cls(reduceOp, output_fields, pointwise_expr, output)
     
     @property
     def children(self):
-        #return [self.output_alias, self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr]
-        return [self.output_alias, self.reduceOp, self.output_fields, self.pointwise_expr, self.indirect_coo_alias]
+        return [self.reduceOp, self.output_fields, self.pointwise_expr, self.output]
 
     def rename(self, new_alias: str):
-        #return Einsum(self.reduceOp, self.input_fields, self.output_fields, self.pointwise_expr, new_alias)
-        return Einsum(self.reduceOp, self.output_fields, self.pointwise_expr, new_alias, self.indirect_coo_alias)
+        return Einsum(self.reduceOp, self.output_fields, self.pointwise_expr, PointwiseNamedField(new_alias))
 
     def reorder(self, idxs: tuple[Field, ...]):
-        #return Einsum(self.reduceOp, idxs, self.output_fields, self.pointwise_expr, self.output_alias)
-        return Einsum(self.reduceOp, idxs, self.pointwise_expr, self.output_alias, self.indirect_coo_alias)
-
-@dataclass(eq=True, frozen=True)
-class ExtractCOOFromSparse(EinsumPlanStatement):
-    """
-    ExtractCOOFromSparse
-    
-    A plan statement that contains an extract's the coordinate array from COO sparse tensor.
-    """
-    alias: str
-
-    @classmethod
-    def from_children(cls, alias: str) -> Self:
-        return cls(alias)
-
-    @property
-    def children(self):
-        return [self.alias]
-
-@dataclass(eq=True, frozen=True)
-class ExtractValuesFromSparse(EinsumPlanStatement):
-    """
-    ExtractValuesFromSparse
-    
-    A plan statement that contains an extract's the values array from COO sparse tensor.
-    """
-    alias: str
-
-    @classmethod
-    def from_children(cls, alias: str) -> Self:
-        return cls(alias)
-
-    @property
-    def children(self):
-        return [self.alias]
+        return Einsum(self.reduceOp, tuple(PointwiseNamedField(idx.name) for idx in idxs), self.pointwise_expr, self.output)
 
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(Plan):
     """
     EinsumPlan
     
-    A plan that contains einsum operations. Basically a list of einsum operations.
+    A plan that contains einsum operations. Basically a list of einsums and some return values.
     """
 
-    bodies: tuple[EinsumPlanStatement, ...] = ()
-    returnValues: tuple[Einsum | str] = ()
+    bodies: tuple[Einsum, ...] = ()
+    returnValues: tuple[PointwiseNode, ...] = ()
 
     @classmethod
-    def from_children(cls, bodies: tuple[EinsumPlanStatement, ...], returnValues: tuple[Einsum | str]) -> Self:
+    def from_children(cls, *bodies: tuple[Einsum, ...], returnValues: tuple[PointwiseNode, ...]) -> Self:
         return cls(bodies, returnValues)
 
     @property
@@ -268,14 +235,14 @@ class EinsumLowerer:
         return einsum.rename(new_alias)
 
     def compile_plan(self, plan: Plan, parameters: dict[str, Table], definitions: dict[str, Einsum]) -> EinsumPlan:
-        einsum_statements: list[EinsumPlanStatement] = []
+        einsums: list[EinsumPlanStatement] = []
         returnValue = []
 
         for body in plan.bodies:
             match body:
                 case Plan(_):
                     einsum_plan = self.compile_plan(body, parameters, definitions)
-                    einsum_statements.extend(einsum_plan.bodies)
+                    einsums.extend(einsum_plan.bodies)
 
                     if einsum_plan.returnValues:
                         if returnValue:
@@ -284,22 +251,22 @@ class EinsumLowerer:
                 case Query(Alias(name), Table(_, _)):
                     parameters[name] = body.rhs
                 case Query(Alias(name), rhs):
-                    einsum_statements.append(self.rename_einsum(self.lower_to_einsum(rhs, einsum_statements, parameters, definitions), name, definitions))
+                    einsums.append(self.rename_einsum(self.lower_to_einsum(rhs, einsums, parameters, definitions), name, definitions))
                 case Produces(args):
                     if returnValue:
                         raise Exception("Cannot invoke return more than once.")
                     for arg in args:
-                        returnValue.append(arg.name if isinstance(arg, Alias) else self.lower_to_einsum(arg, einsum_statements, parameters, definitions))
+                        returnValue.append(arg.name if isinstance(arg, Alias) else self.lower_to_einsum(arg, einsums, parameters, definitions))
                 case _:
-                    einsum_statements.append(self.rename_einsum(self.lower_to_einsum(body, einsum_statements, parameters, definitions), self.get_next_alias(), definitions))
+                    einsums.append(self.rename_einsum(self.lower_to_einsum(body, einsums, parameters, definitions), self.get_next_alias(), definitions))
         
-        return EinsumPlan(tuple(einsum_statements), tuple(returnValue))
+        return EinsumPlan(tuple(einsums), tuple(returnValue))
 
-    def lower_to_einsum(self, ex: LogicNode, einsum_statements: list[EinsumPlanStatement], parameters: dict[str, Table], definitions: dict[str, Einsum]) -> Einsum:
+    def lower_to_einsum(self, ex: LogicNode, einsums: list[Einsum], parameters: dict[str, Table], definitions: dict[str, Einsum]) -> Einsum:
         match ex:
             case Plan(_):
                 plan = self.compile_plan(ex, parameters, definitions)
-                einsum_statements.extend(plan.bodies)
+                einsums.extend(plan.bodies)
                 
                 if not plan.returnValues:
                     raise Exception("Plans with no return value are not statements, but rather are expressions.")
@@ -314,16 +281,16 @@ class EinsumLowerer:
                 
                 return plan.returnValues[0] 
             case MapJoin(Literal(operation), args):
-                args = [self.lower_to_pointwise(arg, einsum_statements, parameters, definitions) for arg in args]
+                args = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
                 pointwise_expr = self.lower_to_pointwise_op(operation, args)
                 #return Einsum(reduceOp=overwrite, input_fields=ex.fields, output_fields=ex.fields, pointwise_expr=pointwise_expr, output_alias=None)
                 return Einsum(reduceOp=overwrite, output_fields=tuple(ex.fields), pointwise_expr=pointwise_expr, output_alias=None, indirect_coo_alias=None)
             case Reorder(arg, idxs):
-                return self.lower_to_einsum(arg, einsum_statements, parameters, definitions).reorder(idxs)
+                return self.lower_to_einsum(arg, einsums, parameters, definitions).reorder(idxs)
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
                     raise Exception(f"Init value {init} is not the default value for operation {operation} of type {type(init)}. Non standard init values are not supported.")
-                pointwise_expr = self.lower_to_pointwise(arg, einsum_statements, parameters, definitions)
+                pointwise_expr = self.lower_to_pointwise(arg, einsums, parameters, definitions)
                 #return Einsum(operation, arg.fields, ex.fields, pointwise_expr, self.get_next_alias())
                 return Einsum(operation, tuple(ex.fields), pointwise_expr, self.get_next_alias(), None)
             case _:
@@ -351,12 +318,12 @@ class EinsumLowerer:
         return result
 
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
-    def lower_to_pointwise(self, ex: LogicNode, einsum_statements: list[EinsumPlanStatement], parameters: dict[str, Table], definitions: dict[str, Einsum]) -> PointwiseNode:
+    def lower_to_pointwise(self, ex: LogicNode, einsums: list[Einsum], parameters: dict[str, Table], definitions: dict[str, Einsum]) -> PointwiseNode:
         match ex:
             case Reorder(arg, idxs):
-                return self.lower_to_pointwise(arg, einsum_statements, parameters, definitions)
+                return self.lower_to_pointwise(arg, einsums, parameters, definitions)
             case MapJoin(Literal(operation), args):
-                args = [self.lower_to_pointwise(arg, einsum_statements, parameters, definitions) for arg in args]
+                args = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
                 return self.lower_to_pointwise_op(operation, args)
             case Relabel(Alias(name), idxs): # relable is really just a glorified pointwise access
                 return PointwiseAccess(alias=name, idxs=idxs)
@@ -364,7 +331,7 @@ class EinsumLowerer:
                 return PointwiseLiteral(val=value)
             case Aggregate(_, _, _, _): # aggregate has to be computed seperatley as it's own einsum
                 aggregate_einsum_alias = self.get_next_alias()
-                einsum_statements.append(self.rename_einsum(self.lower_to_einsum(ex, einsum_statements, parameters, definitions), aggregate_einsum_alias, definitions)) 
+                einsums.append(self.rename_einsum(self.lower_to_einsum(ex, einsums, parameters, definitions), aggregate_einsum_alias, definitions)) 
                 return PointwiseAccess(alias=aggregate_einsum_alias, idxs=tuple(ex.fields))
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
@@ -428,21 +395,10 @@ class EinsumPrinterContext:
     def print_return_value(self, return_value: Einsum | str) -> str:
         return return_value if isinstance(return_value, str) else self.print_einsum(return_value)
 
-    def print_einsum_plan_statement(self, einsum_plan_statement: EinsumPlanStatement) -> str:
-        match einsum_plan_statement:
-            case Einsum(_, _, _, _, _):
-                return self.print_einsum(einsum_plan_statement)
-            case ExtractCOOFromSparse(alias):
-                return f"{alias}_coo = ExtractCOO({alias})"
-            case ExtractValuesFromSparse(alias):
-                return f"{alias}_values = ExtractValues({alias})"
-            case _:
-                raise Exception(f"Unrecognized einsum plan statement: {einsum_plan_statement}")
-
     def print_einsum_plan(self, einsum_plan: EinsumPlan) -> str:
         if not einsum_plan.returnValues:
             return "\n".join([self.print_einsum(einsum) for einsum in einsum_plan.bodies])
-        return f"{"\n".join([self.print_einsum_plan_statement(statement) for statement in einsum_plan.bodies])}\nreturn {", ".join([self.print_return_value(return_value) for return_value in einsum_plan.returnValues])}"
+        return f"{"\n".join([self.print_einsum(statement) for statement in einsum_plan.bodies])}\nreturn {", ".join([self.print_return_value(return_value) for return_value in einsum_plan.returnValues])}"
     
     def __call__(self, prgm: EinsumPlan) -> str:
         return self.print_einsum_plan(prgm)
@@ -463,77 +419,10 @@ class EinsumCompiler:
     def __init__(self):
         self.el = EinsumLowerer()
 
-    def find_sparse_tensors(self, parameters: dict[str, Table])-> tuple[dict, dict]: # -> dict[str, Tuple[Field, ...]]: getting type errors here
-        from finchlite.autoschedule.sparse_tensor import SparseTensor
-        
-        special_field_number = 1
-        sparse_tensors = dict()
-        sparse_fields = dict()
-
-        for alias, value in parameters.items():
-            match value:
-                case Table(Literal(tensor), idxs):
-                    if isinstance(tensor, SparseTensor):
-                        if idxs in sparse_fields:
-                            sparse_tensors[alias] = sparse_fields[idxs][1]
-                        else:
-                            sparse_tensors[alias] = Field(f"sf_{special_field_number}")
-                            sparse_fields[idxs] = (alias, Field(f"sf_{special_field_number}"))
-                            special_field_number += 1
-        return sparse_tensors, sparse_fields
-
-    #getting type errors here if I use dict[str, Tuple[Field, ...]]
-    def optimize_einsum(self, einsum_plan: EinsumPlan, sparse_aliases: dict, sparse_fields: dict) -> EinsumPlan:
-        def optimize_sparse_einsum(einsum: Einsum, extra_ops: list[EinsumPlanStatement]) -> Einsum:            
-            extracted_value_alias = set()
-            extracted_coo_alias = set()
-            
-            def optimize_pointwise_access(node: PointwiseNode) -> PointwiseNode:
-                match node:
-                    case PointwiseAccess(alias, idxs):
-                        if idxs in sparse_fields:
-                            if alias in sparse_aliases:
-                                if alias not in extracted_value_alias:
-                                    extracted_value_alias.add(alias)
-                                    extra_ops.append(ExtractValuesFromSparse(alias))
-                                return PointwiseAccess(f"{alias}_values", (sparse_aliases[alias],))
-                            else:
-                                if alias not in extracted_coo_alias:
-                                    extracted_coo_alias.add(alias)
-                                    extra_ops.append(ExtractCOOFromSparse(alias))
-                                return PointwiseIndirectCOOAccess(alias, f"{sparse_fields[idxs][0]}_coo", sparse_fields[idxs][1])
-                return node
-
-            new_pointwise_expr = Rewrite(PostWalk(optimize_pointwise_access))(einsum.pointwise_expr)
-
-            if einsum.output_fields in sparse_fields:
-                return Einsum(einsum.reduceOp, (sparse_fields[einsum.output_fields][1],), new_pointwise_expr, einsum.output_alias, f"{sparse_fields[einsum.output_fields][0]}_coo")
-            return Einsum(einsum.reduceOp, einsum.output_fields, new_pointwise_expr, einsum.output_alias, None)
-
-        optimized_einsums: list[EinsumPlanStatement] = []
-        for statement in einsum_plan.bodies:
-            match statement:
-                case Einsum(_, _, _, _, _):
-                    optimized_einsums.append(optimize_sparse_einsum(statement, optimized_einsums))
-                case _:
-                    optimized_einsums.append(statement)
-
-        optimized_returns = []
-        for return_value in einsum_plan.returnValues:
-            match return_value:
-                case Einsum(_, _, _, _, _):
-                    optimized_returns.append(optimize_sparse_einsum(return_value, optimized_einsums))
-                case _:
-                    optimized_returns.append(return_value)
-        return EinsumPlan(tuple(optimized_einsums), tuple(optimized_returns))
-
-    def __call__(self, prgm: Plan):
+    def __call__(self, prgm: EinsumPlan):
         parameters = {}
         definitions = {}
         einsum_plan = self.el(prgm, parameters, definitions)
-
-        sparse_aliases, sparse_fields = self.find_sparse_tensors(parameters)
-        einsum_plan = self.optimize_einsum(einsum_plan, sparse_aliases, sparse_fields)
 
         return einsum_plan, parameters, definitions
 
