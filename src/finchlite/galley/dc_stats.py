@@ -672,7 +672,7 @@ class DCStats(TensorStats):
         d_k = ntn.Variable("d_k", np.int64)
         d_k_ijw = ntn.Variable("d_k_ijw", np.int64)
         d_w = ntn.Variable("d_w", np.int64)
-        d_w_ijk = ntn.Variable("d_l_ijw", np.int64)
+        d_w_ijk = ntn.Variable("d_w_ijk", np.int64)
 
         prgm = ntn.Module(
             (
