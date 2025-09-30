@@ -20,20 +20,19 @@ class BasicBlock:
     def __str__(self) -> str:
         """String representation of BasicBlock in LLVM style."""
         lines = []
-        
+
         if self.predecessors:
             pred_names = [pred.id for pred in self.predecessors]
             pred_str = f" #preds=[{', '.join(pred_names)}]"
         else:
             pred_str = " #preds=[]"
-        
+
         # Block header
         lines.append(f"{self.id}:{pred_str}")
-        
+
         # Block statements
-        for stmt in self.statements:
-            lines.append(f"    {stmt}")
-        
+        lines.extend(f"    {stmt}" for stmt in self.statements)
+
         return "\n".join(lines)
 
 
@@ -59,14 +58,14 @@ class ControlFlowGraph:
         """Print the CFG in LLVM style format."""
         lines = []
         blocks = list(self.blocks.values())
-        
+
         for i, block in enumerate(blocks):
             lines.append(str(block))
-            
+
             # Add empty line between blocks (except for last block)
             if i < len(blocks) - 1:
                 lines.append("")
-        
+
         return "\n".join(lines)
 
     def __str__(self) -> str:
@@ -78,20 +77,22 @@ class CFGPrinterContext:
     def print(self, cfgs: dict) -> str:
         """Print multiple CFGs in LLVM style."""
         lines = []
-        
+
         for cfg in cfgs.values():
             # CFG name and metadata (indent = 0)
-            lines.append(f"{cfg.name}: #entry={cfg.entry_block.id}, #exit={cfg.exit_block.id}")
-            
+            lines.append(
+                f"{cfg.name}: #entry={cfg.entry_block.id}, #exit={cfg.exit_block.id}"
+            )
+
             # Get CFG string representation and indent it
             cfg_str = str(cfg)
-            for line in cfg_str.split('\n'):
+            for line in cfg_str.split("\n"):
                 if line.strip():  # Only indent non-empty lines
                     lines.append(f"    {line}")
                 else:
                     lines.append("")
-            
+
             # Add empty line between CFGs
             lines.append("")
-        
+
         return "\n".join(lines).rstrip()
