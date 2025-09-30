@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from abc import ABC
 import operator
-from typing import Callable, Self
+from typing import Callable, Self, cast
 
 from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic import LogicNode, Field, Plan, Query, Alias, Literal, Relabel
@@ -46,8 +46,11 @@ class PointwiseNamedField(PointwiseNode):
     name: str
 
     @classmethod
-    def from_children(cls, name: str):
-        return cls(name)
+    def from_children(cls, *children: Term) -> Self:
+        # Expecting a single child which is the name
+        if len(children) != 1:
+            raise ValueError(f"PointwiseNamedField expects 1 child, got {len(children)}")
+        return cls(str(children[0]))
     
     @property
     def children(self):
@@ -70,8 +73,13 @@ class PointwiseAccess(PointwiseNode, TermTree):
     # Children: None (leaf)
 
     @classmethod
-    def from_children(cls, alias: PointwiseNode, *idxs: tuple[PointwiseNode, ...]) -> Self:
-        return cls(alias, idxs)
+    def from_children(cls, *children: Term) -> Self:
+        # First child is alias, rest are indices
+        if len(children) < 1:
+            raise ValueError("PointwiseAccess expects at least 1 child")
+        alias = cast(PointwiseNode, children[0])
+        idxs = cast(tuple[PointwiseNode, ...], children[1:])
+        return cls(alias, tuple(idxs))
 
     @property
     def children(self):
@@ -91,8 +99,10 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
     sparse_tensor: PointwiseNode
 
     @classmethod
-    def from_children(cls, sparse_tensor: PointwiseNode):
-        return cls(sparse_tensor)
+    def from_children(cls, *children: Term) -> Self:
+        if len(children) != 1:
+            raise ValueError(f"GetSparseCoordArray expects 1 child, got {len(children)}")
+        return cls(cast(PointwiseNode, children[0]))
     
     @property
     def children(self):
@@ -112,8 +122,10 @@ class GetSparseValueArray(PointwiseNode, TermTree):
     sparse_tensor: PointwiseNode
 
     @classmethod
-    def from_children(cls, sparse_tensor: PointwiseNode):
-        return cls(sparse_tensor)
+    def from_children(cls, *children: Term) -> Self:
+        if len(children) != 1:
+            raise ValueError(f"GetSparseValueArray expects 1 child, got {len(children)}")
+        return cls(cast(PointwiseNode, children[0]))
     
     @property
     def children(self):
@@ -138,8 +150,13 @@ class PointwiseOp(PointwiseNode, TermTree):
     # Children: The args
 
     @classmethod
-    def from_children(cls, op: Callable, *args: tuple[PointwiseNode, ...]) -> Self:
-        return cls(op, args)
+    def from_children(cls, *children: Term) -> Self:
+        # First child is op, rest are args
+        if len(children) < 2:
+            raise ValueError("PointwiseOp expects at least 2 children (op and at least one arg)")
+        op = cast(Callable, children[0])
+        args = cast(tuple[PointwiseNode, ...], children[1:])
+        return cls(op, tuple(args))
 
     @property
     def children(self):
@@ -184,7 +201,14 @@ class Einsum(PointwiseNode, TermTree):
     pointwise_expr: PointwiseNode
     
     @classmethod
-    def from_children(cls, reduceOp: Callable, output: PointwiseNode, output_fields: tuple[PointwiseNode, ...], pointwise_expr: PointwiseNode) -> Self:
+    def from_children(cls, *children: Term) -> Self:
+        # Expecting exactly 4 children
+        if len(children) != 4:
+            raise ValueError(f"Einsum expects 4 children, got {len(children)}")
+        reduceOp = cast(Callable, children[0])
+        output = cast(PointwiseNode, children[1])
+        output_fields = cast(tuple[PointwiseNode, ...], children[2])
+        pointwise_expr = cast(PointwiseNode, children[3])
         return cls(reduceOp, output, output_fields, pointwise_expr)
     
     @property
@@ -198,7 +222,7 @@ class Einsum(PointwiseNode, TermTree):
         return Einsum(self.reduceOp, self.output, tuple(PointwiseNamedField(idx.name) for idx in idxs), self.pointwise_expr)
 
 @dataclass(eq=True, frozen=True)
-class EinsumPlan(Plan):
+class EinsumPlan(PointwiseNode):
     """
     EinsumPlan
     
@@ -209,8 +233,12 @@ class EinsumPlan(Plan):
     returnValues: tuple[PointwiseNode, ...] = ()
 
     @classmethod
-    def from_children(cls, *bodies: tuple[Einsum, ...], returnValues: tuple[PointwiseNode, ...]) -> Self:
-        return cls(bodies, returnValues)
+    def from_children(cls, *children: Term) -> Self:
+        # The last child is the returnValues tuple, all others are bodies
+        if len(children) < 1:
+            raise ValueError("EinsumPlan expects at least 1 child")
+        *bodies, returnValues = children
+        return cls(tuple(cast(Einsum, b) for b in bodies), cast(tuple[PointwiseNode, ...], returnValues))
 
     @property
     def children(self):
@@ -225,8 +253,8 @@ class EinsumLowerer:
 
     def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
 
-        parameters = {}
-        definitions = {}
+        parameters: dict[str, Table] = {}
+        definitions: dict[str, Einsum] = {}
         return self.compile_plan(prgm, parameters, definitions), parameters
 
     def get_next_alias(self) -> str:
@@ -265,8 +293,8 @@ class EinsumLowerer:
             case Plan(_):
                 raise Exception("Plans within plans are not supported.")
             case MapJoin(Literal(operation), args):
-                args = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
-                pointwise_expr = self.lower_to_pointwise_op(operation, args)
+                args_list = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
+                pointwise_expr: PointwiseNode = self.lower_to_pointwise_op(operation, tuple(args_list))
                 return Einsum(reduceOp=overwrite, output=PointwiseNamedField(self.get_next_alias()), output_fields=tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr=pointwise_expr)
             case Reorder(arg, idxs):
                 return self.lower_to_einsum(arg, einsums, parameters, definitions).reorder(idxs)
@@ -282,7 +310,7 @@ class EinsumLowerer:
         # if operation is commutative, we simply pass all the args to the pointwise op since order of args does not matter
         if is_commutative(operation):
             def flatten_args(m_args: tuple[PointwiseNode, ...]) -> tuple[PointwiseNode, ...]:
-                ret_args = []
+                ret_args: list[PointwiseNode] = []
                 for arg in m_args:
                     match arg:
                         case PointwiseOp(op2, _) if op2 == operation:
@@ -305,8 +333,8 @@ class EinsumLowerer:
             case Reorder(arg, idxs):
                 return self.lower_to_pointwise(arg, einsums, parameters, definitions)
             case MapJoin(Literal(operation), args):
-                args = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
-                return self.lower_to_pointwise_op(operation, args)
+                args_list = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
+                return self.lower_to_pointwise_op(operation, tuple(args_list))
             case Relabel(Alias(name), idxs): # relable is really just a glorified pointwise access
                 return PointwiseAccess(alias=PointwiseNamedField(name), idxs=tuple(PointwiseNamedField(idx.name) for idx in idxs))
             case Literal(value):
@@ -411,5 +439,7 @@ class EinsumScheduler:
         self.interpret = EinsumInterpreter()
 
     def __call__(self, prgm: LogicNode):
+        if not isinstance(prgm, Plan):
+            raise TypeError(f"EinsumScheduler expects a Plan, got {type(prgm)}")
         einsum_plan, parameters = self.ctx(prgm)
         return self.interpret(einsum_plan, parameters)
