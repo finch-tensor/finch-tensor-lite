@@ -1,13 +1,16 @@
+from typing import Any
+
+
 class BasicBlock:
     """A basic block of FinchAssembly Control Flow Graph."""
 
-    def __init__(self, id):
+    def __init__(self, id: str) -> None:
         self.id = id
-        self.statements = []
-        self.successors = []
-        self.predecessors = []
+        self.statements: list[Any] = []
+        self.successors: list[BasicBlock] = []
+        self.predecessors: list[BasicBlock] = []
 
-    def add_statement(self, statement):
+    def add_statement(self, statement: Any) -> None:
         self.statements.append(statement)
 
     def add_successor(self, successor: "BasicBlock") -> None:
@@ -47,7 +50,7 @@ class ControlFlowGraph:
         self.entry_block = self.new_block()
         self.exit_block = self.new_block()
 
-    def new_block(self):
+    def new_block(self) -> BasicBlock:
         bid = f"{self.name}_{self.block_counter}"
         self.block_counter += 1
         block = BasicBlock(bid)
@@ -56,17 +59,11 @@ class ControlFlowGraph:
 
     def print(self) -> str:
         """Print the CFG in LLVM style format."""
-        lines = []
         blocks = list(self.blocks.values())
 
-        for i, block in enumerate(blocks):
-            lines.append(str(block))
-
-            # Add empty line between blocks (except for last block)
-            if i < len(blocks) - 1:
-                lines.append("")
-
-        return "\n".join(lines)
+        # Use list comprehension with join for better performance
+        block_strings = [str(block) for block in blocks]
+        return "\n\n".join(block_strings)
 
     def __str__(self) -> str:
         """String representation using LLVM-style pretty printing."""
@@ -76,23 +73,21 @@ class ControlFlowGraph:
 class CFGPrinterContext:
     def print(self, cfgs: dict) -> str:
         """Print multiple CFGs in LLVM style."""
-        lines = []
+        cfg_sections = []
 
         for cfg in cfgs.values():
-            # CFG name and metadata (indent = 0)
-            lines.append(
+            # CFG header
+            header = (
                 f"{cfg.name}: #entry={cfg.entry_block.id}, #exit={cfg.exit_block.id}"
             )
 
-            # Get CFG string representation and indent it
+            # Indent all CFG lines
             cfg_str = str(cfg)
-            for line in cfg_str.split("\n"):
-                if line.strip():  # Only indent non-empty lines
-                    lines.append(f"    {line}")
-                else:
-                    lines.append("")
+            indented_lines = [
+                f"    {line}" if line.strip() else "" for line in cfg_str.split("\n")
+            ]
 
-            # Add empty line between CFGs
-            lines.append("")
+            # Combine header and indented content
+            cfg_sections.append(header + "\n" + "\n".join(indented_lines))
 
-        return "\n".join(lines).rstrip()
+        return "\n\n".join(cfg_sections)
