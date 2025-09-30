@@ -19,6 +19,7 @@ from .galley import (
 from .interface import (
     EagerTensor,
     LazyTensor,
+    Mode,
     Scalar,
     abs,
     acos,
@@ -126,6 +127,7 @@ __all__ = [
     "LazyTensor",
     "LinearIndicesTensor",
     "LinearIndicesTensorFType",
+    "Mode",
     "NotationContext",
     "NumpyBuffer",
     "NumpyBufferFType",
