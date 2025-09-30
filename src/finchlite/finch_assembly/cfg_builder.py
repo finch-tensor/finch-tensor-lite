@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..symbolic.cfg import BasicBlock, ControlFlowGraph
+from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -13,7 +13,6 @@ from .nodes import (
     Call,
     ForLoop,
     Function,
-    GetAttr,
     If,
     IfElse,
     Length,
@@ -59,17 +58,12 @@ class CFGBuilder:
     def __call__(self, node: AssemblyNode, break_block: BasicBlock | None = None):
         match node:
             case (
-                Literal()
-                | Unpack()
+                Unpack()
                 | Repack()
                 | Resize()
-                | TaggedVariable()
-                | GetAttr()
                 | SetAttr()
                 | Call()
-                | Load()
                 | Store()
-                | Length()
                 | Assign()
                 | Assert()
             ):
@@ -200,13 +194,13 @@ class CFGBuilder:
                 for arg in args:
                     match arg:
                         case TaggedVariable():
-                            self.current_block.add_statement(arg)
+                            self.current_block.add_statement(Assign(arg, arg))
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
                             )
 
-                self(body)
+                self(body, break_block)
             case Module(funcs):
                 for func in funcs:
                     if not isinstance(func, Function):
@@ -224,7 +218,7 @@ class CFGBuilder:
                         )
 
                     self.current_cfg = self.new_cfg(func_name)
-                    self(func)
+                    self(func, break_block)
                     self.current_block.add_successor(self.current_cfg.exit_block)
             case node:
                 raise NotImplementedError(node)

@@ -1,16 +1,13 @@
-from typing import Any
-
-
 class BasicBlock:
     """A basic block of FinchAssembly Control Flow Graph."""
 
     def __init__(self, id: str) -> None:
         self.id = id
-        self.statements: list[Any] = []
+        self.statements: list = []
         self.successors: list[BasicBlock] = []
         self.predecessors: list[BasicBlock] = []
 
-    def add_statement(self, statement: Any) -> None:
+    def add_statement(self, statement) -> None:
         self.statements.append(statement)
 
     def add_successor(self, successor: "BasicBlock") -> None:
@@ -67,7 +64,7 @@ class ControlFlowGraph:
 
 
 class CFGPrinterContext:
-    def print(self, cfgs: dict) -> str:
+    def print(self, cfgs: dict[str, ControlFlowGraph]) -> str:
         """Print multiple CFGs in LLVM style."""
         cfg_sections = []
 
