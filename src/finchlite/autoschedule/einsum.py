@@ -409,7 +409,9 @@ class EinsumPrinterContext:
         return f"{self.print_pointwise_expr(einsum.output)}[{self.print_indicies(einsum.output_fields)}] {self.print_reducer(einsum.reduceOp)} {self.print_pointwise_expr(einsum.pointwise_expr)}"
 
     def print_einsum_plan(self, einsum_plan: EinsumPlan) -> str:
-        return f"{"\n".join([self.print_einsum(statement) for statement in einsum_plan.bodies])}\nreturn {", ".join([self.print_pointwise_expr(return_value) for return_value in einsum_plan.returnValues])}"
+        statements = "\n".join([self.print_einsum(statement) for statement in einsum_plan.bodies])
+        return_values = ", ".join([self.print_pointwise_expr(return_value) for return_value in einsum_plan.returnValues])
+        return f"{statements}\nreturn {return_values}"
     
     def __call__(self, prgm: EinsumPlan) -> str:
         return self.print_einsum_plan(prgm)
