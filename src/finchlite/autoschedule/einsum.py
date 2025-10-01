@@ -386,14 +386,14 @@ class EinsumLowerer:
                     for operation {operation} of type {type(init)}.
                     Non standard init values are not supported.
                     """)
-                pointwise_expr = self.lower_to_pointwise(
+                aggregate_expr = self.lower_to_pointwise(
                     arg, einsums, parameters, definitions
                 )
                 return Einsum(
                     operation,
                     PointwiseNamedField(self.get_next_alias()),
                     tuple(PointwiseNamedField(field.name) for field in ex.fields),
-                    pointwise_expr,
+                    aggregate_expr,
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
