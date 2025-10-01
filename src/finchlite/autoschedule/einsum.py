@@ -141,7 +141,8 @@ class PointwiseOp(PointwiseNode, TermTree):
 
     Attributes:
         op: The function to apply e.g., 
-            operator.add, operator.mul, operator.subtract, operator.div, etc... Must be a callable.
+            operator.add, operator.mul, operator.subtract, operator.div, etc... 
+            Must be a callable.
         args: The arguments to the operation.
     """
 
@@ -202,7 +203,8 @@ class Einsum(PointwiseNode, TermTree):
                     is mapped and aggregated.
     """
 
-    reduceOp: Callable #technically a reduce operation, much akin to the one in aggregate
+    #technically a reduce operation, much akin to the one in aggregate
+    reduceOp: Callable 
 
     output: PointwiseNode
     output_fields: tuple[PointwiseNode, ...]
@@ -334,28 +336,69 @@ class EinsumLowerer:
         
         return EinsumPlan(tuple(einsums), tuple(returnValue))
 
-    def lower_to_einsum(self, ex: LogicNode, einsums: list[Einsum], parameters: dict[str, Table], definitions: dict[str, Einsum]) -> Einsum:
+    def lower_to_einsum(self, 
+        ex: LogicNode, 
+        einsums: list[Einsum], 
+        parameters: dict[str, Table], 
+        definitions: dict[str, Einsum]
+    ) -> Einsum:
         match ex:
             case Plan(_):
                 raise Exception("Plans within plans are not supported.")
             case MapJoin(Literal(operation), args):
-                args_list = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
-                pointwise_expr: PointwiseNode = self.lower_to_pointwise_op(operation, tuple(args_list))
-                return Einsum(reduceOp=overwrite, output=PointwiseNamedField(self.get_next_alias()), output_fields=tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr=pointwise_expr)
+                args_list = [
+                    self.lower_to_pointwise(arg, einsums, parameters, definitions) 
+                    for arg in args
+                ]
+                pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
+                return Einsum(
+                    reduceOp=overwrite, 
+                    output=PointwiseNamedField(self.get_next_alias()), 
+                    output_fields=tuple(
+                        PointwiseNamedField(field.name) 
+                        for field in ex.fields
+                    ), pointwise_expr=pointwise_expr
+                )
             case Reorder(arg, idxs):
-                return self.lower_to_einsum(arg, einsums, parameters, definitions).reorder(idxs)
+                return self.lower_to_einsum(
+                    arg, 
+                    einsums, 
+                    parameters, 
+                    definitions
+                ).reorder(idxs)
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
-                    raise Exception(f"Init value {init} is not the default value for operation {operation} of type {type(init)}. Non standard init values are not supported.")
-                pointwise_expr = self.lower_to_pointwise(arg, einsums, parameters, definitions)
-                return Einsum(operation, PointwiseNamedField(self.get_next_alias()), tuple(PointwiseNamedField(field.name) for field in ex.fields), pointwise_expr)
+                    raise Exception(f"""
+                    Init value {init} is not the default value 
+                    for operation {operation} of type {type(init)}. 
+                    Non standard init values are not supported.
+                    """)
+                pointwise_expr = self.lower_to_pointwise(
+                    arg, 
+                    einsums, 
+                    parameters, 
+                    definitions
+                )
+                return Einsum(
+                    operation, 
+                    PointwiseNamedField(self.get_next_alias()), 
+                    tuple(PointwiseNamedField(field.name) for field in ex.fields), 
+                    pointwise_expr
+                )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
-    def lower_to_pointwise_op(self, operation: Callable, args: tuple[PointwiseNode, ...]) -> PointwiseOp:
-        # if operation is commutative, we simply pass all the args to the pointwise op since order of args does not matter
+    def lower_to_pointwise_op(self, 
+        operation: Callable, 
+        args: tuple[PointwiseNode, ...]
+    ) -> PointwiseOp:
+        # if operation is commutative, we simply pass 
+        # all the args to the pointwise op since 
+        # order of args does not matter
         if is_commutative(operation):
-            def flatten_args(m_args: tuple[PointwiseNode, ...]) -> tuple[PointwiseNode, ...]:
+            def flatten_args(
+                m_args: tuple[PointwiseNode, ...]
+            ) -> tuple[PointwiseNode, ...]:
                 ret_args: list[PointwiseNode] = []
                 for arg in m_args:
                     match arg:
@@ -374,12 +417,20 @@ class EinsumLowerer:
         return result
 
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
-    def lower_to_pointwise(self, ex: LogicNode, einsums: list[Einsum], parameters: dict[str, Table], definitions: dict[str, Einsum]) -> PointwiseNode:
+    def lower_to_pointwise(self, 
+        ex: LogicNode, 
+        einsums: list[Einsum], 
+        parameters: dict[str, Table], 
+        definitions: dict[str, Einsum]
+    ) -> PointwiseNode:
         match ex:
             case Reorder(arg, idxs):
                 return self.lower_to_pointwise(arg, einsums, parameters, definitions)
             case MapJoin(Literal(operation), args):
-                args_list = [self.lower_to_pointwise(arg, einsums, parameters, definitions) for arg in args]
+                args_list = [
+                    self.lower_to_pointwise(arg, einsums, parameters, definitions) 
+                    for arg in args
+                ]
                 return self.lower_to_pointwise_op(operation, tuple(args_list))
             case Relabel(Alias(name), idxs): # relable is really just a glorified pointwise access
                 return PointwiseAccess(alias=PointwiseNamedField(name), idxs=tuple(PointwiseNamedField(idx.name) for idx in idxs))
