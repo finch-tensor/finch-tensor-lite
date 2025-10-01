@@ -49,7 +49,7 @@ class PointwiseNamedField(PointwiseNode):
     def from_children(cls, *children: Term) -> Self:
         # Expecting a single child which is the name
         if len(children) != 1:
-            raise ValueError(f"PointwiseNamedField expects 1 child, got {len(children)}")
+            raise ValueError(f"PointwiseNamedField expects 1 child got {len(children)}")
         return cls(str(children[0]))
     
     @property
@@ -101,7 +101,7 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         if len(children) != 1:
-            raise ValueError(f"GetSparseCoordArray expects 1 child, got {len(children)}")
+            raise ValueError(f"GetSparseCoordArray expects 1 child got {len(children)}")
         return cls(cast(PointwiseNode, children[0]))
     
     @property
@@ -124,7 +124,7 @@ class GetSparseValueArray(PointwiseNode, TermTree):
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         if len(children) != 1:
-            raise ValueError(f"GetSparseValueArray expects 1 child, got {len(children)}")
+            raise ValueError(f"GetSparseValueArray expects 1 child got {len(children)}")
         return cls(cast(PointwiseNode, children[0]))
     
     @property
@@ -140,7 +140,8 @@ class PointwiseOp(PointwiseNode, TermTree):
     If operation is not commutative, pointwise node must be binary, with 2 args at most.
 
     Attributes:
-        op: The function to apply e.g., operator.add, operator.mul, operator.subtract, operator.div, etc... Must be a callable.
+        op: The function to apply e.g., 
+            operator.add, operator.mul, operator.subtract, operator.div, etc... Must be a callable.
         args: The arguments to the operation.
     """
 
@@ -153,7 +154,7 @@ class PointwiseOp(PointwiseNode, TermTree):
     def from_children(cls, *children: Term) -> Self:
         # First child is op, rest are args
         if len(children) < 2:
-            raise ValueError("PointwiseOp expects at least 2 children (op and at least one arg)")
+            raise ValueError("PointwiseOp expects at least 2 children (op + 1 arg)")
         op = cast(Callable, children[0])
         args = cast(tuple[PointwiseNode, ...], children[1:])
         return cls(op, tuple(args))
@@ -188,10 +189,17 @@ class Einsum(PointwiseNode, TermTree):
     A einsum operation that maps pointwise expressions and aggregates them.
 
     Attributes:
-        updateOp: The function to apply to the pointwise expressions (e.g. +=, f=, max=, etc...).
-        input_fields: The indices that are used in the pointwise expression (i.e. i, j, k).
-        output_fields: The indices that are used in the output (i.e. i, j).
-        pointwise_expr: The pointwise expression that is mapped and aggregated.
+        updateOp: The function to apply to the pointwise expressions 
+                    (e.g. +=, f=, max=, etc...). Must be a callable.
+
+        input_fields: The indices that are used in the pointwise 
+                    expression (i.e. i, j, k).
+
+        output_fields: The indices that are used in the output 
+                    (i.e. i, j).
+
+        pointwise_expr: The pointwise expression that 
+                    is mapped and aggregated.
     """
 
     reduceOp: Callable #technically a reduce operation, much akin to the one in aggregate
@@ -216,17 +224,28 @@ class Einsum(PointwiseNode, TermTree):
         return [self.reduceOp, self.output, self.output_fields, self.pointwise_expr]
 
     def rename(self, new_alias: str):
-        return Einsum(self.reduceOp, PointwiseNamedField(new_alias), self.output_fields, self.pointwise_expr)
+        return Einsum(
+            self.reduceOp, 
+            PointwiseNamedField(new_alias), 
+            self.output_fields, 
+            self.pointwise_expr
+        )
 
     def reorder(self, idxs: tuple[Field, ...]):
-        return Einsum(self.reduceOp, self.output, tuple(PointwiseNamedField(idx.name) for idx in idxs), self.pointwise_expr)
+        return Einsum(
+            self.reduceOp, 
+            self.output, 
+            tuple(PointwiseNamedField(idx.name) for idx in idxs), 
+            self.pointwise_expr
+        )
 
 @dataclass(eq=True, frozen=True)
 class EinsumPlan(PointwiseNode):
     """
     EinsumPlan
     
-    A plan that contains einsum operations. Basically a list of einsums and some return values.
+    A plan that contains einsum operations. 
+    Basically a list of einsums and some return values.
     """
 
     bodies: tuple[Einsum, ...] = ()
@@ -238,7 +257,11 @@ class EinsumPlan(PointwiseNode):
         if len(children) < 1:
             raise ValueError("EinsumPlan expects at least 1 child")
         *bodies, returnValues = children
-        return cls(tuple(cast(Einsum, b) for b in bodies), cast(tuple[PointwiseNode, ...], returnValues))
+
+        return cls(
+            tuple(cast(Einsum, b) for b in bodies), 
+            cast(tuple[PointwiseNode, ...], returnValues)
+        )
 
     @property
     def children(self):
@@ -261,11 +284,21 @@ class EinsumLowerer:
         self.alias_counter += 1
         return f"einsum_{self.alias_counter}"
 
-    def rename_einsum(self, einsum: Einsum, new_alias: str, definitions: dict[str, Einsum]) -> Einsum:
+    def rename_einsum(
+        self,
+        einsum: Einsum, 
+        new_alias: str, 
+        definitions: dict[str, Einsum]
+    ) -> Einsum:
         definitions[new_alias] = einsum
         return einsum.rename(new_alias)
 
-    def compile_plan(self, plan: Plan, parameters: dict[str, Table], definitions: dict[str, Einsum]) -> EinsumPlan:
+    def compile_plan(
+        self, 
+        plan: Plan, 
+        parameters: dict[str, Table], 
+        definitions: dict[str, Einsum]
+    ) -> EinsumPlan:
         einsums: list[Einsum] = []
         returnValue: list[PointwiseNode] = []
 
@@ -278,13 +311,26 @@ class EinsumLowerer:
                 case Query(Alias(name), Table(_, _)):
                     parameters[name] = body.rhs
                 case Query(Alias(name), rhs):
-                    einsums.append(self.rename_einsum(self.lower_to_einsum(rhs, einsums, parameters, definitions), name, definitions))
+                    einsums.append(self.rename_einsum(self.lower_to_einsum(
+                        rhs, 
+                        einsums, 
+                        parameters, 
+                        definitions
+                    ), name, definitions))
                 case Produces(args):
-                    for arg in args:
-                        returnValue.append(PointwiseNamedField(arg.name) if isinstance(arg, Alias) else self.lower_to_einsum(arg, einsums, parameters, definitions))
+                    returnValue = [
+                        PointwiseNamedField(arg.name) if isinstance(arg, Alias) 
+                        else self.lower_to_einsum(arg, einsums, parameters, definitions)
+                        for arg in args
+                    ]
                     break
                 case _:
-                    einsums.append(self.rename_einsum(self.lower_to_einsum(body, einsums, parameters, definitions), self.get_next_alias(), definitions))
+                    einsums.append(self.rename_einsum(self.lower_to_einsum(
+                        body,
+                        einsums,
+                        parameters, 
+                        definitions
+                    ), self.get_next_alias(), definitions))
         
         return EinsumPlan(tuple(einsums), tuple(returnValue))
 
