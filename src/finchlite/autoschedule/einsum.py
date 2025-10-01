@@ -521,9 +521,7 @@ class EinsumPrinterContext:
             case PointwiseNamedField(name):
                 return name
             case PointwiseAccess(alias, idxs):
-                return (
-                    f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
-                )
+                return f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
             case GetSparseCoordArray(sparse_tensor):
                 return f"{self.print_pointwise(sparse_tensor)}Coords"
             case GetSparseValueArray(sparse_tensor):
