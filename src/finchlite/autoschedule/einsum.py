@@ -381,7 +381,9 @@ class EinsumPrinterContext:
     def print_pointwise_op(self, pointwise_op: PointwiseOp):
         if is_commutative(pointwise_op.op) == False:
             return f"({pointwise_op.args[0]} {self.print_pointwise_op_callable(pointwise_op.op)} {pointwise_op.args[1]})"
-        return f"({f" {self.print_pointwise_op_callable(pointwise_op.op)} ".join(self.print_pointwise_expr(arg) for arg in pointwise_op.args)})"
+
+        opstr = f" {self.print_pointwise_op_callable(pointwise_op.op)} ";
+        return f"({opstr.join(self.print_pointwise_expr(arg) for arg in pointwise_op.args)})"
 
     def print_indicies(self, idxs: tuple[PointwiseNode, ...]):
         return ", ".join([self.print_pointwise_expr(idx) for idx in idxs])
