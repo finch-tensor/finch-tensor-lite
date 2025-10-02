@@ -789,7 +789,7 @@ def max(
 
 
 def clip(x, /, *, min=None, max=None) -> LazyTensor:
-    return elementwise(np.clip, defer(x), a_min=min, a_max=max)
+    return elementwise(np.clip, defer(x), defer(min), defer(max))
 
 
 def sqrt(x) -> LazyTensor:
