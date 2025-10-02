@@ -540,7 +540,11 @@ maximum = max
 
 
 def clip(x, /, *, min=None, max=None):
-    if isinstance(x, lazy.LazyTensor):
+    if (
+        isinstance(x, lazy.LazyTensor)
+        or isinstance(min, lazy.LazyTensor)
+        or isinstance(max, lazy.LazyTensor)
+    ):
         return lazy.clip(x, min=min, max=max)
     return compute(lazy.clip(x, min=min, max=max))
 
