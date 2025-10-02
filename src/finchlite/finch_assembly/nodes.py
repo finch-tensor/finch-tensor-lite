@@ -771,10 +771,11 @@ class AssemblyPrinterContext(Context):
                     self(func)
                 return None
             case Print(args):
-                arg_decls = [
-                    f"{self(arg)}" for arg in args if isinstance(arg, Variable)
-                ]
-                self.exec(f"{feed}print {arg_decls}")
+                args_value_str = ""
+                for arg in args:
+                    if isinstance(arg, Variable):
+                        args_value_str = args_value_str + f"{{{self(arg)}}} "
+                self.exec(f"{feed}print(f'{args_value_str}')")
                 return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")

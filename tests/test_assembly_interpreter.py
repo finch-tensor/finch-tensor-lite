@@ -228,7 +228,7 @@ def test_simple_struct():
     assert result == 9.0
 
 
-def test_debug_statement(capsys, file_regression):
+def test_asm_print(capsys, file_regression):
     p_var_name = "p"
     x_var_name = "x"
     res_var_name = "res"
