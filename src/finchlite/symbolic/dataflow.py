@@ -21,14 +21,14 @@ class BasicBlock:
         """String representation of BasicBlock in LLVM style."""
         lines = []
 
-        if self.predecessors:
-            pred_names = [pred.id for pred in self.predecessors]
-            pred_str = f" #preds=[{', '.join(pred_names)}]"
+        if self.successors:
+            succ_names = [succ.id for succ in self.successors]
+            succ_str = f" #succs=[{', '.join(succ_names)}]"
         else:
-            pred_str = " #preds=[]"
+            succ_str = " #succs=[]"
 
         # Block header
-        lines.append(f"{self.id}:{pred_str}")
+        lines.append(f"{self.id}:{succ_str}")
 
         # Block statements
         lines.extend(f"    {stmt}" for stmt in self.statements)
