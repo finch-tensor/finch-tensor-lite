@@ -300,6 +300,95 @@ def test_unary_operations(a, a_wrap, ops, np_op):
 
 
 @pytest.mark.parametrize(
+    "a, b, c",
+    [
+        (
+            np.array([[1, 2], [3, 4]]),
+            np.array([[1, 1], [1, 1]]),
+            np.array([[3, 3], [3, 3]]),
+        ),
+        (
+            np.array([[2, -1], [0, 5]]),
+            None,
+            np.array([[1, 1], [1, 1]]),
+        ),
+        (
+            np.array([[0, -3], [5, 10]]),
+            np.array([[0, 0], [0, 0]]),
+            None,
+        ),
+        (
+            np.array([[-5, 0], [10, 7]]),
+            -2,
+            2,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "c_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "ops, np_op, caller",
+    [
+        ((finchlite.clip, np.clip), np.clip, lambda op, a, b, c: op(a, min=b, max=c)),
+    ],
+)
+def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller):
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+    wc = c_wrap(c)
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
+
+        expected = np_op(a, b, c)
+
+        for op in ops:
+            result = caller(op, wa, wb, wc)
+
+            if (
+                isinstance(wa, finchlite.LazyTensor)
+                or isinstance(wb, finchlite.LazyTensor)
+                or isinstance(wc, finchlite.LazyTensor)
+            ):
+                assert isinstance(result, finchlite.LazyTensor)
+
+                result = finchlite.compute(result)
+
+            assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
     "a",
     [
         (np.array([[True, False, True, False], [False, False, False, False]])),

@@ -661,6 +661,14 @@ for logical in (
     )
 register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
 
+for ternary_op in (np.clip,):
+    register_property(
+        ternary_op,
+        "__call__",
+        "return_type",
+        lambda op, a, b, c, _ternary_op=ternary_op: float,
+    )
+
 # Register return types for numpy comparison ufuncs
 for comparison in (
     np.equal,
