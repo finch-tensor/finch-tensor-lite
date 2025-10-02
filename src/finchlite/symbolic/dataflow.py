@@ -1,3 +1,6 @@
+from abc import ABC, abstractmethod
+from typing import Dict, List
+
 class BasicBlock:
     """A basic block of FinchAssembly Control Flow Graph."""
 
@@ -62,6 +65,64 @@ class ControlFlowGraph:
         block_strings = [str(block) for block in blocks]
         return "\n\n".join(block_strings)
 
+class DataFlowAnalysis(ABC):
+    def __init__(self, cfg: ControlFlowGraph):
+        self.cfg = cfg
+        self.input_states = {block.id: {} for block in cfg.blocks.values()}
+        self.output_states = {block.id: {} for block in cfg.blocks.values()}
+
+    @abstractmethod
+    def transfer(self, insts, state: Dict) -> List:
+        """
+        Transfer function for the data flow analysis.
+        This should be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def join(self, state_1: Dict, state_2: Dict) -> Dict:
+        """
+        Join function for the data flow analysis.
+        This should be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def direction(self) -> str:
+        """
+        Return the direction of the data flow analysis, either "forward" or "backward".
+        This should be implemented by subclasses.
+        """
+        return "forward"
+
+
+    def analyze(self):
+        """
+        Perform the data flow analysis on the control flow graph.
+        This method initializes the work list and processes each block.
+        """
+        if self.direction() == "forward":
+            work_list = [self.cfg.entry_block]
+            while work_list:
+                block = work_list.pop(0)
+                input_state = self.input_states.get(block.id, {})
+                output_state = self.transfer(block, input_state)
+                if output_state != self.output_states.get(block.id, {}):
+                    self.output_states[block] = output_state
+                    for successor in block.successors:
+                        if successor not in work_list:
+                            work_list.append(successor)
+        else:
+            work_list = [self.cfg.exit_block]
+            while work_list:
+                block = work_list.pop(0)
+                input_state = self.input_states.get(block.id, {})
+                output_state = self.transfer(block, input_state)
+                if output_state != self.output_states.get(block.id, {}):
+                    self.output_states[block] = output_state
+                    for predecessor in block.predecessors:
+                        if predecessor not in work_list:
+                            work_list.append(predecessor)
 
 class CFGPrinterContext:
     def print(self, cfgs: dict[str, ControlFlowGraph]) -> str:
