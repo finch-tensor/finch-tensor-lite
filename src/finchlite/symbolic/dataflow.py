@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+
 
 class BasicBlock:
     """A basic block of FinchAssembly Control Flow Graph."""
@@ -65,14 +65,19 @@ class ControlFlowGraph:
         block_strings = [str(block) for block in blocks]
         return "\n\n".join(block_strings)
 
+
 class DataFlowAnalysis(ABC):
     def __init__(self, cfg: ControlFlowGraph):
-        self.cfg = cfg
-        self.input_states = {block.id: {} for block in cfg.blocks.values()}
-        self.output_states = {block.id: {} for block in cfg.blocks.values()}
+        self.cfg: ControlFlowGraph = cfg
+        self.input_states: dict[str, dict] = {
+            block.id: {} for block in cfg.blocks.values()
+        }
+        self.output_states: dict[str, dict] = {
+            block.id: {} for block in cfg.blocks.values()
+        }
 
     @abstractmethod
-    def transfer(self, insts, state: Dict) -> List:
+    def transfer(self, stmts, state: dict) -> list:
         """
         Transfer function for the data flow analysis.
         This should be implemented by subclasses.
@@ -80,7 +85,7 @@ class DataFlowAnalysis(ABC):
         ...
 
     @abstractmethod
-    def join(self, state_1: Dict, state_2: Dict) -> Dict:
+    def join(self, state_1: dict, state_2: dict) -> dict:
         """
         Join function for the data flow analysis.
         This should be implemented by subclasses.
@@ -95,7 +100,6 @@ class DataFlowAnalysis(ABC):
         """
         return "forward"
 
-
     def analyze(self):
         """
         Perform the data flow analysis on the control flow graph.
@@ -106,9 +110,9 @@ class DataFlowAnalysis(ABC):
             while work_list:
                 block = work_list.pop(0)
                 input_state = self.input_states.get(block.id, {})
-                output_state = self.transfer(block, input_state)
+                output_state = self.transfer(block.statements, input_state)
                 if output_state != self.output_states.get(block.id, {}):
-                    self.output_states[block] = output_state
+                    self.output_states[block.id] = output_state
                     for successor in block.successors:
                         if successor not in work_list:
                             work_list.append(successor)
@@ -117,12 +121,13 @@ class DataFlowAnalysis(ABC):
             while work_list:
                 block = work_list.pop(0)
                 input_state = self.input_states.get(block.id, {})
-                output_state = self.transfer(block, input_state)
+                output_state = self.transfer(block.statements, input_state)
                 if output_state != self.output_states.get(block.id, {}):
-                    self.output_states[block] = output_state
+                    self.output_states[block.id] = output_state
                     for predecessor in block.predecessors:
                         if predecessor not in work_list:
                             work_list.append(predecessor)
+
 
 class CFGPrinterContext:
     def print(self, cfgs: dict[str, ControlFlowGraph]) -> str:
