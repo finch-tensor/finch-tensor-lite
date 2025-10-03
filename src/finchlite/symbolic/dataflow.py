@@ -113,19 +113,25 @@ class DataFlowAnalysis(ABC):
         This method initializes the work list and processes each block.
         """
         if self.direction() == "forward":
-            work_list = [self.cfg.entry_block]
+            work_list: list[BasicBlock] = list(self.cfg.blocks.values())
             while work_list:
                 block = work_list.pop(0)
 
                 # get current input state based on the predecessors output states
-                input_state = {}
-                for pred in block.predecessors:
-                    input_state = self.join(
-                        input_state, self.output_states.get(pred.id, {})
-                    )
+                if not block.predecessors:
+                    input_state = {}
+                else:
+                    pred_outputs = [
+                        self.output_states.get(pred.id, {})
+                        for pred in block.predecessors
+                    ]
+                    input_state = pred_outputs[0].copy()
+                    for pred_output in pred_outputs[1:]:
+                        input_state = self.join(input_state, pred_output)
+
                 self.input_states[block.id] = input_state
 
-                # perform trasnfer based on the statements in the current basic block
+                # perform transfer based on the statements in the current basic block
                 output_state = self.transfer(block.statements, input_state)
 
                 # check if output_state changed
@@ -136,16 +142,21 @@ class DataFlowAnalysis(ABC):
                         if successor not in work_list:
                             work_list.append(successor)
         else:
-            work_list = [self.cfg.exit_block]
+            work_list: list[BasicBlock] = list(self.cfg.blocks.values())
             while work_list:
                 block = work_list.pop(0)
 
-                # get current input state based on the predecessors output states
-                input_state = {}
-                for succ in block.successors:
-                    input_state = self.join(
-                        input_state, self.output_states.get(succ.id, {})
-                    )
+                # get current input state based on the successors output states
+                if not block.successors:
+                    input_state = {}
+                else:
+                    succ_outputs = [
+                        self.output_states.get(succ.id, {}) for succ in block.successors
+                    ]
+                    input_state = succ_outputs[0].copy()
+                    for succ_output in succ_outputs[1:]:
+                        input_state = self.join(input_state, succ_output)
+
                 self.input_states[block.id] = input_state
 
                 # perform trasnfer based on the statements in the current basic block

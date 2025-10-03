@@ -4,7 +4,10 @@ import numpy as np
 
 import finchlite.finch_assembly as asm
 from finchlite.codegen.numpy_buffer import NumpyBuffer
-from finchlite.finch_assembly.assembly_dataflow import build_finch_assembly_cfg
+from finchlite.finch_assembly.assembly_dataflow import (
+    FinchAssemblyCopyPropagation,
+    build_finch_assembly_cfg,
+)
 
 
 def test_asm_cfg_printer_if(file_regression):
@@ -134,3 +137,72 @@ def test_asm_cfg_printer_dot(file_regression):
     prgm = asm.nodes.number_assembly_ast(prgm)
     cfg = build_finch_assembly_cfg(prgm)
     file_regression.check(str(cfg), extension=".txt")
+
+
+def test_asm_if_copy_propagation(file_regression):
+    var = asm.Variable("a", np.int64)
+    root = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("if_else", np.int64),
+                (),
+                asm.Block(
+                    (
+                        asm.Assign(var, asm.Literal(np.int64(5))),
+                        asm.If(
+                            asm.Call(
+                                asm.Literal(operator.eq),
+                                (var, asm.Literal(np.int64(5))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(operator.add),
+                                            (var, asm.Literal(np.int64(10))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.IfElse(
+                            asm.Call(
+                                asm.Literal(operator.lt),
+                                (var, asm.Literal(np.int64(15))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(operator.sub),
+                                            (var, asm.Literal(np.int64(3))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (var, asm.Literal(np.int64(2))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(var),
+                    )
+                ),
+            ),
+        )
+    )
+
+    root = asm.nodes.number_assembly_ast(root)
+    cfg = build_finch_assembly_cfg(root)
+    copy_propagation = FinchAssemblyCopyPropagation(cfg)
+    copy_propagation.analyze()
+    file_regression.check(str(copy_propagation.output_states), extension=".txt")
