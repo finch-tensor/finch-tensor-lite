@@ -1,5 +1,5 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import FinchAssemblyCFGBuilder
+from .cfg_builder import FinchAssemblyCFGBuilder, build_finch_assembly_cfg
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -72,6 +72,7 @@ __all__ = [
     "Unpack",
     "Variable",
     "WhileLoop",
+    "build_finch_assembly_cfg",
     "element_type",
     "length_type",
     "number_assembly_ast",
