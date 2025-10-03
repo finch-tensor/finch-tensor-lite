@@ -1,4 +1,4 @@
-from .dataflow import BasicBlock, CFGPrinterContext, ControlFlowGraph
+from .dataflow import BasicBlock, CFGCollection, ControlFlowGraph
 from .environment import Context, Namespace, Reflector, ScopedDict
 from .ftype import FType, FTyped, fisinstance, ftype
 from .gensym import gensym
@@ -19,7 +19,7 @@ from .term import (
 
 __all__ = [
     "BasicBlock",
-    "CFGPrinterContext",
+    "CFGCollection",
     "Chain",
     "Context",
     "ControlFlowGraph",

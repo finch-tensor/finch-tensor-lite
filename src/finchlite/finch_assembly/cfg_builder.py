@@ -2,7 +2,8 @@ import operator
 
 import numpy as np
 
-from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
+from ..symbolic.dataflow import BasicBlock, CFGCollection, ControlFlowGraph
+from ..symbolic.gensym import gensym
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -31,11 +32,11 @@ from .nodes import (
 )
 
 
-class CFGBuilder:
+class FinchAssemblyCFGBuilder:
     """Incrementally builds control-flow graphs for Finch Assembly IR."""
 
     def __init__(self):
-        self.cfgs: dict[str, ControlFlowGraph] = {}
+        self.cfgs: CFGCollection = CFGCollection()
         self.current_block = None
         self.current_cfg: ControlFlowGraph
         self.loop_counter_id = 0
@@ -46,14 +47,6 @@ class CFGBuilder:
         new_cfg.entry_block.add_successor(self.current_block)
         self.cfgs[name] = new_cfg
         return new_cfg
-
-    def get_loop_counter_id(self):
-        current_id = self.loop_counter_id
-        self.loop_counter_id += 1
-        return current_id
-
-    def build(self, node: AssemblyNode):
-        return self(node)
 
     def __call__(self, node: AssemblyNode, break_block: BasicBlock | None = None):
         match node:
@@ -128,9 +121,7 @@ class CFGBuilder:
                 before_block = self.current_block
 
                 # create fictitious variable
-                fic_var = TaggedVariable(
-                    Variable("for_loop_counter", np.int64), self.get_loop_counter_id()
-                )
+                fic_var = TaggedVariable(Variable(gensym("j"), np.int64), 0)
                 before_block.add_statement(Assign(fic_var, start))
 
                 # create while loop condition: j < end
@@ -155,10 +146,8 @@ class CFGBuilder:
             case BufferLoop(buf, var, body):
                 before_block = self.current_block
 
-                fic_var = TaggedVariable(
-                    Variable("buffer_loop_counter", np.int64),
-                    self.get_loop_counter_id(),
-                )
+                # create fictitious variable
+                fic_var = TaggedVariable(Variable(gensym("j"), np.int64), 0)
                 before_block.add_statement(Assign(fic_var, Literal(np.int64(0))))
 
                 # create while loop condition: i < length(buf)

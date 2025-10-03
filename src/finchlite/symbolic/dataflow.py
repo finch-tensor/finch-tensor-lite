@@ -63,12 +63,14 @@ class ControlFlowGraph:
         return "\n\n".join(block_strings)
 
 
-class CFGPrinterContext:
-    def print(self, cfgs: dict[str, ControlFlowGraph]) -> str:
+class CFGCollection(dict[str, ControlFlowGraph]):
+    """Collection of CFGs as a dictionary."""
+
+    def __str__(self) -> str:
         """Print multiple CFGs in LLVM style."""
         cfg_sections = []
 
-        for cfg in cfgs.values():
+        for cfg in self.values():
             # CFG header
             header = (
                 f"{cfg.name}: #entry={cfg.entry_block.id}, #exit={cfg.exit_block.id}"
