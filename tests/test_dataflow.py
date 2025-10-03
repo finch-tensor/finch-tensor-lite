@@ -4,7 +4,10 @@ import numpy as np
 
 import finchlite.finch_assembly as asm
 from finchlite.codegen.numpy_buffer import NumpyBuffer
-from finchlite.finch_assembly.assembly_dataflow import FinchAssemblyCFGBuilder, FinchAssemblyCopyPropagation
+from finchlite.finch_assembly.assembly_dataflow import (
+    FinchAssemblyCFGBuilder,
+)
+
 
 def test_asm_cfg_printer_if(file_regression):
     var = asm.Variable("a", np.int64)
@@ -71,6 +74,7 @@ def test_asm_cfg_printer_if(file_regression):
     root = asm.nodes.number_assembly_ast(root)
     cfgs = FinchAssemblyCFGBuilder()(root)
     file_regression.check(str(cfgs), extension=".txt")
+
 
 def test_asm_cfg_printer_dot(file_regression):
     c = asm.Variable("c", np.float64)
