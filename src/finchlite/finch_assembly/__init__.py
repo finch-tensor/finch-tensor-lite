@@ -1,5 +1,5 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import CFGBuilder
+from .cfg_builder import FinchAssemblyCFGBuilder
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -48,8 +48,8 @@ __all__ = [
     "Buffer",
     "BufferFType",
     "BufferLoop",
-    "CFGBuilder",
     "Call",
+    "FinchAssemblyCFGBuilder",
     "ForLoop",
     "Function",
     "GetAttr",

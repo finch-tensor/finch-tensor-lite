@@ -7,8 +7,7 @@ import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
-from finchlite.finch_assembly.cfg_builder import CFGBuilder
-from finchlite.symbolic.dataflow import CFGPrinterContext
+from finchlite.finch_assembly.cfg_builder import FinchAssemblyCFGBuilder
 
 
 def test_log_printer(file_regression):
@@ -345,10 +344,8 @@ def test_asm_cfg_printer_if(file_regression):
     )
 
     root = asm.nodes.number_assembly_ast(root)
-    cfgs = CFGBuilder()(root)
-    cfg_printer = CFGPrinterContext()
-
-    file_regression.check(cfg_printer.print(cfgs), extension=".txt")
+    cfgs = FinchAssemblyCFGBuilder()(root)
+    file_regression.check(str(cfgs), extension=".txt")
 
 
 def test_asm_printer_dot(file_regression):
@@ -530,7 +527,5 @@ def test_asm_cfg_printer_dot(file_regression):
     )
 
     prgm = asm.nodes.number_assembly_ast(prgm)
-    cfgs = CFGBuilder()(prgm)
-    cfg_printer = CFGPrinterContext()
-
-    file_regression.check(cfg_printer.print(cfgs), extension=".txt")
+    cfgs = FinchAssemblyCFGBuilder()(prgm)
+    file_regression.check(str(cfgs), extension=".txt")
