@@ -36,6 +36,7 @@ from .nodes import (
     WhileLoop,
 )
 
+
 # TODO: change represenation of CFGs from CFGCollection to a single CFG that covers all functions
 class FinchAssemblyCFGBuilder:
     """Incrementally builds control-flow graphs for Finch Assembly IR."""
