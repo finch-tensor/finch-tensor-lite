@@ -7,7 +7,6 @@ from ..symbolic.dataflow import (
     ControlFlowGraph,
     DataFlowAnalysis,
 )
-
 from ..symbolic.gensym import gensym
 from .nodes import (
     AssemblyNode,
@@ -36,8 +35,10 @@ from .nodes import (
     WhileLoop,
 )
 
+
 def build_finch_assembly_cfg(node: AssemblyNode):
     return FinchAssemblyCFGBuilder().build(node)
+
 
 class FinchAssemblyCFGBuilder:
     """Incrementally builds control-flow graph for Finch Assembly IR."""
@@ -260,7 +261,8 @@ class FinchAssemblyCopyPropagation(DataFlowAnalysis):
                     if var_name is not None:
                         new_state[var_name] = rhs
 
-                        # invalidate any copies that point to the variable being assigned
+                        # invalidate any copies that point
+                        # to the variable being assigned
                         to_remove = []
                         for var, val in new_state.items():
                             if self._variables_equal(val, lhs):

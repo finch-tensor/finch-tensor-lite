@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class BasicBlock:
     """A basic block of FinchAssembly's Control Flow Graph."""
 
@@ -36,6 +37,7 @@ class BasicBlock:
         lines.extend(f"    {stmt}" for stmt in self.statements)
 
         return "\n".join(lines)
+
 
 class ControlFlowGraph:
     """Control-Flow Graph (CFG) for FinchAssembly."""

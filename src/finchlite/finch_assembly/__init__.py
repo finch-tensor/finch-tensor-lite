@@ -1,4 +1,8 @@
-from .assembly_dataflow import FinchAssemblyCFGBuilder, FinchAssemblyCopyPropagation, build_finch_assembly_cfg
+from .assembly_dataflow import (
+    FinchAssemblyCFGBuilder,
+    FinchAssemblyCopyPropagation,
+    build_finch_assembly_cfg,
+)
 from .buffer import Buffer, BufferFType, element_type, length_type
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
