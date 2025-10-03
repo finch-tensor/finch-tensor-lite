@@ -24,8 +24,11 @@ class CMallocBuffer(ctypes.Structure):
 
 class MallocBuffer(Buffer):
     """
-    A buffer that uses NumPy arrays to store data. This is a concrete implementation
-    of the Buffer class.
+    A buffer that uses Malloc buffers to store data.
+
+    To check out the corresponding C code, you should reference
+    ./malloc_buffer_backend.c in the same directory as the malloc_buffer.py
+    file
     """
 
     def __init__(self, length: int, dtype, data=None):
@@ -60,7 +63,7 @@ class MallocBuffer(Buffer):
     @property
     def ftype(self):
         """
-        Returns the ftype of the buffer, which is a NumpyBufferFType.
+        Returns the ftype of the buffer, which is a MallocBufferFType.
         """
         return MallocBufferFType(self._dtype)
 
@@ -187,16 +190,16 @@ class MallocBufferFType(CBufferFType, CStackFType):
         return obj.buffer
 
     def deserialize_from_c(self, obj, c_buffer):
-        """
-        Update this buffer based on how the C call modified the CNumpyBuffer structure.
-        """
+        pass
         # this is handled by the resize callback
 
-    def construct_from_c(self, c_buffer):
+    def construct_from_c(self, c_buffer: ctypes.pointer[CMallocBuffer]):
         """
-        Construct a NumpyBuffer from a C-compatible structure.
+        Construct a MallocBuffer from a C-compatible structure.
+
+        TODO: incomplete
         """
-        return c_buffer.contents.arr
+        return c_buffer.contents
 
 
 if __name__ == "__main__":
