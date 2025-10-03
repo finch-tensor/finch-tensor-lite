@@ -193,7 +193,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
         pass
         # this is handled by the resize callback
 
-    def construct_from_c(self, c_buffer: ctypes.pointer[CMallocBuffer]):
+    def construct_from_c(self, c_buffer):
         """
         Construct a MallocBuffer from a C-compatible structure.
 
