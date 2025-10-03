@@ -14,15 +14,12 @@ backend_lib = load_shared_lib(
 
 
 class CMallocBuffer(ctypes.Structure):
-    pass
-
-
-CMallocBuffer._fields_ = [
-    ("data", ctypes.c_void_p),
-    ("length", ctypes.c_size_t),
-    ("datasize", ctypes.c_size_t),
-    ("resize", ctypes.CFUNCTYPE(None, ctypes.POINTER(CMallocBuffer), ctypes.c_size_t)),
-]
+    _fields_ = [
+        ("data", ctypes.c_void_p),
+        ("length", ctypes.c_size_t),
+        ("datasize", ctypes.c_size_t),
+        ("resize", ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t)),
+    ]
 
 
 class MallocBuffer(Buffer):
@@ -31,7 +28,7 @@ class MallocBuffer(Buffer):
     of the Buffer class.
     """
 
-    def __init__(self, length: int, dtype, data = None):
+    def __init__(self, length: int, dtype, data=None):
         """
         Constructor for the MallocBuffer class.
 

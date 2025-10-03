@@ -7,16 +7,20 @@ struct MallocBuffer {
   void *data;
   size_t length;
   size_t datasize;
-  void (*resize)(struct MallocBuffer *, size_t sz);
+  void* (*resize)(void*, size_t sz);
 };
 
-void mallocbuffer_resize(struct MallocBuffer *m, size_t length) {
+// the only reason we are passing a void pointer here is because
+// finch's ctype_name method sputters if we give it a recursive type :(
+void* mallocbuffer_resize(void *ptr, size_t length) {
+  struct MallocBuffer *m = (struct MallocBuffer *) ptr;
   m->data = realloc(m->data, m->datasize * length);
   if (length > m->length) {
     memset(m->data + (m->length * m->datasize), 0,
            (length - m->length) * m->datasize);
   }
   m->length = length;
+  return m->data;
 }
 
 void mallocbuffer_free(struct MallocBuffer *m) {
