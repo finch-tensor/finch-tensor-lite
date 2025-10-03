@@ -66,15 +66,55 @@ class ControlFlowGraph:
         return "\n\n".join(block_strings)
 
 
+class CFGPrinterContext:
+    def print(self, cfgs: dict[str, ControlFlowGraph]) -> str:
+        """Print multiple CFGs in LLVM style."""
+        cfg_sections = []
+
+        for cfg in cfgs.values():
+            # CFG header
+            header = (
+                f"{cfg.name}: #entry={cfg.entry_block.id}, #exit={cfg.exit_block.id}"
+            )
+
+            # Indent all CFG lines
+            cfg_str = str(cfg)
+            indented_lines = [
+                f"    {line}" if line.strip() else "" for line in cfg_str.split("\n")
+            ]
+
+            # Combine header and indented content
+            cfg_sections.append(header + "\n" + "\n".join(indented_lines))
+
+        return "\n\n".join(cfg_sections)
+
+
 class DataFlowAnalysis(ABC):
     def __init__(self, cfg: ControlFlowGraph):
         self.cfg: ControlFlowGraph = cfg
+        # TODO: decide on types for input/output states
         self.input_states: dict[str, dict] = {
             block.id: {} for block in cfg.blocks.values()
         }
         self.output_states: dict[str, dict] = {
             block.id: {} for block in cfg.blocks.values()
         }
+
+    @abstractmethod
+    def bottom_element(self):
+        """
+        Bottom element for the lattice.
+        This should be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def top_element(self):
+        """
+        Top element for the lattice.
+        This should be implemented by subclasses.
+        """
+        ...
 
     @abstractmethod
     def transfer(self, stmts, state: dict) -> list:
@@ -109,10 +149,22 @@ class DataFlowAnalysis(ABC):
             work_list = [self.cfg.entry_block]
             while work_list:
                 block = work_list.pop(0)
-                input_state = self.input_states.get(block.id, {})
+
+                if block == self.cfg.entry_block:
+                    input_state = self.input_states[block.id]
+                else:
+                    input_state = self.bottom_element()
+                    for pred in block.predecessors:
+                        input_state = self.join(
+                            input_state, self.output_states.get(pred.id, {})
+                        )
+                    self.input_states[block.id] = input_state
+
                 output_state = self.transfer(block.statements, input_state)
+
                 if output_state != self.output_states.get(block.id, {}):
                     self.output_states[block.id] = output_state
+
                     for successor in block.successors:
                         if successor not in work_list:
                             work_list.append(successor)
@@ -120,33 +172,22 @@ class DataFlowAnalysis(ABC):
             work_list = [self.cfg.exit_block]
             while work_list:
                 block = work_list.pop(0)
-                input_state = self.input_states.get(block.id, {})
+
+                if block == self.cfg.exit_block:
+                    input_state = self.input_states[block.id]
+                else:
+                    input_state = self.bottom_element()
+                    for succ in block.successors:
+                        input_state = self.join(
+                            input_state, self.output_states.get(succ.id, {})
+                        )
+                    self.input_states[block.id] = input_state
+
                 output_state = self.transfer(block.statements, input_state)
+
                 if output_state != self.output_states.get(block.id, {}):
                     self.output_states[block.id] = output_state
+
                     for predecessor in block.predecessors:
                         if predecessor not in work_list:
                             work_list.append(predecessor)
-
-
-class CFGPrinterContext:
-    def print(self, cfgs: dict[str, ControlFlowGraph]) -> str:
-        """Print multiple CFGs in LLVM style."""
-        cfg_sections = []
-
-        for cfg in cfgs.values():
-            # CFG header
-            header = (
-                f"{cfg.name}: #entry={cfg.entry_block.id}, #exit={cfg.exit_block.id}"
-            )
-
-            # Indent all CFG lines
-            cfg_str = str(cfg)
-            indented_lines = [
-                f"    {line}" if line.strip() else "" for line in cfg_str.split("\n")
-            ]
-
-            # Combine header and indented content
-            cfg_sections.append(header + "\n" + "\n".join(indented_lines))
-
-        return "\n\n".join(cfg_sections)
