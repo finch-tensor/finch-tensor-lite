@@ -46,7 +46,6 @@ class FinchAssemblyCFGBuilder:
     def __init__(self):
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
-        self.loop_counter_id = 0
 
     def build(self, node: AssemblyNode) -> ControlFlowGraph:
         return self(node)
