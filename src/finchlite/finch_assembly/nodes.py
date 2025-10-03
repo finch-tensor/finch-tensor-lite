@@ -634,7 +634,7 @@ class AssemblyPrinterContext(Context):
                         raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
             case GetAttr(obj, attr):
-                return f"getattr({obj}, {attr})"
+                return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
             case Call(Literal(_) as lit, args):

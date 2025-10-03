@@ -15,14 +15,14 @@ from ..util import qual_str
 
 class FinchTensorFType(TensorFType, ABC):
     @abstractmethod
-    def lower_unwrap(tns):
+    def lower_unwrap(self, ctx, obj):
         """
         Unwrap a tensor view to get the underlying tensor.
         This is used to get the original tensor from a tensor view.
         """
 
     @abstractmethod
-    def lower_increment(tns, val):
+    def lower_increment(self, ctx, obj, val):
         """
         Increment a tensor view with an operation and value.
         This updates the tensor at the specified index with the operation and value.
@@ -47,7 +47,10 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(self, ctx, tns, ext, mode, proto): ...
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        """
+        Unfurl a tensor.
+        """
 
 
 @dataclass(eq=True, frozen=True)

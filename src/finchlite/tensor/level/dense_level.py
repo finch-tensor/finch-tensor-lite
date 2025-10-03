@@ -1,5 +1,4 @@
 import operator
-from abc import ABC
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -7,23 +6,35 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...codegen import NumpyBufferFType
 from ...compile import looplets as lplt
-from ..fiber_tensor import FiberTensorFields, Level, LevelFType
+from ..fiber_tensor import Level, LevelFType
 
 
 class DenseLevelFields(NamedTuple):
-    tns: FiberTensorFields
+    lvl: asm.Variable
+    buf_s: NumpyBufferFType
     nind: int
     pos: asm.AssemblyNode
     op: Any
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(LevelFType, ABC):
-    lvl: Any
+class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
+    lvl_t: LevelFType
     dimension_type: Any = None
-    pos: asm.AssemblyNode | None = None
     op: Any = None
+
+    @property
+    def struct_name(self):
+        return "DenseLevelFType"
+
+    @property
+    def struct_fields(self):
+        return [
+            ("lvl", self.lvl_t),
+            ("stride", self.dimension_type),
+        ]
 
     def __post_init__(self):
         if self.dimension_type is None:
@@ -37,55 +48,78 @@ class DenseLevelFType(LevelFType, ABC):
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl(shape[1:], val)
+        lvl = self.lvl_t(shape[1:], val)
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     def __str__(self):
-        return f"DenseLevelFType({self.lvl})"
+        return f"DenseLevelFType({self.lvl_t})"
 
     @property
     def ndim(self):
-        return 1 + self.lvl.ndim
+        return 1 + self.lvl_t.ndim
 
     @property
     def fill_value(self):
-        return self.lvl.fill_value
+        return self.lvl_t.fill_value
 
     @property
     def element_type(self):
         """
         Returns the type of elements stored in the fibers.
         """
-        return self.lvl.element_type
+        return self.lvl_t.element_type
 
     @property
     def shape_type(self):
         """
         Returns the type of the shape of the fibers.
         """
-        return (self.dimension_type, *self.lvl.shape_type)
+        return (self.dimension_type, *self.lvl_t.shape_type)
 
     @property
     def position_type(self):
         """
         Returns the type of positions within the levels.
         """
-        return self.lvl.position_type
+        return self.lvl_t.position_type
+
+    @property
+    def val_format(self):
+        return self.lvl_t.val_format
 
     @property
     def buffer_factory(self):
         """
         Returns the ftype of the buffer used for the fibers.
         """
-        return self.lvl.buffer_factory
+        return self.lvl_t.buffer_factory
 
-    def get_fields_class(self, tns, nind, pos, op):
-        return DenseLevelFields(tns, nind, pos, op)
+    def asm_unpack(self, ctx, var_n, val):
+        val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
+        return self.lvl_t.asm_unpack(ctx, var_n, val_lvl)
+
+    def get_fields_class(self, tns, buf_s, nind, pos, op):
+        return DenseLevelFields(tns, buf_s, nind, pos, op)
+
+    def lower_declare(self, ctx, tns, init, op, shape):
+        return self.lvl_t.lower_declare(ctx, tns, init, op, shape)
+
+    def lower_freeze(self, ctx, tns, op):
+        raise NotImplementedError("DenseLevelFType does not support lower_freeze.")
+
+    def lower_increment(self, ctx, obj, val):
+        raise NotImplementedError("DenseLevelFType does not support lower_increment.")
+
+    def lower_thaw(self, ctx, tns, op):
+        raise NotImplementedError("DenseLevelFType does not support lower_thaw.")
+
+    def lower_unwrap(self, ctx, obj):
+        raise NotImplementedError("DenseLevelFType does not support lower_unwrap.")
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         def child_accessor(ctx, idx):
             pos_2 = asm.Variable(
-                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.pos
+                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(
                 asm.Assign(
@@ -97,7 +131,7 @@ class DenseLevelFType(LevelFType, ABC):
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 [
-                                    tns.obj.tns.stride[tns.obj.nind],
+                                    asm.GetAttr(tns.obj.lvl, asm.Literal("stride")),
                                     asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ],
                             ),
@@ -106,10 +140,14 @@ class DenseLevelFType(LevelFType, ABC):
                 )
             )
             return ntn.Stack(
-                self.lvl.get_fields_class(
-                    tns.obj.tns, tns.obj.nind + 1, pos_2, tns.obj.op
+                self.lvl_t.get_fields_class(
+                    asm.GetAttr(tns.obj.lvl, asm.Literal("lvl")),
+                    tns.obj.buf_s,
+                    tns.obj.nind + 1,
+                    pos_2,
+                    tns.obj.op,
                 ),
-                self.lvl,
+                self.lvl_t,
             )
 
         return lplt.Lookup(
@@ -126,12 +164,12 @@ def dense(lvl, dimension_type=None):
 @dataclass
 class DenseLevel(Level):
     """
-    A class representing the leaf level of Finch tensors.
+    A class representing dense level.
     """
 
     _format: DenseLevelFType
-    lvl: Any
-    dimension: Any
+    lvl: Level
+    dimension: np.intp
     pos: asm.AssemblyNode | None = None
 
     @property
@@ -139,5 +177,16 @@ class DenseLevel(Level):
         return (self.dimension, *self.lvl.shape)
 
     @property
-    def ftype(self):
+    def stride(self) -> np.integer:
+        stride = self.lvl.stride
+        if self.lvl.ndim == 0:
+            return stride
+        return self.lvl.shape[0] * stride
+
+    @property
+    def ftype(self) -> DenseLevelFType:
         return self._format
+
+    @property
+    def buf(self):
+        return self.lvl.buf

@@ -3,29 +3,29 @@ def matmul(C: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64, A: Bufferized
     n: ExtentFType(start=int64, end=int64) = dimension(B, 1)
     p: ExtentFType(start=int64, end=int64) = dimension(A, 1)
     A_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = A
-    A__stride_0: int64 = getattr(getattr(A_, strides), element_0)
-    A__stride_1: int64 = getattr(getattr(A_, strides), element_1)
-    A__buf: np_buf_t(float64) = getattr(A_, buf)
+    A__stride_0: int64 = A_.strides.element_0
+    A__stride_1: int64 = A_.strides.element_1
+    A__buf: np_buf_t(float64) = A_.buf
     A__buf_slot: np_buf_t(float64) = unpack(A__buf)
     B_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = B
-    B__stride_0: int64 = getattr(getattr(B_, strides), element_0)
-    B__stride_1: int64 = getattr(getattr(B_, strides), element_1)
-    B__buf: np_buf_t(float64) = getattr(B_, buf)
+    B__stride_0: int64 = B_.strides.element_0
+    B__stride_1: int64 = B_.strides.element_1
+    B__buf: np_buf_t(float64) = B_.buf
     B__buf_slot: np_buf_t(float64) = unpack(B__buf)
     C_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = C
-    C__stride_0: int64 = getattr(getattr(C_, strides), element_0)
-    C__stride_1: int64 = getattr(getattr(C_, strides), element_1)
-    C__buf: np_buf_t(float64) = getattr(C_, buf)
+    C__stride_0: int64 = C_.strides.element_0
+    C__stride_1: int64 = C_.strides.element_1
+    C__buf: np_buf_t(float64) = C_.buf
     C__buf_slot: np_buf_t(float64) = unpack(C__buf)
     for i in range(0, length(slot(C__buf_slot, np_buf_t(float64)))):
         store(slot(C__buf_slot, np_buf_t(float64)), i, 0.0)
-    for i in range(getattr(m, start), getattr(m, end)):
+    for i in range(m.start, m.end):
         i__pos: int64 = add(0, mul(A__stride_0, i))
         i__pos_2: int64 = add(0, mul(C__stride_0, i))
-        for k in range(getattr(p, start), getattr(p, end)):
+        for k in range(p.start, p.end):
             k__pos: int64 = add(i__pos, mul(A__stride_1, k))
             k__pos_2: int64 = add(0, mul(B__stride_0, k))
-            for j in range(getattr(n, start), getattr(n, end)):
+            for j in range(n.start, n.end):
                 j__pos: int64 = add(k__pos_2, mul(B__stride_1, j))
                 j__pos_2: int64 = add(i__pos_2, mul(C__stride_1, j))
                 a_ik: float64 = load(slot(A__buf_slot, np_buf_t(float64)), k__pos)
