@@ -4,10 +4,10 @@ import numpy as np
 
 from ..symbolic.dataflow import (
     BasicBlock,
-    CFGCollection,
     ControlFlowGraph,
     DataFlowAnalysis,
 )
+
 from ..symbolic.gensym import gensym
 from .nodes import (
     AssemblyNode,
@@ -36,25 +36,26 @@ from .nodes import (
     WhileLoop,
 )
 
+def build_finch_assembly_cfg(node: AssemblyNode):
+    return FinchAssemblyCFGBuilder().build(node)
 
-# TODO: change represenation of CFGs from CFGCollection to a single CFG that covers all functions
 class FinchAssemblyCFGBuilder:
-    """Incrementally builds control-flow graphs for Finch Assembly IR."""
+    """Incrementally builds control-flow graph for Finch Assembly IR."""
 
     def __init__(self):
-        self.cfgs: CFGCollection = CFGCollection()
-        self.current_block = None
-        self.current_cfg: ControlFlowGraph
+        self.cfg: ControlFlowGraph = ControlFlowGraph()
+        self.current_block: BasicBlock = self.cfg.entry_block
         self.loop_counter_id = 0
 
-    def new_cfg(self, name: str) -> ControlFlowGraph:
-        new_cfg = ControlFlowGraph(name)
-        self.current_block = new_cfg.new_block()
-        new_cfg.entry_block.add_successor(self.current_block)
-        self.cfgs[name] = new_cfg
-        return new_cfg
+    def build(self, node: AssemblyNode) -> ControlFlowGraph:
+        return self(node)
 
-    def __call__(self, node: AssemblyNode, break_block: BasicBlock | None = None):
+    def __call__(
+        self,
+        node: AssemblyNode,
+        break_block: BasicBlock | None = None,
+        return_block: BasicBlock | None = None,
+    ) -> ControlFlowGraph:
         match node:
             case (
                 Unpack()
@@ -69,22 +70,22 @@ class FinchAssemblyCFGBuilder:
                 self.current_block.add_statement(node)
             case Block(bodies):
                 for body in bodies:
-                    self(body, break_block)
+                    self(body, break_block, return_block)
             case If(cond, body):
-                self(IfElse(cond, body, Block()), break_block)
+                self(IfElse(cond, body, Block()), break_block, return_block)
             case IfElse(cond, body, else_body):
                 before_block = self.current_block
 
-                if_block = self.current_cfg.new_block()
-                else_block = self.current_cfg.new_block()
-                after_block = self.current_cfg.new_block()
+                if_block = self.cfg.new_block()
+                else_block = self.cfg.new_block()
+                after_block = self.cfg.new_block()
 
                 before_block.add_successor(if_block)
                 before_block.add_successor(else_block)
 
                 self.current_block = if_block
                 self.current_block.add_statement(Assert(cond))
-                self(body, break_block)
+                self(body, break_block, return_block)
                 self.current_block.add_successor(after_block)
 
                 self.current_block = else_block
@@ -96,22 +97,22 @@ class FinchAssemblyCFGBuilder:
                         )
                     )
                 )
-                self(else_body, break_block)
+                self(else_body, break_block, return_block)
                 self.current_block.add_successor(after_block)
 
                 self.current_block = after_block
             case WhileLoop(cond, body):
                 before_block = self.current_block
 
-                body_block = self.current_cfg.new_block()
-                after_block = self.current_cfg.new_block()
+                body_block = self.cfg.new_block()
+                after_block = self.cfg.new_block()
 
                 before_block.add_successor(body_block)
                 before_block.add_successor(after_block)
 
                 self.current_block = body_block
                 self.current_block.add_statement(Assert(cond))
-                self(body, after_block)
+                self(body, after_block, return_block)
 
                 self.current_block.add_successor(before_block)
                 self.current_block = after_block
@@ -148,7 +149,7 @@ class FinchAssemblyCFGBuilder:
                     )
                 )
 
-                self(WhileLoop(loop_condition, loop_body), break_block)
+                self(WhileLoop(loop_condition, loop_body), break_block, return_block)
             case BufferLoop(buf, var, body):
                 before_block = self.current_block
 
@@ -174,16 +175,18 @@ class FinchAssemblyCFGBuilder:
                     )
                 )
 
-                self(WhileLoop(loop_condition, loop_body), break_block)
+                self(WhileLoop(loop_condition, loop_body), break_block, return_block)
             case Return(value):
                 self.current_block.add_statement(Return(value))
-                self.current_block.add_successor(self.current_cfg.exit_block)
-                unreachable_block = self.current_cfg.new_block()
+                assert return_block
+                self.current_block.add_successor(return_block)
+                unreachable_block = self.cfg.new_block()
                 self.current_block = unreachable_block
             case Break():
                 self.current_block.add_statement(Break())
+                assert break_block
                 self.current_block.add_successor(break_block)
-                unreachable_block = self.current_cfg.new_block()
+                unreachable_block = self.cfg.new_block()
                 self.current_block = unreachable_block
             case Function(_, args, body):
                 for arg in args:
@@ -195,7 +198,7 @@ class FinchAssemblyCFGBuilder:
                                 f"Unrecognized argument type: {arg}"
                             )
 
-                self(body, break_block)
+                self(body, break_block, return_block)
             case Module(funcs):
                 for func in funcs:
                     if not isinstance(func, Function):
@@ -212,13 +215,30 @@ class FinchAssemblyCFGBuilder:
                             f"Unrecognized function name type: {type(func.name)}"
                         )
 
-                    self.current_cfg = self.new_cfg(func_name)
-                    self(func, break_block)
-                    self.current_block.add_successor(self.current_cfg.exit_block)
+                    # set block names to the function name
+                    self.cfg.block_name = func_name
+
+                    # create entry/exit block for the function
+                    func_entry_block = self.cfg.new_block()
+                    func_exit_block = self.cfg.new_block()
+
+                    # connect CFG entry block to the function's entry block
+                    self.cfg.entry_block.add_successor(func_entry_block)
+
+                    # dive into the body of the function
+                    self.current_block = func_entry_block
+                    self(func, break_block, func_exit_block)
+
+                    # connect last block in the function to the
+                    # exit block of the function
+                    self.current_block.add_successor(func_exit_block)
+
+                    # connect function exit block to the exit block of the CFG
+                    func_exit_block.add_successor(self.cfg.exit_block)
             case node:
                 raise NotImplementedError(node)
 
-        return self.cfgs
+        return self.cfg
 
 
 class FinchAssemblyCopyPropagation(DataFlowAnalysis):

@@ -8,7 +8,6 @@ import finchlite.finch_notation as ntn
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
 
-
 def test_log_printer(file_regression):
     s = np.array([[2, 4], [6, 0]])
     a = np.array([[1, 2], [3, 2]])
@@ -278,7 +277,6 @@ def test_tagged_asm_printer_if(file_regression):
 
     root = asm.nodes.number_assembly_ast(root)
     file_regression.check(str(root), extension=".txt")
-
 
 def test_asm_printer_dot(file_regression):
     c = asm.Variable("c", np.float64)
