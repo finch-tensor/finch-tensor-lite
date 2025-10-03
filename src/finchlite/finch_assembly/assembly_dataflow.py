@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..symbolic.dataflow import BasicBlock, CFGCollection, ControlFlowGraph
+from ..symbolic.dataflow import BasicBlock, CFGCollection, ControlFlowGraph, DataFlowAnalysis
 from ..symbolic.gensym import gensym
 from .nodes import (
     AssemblyNode,
@@ -213,3 +213,69 @@ class FinchAssemblyCFGBuilder:
                 raise NotImplementedError(node)
 
         return self.cfgs
+
+class FinchAssemblyCopyPropagation(DataFlowAnalysis):
+    def direction(self) -> str:
+        """
+        Copy propagation is a forward analysis.
+        """
+        return "forward"
+    
+    def transfer(self, stmts, state: dict) -> dict:
+        new_state = state.copy()
+        
+        for stmt in stmts:
+            match stmt:
+                case Assign(lhs, rhs):
+                    # Get the variable name being assigned to
+                    var_name = self._get_variable_name(lhs)
+
+                    if var_name is not None:
+                        new_state[var_name] = rhs
+                            
+                        # invalidate any copies that point to the variable being assigned
+                        to_remove = []
+                        for var, val in new_state.items():
+                            if self._variables_equal(val, lhs):
+                                to_remove.append(var)
+                        
+                        for var in to_remove:
+                            new_state.pop(var)
+        
+        return new_state
+
+    def join(self, state_1: dict, state_2: dict) -> dict:
+        result = {}
+        
+        # Only keep copy relationships that exist in both states with the same value
+        for var_name in state_1:
+            if var_name in state_2 and self._values_equal(state_1[var_name], state_2[var_name]):
+                result[var_name] = state_1[var_name]
+        
+        return result
+    
+    def _get_variable_name(self, var) -> str | None:
+        match var:
+            case Variable(name, _):
+                return name
+            case TaggedVariable(Variable(name, _), _):
+                return name
+            case _:
+                return None
+    
+    def _variables_equal(self, var1, var2) -> bool:
+        name1 = self._get_variable_name(var1)
+        name2 = self._get_variable_name(var2)
+        return name1 is not None and name1 == name2
+    
+    def _values_equal(self, val1, val2) -> bool:
+        """
+        Check if two values are equal.
+        """
+        if isinstance(val1, (Variable, TaggedVariable)) and isinstance(val2, (Variable, TaggedVariable)):
+            return self._variables_equal(val1, val2)
+        
+        if isinstance(val1, Literal) and isinstance(val2, Literal):
+            return val1.val == val2.val
+        
+        return False

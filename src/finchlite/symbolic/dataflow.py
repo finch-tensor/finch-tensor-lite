@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 
 class BasicBlock:
-    """A basic block of FinchAssembly Control Flow Graph."""
+    """A basic block of the Control Flow Graph."""
 
     def __init__(self, id: str) -> None:
         self.id = id
@@ -40,7 +40,7 @@ class BasicBlock:
 
 
 class ControlFlowGraph:
-    """Control-Flow Graph (CFG) for a single FinchAssembly function."""
+    """Control-Flow Graph (CFG) for a single function."""
 
     def __init__(self, func_name: str):
         self.block_counter = 0
@@ -94,7 +94,6 @@ class CFGCollection(dict[str, ControlFlowGraph]):
 class DataFlowAnalysis(ABC):
     def __init__(self, cfg: ControlFlowGraph):
         self.cfg: ControlFlowGraph = cfg
-        # TODO: decide on types for input/output states
         self.input_states: dict[str, dict] = {
             block.id: {} for block in cfg.blocks.values()
         }
@@ -103,23 +102,7 @@ class DataFlowAnalysis(ABC):
         }
 
     @abstractmethod
-    def bottom_element(self):
-        """
-        Bottom element for the lattice.
-        This should be implemented by subclasses.
-        """
-        ...
-
-    @abstractmethod
-    def top_element(self):
-        """
-        Top element for the lattice.
-        This should be implemented by subclasses.
-        """
-        ...
-
-    @abstractmethod
-    def transfer(self, stmts, state: dict) -> list:
+    def transfer(self, stmts, state: dict) -> dict:
         """
         Transfer function for the data flow analysis.
         This should be implemented by subclasses.
@@ -140,7 +123,7 @@ class DataFlowAnalysis(ABC):
         Return the direction of the data flow analysis, either "forward" or "backward".
         This should be implemented by subclasses.
         """
-        return "forward"
+        ...
 
     def analyze(self):
         """
@@ -152,18 +135,18 @@ class DataFlowAnalysis(ABC):
             while work_list:
                 block = work_list.pop(0)
 
-                if block == self.cfg.entry_block:
-                    input_state = self.input_states[block.id]
-                else:
-                    input_state = self.bottom_element()
-                    for pred in block.predecessors:
-                        input_state = self.join(
-                            input_state, self.output_states.get(pred.id, {})
-                        )
-                    self.input_states[block.id] = input_state
+                # get current input state based on the predecessors output states
+                input_state = {}
+                for pred in block.predecessors:
+                    input_state = self.join(
+                        input_state, self.output_states.get(pred.id, {})
+                    )
+                self.input_states[block.id] = input_state
 
+                # perform trasnfer based on the statements in the current basic block
                 output_state = self.transfer(block.statements, input_state)
 
+                # check if output_state changed
                 if output_state != self.output_states.get(block.id, {}):
                     self.output_states[block.id] = output_state
 
@@ -175,18 +158,18 @@ class DataFlowAnalysis(ABC):
             while work_list:
                 block = work_list.pop(0)
 
-                if block == self.cfg.exit_block:
-                    input_state = self.input_states[block.id]
-                else:
-                    input_state = self.bottom_element()
-                    for succ in block.successors:
-                        input_state = self.join(
-                            input_state, self.output_states.get(succ.id, {})
-                        )
-                    self.input_states[block.id] = input_state
+                # get current input state based on the predecessors output states
+                input_state = {}
+                for succ in block.successors:
+                    input_state = self.join(
+                        input_state, self.output_states.get(succ.id, {})
+                    )
+                self.input_states[block.id] = input_state
 
+                # perform trasnfer based on the statements in the current basic block
                 output_state = self.transfer(block.statements, input_state)
 
+                # check if output state changed
                 if output_state != self.output_states.get(block.id, {}):
                     self.output_states[block.id] = output_state
 
