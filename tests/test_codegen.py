@@ -12,6 +12,7 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
+from finchlite.codegen.malloc_buffer import MallocBuffer
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -151,21 +152,29 @@ def test_codegen(compiler, buffer):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
+        (CCompiler(), MallocBuffer),
         (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), MallocBuffer),
     ],
 )
 def test_dot_product(compiler, buffer):
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    a_buf = buffer(a)
-    b_buf = buffer(b)
+    if buffer is NumpyBuffer:
+        a_buf = buffer(a)
+        b_buf = buffer(b)
+        ab = buffer(a)
+        bb = buffer(b)
+    else:
+        a_buf = buffer(len(a), np.ctypeslib.as_ctypes_type(a.dtype), a)
+        b_buf = buffer(len(b), np.ctypeslib.as_ctypes_type(b.dtype), b)
+        ab = buffer(len(a), np.ctypeslib.as_ctypes_type(a.dtype), a)
+        bb = buffer(len(b), np.ctypeslib.as_ctypes_type(b.dtype), b)
 
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
-    ab = buffer(a)
-    bb = buffer(b)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -301,8 +310,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
+        (CCompiler(), MallocBuffer),
         (NumbaCompiler(), NumpyBuffer),
+        (NumbaCompiler(), MallocBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), MallocBuffer),
     ],
 )
 def test_if_statement(compiler, buffer):
