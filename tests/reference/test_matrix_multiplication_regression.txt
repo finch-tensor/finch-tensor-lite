@@ -5,17 +5,17 @@ def matmul(C: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64, A: Bufferized
     A_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = A
     A__stride_0: int64 = A_.strides.element_0
     A__stride_1: int64 = A_.strides.element_1
-    A__buf: np_buf_t(float64) = A_.buf
+    A__buf: np_buf_t(float64) = A_.val
     A__buf_slot: np_buf_t(float64) = unpack(A__buf)
     B_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = B
     B__stride_0: int64 = B_.strides.element_0
     B__stride_1: int64 = B_.strides.element_1
-    B__buf: np_buf_t(float64) = B_.buf
+    B__buf: np_buf_t(float64) = B_.val
     B__buf_slot: np_buf_t(float64) = unpack(B__buf)
     C_: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = C
     C__stride_0: int64 = C_.strides.element_0
     C__stride_1: int64 = C_.strides.element_1
-    C__buf: np_buf_t(float64) = C_.buf
+    C__buf: np_buf_t(float64) = C_.val
     C__buf_slot: np_buf_t(float64) = unpack(C__buf)
     for i in range(0, length(slot(C__buf_slot, np_buf_t(float64)))):
         store(slot(C__buf_slot, np_buf_t(float64)), i, 0.0)

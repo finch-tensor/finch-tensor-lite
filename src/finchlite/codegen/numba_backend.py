@@ -716,11 +716,11 @@ register_property(
 
 
 def struct_construct_from_numba(fmt: AssemblyStructFType, numba_struct):
-    args = [
-        construct_from_numba(field_type, getattr(numba_struct, name))
+    kwargs = {
+        name: construct_from_numba(field_type, getattr(numba_struct, name))
         for (name, field_type) in fmt.struct_fields
-    ]
-    return fmt(*args)
+    }
+    return fmt(**kwargs)
 
 
 register_property(

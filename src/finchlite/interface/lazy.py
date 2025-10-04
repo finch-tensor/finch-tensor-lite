@@ -329,6 +329,7 @@ class LazyTensor(OverrideTensor):
 
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
@@ -367,7 +368,6 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
-    arr = asarray(arr)
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

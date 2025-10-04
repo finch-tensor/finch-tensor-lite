@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pprint import pprint
 from typing import Any
 
@@ -160,6 +160,14 @@ class ExtentFType(AssemblyStructFType):
     @property
     def struct_fields(self):
         return [("start", np.intp), ("end", np.intp)]
+
+    def from_kwargs(self, **kwargs) -> "ExtentFType":
+        start = kwargs.get("start", self.start)
+        end = kwargs.get("end", self.end)
+        return ExtentFType(start, end)
+
+    def to_kwargs(self):
+        return asdict(self)
 
     def __call__(self, *args):
         raise TypeError(f"{self.struct_name} is not callable")

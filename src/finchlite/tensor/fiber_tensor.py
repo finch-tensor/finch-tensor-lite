@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Generic, NamedTuple, TypeVar
 
 import numpy as np
+
+from finchlite.finch_assembly.struct import TupleFType
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -35,7 +38,7 @@ class LevelFType(FinchTensorFType, ABC):
 
     @property
     @abstractmethod
-    def val_format(self): ...
+    def buffer_type(self): ...
 
 
 class Level(FTyped, ABC):
@@ -85,8 +88,8 @@ class Level(FTyped, ABC):
         return self.ftype.buffer_factory
 
     @property
-    def val_format(self):
-        return self.ftype.val_format
+    def buffer_type(self):
+        return self.ftype.buffer_type
 
 
 Tp = TypeVar("Tp")
@@ -178,7 +181,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     """
 
     lvl_t: LevelFType
-    _position_type: type | None = None
+    position_type: type | None = None
 
     @property
     def struct_name(self):
@@ -189,31 +192,28 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def struct_fields(self):
         return [
             ("lvl", self.lvl_t),
+            ("shape", TupleFType.from_tuple(self.shape_type)),
         ]
 
     def __post_init__(self):
-        if self._position_type is None:
-            self._position_type = self.lvl_t.position_type
+        if self.position_type is None:
+            self.position_type = self.lvl_t.position_type
 
-    def __call__(self, *, shape=None, val=None):
+    def __call__(self, *, lvl=None, shape=None, val=None):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
+        if lvl is not None:
+            return FiberTensor(lvl, self.lvl_t.position_type(1))
         if shape is None:
             shape = val.shape
-            val = NumpyBuffer(val.reshape[-1])
-        return FiberTensor(self.lvl_t(shape, val), self.lvl_t.position_type(1))
+            val = NumpyBuffer(val.reshape(-1))
+        return FiberTensor(
+            self.lvl_t(shape=shape, val=val), self.lvl_t.position_type(1)
+        )
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
-
-    @property
-    def shape_t(self):
-        return self.lvl_t.shape_type
-
-    @property
-    def strides_t(self):
-        return self.lvl_t.shape_type
 
     @property
     def ndim(self):
@@ -231,17 +231,49 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def fill_value(self):
         return self.lvl_t.fill_value
 
-    @property
-    def position_type(self):
-        return self._position_type
+    # @property
+    # def position_type(self):
+    #     return self._position_type
 
     @property
     def buffer_factory(self):
         return self.lvl_t.buffer_factory
 
     @property
-    def val_format(self):
-        return self.lvl_t.val_format
+    def buffer_type(self):
+        return self.lvl_t.buffer_type
+
+    def from_kwargs(self, **kwargs) -> "FiberTensorFType":
+        pos_t = kwargs.get("position_type", self.position_type)
+        return FiberTensorFType(self.lvl_t.from_kwargs(**kwargs), pos_t)
+
+    def to_kwargs(self):
+        return {
+            "position_type": self.position_type,
+            "shape_type": self.shape_type,
+        } | self.lvl_t.to_kwargs()
+
+    # TODO: temporary approach for suitable rep and traits
+    def add_levels(self, idxs: list[int]):
+        from .level.dense_level import dense
+
+        copy = deepcopy(self)
+        lvl = copy
+        for idx in range(max(idxs) + 1):
+            if idx in idxs:
+                lvl.lvl_t = dense(lvl.lvl_t, dimension_type=np.intp)
+            lvl = lvl.lvl_t
+        return copy
+
+    # TODO: temporary approach for suitable rep and traits
+    def remove_levels(self, idxs: list[int]):
+        copy = deepcopy(self)
+        lvl = copy
+        for i in range(self.ndim):
+            if i in idxs:
+                lvl.lvl_t = lvl.lvl_t.lvl_t
+            lvl = lvl.lvl_t
+        return copy
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         op = None

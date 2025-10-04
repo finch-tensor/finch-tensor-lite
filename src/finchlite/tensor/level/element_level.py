@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -19,31 +19,31 @@ class ElementLevelFields(NamedTuple):
 
 @dataclass(unsafe_hash=True)
 class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
-    _fill_value: Any
-    _element_type: type | FType | None = None
-    _position_type: type | FType | None = None
-    _buffer_factory: Any = NumpyBufferFType
-    val_format: Any = None
+    fill_value: Any = None
+    element_type: type | FType | None = None
+    position_type: type | FType | None = None
+    buffer_factory: Any = NumpyBufferFType
+    buffer_type: Any = None
 
     @property
     def struct_name(self):
-        return "DenseLevelFType"
+        return "ElementLevelFType"
 
     @property
     def struct_fields(self):
         return [
-            ("val", self.val_format),
+            ("val", self.buffer_type),
         ]
 
     def __post_init__(self):
-        if self._element_type is None:
-            self._element_type = ftype(self._fill_value)
-        if self.val_format is None:
-            self.val_format = self._buffer_factory(self._element_type)
-        if self._position_type is None:
-            self._position_type = np.intp
-        self._element_type = self.val_format.element_type
-        self._fill_value = self._element_type(self._fill_value)
+        if self.element_type is None:
+            self.element_type = ftype(self.fill_value)
+        if self.buffer_type is None:
+            self.buffer_type = self.buffer_factory(self.element_type)
+        if self.position_type is None:
+            self.position_type = np.intp
+        self.element_type = self.buffer_type.element_type
+        self.fill_value = self.element_type(self.fill_value)
 
     def __call__(self, shape=(), val=None):
         """
@@ -65,31 +65,26 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def ndim(self):
         return 0
 
-    @property
-    def fill_value(self):
-        return self._fill_value
+    def from_kwargs(self, **kwargs) -> "ElementLevelFType":
+        f_v = kwargs.get("fill_value", self.fill_value)
+        e_t = kwargs.get("element_type", self.element_type)
+        p_t = kwargs.get("position_type", self.position_type)
+        b_f = kwargs.get("buffer_factory", self.buffer_factory)
+        v_f = kwargs.get("buffer_type", self.buffer_type)
+        return ElementLevelFType(f_v, e_t, p_t, b_f, v_f)
 
-    @property
-    def element_type(self):
-        return self._element_type
-
-    @property
-    def position_type(self):
-        return self._position_type
+    def to_kwargs(self):
+        return asdict(self)
 
     @property
     def shape_type(self):
         return ()
 
-    @property
-    def buffer_factory(self):
-        return self._buffer_factory
-
     def asm_unpack(self, ctx, var_n, val):
-        buf = asm.Variable(f"{var_n}_buf", self.val_format)
+        buf = asm.Variable(f"{var_n}_buf", self.buffer_type)
         buf_e = asm.GetAttr(val, asm.Literal("val"))
         ctx.exec(asm.Assign(buf, buf_e))
-        buf_s = asm.Slot(f"{var_n}_buf_slot", self.val_format)
+        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buffer_type)
         ctx.exec(asm.Unpack(buf_s, buf))
         return buf_s
 
@@ -97,7 +92,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         return ElementLevelFields(tns, buf_s, nind, pos, op)
 
     def lower_declare(self, ctx, tns, init, op, shape):
-        i_var = asm.Variable("i", self.val_format.length_type)
+        i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(tns, i_var, asm.Literal(init.val))
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns), body))
 
@@ -132,7 +127,7 @@ def element(
     element_type=None,
     position_type=None,
     buffer_factory=None,
-    val_format=None,
+    buffer_type=None,
 ):
     """
     Creates an ElementLevelFType with the given parameters.
@@ -142,17 +137,17 @@ def element(
         element_type: The type of elements stored in the level.
         position_type: The type of positions within the level.
         buffer_factory: The factory used to create buffers for the level.
-        val_format: Format of the value stored in the level.
+        buffer_type: Format of the value stored in the level.
 
     Returns:
         An instance of ElementLevelFType.
     """
     return ElementLevelFType(
-        _fill_value=fill_value,
-        _element_type=element_type,
-        _position_type=position_type,
-        _buffer_factory=buffer_factory,
-        val_format=val_format,
+        fill_value=fill_value,
+        element_type=element_type,
+        position_type=position_type,
+        buffer_factory=buffer_factory,
+        buffer_type=buffer_type,
     )
 
 
@@ -167,7 +162,9 @@ class ElementLevel(Level):
 
     def __post_init__(self):
         if self.val is None:
-            self.val = self._format.val_format(len=0, dtype=self._format.element_type())
+            self.val = self._format.buffer_type(
+                len=0, dtype=self._format.element_type()
+            )
 
     @property
     def shape(self) -> tuple:

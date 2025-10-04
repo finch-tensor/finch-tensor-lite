@@ -33,6 +33,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def struct_fields(self):
         return [
             ("lvl", self.lvl_t),
+            ("dimension", self.dimension_type),
             ("stride", self.dimension_type),
         ]
 
@@ -40,7 +41,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, shape, val=None):
+    def __call__(self, *, lvl=None, dimension=None, stride=None, shape=None, val=None):
         """
         Creates an instance of DenseLevel with the given ftype.
         Args:
@@ -48,7 +49,9 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl_t(shape[1:], val)
+        if lvl is not None and dimension is not None:
+            return DenseLevel(self, lvl, dimension)
+        lvl = self.lvl_t(shape=shape[1:], val=val)
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     def __str__(self):
@@ -84,8 +87,8 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         return self.lvl_t.position_type
 
     @property
-    def val_format(self):
-        return self.lvl_t.val_format
+    def buffer_type(self):
+        return self.lvl_t.buffer_type
 
     @property
     def buffer_factory(self):
@@ -93,6 +96,21 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         Returns the ftype of the buffer used for the fibers.
         """
         return self.lvl_t.buffer_factory
+
+    def from_kwargs(self, **kwargs) -> "DenseLevelFType":
+        dimension_type = kwargs.get("dimension_type", self.position_type)
+        if "shape_type" in kwargs:
+            shape_type = kwargs["shape_type"]
+            dimension_type = shape_type[0]
+            kwargs["shape_type"] = shape_type[1:]
+        op = kwargs.get("op", self.op)
+        return DenseLevelFType(self.lvl_t.from_kwargs(**kwargs), dimension_type, op)
+
+    def to_kwargs(self):
+        return {
+            "dimension_type": self.position_type,
+            "op": self.op,
+        } | self.lvl_t.to_kwargs()
 
     def asm_unpack(self, ctx, var_n, val):
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
