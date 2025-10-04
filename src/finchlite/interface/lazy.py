@@ -368,6 +368,8 @@ def defer(arr) -> LazyTensor:
     """
     if isinstance(arr, LazyTensor):
         return arr
+    if np.isscalar(arr):
+        arr = np.array(arr)
     name = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

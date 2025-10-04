@@ -231,10 +231,6 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def fill_value(self):
         return self.lvl_t.fill_value
 
-    # @property
-    # def position_type(self):
-    #     return self._position_type
-
     @property
     def buffer_factory(self):
         return self.lvl_t.buffer_factory
