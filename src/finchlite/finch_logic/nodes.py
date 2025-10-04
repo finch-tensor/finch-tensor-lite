@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Self
 
 from ..symbolic import Context, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
@@ -38,11 +38,6 @@ class LogicNode(Term, ABC):
         ctx = LogicPrinterContext()
         res = ctx(self)
         return res if res is not None else ctx.emit()
-
-
-# experiment with type variables
-LNVar1 = TypeVar("LNVar1", bound=LogicNode)
-LNVar2 = TypeVar("LNVar2", bound=LogicNode)
 
 
 @dataclass(eq=True, frozen=True)
@@ -332,7 +327,7 @@ class Subquery(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Query(LogicTree, Generic[LNVar1, LNVar2]):
+class Query(LogicTree):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`.
@@ -342,8 +337,8 @@ class Query(LogicTree, Generic[LNVar1, LNVar2]):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: LNVar1
-    rhs: LNVar2
+    lhs: LogicNode
+    rhs: LogicNode
 
     @property
     def children(self):
