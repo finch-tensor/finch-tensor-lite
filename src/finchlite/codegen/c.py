@@ -555,6 +555,7 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_wchar_p: ("wchar_t*", ["wchar.h"]),
     ctypes.c_void_p: ("void*", []),
     ctypes.py_object: ("void*", []),
+    None: ("void", []),
 }
 
 

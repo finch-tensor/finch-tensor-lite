@@ -12,6 +12,7 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
+from finchlite.codegen.malloc_buffer import MallocBuffer
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -150,6 +151,86 @@ def test_codegen(compiler, buffer):
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
+        (CCompiler(), MallocBuffer),
+        (asm.AssemblyInterpreter(), MallocBuffer),
+    ],
+)
+def test_dot_product_malloc(compiler, buffer):
+    a = [1, 2, 3]
+    b = [4, 5, 6]
+
+    a_buf = buffer(len(a), ctypes.c_double, a)
+    b_buf = buffer(len(b), ctypes.c_double, b)
+    ab = buffer(len(a), ctypes.c_double, a)
+    bb = buffer(len(b), ctypes.c_double, b)
+
+    c = asm.Variable("c", ctypes.c_double)
+    i = asm.Variable("i", np.int64)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("dot_product", ctypes.c_double),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(ctypes.c_double(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(operator.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Literal(operator.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.dot_product(a_buf, b_buf)
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.dot_product(a_buf, b_buf)
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
         (CCompiler(), NumpyBuffer),
         (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
@@ -161,11 +242,11 @@ def test_dot_product(compiler, buffer):
 
     a_buf = buffer(a)
     b_buf = buffer(b)
+    ab = buffer(a)
+    bb = buffer(b)
 
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
-    ab = buffer(a)
-    bb = buffer(b)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -301,8 +382,10 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     ["compiler", "buffer"],
     [
         (CCompiler(), NumpyBuffer),
+        (CCompiler(), MallocBuffer),
         (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), MallocBuffer),
     ],
 )
 def test_if_statement(compiler, buffer):
