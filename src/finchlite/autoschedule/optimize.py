@@ -7,7 +7,6 @@ from typing import TypeVar, overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 
-# from finchlite.autoschedule.einsum import EinsumCompiler
 from ..finch_logic import (
     Aggregate,
     Alias,

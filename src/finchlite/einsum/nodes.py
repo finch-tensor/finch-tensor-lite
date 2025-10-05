@@ -195,8 +195,6 @@ class PointwiseLiteral(PointwiseNode):
         return isinstance(other, PointwiseLiteral) and self.val == other.val
 
 
-# einsum and einsum ast not part of logic IR
-# transform to it's own language
 @dataclass(eq=True, frozen=True)
 class Einsum(PointwiseNode, TermTree):
     """
@@ -219,7 +217,7 @@ class Einsum(PointwiseNode, TermTree):
     """
 
     # technically a reduce operation, much akin to the one in aggregate
-    reduceOp: Callable
+    op: Callable
 
     output: PointwiseNode
     output_fields: tuple[PointwiseNode, ...]
@@ -230,19 +228,19 @@ class Einsum(PointwiseNode, TermTree):
         # Expecting exactly 4 children
         if len(children) != 4:
             raise ValueError(f"Einsum expects 4 children, got {len(children)}")
-        reduceOp = cast(Callable, children[0])
+        op = cast(Callable, children[0])
         output = cast(PointwiseNode, children[1])
         output_fields = cast(tuple[PointwiseNode, ...], children[2])
         pointwise_expr = cast(PointwiseNode, children[3])
-        return cls(reduceOp, output, output_fields, pointwise_expr)
+        return cls(op, output, output_fields, pointwise_expr)
 
     @property
     def children(self):
-        return [self.reduceOp, self.output, self.output_fields, self.pointwise_expr]
+        return [self.op, self.output, self.output_fields, self.pointwise_expr]
 
     def rename(self, new_alias: str):
         return Einsum(
-            self.reduceOp,
+            self.op,
             PointwiseNamedField(new_alias),
             self.output_fields,
             self.pointwise_expr,
@@ -250,7 +248,7 @@ class Einsum(PointwiseNode, TermTree):
 
     def reorder(self, idxs: tuple[Field, ...]):
         return Einsum(
-            self.reduceOp,
+            self.op,
             self.output,
             tuple(PointwiseNamedField(idx.name) for idx in idxs),
             self.pointwise_expr,
@@ -368,7 +366,7 @@ class EinsumLowerer:
                 ]
                 pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
                 return Einsum(
-                    reduceOp=overwrite,
+                    op=overwrite,
                     output=PointwiseNamedField(self.get_next_alias()),
                     output_fields=tuple(
                         PointwiseNamedField(field.name) for field in ex.fields
@@ -535,7 +533,7 @@ class EinsumPrinterContext:
         return (
             f"{self.print_pointwise(einsum.output)}["
             f"{self.print_indicies(einsum.output_fields)}] "
-            f"{self.print_reducer(einsum.reduceOp)} "
+            f"{self.print_reducer(einsum.op)} "
             f"{self.print_pointwise(einsum.pointwise_expr)}"
         )
 
