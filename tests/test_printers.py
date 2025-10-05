@@ -7,6 +7,7 @@ import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
+from finchlite.finch_assembly import assembly_number_uses
 
 
 def test_log_printer(file_regression):
@@ -276,7 +277,7 @@ def test_tagged_asm_printer_if(file_regression):
         )
     )
 
-    root = asm.nodes.number_assembly_ast(root)
+    root = assembly_number_uses(root)
     file_regression.check(str(root), extension=".txt")
 
 
@@ -397,5 +398,5 @@ def test_tagged_asm_printer_dot(file_regression):
         )
     )
 
-    prgm = asm.nodes.number_assembly_ast(prgm)
+    prgm = assembly_number_uses(prgm)
     file_regression.check(str(prgm), extension=".txt")

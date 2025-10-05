@@ -7,6 +7,7 @@ import numpy as np
 
 import finchlite.finch_assembly as asm
 from finchlite.codegen import NumpyBuffer
+from finchlite.finch_assembly import assembly_check_types
 from finchlite.symbolic import FType, ftype
 
 
@@ -563,8 +564,7 @@ def test_dot_product(a, b):
         )
     )
 
-    checker = asm.AssemblyTypeChecker()
-    assert checker(mod) is None
+    assembly_check_types(mod)
 
 
 def test_if_statement():
@@ -630,7 +630,7 @@ def test_if_statement():
         )
     )
 
-    assert asm.AssemblyTypeChecker()(root) is None
+    assembly_check_types(root)
 
 
 def test_simple_struct():
@@ -684,4 +684,4 @@ def test_simple_struct():
         ),
     )
 
-    assert asm.AssemblyTypeChecker()(mod) is None
+    assembly_check_types(mod)

@@ -2,12 +2,14 @@ import operator
 
 import numpy as np
 
-from ..symbolic.dataflow import (
+from ..symbolic import (
     BasicBlock,
     ControlFlowGraph,
     DataFlowAnalysis,
+    PostWalk,
+    Rewrite,
+    gensym,
 )
-from ..symbolic.gensym import gensym
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -24,6 +26,7 @@ from .nodes import (
     Literal,
     Load,
     Module,
+    Print,
     Repack,
     Resize,
     Return,
@@ -36,16 +39,33 @@ from .nodes import (
 )
 
 
-def build_finch_assembly_cfg(node: AssemblyNode):
-    return FinchAssemblyCFGBuilder().build(node)
+def assembly_build_cfg(node: AssemblyNode):
+    return AssemblyCFGBuilder().build(node)
 
 
-class FinchAssemblyCFGBuilder:
+def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:
+    """
+    Number every Variable occurrence in a post-order traversal.
+    """
+    counters: dict[str, int] = {}
+
+    def rule(node):
+        match node:
+            case Variable(name, _) as var:
+                idx = counters.get(name, 0)
+                counters[name] = idx + 1
+                return TaggedVariable(var, idx)
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+class AssemblyCFGBuilder:
     """Incrementally builds control-flow graph for Finch Assembly IR."""
 
     def __init__(self):
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
+        self.loop_counter_id = 0
 
     def build(self, node: AssemblyNode) -> ControlFlowGraph:
         return self(node)
@@ -62,7 +82,7 @@ class FinchAssemblyCFGBuilder:
                 | Repack()
                 | Resize()
                 | SetAttr()
-                | Call()
+                | Print()
                 | Store()
                 | Assign()
                 | Assert()
@@ -241,7 +261,7 @@ class FinchAssemblyCFGBuilder:
         return self.cfg
 
 
-class FinchAssemblyCopyPropagation(DataFlowAnalysis):
+class AssemblyCopyPropagation(DataFlowAnalysis):
     def direction(self) -> str:
         """
         Copy propagation is a forward analysis.

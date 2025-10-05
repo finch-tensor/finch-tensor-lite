@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Context, PostWalk, Rewrite, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 from .buffer import element_type, length_type
 
@@ -607,6 +607,23 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree):
+    """
+    Print values of give variables.
+
+    Attributes:
+        args: list of variables to be printed.
+    """
+
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
+
+
 class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -773,24 +790,15 @@ class AssemblyPrinterContext(Context):
                         )
                     self(func)
                 return None
+            case Print(args):
+                args_value_str = ""
+                for arg in args:
+                    if isinstance(arg, Variable):
+                        args_value_str = args_value_str + f"{{{self(arg)}}} "
+                self.exec(f"{feed}print(f'{args_value_str}')")
+                return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
                 return None
             case node:
                 raise NotImplementedError(node)
-
-
-def number_assembly_ast(root: AssemblyNode) -> AssemblyNode:
-    """
-    Number every Variable occurrence in a post-order traversal.
-    """
-    counters: dict[str, int] = {}
-
-    def rule(node):
-        match node:
-            case Variable(name, _) as var:
-                idx = counters.get(name, 0)
-                counters[name] = idx + 1
-                return TaggedVariable(var, idx)
-
-    return Rewrite(PostWalk(rule))(root)
