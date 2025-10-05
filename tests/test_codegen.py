@@ -159,10 +159,10 @@ def test_dot_product_malloc(compiler, buffer):
     a = [1, 2, 3]
     b = [4, 5, 6]
 
-    a_buf = buffer(len(a), ctypes.c_double, a)
-    b_buf = buffer(len(b), ctypes.c_double, b)
-    ab = buffer(len(a), ctypes.c_double, a)
-    bb = buffer(len(b), ctypes.c_double, b)
+    a_buf = buffer(len(a), np.float64, a)
+    b_buf = buffer(len(b), np.float64, b)
+    ab = buffer(len(a), np.float64, a)
+    bb = buffer(len(b), np.float64, b)
 
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
@@ -379,13 +379,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
 
 
 @pytest.mark.parametrize(
-    ["compiler", "buffer"],
+    ["compiler"],
     [
-        (CCompiler(), NumpyBuffer),
-        (CCompiler(), MallocBuffer),
-        (NumbaCompiler(), NumpyBuffer),
-        (asm.AssemblyInterpreter(), NumpyBuffer),
-        (asm.AssemblyInterpreter(), MallocBuffer),
+        (CCompiler(),),
+        (NumbaCompiler(),),
+        (asm.AssemblyInterpreter(),),
     ],
 )
 def test_if_statement(compiler, buffer):

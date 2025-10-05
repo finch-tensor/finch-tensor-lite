@@ -3,7 +3,6 @@ from pathlib import Path
 
 import numpy as np
 
-from finchlite.algebra import canonical_np_dtype
 from finchlite.codegen.c import CBufferFType, CStackFType, c_type, load_shared_lib
 from finchlite.codegen.numpy_buffer import CBufferFields
 from finchlite.finch_assembly import Buffer
@@ -40,21 +39,21 @@ class MallocBuffer(Buffer):
         dtype (type[ctypes._CData]): the ctype that the buffer will be based on.
         data (optional): a list of data to initialize the buffer with.
         """
-        self._np_dtype = canonical_np_dtype(dtype)
         self._dtype = dtype
+        self._c_dtype = np.ctypeslib.as_ctypes_type(dtype)
         self.buffer = ctypes.pointer(CMallocBuffer())
         backend_lib.mallocbuffer_init(
             self.buffer,
-            ctypes.c_size_t(ctypes.sizeof(self._dtype)),
+            ctypes.c_size_t(ctypes.sizeof(self._c_dtype)),
             ctypes.c_size_t(length),
         )
         if data is None:
             return
         if len(data) > length:
             raise IndexError
-        castarray = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))
+        castarray = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))
         for idx, elt in enumerate(data):
-            castarray[idx] = self._dtype(elt)
+            castarray[idx] = self._c_dtype(elt)
 
     def __del__(self):
         """
@@ -76,11 +75,11 @@ class MallocBuffer(Buffer):
 
     def load(self, index: int):
         return self._np_dtype(
-            ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))[index]
+            ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index]
         )
 
     def store(self, index: int, value):
-        ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))[index] = (
+        ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index] = (
             self._dtype(value)
         )
 
@@ -88,7 +87,7 @@ class MallocBuffer(Buffer):
         self.buffer.contents.resize(self.buffer, ctypes.c_size_t(new_length))
 
     def __str__(self):
-        array = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))[
+        array = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[
             : self.length()
         ]
         return f"malloc_buf({array})"
@@ -103,8 +102,8 @@ class MallocBufferFType(CBufferFType, CStackFType):
     """
 
     def __init__(self, dtype):
-        self._np_dtype = canonical_np_dtype(dtype)
         self._dtype = dtype
+        self._c_dtype = np.ctypeslib.as_ctypes_type(dtype)
 
     def __eq__(self, other):
         if not isinstance(other, MallocBufferFType):
@@ -129,7 +128,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
         """
         Returns the type of elements stored in the buffer. This will be a ctypes array.
         """
-        return self._np_dtype
+        return self._dtype
 
     def __hash__(self):
         return hash(self._dtype)
@@ -207,7 +206,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
 
 
 if __name__ == "__main__":
-    m = MallocBuffer(4, ctypes.c_float, data=[1, 2, 3, 4])
+    m = MallocBuffer(4, np.float64, data=[1, 2, 3, 4])
     m.store(2, 3.0)
     print(m)
     m.resize(2)

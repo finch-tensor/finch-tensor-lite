@@ -11,7 +11,6 @@ from .algebra import (
     query_property,
     register_property,
     return_type,
-    canonical_np_dtype,
 )
 from .operator import (
     InitWrite,
@@ -60,5 +59,4 @@ __all__ = [
     "register_property",
     "return_type",
     "shape_type",
-    "canonical_np_dtype",
 ]

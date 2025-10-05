@@ -64,6 +64,7 @@ _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
 StableNumber = bool | int | float | complex | np.generic
 
+
 def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
     """Queries a property of an attribute of an object or class.  Properties can
     be overridden by calling register_property on the object or it's class.
@@ -211,38 +212,6 @@ def return_type(op: Any, *args: Any) -> Any:
     """
     return query_property(op, "__call__", "return_type", *args)
 
-_ctypes_to_np = {
-    ctypes.c_bool: np.bool_,
-    ctypes.c_char: np.int8,
-    ctypes.c_byte: np.int8,
-    ctypes.c_ubyte: np.uint8,
-    ctypes.c_short: np.int16,
-    ctypes.c_ushort: np.uint16,
-    ctypes.c_int: np.int32,
-    ctypes.c_int8: np.int8,
-    ctypes.c_int16: np.int16,
-    ctypes.c_int32: np.int32,
-    ctypes.c_int64: np.int64,
-    ctypes.c_uint: np.uint32,
-    ctypes.c_uint8: np.uint8,
-    ctypes.c_uint16: np.uint16,
-    ctypes.c_uint32: np.uint32,
-    ctypes.c_uint64: np.uint64,
-    ctypes.c_long: np.int64 if ctypes.sizeof(ctypes.c_long) == 8 else np.int32,
-    ctypes.c_ulong: np.uint64 if ctypes.sizeof(ctypes.c_ulong) == 8 else np.uint32,
-    ctypes.c_longlong: np.int64,
-    ctypes.c_ulonglong: np.uint64,
-    ctypes.c_size_t: np.uint64 if ctypes.sizeof(ctypes.c_size_t) == 8 else np.uint32,
-    ctypes.c_ssize_t: np.int64 if ctypes.sizeof(ctypes.c_ssize_t) == 8 else np.int32,
-    ctypes.c_float: np.float32,
-    ctypes.c_double: np.float64,
-}
-
-def canonical_np_dtype(ctype) -> np.dtype:
-    if not issubclass(ctype, ctypes._SimpleCData):
-        raise TypeError(f"Type passed to canonical_np_dtype, {ctype}, just be a subclass of ctypes._SimpleCData!")
-    return _ctypes_to_np.get(ctype, np.object_)
-
 
 _reflexive_operators = {
     operator.add: ("__add__", "__radd__"),
@@ -269,6 +238,7 @@ def _return_type_reflexive_method(meth):
         raise TypeError(f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}")
 
     return _return_type_closure
+
 
 def _return_type_reflexive_operator(meth, rmeth):
     def _return_type_closure(op, a, b):
