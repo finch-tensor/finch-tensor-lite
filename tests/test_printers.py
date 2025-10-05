@@ -7,7 +7,7 @@ import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
-from finchlite.finch_assembly.cfg_builder import build_finch_assembly_cfg
+from finchlite.finch_assembly import assembly_build_cfg, assembly_number_uses
 
 
 def test_log_printer(file_regression):
@@ -277,7 +277,7 @@ def test_tagged_asm_printer_if(file_regression):
         )
     )
 
-    root = asm.nodes.number_assembly_ast(root)
+    root = assembly_number_uses(root)
     file_regression.check(str(root), extension=".txt")
 
 
@@ -343,8 +343,8 @@ def test_asm_cfg_printer_if(file_regression):
         )
     )
 
-    root = asm.nodes.number_assembly_ast(root)
-    cfg = build_finch_assembly_cfg(root)
+    root = assembly_number_uses(root)
+    cfg = assembly_build_cfg(root)
     file_regression.check(str(cfg), extension=".txt")
 
 
@@ -465,7 +465,7 @@ def test_tagged_asm_printer_dot(file_regression):
         )
     )
 
-    prgm = asm.nodes.number_assembly_ast(prgm)
+    prgm = assembly_number_uses(prgm)
     file_regression.check(str(prgm), extension=".txt")
 
 
@@ -526,6 +526,6 @@ def test_asm_cfg_printer_dot(file_regression):
         )
     )
 
-    prgm = asm.nodes.number_assembly_ast(prgm)
-    cfg = build_finch_assembly_cfg(prgm)
+    prgm = assembly_number_uses(prgm)
+    cfg = assembly_build_cfg(prgm)
     file_regression.check(str(cfg), extension=".txt")

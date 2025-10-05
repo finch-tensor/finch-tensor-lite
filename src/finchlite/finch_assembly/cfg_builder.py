@@ -2,8 +2,7 @@ import operator
 
 import numpy as np
 
-from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
-from ..symbolic.gensym import gensym
+from ..symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite, gensym
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -32,11 +31,27 @@ from .nodes import (
 )
 
 
-def build_finch_assembly_cfg(node: AssemblyNode):
-    return FinchAssemblyCFGBuilder().build(node)
+def assembly_build_cfg(node: AssemblyNode):
+    return AssemblyCFGBuilder().build(node)
 
 
-class FinchAssemblyCFGBuilder:
+def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:
+    """
+    Number every Variable occurrence in a post-order traversal.
+    """
+    counters: dict[str, int] = {}
+
+    def rule(node):
+        match node:
+            case Variable(name, _) as var:
+                idx = counters.get(name, 0)
+                counters[name] = idx + 1
+                return TaggedVariable(var, idx)
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+class AssemblyCFGBuilder:
     """Incrementally builds control-flow graph for Finch Assembly IR."""
 
     def __init__(self):

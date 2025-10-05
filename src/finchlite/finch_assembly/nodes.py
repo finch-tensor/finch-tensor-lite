@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Context, PostWalk, Rewrite, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 from .buffer import element_type, length_type
 
@@ -778,19 +778,3 @@ class AssemblyPrinterContext(Context):
                 return None
             case node:
                 raise NotImplementedError(node)
-
-
-def number_assembly_ast(root: AssemblyNode) -> AssemblyNode:
-    """
-    Number every Variable occurrence in a post-order traversal.
-    """
-    counters: dict[str, int] = {}
-
-    def rule(node):
-        match node:
-            case Variable(name, _) as var:
-                idx = counters.get(name, 0)
-                counters[name] = idx + 1
-                return TaggedVariable(var, idx)
-
-    return Rewrite(PostWalk(rule))(root)
