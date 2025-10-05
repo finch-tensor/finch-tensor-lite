@@ -25,6 +25,10 @@ class LoopState:
         pass
 
 
+def assembly_check_types(prgm: asm.AssemblyNode):
+    AssemblyTypeChecker()(prgm)
+
+
 class AssemblyTypeChecker:
     """
     A type checker for FinchAssembly
