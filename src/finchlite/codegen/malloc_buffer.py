@@ -51,7 +51,9 @@ class MallocBuffer(Buffer):
             return
         if len(data) > length:
             raise IndexError
-        castarray = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))
+        castarray = ctypes.cast(
+            self.buffer.contents.data, ctypes.POINTER(self._c_dtype)
+        )
         for idx, elt in enumerate(data):
             castarray[idx] = self._c_dtype(elt)
 
@@ -59,7 +61,7 @@ class MallocBuffer(Buffer):
         """
         Frees the mallocbuffer stored inside.
         """
-        if hasattr(self, 'buffer'):
+        if hasattr(self, "buffer"):
             backend_lib.mallocbuffer_free(self.buffer)
 
     @property

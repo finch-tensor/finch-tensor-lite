@@ -228,6 +228,7 @@ def test_dot_product_malloc(compiler, buffer):
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
+
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
@@ -308,6 +309,7 @@ def test_dot_product(compiler, buffer):
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
+
 @pytest.mark.parametrize(
     ["compiler", "extension", "buffer"],
     [
@@ -374,6 +376,7 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     )
 
     file_regression.check(compiler(prgm), extension=extension)
+
 
 @pytest.mark.parametrize(
     ["compiler", "extension", "buffer"],
