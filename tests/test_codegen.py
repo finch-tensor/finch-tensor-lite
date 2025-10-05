@@ -164,7 +164,7 @@ def test_dot_product_malloc(compiler, buffer):
     ab = buffer(len(a), ctypes.c_double, a)
     bb = buffer(len(b), ctypes.c_double, b)
 
-    c = asm.Variable("c", ctypes.c_double)
+    c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
 
     ab_v = asm.Variable("a", ab.ftype)
@@ -174,14 +174,14 @@ def test_dot_product_malloc(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", ctypes.c_double),
+                asm.Variable("dot_product", np.float64),
                 (
                     ab_v,
                     bb_v,
                 ),
                 asm.Block(
                     (
-                        asm.Assign(c, asm.Literal(ctypes.c_double(0.0))),
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
                         asm.Unpack(ab_slt, ab_v),
                         asm.Unpack(bb_slt, bb_v),
                         asm.ForLoop(

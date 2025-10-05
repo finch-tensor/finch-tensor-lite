@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
+from finchlite.algebra import canonical_np_dtype
 from finchlite.codegen.c import CBufferFType, CStackFType, c_type, load_shared_lib
 from finchlite.codegen.numpy_buffer import CBufferFields
 from finchlite.finch_assembly import Buffer
@@ -39,6 +40,7 @@ class MallocBuffer(Buffer):
         dtype (type[ctypes._CData]): the ctype that the buffer will be based on.
         data (optional): a list of data to initialize the buffer with.
         """
+        self._np_dtype = canonical_np_dtype(dtype)
         self._dtype = dtype
         self.buffer = ctypes.pointer(CMallocBuffer())
         backend_lib.mallocbuffer_init(
@@ -58,7 +60,8 @@ class MallocBuffer(Buffer):
         """
         Frees the mallocbuffer stored inside.
         """
-        backend_lib.mallocbuffer_free(self.buffer)
+        if hasattr(self, 'buffer'):
+            backend_lib.mallocbuffer_free(self.buffer)
 
     @property
     def ftype(self):
@@ -72,9 +75,9 @@ class MallocBuffer(Buffer):
         return self.buffer.contents.length
 
     def load(self, index: int):
-        return ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))[
-            index
-        ]
+        return self._np_dtype(
+            ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))[index]
+        )
 
     def store(self, index: int, value):
         ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._dtype))[index] = (
@@ -100,6 +103,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
     """
 
     def __init__(self, dtype):
+        self._np_dtype = canonical_np_dtype(dtype)
         self._dtype = dtype
 
     def __eq__(self, other):
@@ -108,7 +112,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
         return self._dtype == other._dtype
 
     def __str__(self):
-        return f"np_buf_t({qual_str(self._dtype)})"
+        return f"malloc_buf_t({qual_str(self._dtype)})"
 
     def __repr__(self):
         return f"MallocBufferFType({qual_str(self._dtype)})"
@@ -118,14 +122,14 @@ class MallocBufferFType(CBufferFType, CStackFType):
         """
         Returns the type used for the length of the buffer.
         """
-        return ctypes.c_size_t
+        return np.intp
 
     @property
     def element_type(self):
         """
         Returns the type of elements stored in the buffer. This will be a ctypes array.
         """
-        return self._dtype
+        return self._np_dtype
 
     def __hash__(self):
         return hash(self._dtype)
