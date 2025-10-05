@@ -6,9 +6,8 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-import pytest
-
 import numpy as np
+import pytest
 from numpy.testing import assert_equal
 
 import finchlite
@@ -227,6 +226,43 @@ def test_dot_product_malloc(compiler, buffer):
     expected = interp.dot_product(a_buf, b_buf)
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    ["new_size"],
+    [(1,), (5,), (10,)],
+)
+def test_malloc_resize(new_size):
+    a = [1, 4, 3, 4]
+
+    ab = MallocBuffer(len(a), np.float64, a)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("b_", ab.ftype)
+    size = asm.Variable("size", np.intp)
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("length", np.intp),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+    mod = CCompiler()(prgm)
+    assert mod.length(ab).value == new_size
+    assert ab.length() == new_size
+    for i in range(new_size):
+        assert ab.load(i) == 0 if i >= len(a) else a[i]
 
 
 @pytest.mark.parametrize(

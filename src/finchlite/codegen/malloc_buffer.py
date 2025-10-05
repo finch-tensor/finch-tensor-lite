@@ -40,7 +40,7 @@ class MallocBuffer(Buffer):
         data (optional): a list of data to initialize the buffer with.
         """
         self._dtype = dtype
-        self._c_dtype = np.ctypeslib.as_ctypes_type(dtype)
+        self._c_dtype = c_type(dtype)
         self.buffer = ctypes.pointer(CMallocBuffer())
         backend_lib.mallocbuffer_init(
             self.buffer,
@@ -73,7 +73,7 @@ class MallocBuffer(Buffer):
 
     # TODO should be property
     def length(self):
-        return self.buffer.contents.length
+        return np.intp(self.buffer.contents.length)
 
     def load(self, index: int):
         return self._dtype(
@@ -105,7 +105,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
 
     def __init__(self, dtype):
         self._dtype = dtype
-        self._c_dtype = np.ctypeslib.as_ctypes_type(dtype)
+        self._c_dtype = c_type(dtype)
 
     def __eq__(self, other):
         if not isinstance(other, MallocBufferFType):
@@ -158,8 +158,13 @@ class MallocBufferFType(CBufferFType, CStackFType):
     def c_resize(self, ctx, buf, new_len):
         new_len = ctx(ctx.cache("len", new_len))
         obj = buf.obj.obj
+        data = buf.obj.data
+        length = buf.obj.length
         t = ctx.ctype_name(c_type(self._dtype))
-        ctx.exec(f"{obj}->resize(&{obj}, ({new_len}) * sizeof({t}));\n")
+        ctx.exec(
+            f"{ctx.feed}{data} = ({t}*){obj}->resize({obj}, ({new_len}));\n"
+            f"{ctx.feed}{length} = {new_len};"
+        )
         return
 
     def c_unpack(self, ctx, var_n, val):
@@ -205,13 +210,3 @@ class MallocBufferFType(CBufferFType, CStackFType):
         TODO: incomplete
         """
         return c_buffer.contents
-
-
-if __name__ == "__main__":
-    m = MallocBuffer(4, np.float64, data=[1, 2, 3, 4])
-    m.store(2, 3.0)
-    print(m)
-    m.resize(2)
-    print(m)
-    m.resize(8)
-    print(m)

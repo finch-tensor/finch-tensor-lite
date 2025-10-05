@@ -297,7 +297,6 @@ class Call(AssemblyExpression, AssemblyTree):
     def result_format(self):
         """Returns the type of the expression."""
         arg_types = [arg.result_format for arg in self.args]
-        print("return type of", self.op.val, *arg_types)
         return return_type(self.op.val, *arg_types)
 
 

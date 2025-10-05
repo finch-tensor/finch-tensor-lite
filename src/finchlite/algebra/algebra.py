@@ -257,11 +257,13 @@ op: Callable
 
 
 for op, (meth, rmeth) in _reflexive_operators.items():
-    register_property(
-        op,
-        "__call__",
-        "return_type",
-        _return_type_reflexive_operator(meth, rmeth),
+    (
+        register_property(
+            op,
+            "__call__",
+            "return_type",
+            _return_type_reflexive_operator(meth, rmeth),
+        ),
     )
 
     for t in StableNumber.__args__:
