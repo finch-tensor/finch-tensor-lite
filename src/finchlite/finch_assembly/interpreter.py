@@ -338,8 +338,7 @@ class AssemblyInterpreter:
             case asm.Print(args):
                 args_value_str = ""
                 for arg in args:
-                    if isinstance(arg, asm.Variable):
-                        args_value_str = args_value_str + f"{self(arg)} "
+                    args_value_str = args_value_str + f"{self(arg)} "
                 print(args_value_str, file=sys.stdout)
                 return None
             case asm.Stack(val):
