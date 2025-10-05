@@ -71,7 +71,7 @@ class AssemblyInterpreter:
         types=None,
         loop_state=None,
         function_state=None,
-        stdout = None,
+        stdout=None,
     ):
         if bindings is None:
             bindings = ScopedDict()
@@ -95,7 +95,7 @@ class AssemblyInterpreter:
         types=None,
         loop_state=None,
         function_state=None,
-        stdout=None
+        stdout=None,
     ):
         """
         Create a new scope for the interpreter.
