@@ -52,7 +52,6 @@ property of the `fill_value` attribute by defining a `fill_value` in the class
 itself.
 """
 
-import ctypes
 import math
 import operator
 from collections.abc import Callable, Hashable

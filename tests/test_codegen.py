@@ -12,7 +12,6 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
-from finchlite.codegen.malloc_buffer import MallocBuffer
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -25,6 +24,7 @@ from finchlite.codegen import (
     SafeBuffer,
 )
 from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_backend import (
     construct_from_numba,
     deserialize_from_numba,
