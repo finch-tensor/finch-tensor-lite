@@ -74,7 +74,7 @@ class MallocBuffer(Buffer):
         return self.buffer.contents.length
 
     def load(self, index: int):
-        return self._np_dtype(
+        return self._dtype(
             ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index]
         )
 

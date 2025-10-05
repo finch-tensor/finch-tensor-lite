@@ -308,6 +308,72 @@ def test_dot_product(compiler, buffer):
 
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
+@pytest.mark.parametrize(
+    ["compiler", "extension", "buffer"],
+    [
+        (CGenerator(), ".c", MallocBuffer),
+    ],
+)
+def test_dot_product_regression_malloc(compiler, extension, buffer, file_regression):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    c = asm.Variable("c", np.float64)
+    i = asm.Variable("i", np.int64)
+    ab = buffer(len(a), np.float64, a)
+    bb = buffer(len(b), np.float64, b)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("dot_product", np.float64),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(operator.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Literal(operator.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(compiler(prgm), extension=extension)
 
 @pytest.mark.parametrize(
     ["compiler", "extension", "buffer"],
