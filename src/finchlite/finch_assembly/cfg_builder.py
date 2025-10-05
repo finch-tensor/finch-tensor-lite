@@ -19,6 +19,7 @@ from .nodes import (
     Literal,
     Load,
     Module,
+    Print,
     Repack,
     Resize,
     Return,
@@ -74,7 +75,7 @@ class AssemblyCFGBuilder:
                 | Repack()
                 | Resize()
                 | SetAttr()
-                | Call()
+                | Print()
                 | Store()
                 | Assign()
                 | Assert()
