@@ -455,7 +455,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
         (asm.AssemblyInterpreter(),),
     ],
 )
-def test_if_statement(compiler, buffer):
+def test_if_statement(compiler):
     var = asm.Variable("a", np.int64)
     prgm = asm.Module(
         (
