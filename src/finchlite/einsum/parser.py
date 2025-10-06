@@ -286,14 +286,14 @@ def parse_einsum(expr: str) -> ein.EinsumNode:
             "start", [Tree("increment", [Tree("access", [tns, *idxs]), op, expr_node])]
         ):
             arg = _parse_einsum_expr(expr_node)  # type: ignore[arg-type]
-            idxs = tuple(idx.value for idx in idxs)  # type: ignore[union-attr]
+            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
             return ein.Einsum(
-                op.value, tns.value, idxs, arg   # type: ignore[union-attr]
+                op.value, ein.Alias(tns.value), idxs_exprs, arg   # type: ignore[union-attr]
             )
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
             arg = _parse_einsum_expr(expr_node)  # type: ignore[arg-type]
-            return ein.Einsum(overwrite, tns.value, [idx.value for idx in idxs], arg)  # type: ignore[union-attr]
+            return ein.Einsum(overwrite, ein.Alias(tns.value), tuple(ein.Index(idx.value) for idx in idxs), arg)  # type: ignore[union-attr]
 
         case _:
             raise ValueError(

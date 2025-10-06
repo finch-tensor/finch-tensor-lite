@@ -48,7 +48,6 @@ class EinsumTree(EinsumNode, TermTree):
 
 
 class EinsumExpr(EinsumNode, ABC):
-    @property
     @abstractmethod
     def get_idxs(self) -> set[str]:
         pass
@@ -163,7 +162,7 @@ class Call(EinsumExpr, EinsumTree):
         # First child is op, rest are args
         if len(children) < 2:
             raise ValueError("Call expects at least 2 children (op + 1 arg)")
-        op = cast(Callable, children[0])
+        op = cast(Literal, children[0])
         args = cast(tuple[EinsumExpr, ...], children[1:])
         return cls(op, tuple(args))
 
@@ -208,14 +207,14 @@ class Einsum(EinsumTree):
         if len(children) != 4:
             raise ValueError(f"Einsum expects 4 children, got {len(children)}")
         op = cast(Callable, children[0])
-        output = cast(EinsumExpr, children[1])
+        tns = cast(Alias, children[1])
         idxs = cast(tuple[EinsumExpr, ...], children[2])
         arg = cast(EinsumExpr, children[3])
-        return cls(op, output, idxs, arg)
+        return cls(op, tns, idxs, arg)
 
     @property
     def children(self):
-        return [self.op, self.output, self.idxs, self.arg]
+        return [self.op, self.tns, self.idxs, self.arg]
 
 
 @dataclass(eq=True, frozen=True)
@@ -336,17 +335,17 @@ class EinsumPrinterContext(Context):
                 return f"{self(tns)}[{', '.join(self(idx) for idx in idxs)}]"
             case Call(fn, args):
                 args_e = tuple(self(arg) for arg in args)
-                if len(args) == 2 and fn in infix_strs:
-                    return f"({args_e[0]} {infix_strs[fn]} {args_e[1]})"
-                if len(args) == 1 and fn in unary_strs:
-                    return f"{unary_strs[fn]}{args_e[0]}"
+                if len(args) == 2 and fn.val in infix_strs:
+                    return f"({args_e[0]} {infix_strs[fn.val]} {args_e[1]})"
+                if len(args) == 1 and fn.val in unary_strs:
+                    return f"{unary_strs[fn.val]}{args_e[0]}"
                 return f"{self(fn)}({', '.join(args_e)})"
             case Einsum(op, tns, idxs, arg):
-                op = infix_strs.get(op, op.__name__)
+                op_str = infix_strs.get(op, op.__name__)
                 self.exec(
                     f"{self.feed}{self(tns)}["
                     f"{', '.join(self(idx) for idx in idxs)}] "
-                    f"{op}= {self(arg)}"
+                    f"{op_str}= {self(arg)}"
                 )
                 return None
             case Plan(bodies):
