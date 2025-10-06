@@ -1,8 +1,10 @@
+import operator
+
+import numpy as np
+
 from lark import Lark, Tree
 
 from . import nodes as ein
-import numpy as np
-import operator
 
 nary_ops = {
     "+": operator.add,

@@ -1,5 +1,7 @@
-import numpy as np
 import operator
+
+import numpy as np
+
 from . import nodes as ein
 
 pointwise_ops = {
@@ -61,7 +63,8 @@ reduction_ops = {
     np.logical_or: "any",
 }
 
-class EinsumInterpreter():
+
+class EinsumInterpreter:
     def __init__(self, xp=None, bindings=None):
         if bindings is None:
             bindings = {}
@@ -84,7 +87,7 @@ class EinsumInterpreter():
                 arg = self.eval(arg, loops)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
                 if op is not None:
-                    op = getattr(xp, reduction_ops.get(op, None))
+                    op = getattr(xp, reduction_ops.get(op))
                     val = op(arg, axis=axis)
                 else:
                     assert set(idxs) == set(loops)
@@ -92,7 +95,6 @@ class EinsumInterpreter():
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
                 self.bindings[tns] = xp.transpose(val, axis)
-
 
     def eval(self, ex, loops):
         xp = self.xp
