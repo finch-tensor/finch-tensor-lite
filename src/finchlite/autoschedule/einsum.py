@@ -2,7 +2,7 @@ import operator
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Optional, Self, cast
+from typing import Self, cast
 
 import numpy as np
 
@@ -108,7 +108,7 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
     """
 
     sparse_tensor: PointwiseNode
-    dimension: Optional[PointwiseNamedField]
+    dimension: PointwiseNamedField | None
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -119,7 +119,7 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
             )
         return cls(
             cast(PointwiseNode, children[0]),
-            cast(Optional[PointwiseNamedField], children[1])
+            cast(PointwiseNamedField | None, children[1])
             if len(children) == 2
             else None,
         )
