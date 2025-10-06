@@ -186,6 +186,35 @@ class PointwiseOp(PointwiseNode, TermTree):
     def children(self):
         return [self.op, *self.args]
 
+@dataclass(eq=True, frozen=True)
+class PointwiseIfElse(PointwiseNode, TermTree):
+    """
+    PointwiseIfElse
+    
+    Attributes:
+        condition: The condition to check.
+        then_expr: The expression to evaluate if the condition is not zero.
+        else_expr: The expression to evaluate if the condition is zero.
+    """
+    
+    condition: PointwiseNode
+    then_expr: PointwiseNode
+    else_expr: PointwiseNode
+
+    @classmethod
+    def from_children(cls, *children: Term) -> Self:
+        if len(children) != 3:
+            raise ValueError(f"PointwiseIfElse expects 3 children, got {len(children)}")
+        return cls(
+            cast(PointwiseNode, children[0]),
+            cast(PointwiseNode, children[1]),
+            cast(PointwiseNode, children[2]),
+        )
+
+    @property
+    def children(self):
+        return [self.condition, self.then_expr, self.else_expr]
+
 
 @dataclass(eq=True, frozen=True)
 class PointwiseLiteral(PointwiseNode):
@@ -544,6 +573,10 @@ class EinsumPrinterContext:
                 return self.print_pointwise_op(pointwise_expr)
             case PointwiseLiteral(val):
                 return str(val)
+            case PointwiseIfElse(condition, then_expr, else_expr):
+                return f"ifelse({self.print_pointwise(condition)}, \
+                    {self.print_pointwise(then_expr)}, \
+                    {self.print_pointwise(else_expr)})"
 
     def print_einsum(self, einsum: Einsum) -> str:
         return (
