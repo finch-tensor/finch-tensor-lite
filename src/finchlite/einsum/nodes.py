@@ -6,6 +6,7 @@ from typing import Self, cast
 
 import numpy as np
 
+import finchlite.finch_logic as lgc
 from finchlite.algebra import (
     init_value,
     is_commutative,
@@ -13,8 +14,7 @@ from finchlite.algebra import (
     promote_max,
     promote_min,
 )
-from finchlite.finch_logic import Alias, Field, Literal, LogicNode, Plan, Query, Relabel
-from finchlite.finch_logic.nodes import Aggregate, MapJoin, Produces, Reorder, Table
+from finchlite.finch_logic import LogicNode
 from finchlite.symbolic import Term, TermTree
 
 
@@ -45,25 +45,27 @@ class PointwiseNode(Term, ABC):
 
 
 @dataclass(eq=True, frozen=True)
-class PointwiseNamedField(PointwiseNode):
+class Index(PointwiseNode):
     """
-    PointwiseNamedFiled
+    Represents a  AST expression for an index named `name`.
 
-    Could be an alias to a tensor, could be a named field in an index array
+    Attributes:
+        name: The name of the index.
     """
 
     name: str
 
-    @classmethod
-    def from_children(cls, *children: Term) -> Self:
-        # Expecting a single child which is the name
-        if len(children) != 1:
-            raise ValueError(f"PointwiseNamedField expects 1 child got {len(children)}")
-        return cls(str(children[0]))
 
-    @property
-    def children(self):
-        return [self.name]
+@dataclass(eq=True, frozen=True)
+class Alias(PointwiseNode):
+    """
+    Represents a  AST expression for an index named `name`.
+
+    Attributes:
+        name: The name of the index.
+    """
+
+    name: str
 
 
 @dataclass(eq=True, frozen=True)
@@ -241,24 +243,24 @@ class Einsum(PointwiseNode, TermTree):
     def rename(self, new_alias: str):
         return Einsum(
             self.op,
-            PointwiseNamedField(new_alias),
+            Alias(new_alias),
             self.output_fields,
             self.pointwise_expr,
         )
 
-    def reorder(self, idxs: tuple[Field, ...]):
+    def reorder(self, idxs: tuple[lgc.Field, ...]):
         return Einsum(
             self.op,
             self.output,
-            tuple(PointwiseNamedField(idx.name) for idx in idxs),
+            tuple(Index(idx.name) for idx in idxs),
             self.pointwise_expr,
         )
 
 
 @dataclass(eq=True, frozen=True)
-class EinsumPlan(PointwiseNode):
+class Plan(PointwiseNode):
     """
-    EinsumPlan
+    Plan
 
     A plan that contains einsum operations.
     Basically a list of einsums and some return values.
@@ -271,7 +273,7 @@ class EinsumPlan(PointwiseNode):
     def from_children(cls, *children: Term) -> Self:
         # The last child is the returnValues tuple, all others are bodies
         if len(children) < 1:
-            raise ValueError("EinsumPlan expects at least 1 child")
+            raise ValueError("Plan expects at least 1 child")
         *bodies, returnValues = children
 
         return cls(
@@ -291,8 +293,8 @@ class EinsumPlan(PointwiseNode):
 class EinsumLowerer:
     alias_counter: int = 0
 
-    def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
-        parameters: dict[str, Table] = {}
+    def __call__(self, prgm: lgc.Plan) -> tuple[Plan, dict[str, lgc.Table]]:
+        parameters: dict[str, lgc.Table] = {}
         definitions: dict[str, Einsum] = {}
         return self.compile_plan(prgm, parameters, definitions), parameters
 
@@ -307,20 +309,23 @@ class EinsumLowerer:
         return einsum.rename(new_alias)
 
     def compile_plan(
-        self, plan: Plan, parameters: dict[str, Table], definitions: dict[str, Einsum]
-    ) -> EinsumPlan:
+        self,
+        plan: lgc.Plan,
+        parameters: dict[str, lgc.Table],
+        definitions: dict[str, Einsum],
+    ) -> Plan:
         einsums: list[Einsum] = []
         returnValue: list[PointwiseNode] = []
 
         for body in plan.bodies:
             match body:
-                case Plan(_):
+                case lgc.Plan(_):
                     inner_plan = self.compile_plan(body, parameters, definitions)
                     einsums.extend(inner_plan.bodies)
                     break
-                case Query(Alias(name), Table(_, _)):
+                case lgc.Query(lgc.Alias(name), lgc.Table(_, _)):
                     parameters[name] = body.rhs
-                case Query(Alias(name), rhs):
+                case lgc.Query(lgc.Alias(name), rhs):
                     einsums.append(
                         self.rename_einsum(
                             self.lower_to_einsum(rhs, einsums, parameters, definitions),
@@ -328,10 +333,10 @@ class EinsumLowerer:
                             definitions,
                         )
                     )
-                case Produces(args):
+                case lgc.Produces(args):
                     returnValue = [
-                        PointwiseNamedField(arg.name)
-                        if isinstance(arg, Alias)
+                        Alias(arg.name)
+                        if isinstance(arg, lgc.Alias)
                         else self.lower_to_einsum(arg, einsums, parameters, definitions)
                         for arg in args
                     ]
@@ -347,19 +352,19 @@ class EinsumLowerer:
                         )
                     )
 
-        return EinsumPlan(tuple(einsums), tuple(returnValue))
+        return Plan(tuple(einsums), tuple(returnValue))
 
     def lower_to_einsum(
         self,
         ex: LogicNode,
         einsums: list[Einsum],
-        parameters: dict[str, Table],
+        parameters: dict[str, lgc.Table],
         definitions: dict[str, Einsum],
     ) -> Einsum:
         match ex:
-            case Plan(_):
+            case lgc.Plan(_):
                 raise Exception("Plans within plans are not supported.")
-            case MapJoin(Literal(operation), args):
+            case lgc.MapJoin(lgc.Literal(operation), args):
                 args_list = [
                     self.lower_to_pointwise(arg, einsums, parameters, definitions)
                     for arg in args
@@ -367,17 +372,15 @@ class EinsumLowerer:
                 pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
                 return Einsum(
                     op=overwrite,
-                    output=PointwiseNamedField(self.get_next_alias()),
-                    output_fields=tuple(
-                        PointwiseNamedField(field.name) for field in ex.fields
-                    ),
+                    output=Alias(self.get_next_alias()),
+                    output_fields=tuple(Index(field.name) for field in ex.fields),
                     pointwise_expr=pointwise_expr,
                 )
-            case Reorder(arg, idxs):
+            case lgc.Reorder(arg, idxs):
                 return self.lower_to_einsum(
                     arg, einsums, parameters, definitions
                 ).reorder(idxs)
-            case Aggregate(Literal(operation), Literal(init), arg, idxs):
+            case lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
                     raise Exception(f"""
                     Init value {init} is not the default value
@@ -389,8 +392,8 @@ class EinsumLowerer:
                 )
                 return Einsum(
                     operation,
-                    PointwiseNamedField(self.get_next_alias()),
-                    tuple(PointwiseNamedField(field.name) for field in ex.fields),
+                    Alias(self.get_next_alias()),
+                    tuple(Index(field.name) for field in ex.fields),
                     aggregate_expr,
                 )
             case _:
@@ -428,30 +431,30 @@ class EinsumLowerer:
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
     def lower_to_pointwise(
         self,
-        ex: LogicNode,
+        ex: lgc.LogicNode,
         einsums: list[Einsum],
-        parameters: dict[str, Table],
+        parameters: dict[str, lgc.Table],
         definitions: dict[str, Einsum],
     ) -> PointwiseNode:
         match ex:
-            case Reorder(arg, idxs):
+            case lgc.Reorder(arg, idxs):
                 return self.lower_to_pointwise(arg, einsums, parameters, definitions)
-            case MapJoin(Literal(operation), args):
+            case lgc.MapJoin(lgc.Literal(operation), args):
                 args_list = [
                     self.lower_to_pointwise(arg, einsums, parameters, definitions)
                     for arg in args
                 ]
                 return self.lower_to_pointwise_op(operation, tuple(args_list))
-            case Relabel(
-                Alias(name), idxs
+            case lgc.Relabel(
+                lgc.Alias(name), idxs
             ):  # relable is really just a glorified pointwise access
                 return PointwiseAccess(
-                    alias=PointwiseNamedField(name),
-                    idxs=tuple(PointwiseNamedField(idx.name) for idx in idxs),
+                    alias=Alias(name),
+                    idxs=tuple(Index(idx.name) for idx in idxs),
                 )
-            case Literal(value):
+            case lgc.Literal(value):
                 return PointwiseLiteral(val=value)
-            case Aggregate(
+            case lgc.Aggregate(
                 _, _, _, _
             ):  # aggregate has to be computed seperatley as it's own einsum
                 aggregate_einsum_alias = self.get_next_alias()
@@ -463,8 +466,8 @@ class EinsumLowerer:
                     )
                 )
                 return PointwiseAccess(
-                    alias=PointwiseNamedField(aggregate_einsum_alias),
-                    idxs=tuple(PointwiseNamedField(field.name) for field in ex.fields),
+                    alias=Alias(aggregate_einsum_alias),
+                    idxs=tuple(Index(field.name) for field in ex.fields),
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
@@ -516,7 +519,9 @@ class EinsumPrinterContext:
         match pointwise_expr:
             case Einsum(_, _, _, _):
                 return self.print_einsum(pointwise_expr)
-            case PointwiseNamedField(name):
+            case Alias(name):
+                return name
+            case Index(name):
                 return name
             case PointwiseAccess(alias, idxs):
                 return f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
@@ -537,7 +542,7 @@ class EinsumPrinterContext:
             f"{self.print_pointwise(einsum.pointwise_expr)}"
         )
 
-    def print_einsum_plan(self, einsum_plan: EinsumPlan) -> str:
+    def print_einsum_plan(self, einsum_plan: Plan) -> str:
         statements = "\n".join(
             [self.print_einsum(statement) for statement in einsum_plan.bodies]
         )
@@ -549,15 +554,15 @@ class EinsumPrinterContext:
         )
         return f"{statements}\nreturn {return_values}"
 
-    def __call__(self, prgm: EinsumPlan) -> str:
+    def __call__(self, prgm: Plan) -> str:
         return self.print_einsum_plan(prgm)
 
 
 class EinsumInterpreter:
-    def __call__(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
+    def __call__(self, einsum_plan: Plan, parameters: dict[str, lgc.Table]):
         return self.print(einsum_plan, parameters)
 
-    def print(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]):
+    def print(self, einsum_plan: Plan, parameters: dict[str, lgc.Table]):
         for str, table in parameters.items():
             print(f"Parameter: {str} = {table}")
 
@@ -569,7 +574,7 @@ class EinsumCompiler:
     def __init__(self):
         self.el = EinsumLowerer()
 
-    def __call__(self, prgm: Plan):
+    def __call__(self, prgm: lgc.Plan):
         einsum_plan, parameters = self.el(prgm)
 
         return einsum_plan, parameters
@@ -581,7 +586,7 @@ class EinsumScheduler:
         self.interpret = EinsumInterpreter()
 
     def __call__(self, prgm: LogicNode):
-        if not isinstance(prgm, Plan):
+        if not isinstance(prgm, lgc.Plan):
             raise TypeError(f"EinsumScheduler expects a Plan, got {type(prgm)}")
         einsum_plan, parameters = self.ctx(prgm)
         return self.interpret(einsum_plan, parameters)

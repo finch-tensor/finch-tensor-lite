@@ -1,8 +1,8 @@
-from .nodes import Einsum, EinsumCompiler, EinsumPlan, EinsumScheduler
+from .nodes import Einsum, EinsumCompiler, Plan, EinsumScheduler
 
 __all__ = [
     "Einsum",
     "EinsumCompiler",
-    "EinsumPlan",
+    "Plan",
     "EinsumScheduler",
 ]
