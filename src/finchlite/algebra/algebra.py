@@ -356,6 +356,8 @@ for op in (
     np.logical_and,
     np.logical_or,
     np.logical_xor,
+    operator.eq,
+    operator.ne
 ):
     register_property(op, "__call__", "is_commutative", lambda op: True)
 
@@ -366,6 +368,10 @@ for op in (
     operator.pow,
     operator.lshift,
     operator.rshift,
+    operator.ge,
+    operator.le,
+    operator.gt,
+    operator.lt
 ):
     register_property(op, "__call__", "is_commutative", lambda op: False)
 

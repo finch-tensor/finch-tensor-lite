@@ -1,6 +1,4 @@
-from multiprocessing import Value
 import operator
-from finchlite.algebra.operator import ifelse
 from finchlite.autoschedule.einsum import (
     EinsumPlan,
     EinsumLowerer, 
@@ -13,17 +11,15 @@ from finchlite.autoschedule.einsum import (
     PointwiseLiteral, 
     GetSparseCoordArray, 
     GetSparseValueArray,
-    PointwiseGetDimOfIndex
+    PointwiseGetDimOfIndex,
+    EinsumInterpreter
 )
-from finchlite.autoschedule.sparse_tensor import (
-    SparseTensorFType
-)
-from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.finch_logic import (
     Plan, 
     Table, 
     Literal
 )
+from finchlite.finch_logic.nodes import LogicNode
 from finchlite.symbolic.ftype import ftype
 from finchlite.symbolic import PostWalk, Rewrite
 from finchlite.algebra import overwrite, init_value
@@ -94,22 +90,19 @@ class InsumLowerer:
                     return GetSparseValueArray(PointwiseNamedField(sparse_param))
                 case PointwiseAccess(alias, idxs):
                     return PointwiseAccess(alias, rewrite_indicies(idxs))
-                case _:
-                    return pointwise_expr
 
         def sparse_is_zero(pointwise_expr: PointwiseNode) -> PointwiseNode:
             match pointwise_expr:
-                case PointwiseAccess(PointwiseNamedField(name), _):
-                    if name == sparse_param:
-                        return PointwiseLiteral(0)
-                    return pointwise_expr
-            return pointwise_expr
+                case PointwiseAccess(PointwiseNamedField(name), _) if name == sparse_param:
+                    return PointwiseLiteral(0)
+                case GetSparseValueArray(PointwiseNamedField(name)) if name == sparse_param:
+                    return PointwiseLiteral(0)
 
         new_pointwise_expr = Rewrite(PostWalk(rewrite_pointwise_expr))(einsum.pointwise_expr)
         sparse_is_zero_pointwise_expr = Rewrite(PostWalk(sparse_is_zero))(new_pointwise_expr)
 
         # initialize the initial reduction values in output tensor
-        op_init_value = init_value(einsum.reduceOp, einsum.output.element_type)
+        op_init_value = 0 if einsum.reduceOp == overwrite else init_value(einsum.reduceOp, float)
         einsums.append(Einsum(
             reduceOp=overwrite,
             output=einsum.output,
@@ -135,6 +128,8 @@ class InsumLowerer:
         return einsums
 
     def get_sparse_params(self, parameters: dict[str, Table]) -> set[str]:
+        from finchlite.autoschedule.sparse_tensor import SparseTensorFType
+
         sparse_params = set()
         
         for alias, value in parameters.items():
@@ -159,3 +154,22 @@ class InsumLowerer:
                 new_bodies.append(einsum)
 
         return EinsumPlan(tuple(new_bodies), einsum_plan.returnValues), parameters
+
+class InsumCompiler:
+    def __init__(self):
+        self.insum_lowerer = InsumLowerer()
+    
+    def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
+        return self.insum_lowerer(prgm)
+
+class InsumScheduler:
+    def __init__(self, ctx: InsumCompiler):
+        self.ctx = ctx
+        self.interpret = EinsumInterpreter()
+
+    def __call__(self, prgm: LogicNode) -> tuple[EinsumPlan, dict[str, Table]]:
+        if not isinstance(prgm, Plan):
+            raise TypeError(f"InsumScheduler expects a Plan, got {type(prgm)}")
+
+        einsum_plan, parameters = self.ctx(prgm)
+        return self.interpret(einsum_plan, parameters)

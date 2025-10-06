@@ -570,10 +570,26 @@ class EinsumPrinterContext:
             operator.truediv: "/",
             operator.mod: "%",
             operator.pow: "**",
+            operator.eq: "==",
+            operator.ne: "!=",
+            operator.lt: "<",
+            operator.le: "<=",
+            operator.gt: ">",
+            operator.ge: ">=",
+            operator.not_: "not",
+            operator.and_: "and",
+            operator.or_: "or",
+            operator.xor: "xor",
+            operator.floordiv: "//",
+            operator.mod: "%",
+            operator.pow: "**",
+            overwrite: "=",
         }
         return str_map[op]
 
     def print_pointwise_op(self, pointwise_op: PointwiseOp):
+        if pointwise_op.op == overwrite:
+            return self.print_pointwise(pointwise_op.args[1])
         opstr = f" {self.print_pointwise_op_callable(pointwise_op.op)} "
         if not is_commutative(pointwise_op.op):
             return f"({pointwise_op.args[0]}{opstr}{pointwise_op.args[1]})"
@@ -593,8 +609,10 @@ class EinsumPrinterContext:
                 return f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
             case GetSparseCoordArray(sparse_tensor, dimension):
                 return (
-                    f"{self.print_pointwise(sparse_tensor)}Coords\
-                    {self.print_pointwise(dimension)}"
+                    (
+                        f"{self.print_pointwise(sparse_tensor)}Coords"
+                        f"{self.print_pointwise(dimension)}"
+                    )
                     if dimension
                     else f"{self.print_pointwise(sparse_tensor)}Coords"
                 )
@@ -605,12 +623,16 @@ class EinsumPrinterContext:
             case PointwiseLiteral(val):
                 return str(val)
             case PointwiseIfElse(condition, then_expr, else_expr):
-                return f"ifelse({self.print_pointwise(condition)}, \
-                    {self.print_pointwise(then_expr)}, \
-                    {self.print_pointwise(else_expr)})"
+                return (
+                    f"ifelse({self.print_pointwise(condition)}, "
+                    f"{self.print_pointwise(then_expr)}, "
+                    f"{self.print_pointwise(else_expr)})"
+                )
             case PointwiseGetDimOfIndex(tensor, index):
-                return f"{self.print_pointwise(tensor)}DimOf\
-                    {self.print_pointwise(index)}"
+                return (
+                    f"{self.print_pointwise(tensor)}DimOf("
+                    f"{self.print_pointwise(index)})"
+                )
 
     def print_einsum(self, einsum: Einsum) -> str:
         return (

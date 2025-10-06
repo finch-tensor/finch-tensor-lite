@@ -17,6 +17,7 @@ from ..finch_logic import (
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler
 from .einsum import Einsum, EinsumCompiler, EinsumPlan, EinsumScheduler
+from .insum import InsumCompiler, InsumScheduler
 from .optimize import (
     DefaultLogicOptimizer,
     concordize,
@@ -43,6 +44,9 @@ from .optimize import (
 __all__ = [
     "Aggregate",
     "Alias",
+    "InsumCompiler",
+    "InsumPlan",
+    "InsumScheduler",
     "DefaultLogicOptimizer",
     "Einsum",
     "EinsumCompiler",
