@@ -218,6 +218,37 @@ class PointwiseIfElse(PointwiseNode, TermTree):
 
 
 @dataclass(eq=True, frozen=True)
+class PointwiseGetDimOfIndex(PointwiseNode, TermTree):
+    """
+    PointwiseGetDimOfIndex
+
+    Gets the dimension of an index
+
+    Attributes:
+        index: The iterative index of the axis to get the dimension of
+    """
+
+    tensor: PointwiseNode
+    index: PointwiseNode
+
+    @classmethod
+    def from_children(cls, *children: Term) -> Self:
+        if len(children) != 2:
+            raise ValueError(
+                f"PointwiseGetDimOfIndex expects 2 children\
+                    , got {len(children)}"
+            )
+        return cls(
+            cast(PointwiseNode, children[0]),
+            cast(PointwiseNode, children[1]),
+        )
+
+    @property
+    def children(self):
+        return [self.tensor, self.index]
+
+
+@dataclass(eq=True, frozen=True)
 class PointwiseLiteral(PointwiseNode):
     """
     PointwiseLiteral
@@ -577,6 +608,9 @@ class EinsumPrinterContext:
                 return f"ifelse({self.print_pointwise(condition)}, \
                     {self.print_pointwise(then_expr)}, \
                     {self.print_pointwise(else_expr)})"
+            case PointwiseGetDimOfIndex(tensor, index):
+                return f"{self.print_pointwise(tensor)}DimOf\
+                    {self.print_pointwise(index)}"
 
     def print_einsum(self, einsum: Einsum) -> str:
         return (
