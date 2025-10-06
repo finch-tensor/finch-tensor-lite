@@ -1,5 +1,65 @@
 import numpy as np
-import .nodes as ein
+import operator
+from . import nodes as ein
+
+pointwise_ops = {
+    operator.add: "add",
+    operator.mul: "mul",
+    operator.sub: "subtract",
+    operator.truediv: "divide",
+    operator.floordiv: "floor_divide",
+    operator.mod: "remainder",
+    operator.pow: "power",
+    operator.eq: "equal",
+    operator.ne: "not_equal",
+    operator.lt: "less",
+    operator.le: "less_equal",
+    operator.gt: "greater",
+    operator.ge: "greater_equal",
+    operator.and_: "bitwise_and",
+    operator.or_: "bitwise_or",
+    operator.xor: "bitwise_xor",
+    operator.lshift: "bitwise_left_shift",
+    operator.rshift: "bitwise_right_shift",
+    np.logical_and: "logical_and",
+    np.logical_or: "logical_or",
+    np.logical_not: "logical_not",
+    operator.pos: "positive",
+    operator.neg: "negative",
+    operator.invert: "bitwise_invert",
+    operator.abs: "absolute",
+    np.sqrt: "sqrt",
+    np.exp: "exp",
+    np.log: "log",
+    np.log1p: "log1p",
+    np.log10: "log10",
+    np.log2: "log2",
+    np.sin: "sin",
+    np.cos: "cos",
+    np.tan: "tan",
+    np.sinh: "sinh",
+    np.cosh: "cosh",
+    np.tanh: "tanh",
+    np.arcsin: "arcsin",
+    np.arccos: "arccos",
+    np.arctan: "arctan",
+    np.arcsinh: "arcsinh",
+    np.arccosh: "arccosh",
+    np.arctanh: "arctanh",
+    operator.min: "minimum",
+    operator.max: "maximum",
+}
+
+reduction_ops = {
+    operator.add: "sum",
+    operator.mul: "prod",
+    operator.and_: "all",
+    operator.or_: "any",
+    operator.min: "min",
+    operator.max: "max",
+    np.logical_and: "all",
+    np.logical_or: "any",
+}
 
 class EinsumInterpreter():
     def __init__(self, xp=None, bindings=None):
