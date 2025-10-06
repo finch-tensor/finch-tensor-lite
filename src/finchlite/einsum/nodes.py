@@ -49,7 +49,7 @@ class EinsumTree(EinsumNode, TermTree):
 
 class EinsumExpr(EinsumNode, ABC):
     @abstractmethod
-    def get_idxs(self) -> set[str]:
+    def get_idxs(self) -> set["Index"]:
         pass
 
 
@@ -68,7 +68,7 @@ class Literal(EinsumExpr):
     def __eq__(self, other):
         return isinstance(other, Literal) and self.val == other.val
 
-    def get_idxs(self) -> set[str]:
+    def get_idxs(self) -> set["Index"]:
         return set()
 
 @dataclass(eq=True, frozen=True)
@@ -82,8 +82,8 @@ class Index(EinsumExpr):
 
     name: str
 
-    def get_idxs(self) -> set[str]:
-        return {self.name}
+    def get_idxs(self) -> set["Index"]:
+        return {self}
 
 
 @dataclass(eq=True, frozen=True)
@@ -97,8 +97,8 @@ class Alias(EinsumExpr):
 
     name: str
 
-    def get_idxs(self) -> set[str]:
-        return {self.name}
+    def get_idxs(self) -> set["Index"]:
+        return {self}
 
 
 @dataclass(eq=True, frozen=True)
@@ -130,7 +130,7 @@ class Access(EinsumExpr, EinsumTree):
     def children(self):
         return [self.tns, *self.idxs]
 
-    def get_idxs(self) -> set[str]:
+    def get_idxs(self) -> set["Index"]:
         idxs = set()
         for idx in self.idxs:
             idxs.update(idx.get_idxs())
@@ -170,7 +170,7 @@ class Call(EinsumExpr, EinsumTree):
     def children(self):
         return [self.op, *self.args]
 
-    def get_idxs(self) -> set[str]:
+    def get_idxs(self) -> set["Index"]:
         idxs = set()
         for arg in self.args:
             idxs.update(arg.get_idxs())

@@ -196,10 +196,10 @@ class LazyTensor(OverrideTensor):
         return mod(other, self)
 
     def __pow__(self, other):
-        return pow(self, other)
+        return power(self, other)
 
     def __rpow__(self, other):
-        return pow(other, self)
+        return power(other, self)
 
     def __matmul__(self, other):
         return matmul(self, other)
@@ -922,8 +922,10 @@ def floordiv(x1, x2) -> LazyTensor:
 def mod(x1, x2) -> LazyTensor:
     return elementwise(operator.mod, defer(x1), defer(x2))
 
-
 def pow(x1, x2) -> LazyTensor:
+    return power(x1, x2)
+
+def power(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
 
 
@@ -1715,5 +1717,6 @@ def einsum(prgm, **kwargs):
     stmt = ein.parse_einsum(prgm)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
-    ctx = ein.EinsumInterpreter(xp, dict(kwargs))
+    ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
+    print(ctx.bindings)
     return ctx(prgm)

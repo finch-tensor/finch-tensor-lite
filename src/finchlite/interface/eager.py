@@ -92,10 +92,10 @@ class EagerTensor(OverrideTensor, ABC):
         return mod(other, self)
 
     def __pow__(self, other):
-        return pow(self, other)
+        return power(self, other)
 
     def __rpow__(self, other):
-        return pow(other, self)
+        return power(other, self)
 
     def __matmul__(self, other):
         return matmul(self, other)
@@ -413,11 +413,13 @@ def mod(x1, x2):
         return lazy.mod(x1, x2)
     return compute(lazy.mod(x1, x2))
 
-
 def pow(x1, x2):
+    return power(x1, x2)
+
+def power(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.pow(x1, x2)
-    return compute(lazy.pow(x1, x2))
+        return lazy.power(x1, x2)
+    return compute(lazy.power(x1, x2))
 
 
 def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):

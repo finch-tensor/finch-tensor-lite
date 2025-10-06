@@ -6,7 +6,7 @@ import numpy as np
 from lark import Lark, Tree
 
 from . import nodes as ein
-from ..algebra import overwrite
+from ..algebra import overwrite, promote_max, promote_min
 
 nary_ops = {
     "+": operator.add,
@@ -62,8 +62,8 @@ nary_ops = {
     "and": np.logical_and,
     "or": np.logical_or,
     "not": np.logical_not,
-    "min": builtins.min,
-    "max": builtins.max,
+    "min": promote_min,
+    "max": promote_max,
     "logaddexp": np.logaddexp,
 }
 
@@ -120,10 +120,10 @@ reduction_ops = {
     "all": np.logical_and,
     "or": np.logical_or,
     "any": np.logical_or,
-    "min": builtins.min,
-    "minimum": builtins.min,
-    "max": builtins.max,
-    "maximum": builtins.max,
+    "min": promote_min,
+    "minimum": promote_min,
+    "max": promote_max,
+    "maximum": promote_max,
     "&": operator.and_,
     "bitwise_and": operator.and_,
     "|": operator.or_,
@@ -250,7 +250,7 @@ def _parse_einsum_expr(t: Tree) -> ein.EinsumExpr:
                 left = _parse_einsum_expr(args[i])
                 right = _parse_einsum_expr(args[i + 2])
                 and_ = ein.Literal(nary_ops["and"])  # type: ignore[union-attr]
-                op = ein.Literal(args[i + 1].value)  # type: ignore[union-attr]
+                op = ein.Literal(nary_ops[args[i + 1].value])  # type: ignore[union-attr]
                 expr = ein.Call(
                     and_, (expr, ein.Call(op, (left, right)))
                 )  # type: ignore[union-attr]
@@ -287,13 +287,15 @@ def parse_einsum(expr: str) -> ein.EinsumNode:
         ):
             arg = _parse_einsum_expr(expr_node)  # type: ignore[arg-type]
             idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
+            op = ein.Literal(reduction_ops[op.value])  # type: ignore[union-attr]
             return ein.Einsum(
-                op.value, ein.Alias(tns.value), idxs_exprs, arg   # type: ignore[union-attr]
+                op, ein.Alias(tns.value), idxs_exprs, arg   # type: ignore[union-attr]
             )
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
             arg = _parse_einsum_expr(expr_node)  # type: ignore[arg-type]
-            return ein.Einsum(overwrite, ein.Alias(tns.value), tuple(ein.Index(idx.value) for idx in idxs), arg)  # type: ignore[union-attr]
+            op = ein.Literal(overwrite)  # type: ignore[union-attr]
+            return ein.Einsum(op, ein.Alias(tns.value), tuple(ein.Index(idx.value) for idx in idxs), arg)  # type: ignore[union-attr]
 
         case _:
             raise ValueError(
