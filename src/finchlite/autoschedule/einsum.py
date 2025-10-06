@@ -233,7 +233,6 @@ class PointwiseLiteral(PointwiseNode):
     def __eq__(self, other):
         return isinstance(other, PointwiseLiteral) and self.val == other.val
 
-
 # einsum and einsum ast not part of logic IR
 # transform to it's own language
 @dataclass(eq=True, frozen=True)

@@ -1,9 +1,12 @@
 from multiprocessing import Value
+import operator
+from finchlite.algebra.operator import ifelse
 from finchlite.autoschedule.einsum import (
     EinsumPlan,
     EinsumLowerer, 
     Einsum, 
-    PointwiseAccess, 
+    PointwiseAccess,
+    PointwiseIfElse, 
     PointwiseNamedField, 
     PointwiseOp, 
     PointwiseLiteral, 
@@ -21,7 +24,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic.ftype import ftype
 from finchlite.symbolic import PostWalk
-from finchlite.algebra import overwrite
+from finchlite.algebra import overwrite, init_value
 
 class InsumLowerer:
     def __init__(self):
@@ -46,20 +49,41 @@ class InsumLowerer:
 
     def optimize_sparse_einsum(self, einsum: Einsum, sparse_param: str, sparse_param_idxs: tuple[PointwiseNamedField, ...]) -> list[Einsum]:
         einsums = []
-        
+
         # initialize tensor T which is a boolean tensor of whether an element exists at a particular location of a sparse tensor
-        einsums.append(Einsum(  # initialize T[i, j, ...] = 0
+        # The shape of T is equal to the shape of the NON-REDUCED indicies of the sparse tensor
+        T_idxs = tuple(idx for idx in einsum.output_fields if idx in sparse_param_idxs)
+        einsums.append(Einsum( 
             reduceOp=overwrite,
             output=PointwiseNamedField(f"{sparse_param}T"),
-            output_fields= sparse_param_idxs,
+            output_fields= T_idxs,
             pointwise_expr = PointwiseLiteral(0)
         ))
-        einsums.append(Einsum(  # initialize T[SparseCoords[k]] = 1
-            reduceOp=overwrite,
+        einsums.append(Einsum( 
+            reduceOp=operator.add,
             output=PointwiseNamedField(f"{sparse_param}T"),
             output_fields= (GetSparseCoordArray(PointwiseNamedField(sparse_param), None),),
             pointwise_expr = PointwiseLiteral(1)
         ))
+
+        # The indicies in the sparse tensor that are reduced; essentially reduced_idxs = sparse_param_idxs - T_idxs
+        reduced_idxs = tuple(idx for idx in sparse_param_idxs if idx not in T_idxs)
+        reduced_prod = PointwiseOp(operator.mul, reduced_idxs) if len(reduced_idxs) > 0 else PointwiseLiteral(1)
+
+        # initialize the initial reduction values in output tensor
+        op_init_value = init_value(einsum.reduceOp, einsum.output.element_type)
+        einsums.append(Einsum(
+            reduceOp=overwrite,
+            output=einsum.output,
+            output_fields= einsum.output_fields,
+            pointwise_expr= PointwiseIfElse(
+                condition= PointwiseOp(operator.eq, (PointwiseAccess(PointwiseNamedField(f"{sparse_param}T"), T_idxs), reduced_prod)),
+                then_expr= PointwiseLiteral(op_init_value),
+                else_expr= PointwiseLiteral(einsum.reduceOp(op_init_value, 0)) # replace zero with custom fill value for non-standard "sparse" tensors
+            )
+        ))
+
+        
         
         return einsum
 
