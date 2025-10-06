@@ -216,6 +216,7 @@ class PointwiseIfElse(PointwiseNode, TermTree):
     def children(self):
         return [self.condition, self.then_expr, self.else_expr]
 
+
 @dataclass(eq=True, frozen=True)
 class PointwiseGetDimOfIndex(PointwiseNode, TermTree):
     """
@@ -233,15 +234,19 @@ class PointwiseGetDimOfIndex(PointwiseNode, TermTree):
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         if len(children) != 2:
-            raise ValueError(f"PointwiseGetDimOfIndex expects 2 children, got {len(children)}")
+            raise ValueError(
+                f"PointwiseGetDimOfIndex expects 2 children\
+                    , got {len(children)}"
+            )
         return cls(
             cast(PointwiseNode, children[0]),
             cast(PointwiseNode, children[1]),
         )
-    
+
     @property
     def children(self):
         return [self.tensor, self.index]
+
 
 @dataclass(eq=True, frozen=True)
 class PointwiseLiteral(PointwiseNode):
