@@ -1713,7 +1713,7 @@ def std(
     return pow(d, 0.5)
 
 
-def einsum(prgm, **kwargs):
+def einop(prgm, **kwargs):
     stmt = ein.parse_einsum(prgm)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]

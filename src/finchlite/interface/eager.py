@@ -889,7 +889,7 @@ def std(
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
 
 
-def einsum(prgm: str, /, **kwargs):
+def einop(prgm: str, /, **kwargs):
     """Execute an einsum expression using the specified array framework.
 
     This function parses and executes einsum-like expressions with extended syntax
@@ -922,12 +922,12 @@ def einsum(prgm: str, /, **kwargs):
         >>> A = np.random.rand(3, 4)
         >>> B = np.random.rand(4, 3)
         >>> # Matrix addition with transpose
-        >>> C = einsum(np, "C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
+        >>> C = einop(np, "C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
         >>> # Matrix multiplication
-        >>> D = einsum(np, "D[i,j] += A[i,k] * B[k,j]", A=A, B=B)
+        >>> D = einop(np, "D[i,j] += A[i,k] * B[k,j]", A=A, B=B)
         >>> # Min-Plus multiplication with shift
-        >>> E = einsum(np, "E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
+        >>> E = einop(np, "E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
     """
     if builtins.any(isinstance(v, lazy.LazyTensor) for v in kwargs.values()):
-        return lazy.einsum(prgm, **kwargs)
-    return compute(lazy.einsum(prgm, **kwargs))
+        return lazy.einop(prgm, **kwargs)
+    return compute(lazy.einop(prgm, **kwargs))
