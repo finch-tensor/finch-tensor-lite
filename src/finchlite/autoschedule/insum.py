@@ -5,13 +5,15 @@ from finchlite.autoschedule.einsum import (
     EinsumPlan,
     EinsumLowerer, 
     Einsum, 
+    PointwiseNode,
     PointwiseAccess,
     PointwiseIfElse, 
     PointwiseNamedField, 
     PointwiseOp, 
     PointwiseLiteral, 
     GetSparseCoordArray, 
-    GetSparseValueArray
+    GetSparseValueArray,
+    PointwiseGetDimOfIndex
 )
 from finchlite.autoschedule.sparse_tensor import (
     SparseTensorFType
@@ -23,23 +25,25 @@ from finchlite.finch_logic import (
     Literal
 )
 from finchlite.symbolic.ftype import ftype
-from finchlite.symbolic import PostWalk
+from finchlite.symbolic import PostWalk, Rewrite
 from finchlite.algebra import overwrite, init_value
 
 class InsumLowerer:
     def __init__(self):
         self.el = EinsumLowerer()
 
-    def can_optimize(self, einsum: Einsum, sparse_params: set[str]) -> tuple[bool, set[str]]:
+    def can_optimize(self, einsum: Einsum, sparse_params: set[str]) -> tuple[bool, dict[str, tuple[PointwiseNamedField, ...]]]:
         """Check if einsum accesses any sparse tensors."""
-        used_sparse_params = set()
+        used_sparse_params = dict()
         
         def check_for_sparse_access(node):
             nonlocal used_sparse_params
             match node:
-                case PointwiseAccess(PointwiseNamedField(name), _):
+                case PointwiseAccess(PointwiseNamedField(name), idxs):
                     if name in sparse_params:
-                        used_sparse_params.add(name)
+                        if name in used_sparse_params and used_sparse_params[name] != idxs:
+                            raise ValueError(f"Sparse parameter {name} has different indices in the einsum")
+                        used_sparse_params[name] = idxs
             return None
         
         # Walk the pointwise expression tree to check for sparse accesses
@@ -67,8 +71,42 @@ class InsumLowerer:
         ))
 
         # The indicies in the sparse tensor that are reduced; essentially reduced_idxs = sparse_param_idxs - T_idxs
-        reduced_idxs = tuple(idx for idx in sparse_param_idxs if idx not in T_idxs)
-        reduced_prod = PointwiseOp(operator.mul, reduced_idxs) if len(reduced_idxs) > 0 else PointwiseLiteral(1)
+        reduced_dims = tuple(PointwiseGetDimOfIndex(PointwiseNamedField(sparse_param), idx) for idx in sparse_param_idxs if idx not in T_idxs)
+        reduced_prod = PointwiseOp(operator.mul, reduced_dims) if len(reduced_dims) > 0 else PointwiseLiteral(1)
+
+        def rewrite_indicies(idxs: tuple[PointwiseNode, ...]) -> tuple[PointwiseNode, ...]:
+            if idxs == sparse_param_idxs:
+                return (GetSparseCoordArray(PointwiseNamedField(sparse_param), None),)
+            
+            new_idxs = []
+
+            for idx in idxs:
+                match idx:
+                    case PointwiseNamedField(_) if idx in sparse_param_idxs:
+                        new_idxs.append(GetSparseCoordArray(PointwiseNamedField(sparse_param), idx))
+                    case _:
+                        new_idxs.append(idx)
+            return tuple(new_idxs)
+
+        def rewrite_pointwise_expr(pointwise_expr: PointwiseNode) -> PointwiseNode:
+            match pointwise_expr:
+                case PointwiseAccess(PointwiseNamedField(name), idxs) if name == sparse_param and idxs == sparse_param_idxs:
+                    return GetSparseValueArray(PointwiseNamedField(sparse_param))
+                case PointwiseAccess(alias, idxs):
+                    return PointwiseAccess(alias, rewrite_indicies(idxs))
+                case _:
+                    return pointwise_expr
+
+        def sparse_is_zero(pointwise_expr: PointwiseNode) -> PointwiseNode:
+            match pointwise_expr:
+                case PointwiseAccess(PointwiseNamedField(name), _):
+                    if name == sparse_param:
+                        return PointwiseLiteral(0)
+                    return pointwise_expr
+            return pointwise_expr
+
+        new_pointwise_expr = Rewrite(PostWalk(rewrite_pointwise_expr))(einsum.pointwise_expr)
+        sparse_is_zero_pointwise_expr = Rewrite(PostWalk(sparse_is_zero))(new_pointwise_expr)
 
         # initialize the initial reduction values in output tensor
         op_init_value = init_value(einsum.reduceOp, einsum.output.element_type)
@@ -79,35 +117,44 @@ class InsumLowerer:
             pointwise_expr= PointwiseIfElse(
                 condition= PointwiseOp(operator.eq, (PointwiseAccess(PointwiseNamedField(f"{sparse_param}T"), T_idxs), reduced_prod)),
                 then_expr= PointwiseLiteral(op_init_value),
-                else_expr= PointwiseLiteral(einsum.reduceOp(op_init_value, 0)) # replace zero with custom fill value for non-standard "sparse" tensors
+                else_expr= PointwiseOp(einsum.reduceOp,(
+                    PointwiseLiteral(op_init_value),
+                    sparse_is_zero_pointwise_expr
+                ))
             )
         ))
 
+        # finally we do the naive einsum -> insum
+        einsums.append(Einsum(
+            reduceOp=einsum.reduceOp,
+            output=einsum.output,
+            output_fields= rewrite_indicies(einsum.output_fields),
+            pointwise_expr= new_pointwise_expr
+        ))
         
-        
-        return einsum
+        return einsums
 
     def get_sparse_params(self, parameters: dict[str, Table]) -> set[str]:
-        sparse_params = dict()
+        sparse_params = set()
         
         for alias, value in parameters.items():
             match value:
-                case Table(Literal(val), idxs):
+                case Table(Literal(val), _):
                     if isinstance(ftype(val), SparseTensorFType):
-                        sparse_params[alias] = idxs
+                        sparse_params.add(alias)
                 
         return sparse_params
 
     def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
         einsum_plan, parameters = self.el(prgm)
-        sparse_params_idxs = self.get_sparse_params(parameters)
-        sparse_params = set(sparse_params_idxs.keys())
+        sparse_params = self.get_sparse_params(parameters)
 
         new_bodies = []
         for einsum in einsum_plan.bodies:
             can_optimize, used_sparse_params = self.can_optimize(einsum, sparse_params)
             if can_optimize:
-                new_bodies.extend(self.optimize_sparse_einsum(einsum, used_sparse_params[0], tuple(PointwiseNamedField(idx.name) for idx in sparse_params_idxs[used_sparse_params[0]])))
+                sparse_param, sparse_param_idxs = next(iter(used_sparse_params.items()))
+                new_bodies.extend(self.optimize_sparse_einsum(einsum, sparse_param, sparse_param_idxs))
             else:
                 new_bodies.append(einsum)
 
