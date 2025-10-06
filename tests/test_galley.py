@@ -786,7 +786,8 @@ def test_large_disjoint_disjunction_dc_card(
     stat3 = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
     stat3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 1)
     stat3.dcs = set(dcs3)
-    reduce_stats = DCStats.mapjoin(op.mul, stat1, stat2, stat3)
+    reduce = DCStats.mapjoin(op.mul, stat1, stat2)
+    reduce_stats = DCStats.mapjoin(op.mul, reduce, stat3)
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
 
@@ -818,5 +819,6 @@ def test_mixture_disjoint_disjunction_dc_card(
     stat3 = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
     stat3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 0)
     stat3.dcs = set(dcs3)
-    reduce_stats = DCStats.mapjoin(op.mul, stat1, stat2, stat3)
+    reduce = DCStats.mapjoin(op.mul, stat1, stat2)
+    reduce_stats = DCStats.mapjoin(op.mul, reduce, stat3)
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
