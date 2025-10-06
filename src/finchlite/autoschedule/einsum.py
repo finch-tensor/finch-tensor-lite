@@ -2,8 +2,7 @@ import operator
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
-from optparse import Option
-from typing import Optional, Self, cast
+from typing import Self, cast
 
 import numpy as np
 
@@ -109,20 +108,23 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
     """
 
     sparse_tensor: PointwiseNode
-    dimension: Optional[PointwiseNamedField]
+    dimension: PointwiseNamedField | None
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         if len(children) != 1 and len(children) != 2:
-            raise ValueError(f"GetSparseCoordArray expects 1 or 2 children, got {len(children)}")
+            raise ValueError(f"GetSparseCoordArray expects 1 or 2 children, \
+                             got {len(children)}")
         return cls(
             cast(PointwiseNode, children[0]),
-            cast(Optional[PointwiseNamedField], children[1]) if len(children) == 2 else None
+            cast(PointwiseNamedField | None, children[1])
+            if len(children) == 2 else None
         )
 
     @property
     def children(self):
-        return [self.sparse_tensor, self.dimension] if self.dimension else [self.sparse_tensor]
+        return [self.sparse_tensor, self.dimension] \
+            if self.dimension else [self.sparse_tensor]
 
 
 @dataclass(eq=True, frozen=True)
@@ -528,7 +530,9 @@ class EinsumPrinterContext:
             case PointwiseAccess(alias, idxs):
                 return f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
             case GetSparseCoordArray(sparse_tensor):
-                return f"{self.print_pointwise(sparse_tensor)}Coords{self.print_pointwise(self.dimension)}" if self.dimension else f"{self.print_pointwise(sparse_tensor)}Coords"
+                return f"{self.print_pointwise(sparse_tensor)}Coords\
+                    {self.print_pointwise(self.dimension)}" if self.dimension\
+                    else f"{self.print_pointwise(sparse_tensor)}Coords"
             case GetSparseValueArray(sparse_tensor):
                 return f"{self.print_pointwise(sparse_tensor)}Values"
             case PointwiseOp(_, __):
