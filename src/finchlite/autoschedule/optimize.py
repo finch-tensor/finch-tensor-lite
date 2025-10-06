@@ -322,7 +322,7 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
     class Entry:
         node: Query
         node_pos: int
-        matched: Query[LogicNode, Reformat] | None = None
+        matched: Query | None = None
         matched_pos: int | None = None
 
     def rule_0(ex: LogicNode) -> LogicNode | None:
@@ -347,6 +347,7 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
                         if q.node.lhs not in PostOrderDFS(
                             Plan(tuple(new_bodies[q.node_pos + 1 :]))
                         ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
+                            assert isinstance(q.matched.rhs, Reformat)
                             new_bodies[q.node_pos] = Query(
                                 q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
                             )
