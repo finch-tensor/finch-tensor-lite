@@ -590,7 +590,6 @@ class EinsumCompiler:
 
         return einsum_plan, parameters
 
-
 class EinsumScheduler:
     def __init__(self, ctx: EinsumCompiler):
         self.ctx = ctx
