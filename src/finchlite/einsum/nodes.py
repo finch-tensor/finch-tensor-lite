@@ -316,7 +316,7 @@ class EinsumPrinterContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> LogicPrinterContext:
+    def block(self):
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
@@ -350,6 +350,7 @@ class EinsumPrinterContext(Context):
                     f"{', '.join(self(idx) for idx in idxs)}] "
                     f"{op}= {self(arg)}"
                 )
+                return None
             case Plan(bodies):
                 ctx_2 = self.block()
                 for body in bodies:

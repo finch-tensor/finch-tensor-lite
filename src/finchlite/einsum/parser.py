@@ -1,4 +1,5 @@
 import operator
+import builtins
 
 import numpy as np
 
@@ -60,8 +61,8 @@ nary_ops = {
     "and": np.logical_and,
     "or": np.logical_or,
     "not": np.logical_not,
-    "min": operator.min,
-    "max": operator.max,
+    "min": builtins.min,
+    "max": builtins.max,
     "logaddexp": np.logaddexp,
 }
 
@@ -118,10 +119,10 @@ reduction_ops = {
     "all": np.logical_and,
     "or": np.logical_or,
     "any": np.logical_or,
-    "min": operator.min,
-    "minimum": operator.min,
-    "max": operator.max,
-    "maximum": operator.max,
+    "min": builtins.min,
+    "minimum": builtins.min,
+    "max": builtins.max,
+    "maximum": builtins.max,
     "&": operator.and_,
     "bitwise_and": operator.and_,
     "|": operator.or_,
@@ -199,7 +200,7 @@ lark_parser = Lark("""
 """)
 
 
-def _parse_einsum_expr(t: Tree) -> EinsumExpr:
+def _parse_einsum_expr(t: Tree) -> ein.EinsumExpr:
     match t:
         case Tree(
             "start"
@@ -245,7 +246,9 @@ def _parse_einsum_expr(t: Tree) -> EinsumExpr:
             for i in range(2, len(args) - 2, 2):
                 left = _parse_einsum_expr(args[i])
                 right = _parse_einsum_expr(args[i + 2])
-                expr = ein.Call("and", [expr, Call(args[i + 1].value, [left, right])])  # type: ignore[union-attr]
+                expr = ein.Call(
+                    "and", [expr, ein.Call(args[i + 1].value, [left, right])]
+                )  # type: ignore[union-attr]
             return expr
         case Tree("power_expr", args) if len(args) > 1:
             left = _parse_einsum_expr(args[0])
@@ -269,7 +272,7 @@ def _parse_einsum_expr(t: Tree) -> EinsumExpr:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
-def parse_einsum(expr: str) -> Einsum:
+def parse_einsum(expr: str) -> ein.EinsumNode:
     tree = lark_parser.parse(expr)
     print(f"Parsed tree: {tree.pretty()}")
 

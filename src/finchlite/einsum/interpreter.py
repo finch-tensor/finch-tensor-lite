@@ -1,10 +1,11 @@
 import operator
+import builtins
 
 import numpy as np
 
 from . import nodes as ein
 
-pointwise_ops = {
+nary_ops = {
     operator.add: "add",
     operator.mul: "mul",
     operator.sub: "subtract",
@@ -26,6 +27,8 @@ pointwise_ops = {
     np.logical_and: "logical_and",
     np.logical_or: "logical_or",
     np.logical_not: "logical_not",
+}
+unary_ops = {
     operator.pos: "positive",
     operator.neg: "negative",
     operator.invert: "bitwise_invert",
@@ -48,8 +51,8 @@ pointwise_ops = {
     np.arcsinh: "arcsinh",
     np.arccosh: "arccosh",
     np.arctanh: "arctanh",
-    operator.min: "minimum",
-    operator.max: "maximum",
+    builtins.min: "minimum",
+    builtins.max: "maximum",
 }
 
 reduction_ops = {
@@ -57,8 +60,8 @@ reduction_ops = {
     operator.mul: "prod",
     operator.and_: "all",
     operator.or_: "any",
-    operator.min: "min",
-    operator.max: "max",
+    builtins.min: "min",
+    builtins.max: "max",
     np.logical_and: "all",
     np.logical_or: "any",
 }
@@ -77,6 +80,7 @@ class EinsumInterpreter:
             case ein.Plan(bodies):
                 for body in bodies:
                     prgm = body
+                return None
             case ein.Produces(args):
                 return tuple(self(arg) for arg in args)
             case ein.Einsum(op, tns, idxs, arg):
@@ -95,6 +99,7 @@ class EinsumInterpreter:
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
                 self.bindings[tns] = xp.transpose(val, axis)
+                return None
 
     def eval(self, ex, loops):
         xp = self.xp
