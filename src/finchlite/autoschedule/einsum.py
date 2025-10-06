@@ -186,17 +186,18 @@ class PointwiseOp(PointwiseNode, TermTree):
     def children(self):
         return [self.op, *self.args]
 
+
 @dataclass(eq=True, frozen=True)
 class PointwiseIfElse(PointwiseNode, TermTree):
     """
     PointwiseIfElse
-    
+
     Attributes:
         condition: The condition to check.
         then_expr: The expression to evaluate if the condition is not zero.
         else_expr: The expression to evaluate if the condition is zero.
     """
-    
+
     condition: PointwiseNode
     then_expr: PointwiseNode
     else_expr: PointwiseNode
