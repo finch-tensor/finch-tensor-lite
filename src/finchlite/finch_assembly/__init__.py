@@ -1,7 +1,9 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
+from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
+    Assert,
     Assign,
     Block,
     Break,
@@ -16,6 +18,7 @@ from .nodes import (
     Literal,
     Load,
     Module,
+    Print,
     Repack,
     Resize,
     Return,
@@ -27,18 +30,19 @@ from .nodes import (
     Unpack,
     Variable,
     WhileLoop,
-    number_assembly_ast,
 )
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
-from .type_checker import AssemblyTypeChecker, AssemblyTypeError
+from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 
 __all__ = [
+    "AssemblyCFGBuilder",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
     "AssemblyStructFType",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
+    "Assert",
     "Assign",
     "Block",
     "Break",
@@ -56,6 +60,7 @@ __all__ = [
     "Load",
     "Module",
     "NamedTupleFType",
+    "Print",
     "Repack",
     "Resize",
     "Return",
@@ -68,7 +73,9 @@ __all__ = [
     "Unpack",
     "Variable",
     "WhileLoop",
+    "assembly_build_cfg",
+    "assembly_check_types",
+    "assembly_number_uses",
     "element_type",
     "length_type",
-    "number_assembly_ast",
 ]

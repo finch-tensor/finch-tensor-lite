@@ -25,6 +25,10 @@ class LoopState:
         pass
 
 
+def assembly_check_types(prgm: asm.AssemblyNode):
+    AssemblyTypeChecker()(prgm)
+
+
 class AssemblyTypeChecker:
     """
     A type checker for FinchAssembly
@@ -239,6 +243,10 @@ class AssemblyTypeChecker:
                 return_type = self.check_expr(arg)
                 self.check_return_type(return_type)
                 return return_type
+            case asm.Assert(arg):
+                t = self.check_expr(arg)
+                check_type_match(np.bool_, t)
+                return None
             case asm.Break():
                 if self.loop_state is None:
                     raise AssemblyTypeError("Cannot break outside of loop.")
