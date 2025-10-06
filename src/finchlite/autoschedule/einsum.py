@@ -2,7 +2,8 @@ import operator
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Self, cast
+from optparse import Option
+from typing import Optional, Self, cast
 
 import numpy as np
 
@@ -104,20 +105,24 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
     Gets the coordinate array of a sparse tensor stored in COO form
 
     Attributes:
-        sparse_tensro: The sparse tensor to access
+        sparse_tensor: The sparse tensor to access
     """
 
     sparse_tensor: PointwiseNode
+    dimension: Optional[PointwiseNamedField]
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
-        if len(children) != 1:
-            raise ValueError(f"GetSparseCoordArray expects 1 child got {len(children)}")
-        return cls(cast(PointwiseNode, children[0]))
+        if len(children) != 1 and len(children) != 2:
+            raise ValueError(f"GetSparseCoordArray expects 1 or 2 children, got {len(children)}")
+        return cls(
+            cast(PointwiseNode, children[0]),
+            cast(Optional[PointwiseNamedField], children[1]) if len(children) == 2 else None
+        )
 
     @property
     def children(self):
-        return [self.sparse_tensor]
+        return [self.sparse_tensor, self.dimension] if self.dimension else [self.sparse_tensor]
 
 
 @dataclass(eq=True, frozen=True)
@@ -523,7 +528,7 @@ class EinsumPrinterContext:
             case PointwiseAccess(alias, idxs):
                 return f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
             case GetSparseCoordArray(sparse_tensor):
-                return f"{self.print_pointwise(sparse_tensor)}Coords"
+                return f"{self.print_pointwise(sparse_tensor)}Coords{self.print_pointwise(self.dimension)}" if self.dimension else f"{self.print_pointwise(sparse_tensor)}Coords"
             case GetSparseValueArray(sparse_tensor):
                 return f"{self.print_pointwise(sparse_tensor)}Values"
             case PointwiseOp(_, __):
