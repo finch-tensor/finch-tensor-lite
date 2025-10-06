@@ -2,7 +2,7 @@ import operator
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Self, cast
+from typing import Any, Self, cast
 
 from finchlite.algebra import (
     overwrite,
@@ -53,6 +53,24 @@ class EinsumExpr(EinsumNode, ABC):
     def get_idxs(self) -> set[str]:
         pass
 
+
+
+@dataclass(eq=True, frozen=True)
+class Literal(EinsumExpr):
+    """
+    Literal
+    """
+
+    val: Any
+
+    def __hash__(self):
+        return hash(self.val)
+
+    def __eq__(self, other):
+        return isinstance(other, Literal) and self.val == other.val
+
+    def get_idxs(self) -> set[str]:
+        return set()
 
 @dataclass(eq=True, frozen=True)
 class Index(EinsumExpr):
@@ -135,7 +153,7 @@ class Call(EinsumExpr, EinsumTree):
         args: The arguments to the operation.
     """
 
-    op: Callable  # the function to apply e.g., operator.add
+    op: Literal  # the function to apply e.g., operator.add
     args: tuple[EinsumExpr, ...]  # Subtrees
     # input_fields: tuple[tuple[Field, ...], ...]
     # Children: The args
@@ -158,26 +176,6 @@ class Call(EinsumExpr, EinsumTree):
         for arg in self.args:
             idxs.update(arg.get_idxs())
         return idxs
-
-
-@dataclass(eq=True, frozen=True)
-class Literal(EinsumExpr):
-    """
-    Literal
-
-    A scalar literal/value for pointwise operations.
-    """
-
-    val: float
-
-    def __hash__(self):
-        return hash(self.val)
-
-    def __eq__(self, other):
-        return isinstance(other, Literal) and self.val == other.val
-
-    def get_idxs(self) -> set[str]:
-        return set()
 
 
 @dataclass(eq=True, frozen=True)

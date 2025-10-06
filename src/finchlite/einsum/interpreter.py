@@ -73,19 +73,22 @@ class EinsumInterpreter:
             bindings = {}
         if xp is None:
             xp = np
+        self.bindings = bindings
+        self.xp = xp
 
     def __call__(self, prgm):
         xp = self.xp
         match prgm:
             case ein.Plan(bodies):
+                res = None
                 for body in bodies:
-                    prgm = body
-                return None
+                    res = self(body)
+                return res
             case ein.Produces(args):
                 return tuple(self(arg) for arg in args)
             case ein.Einsum(op, tns, idxs, arg):
                 # This is the main entry point for einsum execution
-                loops = arg.get_loops()
+                loops = arg.get_idxs()
                 assert set(idxs).issubset(loops)
                 loops = sorted(loops)
                 arg = self.eval(arg, loops)
@@ -99,7 +102,7 @@ class EinsumInterpreter:
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
                 self.bindings[tns] = xp.transpose(val, axis)
-                return None
+                return (tns,)
 
     def eval(self, ex, loops):
         xp = self.xp
