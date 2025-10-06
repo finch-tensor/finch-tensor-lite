@@ -4,28 +4,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self, cast
 
-import numpy as np
-
-import finchlite.finch_logic as lgc
 from finchlite.algebra import (
-    init_value,
-    is_commutative,
     overwrite,
     promote_max,
     promote_min,
 )
-from finchlite.finch_logic import LogicNode
-from finchlite.symbolic import Term, TermTree
+from finchlite.symbolic import Context, Term, TermTree
+from finchlite.util.print import qual_str
 
 
-@dataclass(eq=True, frozen=True)
-class EinsumExpr(Term, ABC):
-    """
-    EinsumExpr
-
-    Represents a pointwise expression in the Einsum IR
-    """
-
+class EinsumNode(Term):
     @classmethod
     def head(cls):
         """Returns the head of the node."""
@@ -40,9 +28,26 @@ class EinsumExpr(Term, ABC):
         return cls(*children)
 
     def __str__(self):
+        """Returns a string representation of the node."""
         ctx = EinsumPrinterContext()
-        return ctx.print_pointwise(self)
+        res = ctx(self)
+        return res if res is not None else ctx.emit()
 
+
+class EinsumTree(EinsumNode, TermTree):
+    """
+    EinsumExpr
+
+    Represents a pointwise expression in the Einsum IR
+    """
+
+    @property
+    @abstractmethod
+    def children(self) -> list[EinsumNode]:  # type: ignore[override]
+        ...
+
+
+class EinsumExpr(EinsumNode, ABC):
     @property
     @abstractmethod
     def get_idxs(self) -> set[str]:
@@ -80,7 +85,7 @@ class Alias(EinsumExpr):
 
 
 @dataclass(eq=True, frozen=True)
-class Access(EinsumExpr, TermTree):
+class Access(EinsumExpr, EinsumTree):
     """
     Access
 
@@ -116,7 +121,7 @@ class Access(EinsumExpr, TermTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(EinsumExpr, TermTree):
+class Call(EinsumExpr, EinsumTree):
     """
     Call
 
@@ -176,7 +181,7 @@ class Literal(EinsumExpr):
 
 
 @dataclass(eq=True, frozen=True)
-class Einsum(EinsumExpr, TermTree):
+class Einsum(EinsumTree):
     """
     Einsum
 
@@ -214,25 +219,9 @@ class Einsum(EinsumExpr, TermTree):
     def children(self):
         return [self.op, self.output, self.idxs, self.arg]
 
-    def rename(self, new_alias: str):
-        return Einsum(
-            self.op,
-            Alias(new_alias),
-            self.idxs,
-            self.arg,
-        )
-
-    def reorder(self, idxs: tuple[lgc.Field, ...]):
-        return Einsum(
-            self.op,
-            self.output,
-            tuple(Index(idx.name) for idx in idxs),
-            self.arg,
-        )
-
 
 @dataclass(eq=True, frozen=True)
-class Plan(EinsumExpr):
+class Plan(EinsumTree):
     """
     Plan
 
@@ -264,299 +253,114 @@ class Plan(EinsumExpr):
         return ctx(self)
 
 
-class LogicLowerer:
-    alias_counter: int = 0
+@dataclass(eq=True, frozen=True)
+class Produces(EinsumTree):
+    """
+    Represents a logical AST statement that returns `args...` from the current plan.
+    Halts execution of the program.
 
-    def __call__(self, prgm: lgc.Plan) -> tuple[Plan, dict[str, lgc.Table]]:
-        parameters: dict[str, lgc.Table] = {}
-        definitions: dict[str, Einsum] = {}
-        return self.compile_plan(prgm, parameters, definitions), parameters
+    Attributes:
+        args: The arguments to return.
+    """
 
-    def get_next_alias(self) -> str:
-        self.alias_counter += 1
-        return f"einsum_{self.alias_counter}"
+    args: tuple[EinsumNode, ...]
 
-    def rename_einsum(
-        self, einsum: Einsum, new_alias: str, definitions: dict[str, Einsum]
-    ) -> Einsum:
-        definitions[new_alias] = einsum
-        return einsum.rename(new_alias)
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
 
-    def compile_plan(
-        self,
-        plan: lgc.Plan,
-        parameters: dict[str, lgc.Table],
-        definitions: dict[str, Einsum],
-    ) -> Plan:
-        einsums: list[Einsum] = []
-        returnValue: list[EinsumExpr] = []
-
-        for body in plan.bodies:
-            match body:
-                case lgc.Plan(_):
-                    inner_plan = self.compile_plan(body, parameters, definitions)
-                    einsums.extend(inner_plan.bodies)
-                    break
-                case lgc.Query(lgc.Alias(name), lgc.Table(_, _)):
-                    parameters[name] = body.rhs
-                case lgc.Query(lgc.Alias(name), rhs):
-                    einsums.append(
-                        self.rename_einsum(
-                            self.lower_to_einsum(rhs, einsums, parameters, definitions),
-                            name,
-                            definitions,
-                        )
-                    )
-                case lgc.Produces(args):
-                    returnValue = [
-                        Alias(arg.name)
-                        if isinstance(arg, lgc.Alias)
-                        else self.lower_to_einsum(arg, einsums, parameters, definitions)
-                        for arg in args
-                    ]
-                    break
-                case _:
-                    einsums.append(
-                        self.rename_einsum(
-                            self.lower_to_einsum(
-                                body, einsums, parameters, definitions
-                            ),
-                            self.get_next_alias(),
-                            definitions,
-                        )
-                    )
-
-        return Plan(tuple(einsums), tuple(returnValue))
-
-    def lower_to_einsum(
-        self,
-        ex: LogicNode,
-        einsums: list[Einsum],
-        parameters: dict[str, lgc.Table],
-        definitions: dict[str, Einsum],
-    ) -> Einsum:
-        match ex:
-            case lgc.Plan(_):
-                raise Exception("Plans within plans are not supported.")
-            case lgc.MapJoin(lgc.Literal(operation), args):
-                args_list = [
-                    self.lower_to_pointwise(arg, einsums, parameters, definitions)
-                    for arg in args
-                ]
-                arg = self.lower_to_pointwise_op(operation, tuple(args_list))
-                return Einsum(
-                    op=overwrite,
-                    output=Alias(self.get_next_alias()),
-                    idxs=tuple(Index(field.name) for field in ex.fields),
-                    arg=arg,
-                )
-            case lgc.Reorder(arg, idxs):
-                return self.lower_to_einsum(
-                    arg, einsums, parameters, definitions
-                ).reorder(idxs)
-            case lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, idxs):
-                if init != init_value(operation, type(init)):
-                    raise Exception(f"""
-                    Init value {init} is not the default value
-                    for operation {operation} of type {type(init)}.
-                    Non standard init values are not supported.
-                    """)
-                aggregate_expr = self.lower_to_pointwise(
-                    arg, einsums, parameters, definitions
-                )
-                return Einsum(
-                    operation,
-                    Alias(self.get_next_alias()),
-                    tuple(Index(field.name) for field in ex.fields),
-                    aggregate_expr,
-                )
-            case _:
-                raise Exception(f"Unrecognized logic: {ex}")
-
-    def lower_to_pointwise_op(
-        self, operation: Callable, args: tuple[EinsumExpr, ...]
-    ) -> Call:
-        # if operation is commutative, we simply pass
-        # all the args to the pointwise op since
-        # order of args does not matter
-        if is_commutative(operation):
-
-            def flatten_args(
-                m_args: tuple[EinsumExpr, ...],
-            ) -> tuple[EinsumExpr, ...]:
-                ret_args: list[EinsumExpr] = []
-                for arg in m_args:
-                    match arg:
-                        case Call(op2, _) if op2 == operation:
-                            ret_args.extend(flatten_args(arg.args))
-                        case _:
-                            ret_args.append(arg)
-                return tuple(ret_args)
-
-            return Call(operation, flatten_args(args))
-
-        # combine args from left to right (i.e a / b / c -> (a / b) / c)
-        assert len(args) > 1
-        result = Call(operation, (args[0], args[1]))
-        for arg in args[2:]:
-            result = Call(operation, (result, arg))
-        return result
-
-    # lowers nested mapjoin logic IR nodes into a single pointwise expression
-    def lower_to_pointwise(
-        self,
-        ex: lgc.LogicNode,
-        einsums: list[Einsum],
-        parameters: dict[str, lgc.Table],
-        definitions: dict[str, Einsum],
-    ) -> EinsumExpr:
-        match ex:
-            case lgc.Reorder(arg, idxs):
-                return self.lower_to_pointwise(arg, einsums, parameters, definitions)
-            case lgc.MapJoin(lgc.Literal(operation), args):
-                args_list = [
-                    self.lower_to_pointwise(arg, einsums, parameters, definitions)
-                    for arg in args
-                ]
-                return self.lower_to_pointwise_op(operation, tuple(args_list))
-            case lgc.Relabel(
-                lgc.Alias(name), idxs
-            ):  # relable is really just a glorified pointwise access
-                return Access(
-                    tns=Alias(name),
-                    idxs=tuple(Index(idx.name) for idx in idxs),
-                )
-            case lgc.Literal(value):
-                return Literal(val=value)
-            case lgc.Aggregate(
-                _, _, _, _
-            ):  # aggregate has to be computed seperatley as it's own einsum
-                aggregate_einsum_alias = self.get_next_alias()
-                einsums.append(
-                    self.rename_einsum(
-                        self.lower_to_einsum(ex, einsums, parameters, definitions),
-                        aggregate_einsum_alias,
-                        definitions,
-                    )
-                )
-                return Access(
-                    tns=Alias(aggregate_einsum_alias),
-                    idxs=tuple(Index(field.name) for field in ex.fields),
-                )
-            case _:
-                raise Exception(f"Unrecognized logic: {ex}")
+    @classmethod
+    def from_children(cls, *args):
+        return cls(args)
 
 
-class EinsumPrinterContext:
-    def print_reducer(self, reducer: Callable):
-        str_map = {
-            overwrite: "=",
-            operator.add: "+=",
-            operator.sub: "-=",
-            operator.mul: "*=",
-            operator.truediv: "/=",
-            operator.mod: "%=",
-            operator.pow: "**=",
-            operator.and_: "&=",
-            operator.or_: "|=",
-            operator.xor: "^=",
-            operator.floordiv: "//=",
-            operator.mod: "%=",
-            operator.pow: "**=",
-            promote_max: "max=",
-            promote_min: "min=",
-        }
-        return str_map[reducer]
+infix_strs = {
+    overwrite: "",
+    operator.add: "+",
+    operator.sub: "-",
+    operator.mul: "*",
+    operator.truediv: "/",
+    operator.mod: "%",
+    operator.pow: "**",
+    operator.and_: "&",
+    operator.or_: "|",
+    operator.xor: "^",
+    operator.floordiv: "//",
+    operator.mod: "%",
+    operator.pow: "**",
+    promote_max: "max",
+    promote_min: "min",
+}
 
-    def print_pointwise_op_callable(self, op: Callable):
-        str_map = {
-            operator.add: "+",
-            operator.sub: "-",
-            operator.mul: "*",
-            operator.truediv: "/",
-            operator.mod: "%",
-            operator.pow: "**",
-        }
-        return str_map[op]
 
-    def print_pointwise_op(self, pointwise_op: Call):
-        opstr = f" {self.print_pointwise_op_callable(pointwise_op.op)} "
-        if not is_commutative(pointwise_op.op):
-            return f"({pointwise_op.args[0]}{opstr}{pointwise_op.args[1]})"
+unary_strs = {
+    operator.add: "+",
+    operator.pos: "+",
+    operator.sub: "-",
+    operator.neg: "-",
+    operator.invert: "~",
+}
 
-        return f"({opstr.join(self.print_pointwise(arg) for arg in pointwise_op.args)})"
 
-    def print_indicies(self, idxs: tuple[EinsumExpr, ...]):
-        return ", ".join([self.print_pointwise(idx) for idx in idxs])
+class EinsumPrinterContext(Context):
+    def __init__(self, tab="    ", indent=0):
+        super().__init__()
+        self.tab = tab
+        self.indent = indent
 
-    def print_pointwise(self, arg: EinsumExpr):
-        match arg:
-            case Einsum(_, _, _, _):
-                return self.print_einsum(arg)
+    @property
+    def feed(self) -> str:
+        return self.tab * self.indent
+
+    def emit(self):
+        return "\n".join([*self.preamble, *self.epilogue])
+
+    def block(self) -> LogicPrinterContext:
+        blk = super().block()
+        blk.indent = self.indent
+        blk.tab = self.tab
+        return blk
+
+    def subblock(self):
+        blk = self.block()
+        blk.indent = self.indent + 1
+        return blk
+
+    def __call__(self, prgm: EinsumNode):
+        feed = self.feed
+        match prgm:
+            case Literal(value):
+                return qual_str(value).replace("\n", "")
             case Alias(name):
-                return name
-            case Index(name):
-                return name
+                return str(name)
             case Access(tns, idxs):
-                return f"{self.print_pointwise(tns)}[{self.print_indicies(idxs)}]"
-            case Call(_, __):
-                return self.print_pointwise_op(arg)
-            case Literal(val):
-                return str(val)
-
-    def print_einsum(self, einsum: Einsum) -> str:
-        return (
-            f"{self.print_pointwise(einsum.output)}["
-            f"{self.print_indicies(einsum.idxs)}] "
-            f"{self.print_reducer(einsum.op)} "
-            f"{self.print_pointwise(einsum.arg)}"
-        )
-
-    def print_einsum_plan(self, einsum_plan: Plan) -> str:
-        statements = "\n".join(
-            [self.print_einsum(statement) for statement in einsum_plan.bodies]
-        )
-        return_values = ", ".join(
-            [
-                self.print_pointwise(return_value)
-                for return_value in einsum_plan.returnValues
-            ]
-        )
-        return f"{statements}\nreturn {return_values}"
-
-    def __call__(self, prgm: Plan) -> str:
-        return self.print_einsum_plan(prgm)
-
-
-class EinsumInterpreter:
-    def __call__(self, einsum_plan: Plan, parameters: dict[str, lgc.Table]):
-        return self.print(einsum_plan, parameters)
-
-    def print(self, einsum_plan: Plan, parameters: dict[str, lgc.Table]):
-        for str, table in parameters.items():
-            print(f"Parameter: {str} = {table}")
-
-        print(einsum_plan)
-        return (np.arange(6, dtype=np.float32).reshape(2, 3),)
-
-
-class EinsumCompiler:
-    def __init__(self):
-        self.el = LogicLowerer()
-
-    def __call__(self, prgm: lgc.Plan):
-        einsum_plan, parameters = self.el(prgm)
-
-        return einsum_plan, parameters
-
-
-class EinsumScheduler:
-    def __init__(self, ctx: EinsumCompiler):
-        self.ctx = ctx
-        self.interpret = EinsumInterpreter()
-
-    def __call__(self, prgm: LogicNode):
-        if not isinstance(prgm, lgc.Plan):
-            raise TypeError(f"EinsumScheduler expects a Plan, got {type(prgm)}")
-        einsum_plan, parameters = self.ctx(prgm)
-        return self.interpret(einsum_plan, parameters)
+                return f"{self(tns)}[{', '.join(self(idx) for idx in idxs)}]"
+            case Call(fn, args):
+                args_e = tuple(self(arg) for arg in args)
+                if len(args) == 2 and fn in infix_strs:
+                    return f"({args_e[0]} {infix_strs[fn]} {args_e[1]})"
+                if len(args) == 1 and fn in unary_strs:
+                    return f"{unary_strs[fn]}{args_e[0]}"
+                return f"{self(fn)}({', '.join(args_e)})"
+            case Einsum(op, tns, idxs, arg):
+                op = infix_strs.get(op, op.__name__)
+                self.exec(
+                    f"{self.feed}{self(tns)}["
+                    f"{', '.join(self(idx) for idx in idxs)}] "
+                    f"{op}= {self(arg)}"
+                )
+            case Plan(bodies):
+                ctx_2 = self.block()
+                for body in bodies:
+                    ctx_2(body)
+                self.exec(ctx_2.emit())
+                return None
+            case Produces(args):
+                args = tuple(self(arg) for arg in args)
+                self.exec(f"{feed}return {args}\n")
+                return None
+            case str(label):
+                return label
+            case _:
+                raise ValueError(f"Unknown expression type: {type(prgm)}")

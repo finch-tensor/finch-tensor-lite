@@ -7,7 +7,7 @@ class EinsumInterpreter():
             bindings = {}
         if xp is None:
             xp = np
-    
+
     def __call__(self, prgm):
         xp = self.xp
         match prgm:

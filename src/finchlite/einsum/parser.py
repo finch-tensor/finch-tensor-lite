@@ -1,7 +1,6 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-
 from lark import Lark, Tree
+
+from . import nodes as ein
 
 nary_ops = {
     "+": "add",
@@ -268,7 +267,9 @@ def parse_einsum(expr: str) -> Einsum:
             "start", [Tree("increment", [Tree("access", [tns, *idxs]), op, expr_node])]
         ):
             input_expr = _parse_einsum_expr(expr_node)  # type: ignore[arg-type]
-            return ein.Einsum(input_expr, op.value, tns.value, [idx.value for idx in idxs])  # type: ignore[union-attr]
+            return ein.Einsum(
+                input_expr, op.value, tns.value, [idx.value for idx in idxs]
+            )  # type: ignore[union-attr]
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
             input_expr = _parse_einsum_expr(expr_node)  # type: ignore[arg-type]
