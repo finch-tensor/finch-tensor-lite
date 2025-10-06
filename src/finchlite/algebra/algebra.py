@@ -593,6 +593,7 @@ register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
 
 for unary in (
+    np.reciprocal,
     np.sin,
     np.cos,
     np.tan,
@@ -605,10 +606,20 @@ for unary in (
     np.acos,
     np.acosh,
     np.atanh,
+    np.round,
+    np.floor,
+    np.ceil,
+    np.trunc,
+    np.exp,
+    np.expm1,
     np.log,
     np.log1p,
     np.log2,
     np.log10,
+    np.signbit,
+    np.sqrt,
+    np.square,
+    np.sign,
 ):
 
     def unary_type(op, a):
