@@ -91,11 +91,17 @@ unary_ops = {
     "cosh": np.cosh,
     "tanh": np.tanh,
     "asin": np.arcsin,
+    "arcsin": np.arcsin,
     "acos": np.arccos,
+    "arccos": np.arccos,
     "atan": np.arctan,
+    "arctan": np.arctan,
     "asinh": np.arcsinh,
+    "arcsinh": np.arcsinh,
     "acosh": np.arccosh,
+    "arccosh": np.arccosh,
     "atanh": np.arctanh,
+    "arctanh": np.arctanh,
 }
 
 
