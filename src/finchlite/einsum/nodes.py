@@ -1,5 +1,5 @@
 import operator
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self, cast
@@ -43,6 +43,11 @@ class EinsumExpr(Term, ABC):
         ctx = EinsumPrinterContext()
         return ctx.print_pointwise(self)
 
+    @property
+    @abstractmethod
+    def get_idxs(self) -> set[str]:
+        pass
+
 
 @dataclass(eq=True, frozen=True)
 class Index(EinsumExpr):
@@ -55,6 +60,9 @@ class Index(EinsumExpr):
 
     name: str
 
+    def get_idxs(self) -> set[str]:
+        return {self.name}
+
 
 @dataclass(eq=True, frozen=True)
 class Alias(EinsumExpr):
@@ -66,6 +74,9 @@ class Alias(EinsumExpr):
     """
 
     name: str
+
+    def get_idxs(self) -> set[str]:
+        return {self.name}
 
 
 @dataclass(eq=True, frozen=True)
@@ -96,6 +107,12 @@ class Access(EinsumExpr, TermTree):
     @property
     def children(self):
         return [self.tns, *self.idxs]
+
+    def get_idxs(self) -> set[str]:
+        idxs = set()
+        for idx in self.idxs:
+            idxs.update(idx.get_idxs())
+        return idxs
 
 
 @dataclass(eq=True, frozen=True)
@@ -131,6 +148,12 @@ class Call(EinsumExpr, TermTree):
     def children(self):
         return [self.op, *self.args]
 
+    def get_idxs(self) -> set[str]:
+        idxs = set()
+        for arg in self.args:
+            idxs.update(arg.get_idxs())
+        return idxs
+
 
 @dataclass(eq=True, frozen=True)
 class Literal(EinsumExpr):
@@ -147,6 +170,9 @@ class Literal(EinsumExpr):
 
     def __eq__(self, other):
         return isinstance(other, Literal) and self.val == other.val
+
+    def get_idxs(self) -> set[str]:
+        return set()
 
 
 @dataclass(eq=True, frozen=True)
@@ -169,8 +195,7 @@ class Einsum(EinsumExpr, TermTree):
 
     # technically a reduce operation, much akin to the one in aggregate
     op: Callable
-
-    output: EinsumExpr
+    tns: Alias
     idxs: tuple[EinsumExpr, ...]
     arg: EinsumExpr
 

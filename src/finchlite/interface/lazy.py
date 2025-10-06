@@ -10,6 +10,8 @@ from typing import Any
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
+import einsum as ein
+
 from ..algebra import (
     Tensor,
     TensorFType,
@@ -1707,3 +1709,11 @@ def std(
     x = defer(x)
     d = var(x, axis=axis, correction=correction, keepdims=keepdims)
     return pow(d, 0.5)
+
+
+def einsum(prgm, **kwargs):
+    stmt = ein.parse_einsum(prgm)
+    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    xp = sys.modules[__name__]
+    ctx = ein.EinsumInterpreter(xp, dict(kwargs))
+    return ctx(prgm)
