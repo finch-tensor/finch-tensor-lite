@@ -2,7 +2,7 @@ import operator
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Self, cast
+from typing import Optional, Self, cast
 
 import numpy as np
 
@@ -108,7 +108,7 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
     """
 
     sparse_tensor: PointwiseNode
-    dimension: PointwiseNamedField | None
+    dimension: Optional[PointwiseNamedField]
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -119,18 +119,14 @@ class GetSparseCoordArray(PointwiseNode, TermTree):
             )
         return cls(
             cast(PointwiseNode, children[0]),
-            cast(PointwiseNamedField | None, children[1])
+            cast(Optional[PointwiseNamedField], children[1])
             if len(children) == 2
             else None,
         )
 
     @property
     def children(self):
-        return (
-            [self.sparse_tensor, self.dimension]
-            if self.dimension
-            else [self.sparse_tensor]
-        )
+        return [self.sparse_tensor, self.dimension]
 
 
 @dataclass(eq=True, frozen=True)
@@ -535,11 +531,11 @@ class EinsumPrinterContext:
                 return name
             case PointwiseAccess(alias, idxs):
                 return f"{self.print_pointwise(alias)}[{self.print_indicies(idxs)}]"
-            case GetSparseCoordArray(sparse_tensor):
+            case GetSparseCoordArray(sparse_tensor, dimension):
                 return (
                     f"{self.print_pointwise(sparse_tensor)}Coords\
-                    {self.print_pointwise(self.dimension)}"
-                    if self.dimension
+                    {self.print_pointwise(dimension)}"
+                    if dimension
                     else f"{self.print_pointwise(sparse_tensor)}Coords"
                 )
             case GetSparseValueArray(sparse_tensor):
