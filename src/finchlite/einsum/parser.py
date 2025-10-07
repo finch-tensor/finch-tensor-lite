@@ -318,6 +318,7 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
     args = list(args_)
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
+    bc = "none"
     if isinstance(args[0], str):
         subscripts = args[0]
         operands = args[1:]
@@ -330,6 +331,24 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
         else:
             output_idxs = None
         input_subs = [s.strip() for s in subscripts.split(",")]
+        # Check for ellipses in input subscripts
+        if any("..." in sub for sub in input_subs):
+            if all(sub.startswith("...") for sub in input_subs):
+                bc = "prefix"
+                input_subs = [sub[3:] for sub in input_subs]
+                if output_idxs is not None:
+                    assert output_idxs.startswith("...")
+                    output_idxs = output_idxs[3:]
+            elif all(sub.endswith("...") for sub in input_subs):
+                bc = "suffix"
+                input_subs = [sub[:-3] for sub in input_subs]
+                if output_idxs is not None:
+                    assert output_idxs.endswith("...")
+                    output_idxs = output_idxs[:-3]
+            else:
+                raise ValueError(
+                    "Ellipses must be at the start or end of all subscripts."
+                )
         input_idxs = [list(sub) for sub in input_subs]
     else:
         # Alternative syntax: einsum(operand0, subscript0, operand1, subscript1, ...)
@@ -344,6 +363,23 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
             input_subs = args[1::2]
             output_idxs = None
         input_idxs = [[f"i_{j}" for j in sub] for sub in input_subs]
+        if any(Ellipsis in sub for sub in input_subs):
+            if all(sub[0] == Ellipsis for sub in input_subs):
+                bc = "prefix"
+                input_idxs = [sub[1:] for sub in input_idxs]
+                if output_idxs is not None:
+                    assert output_idxs[0] == Ellipsis
+                    output_idxs = output_idxs[1:]
+            elif all(sub[-1] == Ellipsis for sub in input_subs):
+                bc = "suffix"
+                input_idxs = [sub[:-1] for sub in input_idxs]
+                if output_idxs is not None:
+                    assert output_idxs[-1] == Ellipsis
+                    output_idxs = output_idxs[:-1]
+            else:
+                raise ValueError(
+                    "Ellipses must be at the start or end of all subscripts."
+                )
     all_idxs = set().union(*input_idxs)
     if output_idxs is None:
         output_idx_set = set()
@@ -351,6 +387,31 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
             if sum(idx in sub for sub in input_idxs) == 1:
                 output_idx_set.add(idx)
         output_idxs = sorted(output_idx_set)
+    if bc == "prefix":
+        max_ell_len = max(
+            len(op.shape) - len(sub)
+            for op, sub in zip(operands, input_idxs, strict=False)
+        )
+        for i in range(len(operands)):
+            ell_idxs = [
+                f"j_{j}"
+                for j in range(
+                    max_ell_len - (operands[i].ndims - len(input_idxs[i])), max_ell_len
+                )
+            ]
+            input_idxs[i] = ell_idxs + input_idxs[i]
+        if output_idxs is not None:
+            output_idxs = [f"e_{j}" for j in range(max_ell_len)] + output_idxs
+    elif bc == "suffix":
+        max_ell_len = max(
+            len(op.shape) - len(sub)
+            for op, sub in zip(operands, input_idxs, strict=False)
+        )
+        for i in range(len(operands)):
+            ell_idxs = [f"j_{j}" for j in range(operands[i].ndims - len(input_idxs[i]))]
+            input_idxs[i] = input_idxs[i] + ell_idxs
+        if output_idxs is not None:
+            output_idxs = output_idxs + [f"e_{j}" for j in range(max_ell_len)]
     if len(input_idxs) != len(operands):
         raise ValueError("Number of input subscripts must match number of operands.")
     assert set(output_idxs).issubset(all_idxs), (
