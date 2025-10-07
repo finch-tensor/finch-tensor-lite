@@ -264,7 +264,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpr:
             return ein.Call(op, (_parse_einop_expr(arg),))
         case Tree("access", [tns, *idxs]):
             return ein.Access(
-                ein.Alias(tns.value), # type: ignore[union-attr]
+                ein.Alias(tns.value),  # type: ignore[union-attr]
                 tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
             )
         case Tree("bool_literal", (val,)):
@@ -349,10 +349,7 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
                     "Ellipses must be at the start or end of all subscripts."
                 )
         input_idxs = [list(sub) for sub in input_subs]
-        if output_sub is not None:
-            output_idxs = list(output_sub)
-        else:
-            output_idxs = None
+        output_idxs = None if output_sub is None else list(output_sub)
     else:
         # Alternative syntax: einsum(operand0, subscript0, operand1, subscript1, ...)
         # Check if the last element is the output subscript
@@ -396,13 +393,11 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
     def ndim(tns):
         if hasattr(tns, "ndim"):
             return tns.ndim
-        else:
-            return 0
-    
+        return 0
+
     if bc == "prefix":
         max_ell_len = max(
-            ndim(op) - len(sub)
-            for op, sub in zip(operands, input_idxs, strict=False)
+            ndim(op) - len(sub) for op, sub in zip(operands, input_idxs, strict=False)
         )
         for i in range(len(operands)):
             ell_idxs = [
@@ -416,16 +411,15 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
         output_idxs = [f"i_{j}" for j in range(max_ell_len)] + output_idxs
     elif bc == "suffix":
         max_ell_len = max(
-            ndim(op) - len(sub)
-            for op, sub in zip(operands, input_idxs, strict=False)
+            ndim(op) - len(sub) for op, sub in zip(operands, input_idxs, strict=False)
         )
         for i in range(len(operands)):
             ell_idxs = [f"k_{j}" for j in range(ndim(operands[i]) - len(input_idxs[i]))]
             input_idxs[i] = input_idxs[i] + ell_idxs
         output_idxs = output_idxs + [f"k_{j}" for j in range(max_ell_len)]
-    
+
     all_idxs = set().union(*input_idxs)
-    
+
     if len(input_idxs) != len(operands):
         raise ValueError("Number of input subscripts must match number of operands.")
     assert set(output_idxs).issubset(all_idxs), (
