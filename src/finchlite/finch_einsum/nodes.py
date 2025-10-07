@@ -30,7 +30,6 @@ class EinsumNode(Term):
         """Returns a string representation of the node."""
         ctx = EinsumPrinterContext()
         res = ctx(self)
-        print("hello")
         return res if res is not None else ctx.emit()
 
 
@@ -244,9 +243,6 @@ class Plan(EinsumTree):
     def children(self):
         return [*self.bodies, self.returnValues]
 
-    def __str__(self):
-        ctx = EinsumPrinterContext()
-        return ctx(self)
 
 
 @dataclass(eq=True, frozen=True)
@@ -350,6 +346,7 @@ class EinsumPrinterContext(Context):
                 )
                 return None
             case Plan(bodies):
+                self.exec(f"{self.feed}plan:")
                 ctx_2 = self.subblock()
                 for body in bodies:
                     ctx_2(body)
