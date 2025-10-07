@@ -30,6 +30,7 @@ class EinsumNode(Term):
         """Returns a string representation of the node."""
         ctx = EinsumPrinterContext()
         res = ctx(self)
+        print("hello")
         return res if res is not None else ctx.emit()
 
 
@@ -329,6 +330,8 @@ class EinsumPrinterContext(Context):
                 return qual_str(value).replace("\n", "")
             case Alias(name):
                 return str(name)
+            case Index(name):
+                return str(name)
             case Access(tns, idxs):
                 return f"{self(tns)}[{', '.join(self(idx) for idx in idxs)}]"
             case Call(fn, args):
@@ -347,7 +350,7 @@ class EinsumPrinterContext(Context):
                 )
                 return None
             case Plan(bodies):
-                ctx_2 = self.block()
+                ctx_2 = self.subblock()
                 for body in bodies:
                     ctx_2(body)
                 self.exec(ctx_2.emit())
@@ -356,7 +359,5 @@ class EinsumPrinterContext(Context):
                 args = tuple(self(arg) for arg in args)
                 self.exec(f"{feed}return {args}\n")
                 return None
-            case str(label):
-                return label
             case _:
                 raise ValueError(f"Unknown expression type: {type(prgm)}")

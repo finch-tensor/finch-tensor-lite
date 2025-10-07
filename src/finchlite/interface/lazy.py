@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
-from .. import einsum as ein
+from .. import finch_einsum as ein
 from ..algebra import (
     Tensor,
     TensorFType,
