@@ -676,6 +676,16 @@ for logical in (
     )
 register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
 
+
+for complex_op in (np.real, np.imag):
+    register_property(
+        complex_op,
+        "__call__",
+        "return_type",
+        lambda op, a, _complex_op=complex_op: float,
+    )
+
+
 for ternary_op in (np.clip,):
     register_property(
         ternary_op,

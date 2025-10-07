@@ -314,6 +314,54 @@ def test_unary_operations(a, a_wrap, ops, np_op):
 
 
 @pytest.mark.parametrize(
+    "a",
+    [
+        np.array([1 + 2j, 3 - 4j, 0 + 1j]),
+        np.array([[1j, -1j], [2 + 3j, -4 - 5j]]),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "op, np_op",
+    [
+        (finchlite.real, np.real),
+        (finchlite.imag, np.imag),
+    ],
+)
+def test_complex_operations(a, a_wrap, op, np_op):
+    wa = a_wrap(a)
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
+
+        expected = np_op(a)
+        result = op(wa)
+
+        if isinstance(wa, finchlite.LazyTensor):
+            assert isinstance(result, finchlite.LazyTensor)
+
+            result = finchlite.compute(result)
+
+        assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
     "a, b, c",
     [
         (
