@@ -905,6 +905,14 @@ class CContext(Context):
                         )
                     self(func)
                 return None
+            case asm.Print(args):
+                args_str = ""
+                for arg in args:
+                    args_str = args_str + f'<< {self(arg)} << " " '
+                self.exec(
+                    f"{feed}#include <iostream>{feed}std::cout {args_str} << std::endl;"
+                )
+                return None
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"
