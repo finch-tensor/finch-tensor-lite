@@ -11,7 +11,7 @@ from .nodes import (
     Plan,
     Produces,
 )
-from .parser import parse_einsum
+from .parser import parse_einop
 
 __all__ = [
     "Access",
@@ -28,5 +28,5 @@ __all__ = [
     "Literal",
     "Plan",
     "Produces",
-    "parse_einsum",
+    "parse_einop",
 ]
