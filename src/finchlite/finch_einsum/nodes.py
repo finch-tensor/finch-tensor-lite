@@ -244,7 +244,6 @@ class Plan(EinsumTree):
         return [*self.bodies, self.returnValues]
 
 
-
 @dataclass(eq=True, frozen=True)
 class Produces(EinsumTree):
     """
