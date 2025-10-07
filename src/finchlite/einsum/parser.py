@@ -312,7 +312,8 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             )
 
 
-def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
+def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
+    args = list(args_)
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
     if isinstance(args[0], str):
@@ -321,26 +322,26 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
         if subscripts.count("->") > 1:
             raise ValueError("Subscripts can only contain one '->' symbol.")
         if subscripts.count("->") == 1:
-            input_subs, output_sub = subscripts.split("->")
+            subscripts, output_sub = subscripts.split("->")
             output_sub = output_sub.strip()
             output_idxs = list(output_sub)
         else:
-            input_subs = subscripts
             output_idxs = None
-        input_subs = [s.strip() for s in input_subs.split(",")]
+        input_subs = [s.strip() for s in subscripts.split(",")]
         input_idxs = [list(sub) for sub in input_subs]
     else:
         # Alternative syntax: einsum(operand0, subscript0, operand1, subscript1, ...)
-        operands = args[0::2]
-        subscripts = args[1::2]
         # Check if the last element is the output subscript
         if len(args) % 2 == 1:
-            output_idxs = list(operands[-1])
-            operands = operands[:-1]
+            operands = args[0:-2:2]
+            input_subs = args[1::2]
+            output_idxs = list(args[-1])
             output_idxs = [f"i_{j}" for j in output_idxs]
         else:
+            operands = args[0::2]
+            input_subs = args[1::2]
             output_idxs = None
-        input_idxs = [[f"i_{j}" for j in sub] for sub in subscripts]
+        input_idxs = [[f"i_{j}" for j in sub] for sub in input_subs]
     all_idxs = set().union(*input_idxs)
     if output_idxs is None:
         output_idx_set = set()
@@ -354,21 +355,21 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
         "Output indices must be a subset of input indices."
     )
     spc = Namespace()
-    for i in all_idxs:
-        spc.freshen(i)
+    for j in all_idxs:
+        spc.freshen(j)
     if output_idxs == all_idxs:
         op = ein.Literal(overwrite)
     else:
         op = ein.Literal(operator.add)
     out_tns = ein.Alias(spc.freshen("B"))
-    idxs = tuple(ein.Index(i) for i in output_idxs)
+    idxs = tuple(ein.Index(j) for j in output_idxs)
     in_tnss = [ein.Alias(spc.freshen("A")) for _ in operands]
     arg = ein.Access(in_tnss[0], tuple(ein.Index(i) for i in input_idxs[0]))
     for i in range(1, len(operands)):
-        arg = ein.Call(  # type: ignore[assignment]
+        arg = ein.Call(
             ein.Literal(operator.mul),
-            (arg, ein.Access(in_tnss[i], tuple(ein.Index(i) for i in input_idxs[i]))),
-        )
+            (arg, ein.Access(in_tnss[i], tuple(ein.Index(j) for j in input_idxs[i]))),
+        ) # type: ignore[assignment]
     return (
         ein.Einsum(
             op,
