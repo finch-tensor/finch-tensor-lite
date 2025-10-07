@@ -388,6 +388,7 @@ class EinsumLowerer:
                 case Plan(_):
                     inner_plan = self.compile_plan(body, parameters, definitions)
                     einsums.extend(inner_plan.bodies)
+                    returnValue.extend(inner_plan.returnValues)
                     break
                 case Query(Alias(name), Table(_, _)):
                     parameters[name] = body.rhs
@@ -588,8 +589,17 @@ class EinsumPrinterContext:
         return str_map[op]
 
     def print_pointwise_op(self, pointwise_op: PointwiseOp):
+        func_ops = {
+            promote_max: ("max", 2),
+            promote_min: ("min", 2),
+        }
+
         if pointwise_op.op == overwrite:
             return self.print_pointwise(pointwise_op.args[1])
+
+        if pointwise_op.op in func_ops:
+            return f"{func_ops[pointwise_op.op][0]}({', '.join(self.print_pointwise(arg) for arg in pointwise_op.args[:func_ops[pointwise_op.op][1]])})"
+
         opstr = f" {self.print_pointwise_op_callable(pointwise_op.op)} "
         if not is_commutative(pointwise_op.op):
             return f"({pointwise_op.args[0]}{opstr}{pointwise_op.args[1]})"

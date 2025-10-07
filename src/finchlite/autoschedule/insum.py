@@ -25,8 +25,11 @@ from finchlite.symbolic import PostWalk, Rewrite
 from finchlite.algebra import overwrite, init_value
 
 class InsumLowerer:
+    pos_counter: int = 0
+
     def __init__(self):
         self.el = EinsumLowerer()
+        self.pos_counter = 0
 
     def can_optimize(self, einsum: Einsum, sparse_params: set[str]) -> tuple[bool, dict[str, tuple[PointwiseNamedField, ...]]]:
         """Check if einsum accesses any sparse tensors."""
@@ -49,6 +52,8 @@ class InsumLowerer:
 
     def optimize_sparse_einsum(self, einsum: Einsum, sparse_param: str, sparse_param_idxs: tuple[PointwiseNamedField, ...]) -> list[Einsum]:
         einsums = []
+        self.pos_counter += 1
+        postr = f"pos{self.pos_counter}"
 
         # initialize tensor T which is a boolean tensor of whether an element exists at a particular location of a sparse tensor
         # The shape of T is equal to the shape of the NON-REDUCED indicies of the sparse tensor
@@ -62,7 +67,12 @@ class InsumLowerer:
         einsums.append(Einsum( 
             reduceOp=operator.add,
             output=PointwiseNamedField(f"{sparse_param}T"),
-            output_fields= (GetSparseCoordArray(PointwiseNamedField(sparse_param), None),),
+            output_fields= (
+                PointwiseAccess(
+                    GetSparseCoordArray(PointwiseNamedField(sparse_param), None),
+                    (PointwiseNamedField(postr),)
+                ),
+            ),
             pointwise_expr = PointwiseLiteral(1)
         ))
 
@@ -72,14 +82,24 @@ class InsumLowerer:
 
         def rewrite_indicies(idxs: tuple[PointwiseNode, ...]) -> tuple[PointwiseNode, ...]:
             if idxs == sparse_param_idxs:
-                return (GetSparseCoordArray(PointwiseNamedField(sparse_param), None),)
+                return (
+                    PointwiseAccess(
+                        GetSparseCoordArray(PointwiseNamedField(sparse_param), None),
+                        (PointwiseNamedField(postr),)
+                    ),
+                )
             
             new_idxs = []
 
             for idx in idxs:
                 match idx:
                     case PointwiseNamedField(_) if idx in sparse_param_idxs:
-                        new_idxs.append(GetSparseCoordArray(PointwiseNamedField(sparse_param), idx))
+                        new_idxs.append(
+                            PointwiseAccess(
+                                GetSparseCoordArray(PointwiseNamedField(sparse_param), idx),
+                                (PointwiseNamedField(postr),)
+                            )
+                        )
                     case _:
                         new_idxs.append(idx)
             return tuple(new_idxs)
@@ -87,7 +107,10 @@ class InsumLowerer:
         def rewrite_pointwise_expr(pointwise_expr: PointwiseNode) -> PointwiseNode:
             match pointwise_expr:
                 case PointwiseAccess(PointwiseNamedField(name), idxs) if name == sparse_param and idxs == sparse_param_idxs:
-                    return GetSparseValueArray(PointwiseNamedField(sparse_param))
+                    return PointwiseAccess(
+                        GetSparseValueArray(PointwiseNamedField(sparse_param)),
+                        (PointwiseNamedField(postr),)
+                    )
                 case PointwiseAccess(alias, idxs):
                     return PointwiseAccess(alias, rewrite_indicies(idxs))
 
@@ -95,11 +118,11 @@ class InsumLowerer:
             match pointwise_expr:
                 case PointwiseAccess(PointwiseNamedField(name), _) if name == sparse_param:
                     return PointwiseLiteral(0)
-                case GetSparseValueArray(PointwiseNamedField(name)) if name == sparse_param:
+                case PointwiseAccess(GetSparseValueArray(PointwiseNamedField(name)), _) if name == sparse_param:
                     return PointwiseLiteral(0)
 
         new_pointwise_expr = Rewrite(PostWalk(rewrite_pointwise_expr))(einsum.pointwise_expr)
-        sparse_is_zero_pointwise_expr = Rewrite(PostWalk(sparse_is_zero))(new_pointwise_expr)
+        sparse_is_zero_pointwise_expr = Rewrite(PostWalk(sparse_is_zero))(einsum.pointwise_expr)
 
         # initialize the initial reduction values in output tensor
         op_init_value = 0 if einsum.reduceOp == overwrite else init_value(einsum.reduceOp, float)
@@ -140,9 +163,9 @@ class InsumLowerer:
                 
         return sparse_params
 
-    def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
-        einsum_plan, parameters = self.el(prgm)
+    def optimize_einsum_plan(self, einsum_plan: EinsumPlan, parameters: dict[str, Table]) -> tuple[EinsumPlan, dict[str, Table]]:
         sparse_params = self.get_sparse_params(parameters)
+        self.pos_counter = 0
 
         new_bodies = []
         for einsum in einsum_plan.bodies:
@@ -154,6 +177,10 @@ class InsumLowerer:
                 new_bodies.append(einsum)
 
         return EinsumPlan(tuple(new_bodies), einsum_plan.returnValues), parameters
+
+    def __call__(self, prgm: Plan) -> tuple[EinsumPlan, dict[str, Table]]:
+        einsum_plan, parameters = self.el(prgm)
+        return self.optimize_einsum_plan(einsum_plan, parameters)
 
 class InsumCompiler:
     def __init__(self):
