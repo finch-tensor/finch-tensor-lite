@@ -98,7 +98,7 @@ class Alias(EinsumExpr):
     name: str
 
     def get_idxs(self) -> set["Index"]:
-        return {self}
+        return set()
 
 
 @dataclass(eq=True, frozen=True)
@@ -186,7 +186,7 @@ class Einsum(EinsumTree):
 
     Attributes:
         op: The function to apply to the pointwise expressions
-                    (e.g. +=, f=, max=, etc...). Must be a callable.
+                    (e.g. +=, f=, max=, etc...).
 
         idxs: The indices that are used in the output
                     (i.e. i, j).
@@ -195,8 +195,7 @@ class Einsum(EinsumTree):
                     is mapped and aggregated.
     """
 
-    # technically a reduce operation, much akin to the one in aggregate
-    op: Callable
+    op: Literal
     tns: Alias
     idxs: tuple[EinsumExpr, ...]
     arg: EinsumExpr
