@@ -316,7 +316,8 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
     if isinstance(args[0], str):
-        (subscripts, *operands) = args
+        subscripts = args[1]
+        operands = args[2:]
         if subscripts.count("->") > 1:
             raise ValueError("Subscripts can only contain one '->' symbol.")
         if subscripts.count("->") == 1:
@@ -340,14 +341,14 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
             output_idxs = None
     all_idxs = set().union(*input_idxs)
     if output_idxs is None:
-        output_idxs = set()
+        output_idx_set = set()
         for idx in all_idxs:
             if sum(idx in sub for sub in input_idxs) == 1:
-                output_idxs.add(idx)
-        output_idxs = list(output_idxs)
+                output_idx_set.add(idx)
+        output_idxs = sorted(output_idx_set)
     if len(input_idxs) != len(operands):
         raise ValueError("Number of input subscripts must match number of operands.")
-    assert output_idxs.issubset(all_idxs), (
+    assert set(output_idxs).issubset(all_idxs), (
         "Output indices must be a subset of input indices."
     )
     spc = Namespace()
