@@ -337,9 +337,10 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
         if len(args) % 2 == 1 and len(subscripts) == len(operands):
             output_idxs = list(subscripts[-1])
             subscripts = subscripts[:-1]
+            output_idxs = [f"i_{j}" for j in output_idxs]
         else:
             output_idxs = None
-        input_idxs = [list(sub) for sub in subscripts]
+        input_idxs = [[f"i_{j}" for j in sub] for sub in subscripts]
     all_idxs = set().union(*input_idxs)
     if output_idxs is None:
         output_idx_set = set()
@@ -360,13 +361,13 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
     else:
         op = ein.Literal(operator.add)
     out_tns = ein.Alias(spc.freshen("B"))
-    idxs = tuple(ein.Index(spc.freshen(i)) for i in output_idxs)
+    idxs = tuple(ein.Index(i) for i in output_idxs)
     in_tnss = [ein.Alias(spc.freshen("A")) for _ in operands]
-    arg = ein.Access(in_tnss[0], tuple(ein.Index(spc.freshen(i)) for i in input_idxs[0]))
+    arg = ein.Access(in_tnss[0], tuple(ein.Index(i) for i in input_idxs[0]))
     for i in range(1, len(operands)):
         arg = ein.Call(  # type: ignore[assignment]
             ein.Literal(operator.mul),
-            (arg, ein.Access(in_tnss[i], tuple(ein.Index(spc.freshen(i)) for i in input_idxs[i]))),
+            (arg, ein.Access(in_tnss[i], tuple(ein.Index(i) for i in input_idxs[i]))),
         )
     return (
         ein.Einsum(
