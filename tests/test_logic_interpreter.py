@@ -7,7 +7,7 @@ import numpy as np
 from numpy import array  # noqa: F401
 from numpy.testing import assert_equal
 
-from finch.finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,

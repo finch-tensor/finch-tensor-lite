@@ -15,7 +15,7 @@ jobs:
         run: pip install toml
       - name: Get version
         run: |
-            VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["tool"]["poetry"]["version"])')
+            VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["project"]["version"])')
             if [ $? -ne 0 ]; then exit 1; fi
             echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: Build and publish to pypi

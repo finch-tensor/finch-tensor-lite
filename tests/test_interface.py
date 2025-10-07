@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal
 
-import finch
+import finchlite
 
 
 # Utility function to generate random complex numpy tensors
@@ -48,9 +48,9 @@ def random_array(shape, dtype=np.complex128, rng: np.random.Generator | None = N
     ],
 )
 def test_matrix_multiplication(a, b):
-    result = finch.fuse(
-        lambda a, b: finch.reduce(
-            operator.add, finch.multiply(finch.expand_dims(a, 2), b), axis=1
+    result = finchlite.fuse(
+        lambda a, b: finchlite.reduce(
+            operator.add, finchlite.multiply(finchlite.expand_dims(a, 2), b), axis=1
         ),
         a,
         b,
@@ -61,7 +61,7 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
 
-class TestEagerTensorFType(finch.TensorFType):
+class TestEagerTensorFType(finchlite.TensorFType):
     # This class doesn't define any pytests
     __test__ = False
 
@@ -78,18 +78,18 @@ class TestEagerTensorFType(finch.TensorFType):
 
     @property
     def fill_value(self):
-        return finch.fill_value(self.fmt)
+        return finchlite.fill_value(self.fmt)
 
     @property
     def element_type(self):
-        return finch.element_type(self.fmt)
+        return finchlite.element_type(self.fmt)
 
     @property
     def shape_type(self):
-        return finch.shape_type(self.fmt)
+        return finchlite.shape_type(self.fmt)
 
 
-class TestEagerTensor(finch.EagerTensor):
+class TestEagerTensor(finchlite.EagerTensor):
     # This class doesn't define any pytests
     __test__ = False
 
@@ -102,13 +102,17 @@ class TestEagerTensor(finch.EagerTensor):
     def __getitem__(self, item):
         return self.array[item]
 
+    def __hash__(self):
+        # TODO: correct hashing for ndarrays
+        return id(self.array)
+
     @property
     def shape(self):
         return self.array.shape
 
     @property
     def ftype(self):
-        return TestEagerTensorFType(finch.ftype(self.array))
+        return TestEagerTensorFType(finchlite.ftype(self.array))
 
     def to_numpy(self):
         return self.array
@@ -129,7 +133,7 @@ class TestEagerTensor(finch.EagerTensor):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -137,35 +141,44 @@ class TestEagerTensor(finch.EagerTensor):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((operator.add, finch.add, np.add), np.add),
-        ((operator.sub, finch.subtract, np.subtract), np.subtract),
-        ((operator.mul, finch.multiply, np.multiply), np.multiply),
-        ((operator.and_, finch.bitwise_and, np.bitwise_and), np.bitwise_and),
-        ((operator.or_, finch.bitwise_or, np.bitwise_or), np.bitwise_or),
-        ((operator.xor, finch.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
+        ((operator.add, finchlite.add, np.add), np.add),
+        ((operator.sub, finchlite.subtract, np.subtract), np.subtract),
+        ((operator.mul, finchlite.multiply, np.multiply), np.multiply),
+        ((operator.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
+        ((operator.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
+        ((operator.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         (
-            (operator.lshift, finch.bitwise_left_shift, np.bitwise_left_shift),
+            (operator.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
             np.bitwise_left_shift,
         ),
         (
-            (operator.rshift, finch.bitwise_right_shift, np.bitwise_right_shift),
+            (operator.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
-        ((operator.truediv, finch.truediv, np.true_divide), np.true_divide),
-        ((operator.floordiv, finch.floordiv, np.floor_divide), np.floor_divide),
-        ((operator.mod, finch.mod, np.mod), np.mod),
-        ((operator.pow, finch.pow, np.pow), np.pow),
-        ((finch.atan2, np.atan2), np.atan2),
-        ((finch.logaddexp, np.logaddexp), np.logaddexp),
-        ((finch.logical_and, np.logical_and), np.logical_and),
-        ((finch.logical_or, np.logical_or), np.logical_or),
-        ((finch.logical_xor, np.logical_xor), np.logical_xor),
+        ((operator.truediv, finchlite.truediv, np.true_divide), np.true_divide),
+        ((operator.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
+        ((operator.mod, finchlite.mod, np.mod), np.mod),
+        ((operator.pow, finchlite.pow, np.pow), np.pow),
+        ((finchlite.atan2, np.atan2), np.atan2),
+        ((finchlite.logaddexp, np.logaddexp), np.logaddexp),
+        ((finchlite.logical_and, np.logical_and), np.logical_and),
+        ((finchlite.logical_or, np.logical_or), np.logical_or),
+        ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
+        ((operator.eq, finchlite.equal, np.equal), np.equal),
+        ((operator.ne, finchlite.not_equal, np.not_equal), np.not_equal),
+        ((operator.lt, finchlite.less, np.less), np.less),
+        ((operator.le, finchlite.less_equal, np.less_equal), np.less_equal),
+        ((operator.gt, finchlite.greater, np.greater), np.greater),
+        (
+            (operator.ge, finchlite.greater_equal, np.greater_equal),
+            np.greater_equal,
+        ),
     ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -189,10 +202,12 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         for op in ops:
             result = op(wa, wb)
 
-            if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
-                assert isinstance(result, finch.LazyTensor)
+            if isinstance(wa, finchlite.LazyTensor) or isinstance(
+                wb, finchlite.LazyTensor
+            ):
+                assert isinstance(result, finchlite.LazyTensor)
 
-                result = finch.compute(result)
+                result = finchlite.compute(result)
 
             assert_equal(result, expected)
 
@@ -209,36 +224,36 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((operator.abs, finch.abs, np.abs), np.abs),
-        ((operator.pos, finch.positive, np.positive), np.positive),
-        ((operator.neg, finch.negative, np.negative), np.negative),
+        ((operator.abs, finchlite.abs, np.abs), np.abs),
+        ((operator.pos, finchlite.positive, np.positive), np.positive),
+        ((operator.neg, finchlite.negative, np.negative), np.negative),
         (
-            (operator.invert, finch.bitwise_inverse, np.bitwise_invert),
+            (operator.invert, finchlite.bitwise_inverse, np.bitwise_invert),
             np.bitwise_invert,
         ),
-        ((finch.sin, np.sin), np.sin),
-        ((finch.sinh, np.sinh), np.sinh),
-        ((finch.cos, np.cos), np.cos),
-        ((finch.cosh, np.cosh), np.cosh),
-        ((finch.tan, np.tan), np.tan),
-        ((finch.tanh, np.tanh), np.tanh),
-        ((finch.asin, np.asin), np.asin),
-        ((finch.asinh, np.asinh), np.asinh),
-        ((finch.acos, np.acos), np.acos),
-        ((finch.acosh, np.acosh), np.acosh),
-        ((finch.atan, np.atan), np.atan),
-        ((finch.atanh, np.atanh), np.atanh),
-        ((finch.log, np.log), np.log),
-        ((finch.log1p, np.log1p), np.log1p),
-        ((finch.log2, np.log2), np.log2),
-        ((finch.log10, np.log10), np.log10),
-        ((finch.logical_not, np.logical_not), np.logical_not),
+        ((finchlite.sin, np.sin), np.sin),
+        ((finchlite.sinh, np.sinh), np.sinh),
+        ((finchlite.cos, np.cos), np.cos),
+        ((finchlite.cosh, np.cosh), np.cosh),
+        ((finchlite.tan, np.tan), np.tan),
+        ((finchlite.tanh, np.tanh), np.tanh),
+        ((finchlite.asin, np.asin), np.asin),
+        ((finchlite.asinh, np.asinh), np.asinh),
+        ((finchlite.acos, np.acos), np.acos),
+        ((finchlite.acosh, np.acosh), np.acosh),
+        ((finchlite.atan, np.atan), np.atan),
+        ((finchlite.atanh, np.atanh), np.atanh),
+        ((finchlite.log, np.log), np.log),
+        ((finchlite.log1p, np.log1p), np.log1p),
+        ((finchlite.log2, np.log2), np.log2),
+        ((finchlite.log10, np.log10), np.log10),
+        ((finchlite.logical_not, np.logical_not), np.logical_not),
     ],
 )
 def test_unary_operations(a, a_wrap, ops, np_op):
@@ -261,10 +276,10 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         for op in ops:
             result = op(wa)
 
-            if isinstance(wa, finch.LazyTensor):
-                assert isinstance(result, finch.LazyTensor)
+            if isinstance(wa, finchlite.LazyTensor):
+                assert isinstance(result, finchlite.LazyTensor)
 
-                result = finch.compute(result)
+                result = finchlite.compute(result)
 
             assert_equal(result, expected)
 
@@ -285,21 +300,21 @@ def test_unary_operations(a, a_wrap, ops, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((finch.prod, np.prod), np.prod),
-        ((finch.sum, np.sum), np.sum),
-        ((finch.any, np.any), np.any),
-        ((finch.all, np.all), np.all),
-        ((finch.min, np.min), np.min),
-        ((finch.max, np.max), np.max),
-        ((finch.mean, np.mean), np.mean),
-        ((finch.std, np.std), np.std),
-        ((finch.var, np.var), np.var),
+        ((finchlite.prod, np.prod), np.prod),
+        ((finchlite.sum, np.sum), np.sum),
+        ((finchlite.any, np.any), np.any),
+        ((finchlite.all, np.all), np.all),
+        ((finchlite.min, np.min), np.min),
+        ((finchlite.max, np.max), np.max),
+        ((finchlite.mean, np.mean), np.mean),
+        ((finchlite.std, np.std), np.std),
+        ((finchlite.var, np.var), np.var),
     ],
 )
 @pytest.mark.parametrize(
@@ -319,10 +334,10 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     for op in ops:
         result = op(wa, axis=axis)
 
-        if isinstance(wa, finch.LazyTensor):
-            assert isinstance(result, finch.LazyTensor)
+        if isinstance(wa, finchlite.LazyTensor):
+            assert isinstance(result, finchlite.LazyTensor)
 
-            result = finch.compute(result)
+            result = finchlite.compute(result)
 
         if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
             expected.dtype, np.complexfloating
@@ -383,7 +398,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -391,7 +406,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_matmul(a, b, a_wrap, b_wrap):
@@ -405,19 +420,19 @@ def test_matmul(a, b, a_wrap, b_wrap):
         expected = np.linalg.matmul(a, b)
     except ValueError:
         with pytest.raises(ValueError):
-            finch.matmul(wa, wb)  # make sure matmul raises error too
+            finchlite.matmul(wa, wb)  # make sure matmul raises error too
             _ = wa @ wb
         return
 
-    result = finch.matmul(wa, wb)
+    result = finchlite.matmul(wa, wb)
     result_with_op = wa @ wb  # make sure the operator overload works too
     result_with_np = np.matmul(wa, wb)
 
-    if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
-        assert isinstance(result, finch.LazyTensor)
-        result = finch.compute(result)
-        result_with_op = finch.compute(result_with_op)
-        result_with_np = finch.compute(result_with_np)
+    if isinstance(wa, finchlite.LazyTensor) or isinstance(wb, finchlite.LazyTensor):
+        assert isinstance(result, finchlite.LazyTensor)
+        result = finchlite.compute(result)
+        result_with_op = finchlite.compute(result_with_op)
+        result_with_np = finchlite.compute(result_with_np)
 
     assert isinstance(result, np.ndarray)
     assert expected.dtype == result.dtype, (
@@ -444,7 +459,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_matrix_transpose(a, a_wrap):
@@ -455,9 +470,9 @@ def test_matrix_transpose(a, a_wrap):
     wa = a_wrap(a)
     expected = np.linalg.matrix_transpose(a)
 
-    result = finch.matrix_transpose(wa)
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    result = finchlite.matrix_transpose(wa)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
     assert_equal(result, expected)
 
 
@@ -501,7 +516,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -509,7 +524,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_tensordot(a, b, axes, a_wrap, b_wrap):
@@ -524,13 +539,13 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     except ValueError:
         # tensordot should raise a ValueError
         with pytest.raises(ValueError):
-            finch.tensordot(wa, wb, axes=axes)
+            finchlite.tensordot(wa, wb, axes=axes)
         return
-    result = finch.tensordot(wa, wb, axes=axes)
+    result = finchlite.tensordot(wa, wb, axes=axes)
 
-    if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
-        assert isinstance(result, finch.LazyTensor)
-        result = finch.compute(result)
+    if isinstance(wa, finchlite.LazyTensor) or isinstance(wb, finchlite.LazyTensor):
+        assert isinstance(result, finchlite.LazyTensor)
+        result = finchlite.compute(result)
     assert isinstance(result, np.ndarray)  # for type checker
     assert_allclose(result, expected)
 
@@ -586,7 +601,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -594,7 +609,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
@@ -608,13 +623,13 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
         expected = np.linalg.vecdot(x1, x2, axis=axis)
     except ValueError:
         with pytest.raises(ValueError):
-            finch.vecdot(wx1, wx2, axis=axis)
+            finchlite.vecdot(wx1, wx2, axis=axis)
         return
 
-    result = finch.vecdot(wx1, wx2, axis=axis)
-    if isinstance(wx1, finch.LazyTensor) or isinstance(wx2, finch.LazyTensor):
-        assert isinstance(result, finch.LazyTensor)
-        result = finch.compute(result)
+    result = finchlite.vecdot(wx1, wx2, axis=axis)
+    if isinstance(wx1, finchlite.LazyTensor) or isinstance(wx2, finchlite.LazyTensor):
+        assert isinstance(result, finchlite.LazyTensor)
+        result = finchlite.compute(result)
 
     assert isinstance(result, np.ndarray), "Result should be a NumPy array"
     assert_allclose(result, expected)
@@ -634,7 +649,7 @@ def test_squeeze_valid(x, axis, expected):
     """
     Tests for squeeze operation
     """
-    result = finch.squeeze(x, axis=axis)
+    result = finchlite.squeeze(x, axis=axis)
     np.testing.assert_equal(result, expected)
 
 
@@ -648,7 +663,7 @@ def test_squeeze_valid(x, axis, expected):
 )
 def test_squeeze_invalid(x, axis):
     with pytest.raises(ValueError):
-        finch.squeeze(x, axis=axis)
+        finchlite.squeeze(x, axis=axis)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -668,7 +683,7 @@ def test_squeeze_invalid(x, axis):
 )
 def test_expand_dims_valid(x, axis):
     expected = np.expand_dims(x, axis=axis)
-    result = finch.expand_dims(x, axis=axis)
+    result = finchlite.expand_dims(x, axis=axis)
     np.testing.assert_equal(result, expected)
 
 
@@ -683,7 +698,7 @@ def test_expand_dims_valid(x, axis):
 )
 def test_expand_dims_invalid(x, axis):
     with pytest.raises(IndexError):
-        finch.expand_dims(x, axis=axis)
+        finchlite.expand_dims(x, axis=axis)
 
 
 @pytest.mark.parametrize(
@@ -765,7 +780,7 @@ def test_scalar_coerce(x, func):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_broadcast_to(x, shape, x_wrap):
@@ -779,12 +794,12 @@ def test_broadcast_to(x, shape, x_wrap):
     except ValueError:
         # if NumPy cannot broadcast, we expect finch to raise
         with pytest.raises(ValueError):
-            finch.broadcast_to(wx, shape)
+            finchlite.broadcast_to(wx, shape)
 
     else:
-        out = finch.broadcast_to(wx, shape)
-        if isinstance(wx, finch.LazyTensor):
-            out = finch.compute(out)
+        out = finchlite.broadcast_to(wx, shape)
+        if isinstance(wx, finchlite.LazyTensor):
+            out = finchlite.compute(out)
         assert_equal(out, expected, strict=True)
 
 
@@ -805,7 +820,7 @@ def test_broadcast_to(x, shape, x_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
@@ -821,12 +836,12 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
         expected = np.broadcast_arrays(*arrays)
     except ValueError:
         with pytest.raises(ValueError):
-            finch.broadcast_arrays(*wrapped_arrays)
+            finchlite.broadcast_arrays(*wrapped_arrays)
         return
-    result = finch.broadcast_arrays(*wrapped_arrays)
-    if isinstance(result[0], finch.LazyTensor):
-        assert all(isinstance(r, finch.LazyTensor) for r in result)
-        result = finch.compute(result)  # compute all lazy tensors
+    result = finchlite.broadcast_arrays(*wrapped_arrays)
+    if isinstance(result[0], finchlite.LazyTensor):
+        assert all(isinstance(r, finchlite.LazyTensor) for r in result)
+        result = finchlite.compute(result)  # compute all lazy tensors
 
     assert len(result) == len(expected), "Number of results does not match expected"
     for i, (res, exp) in enumerate(zip(result, expected, strict=True)):
@@ -867,7 +882,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
@@ -887,11 +902,11 @@ def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
     expected = np.concatenate(arrays, axis=axis)
 
     # Test finch's implementation
-    result = finch.concat(wrapped_arrays, axis=axis)
+    result = finchlite.concat(wrapped_arrays, axis=axis)
 
     # Evaluate lazy tensors if needed
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
 
     assert_equal(result, expected, "Values mismatch in concatenated array", strict=True)
 
@@ -914,7 +929,7 @@ def test_concat_invalid(shapes, rng):
     arrays = [rng.random(shape) for shape in shapes]
 
     with pytest.raises(ValueError):
-        finch.concat(arrays, axis=0)
+        finchlite.concat(arrays, axis=0)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -934,7 +949,7 @@ def test_concat_invalid(shapes, rng):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_moveaxis(shape, source, destination, wrapper, rng):
@@ -951,12 +966,12 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     except ValueError:
         # If NumPy raises a ValueError, we expect finch to raise the same
         with pytest.raises(ValueError):
-            finch.moveaxis(wrapped_x, source, destination)
+            finchlite.moveaxis(wrapped_x, source, destination)
         return
 
-    result = finch.moveaxis(wrapped_x, source, destination)
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    result = finchlite.moveaxis(wrapped_x, source, destination)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
 
     assert_equal(result, expected, "Values mismatch in moved axis array", strict=True)
 
@@ -991,7 +1006,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
@@ -1014,15 +1029,15 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     except ValueError:
         # Check that finch also raises an error
         with pytest.raises(ValueError):
-            finch.stack(wrapped_arrays, axis=axis)
+            finchlite.stack(wrapped_arrays, axis=axis)
         return
 
     # Test finch's implementation
-    result = finch.stack(wrapped_arrays, axis=axis)
+    result = finchlite.stack(wrapped_arrays, axis=axis)
 
     # Evaluate lazy tensors if needed
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
 
     assert_equal(result, expected, "Values mismatch in stacked array", strict=True)
 
@@ -1046,7 +1061,7 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
@@ -1056,10 +1071,10 @@ def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
     wrapped_x = wrapper(x)
     expected = np.reshape(x, expected_shape)
     # Apply split_dims operation
-    result = finch.split_dims(wrapped_x, axis, split_shape)
+    result = finchlite.split_dims(wrapped_x, axis, split_shape)
     # Compute if result is lazy
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
 
     assert_equal(result, expected, strict=True)
 
@@ -1082,7 +1097,7 @@ def test_split_dims_errors(array_shape, axis, split_shape):
     x = np.arange(np.prod(array_shape)).reshape(array_shape)
     with pytest.raises(ValueError):
         # error must be raised before computing
-        finch.split_dims(x, axis, split_shape)
+        finchlite.split_dims(x, axis, split_shape)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1109,7 +1124,7 @@ def test_split_dims_errors(array_shape, axis, split_shape):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_combine_dims(array_shape, axes, expected_shape, wrapper):
@@ -1120,11 +1135,11 @@ def test_combine_dims(array_shape, axes, expected_shape, wrapper):
     expected = np.reshape(x, expected_shape)
 
     # Apply combine_dims operation
-    result = finch.combine_dims(wrapped_x, axes)
+    result = finchlite.combine_dims(wrapped_x, axes)
 
     # Compute if result is lazy
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
 
     assert_equal(result, expected, strict=True)
 
@@ -1148,7 +1163,7 @@ def test_combine_dims_errors(array_shape, axes):
     x = np.arange(np.prod(array_shape)).reshape(array_shape)
     with pytest.raises(ValueError):
         # error must be raised before computing
-        finch.combine_dims(x, axes)
+        finchlite.combine_dims(x, axes)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1174,7 +1189,7 @@ def test_combine_dims_errors(array_shape, axes):
     [
         lambda x: x,
         TestEagerTensor,
-        finch.defer,
+        finchlite.defer,
     ],
 )
 def test_flatten(array_shape, expected_shape, wrapper):
@@ -1189,10 +1204,10 @@ def test_flatten(array_shape, expected_shape, wrapper):
     expected = x.flatten() if array_shape != () else np.array([5])
 
     # Apply flatten operation
-    result = finch.flatten(wrapped_x)
+    result = finchlite.flatten(wrapped_x)
 
     # Compute if result is lazy
-    if isinstance(result, finch.LazyTensor):
-        result = finch.compute(result)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
 
     assert_equal(result, expected, strict=True)

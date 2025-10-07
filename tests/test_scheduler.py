@@ -4,7 +4,7 @@ import pytest
 
 import numpy as np
 
-from finch.autoschedule import (
+from finchlite.autoschedule import (
     concordize,
     flatten_plans,
     isolate_aggregates,
@@ -23,8 +23,9 @@ from finch.autoschedule import (
     propagate_map_queries_backward,
     propagate_transpose_queries,
     push_fields,
+    set_loop_order,
 )
-from finch.finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -39,8 +40,8 @@ from finch.finch_logic import (
     Subquery,
     Table,
 )
-from finch.finch_logic.interpreter import FinchLogicInterpreter
-from finch.symbolic.gensym import _sg
+from finchlite.finch_logic.interpreter import FinchLogicInterpreter
+from finchlite.symbolic.gensym import _sg
 
 
 def test_propagate_map_queries():
@@ -199,11 +200,11 @@ def test_pretty_labels():
     )
     expected = Plan(
         (
-            Field(":i0"),
-            Alias(":A0"),
-            Alias(":A1"),
-            Subquery(Alias(":A0"), Field(":i0")),
-            Subquery(Alias(":A1"), Field(":i0")),
+            Field("i0"),
+            Alias("A0"),
+            Alias("A1"),
+            Subquery(Alias("A0"), Field("i0")),
+            Subquery(Alias("A1"), Field("i0")),
         )
     )
 
@@ -660,10 +661,10 @@ def test_propagate_map_queries_backward():
             Aggregate(
                 Literal(add), Literal(10), Alias("A2"), (Field("i4"), Field("i5"))
             ),
-            Aggregate(
-                Literal(mul),
-                Literal(1),
-                Reorder(
+            Reorder(
+                Aggregate(
+                    Literal(mul),
+                    Literal(1),
                     Table(
                         Literal(10),
                         (
@@ -672,9 +673,9 @@ def test_propagate_map_queries_backward():
                             Field("i8"),
                         ),
                     ),
-                    (Field("i6"), Field("i7"), Field("i8")),
+                    (Field("i7"),),
                 ),
-                (Field("i7"),),
+                (Field("i6"), Field("i8")),
             ),
         )
     )
@@ -733,6 +734,64 @@ def test_materialize_squeeze_expand_productions():
     assert result == expected
 
 
+def test_set_loop_order():
+    plan = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(add),
+            Literal(0),
+            Reorder(
+                MapJoin(
+                    Literal(mul),
+                    (
+                        Reorder(
+                            Relabel(Alias("A"), (Field("i0"), Field("i1"))),
+                            (Field("i0"), Field("i1")),
+                        ),
+                        Reorder(
+                            Relabel(Alias("B"), (Field("i1"), Field("i2"))),
+                            (Field("i1"), Field("i2")),
+                        ),
+                    ),
+                ),
+                (Field("i0"), Field("i2"), Field("i1")),
+            ),
+            (Field("i1"),),
+        ),
+    )
+
+    expected = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(add),
+            Literal(0),
+            Reorder(
+                Reorder(
+                    MapJoin(
+                        Literal(mul),
+                        (
+                            Reorder(
+                                Relabel(Alias("A"), (Field("i0"), Field("i1"))),
+                                (Field("i0"), Field("i1")),
+                            ),
+                            Reorder(
+                                Relabel(Alias("B"), (Field("i1"), Field("i2"))),
+                                (Field("i1"), Field("i2")),
+                            ),
+                        ),
+                    ),
+                    (Field("i0"), Field("i2"), Field("i1")),
+                ),
+                (Field("i0"), Field("i1"), Field("i2")),
+            ),
+            (Field("i1"),),
+        ),
+    )
+
+    result = set_loop_order(plan)
+    assert result == expected
+
+
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -787,11 +846,11 @@ def test_scheduler_e2e_sddmm():
 
     expected_plan = Plan(
         (
-            Query(Alias(":A0"), Table(Literal(a), (Field(":i0"), Field(":i1")))),
-            Query(Alias(":A1"), Table(Literal(b), (Field(":i1"), Field(":i2")))),
-            Query(Alias(":A2"), Table(Literal(s), (Field(":i0"), Field(":i2")))),
+            Query(Alias("A0"), Table(Literal(a), (Field("i0"), Field("i1")))),
+            Query(Alias("A1"), Table(Literal(b), (Field("i1"), Field("i2")))),
+            Query(Alias("A2"), Table(Literal(s), (Field("i0"), Field("i2")))),
             Query(
-                Alias(":A3"),
+                Alias("A3"),
                 Aggregate(
                     Literal(add),
                     Literal(0),
@@ -805,34 +864,34 @@ def test_scheduler_e2e_sddmm():
                                         (
                                             Reorder(
                                                 Relabel(
-                                                    Alias(":A0"),
-                                                    (Field(":i0"), Field(":i1")),
+                                                    Alias("A0"),
+                                                    (Field("i0"), Field("i1")),
                                                 ),
-                                                (Field(":i0"), Field(":i1")),
+                                                (Field("i0"), Field("i1")),
                                             ),
                                             Reorder(
                                                 Relabel(
-                                                    Alias(":A1"),
-                                                    (Field(":i1"), Field(":i2")),
+                                                    Alias("A1"),
+                                                    (Field("i1"), Field("i2")),
                                                 ),
-                                                (Field(":i1"), Field(":i2")),
+                                                (Field("i1"), Field("i2")),
                                             ),
                                         ),
                                     ),
-                                    (Field(":i0"), Field(":i1"), Field(":i2")),
+                                    (Field("i0"), Field("i1"), Field("i2")),
                                 ),
                                 Reorder(
-                                    Relabel(Alias(":A2"), (Field(":i0"), Field(":i2"))),
-                                    (Field(":i0"), Field(":i2")),
+                                    Relabel(Alias("A2"), (Field("i0"), Field("i2"))),
+                                    (Field("i0"), Field("i2")),
                                 ),
                             ),
                         ),
-                        (Field(":i0"), Field(":i1"), Field(":i2")),
+                        (Field("i0"), Field("i1"), Field("i2")),
                     ),
-                    (Field(":i1"),),
+                    (Field("i1"),),
                 ),
             ),
-            Plan((Produces((Relabel(Alias(":A3"), (Field(":i0"), Field(":i2"))),)),)),
+            Plan((Produces((Alias("A3"),)),)),
         )
     )
 
