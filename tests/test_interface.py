@@ -161,12 +161,29 @@ class TestEagerTensor(finchlite.EagerTensor):
             (operator.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
-        ((operator.truediv, finchlite.truediv, np.true_divide), np.true_divide),
+        (
+            (
+                operator.truediv,
+                finchlite.truediv,
+                np.true_divide,
+                finchlite.divide,
+                np.divide,
+            ),
+            np.true_divide,
+        ),
         ((operator.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
         ((operator.mod, finchlite.mod, np.mod), np.mod),
         ((operator.pow, finchlite.power, np.power), np.power),
+        (
+            (operator.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
+            np.mod,
+        ),
+        ((operator.pow, finchlite.pow, np.pow), np.pow),
+        ((finchlite.hypot, np.hypot), np.hypot),
         ((finchlite.atan2, np.atan2), np.atan2),
         ((finchlite.logaddexp, np.logaddexp), np.logaddexp),
+        ((finchlite.copysign, np.copysign), np.copysign),
+        ((finchlite.nextafter, np.nextafter), np.nextafter),
         ((finchlite.logical_and, np.logical_and), np.logical_and),
         ((finchlite.logical_or, np.logical_or), np.logical_or),
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
@@ -237,6 +254,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
             (operator.invert, finchlite.bitwise_inverse, np.bitwise_invert),
             np.bitwise_invert,
         ),
+        ((finchlite.reciprocal, np.reciprocal), np.reciprocal),
         ((finchlite.sin, np.sin), np.sin),
         ((finchlite.sinh, np.sinh), np.sinh),
         ((finchlite.cos, np.cos), np.cos),
@@ -249,10 +267,23 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((finchlite.acosh, np.acosh), np.acosh),
         ((finchlite.atan, np.atan), np.atan),
         ((finchlite.atanh, np.atanh), np.atanh),
+        ((finchlite.round, np.round), np.round),
+        ((finchlite.floor, np.floor), np.floor),
+        ((finchlite.ceil, np.ceil), np.ceil),
+        ((finchlite.trunc, np.trunc), np.trunc),
+        ((finchlite.exp, np.exp), np.exp),
+        ((finchlite.expm1, np.expm1), np.expm1),
         ((finchlite.log, np.log), np.log),
         ((finchlite.log1p, np.log1p), np.log1p),
         ((finchlite.log2, np.log2), np.log2),
         ((finchlite.log10, np.log10), np.log10),
+        ((finchlite.signbit, np.signbit), np.signbit),
+        ((finchlite.sqrt, np.sqrt), np.sqrt),
+        ((finchlite.square, np.square), np.square),
+        ((finchlite.sign, np.sign), np.sign),
+        ((finchlite.isfinite, np.isfinite), np.isfinite),
+        ((finchlite.isinf, np.isinf), np.isinf),
+        ((finchlite.isnan, np.isnan), np.isnan),
         ((finchlite.logical_not, np.logical_not), np.logical_not),
     ],
 )
@@ -277,6 +308,143 @@ def test_unary_operations(a, a_wrap, ops, np_op):
             result = op(wa)
 
             if isinstance(wa, finchlite.LazyTensor):
+                assert isinstance(result, finchlite.LazyTensor)
+
+                result = finchlite.compute(result)
+
+            assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([1 + 2j, 3 - 4j, 0 + 1j]),
+        np.array([[1j, -1j], [2 + 3j, -4 - 5j]]),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "op, np_op",
+    [
+        (finchlite.real, np.real),
+        (finchlite.imag, np.imag),
+    ],
+)
+def test_complex_operations(a, a_wrap, op, np_op):
+    wa = a_wrap(a)
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
+
+        expected = np_op(a)
+        result = op(wa)
+
+        if isinstance(wa, finchlite.LazyTensor):
+            assert isinstance(result, finchlite.LazyTensor)
+
+            result = finchlite.compute(result)
+
+        assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a, b, c",
+    [
+        (
+            np.array([[1, 2], [3, 4]]),
+            np.array([[1, 1], [1, 1]]),
+            np.array([[3, 3], [3, 3]]),
+        ),
+        (
+            np.array([[2, -1], [0, 5]]),
+            None,
+            np.array([[1, 1], [1, 1]]),
+        ),
+        (
+            np.array([[0, -3], [5, 10]]),
+            np.array([[0, 0], [0, 0]]),
+            None,
+        ),
+        (
+            np.array([[-5, 0], [10, 7]]),
+            -2,
+            2,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "c_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "ops, np_op, caller",
+    [
+        ((finchlite.clip, np.clip), np.clip, lambda op, a, b, c: op(a, min=b, max=c)),
+    ],
+)
+def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller):
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+    wc = c_wrap(c)
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
+
+        expected = np_op(a, b, c)
+
+        for op in ops:
+            result = caller(op, wa, wb, wc)
+
+            if (
+                isinstance(wa, finchlite.LazyTensor)
+                or isinstance(wb, finchlite.LazyTensor)
+                or isinstance(wc, finchlite.LazyTensor)
+            ):
                 assert isinstance(result, finchlite.LazyTensor)
 
                 result = finchlite.compute(result)
