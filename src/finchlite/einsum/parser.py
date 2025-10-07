@@ -334,9 +334,9 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
         operands = args[0::2]
         subscripts = args[1::2]
         # Check if the last element is the output subscript
-        if len(args) % 2 == 1 and len(subscripts) == len(operands):
-            output_idxs = list(subscripts[-1])
-            subscripts = subscripts[:-1]
+        if len(args) % 2 == 1:
+            output_idxs = list(operands[-1])
+            operands = operands[:-1]
             output_idxs = [f"i_{j}" for j in output_idxs]
         else:
             output_idxs = None

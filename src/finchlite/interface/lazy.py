@@ -1719,7 +1719,7 @@ def einop(prgm, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
-    return ctx(prgm)
+    return ctx(prgm)[0]
 
 
 def einsum(prgm, *args, **kwargs):
@@ -1727,4 +1727,4 @@ def einsum(prgm, *args, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp, bindings)
-    return ctx(prgm)
+    return ctx(prgm)[0]
