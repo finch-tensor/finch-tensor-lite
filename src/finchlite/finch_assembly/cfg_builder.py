@@ -2,6 +2,8 @@ import operator
 
 import numpy as np
 
+from ..symbolic import PostOrderDFS
+
 from ..symbolic import BasicBlock, ControlFlowGraph, Namespace, PostWalk, Rewrite
 from .nodes import (
     AssemblyNode,
@@ -33,7 +35,14 @@ from .nodes import (
 
 
 def assembly_build_cfg(node: AssemblyNode):
-    return AssemblyCFGBuilder().build(node)
+    names = set()
+    spc = Namespace()
+    for ex in PostOrderDFS(node):
+        if isinstance(ex, Variable):
+            names.add(ex.name)
+    for name in names:
+        spc.freshen(name)
+    return AssemblyCFGBuilder(spc).build(node)
 
 
 def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:
@@ -55,10 +64,10 @@ def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:
 class AssemblyCFGBuilder:
     """Incrementally builds control-flow graph for Finch Assembly IR."""
 
-    def __init__(self):
+    def __init__(self, namespace: Namespace | None = None):
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
-        self.namespace = Namespace()
+        self.namespace = namespace or Namespace()
 
     def build(self, node: AssemblyNode) -> ControlFlowGraph:
         return self(node)
