@@ -316,8 +316,8 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
     if isinstance(args[0], str):
-        subscripts = args[1]
-        operands = args[2:]
+        subscripts = args[0]
+        operands = args[1:]
         if subscripts.count("->") > 1:
             raise ValueError("Subscripts can only contain one '->' symbol.")
         if subscripts.count("->") == 1:
@@ -330,15 +330,16 @@ def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
         input_subs = [s.strip() for s in input_subs.split(",")]
         input_idxs = [list(sub) for sub in input_subs]
     else:
-        subscripts = args[1:-1:2]
-        operands = args[2::2]
-        subscripts = [[f"i_{j}" for j in sub] for sub in subscripts]
-        if len(subscripts) == len(operands) + 1:
-            input_idxs = [list(sub) for sub in subscripts[:-1]]
+        # Alternative syntax: einsum(operand0, subscript0, operand1, subscript1, ...)
+        operands = args[0::2]
+        subscripts = args[1::2]
+        # Check if the last element is the output subscript
+        if len(args) % 2 == 1 and len(subscripts) == len(operands):
             output_idxs = list(subscripts[-1])
+            subscripts = subscripts[:-1]
         else:
-            input_idxs = [list(sub) for sub in subscripts]
             output_idxs = None
+        input_idxs = [list(sub) for sub in subscripts]
     all_idxs = set().union(*input_idxs)
     if output_idxs is None:
         output_idx_set = set()

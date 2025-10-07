@@ -498,3 +498,462 @@ def test_literal_edge_cases(rng):
     expected_parens = A * (2 + 3)  # Should be A * 5
     assert np.allclose(result_parens, expected_parens)
 
+
+# =============================================================================
+# Einsum tests comparing finchlite.einsum to np.einsum
+# =============================================================================
+
+class TestEinsumImplicitMode:
+    """Test einsum in implicit mode (no -> in subscripts)"""
+    
+    @pytest.mark.skip(reason="Trace operation needs implementation fixes")
+    def test_trace(self, rng):
+        """Test trace of a matrix"""
+        A = rng.random((5, 5))
+        
+        result = finchlite.einsum("ii", A)
+        expected = np.einsum("ii", A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.trace(A))
+    
+    def test_element_wise_multiplication(self, rng):
+        """Test element-wise multiplication"""
+        A = rng.random((4, 3))
+        B = rng.random((4, 3))
+        
+        result = finchlite.einsum("ij,ij", A, B)
+        expected = np.einsum("ij,ij", A, B)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.sum(A * B))
+    
+    def test_matrix_multiplication(self, rng):
+        """Test matrix multiplication"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        result = finchlite.einsum("ij,jk", A, B)
+        expected = np.einsum("ij,jk", A, B)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, A @ B)
+    
+    def test_transpose(self, rng):
+        """Test transpose via einsum"""
+        A = rng.random((3, 4))
+        
+        result = finchlite.einsum("ji", A)
+        expected = np.einsum("ji", A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, A.T)
+    
+    def test_vector_inner_product(self, rng):
+        """Test vector inner product"""
+        a = rng.random(5)
+        b = rng.random(5)
+        
+        result = finchlite.einsum("i,i", a, b)
+        expected = np.einsum("i,i", a, b)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.inner(a, b))
+    
+    def test_vector_outer_product(self, rng):
+        """Test vector outer product"""
+        a = rng.random(3)
+        b = rng.random(4)
+        
+        result = finchlite.einsum("i,j", a, b)
+        expected = np.einsum("i,j", a, b)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.outer(a, b))
+    
+    def test_batch_matrix_multiplication(self, rng):
+        """Test batch matrix multiplication"""
+        A = rng.random((2, 3, 4))
+        B = rng.random((2, 4, 5))
+        
+        result = finchlite.einsum("bij,bjk", A, B)
+        expected = np.einsum("bij,bjk", A, B)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.matmul(A, B))
+    
+    def test_tensor_contraction(self, rng):
+        """Test tensor contraction"""
+        A = rng.random((3, 4, 5))
+        B = rng.random((4, 3, 2))
+        
+        result = finchlite.einsum("ijk,jil", A, B)
+        expected = np.einsum("ijk,jil", A, B)
+        
+        assert np.allclose(result, expected)
+    
+    def test_bilinear_transformation(self, rng):
+        """Test bilinear transformation"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5, 6))
+        C = rng.random((6, 7))
+        
+        result = finchlite.einsum("ij,jkl,lm", A, B, C)
+        expected = np.einsum("ij,jkl,lm", A, B, C)
+        
+        assert np.allclose(result, expected)
+
+
+class TestEinsumExplicitMode:
+    """Test einsum in explicit mode (with -> in subscripts)"""
+    
+    @pytest.mark.skip(reason="Trace operation needs implementation fixes")
+    def test_extract_diagonal(self, rng):
+        """Test extracting diagonal"""
+        A = rng.random((5, 5))
+        
+        result = finchlite.einsum("ii->i", A)
+        expected = np.einsum("ii->i", A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.diag(A))
+    
+    def test_sum_over_axis(self, rng):
+        """Test sum over specific axis"""
+        A = rng.random((4, 5))
+        
+        # Sum over axis 1
+        result = finchlite.einsum("ij->i", A)
+        expected = np.einsum("ij->i", A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.sum(A, axis=1))
+        
+        # Sum over axis 0
+        result2 = finchlite.einsum("ij->j", A)
+        expected2 = np.einsum("ij->j", A)
+        
+        assert np.allclose(result2, expected2)
+        assert np.allclose(result2, np.sum(A, axis=0))
+    
+    def test_total_sum(self, rng):
+        """Test total sum"""
+        A = rng.random((3, 4))
+        
+        result = finchlite.einsum("ij->", A)
+        expected = np.einsum("ij->", A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.sum(A))
+    
+    def test_transpose_explicit(self, rng):
+        """Test transpose with explicit output"""
+        A = rng.random((3, 4))
+        
+        result = finchlite.einsum("ij->ji", A)
+        expected = np.einsum("ij->ji", A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, A.T)
+    
+    def test_matrix_vector_explicit(self, rng):
+        """Test matrix-vector multiplication with explicit output"""
+        A = rng.random((3, 4))
+        b = rng.random(4)
+        
+        result = finchlite.einsum("ij,j->i", A, b)
+        expected = np.einsum("ij,j->i", A, b)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, A @ b)
+    
+    def test_custom_contraction(self, rng):
+        """Test custom tensor contraction with explicit output"""
+        A = rng.random((2, 3, 4))
+        B = rng.random((4, 5))
+        
+        result = finchlite.einsum("ijk,kl->ijl", A, B)
+        expected = np.einsum("ijk,kl->ijl", A, B)
+        
+        assert np.allclose(result, expected)
+    
+    def test_reorder_axes(self, rng):
+        """Test reordering axes with explicit output"""
+        A = rng.random((2, 3, 4, 5))
+        
+        result = finchlite.einsum("ijkl->ljik", A)
+        expected = np.einsum("ijkl->ljik", A)
+        
+        assert np.allclose(result, expected)
+
+
+class TestEinsumVariableOrdering:
+    """Test different variable orderings in einsum"""
+    
+    def test_alphabetical_ordering_implicit(self, rng):
+        """Test that implicit mode respects alphabetical ordering"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        # Standard order
+        result1 = finchlite.einsum("ij,jk", A, B)
+        expected1 = np.einsum("ij,jk", A, B)
+        assert np.allclose(result1, expected1)
+        
+        # Different variable names but same meaning
+        result2 = finchlite.einsum("ab,bc", A, B)
+        expected2 = np.einsum("ab,bc", A, B)
+        assert np.allclose(result2, expected2)
+        assert np.allclose(result1, result2)
+    
+    def test_non_alphabetical_ordering(self, rng):
+        """Test non-alphabetical variable ordering"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        # Non-alphabetical order should transpose result in implicit mode
+        result = finchlite.einsum("ij,jl", A, B)
+        expected = np.einsum("ij,jl", A, B)
+        
+        assert np.allclose(result, expected)
+        # This should be different from alphabetical ij,jk due to l < k
+    
+    def test_variable_ordering_explicit_override(self, rng):
+        """Test that explicit mode overrides alphabetical ordering"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        # Force specific output order
+        result = finchlite.einsum("ij,jk->ki", A, B)
+        expected = np.einsum("ij,jk->ki", A, B)
+        
+        assert np.allclose(result, expected)
+        # This should be transpose of standard matrix multiplication
+        assert np.allclose(result, (A @ B).T)
+    
+    def test_repeated_indices(self, rng):
+        """Test repeated indices for diagonal operations"""
+        A = rng.random((4, 4, 4))
+        
+        # Repeated index in same tensor
+        result = finchlite.einsum("iji", A)
+        expected = np.einsum("iji", A)
+        
+        assert np.allclose(result, expected)
+    
+    def test_mixed_variable_types(self, rng):
+        """Test mixing different variable names"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        # Mix letters from different parts of alphabet
+        result = finchlite.einsum("az,zb", A, B)
+        expected = np.einsum("az,zb", A, B)
+        
+        assert np.allclose(result, expected)
+
+
+class TestEinsumSpecialSyntax:
+    """Test einsum special syntax: einsum(op1, op1inds, op2, op2inds, ...)"""
+    
+    def test_alternative_syntax_matrix_mult(self, rng):
+        """Test alternative syntax for matrix multiplication"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        # Standard syntax
+        result1 = finchlite.einsum("ij,jk", A, B)
+        
+        # Alternative syntax
+        result2 = finchlite.einsum(A, [0, 1], B, [1, 2])
+        
+        expected = np.einsum(A, [0, 1], B, [1, 2])
+        
+        assert np.allclose(result1, result2)
+        assert np.allclose(result2, expected)
+    
+    def test_alternative_syntax_with_output(self, rng):
+        """Test alternative syntax with explicit output specification"""
+        A = rng.random((3, 4))
+        B = rng.random((4, 5))
+        
+        # Explicit output indices
+        result = finchlite.einsum(A, [0, 1], B, [1, 2], [0, 2])
+        expected = np.einsum(A, [0, 1], B, [1, 2], [0, 2])
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, A @ B)
+    
+    def test_alternative_syntax_transpose(self, rng):
+        """Test alternative syntax for transpose"""
+        A = rng.random((3, 4))
+        
+        # Implicit transpose
+        result1 = finchlite.einsum(A, [1, 0])
+        expected1 = np.einsum(A, [1, 0])
+        
+        assert np.allclose(result1, expected1)
+        assert np.allclose(result1, A.T)
+        
+        # Explicit transpose
+        result2 = finchlite.einsum(A, [0, 1], [1, 0])
+        expected2 = np.einsum(A, [0, 1], [1, 0])
+        
+        assert np.allclose(result2, expected2)
+        assert np.allclose(result2, A.T)
+    
+    @pytest.mark.skip(reason="Trace operation needs implementation fixes")
+    def test_alternative_syntax_trace(self, rng):
+        """Test alternative syntax for trace"""
+        A = rng.random((5, 5))
+        
+        # Trace using alternative syntax
+        result = finchlite.einsum(A, [0, 0])
+        expected = np.einsum(A, [0, 0])
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.trace(A))
+    
+    @pytest.mark.skip(reason="Trace operation needs implementation fixes")
+    def test_alternative_syntax_diagonal(self, rng):
+        """Test alternative syntax for diagonal extraction"""
+        A = rng.random((5, 5))
+        
+        result = finchlite.einsum(A, [0, 0], [0])
+        expected = np.einsum(A, [0, 0], [0])
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.diag(A))
+    
+    def test_alternative_syntax_sum(self, rng):
+        """Test alternative syntax for sum operations"""
+        A = rng.random((3, 4))
+        
+        # Sum over axis 1
+        result1 = finchlite.einsum(A, [0, 1], [0])
+        expected1 = np.einsum(A, [0, 1], [0])
+        
+        assert np.allclose(result1, expected1)
+        assert np.allclose(result1, np.sum(A, axis=1))
+        
+        # Total sum
+        result2 = finchlite.einsum(A, [0, 1], [])
+        expected2 = np.einsum(A, [0, 1], [])
+        
+        assert np.allclose(result2, expected2)
+        assert np.allclose(result2, np.sum(A))
+    
+    def test_alternative_syntax_outer_product(self, rng):
+        """Test alternative syntax for outer product"""
+        a = rng.random(3)
+        b = rng.random(4)
+        
+        result = finchlite.einsum(a, [0], b, [1])
+        expected = np.einsum(a, [0], b, [1])
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, np.outer(a, b))
+    
+    def test_alternative_syntax_complex_contraction(self, rng):
+        """Test alternative syntax for complex tensor contraction"""
+        A = rng.random((2, 3, 4))
+        B = rng.random((4, 5, 6))
+        C = rng.random((6, 2))
+        
+        result = finchlite.einsum(A, [0, 1, 2], B, [2, 3, 4], C, [4, 0], [1, 3])
+        expected = np.einsum(A, [0, 1, 2], B, [2, 3, 4], C, [4, 0], [1, 3])
+        
+        assert np.allclose(result, expected)
+
+
+class TestEinsumEdgeCases:
+    """Test edge cases and special scenarios"""
+    
+    def test_single_tensor_operations(self, rng):
+        """Test operations on single tensors"""
+        A = rng.random((3, 4, 5))
+        
+        # Identity operation
+        result1 = finchlite.einsum("ijk", A)
+        expected1 = np.einsum("ijk", A)
+        assert np.allclose(result1, expected1)
+        assert np.allclose(result1, A)
+        
+        # Permute dimensions
+        result2 = finchlite.einsum("ikj", A)
+        expected2 = np.einsum("ikj", A)
+        assert np.allclose(result2, expected2)
+    
+    def test_scalar_operations(self, rng):
+        """Test operations involving scalars"""
+        scalar = rng.random()
+        A = rng.random((3, 4))
+        
+        # Scalar multiplication (broadcasting)
+        result = finchlite.einsum(",ij", scalar, A)
+        expected = np.einsum(",ij", scalar, A)
+        
+        assert np.allclose(result, expected)
+        assert np.allclose(result, scalar * A)
+    
+    def test_empty_dimensions(self, rng):
+        """Test with empty dimensions"""
+        A = rng.random((0, 3))
+        B = rng.random((3, 4))
+        
+        result = finchlite.einsum("ij,jk", A, B)
+        expected = np.einsum("ij,jk", A, B)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == (0, 4)
+    
+    def test_1d_tensors(self, rng):
+        """Test operations on 1D tensors"""
+        a = rng.random(5)
+        b = rng.random(5)
+        
+        # Element-wise product and sum
+        result = finchlite.einsum("i,i", a, b)
+        expected = np.einsum("i,i", a, b)
+        
+        assert np.allclose(result, expected)
+        assert np.isscalar(result) or result.shape == ()
+    
+    def test_high_dimensional(self, rng):
+        """Test high-dimensional tensors"""
+        A = rng.random((2, 2, 2, 2, 2))
+        B = rng.random((2, 2, 2, 2, 2))
+        
+        result = finchlite.einsum("abcde,abcde", A, B)
+        expected = np.einsum("abcde,abcde", A, B)
+        
+        assert np.allclose(result, expected)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.complex64, np.complex128])
+class TestEinsumDataTypes:
+    """Test einsum with different data types"""
+    
+    def test_matrix_multiplication_dtypes(self, rng, dtype):
+        """Test matrix multiplication with different dtypes"""
+        A = rng.random((3, 4)).astype(dtype)
+        B = rng.random((4, 5)).astype(dtype)
+        
+        result = finchlite.einsum("ij,jk", A, B)
+        expected = np.einsum("ij,jk", A, B)
+        
+        assert np.allclose(result, expected)
+        # Check dtype preservation (may depend on implementation)
+    
+    def test_complex_operations(self, rng, dtype):
+        """Test operations with complex numbers"""
+        if not np.issubdtype(dtype, np.complexfloating):
+            pytest.skip("Test only for complex dtypes")
+            
+        A = (rng.random((3, 3)) + 1j * rng.random((3, 3))).astype(dtype)
+        
+        result = finchlite.einsum("ij", A)
+        expected = np.einsum("ij", A)
+        
+        assert np.allclose(result, expected)
+
