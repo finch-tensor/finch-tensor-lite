@@ -11,7 +11,6 @@ import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from .. import einsum as ein
-
 from ..algebra import (
     Tensor,
     TensorFType,
@@ -922,8 +921,10 @@ def floordiv(x1, x2) -> LazyTensor:
 def mod(x1, x2) -> LazyTensor:
     return elementwise(operator.mod, defer(x1), defer(x2))
 
+
 def pow(x1, x2) -> LazyTensor:
     return power(x1, x2)
+
 
 def power(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
@@ -1719,6 +1720,7 @@ def einop(prgm, **kwargs):
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
     return ctx(prgm)
+
 
 def einsum(prgm, *args, **kwargs):
     stmt, bindings = ein.parse_einsum(prgm, *args)

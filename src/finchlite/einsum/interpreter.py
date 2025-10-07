@@ -1,10 +1,9 @@
 import operator
-import builtins
 
 import numpy as np
 
-from . import nodes as ein
 from ..algebra import overwrite, promote_max, promote_min
+from . import nodes as ein
 
 nary_ops = {
     operator.add: "add",
@@ -67,6 +66,7 @@ reduction_ops = {
     np.logical_or: "any",
 }
 
+
 class EinsumInterpreter:
     def __init__(self, xp=None, bindings=None, loops=None):
         if bindings is None:
@@ -99,7 +99,8 @@ class EinsumInterpreter:
                 tns = self(tns)
                 tns = xp.permute_dims(tns, perm)
                 return xp.expand_dims(
-                    tns, [i for i in range(len(self.loops)) if self.loops[i] not in idxs]
+                    tns,
+                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
             case ein.Plan(bodies):
                 res = None

@@ -413,8 +413,10 @@ def mod(x1, x2):
         return lazy.mod(x1, x2)
     return compute(lazy.mod(x1, x2))
 
+
 def pow(x1, x2):
     return power(x1, x2)
+
 
 def power(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
@@ -930,6 +932,8 @@ def einop(prgm: str, /, **kwargs):
         return lazy.einop(prgm, **kwargs)
     return compute(lazy.einop(prgm, **kwargs))
 
+
+def einsum(*args, **kwargs):
     """
     einsum(subscripts, *operands)
 
@@ -1036,33 +1040,33 @@ def einop(prgm: str, /, **kwargs):
 
     Examples
     --------
-    >>> a = np.arange(25).reshape(5,5)
+    >>> a = np.arange(25).reshape(5, 5)
     >>> b = np.arange(5)
-    >>> c = np.arange(6).reshape(2,3)
+    >>> c = np.arange(6).reshape(2, 3)
 
     Trace of a matrix:
 
-    >>> np.einsum('ii', a)
+    >>> np.einsum("ii", a)
     60
-    >>> np.einsum(a, [0,0])
+    >>> np.einsum(a, [0, 0])
     60
     >>> np.trace(a)
     60
 
     Extract the diagonal (requires explicit form):
 
-    >>> np.einsum('ii->i', a)
+    >>> np.einsum("ii->i", a)
     array([ 0,  6, 12, 18, 24])
-    >>> np.einsum(a, [0,0], [0])
+    >>> np.einsum(a, [0, 0], [0])
     array([ 0,  6, 12, 18, 24])
     >>> np.diag(a)
     array([ 0,  6, 12, 18, 24])
 
     Sum over an axis (requires explicit form):
 
-    >>> np.einsum('ij->i', a)
+    >>> np.einsum("ij->i", a)
     array([ 10,  35,  60,  85, 110])
-    >>> np.einsum(a, [0,1], [0])
+    >>> np.einsum(a, [0, 1], [0])
     array([ 10,  35,  60,  85, 110])
     >>> np.sum(a, axis=1)
     array([ 10,  35,  60,  85, 110])
@@ -1070,22 +1074,22 @@ def einop(prgm: str, /, **kwargs):
     For higher dimensional arrays summing a single axis can be done
     with ellipsis:
 
-    >>> np.einsum('...j->...', a)
+    >>> np.einsum("...j->...", a)
     array([ 10,  35,  60,  85, 110])
-    >>> np.einsum(a, [Ellipsis,1], [Ellipsis])
+    >>> np.einsum(a, [Ellipsis, 1], [Ellipsis])
     array([ 10,  35,  60,  85, 110])
 
     Compute a matrix transpose, or reorder any number of axes:
 
-    >>> np.einsum('ji', c)
+    >>> np.einsum("ji", c)
     array([[0, 3],
            [1, 4],
            [2, 5]])
-    >>> np.einsum('ij->ji', c)
+    >>> np.einsum("ij->ji", c)
     array([[0, 3],
            [1, 4],
            [2, 5]])
-    >>> np.einsum(c, [1,0])
+    >>> np.einsum(c, [1, 0])
     array([[0, 3],
            [1, 4],
            [2, 5]])
@@ -1096,30 +1100,30 @@ def einop(prgm: str, /, **kwargs):
 
     Vector inner products:
 
-    >>> np.einsum('i,i', b, b)
+    >>> np.einsum("i,i", b, b)
     30
     >>> np.einsum(b, [0], b, [0])
     30
-    >>> np.inner(b,b)
+    >>> np.inner(b, b)
     30
 
     Matrix vector multiplication:
 
-    >>> np.einsum('ij,j', a, b)
+    >>> np.einsum("ij,j", a, b)
     array([ 30,  80, 130, 180, 230])
-    >>> np.einsum(a, [0,1], b, [1])
+    >>> np.einsum(a, [0, 1], b, [1])
     array([ 30,  80, 130, 180, 230])
     >>> np.dot(a, b)
     array([ 30,  80, 130, 180, 230])
-    >>> np.einsum('...j,j', a, b)
+    >>> np.einsum("...j,j", a, b)
     array([ 30,  80, 130, 180, 230])
 
     Broadcasting and scalar multiplication:
 
-    >>> np.einsum('..., ...', 3, c)
+    >>> np.einsum("..., ...", 3, c)
     array([[ 0,  3,  6],
            [ 9, 12, 15]])
-    >>> np.einsum(',ij', 3, c)
+    >>> np.einsum(",ij", 3, c)
     array([[ 0,  3,  6],
            [ 9, 12, 15]])
     >>> np.einsum(3, [Ellipsis], c, [Ellipsis])
@@ -1131,33 +1135,33 @@ def einop(prgm: str, /, **kwargs):
 
     Vector outer product:
 
-    >>> np.einsum('i,j', np.arange(2)+1, b)
+    >>> np.einsum("i,j", np.arange(2) + 1, b)
     array([[0, 1, 2, 3, 4],
            [0, 2, 4, 6, 8]])
-    >>> np.einsum(np.arange(2)+1, [0], b, [1])
+    >>> np.einsum(np.arange(2) + 1, [0], b, [1])
     array([[0, 1, 2, 3, 4],
            [0, 2, 4, 6, 8]])
-    >>> np.outer(np.arange(2)+1, b)
+    >>> np.outer(np.arange(2) + 1, b)
     array([[0, 1, 2, 3, 4],
            [0, 2, 4, 6, 8]])
 
     Tensor contraction:
 
-    >>> a = np.arange(60.).reshape(3,4,5)
-    >>> b = np.arange(24.).reshape(4,3,2)
-    >>> np.einsum('ijk,jil->kl', a, b)
+    >>> a = np.arange(60.0).reshape(3, 4, 5)
+    >>> b = np.arange(24.0).reshape(4, 3, 2)
+    >>> np.einsum("ijk,jil->kl", a, b)
     array([[4400., 4730.],
            [4532., 4874.],
            [4664., 5018.],
            [4796., 5162.],
            [4928., 5306.]])
-    >>> np.einsum(a, [0,1,2], b, [1,0,3], [2,3])
+    >>> np.einsum(a, [0, 1, 2], b, [1, 0, 3], [2, 3])
     array([[4400., 4730.],
            [4532., 4874.],
            [4664., 5018.],
            [4796., 5162.],
            [4928., 5306.]])
-    >>> np.tensordot(a,b, axes=([1,0],[0,1]))
+    >>> np.tensordot(a, b, axes=([1, 0], [0, 1]))
     array([[4400., 4730.],
            [4532., 4874.],
            [4664., 5018.],
@@ -1166,19 +1170,19 @@ def einop(prgm: str, /, **kwargs):
 
     Example of ellipsis use:
 
-    >>> a = np.arange(6).reshape((3,2))
-    >>> b = np.arange(12).reshape((4,3))
-    >>> np.einsum('ki,jk->ij', a, b)
+    >>> a = np.arange(6).reshape((3, 2))
+    >>> b = np.arange(12).reshape((4, 3))
+    >>> np.einsum("ki,jk->ij", a, b)
     array([[10, 28, 46, 64],
            [13, 40, 67, 94]])
-    >>> np.einsum('ki,...k->i...', a, b)
+    >>> np.einsum("ki,...k->i...", a, b)
     array([[10, 28, 46, 64],
            [13, 40, 67, 94]])
-    >>> np.einsum('k...,jk', a, b)
+    >>> np.einsum("k...,jk", a, b)
     array([[10, 28, 46, 64],
            [13, 40, 67, 94]])
     """
 
     if builtins.any(isinstance(v, lazy.LazyTensor) for v in args):
-        return lazy.einsum(prgm, *args, **kwargs)
-    return compute(lazy.einsum(prgm, *args, **kwargs))
+        return lazy.einsum(*args, **kwargs)
+    return compute(lazy.einsum(*args, **kwargs))

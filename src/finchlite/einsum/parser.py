@@ -1,13 +1,13 @@
 import operator
-import builtins
+from typing import Any
 
 import numpy as np
 
 from lark import Lark, Tree
 
-from . import nodes as ein
 from ..algebra import overwrite, promote_max, promote_min
 from ..symbolic import Namespace
+from . import nodes as ein
 
 nary_ops = {
     "+": operator.add,
@@ -252,9 +252,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpr:
                 right = _parse_einop_expr(args[i + 2])
                 and_ = ein.Literal(nary_ops["and"])  # type: ignore[union-attr]
                 op = ein.Literal(nary_ops[args[i + 1].value])  # type: ignore[union-attr]
-                expr = ein.Call(
-                    and_, (expr, ein.Call(op, (left, right)))
-                )  # type: ignore[union-attr]
+                expr = ein.Call(and_, (expr, ein.Call(op, (left, right))))  # type: ignore[union-attr]
             return expr
         case Tree("power_expr", args) if len(args) > 1:
             left = _parse_einop_expr(args[0])
@@ -265,7 +263,9 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpr:
             op = ein.Literal(unary_ops[op.value])  # type: ignore[union-attr]
             return ein.Call(op, (_parse_einop_expr(arg),))
         case Tree("access", [tns, *idxs]):
-            return ein.Access(ein.Alias(tns.value), (*(ein.Index(idx.value) for idx in idxs),))  # type: ignore[union-attr]
+            return ein.Access(
+                ein.Alias(tns.value), (*(ein.Index(idx.value) for idx in idxs),)
+            )  # type: ignore[union-attr]
         case Tree("bool_literal", (val,)):
             return ein.Literal(val.value == "True")  # type: ignore[union-attr]
         case Tree("int_literal", (val,)):
@@ -290,50 +290,54 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
             op = ein.Literal(reduction_ops[op.value])  # type: ignore[union-attr]
             return ein.Einsum(
-                op, ein.Alias(tns.value), idxs_exprs, arg   # type: ignore[union-attr]
+                op,
+                ein.Alias(tns.value),
+                idxs_exprs,
+                arg,  # type: ignore[union-attr]
             )
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             op = ein.Literal(overwrite)  # type: ignore[union-attr]
-            return ein.Einsum(op, ein.Alias(tns.value), tuple(ein.Index(idx.value) for idx in idxs), arg)  # type: ignore[union-attr]
+            return ein.Einsum(
+                op,
+                ein.Alias(tns.value),
+                tuple(ein.Index(idx.value) for idx in idxs),
+                arg,
+            )  # type: ignore[union-attr]
 
         case _:
             raise ValueError(
                 f"Expected top-level assignment or increment, got {tree.data}"
             )
 
-def parse_einsum(*args) -> tuple(EinsumNode, dict[str, Any]):
+
+def parse_einsum(*args) -> tuple[ein.EinsumNode, dict[str, Any]]:
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
     if isinstance(args[0], str):
         (subscripts, *operands) = args
-        if subscripts.count('->') > 1:
+        if subscripts.count("->") > 1:
             raise ValueError("Subscripts can only contain one '->' symbol.")
-        elif subscripts.count('->') == 1:
-            input_subs, output_subs = subscripts.split('->')
-            output_subs = output_subs.strip()
+        if subscripts.count("->") == 1:
+            input_subs, output_sub = subscripts.split("->")
+            output_sub = output_sub.strip()
+            output_idxs = list(output_sub)
         else:
             input_subs = subscripts
-            output_subs = None
-        input_subs = [s.strip() for s in input_subs.split(',')]
-        input_idxs = [set(sub) for sub in input_subs]
-        if output_subs is None:
             output_idxs = None
-        else:
-            output_idxs = set(output_subs)
+        input_subs = [s.strip() for s in input_subs.split(",")]
+        input_idxs = [list(sub) for sub in input_subs]
     else:
         subscripts = args[1:-1:2]
         operands = args[2::2]
         subscripts = [[f"i_{j}" for j in sub] for sub in subscripts]
         if len(subscripts) == len(operands) + 1:
-            input_idxs = [set(sub) for sub in subscripts[:-1]]
-            output_idxs = set(subscripts[-1])
+            input_idxs = [list(sub) for sub in subscripts[:-1]]
+            output_idxs = list(subscripts[-1])
         else:
-            input_idxs = [set(sub) for sub in subscripts]
+            input_idxs = [list(sub) for sub in subscripts]
             output_idxs = None
-            raise ValueError("When providing subscripts as separate arguments, must provide one more subscript than operands.")
-
     all_idxs = set().union(*input_idxs)
     if output_idxs is None:
         output_idxs = set()
@@ -342,7 +346,9 @@ def parse_einsum(*args) -> tuple(EinsumNode, dict[str, Any]):
                 output_idxs.add(idx)
     if len(input_idxs) != len(operands):
         raise ValueError("Number of input subscripts must match number of operands.")
-    assert output_idxs.issubset(all_idxs), "Output indices must be a subset of input indices."
+    assert output_idxs.issubset(all_idxs), (
+        "Output indices must be a subset of input indices."
+    )
     spc = Namespace()
     for i in all_idxs:
         spc.freshen(i)
@@ -353,20 +359,18 @@ def parse_einsum(*args) -> tuple(EinsumNode, dict[str, Any]):
     out_tns = ein.Alias(spc.freshen("B"))
     idxs = tuple(ein.Index(spc.freshen(i)) for i in output_idxs)
     in_tnss = [ein.Alias(spc.freshen("A")) for _ in operands]
-    arg = ein.Access(
-        in_tnss[0],
-        tuple(spc.freshen(i) for i in input_idxs[0])
-    )
+    arg = ein.Access(in_tnss[0], tuple(spc.freshen(i) for i in input_idxs[0]))
     for i in range(1, len(operands)):
         arg = ein.Call(
             ein.Literal(operator.mul),
-            (arg, ein.Access(
-                in_tnss[i],
-                tuple(spc.freshen(i) for i in input_idxs[i])
-            ))
+            (arg, ein.Access(in_tnss[i], tuple(spc.freshen(i) for i in input_idxs[i]))),
         )
     return (
-        ein.Einsum( out_tns, idxs, op, arg,),
-        {in_tnss[i].name: operands[i] for i in range(len(operands))}
+        ein.Einsum(
+            out_tns,
+            idxs,
+            op,
+            arg,
+        ),
+        {in_tnss[i].name: operands[i] for i in range(len(operands))},
     )
-

@@ -53,7 +53,6 @@ class EinsumExpr(EinsumNode, ABC):
         pass
 
 
-
 @dataclass(eq=True, frozen=True)
 class Literal(EinsumExpr):
     """
@@ -70,6 +69,7 @@ class Literal(EinsumExpr):
 
     def get_idxs(self) -> set["Index"]:
         return set()
+
 
 @dataclass(eq=True, frozen=True)
 class Index(EinsumExpr):

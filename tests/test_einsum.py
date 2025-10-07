@@ -1,4 +1,3 @@
-
 import pytest
 
 import numpy as np
@@ -183,7 +182,9 @@ def test_operator_precedence_bitwise_operations(rng):
     D = rng.integers(0, 8, size=(3, 3))
 
     # Test: A | B ^ C & D should be A | (B ^ (C & D))
-    result = finchlite.einop("E[i,j] = A[i,j] | B[i,j] ^ C[i,j] & D[i,j]", A=A, B=B, C=C, D=D)
+    result = finchlite.einop(
+        "E[i,j] = A[i,j] | B[i,j] ^ C[i,j] & D[i,j]", A=A, B=B, C=C, D=D
+    )
     expected = A | (B ^ (C & D))
 
     assert np.allclose(result, expected)
@@ -222,7 +223,9 @@ def test_operator_precedence_with_parentheses(rng):
     C = rng.random((3, 3))
 
     # Test: (A + B) * C should be different from A + B * C
-    result_with_parens = finchlite.einop("D[i,j] = (A[i,j] + B[i,j]) * C[i,j]", A=A, B=B, C=C)
+    result_with_parens = finchlite.einop(
+        "D[i,j] = (A[i,j] + B[i,j]) * C[i,j]", A=A, B=B, C=C
+    )
     result_without_parens = finchlite.einop(
         "E[i,j] = A[i,j] + B[i,j] * C[i,j]", A=A, B=B, C=C
     )
@@ -303,7 +306,9 @@ def test_comparison_chaining_four_way(rng):
     D = np.array([[4]])
 
     # Test: A < B < C < D should be ((A < B) and (B < C)) and (C < D)
-    result = finchlite.einop("E[i,j] = A[i,j] < B[i,j] < C[i,j] < D[i,j]", A=A, B=B, C=C, D=D)
+    result = finchlite.einop(
+        "E[i,j] = A[i,j] < B[i,j] < C[i,j] < D[i,j]", A=A, B=B, C=C, D=D
+    )
     expected = np.logical_and(np.logical_and(A < B, B < C), C < D).astype(float)
 
     assert np.allclose(result, expected)
@@ -377,7 +382,9 @@ def test_bool_literals(rng):
 
     # Test boolean operations with literals
     A_bool = rng.random((2, 2)) > 0.5
-    result_and = finchlite.einop("D[i,j] = A_bool[i,j] and True and False", A_bool=A_bool)
+    result_and = finchlite.einop(
+        "D[i,j] = A_bool[i,j] and True and False", A_bool=A_bool
+    )
     expected_and = np.logical_and(np.logical_and(A_bool, True), False)
     assert np.allclose(result_and, expected_and)
 
