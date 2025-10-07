@@ -2,9 +2,14 @@ import operator
 
 import numpy as np
 
-from ..symbolic import PostOrderDFS
-
-from ..symbolic import BasicBlock, ControlFlowGraph, Namespace, PostWalk, Rewrite
+from ..symbolic import (
+    BasicBlock,
+    ControlFlowGraph,
+    Namespace,
+    PostOrderDFS,
+    PostWalk,
+    Rewrite,
+)
 from .nodes import (
     AssemblyNode,
     Assert,
