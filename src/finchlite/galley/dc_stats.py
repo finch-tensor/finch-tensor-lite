@@ -1,11 +1,14 @@
+import math
 import operator
-from collections.abc import Iterable
+from collections import Counter
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
 import finchlite.finch_notation as ntn
+from finchlite.algebra import is_annihilator
 from finchlite.compile import dimension
 from finchlite.finch_notation.nodes import (
     Literal,
@@ -17,41 +20,85 @@ from .tensor_stats import TensorStats
 
 @dataclass(frozen=True)
 class DC:
+    """
+    A degree constraint (DC) record representing structural cardinality
+
+    Attributes:
+        from_indices: Conditioning index names.
+        to_indices: Index names whose distinct combinations are counted
+            when `from_indices` are fixed.
+        value: Estimated number of distinct combinations for `to_indices`
+            given the fixed `from_indices`.
+    """
+
     from_indices: frozenset[str]
     to_indices: frozenset[str]
     value: float
 
 
 class DCStats(TensorStats):
+    """
+    Structural statistics derived from a tensor using degree constraint (DCs).
+
+    DCStats scans a tensor and computes degree constraint (DC) records that
+    summarize how index sets relate. These DCs can be used to estimate the
+    number of non-fill values without materializing sparse coordinates.
+    """
+
     def __init__(self, tensor: Any, fields: Iterable[str]):
+        """
+        Initialize DCStats from a tensor and its axis names, build the TensorDef,
+        and compute degree constraint (DC) records from the tensor’s structure.
+        """
         self.tensordef = TensorDef.from_tensor(tensor, fields)
-        self.fields = list(fields)
-        self.tensor = np.asarray(tensor)
-        self.dcs = self._structure_to_dcs()
+        self.dcs = self._structure_to_dcs(tensor)
 
-    @classmethod
-    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
-        return None
+    @staticmethod
+    def from_def(tensordef: TensorDef, dcs: set[DC]) -> "DCStats":
+        """
+        Build DCStats directly from a TensorDef and an existing DC set.
+        """
+        self = object.__new__(DCStats)
+        self.tensordef = tensordef.copy()
+        self.dcs = set(dcs)
+        return self
 
-    def _structure_to_dcs(self) -> set[DC]:
-        if self.tensor.size == 0:
+    def _structure_to_dcs(self, arr: Any) -> set[DC]:
+        """
+        Dispatch DC extraction based on tensor dimensionality.
+
+        Returns:
+            set[DC]: One of the following, depending on `self.tensor.ndim`:
+                • Empty set, if the tensor is empty (`self.tensor.size == 0`)
+                • 1D → _vector_structure_to_dcs()
+                • 2D → _matrix_structure_to_dcs()
+                • 3D → _3d_structure_to_dcs()
+                • 4D → _4d_structure_to_dcs()
+
+        Raises:
+            NotImplementedError: If dimensionality is not in {1, 2, 3, 4}.
+        """
+        if arr is None or getattr(arr, "size", 0) == 0:
             return set()
 
-        ndim = self.tensor.ndim
+        ndim = getattr(arr, "ndim", None)
         if ndim == 1:
-            return self._vector_structure_to_dcs()
+            return self._vector_structure_to_dcs(arr)
         if ndim == 2:
-            return self._matrix_structure_to_dcs()
+            return self._matrix_structure_to_dcs(arr)
         if ndim == 3:
-            return self._3d_structure_to_dcs()
+            return self._3d_structure_to_dcs(arr)
         if ndim == 4:
-            return self._4d_structure_to_dcs()
+            return self._4d_structure_to_dcs(arr)
         raise NotImplementedError(f"DC analysis not implemented for {ndim}D tensors")
 
-    def _vector_structure_to_dcs(self) -> set[DC]:
+    def _vector_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
-        Build a Finch Notation program that counts non-fill entries in a 1-D tensor,
-        execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes the structural
+        relationships within a one-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 1-D tensor.
         """
         A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
@@ -97,15 +144,18 @@ class DCStats(TensorStats):
         )
 
         mod = ntn.NotationInterpreter()(prgm)
-        cnt = mod.vector_structure_to_dcs(self.tensor)
-        result = self.fields[0]
+        cnt = mod.vector_structure_to_dcs(arr)
+        result = next(iter(self.tensordef.dim_sizes))
 
         return {DC(frozenset(), frozenset([result]), float(cnt))}
 
-    def _matrix_structure_to_dcs(self) -> set[DC]:
+    def _matrix_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
-        Build a Finch Notation program that extracts structural dependencies
-        from a 2-D tensor, execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes the structural
+        relationships within a two-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 2-D tensor.
         """
 
         A = ntn.Variable("A", np.ndarray)
@@ -288,9 +338,10 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        d_ij = mod.matrix_total_nnz(self.tensor)
-        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(self.tensor)
-        i_result, j_result = self.fields
+        d_ij = mod.matrix_total_nnz(arr)
+        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr)
+        i_result, j_result = tuple(self.tensordef.dim_sizes)
+
         return {
             DC(frozenset(), frozenset([i_result, j_result]), float(d_ij)),
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
@@ -299,10 +350,13 @@ class DCStats(TensorStats):
             DC(frozenset([j_result]), frozenset([i_result, j_result]), float(d_j_i_)),
         }
 
-    def _3d_structure_to_dcs(self) -> set[DC]:
+    def _3d_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
-        Build a Finch Notation program that extracts structural dependencies
-        from a 3-D tensor, execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes structural
+        relationships within a three-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 3-D tensor.
         """
         A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
@@ -570,11 +624,9 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        d_ijk = mod._3d_total_nnz(self.tensor)
-        d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(
-            self.tensor
-        )
-        i_result, j_result, k_result = self.fields
+        d_ijk = mod._3d_total_nnz(arr)
+        d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(arr)
+        i_result, j_result, k_result = tuple(self.tensordef.dim_sizes)
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
             DC(frozenset(), frozenset([j_result]), float(d_j_)),
@@ -585,10 +637,13 @@ class DCStats(TensorStats):
             DC(frozenset([]), frozenset([i_result, j_result, k_result]), float(d_ijk)),
         }
 
-    def _4d_structure_to_dcs(self) -> set[DC]:
+    def _4d_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
-        Build a Finch Notation program that extracts structural dependencies
-        from a 4-D tensor, execute it, and return a set of DC.
+        Build and execute a Finch-notation program that analyzes structural
+        relationships within a four-dimensional tensor.
+
+        Returns:
+            set[DC]: The degree constraint (DC) records derived from the 4-D tensor.
         """
         A = ntn.Variable("A", np.ndarray)
         A_ = ntn.Slot("A_", np.ndarray)
@@ -617,7 +672,7 @@ class DCStats(TensorStats):
         d_k = ntn.Variable("d_k", np.int64)
         d_k_ijw = ntn.Variable("d_k_ijw", np.int64)
         d_w = ntn.Variable("d_w", np.int64)
-        d_w_ijk = ntn.Variable("d_l_ijw", np.int64)
+        d_w_ijk = ntn.Variable("d_w_ijk", np.int64)
 
         prgm = ntn.Module(
             (
@@ -961,12 +1016,12 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        d_ijkw = mod._4d_total_nnz(self.tensor)
+        d_ijkw = mod._4d_total_nnz(arr)
         d_i_, d_i_jkw_, d_j_, d_j_ikw_, d_k_, d_k_ijw_, d_w_, d_w_ijk_ = (
-            mod._4d_structure_to_dcs(self.tensor)
+            mod._4d_structure_to_dcs(arr)
         )
 
-        i_result, j_result, k_result, w_result = self.fields
+        i_result, j_result, k_result, w_result = tuple(self.tensordef.dim_sizes)
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
             DC(frozenset(), frozenset([j_result]), float(d_j_)),
@@ -1000,8 +1055,124 @@ class DCStats(TensorStats):
         }
 
     @staticmethod
-    def mapjoin(op, *args, **kwargs):
-        pass
+    def _merge_dc_join(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+        """
+        Merge DCs for join-like operators
+
+        Args:
+            new_def: The merged TensorDef produced by TensorDef.mapjoin(...).
+            all_stats: DCStats inputs whose DC sets are to be merged.
+
+        Returns:
+            A new DCStats built on `new_def` with DCs:
+            For every key (X, Y) that appears in at least one input, set
+            d_out(X, Y) to the smallest of the values provided for that key
+            by the inputs that define it.
+        """
+        if len(all_stats) == 1:
+            return DCStats.from_def(new_def, set(all_stats[0].dcs))
+
+        new_dc: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+        for stats in all_stats:
+            for dc in stats.dcs:
+                dc_key = (dc.from_indices, dc.to_indices)
+                current_dc = new_dc.get(dc_key, math.inf)
+                if dc.value < current_dc:
+                    new_dc[dc_key] = dc.value
+
+        new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
+        return DCStats.from_def(new_def, new_stats)
+
+    @staticmethod
+    def _merge_dc_union(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+        """
+        Merge DCs for union-like operators.
+
+        Args:
+            new_def: The output TensorDef produced by TensorDef.mapjoin(...).
+            all_stats: The DCStats inputs to merge.
+
+        Returns:
+            A new DCStats built on `new_def` whose DC set reflects union semantics.
+            If there is only one input, this returns a copy of its DCs attached to
+            `new_def`.
+        """
+        if len(all_stats) == 1:
+            return DCStats.from_def(new_def, set(all_stats[0].dcs))
+
+        dc_keys: Counter[tuple[frozenset[str], frozenset[str]]] = Counter()
+        stats_dcs: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
+        for stats in all_stats:
+            dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+            Z = new_def.index_set - stats.tensordef.index_set
+            Z_dim_size = new_def.get_dim_space_size(Z)
+            for dc in stats.dcs:
+                new_key = (dc.from_indices, dc.to_indices)
+                dcs[new_key] = dc.value
+                dc_keys[new_key] += 1
+
+                ext_dc_key = (dc.from_indices, dc.to_indices | frozenset(Z))
+                if ext_dc_key not in dcs:
+                    dc_keys[ext_dc_key] += 1
+                prev = dcs.get(ext_dc_key, math.inf)
+                dcs[ext_dc_key] = min(prev, dc.value * Z_dim_size)
+            stats_dcs.append(dcs)
+
+        new_dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
+        for key, count in dc_keys.items():
+            if count == len(all_stats):
+                total = sum(d.get(key, 0.0) for d in stats_dcs)
+                X, Y = key
+                if Y.issubset(new_def.index_set):
+                    total = min(total, new_def.get_dim_space_size(Y))
+                new_dcs[key] = min(float(2**64), total)
+
+        new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
+        return DCStats.from_def(new_def, new_stats)
+
+    @staticmethod
+    def mapjoin(op: Callable[..., Any], *all_stats: "TensorStats") -> "TensorStats":
+        """
+        Merge DC statistics for an elementwise binary operation.
+
+        Args:
+            op: The elementwise operator (e.g., operator.add, operator.mul).
+            all_stats: Input statistics objects to be merged. Must be DCStats at runtime
+
+        Returns:
+            A DCStats instance whose TensorDef is the union of input dims and whose DC
+            set reflects the operator semantics:
+            - If every informative argument is *join-like* (its fill is an annihilator
+                for `op`), merge with join rules (take minima over matching DC keys).
+            - If every informative argument is *union-like* (fill not an annihilator),
+                merge with union rules (infer/extend DCs to missing dims, sum compatible
+                DCs, clamp by dense capacity).
+            - If mixed, and the join-like arguments cover all output indices, prefer
+                join merge; otherwise perform union merge over all arguments.
+        """
+        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
+        join_like_args: list[TensorStats] = []
+        union_like_args: list[TensorStats] = []
+        for stats in all_stats:
+            if len(stats.tensordef.index_set) == 0:
+                continue
+            if is_annihilator(op, stats.tensordef.fill_value):
+                join_like_args.append(stats)
+            else:
+                union_like_args.append(stats)
+        join_like_dc: list[DCStats] = cast(list["DCStats"], join_like_args)
+        union_like_dc: list[DCStats] = cast(list["DCStats"], union_like_args)
+
+        if len(union_like_args) == 0 and len(join_like_args) == 0:
+            return DCStats.from_def(new_def, set())
+        if len(union_like_args) == 0:
+            return DCStats._merge_dc_join(new_def, join_like_dc)
+        if len(join_like_args) == 0:
+            return DCStats._merge_dc_union(new_def, union_like_dc)
+        join_cover = set().union(*(s.tensordef.index_set for s in join_like_dc))
+        if join_cover == new_def.index_set:
+            return DCStats._merge_dc_join(new_def, join_like_dc)
+        return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
 
     @staticmethod
     def aggregate(op, dims, *args, **kwargs):
@@ -1013,18 +1184,25 @@ class DCStats(TensorStats):
 
     def estimate_non_fill_values(self) -> float:
         """
-        Return:
-            the estimated number of non-fill values using DCs.
+        Estimate the number of non-fill values using DCs.
+
+        This uses the stored degree constraint (DC) as multiplicative factors to
+        grow coverage over the target indices and finds the smallest product that
+        covers all target indices. The result is clamped by the tensor’s dense
+        capacity (the product of the target dimensions).
+
+        Returns:
+            the estimated number of non-fill entries in the tensor.
         """
-        idx = frozenset(self.fields)
-        if not idx:
-            return 1.0
+        idx: frozenset[str] = frozenset(self.tensordef.dim_sizes.keys())
+        if len(idx) == 0:
+            return 0.0
 
         best: dict[frozenset[str], float] = {frozenset(): 1.0}
         frontier: set[frozenset[str]] = {frozenset()}
 
         while True:
-            current_bound = best.get(idx, float("inf"))
+            current_bound = best.get(idx, math.inf)
             new_frontier: set[frozenset[str]] = set()
 
             for node in frontier:
@@ -1037,10 +1215,10 @@ class DCStats(TensorStats):
                             y_weight = float(2**64)
                         else:
                             y_weight = best[node] * dc.value
-                        if min(current_bound, best.get(y, float("inf"))) > y_weight:
+                        if min(current_bound, best.get(y, math.inf)) > y_weight:
                             best[y] = y_weight
                             new_frontier.add(y)
-            if not new_frontier:
+            if len(new_frontier) == 0:
                 break
             frontier = new_frontier
 
@@ -1048,4 +1226,4 @@ class DCStats(TensorStats):
         for node, weight in best.items():
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
-        return float(min_weight)
+        return min_weight

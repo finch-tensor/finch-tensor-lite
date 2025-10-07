@@ -377,6 +377,8 @@ register_property(
 )
 register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
 register_property(np.logical_or, "__call__", "is_identity", lambda op, val: not val)
+register_property(min, "__call__", "is_identity", lambda op, val: val == math.inf)
+register_property(max, "__call__", "is_identity", lambda op, val: val == -math.inf)
 
 
 def is_distributive(op, other_op):
@@ -591,6 +593,40 @@ for t in StableNumber.__args__:
 
 register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
 register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
+
+
+def is_idempotent(op: Any) -> bool:
+    """
+    Returns whether the given operator is idempotent over the argument domain,
+    i.e., op(x, x) == x.
+
+    Args:
+        op: The operator/function to check.
+
+    Returns:
+        True if the operator is known to be idempotent, False otherwise.
+    """
+    return query_property(op, "__call__", "is_idempotent")
+
+
+for fn in [
+    operator.and_,
+    operator.or_,
+    np.logical_and,
+    np.logical_or,
+    min,
+    max,
+]:
+    register_property(fn, "__call__", "is_idempotent", lambda op: True)
+
+for fn in [
+    operator.add,
+    operator.mul,
+    operator.xor,
+    np.logical_xor,
+    np.logaddexp,
+]:
+    register_property(fn, "__call__", "is_idempotent", lambda op: False)
 
 for unary in (
     np.reciprocal,

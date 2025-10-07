@@ -102,6 +102,31 @@ class Variable(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class TaggedVariable(AssemblyExpression):
+    """
+    Represents a numbered Variable assembly node that refers to variable
+    named `name`, with type `type`, and has ID `id`. Used in the the
+    representation of programs which need to distinguish between multiple
+    uses of the same variable, such as SSA or numbered occurrence forms.
+
+    Attributes:
+        variable: The variable that it references.
+        id: The ID of the variable
+    """
+
+    variable: Variable
+    id: int
+
+    @property
+    def result_format(self):
+        """Returns the type of the expression."""
+        return self.variable.result_format()
+
+    def __repr__(self) -> str:
+        return literal_repr(type(self).__name__, asdict(self))
+
+
+@dataclass(eq=True, frozen=True)
 class Stack(AssemblyExpression):
     """
     A logical AST expression representing an object using a set `obj` of
@@ -194,7 +219,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable | Stack
+    lhs: TaggedVariable | Variable | Stack
     rhs: AssemblyExpression
 
     @property
@@ -440,6 +465,24 @@ class If(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
+class Assert(AssemblyTree):
+    """
+    Represents an assert node which asserts that expression is true.
+    Used in the dataflow analysis to assert conditions in conditionals and loops.
+
+    Attributes:
+        exp: Expression which is being asserted.
+    """
+
+    exp: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.exp]
+
+
+@dataclass(eq=True, frozen=True)
 class IfElse(AssemblyTree):
     """
     Represents an if-else statement that executes the body if the condition
@@ -485,9 +528,10 @@ class Function(AssemblyTree):
         return [self.name, *self.args, self.body]
 
     @classmethod
-    def from_children(cls, name, *args, body):
+    def from_children(cls, *children):
         """Creates a term with the given head and arguments."""
-        return cls(name, args, body)
+        name, *arg_nodes, body = children
+        return cls(name, tuple(arg_nodes), body)
 
 
 @dataclass(eq=True, frozen=True)
@@ -563,6 +607,23 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree):
+    """
+    Print values of give variables.
+
+    Attributes:
+        args: list of variables to be printed.
+    """
+
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
+
+
 class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -592,10 +653,22 @@ class AssemblyPrinterContext(Context):
         match prgm:
             case Literal(value):
                 return qual_str(value)
+            case Assert(exp):
+                return f"assert({self(exp)})"
+            case TaggedVariable(Variable(name, _), id):
+                return f"{name}_{id}"
             case Variable(name, _):
                 return str(name)
-            case Assign(Variable(var_n, var_t), val):
-                self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
+            case Assign(lhs, val):
+                match lhs:
+                    case Variable(var_n, var_t):
+                        self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
+                    case TaggedVariable(Variable(var_n, var_t), id):
+                        self.exec(
+                            f"{feed}{var_n}_{id}: {qual_str(var_t)} = {self(val)}"
+                        )
+                    case _:
+                        raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
             case GetAttr(obj, attr):
                 return f"getattr({obj}, {attr})"
@@ -670,13 +743,15 @@ class AssemblyPrinterContext(Context):
                     f"{feed}if {cond_code}:\n{body_code}\n{feed}else:\n{else_body_code}"
                 )
                 return None
-            case Function(Variable(func_name, return_t), args, body):
+            case Function(name, args, body):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:
                     match arg:
-                        case Variable(name, t):
-                            arg_decls.append(f"{name}: {qual_str(t)}")
+                        case Variable(arg_name, t):
+                            arg_decls.append(f"{arg_name}: {qual_str(t)}")
+                        case TaggedVariable(Variable(arg_name, t), id):
+                            arg_decls.append(f"{arg_name}_{id}: {qual_str(t)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -684,8 +759,19 @@ class AssemblyPrinterContext(Context):
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 feed = self.feed
+
+                match name:
+                    case Variable(func_name, return_t):
+                        func_decl = f"{func_name}"
+                    case TaggedVariable(Variable(func_name, return_t), id):
+                        func_decl = f"{func_name}_{id}"
+                    case _:
+                        raise NotImplementedError(
+                            f"Unrecognized function name type: {name}"
+                        )
+
                 self.exec(
-                    f"{feed}def {func_name}({', '.join(arg_decls)}) -> "
+                    f"{feed}def {func_decl}({', '.join(arg_decls)}) -> "
                     f"{qual_str(return_t)}:\n"
                     f"{body_code}\n"
                 )
@@ -703,6 +789,13 @@ class AssemblyPrinterContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
+                return None
+            case Print(args):
+                args_value_str = ""
+                for arg in args:
+                    if isinstance(arg, Variable):
+                        args_value_str = args_value_str + f"{{{self(arg)}}} "
+                self.exec(f"{feed}print(f'{args_value_str}')")
                 return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")

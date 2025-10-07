@@ -1,12 +1,12 @@
-#include <stddef.h>
-typedef void* (*fptr)( void**, size_t );
+#include <stdint.h>
+typedef void* (*fptr)( void**, uint64_t );
 struct CNumpyBuffer {
     void* arr;
     void* data;
-    size_t length;
+    uint64_t length;
     fptr resize;
 };
-#include <unistd.h>
+#include <stddef.h>
 double dot_product(struct CNumpyBuffer* a, struct CNumpyBuffer* b) {
     double c = (double)0.0;
     struct CNumpyBuffer* a_ = a;
@@ -15,7 +15,7 @@ double dot_product(struct CNumpyBuffer* a, struct CNumpyBuffer* b) {
     struct CNumpyBuffer* b_ = b;
     double* b__data = (double*)b_->data;
     size_t b__length = b_->length;
-    for (ssize_t i = (ssize_t)0; i < a__length; i++) {
+    for (int64_t i = (int64_t)0; i < a__length; i++) {
         c = c + (a__data)[i] * (b__data)[i];
     }
     a_->data = (void*)a__data;
