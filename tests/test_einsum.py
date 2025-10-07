@@ -497,3 +497,4 @@ def test_literal_edge_cases(rng):
     result_parens = finchlite.einop("D[i,j] = A[i,j] * (2 + 3)", A=A)
     expected_parens = A * (2 + 3)  # Should be A * 5
     assert np.allclose(result_parens, expected_parens)
+
