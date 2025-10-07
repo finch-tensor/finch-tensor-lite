@@ -1,6 +1,5 @@
 import operator
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, cast
 

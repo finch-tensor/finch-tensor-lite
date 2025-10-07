@@ -264,7 +264,8 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpr:
             return ein.Call(op, (_parse_einop_expr(arg),))
         case Tree("access", [tns, *idxs]):
             return ein.Access(
-                ein.Alias(tns.value), tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
+                ein.Alias(tns.value),
+                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
             )
         case Tree("bool_literal", (val,)):
             return ein.Literal(val.value == "True")  # type: ignore[union-attr]
@@ -284,7 +285,8 @@ def parse_einop(expr: str) -> ein.EinsumNode:
     tree = lark_parser.parse(expr)
     match tree:
         case Tree(
-            "start", [Tree("increment", [Tree("access", [tns, *idxs]), op_token, expr_node])]
+            "start",
+            [Tree("increment", [Tree("access", [tns, *idxs]), op_token, expr_node])],
         ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
@@ -369,7 +371,7 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
         arg = ein.Call(
             ein.Literal(operator.mul),
             (arg, ein.Access(in_tnss[i], tuple(ein.Index(j) for j in input_idxs[i]))),
-        ) # type: ignore[assignment]
+        )  # type: ignore[assignment]
     return (
         ein.Einsum(
             op,
