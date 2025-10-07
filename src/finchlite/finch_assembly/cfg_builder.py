@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite, Namespace
+from ..symbolic import BasicBlock, ControlFlowGraph, Namespace, PostWalk, Rewrite
 from .nodes import (
     AssemblyNode,
     Assert,
