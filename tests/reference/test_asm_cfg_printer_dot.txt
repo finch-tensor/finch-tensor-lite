@@ -8,18 +8,18 @@ dot_product_2: #succs=[dot_product_4, dot_product_5]
     c_0: float64 = 0.0
     a_: np_buf_t(float64) = unpack(a_1)
     b_: np_buf_t(float64) = unpack(b_1)
-    #j#0_0: int64 = 0
+    #j#52775_0: int64 = 0
 
 dot_product_3: #succs=[EXIT_1]
 
 dot_product_4: #succs=[dot_product_2]
-    assert(lt(#j#0_0, length(slot(a_, np_buf_t(float64)))))
-    i_0: int64 = #j#0_0
+    assert(lt(#j#52775_0, length(slot(a_, np_buf_t(float64)))))
+    i_0: int64 = #j#52775_0
     c_1: float64 = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))
-    #j#0_0: int64 = add(#j#0_0, 1)
+    #j#52775_0: int64 = add(#j#52775_0, 1)
 
 dot_product_5: #succs=[dot_product_3]
-    assert(not_(lt(#j#0_0, length(slot(a_, np_buf_t(float64))))))
+    assert(not_(lt(#j#52775_0, length(slot(a_, np_buf_t(float64))))))
     repack(a_)
     repack(b_)
     return c_3
