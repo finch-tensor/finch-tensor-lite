@@ -264,7 +264,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpr:
             return ein.Call(op, (_parse_einop_expr(arg),))
         case Tree("access", [tns, *idxs]):
             return ein.Access(
-                ein.Alias(tns.value),
+                ein.Alias(tns.value), # type: ignore[union-attr]
                 tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
             )
         case Tree("bool_literal", (val,)):
@@ -327,52 +327,55 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
         if subscripts.count("->") == 1:
             subscripts, output_sub = subscripts.split("->")
             output_sub = output_sub.strip()
-            output_idxs = list(output_sub)
         else:
-            output_idxs = None
+            output_sub = None
         input_subs = [s.strip() for s in subscripts.split(",")]
         # Check for ellipses in input subscripts
         if any("..." in sub for sub in input_subs):
             if all(sub.startswith("...") for sub in input_subs):
                 bc = "prefix"
                 input_subs = [sub[3:] for sub in input_subs]
-                if output_idxs is not None:
-                    assert output_idxs.startswith("...")
-                    output_idxs = output_idxs[3:]
+                if output_sub is not None:
+                    assert output_sub.startswith("...")
+                    output_sub = output_sub[3:]
             elif all(sub.endswith("...") for sub in input_subs):
                 bc = "suffix"
                 input_subs = [sub[:-3] for sub in input_subs]
-                if output_idxs is not None:
-                    assert output_idxs.endswith("...")
-                    output_idxs = output_idxs[:-3]
+                if output_sub is not None:
+                    assert output_sub.endswith("...")
+                    output_sub = output_sub[:-3]
             else:
                 raise ValueError(
                     "Ellipses must be at the start or end of all subscripts."
                 )
         input_idxs = [list(sub) for sub in input_subs]
+        if output_sub is not None:
+            output_idxs = list(output_sub)
+        else:
+            output_idxs = None
     else:
         # Alternative syntax: einsum(operand0, subscript0, operand1, subscript1, ...)
         # Check if the last element is the output subscript
         if len(args) % 2 == 1:
             operands = args[0:-2:2]
-            input_subs = args[1::2]
+            input_idxs = args[1::2]
             output_idxs = list(args[-1])
             output_idxs = [f"i_{j}" for j in output_idxs]
         else:
             operands = args[0::2]
-            input_subs = args[1::2]
+            input_idxs = args[1::2]
             output_idxs = None
-        input_idxs = [[f"i_{j}" for j in sub] for sub in input_subs]
-        if any(Ellipsis in sub for sub in input_subs):
-            if all(sub[0] == Ellipsis for sub in input_subs):
+        input_idxs = [[f"i_{j}" for j in idx] for idx in input_idxs]
+        if any(Ellipsis in idx for idx in input_idxs):
+            if all(idx[0] == Ellipsis for idx in input_idxs):
                 bc = "prefix"
-                input_idxs = [sub[1:] for sub in input_idxs]
+                input_idxs = [idx[1:] for idx in input_idxs]
                 if output_idxs is not None:
                     assert output_idxs[0] == Ellipsis
                     output_idxs = output_idxs[1:]
-            elif all(sub[-1] == Ellipsis for sub in input_subs):
+            elif all(idx[-1] == Ellipsis for idx in input_idxs):
                 bc = "suffix"
-                input_idxs = [sub[:-1] for sub in input_idxs]
+                input_idxs = [idx[:-1] for idx in input_idxs]
                 if output_idxs is not None:
                     assert output_idxs[-1] == Ellipsis
                     output_idxs = output_idxs[:-1]
