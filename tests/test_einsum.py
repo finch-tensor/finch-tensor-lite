@@ -921,6 +921,182 @@ class TestEinsumEdgeCases:
         assert np.allclose(result, expected)
 
 
+class TestEinsumEllipses:
+    """Test einsum with ellipses (...) notation"""
+
+    def test_basic_ellipses(self, rng):
+        """Test basic ellipses usage for identity operations"""
+        A = rng.random((3, 4, 5))
+        
+        # Identity with ellipses
+        result = finchlite.einsum("...", A)
+        expected = np.einsum("...", A)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_with_named_indices(self, rng):
+        """Test ellipses combined with named indices"""
+        A = rng.random((2, 3, 4, 5))
+        
+        # Sum over last dimension, keeping others
+        result = finchlite.einsum("...i->...", A)
+        expected = np.einsum("...i->...", A)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_transpose(self, rng):
+        """Test ellipses with transpose operations"""
+        A = rng.random((2, 3, 4, 5))
+        
+        # Transpose last two dimensions
+        result = finchlite.einsum("...ij->...ji", A)
+        expected = np.einsum("...ij->...ji", A)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_matrix_multiply(self, rng):
+        """Test batch matrix multiplication with ellipses"""
+        A = rng.random((2, 3, 4, 5))
+        B = rng.random((2, 3, 5, 6))
+        
+        # Batch matrix multiplication
+        result = finchlite.einsum("...ij,...jk->...ik", A, B)
+        expected = np.einsum("...ij,...jk->...ik", A, B)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_different_batch_dims(self, rng):
+        """Test ellipses with different numbers of batch dimensions"""
+        A = rng.random((2, 3, 4))  # 1 batch dim + 2x4 matrix
+        B = rng.random((5, 2, 4, 6))  # 2 batch dims + 4x6 matrix
+        
+        # Broadcasting should work
+        result = finchlite.einsum("...ij,...jk->...ik", A, B)
+        expected = np.einsum("...ij,...jk->...ik", A, B)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    @pytest.mark.skip(reason="Repeated indices not yet supported")
+    def test_ellipses_trace(self, rng):
+        """Test computing trace with ellipses"""
+        A = rng.random((2, 3, 4, 4))
+        
+        # Trace of last two dimensions for each batch
+        result = finchlite.einsum("...ii->...", A)
+        expected = np.einsum("...ii->...", A)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    @pytest.mark.skip(reason="Repeated indices not yet supported")
+    def test_ellipses_diagonal(self, rng):
+        """Test extracting diagonal with ellipses"""
+        A = rng.random((2, 3, 4, 4))
+        
+        # Extract diagonal of last two dimensions
+        result = finchlite.einsum("...ii->...i", A)
+        expected = np.einsum("...ii->...i", A)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_element_wise(self, rng):
+        """Test element-wise operations with ellipses"""
+        A = rng.random((2, 3, 4, 5))
+        B = rng.random((2, 3, 4, 5))
+        
+        # Element-wise multiplication
+        result = finchlite.einsum("...,...->...", A, B)
+        expected = np.einsum("...,...->...", A, B)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_sum_product(self, rng):
+        """Test sum of element-wise product with ellipses"""
+        A = rng.random((2, 3, 4, 5))
+        B = rng.random((2, 3, 4, 5))
+        
+        # Sum of element-wise product
+        result = finchlite.einsum("...,...", A, B)
+        expected = np.einsum("...,...", A, B)
+        
+        assert np.allclose(result, expected)
+
+    def test_ellipses_outer_product(self, rng):
+        """Test outer product with ellipses"""
+        A = rng.random((2, 3))
+        B = rng.random((2, 5))
+        
+        # Outer product with batch dimensions
+        result = finchlite.einsum("...i,...j->...ij", A, B)
+        expected = np.einsum("...i,...j->...ij", A, B)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_multiple_contractions(self, rng):
+        """Test multiple contractions with ellipses"""
+        A = rng.random((2, 3, 4, 5))
+        B = rng.random((2, 3, 5, 6))
+        C = rng.random((2, 3, 6, 7))
+        
+        # Chain of matrix multiplications
+        result = finchlite.einsum("...ij,...jk,...kl->...il", A, B, C)
+        expected = np.einsum("...ij,...jk,...kl->...il", A, B, C)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_broadcasting_edge_cases(self, rng):
+        """Test edge cases with broadcasting and ellipses"""
+        # Test with single dimension arrays
+        A = rng.random((1, 3, 4))
+        B = rng.random((2, 1, 4, 5))
+        
+        result = finchlite.einsum("...ij,...jk->...ik", A, B)
+        expected = np.einsum("...ij,...jk->...ik", A, B)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_with_scalars(self, rng):
+        """Test ellipses operations with scalar inputs"""
+        A = rng.random((2, 3, 4))
+        scalar = 2.5
+        
+        # Multiply tensor by scalar using ellipses
+        result = finchlite.einsum("...,...->...", A, scalar)
+        expected = np.einsum("...,...->...", A, scalar)
+        
+        assert np.allclose(result, expected)
+        assert result.shape == expected.shape
+
+    def test_ellipses_reduction_patterns(self, rng):
+        """Test various reduction patterns with ellipses"""
+        A = rng.random((2, 3, 4, 5, 6))
+        
+        # Sum over last dimension
+        result1 = finchlite.einsum("...i->...", A)
+        expected1 = np.einsum("...i->...", A)
+        assert np.allclose(result1, expected1)
+        
+        # Sum over last two dimensions
+        result2 = finchlite.einsum("...ij->...", A)
+        expected2 = np.einsum("...ij->...", A)
+        assert np.allclose(result2, expected2)
+        
+        # Sum over specific dimensions while keeping others
+        result3 = finchlite.einsum("...ijk->...ik", A)
+        expected3 = np.einsum("...ijk->...ik", A)
+        assert np.allclose(result3, expected3)
+
+
 @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.complex64, np.complex128])
 class TestEinsumDataTypes:
     """Test einsum with different data types"""

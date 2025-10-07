@@ -360,12 +360,12 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
             operands = args[0:-2:2]
             input_idxs = args[1::2]
             output_idxs = list(args[-1])
-            output_idxs = [f"i_{j}" for j in output_idxs]
+            output_idxs = [f"j_{j}" for j in output_idxs]
         else:
             operands = args[0::2]
             input_idxs = args[1::2]
             output_idxs = None
-        input_idxs = [[f"i_{j}" for j in idx] for idx in input_idxs]
+        input_idxs = [[f"j_{j}" for j in idx] for idx in input_idxs]
         if any(Ellipsis in idx for idx in input_idxs):
             if all(idx[0] == Ellipsis for idx in input_idxs):
                 bc = "prefix"
@@ -383,38 +383,49 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
                 raise ValueError(
                     "Ellipses must be at the start or end of all subscripts."
                 )
+
     all_idxs = set().union(*input_idxs)
+
     if output_idxs is None:
         output_idx_set = set()
         for idx in all_idxs:
             if sum(idx in sub for sub in input_idxs) == 1:
                 output_idx_set.add(idx)
         output_idxs = sorted(output_idx_set)
+
+    def ndim(tns):
+        if hasattr(tns, "ndim"):
+            return tns.ndim
+        else:
+            return 0
+    
     if bc == "prefix":
         max_ell_len = max(
-            len(op.shape) - len(sub)
+            ndim(op) - len(sub)
             for op, sub in zip(operands, input_idxs, strict=False)
         )
         for i in range(len(operands)):
             ell_idxs = [
-                f"j_{j}"
+                f"i_{j}"
                 for j in range(
-                    max_ell_len - (operands[i].ndims - len(input_idxs[i])), max_ell_len
+                    max_ell_len - (ndim(operands[i]) - len(input_idxs[i])), max_ell_len
                 )
             ]
             input_idxs[i] = ell_idxs + input_idxs[i]
-        if output_idxs is not None:
-            output_idxs = [f"e_{j}" for j in range(max_ell_len)] + output_idxs
+        ell_idxs = [f"i_{j}" for j in range(max_ell_len)]
+        output_idxs = [f"i_{j}" for j in range(max_ell_len)] + output_idxs
     elif bc == "suffix":
         max_ell_len = max(
-            len(op.shape) - len(sub)
+            ndim(op) - len(sub)
             for op, sub in zip(operands, input_idxs, strict=False)
         )
         for i in range(len(operands)):
-            ell_idxs = [f"j_{j}" for j in range(operands[i].ndims - len(input_idxs[i]))]
+            ell_idxs = [f"k_{j}" for j in range(ndim(operands[i]) - len(input_idxs[i]))]
             input_idxs[i] = input_idxs[i] + ell_idxs
-        if output_idxs is not None:
-            output_idxs = output_idxs + [f"e_{j}" for j in range(max_ell_len)]
+        output_idxs = output_idxs + [f"k_{j}" for j in range(max_ell_len)]
+    
+    all_idxs = set().union(*input_idxs)
+    
     if len(input_idxs) != len(operands):
         raise ValueError("Number of input subscripts must match number of operands.")
     assert set(output_idxs).issubset(all_idxs), (
