@@ -659,6 +659,10 @@ for binary_op in (
         lambda op, a, b, _binary_op=binary_op: float,
     )
 
+register_property(np.isfinite, "__call__", "return_type", lambda op, a: bool)
+register_property(np.isinf, "__call__", "return_type", lambda op, a: bool)
+register_property(np.isnan, "__call__", "return_type", lambda op, a: bool)
+
 for logical in (
     np.logical_and,
     np.logical_or,

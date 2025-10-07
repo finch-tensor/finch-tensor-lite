@@ -279,6 +279,9 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((finchlite.sqrt, np.sqrt), np.sqrt),
         ((finchlite.square, np.square), np.square),
         ((finchlite.sign, np.sign), np.sign),
+        ((finchlite.isfinite, np.isfinite), np.isfinite),
+        ((finchlite.isinf, np.isinf), np.isinf),
+        ((finchlite.isnan, np.isnan), np.isnan),
         ((finchlite.logical_not, np.logical_not), np.logical_not),
     ],
 )
