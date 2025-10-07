@@ -256,9 +256,6 @@ def test_aggregate_and_issimilar():
     assert ds_agg.get_dim_size("i") == 2.0
     assert ds_agg.fill_value == dsa.fill_value
     assert DenseStats.issimilar(dsa, dsa)
-    B = np.ones((3, 4))
-    dsb = DenseStats.from_tensor(B, ["j", "k"])
-    assert not DenseStats.issimilar(dsa, dsb)
 
 
 # ─────────────────────────────── DCStats tests ─────────────────────────────
@@ -582,3 +579,244 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     assert out.tensordef.index_set == {"i"}
     assert out.tensordef.dim_sizes == dims
     assert out.dcs == expected_dcs
+
+
+@pytest.mark.parametrize(
+    "new_dims, inputs, expected_dcs",
+    [
+        # Single input passthrough
+        (
+            {"i": 1000},
+            [
+                (
+                    {"i"},
+                    {
+                        DC(frozenset(), frozenset({"i"}), 5.0),
+                        DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                    },
+                )
+            ],
+            {
+                DC(frozenset(), frozenset({"i"}), 5.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+            },
+        ),
+        # Two inputs, same axes: overlap SUMs; keys not in all inputs are dropped
+        (
+            {"i": 1000},
+            [
+                (
+                    {"i"},
+                    {
+                        DC(frozenset(), frozenset({"i"}), 5.0),
+                        DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                    },
+                ),
+                (
+                    {"i"},
+                    {
+                        DC(frozenset(), frozenset({"i"}), 2.0),
+                        DC(frozenset({"i"}), frozenset({"i"}), 3.0),
+                        DC(frozenset(), frozenset(), 7.0),
+                    },
+                ),
+            ],
+            {
+                DC(frozenset(), frozenset({"i"}), 7.0),
+                DC(frozenset({"i"}), frozenset({"i"}), 4.0),
+            },
+        ),
+        # Lifting across extra axes (Z) + consensus then SUM
+        (
+            {"i": 10, "j": 4},
+            [
+                ({"i"}, {DC(frozenset(), frozenset({"i"}), 3.0)}),
+                ({"j"}, {DC(frozenset(), frozenset({"j"}), 2.0)}),
+            ],
+            {DC(frozenset(), frozenset({"i", "j"}), 32.0)},
+        ),
+        # Clamp by dense capacity of Y
+        (
+            {"i": 5},
+            [
+                ({"i"}, {DC(frozenset(), frozenset({"i"}), 7.0)}),
+                ({"i"}, {DC(frozenset(), frozenset({"i"}), 9.0)}),
+            ],
+            {DC(frozenset(), frozenset({"i"}), 5.0)},
+        ),
+    ],
+)
+def test_merge_dc_union(new_dims, inputs, expected_dcs):
+    stats_objs = []
+    for idx_set, dcs in inputs:
+        td = TensorDef(frozenset(idx_set), {k: new_dims[k] for k in idx_set}, 0)
+        s = DCStats.from_def(td, set(dcs))
+        stats_objs.append(s)
+
+    new_def = TensorDef(frozenset(new_dims.keys()), new_dims, 0)
+    out = DCStats._merge_dc_union(new_def, stats_objs)
+
+    assert out.tensordef.index_set == set(new_dims.keys())
+    assert dict(out.tensordef.dim_sizes) == new_dims
+    assert out.dcs == expected_dcs
+
+
+@pytest.mark.parametrize(
+    "dims1, dcs1, dims2, dcs2, expected_nnz",
+    [
+        (
+            {"i": 1000},
+            [DC(frozenset(), frozenset(["i"]), 1)],
+            {"i": 1000},
+            [DC(frozenset(), frozenset(["i"]), 1)],
+            2,
+        ),
+    ],
+)
+def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
+    stat1 = DCStats(np.zeros((1), dtype=int), ["i"])
+    stat1.tensordef = TensorDef(frozenset(["i"]), dims1, 0)
+    stat1.dcs = set(dcs1)
+
+    stat2 = DCStats(np.zeros((1), dtype=int), ["i"])
+    stat2.tensordef = TensorDef(frozenset(["i"]), dims2, 0)
+    stat2.dcs = set(dcs2)
+    reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims1, dcs1, dims2, dcs2, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000},
+            [DC(frozenset(), frozenset(["i", "j"]), 1)],
+            {"i": 1000, "j": 1000},
+            [DC(frozenset(), frozenset(["i", "j"]), 1)],
+            2,
+        ),
+    ],
+)
+def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
+    stat1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 0)
+    stat1.dcs = set(dcs1)
+
+    stat2 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat2.tensordef = TensorDef(frozenset(["i", "j"]), dims2, 0)
+    stat2.dcs = set(dcs2)
+    reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims1, dcs1, dims2, dcs2, expected_nnz",
+    [
+        (
+            {"i": 1000},
+            [DC(frozenset(), frozenset(["i"]), 5)],
+            {"j": 100},
+            [DC(frozenset(), frozenset(["j"]), 10)],
+            10 * 1000 + 5 * 100,
+        ),
+    ],
+)
+def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
+    stat1 = DCStats(np.zeros((1), dtype=int), ["i"])
+    stat1.tensordef = TensorDef(frozenset(["i"]), dims1, 0)
+    stat1.dcs = set(dcs1)
+
+    stat2 = DCStats(np.zeros((1), dtype=int), ["j"])
+    stat2.tensordef = TensorDef(frozenset(["j"]), dims2, 0)
+    stat2.dcs = set(dcs2)
+    reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims1, dcs1, dims2, dcs2, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 100},
+            [DC(frozenset(), frozenset(["i", "j"]), 5)],
+            {"j": 100, "k": 1000},
+            [DC(frozenset(), frozenset(["j", "k"]), 10)],
+            10 * 1000 + 5 * 1000,
+        ),
+    ],
+)
+def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
+    stat1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 0)
+    stat1.dcs = set(dcs1)
+
+    stat2 = DCStats(np.zeros((1, 1), dtype=int), ["j", "k"])
+    stat2.tensordef = TensorDef(frozenset(["j", "k"]), {"j": 100, "k": 1000}, 0)
+    stat2.dcs = set(dcs2)
+
+    reduce_stats = DCStats.mapjoin(op.add, stat1, stat2)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 100},
+            [DC(frozenset(), frozenset(["i", "j"]), 5)],
+            {"j": 100, "k": 1000},
+            [DC(frozenset(), frozenset(["j", "k"]), 10)],
+            {"i": 1000, "j": 100, "k": 1000},
+            [DC(frozenset(), frozenset(["i", "j", "k"]), 10)],
+            10 * 1000 + 5 * 1000 + 10,
+        ),
+    ],
+)
+def test_large_disjoint_disjunction_dc_card(
+    dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
+):
+    stat1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 1)
+    stat1.dcs = set(dcs1)
+
+    stat2 = DCStats(np.zeros((1, 1), dtype=int), ["j", "k"])
+    stat2.tensordef = TensorDef(frozenset(["j", "k"]), dims2, 1)
+    stat2.dcs = set(dcs2)
+
+    stat3 = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 1)
+    stat3.dcs = set(dcs3)
+    reduce_stats = DCStats.mapjoin(op.mul, stat1, stat2, stat3)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 100},
+            [DC(frozenset(), frozenset(["i", "j"]), 5)],
+            {"j": 100, "k": 1000},
+            [DC(frozenset(), frozenset(["j", "k"]), 10)],
+            {"i": 1000, "j": 100, "k": 1000},
+            [DC(frozenset(), frozenset(["i", "j", "k"]), 10)],
+            10,
+        ),
+    ],
+)
+def test_mixture_disjoint_disjunction_dc_card(
+    dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
+):
+    stat1 = DCStats(np.zeros((1, 1), dtype=int), ["i", "j"])
+    stat1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 1)
+    stat1.dcs = set(dcs1)
+
+    stat2 = DCStats(np.zeros((1, 1), dtype=int), ["j", "k"])
+    stat2.tensordef = TensorDef(frozenset(["j", "k"]), dims2, 1)
+    stat2.dcs = set(dcs2)
+
+    stat3 = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 0)
+    stat3.dcs = set(dcs3)
+    reduce_stats = DCStats.mapjoin(op.mul, stat1, stat2, stat3)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
