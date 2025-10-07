@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite, gensym
+from ..symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite, Namespace
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -58,7 +58,7 @@ class AssemblyCFGBuilder:
     def __init__(self):
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
-        self.loop_counter_id = 0
+        self.namespace = Namespace()
 
     def build(self, node: AssemblyNode) -> ControlFlowGraph:
         return self(node)
@@ -140,8 +140,8 @@ class AssemblyCFGBuilder:
             case ForLoop(var, start, end, body):
                 before_block = self.current_block
 
-                # create fictitious variable
-                fic_var = TaggedVariable(Variable(gensym("j"), np.int64), 0)
+                fic_var_name = self.namespace.freshen("j")
+                fic_var = TaggedVariable(Variable(fic_var_name, np.int64), 0)
                 before_block.add_statement(Assign(fic_var, start))
 
                 # create while loop condition: j < end
@@ -166,8 +166,8 @@ class AssemblyCFGBuilder:
             case BufferLoop(buf, var, body):
                 before_block = self.current_block
 
-                # create fictitious variable
-                fic_var = TaggedVariable(Variable(gensym("j"), np.int64), 0)
+                fic_var_name = self.namespace.freshen("j")
+                fic_var = TaggedVariable(Variable(fic_var_name, np.int64), 0)
                 before_block.add_statement(Assign(fic_var, Literal(np.int64(0))))
 
                 # create while loop condition: i < length(buf)
