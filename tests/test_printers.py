@@ -3,6 +3,7 @@ import operator
 import numpy as np
 
 import finchlite.finch_assembly as asm
+import finchlite.finch_einsum as ein
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite.codegen.numpy_buffer import NumpyBuffer
@@ -529,3 +530,20 @@ def test_asm_cfg_printer_dot(file_regression):
     prgm = assembly_number_uses(prgm)
     cfg = assembly_build_cfg(prgm)
     file_regression.check(str(cfg), extension=".txt")
+
+
+def test_einsum_printer(file_regression):
+    prgm = ein.Plan(
+        (
+            ein.parse_einop("C[i,j] = A[i,j] + B[j,i]"),
+            ein.Plan(
+                (
+                    ein.parse_einop("D[i,j] += A[i,k] * B[k,j]"),
+                    ein.parse_einop("E[i] min= A[i,k] + D[k,j] << 1"),
+                )
+            ),
+            ein.Produces((ein.Alias("C"), ein.Alias("E"))),
+        )
+    )
+
+    file_regression.check(str(prgm), extension=".txt")

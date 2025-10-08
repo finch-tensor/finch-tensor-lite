@@ -172,6 +172,8 @@ class TestEagerTensor(finchlite.EagerTensor):
             np.true_divide,
         ),
         ((operator.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
+        ((operator.mod, finchlite.mod, np.mod), np.mod),
+        ((operator.pow, finchlite.power, np.power), np.power),
         (
             (operator.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
             np.mod,

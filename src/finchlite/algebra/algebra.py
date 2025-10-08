@@ -344,6 +344,34 @@ register_property(np.logical_and, "__call__", "is_associative", lambda op: True)
 register_property(np.logical_or, "__call__", "is_associative", lambda op: True)
 register_property(np.logical_xor, "__call__", "is_associative", lambda op: True)
 
+# Commutative properties
+
+for op in (
+    operator.add,
+    operator.mul,
+    operator.and_,
+    operator.or_,
+    operator.xor,
+    np.logical_and,
+    np.logical_or,
+    np.logical_xor,
+):
+    register_property(op, "__call__", "is_commutative", lambda op: True)
+
+for op in (
+    operator.sub,
+    operator.truediv,
+    operator.floordiv,
+    operator.pow,
+    operator.lshift,
+    operator.rshift,
+):
+    register_property(op, "__call__", "is_commutative", lambda op: False)
+
+
+def is_commutative(op: Any) -> bool:
+    return query_property(op, "__call__", "is_commutative")
+
 
 def is_identity(op: Any, val: Any) -> bool:
     """

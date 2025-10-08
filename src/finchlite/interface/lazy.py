@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
+from .. import finch_einsum as ein
 from ..algebra import (
     Tensor,
     TensorFType,
@@ -195,10 +196,10 @@ class LazyTensor(OverrideTensor):
         return mod(other, self)
 
     def __pow__(self, other):
-        return pow(self, other)
+        return power(self, other)
 
     def __rpow__(self, other):
-        return pow(other, self)
+        return power(other, self)
 
     def __matmul__(self, other):
         return matmul(self, other)
@@ -971,6 +972,10 @@ def mod(x1, x2) -> LazyTensor:
 
 
 def pow(x1, x2) -> LazyTensor:
+    return power(x1, x2)
+
+
+def power(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
 
 
@@ -1796,3 +1801,19 @@ def std(
     x = defer(x)
     d = var(x, axis=axis, correction=correction, keepdims=keepdims)
     return pow(d, 0.5)
+
+
+def einop(prgm, **kwargs):
+    stmt = ein.parse_einop(prgm)
+    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    xp = sys.modules[__name__]
+    ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
+    return ctx(prgm)[0]
+
+
+def einsum(prgm, *args, **kwargs):
+    stmt, bindings = ein.parse_einsum(prgm, *args)
+    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    xp = sys.modules[__name__]
+    ctx = ein.EinsumInterpreter(xp, bindings)
+    return ctx(prgm)[0]
