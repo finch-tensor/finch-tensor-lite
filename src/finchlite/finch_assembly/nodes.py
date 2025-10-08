@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Context, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 from .buffer import element_type, length_type
 
@@ -79,7 +79,7 @@ class Literal(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(AssemblyExpression):
+class Variable(AssemblyExpression, NamedTerm):
     """
     Represents a logical AST expression for a variable named `name`, which
     will hold a value of type `type`.
@@ -99,6 +99,10 @@ class Variable(AssemblyExpression):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
+
+    @property
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
@@ -167,6 +171,10 @@ class Slot(AssemblyExpression):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
+
+    @property
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
