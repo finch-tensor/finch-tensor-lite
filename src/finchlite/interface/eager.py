@@ -296,6 +296,19 @@ def prod(
     return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
 
 
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    dtype=None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, dtype=dtype, keepdims=keepdims)
+    return compute(lazy.argmin(x, axis=axis, dtype=dtype, keepdims=keepdims))
+
+
 def elementwise(f: Callable, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)

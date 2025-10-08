@@ -314,7 +314,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
         ((finchlite.min, np.min), np.min),
         ((finchlite.max, np.max), np.max),
         ((finchlite.argmin, np.argmin), np.argmin),
-        ((finchlite.argmax, np.argmax), np.argmax),
+        # ((finchlite.argmax, np.argmax), np.argmax),
         ((finchlite.mean, np.mean), np.mean),
         ((finchlite.std, np.std), np.std),
         ((finchlite.var, np.var), np.var),

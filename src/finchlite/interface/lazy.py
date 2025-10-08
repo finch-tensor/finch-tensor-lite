@@ -20,6 +20,9 @@ from ..algebra import (
     identity,
     init_value,
     last,
+    maxby,
+    minby,
+    pair,
     promote_max,
     promote_min,
     promote_type,
@@ -87,6 +90,17 @@ class LazyTensorFType(TensorFType):
         return self._shape_type
 
 
+"""
+# Added to solve error associated with no iscomplxobj in lazy.py
+def iscomplexobj(x):
+
+    try:
+        return np.issubdtype(x.element_type, np.complexfloating)
+    except AttributeError:
+        return False
+"""
+
+
 class LazyTensor(OverrideTensor):
     def __init__(
         self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
@@ -101,7 +115,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=ftype(self._shape),
+            _shape_type=tuple(type(dim) for dim in self.shape),
         )
 
     @property
@@ -697,8 +711,6 @@ def prod(
 
 
 #######################################
-
-
 @dataclass(frozen=True)
 class LinearIndicesTensorFType(TensorFType):
     _shape_type: tuple[type, ...]
@@ -738,12 +750,22 @@ class LinearIndicesTensor(Tensor):
         return LinearIndicesTensorFType(shape_type, int, 0)
 
 
-def argmin(x, axis=None):
+register_property(LinearIndicesTensor, "promote_type", "__attr__", lambda x: int)
+
+
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    dtype=None,
+    keepdims: bool = False,
+):
     x = defer(x)
     shape = x.shape
 
     if axis is None:
-        indices = LinearIndicesTensor(shape)
+        indices = defer(LinearIndicesTensor(shape))
 
     else:
         broadcast_indices = LazyTensor(
@@ -756,8 +778,10 @@ def argmin(x, axis=None):
             broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
         )
 
-    paired = elementwise(tuple, x, indices)
-    reduced = reduce(operator.minby, paired, axis=axis, init=(float("inf"), 0))
+    paired = elementwise(pair, x, indices)
+    reduced = reduce(
+        minby, paired, axis=axis, init=(float("inf"), 0), keepdims=keepdims
+    )
 
     return elementwise(last, reduced)
 
@@ -780,8 +804,8 @@ def argmax(x, axis=None):
             broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
         )
 
-    paired = elementwise(tuple, x, indices)
-    reduced = reduce(operator.maxby, paired, axis=axis, init=(float("inf"), 0))
+    paired = elementwise(pair, x, indices)
+    reduced = reduce(maxby, paired, axis=axis, init=(float("inf"), 0))
 
     return elementwise(last, reduced)
 
