@@ -270,6 +270,30 @@ def reduce(
     )
 
 
+def round(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.round(x)
+    return compute(lazy.round(x))
+
+
+def floor(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.floor(x)
+    return compute(lazy.floor(x))
+
+
+def ceil(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.ceil(x)
+    return compute(lazy.ceil(x))
+
+
+def trunc(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.trunc(x)
+    return compute(lazy.trunc(x))
+
+
 def sum(
     x,
     /,
@@ -308,6 +332,12 @@ def add(x1, x2):
     return compute(lazy.add(x1, x2))
 
 
+def reciprocal(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.reciprocal(x)
+    return compute(lazy.reciprocal(x))
+
+
 def subtract(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.subtract(x1, x2)
@@ -318,6 +348,12 @@ def multiply(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.multiply(x1, x2)
     return compute(lazy.multiply(x1, x2))
+
+
+def divide(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.divide(x1, x2)
+    return compute(lazy.divide(x1, x2))
 
 
 def abs(x):
@@ -420,6 +456,12 @@ def pow(x1, x2):
     return compute(lazy.pow(x1, x2))
 
 
+def remainder(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.remainder(x1, x2)
+    return compute(lazy.remainder(x1, x2))
+
+
 def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
     """
     Computes the tensordot operation.
@@ -467,16 +509,68 @@ def all(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.all(x, axis=axis, keepdims=keepdims))
 
 
+def real(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.real(x)
+    return compute(lazy.real(x))
+
+
+def imag(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.imag(x)
+    return compute(lazy.imag(x))
+
+
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.min(x, axis=axis, keepdims=keepdims)
     return compute(lazy.min(x, axis=axis, keepdims=keepdims))
 
 
+minimum = min
+
+
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.max(x, axis=axis, keepdims=keepdims)
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
+
+
+maximum = max
+
+
+def clip(x, /, *, min=None, max=None):
+    if (
+        isinstance(x, lazy.LazyTensor)
+        or isinstance(min, lazy.LazyTensor)
+        or isinstance(max, lazy.LazyTensor)
+    ):
+        return lazy.clip(x, min=min, max=max)
+    return compute(lazy.clip(x, min=min, max=max))
+
+
+def sqrt(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sqrt(x)
+    return compute(lazy.sqrt(x))
+
+
+def square(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.square(x)
+    return compute(lazy.square(x))
+
+
+def signbit(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.signbit(x)
+    return compute(lazy.signbit(x))
+
+
+def sign(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sign(x)
+    return compute(lazy.sign(x))
 
 
 # manipulation functions:
@@ -753,6 +847,12 @@ def atan(x):
     return compute(lazy.atan(x))
 
 
+def hypot(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.hypot(x1, x2)
+    return compute(lazy.hypot(x1, x2))
+
+
 def atanh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.atanh(x)
@@ -763,6 +863,18 @@ def atan2(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.atan2(x1, x2)
     return compute(lazy.atan2(x1, x2))
+
+
+def exp(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.exp(x)
+    return compute(lazy.exp(x))
+
+
+def expm1(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.expm1(x)
+    return compute(lazy.expm1(x))
 
 
 def log(x):
@@ -793,6 +905,36 @@ def logaddexp(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logaddexp(x1, x2)
     return compute(lazy.logaddexp(x1, x2))
+
+
+def copysign(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.copysign(x1, x2)
+    return compute(lazy.copysign(x1, x2))
+
+
+def nextafter(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.nextafter(x1, x2)
+    return compute(lazy.nextafter(x1, x2))
+
+
+def isfinite(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.isfinite(x)
+    return compute(lazy.isfinite(x))
+
+
+def isinf(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.isinf(x)
+    return compute(lazy.isinf(x))
+
+
+def isnan(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.isnan(x)
+    return compute(lazy.isnan(x))
 
 
 def logical_and(x1, x2):

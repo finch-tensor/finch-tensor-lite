@@ -142,6 +142,7 @@ class LazyTensor(OverrideTensor):
     def __neg__(self):
         return negative(self)
 
+    # same as before?
     def __and__(self, other):
         return bitwise_and(self, other)
 
@@ -672,6 +673,22 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
 
 
+def round(x) -> LazyTensor:
+    return elementwise(np.round, defer(x))
+
+
+def floor(x) -> LazyTensor:
+    return elementwise(np.floor, defer(x))
+
+
+def ceil(x) -> LazyTensor:
+    return elementwise(np.ceil, defer(x))
+
+
+def trunc(x) -> LazyTensor:
+    return elementwise(np.trunc, defer(x))
+
+
 def sum(
     x,
     /,
@@ -738,6 +755,14 @@ def all(
     )
 
 
+def real(x) -> LazyTensor:
+    return elementwise(np.real, defer(x))
+
+
+def imag(x) -> LazyTensor:
+    return elementwise(np.imag, defer(x))
+
+
 def min(
     x,
     /,
@@ -768,8 +793,28 @@ def max(
     return reduce(promote_max, x, axis=axis, keepdims=keepdims, init=init)
 
 
+def clip(x, /, *, min=None, max=None) -> LazyTensor:
+    return elementwise(np.clip, defer(x), defer(min), defer(max))
+
+
+def sqrt(x) -> LazyTensor:
+    return elementwise(np.sqrt, defer(x))
+
+
+def square(x) -> LazyTensor:
+    return elementwise(np.square, defer(x))
+
+
+def sign(x) -> LazyTensor:
+    return elementwise(np.sign, defer(x))
+
+
 def add(x1, x2) -> LazyTensor:
     return elementwise(operator.add, defer(x1), defer(x2))
+
+
+def reciprocal(x) -> LazyTensor:
+    return elementwise(np.reciprocal, defer(x))
 
 
 def subtract(x1, x2) -> LazyTensor:
@@ -778,6 +823,10 @@ def subtract(x1, x2) -> LazyTensor:
 
 def multiply(x1, x2) -> LazyTensor:
     return elementwise(operator.mul, defer(x1), defer(x2))
+
+
+def divide(x1, x2) -> LazyTensor:
+    return elementwise(np.divide, defer(x1), defer(x2))
 
 
 def abs(x) -> LazyTensor:
@@ -923,6 +972,10 @@ def mod(x1, x2) -> LazyTensor:
 
 def pow(x1, x2) -> LazyTensor:
     return elementwise(operator.pow, defer(x1), defer(x2))
+
+
+def remainder(x1, x2) -> LazyTensor:
+    return elementwise(np.remainder, defer(x1), defer(x2))
 
 
 def conjugate(x) -> LazyTensor:
@@ -1589,12 +1642,24 @@ def atan(x) -> LazyTensor:
     return elementwise(np.atan, defer(x))
 
 
+def hypot(x1, x2) -> LazyTensor:
+    return elementwise(np.hypot, defer(x1), defer(x2))
+
+
 def atanh(x) -> LazyTensor:
     return elementwise(np.atanh, defer(x))
 
 
 def atan2(x1, x2) -> LazyTensor:
     return elementwise(np.atan2, defer(x1), defer(x2))
+
+
+def exp(x) -> LazyTensor:
+    return elementwise(np.exp, defer(x))
+
+
+def expm1(x) -> LazyTensor:
+    return elementwise(np.expm1, defer(x))
 
 
 def log(x) -> LazyTensor:
@@ -1615,6 +1680,30 @@ def log10(x) -> LazyTensor:
 
 def logaddexp(x1, x2) -> LazyTensor:
     return elementwise(np.logaddexp, defer(x1), defer(x2))
+
+
+def signbit(x) -> LazyTensor:
+    return elementwise(np.signbit, defer(x))
+
+
+def copysign(x1, x2) -> LazyTensor:
+    return elementwise(np.copysign, defer(x1), defer(x2))
+
+
+def nextafter(x1, x2) -> LazyTensor:
+    return elementwise(np.nextafter, defer(x1), defer(x2))
+
+
+def isfinite(x) -> LazyTensor:
+    return elementwise(np.isfinite, defer(x))
+
+
+def isinf(x) -> LazyTensor:
+    return elementwise(np.isinf, defer(x))
+
+
+def isnan(x) -> LazyTensor:
+    return elementwise(np.isnan, defer(x))
 
 
 def logical_and(x1, x2) -> LazyTensor:
