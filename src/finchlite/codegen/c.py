@@ -558,6 +558,40 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
+ctype_print_fmt: dict[Any, str] = {
+    ctypes.c_bool: "%u",
+    ctypes.c_char: "%d",
+    ctypes.c_wchar: "%d",
+    ctypes.c_byte: "%d",
+    ctypes.c_ubyte: "%d",
+    ctypes.c_int8: "%d",
+    ctypes.c_int16: "%d",
+    ctypes.c_int32: "%ld",
+    ctypes.c_int64: "%lld",
+    ctypes.c_uint8: "%u",
+    ctypes.c_uint16: "%u",
+    ctypes.c_uint32: "%lu",
+    ctypes.c_uint64: "%llu",
+    # use standard types instead of aliases
+    # ctypes.c_short: "",
+    # ctypes.c_ushort: "",
+    # ctypes.c_int: "",
+    # ctypes.c_uint: "",
+    # ctypes.c_long: "",
+    # ctypes.c_ulong: "",
+    # ctypes.c_longlong: "",
+    # ctypes.c_ulonglong: "",
+    # ctypes.c_size_t: "",
+    # ctypes.c_ssize_t: "",
+    ctypes.c_float: "%f",
+    ctypes.c_double: "%f",
+    # ctypes.c_char_p: "",
+    # ctypes.c_wchar_p: "",
+    # ctypes.c_void_p: "",
+    # ctypes.py_object: "",
+}
+
+
 class CGenerator:
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = CContext()
@@ -906,12 +940,22 @@ class CContext(Context):
                     self(func)
                 return None
             case asm.Print(args):
-                args_str = ""
+                self.add_header("#include <stdio.h>")
                 for arg in args:
-                    args_str = args_str + f'<< {self(arg)} << " " '
-                self.exec(
-                    f"{feed}#include <iostream>{feed}std::cout {args_str} << std::endl;"
-                )
+                    match arg:
+                        case asm.Variable(name, t):
+                            var_ctype = c_type(t)
+                            if var_ctype in ctype_print_fmt:
+                                fmt_str = f'"{ctype_print_fmt[var_ctype]}  "'
+                                arg_str = f"{name}"
+                            else:
+                                t_name = self.ctype_name(var_ctype)
+                                fmt_str = '"%s  "'
+                                arg_str = f'"{t_name}"'
+                            self.exec(f"{feed}printf({fmt_str}, {arg_str});")
+                        case _:
+                            self.exec(f'{feed}printf("%s  ", "UnknownType");')
+                self.exec(f'{feed}printf("\\n");')
                 return None
             case _:
                 raise NotImplementedError(

@@ -748,6 +748,7 @@ def test_e2e_numba():
     ],
 )
 def test_print(compiler, capsys, file_regression):
+    # TODO: Test all types of variables
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))
     x = (np.int64(1), np.int64(4))
@@ -755,7 +756,7 @@ def test_print(compiler, capsys, file_regression):
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
     res_var = asm.Variable("res", np.float64)
-    mod = compiler(
+    prgm = compiler(
         asm.Module(
             (
                 asm.Function(
@@ -804,8 +805,8 @@ def test_print(compiler, capsys, file_regression):
         )
     )
 
-    result = mod.simple_struct(p, x)
+    result = prgm.simple_struct(p, x)
     assert result == np.float64(9.0)
 
     capture = capsys.readouterr().out
-    print(capture)
+    file_regression.check(capture, extension=".txt")
