@@ -21,7 +21,6 @@ class LogicExecutor:
 
 
 def logic_executor_code(ctx, prgm):
-    # jc = JuliaContext()
     code = ctx(prgm)
     fname = gensym("compute")
     return f""":(function {fname}(prgm) \n {code} \n end)"""
