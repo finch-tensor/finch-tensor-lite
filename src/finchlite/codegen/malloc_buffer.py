@@ -206,7 +206,5 @@ class MallocBufferFType(CBufferFType, CStackFType):
     def construct_from_c(self, c_buffer):
         """
         Construct a MallocBuffer from a C-compatible structure.
-
-        TODO: incomplete
         """
         return c_buffer.contents
