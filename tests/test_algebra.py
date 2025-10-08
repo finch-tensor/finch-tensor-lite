@@ -37,6 +37,7 @@ def test_algebra_selected():
     assert is_identity(operator.lshift, 0)
     assert is_identity(operator.rshift, 0)
     assert is_identity(operator.pow, 1)
+    assert is_identity(np.divide, 1)
     assert is_identity(np.logaddexp, -math.inf)
     assert is_identity(np.logical_or, False)
     assert is_identity(np.logical_and, True)

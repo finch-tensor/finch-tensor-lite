@@ -92,10 +92,10 @@ class EagerTensor(OverrideTensor, ABC):
         return mod(other, self)
 
     def __pow__(self, other):
-        return pow(self, other)
+        return power(self, other)
 
     def __rpow__(self, other):
-        return pow(other, self)
+        return power(other, self)
 
     def __matmul__(self, other):
         return matmul(self, other)
@@ -270,6 +270,30 @@ def reduce(
     )
 
 
+def round(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.round(x)
+    return compute(lazy.round(x))
+
+
+def floor(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.floor(x)
+    return compute(lazy.floor(x))
+
+
+def ceil(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.ceil(x)
+    return compute(lazy.ceil(x))
+
+
+def trunc(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.trunc(x)
+    return compute(lazy.trunc(x))
+
+
 def sum(
     x,
     /,
@@ -308,6 +332,12 @@ def add(x1, x2):
     return compute(lazy.add(x1, x2))
 
 
+def reciprocal(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.reciprocal(x)
+    return compute(lazy.reciprocal(x))
+
+
 def subtract(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.subtract(x1, x2)
@@ -318,6 +348,12 @@ def multiply(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.multiply(x1, x2)
     return compute(lazy.multiply(x1, x2))
+
+
+def divide(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.divide(x1, x2)
+    return compute(lazy.divide(x1, x2))
 
 
 def abs(x):
@@ -415,9 +451,19 @@ def mod(x1, x2):
 
 
 def pow(x1, x2):
+    return power(x1, x2)
+
+
+def power(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.pow(x1, x2)
-    return compute(lazy.pow(x1, x2))
+        return lazy.power(x1, x2)
+    return compute(lazy.power(x1, x2))
+
+
+def remainder(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.remainder(x1, x2)
+    return compute(lazy.remainder(x1, x2))
 
 
 def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
@@ -467,16 +513,68 @@ def all(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.all(x, axis=axis, keepdims=keepdims))
 
 
+def real(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.real(x)
+    return compute(lazy.real(x))
+
+
+def imag(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.imag(x)
+    return compute(lazy.imag(x))
+
+
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.min(x, axis=axis, keepdims=keepdims)
     return compute(lazy.min(x, axis=axis, keepdims=keepdims))
 
 
+minimum = min
+
+
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.max(x, axis=axis, keepdims=keepdims)
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
+
+
+maximum = max
+
+
+def clip(x, /, *, min=None, max=None):
+    if (
+        isinstance(x, lazy.LazyTensor)
+        or isinstance(min, lazy.LazyTensor)
+        or isinstance(max, lazy.LazyTensor)
+    ):
+        return lazy.clip(x, min=min, max=max)
+    return compute(lazy.clip(x, min=min, max=max))
+
+
+def sqrt(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sqrt(x)
+    return compute(lazy.sqrt(x))
+
+
+def square(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.square(x)
+    return compute(lazy.square(x))
+
+
+def signbit(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.signbit(x)
+    return compute(lazy.signbit(x))
+
+
+def sign(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sign(x)
+    return compute(lazy.sign(x))
 
 
 # manipulation functions:
@@ -753,6 +851,12 @@ def atan(x):
     return compute(lazy.atan(x))
 
 
+def hypot(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.hypot(x1, x2)
+    return compute(lazy.hypot(x1, x2))
+
+
 def atanh(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.atanh(x)
@@ -763,6 +867,18 @@ def atan2(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.atan2(x1, x2)
     return compute(lazy.atan2(x1, x2))
+
+
+def exp(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.exp(x)
+    return compute(lazy.exp(x))
+
+
+def expm1(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.expm1(x)
+    return compute(lazy.expm1(x))
 
 
 def log(x):
@@ -793,6 +909,36 @@ def logaddexp(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.logaddexp(x1, x2)
     return compute(lazy.logaddexp(x1, x2))
+
+
+def copysign(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.copysign(x1, x2)
+    return compute(lazy.copysign(x1, x2))
+
+
+def nextafter(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.nextafter(x1, x2)
+    return compute(lazy.nextafter(x1, x2))
+
+
+def isfinite(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.isfinite(x)
+    return compute(lazy.isfinite(x))
+
+
+def isinf(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.isinf(x)
+    return compute(lazy.isinf(x))
+
+
+def isnan(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.isnan(x)
+    return compute(lazy.isnan(x))
 
 
 def logical_and(x1, x2):
@@ -885,3 +1031,300 @@ def std(
     if isinstance(x, lazy.LazyTensor):
         return lazy.std(x, axis=axis, correction=correction, keepdims=keepdims)
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
+
+
+def einop(prgm: str, /, **kwargs):
+    """Execute an einsum expression using the specified array framework.
+
+    This function parses and executes einsum-like expressions with extended syntax
+    that supports various operations beyond traditional Einstein summation notation.
+
+    Args:
+        prgm (str): Einsum program string specifying the computation. The syntax
+            supports:
+            - Assignment: "C[i,j] = A[i,j] + B[j,i]"
+            - Increment: "C[i,j] += A[i,k] * B[k,j]"
+            - Reductions: "C[i] += A[i,j]", "C[i] max= A[i,j]", "C[i] &= A[i,j]"
+            - Arithmetic operations: +, -, *, /, //, %, **
+            - Comparison operations: ==, !=, <, <=, >, >=
+            - Logical operations: and, or, not
+            - Bitwise operations: &, |, ^, <<, >>
+            - Function calls and complex expressions with parentheses
+            - Mathematical functions: abs, sqrt, exp, log, sin, cos, tan, etc.
+            - Literal values: integers, floats, booleans, and complex numbers
+            - Python operator precedence and parentheses for grouping
+        **kwargs: Named arrays referenced in the einsum expression. The keys
+            should match the tensor names used in the program string.
+
+    Returns:
+        The result array from executing the einsum expression.
+
+    Examples:
+        >>> import numpy as np
+        >>> A = np.random.rand(3, 4)
+        >>> B = np.random.rand(4, 3)
+        >>> # Matrix addition with transpose
+        >>> C = einop("C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
+        >>> # Matrix multiplication
+        >>> D = einop("D[i,j] += A[i,k] * B[k,j]", A=A, B=B)
+        >>> # Min-Plus multiplication with shift
+        >>> E = einop("E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
+    """
+    if builtins.any(isinstance(v, lazy.LazyTensor) for v in kwargs.values()):
+        return lazy.einop(prgm, **kwargs)
+    return compute(lazy.einop(prgm, **kwargs))
+
+
+def einsum(*args, **kwargs):
+    """
+    einsum(subscripts, *operands)
+
+    Evaluates the Einstein summation convention on the operands.
+
+    Using the Einstein summation convention, many common multi-dimensional,
+    linear algebraic array operations can be represented in a simple fashion.
+    In *implicit* mode `einsum` computes these values.
+
+    In *explicit* mode, `einsum` provides further flexibility to compute
+    other array operations that might not be considered classical Einstein
+    summation operations, by disabling, or forcing summation over specified
+    subscript labels.
+
+    See the notes and examples for clarification.
+
+    Parameters
+    ----------
+    subscripts : str
+        Specifies the subscripts for summation as comma separated list of
+        subscript labels. An implicit (classical Einstein summation)
+        calculation is performed unless the explicit indicator '->' is
+        included as well as subscript labels of the precise output form.
+    operands : list of array_like
+        These are the arrays for the operation.
+
+    Returns
+    -------
+    output : ndarray
+        The calculation based on the Einstein summation convention.
+
+    Notes
+    -----
+    The Einstein summation convention can be used to compute
+    many multi-dimensional, linear algebraic array operations. `einsum`
+    provides a succinct way of representing these.
+
+    A non-exhaustive list of these operations,
+    which can be computed by `einsum`, is shown below along with examples:
+
+    * Trace of an array, :py:func:`numpy.trace`.
+    * Return a diagonal, :py:func:`numpy.diag`.
+    * Array axis summations, :py:func:`numpy.sum`.
+    * Transpositions and permutations, :py:func:`numpy.transpose`.
+    * Matrix multiplication and dot product, :py:func:`numpy.matmul`
+        :py:func:`numpy.dot`.
+    * Vector inner and outer products, :py:func:`numpy.inner`
+        :py:func:`numpy.outer`.
+    * Broadcasting, element-wise and scalar multiplication,
+        :py:func:`numpy.multiply`.
+    * Tensor contractions, :py:func:`numpy.tensordot`.
+    * Chained array operations, in efficient calculation order,
+        :py:func:`numpy.einsum_path`.
+
+    The subscripts string is a comma-separated list of subscript labels,
+    where each label refers to a dimension of the corresponding operand.
+    Whenever a label is repeated it is summed, so ``np.einsum('i,i', a, b)``
+    is equivalent to :py:func:`np.inner(a,b) <numpy.inner>`. If a label
+    appears only once, it is not summed, so ``np.einsum('i', a)``
+    produces a view of ``a`` with no changes. A further example
+    ``np.einsum('ij,jk', a, b)`` describes traditional matrix multiplication
+    and is equivalent to :py:func:`np.matmul(a,b) <numpy.matmul>`.
+    Repeated subscript labels in one operand take the diagonal.
+    For example, ``np.einsum('ii', a)`` is equivalent to
+    :py:func:`np.trace(a) <numpy.trace>`.
+
+    In *implicit mode*, the chosen subscripts are important
+    since the axes of the output are reordered alphabetically.  This
+    means that ``np.einsum('ij', a)`` doesn't affect a 2D array, while
+    ``np.einsum('ji', a)`` takes its transpose. Additionally,
+    ``np.einsum('ij,jk', a, b)`` returns a matrix multiplication, while,
+    ``np.einsum('ij,jh', a, b)`` returns the transpose of the
+    multiplication since subscript 'h' precedes subscript 'i'.
+
+    In *explicit mode* the output can be directly controlled by
+    specifying output subscript labels.  This requires the
+    identifier '->' as well as the list of output subscript labels.
+    This feature increases the flexibility of the function since
+    summing can be disabled or forced when required. The call
+    ``np.einsum('i->', a)`` is like :py:func:`np.sum(a) <numpy.sum>`
+    if ``a`` is a 1-D array, and ``np.einsum('ii->i', a)``
+    is like :py:func:`np.diag(a) <numpy.diag>` if ``a`` is a square 2-D array.
+    The difference is that `einsum` does not allow broadcasting by default.
+    Additionally ``np.einsum('ij,jh->ih', a, b)`` directly specifies the
+    order of the output subscript labels and therefore returns matrix
+    multiplication, unlike the example above in implicit mode.
+
+    To enable and control broadcasting, use an ellipsis.  Default
+    NumPy-style broadcasting is done by adding an ellipsis
+    to the left of each term, like ``np.einsum('...ii->...i', a)``.
+    ``np.einsum('...i->...', a)`` is like
+    :py:func:`np.sum(a, axis=-1) <numpy.sum>` for array ``a`` of any shape.
+    To take the trace along the first and last axes,
+    you can do ``np.einsum('i...i', a)``, or to do a matrix-matrix
+    product with the left-most indices instead of rightmost, one can do
+    ``np.einsum('ij...,jk...->ik...', a, b)``.
+
+    `einsum` also provides an alternative way to provide the subscripts and
+    operands as ``einsum(op0, sublist0, op1, sublist1, ..., [sublistout])``.
+    If the output shape is not provided in this format `einsum` will be
+    calculated in implicit mode, otherwise it will be performed explicitly.
+    The examples below have corresponding `einsum` calls with the two
+    parameter methods.
+
+    Examples
+    --------
+    >>> a = np.arange(25).reshape(5, 5)
+    >>> b = np.arange(5)
+    >>> c = np.arange(6).reshape(2, 3)
+
+    Trace of a matrix:
+
+    >>> np.einsum("ii", a)
+    60
+    >>> np.einsum(a, [0, 0])
+    60
+    >>> np.trace(a)
+    60
+
+    Extract the diagonal (requires explicit form):
+
+    >>> np.einsum("ii->i", a)
+    array([ 0,  6, 12, 18, 24])
+    >>> np.einsum(a, [0, 0], [0])
+    array([ 0,  6, 12, 18, 24])
+    >>> np.diag(a)
+    array([ 0,  6, 12, 18, 24])
+
+    Sum over an axis (requires explicit form):
+
+    >>> np.einsum("ij->i", a)
+    array([ 10,  35,  60,  85, 110])
+    >>> np.einsum(a, [0, 1], [0])
+    array([ 10,  35,  60,  85, 110])
+    >>> np.sum(a, axis=1)
+    array([ 10,  35,  60,  85, 110])
+
+    For higher dimensional arrays summing a single axis can be done
+    with ellipsis:
+
+    >>> np.einsum("...j->...", a)
+    array([ 10,  35,  60,  85, 110])
+    >>> np.einsum(a, [Ellipsis, 1], [Ellipsis])
+    array([ 10,  35,  60,  85, 110])
+
+    Compute a matrix transpose, or reorder any number of axes:
+
+    >>> np.einsum("ji", c)
+    array([[0, 3],
+           [1, 4],
+           [2, 5]])
+    >>> np.einsum("ij->ji", c)
+    array([[0, 3],
+           [1, 4],
+           [2, 5]])
+    >>> np.einsum(c, [1, 0])
+    array([[0, 3],
+           [1, 4],
+           [2, 5]])
+    >>> np.transpose(c)
+    array([[0, 3],
+           [1, 4],
+           [2, 5]])
+
+    Vector inner products:
+
+    >>> np.einsum("i,i", b, b)
+    30
+    >>> np.einsum(b, [0], b, [0])
+    30
+    >>> np.inner(b, b)
+    30
+
+    Matrix vector multiplication:
+
+    >>> np.einsum("ij,j", a, b)
+    array([ 30,  80, 130, 180, 230])
+    >>> np.einsum(a, [0, 1], b, [1])
+    array([ 30,  80, 130, 180, 230])
+    >>> np.dot(a, b)
+    array([ 30,  80, 130, 180, 230])
+    >>> np.einsum("...j,j", a, b)
+    array([ 30,  80, 130, 180, 230])
+
+    Broadcasting and scalar multiplication:
+
+    >>> np.einsum("..., ...", 3, c)
+    array([[ 0,  3,  6],
+           [ 9, 12, 15]])
+    >>> np.einsum(",ij", 3, c)
+    array([[ 0,  3,  6],
+           [ 9, 12, 15]])
+    >>> np.einsum(3, [Ellipsis], c, [Ellipsis])
+    array([[ 0,  3,  6],
+           [ 9, 12, 15]])
+    >>> np.multiply(3, c)
+    array([[ 0,  3,  6],
+           [ 9, 12, 15]])
+
+    Vector outer product:
+
+    >>> np.einsum("i,j", np.arange(2) + 1, b)
+    array([[0, 1, 2, 3, 4],
+           [0, 2, 4, 6, 8]])
+    >>> np.einsum(np.arange(2) + 1, [0], b, [1])
+    array([[0, 1, 2, 3, 4],
+           [0, 2, 4, 6, 8]])
+    >>> np.outer(np.arange(2) + 1, b)
+    array([[0, 1, 2, 3, 4],
+           [0, 2, 4, 6, 8]])
+
+    Tensor contraction:
+
+    >>> a = np.arange(60.0).reshape(3, 4, 5)
+    >>> b = np.arange(24.0).reshape(4, 3, 2)
+    >>> np.einsum("ijk,jil->kl", a, b)
+    array([[4400., 4730.],
+           [4532., 4874.],
+           [4664., 5018.],
+           [4796., 5162.],
+           [4928., 5306.]])
+    >>> np.einsum(a, [0, 1, 2], b, [1, 0, 3], [2, 3])
+    array([[4400., 4730.],
+           [4532., 4874.],
+           [4664., 5018.],
+           [4796., 5162.],
+           [4928., 5306.]])
+    >>> np.tensordot(a, b, axes=([1, 0], [0, 1]))
+    array([[4400., 4730.],
+           [4532., 4874.],
+           [4664., 5018.],
+           [4796., 5162.],
+           [4928., 5306.]])
+
+    Example of ellipsis use:
+
+    >>> a = np.arange(6).reshape((3, 2))
+    >>> b = np.arange(12).reshape((4, 3))
+    >>> np.einsum("ki,jk->ij", a, b)
+    array([[10, 28, 46, 64],
+           [13, 40, 67, 94]])
+    >>> np.einsum("ki,...k->i...", a, b)
+    array([[10, 28, 46, 64],
+           [13, 40, 67, 94]])
+    >>> np.einsum("k...,jk", a, b)
+    array([[10, 28, 46, 64],
+           [13, 40, 67, 94]])
+    """
+
+    if builtins.any(isinstance(v, lazy.LazyTensor) for v in args):
+        return lazy.einsum(*args, **kwargs)
+    return compute(lazy.einsum(*args, **kwargs))
