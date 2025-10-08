@@ -3,17 +3,31 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Generic, Optional, TypeVar
 
-"""
-    Namespace
+from .term import PostOrderDFS, Term
 
-A namespace for managing variable names and aesthetic fresh variable generation.
-"""
+
+class NamedTerm(Term, ABC):
+    """
+    A named program node, e.g. a variable, function, or index.
+    """
+
+    @property
+    @abstractmethod
+    def symbol(self) -> str: ...
 
 
 class Namespace:
-    def __init__(self):
+    """
+        Namespace
+
+    A namespace for managing variable names and aesthetic fresh variable generation.
+    """
+
+    def __init__(self, root=None):
         self.counts = defaultdict(int)
         self.resolutions = {}
+        if root is not None:
+            self.update(root)
 
     def freshen(self, *tags) -> str:
         name = "_".join(str(tag) for tag in tags)
@@ -37,6 +51,11 @@ class Namespace:
         used in scope.
         """
         self.resolutions.setdefault(names, lambda: self.freshen("_".join(names)))
+
+    def update(self, root):
+        for node in PostOrderDFS(root):
+            if isinstance(node, NamedTerm):
+                self.freshen(node.symbol)
 
 
 T = TypeVar("T")

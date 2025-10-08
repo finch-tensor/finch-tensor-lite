@@ -6,7 +6,6 @@ from ..symbolic import (
     BasicBlock,
     ControlFlowGraph,
     Namespace,
-    PostOrderDFS,
     PostWalk,
     Rewrite,
 )
@@ -40,14 +39,8 @@ from .nodes import (
 
 
 def assembly_build_cfg(node: AssemblyNode):
-    names = set()
-    spc = Namespace()
-    for ex in PostOrderDFS(node):
-        if isinstance(ex, Variable):
-            names.add(ex.name)
-    for name in names:
-        spc.freshen(name)
-    return AssemblyCFGBuilder(spc).build(node)
+    ctx = AssemblyCFGBuilder(namespace=Namespace(node))
+    return ctx.build(node)
 
 
 def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:

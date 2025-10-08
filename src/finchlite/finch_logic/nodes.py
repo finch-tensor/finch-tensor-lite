@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Generic, Self, TypeVar
 
-from ..symbolic import Context, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 
@@ -100,7 +100,7 @@ class Value(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Field(LogicNode):
+class Field(LogicNode, NamedTerm):
     """
     Represents a logical AST expression for a field named `name`.
     Fields are used to name the dimensions of a tensor. The named
@@ -112,9 +112,13 @@ class Field(LogicNode):
 
     name: str
 
+    @property
+    def symbol(self) -> str:
+        return self.name
+
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode):
+class Alias(LogicNode, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -124,6 +128,10 @@ class Alias(LogicNode):
     """
 
     name: str
+
+    @property
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
