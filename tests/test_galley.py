@@ -251,7 +251,7 @@ def test_aggregate_and_issimilar():
     A = np.ones((2, 3))
     dsa = DenseStats(A, ["i", "j"])
 
-    ds_agg = DenseStats.aggregate(sum, ["j"], dsa)
+    ds_agg = DenseStats.aggregate(sum, None, ["j"], dsa)
     assert ds_agg.index_set == {"i"}
     assert ds_agg.get_dim_size("i") == 2.0
     assert ds_agg.fill_value == dsa.fill_value
@@ -821,4 +821,143 @@ def test_mixture_disjoint_disjunction_dc_card(
     stat3.dcs = set(dcs3)
     reduce = DCStats.mapjoin(op.mul, stat1, stat2)
     reduce_stats = DCStats.mapjoin(op.mul, reduce, stat3)
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 50),
+                DC(frozenset(["i"]), frozenset(["j"]), 5),
+                DC(frozenset(["j"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset(["j", "k"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["j"]), 5),
+                DC(frozenset(), frozenset(["i", "k"]), 50),
+                DC(frozenset(["i"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["i"]), 5),
+            ],
+            1,
+        ),
+    ],
+)
+def test_full_reduce_DC_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    stat.dcs = set(dcs)
+
+    reduce_stats = DCStats.aggregate(
+        op.add, init=0, reduce_indices=["i", "j", "k"], stats=stat
+    )
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 1),
+                DC(frozenset(["i"]), frozenset(["j"]), 1),
+                DC(frozenset(["j"]), frozenset(["i"]), 1),
+                DC(frozenset(), frozenset(["j", "k"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["j"]), 5),
+                DC(frozenset(), frozenset(["i", "k"]), 50),
+                DC(frozenset(["i"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["i"]), 5),
+            ],
+            5,
+        ),
+    ],
+)
+def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    stat.dcs = set(dcs)
+
+    reduce_stats = DCStats.aggregate(
+        op.add, init=0, reduce_indices=["i", "j"], stats=stat
+    )
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, expected_nnz",
+    [
+        (
+            {"i": 1000, "j": 1000, "k": 1000},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 1),
+                DC(frozenset(["i"]), frozenset(["j"]), 1),
+                DC(frozenset(["j"]), frozenset(["i"]), 1),
+                DC(frozenset(), frozenset(["j", "k"]), 50),
+                DC(frozenset(["j"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["j"]), 5),
+                DC(frozenset(), frozenset(["i", "k"]), 50),
+                DC(frozenset(["i"]), frozenset(["k"]), 5),
+                DC(frozenset(["k"]), frozenset(["i"]), 5),
+            ],
+            5,
+        ),
+    ],
+)
+def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    stat.dcs = set(dcs)
+    reduce_stats = DCStats.aggregate(op.add, init=0, reduce_indices=["i"], stats=stat)
+
+    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize(
+    "dims, dcs, reduce_indices, expected_nnz",
+    [
+        # Asymmetric densities
+        (
+            {"i": 100, "j": 100, "k": 100},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 100),
+                DC(frozenset(["i"]), frozenset(["j"]), 2),
+                DC(frozenset(), frozenset(["j", "k"]), 50),
+            ],
+            ["j"],
+            5000,
+        ),
+        # Sparse + dense mix
+        (
+            {"i": 100, "j": 100, "k": 100},
+            [
+                DC(frozenset(), frozenset(["i", "k"]), 900),
+                DC(frozenset(["i"]), frozenset(["k"]), 1),
+            ],
+            ["i", "k"],
+            100,
+        ),
+        # Imbalance across dimensions
+        (
+            {"i": 1000, "j": 100, "k": 10},
+            [
+                DC(frozenset(), frozenset(["i", "j"]), 5),
+                DC(frozenset(), frozenset(["j", "k"]), 80),
+                DC(frozenset(), frozenset(["i", "k"]), 1),
+            ],
+            ["i"],
+            5,
+        ),
+    ],
+)
+def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
+    stat = DCStats(np.zeros((1, 1, 1), dtype=int), ["i", "j", "k"])
+    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    stat.dcs = set(dcs)
+
+    reduce_stats = DCStats.aggregate(
+        op.add, init=0, reduce_indices=reduce_indices, stats=stat
+    )
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
