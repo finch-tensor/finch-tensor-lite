@@ -426,48 +426,16 @@ def is_distributive(op, other_op):
     return query_property(op, "__call__", "is_distributive", other_op)
 
 
-register_property(
-    operator.mul,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: other_op in (operator.add, operator.sub),
-)
-register_property(
-    operator.and_,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: other_op in (operator.or_, operator.xor),
-)
-register_property(
-    operator.or_,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: other_op == operator.and_,
-)
-register_property(
-    np.logical_and,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: other_op in (np.logical_or, np.logical_xor),
-)
-register_property(
-    np.logical_or,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: other_op == np.logical_and,
-)
-register_property(
-    operator.pow,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: False,
-)
-register_property(
-    operator.truediv,
-    "__call__",
-    "is_distributive",
-    lambda op, other_op: False,
-)
+for fn, func in [
+    (operator.mul, lambda op, other_op: other_op in (operator.add, operator.sub)),
+    (operator.and_, lambda op, other_op: other_op in (operator.or_, operator.xor)),
+    (operator.or_, lambda op, other_op: other_op == operator.and_),
+    (np.logical_and, lambda op, other_op: other_op in (np.logical_or, np.logical_xor)),
+    (np.logical_or, lambda op, other_op: other_op == np.logical_and),
+    (operator.pow, lambda op, other_op: False),
+    (operator.truediv, lambda op, other_op: False),
+]:
+    register_property(fn, "__call__", "is_distributive", func)
 
 
 def is_annihilator(op, val):
@@ -636,6 +604,21 @@ for t in StableNumber.__args__:
     register_property(t, "__xor__", "init_value", lambda a: a(False))
     register_property(t, "__or__", "init_value", lambda a: a(False))
 
+
+def is_idempotent(op: Any) -> bool:
+    """
+    Returns whether the given operator is idempotent over the argument domain,
+    i.e., op(x, x) == x.
+
+    Args:
+        op: The operator/function to check.
+
+    Returns:
+        True if the operator is known to be idempotent, False otherwise.
+    """
+    return query_property(op, "__call__", "is_idempotent")
+
+
 for fn in [
     operator.and_,
     operator.or_,
@@ -654,20 +637,6 @@ for fn in [
     np.logaddexp,
 ]:
     register_property(fn, "__call__", "is_idempotent", lambda op: False)
-
-
-def is_idempotent(op: Any) -> bool:
-    """
-    Returns whether the given operator is idempotent over the argument domain,
-    i.e., op(x, x) == x.
-
-    Args:
-        op: The operator/function to check.
-
-    Returns:
-        True if the operator is known to be idempotent, False otherwise.
-    """
-    return query_property(op, "__call__", "is_idempotent")
 
 
 for unary in (
