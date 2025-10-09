@@ -1,5 +1,5 @@
 from .dataflow import BasicBlock, ControlFlowGraph
-from .environment import Context, Namespace, Reflector, ScopedDict
+from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
 from .ftype import FType, FTyped, fisinstance, ftype
 from .gensym import gensym
 from .rewriters import (
@@ -25,6 +25,7 @@ __all__ = [
     "FType",
     "FTyped",
     "Fixpoint",
+    "NamedTerm",
     "Namespace",
     "PostOrderDFS",
     "PostWalk",

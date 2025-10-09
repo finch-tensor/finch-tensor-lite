@@ -6,7 +6,7 @@ from typing import Any
 
 from ..algebra import element_type, query_property, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, Term, TermTree, literal_repr
+from ..symbolic import Context, FType, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 
 
@@ -95,7 +95,7 @@ class Value(NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(NotationExpression):
+class Variable(NotationExpression, NamedTerm):
     """
     Notation AST expression for a variable named `name`.
 
@@ -115,6 +115,10 @@ class Variable(NotationExpression):
         return literal_repr(
             type(self).__name__, {"name": self.name, "type_": self.type_}
         )
+
+    @property
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
@@ -362,7 +366,7 @@ class Stack(NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Slot(NotationExpression):
+class Slot(NotationExpression, NamedTerm):
     """
     Represents a register to a symbolic object. Using a register in an
     expression creates a copy of the object.
@@ -382,6 +386,10 @@ class Slot(NotationExpression):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"name": self.name, "type": self.type})
+
+    @property
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
