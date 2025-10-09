@@ -638,7 +638,6 @@ for fn in [
 ]:
     register_property(fn, "__call__", "is_idempotent", lambda op: False)
 
-
 for unary in (
     np.reciprocal,
     np.sin,
