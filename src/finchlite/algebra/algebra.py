@@ -540,6 +540,17 @@ def type_min(t: type[T]) -> T:
     return query_property(t, "type_min", "__attr__")
 
 
+for t, tn in [
+    (bool, lambda x: -math.inf),
+    (int, lambda x: -math.inf),
+    (float, lambda x: -math.inf),
+    (np.bool_, lambda x: x(False)),
+    (np.integer, lambda x: np.iinfo(x).min),
+    (np.floating, lambda x: np.finfo(x).min),
+]:
+    register_property(t, "type_min", "__attr__", tn)
+
+
 def type_max(t: type[T]) -> T:
     """
     Returns the maximum value of the given type.
@@ -558,16 +569,15 @@ def type_max(t: type[T]) -> T:
     return query_property(t, "type_max", "__attr__")
 
 
-for t in [bool, int, float]:
-    register_property(t, "type_min", "__attr__", lambda x: -math.inf)
-    register_property(t, "type_max", "__attr__", lambda x: +math.inf)
-
-register_property(np.bool_, "type_min", "__attr__", lambda x: x(False))
-register_property(np.bool_, "type_max", "__attr__", lambda x: x(True))
-register_property(np.integer, "type_min", "__attr__", lambda x: np.iinfo(x).min)
-register_property(np.integer, "type_max", "__attr__", lambda x: np.iinfo(x).max)
-register_property(np.floating, "type_min", "__attr__", lambda x: np.finfo(x).min)
-register_property(np.floating, "type_max", "__attr__", lambda x: np.finfo(x).max)
+for t, tn in [
+    (bool, lambda x: +math.inf),
+    (int, lambda x: +math.inf),
+    (float, lambda x: +math.inf),
+    (np.bool_, lambda x: x(True)),
+    (np.integer, lambda x: np.iinfo(x).max),
+    (np.floating, lambda x: np.finfo(x).max),
+]:
+    register_property(t, "type_max", "__attr__", tn)
 
 
 def init_value(op, arg) -> Any:
@@ -586,12 +596,17 @@ def init_value(op, arg) -> Any:
     """
     return query_property(op, "__call__", "init_value", arg)
 
+
+for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
+    (meth, rmeth) = _reflexive_operators[op]
+    register_property(
+        op,
+        "__call__",
+        "init_value",
+        lambda op, arg, meth=meth: query_property(arg, meth, "init_value"),
+    )
+
 for fn, func in [
-    (operator.add, lambda op, val: val == 0),
-    (operator.mul, lambda op, val: val == 1),
-    (operator.and_, lambda op, val: True),
-    (operator.xor, lambda op, val: False),
-    (operator.or_, lambda op, val: False),
     (np.logaddexp, lambda op, val: -math.inf),
     (np.logical_and, lambda op, val: True),
     (np.logical_or, lambda op, val: False),
