@@ -336,15 +336,23 @@ def is_associative(op: Any) -> bool:
     return query_property(op, "__call__", "is_associative")
 
 
-for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
+for op in (
+    operator.add,
+    operator.mul,
+    operator.and_,
+    operator.or_,
+    operator.xor,
+    np.logaddexp,
+    np.logical_and,
+    np.logical_or,
+    np.logical_xor,
+):
     register_property(op, "__call__", "is_associative", lambda op: True)
 
-register_property(np.logaddexp, "__call__", "is_associative", lambda op: True)
-register_property(np.logical_and, "__call__", "is_associative", lambda op: True)
-register_property(np.logical_or, "__call__", "is_associative", lambda op: True)
-register_property(np.logical_xor, "__call__", "is_associative", lambda op: True)
 
-# Commutative properties
+def is_commutative(op: Any) -> bool:
+    return query_property(op, "__call__", "is_commutative")
+
 
 for op in (
     operator.add,
@@ -369,10 +377,6 @@ for op in (
     register_property(op, "__call__", "is_commutative", lambda op: False)
 
 
-def is_commutative(op: Any) -> bool:
-    return query_property(op, "__call__", "is_commutative")
-
-
 def is_identity(op: Any, val: Any) -> bool:
     """
     Returns whether the given object is an identity for the given function, that is,
@@ -388,24 +392,23 @@ def is_identity(op: Any, val: Any) -> bool:
     return query_property(op, "__call__", "is_identity", val)
 
 
-register_property(operator.add, "__call__", "is_identity", lambda op, val: val == 0)
-register_property(operator.mul, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(
-    operator.or_, "__call__", "is_identity", lambda op, val: not bool(val)
-)
-register_property(operator.and_, "__call__", "is_identity", lambda op, val: bool(val))
-register_property(operator.truediv, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
-register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
-register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(np.divide, "__call__", "is_identity", lambda op, val: val == 1)
-register_property(
-    np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
-)
-register_property(np.logical_and, "__call__", "is_identity", lambda op, val: bool(val))
-register_property(np.logical_or, "__call__", "is_identity", lambda op, val: not val)
-register_property(min, "__call__", "is_identity", lambda op, val: val == math.inf)
-register_property(max, "__call__", "is_identity", lambda op, val: val == -math.inf)
+for fn, func in [
+    (operator.add, lambda op, val: val == 0),
+    (operator.mul, lambda op, val: val == 1),
+    (operator.or_, lambda op, val: not bool(val)),
+    (operator.and_, lambda op, val: bool(val)),
+    (operator.truediv, lambda op, val: val == 1),
+    (operator.lshift, lambda op, val: val == 0),
+    (operator.rshift, lambda op, val: val == 0),
+    (operator.pow, lambda op, val: val == 1),
+    (np.divide, lambda op, val: val == 1),
+    (np.logaddexp, lambda op, val: val == -math.inf),
+    (np.logical_and, lambda op, val: bool(val)),
+    (np.logical_or, lambda op, val: not val),
+    (min, lambda op, val: val == math.inf),
+    (max, lambda op, val: val == -math.inf),
+]:
+    register_property(fn, "__call__", "is_identity", func)
 
 
 def is_distributive(op, other_op):
@@ -583,20 +586,20 @@ def init_value(op, arg) -> Any:
     """
     return query_property(op, "__call__", "init_value", arg)
 
-
-for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
-    (meth, rmeth) = _reflexive_operators[op]
-    register_property(
-        op,
-        "__call__",
-        "init_value",
-        lambda op, arg, meth=meth: query_property(arg, meth, "init_value"),
-    )
-
-register_property(np.logaddexp, "__call__", "init_value", lambda op, arg: -math.inf)
-register_property(np.logical_and, "__call__", "init_value", lambda op, arg: True)
-register_property(np.logical_or, "__call__", "init_value", lambda op, arg: False)
-register_property(np.logical_xor, "__call__", "init_value", lambda op, arg: False)
+for fn, func in [
+    (operator.add, lambda op, val: val == 0),
+    (operator.mul, lambda op, val: val == 1),
+    (operator.and_, lambda op, val: True),
+    (operator.xor, lambda op, val: False),
+    (operator.or_, lambda op, val: False),
+    (np.logaddexp, lambda op, val: -math.inf),
+    (np.logical_and, lambda op, val: True),
+    (np.logical_or, lambda op, val: False),
+    (np.logical_xor, lambda op, val: False),
+    (min, lambda op, val: type_max(val)),
+    (max, lambda op, val: type_min(val)),
+]:
+    register_property(fn, "__call__", "init_value", func)
 
 
 def sum_init_value(t):
@@ -618,24 +621,6 @@ for t in StableNumber.__args__:
     register_property(t, "__xor__", "init_value", lambda a: a(False))
     register_property(t, "__or__", "init_value", lambda a: a(False))
 
-register_property(min, "__call__", "init_value", lambda op, arg: type_max(arg))
-register_property(max, "__call__", "init_value", lambda op, arg: type_min(arg))
-
-
-def is_idempotent(op: Any) -> bool:
-    """
-    Returns whether the given operator is idempotent over the argument domain,
-    i.e., op(x, x) == x.
-
-    Args:
-        op: The operator/function to check.
-
-    Returns:
-        True if the operator is known to be idempotent, False otherwise.
-    """
-    return query_property(op, "__call__", "is_idempotent")
-
-
 for fn in [
     operator.and_,
     operator.or_,
@@ -654,6 +639,21 @@ for fn in [
     np.logaddexp,
 ]:
     register_property(fn, "__call__", "is_idempotent", lambda op: False)
+
+
+def is_idempotent(op: Any) -> bool:
+    """
+    Returns whether the given operator is idempotent over the argument domain,
+    i.e., op(x, x) == x.
+
+    Args:
+        op: The operator/function to check.
+
+    Returns:
+        True if the operator is known to be idempotent, False otherwise.
+    """
+    return query_property(op, "__call__", "is_idempotent")
+
 
 for unary in (
     np.reciprocal,

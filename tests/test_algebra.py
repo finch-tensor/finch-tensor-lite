@@ -56,6 +56,11 @@ def test_algebra_selected():
     assert init_value(np.logical_and, bool) is True
     assert init_value(np.logical_or, bool) is False
     assert init_value(np.logical_xor, bool) is False
+    assert init_value(operator.add, float) == 0
+    # assert init_value(operator.mul, float) == 1
+    assert init_value(operator.and_, bool) is True
+    assert init_value(operator.xor, bool) is False
+    assert init_value(operator.or_, bool) is False
     assert is_idempotent(operator.and_)
     assert is_idempotent(operator.or_)
     assert is_idempotent(np.logical_and)
