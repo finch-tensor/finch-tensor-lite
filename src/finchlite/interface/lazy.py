@@ -329,6 +329,12 @@ class LazyTensor(OverrideTensor):
     def __ne__(self, other):
         return not_equal(self, other)
 
+    def __divmod__(self, other):
+        return divmod(self, other)
+
+    def __rdivmod__(self, other):
+        return divmod(other, self)
+
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
@@ -651,6 +657,12 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
+    if not callable(f):
+        bundle = ((f,) if not isinstance(f, (tuple, list)) else tuple(f)) + args
+        tensors = tuple(defer(t) for t in bundle)
+        shape = _broadcast_shape(*(t.shape for t in tensors))
+        return tuple(broadcast_to(t, shape) for t in tensors)
+
     args = tuple(defer(a) for a in args)
     shape = _broadcast_shape(*(arg.shape for arg in args))
     ndim = len(shape)
@@ -1817,3 +1829,22 @@ def einsum(prgm, *args, **kwargs):
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp, bindings)
     return ctx(prgm)[0]
+
+
+def divmod(x1, x2):
+    q = floordiv(x1, x2)
+    r = mod(x1, x2)
+    return elementwise((q, r))
+
+
+def divmod_arrays(x1, x2):
+    d = divmod(x1, x2)
+    return first(d), last(d)
+
+
+def first(x):
+    return x[0]
+
+
+def last(x):
+    return x[1]

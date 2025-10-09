@@ -70,6 +70,7 @@ element_wise_ufunc_map = {
     np.less_equal: np.less_equal,
     np.greater: np.greater,
     np.greater_equal: np.greater_equal,
+    np.divmod: np.divmod,
 }
 
 ufunc_map: dict[Any, Any] = {
