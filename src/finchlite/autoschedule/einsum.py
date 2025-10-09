@@ -94,12 +94,12 @@ class EinsumLowerer:
                 ]
                 pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
                 return ein.Einsum(
-                    reduceOp=overwrite,
-                    output=self.get_next_alias(),
-                    output_fields=tuple(
+                    op=ein.Literal(overwrite),
+                    tns=self.get_next_alias(),
+                    idxs=tuple(
                         ein.Index(field.name) for field in ex.fields
                     ),
-                    pointwise_expr=pointwise_expr,
+                    arg=pointwise_expr,
                 )
             case Reorder(arg, idxs):
                 return self.lower_to_einsum(
@@ -138,16 +138,16 @@ class EinsumLowerer:
                 ret_args: list[ein.EinsumExpr] = []
                 for arg in m_args:
                     match arg:
-                        case ein.Call(op2, _) if op2 == operation:
+                        case ein.Call(ein.Literal(op2), _) if op2 == operation:
                             ret_args.extend(flatten_args(arg.args))
                         case _:
                             ret_args.append(arg)
                 return tuple(ret_args)
 
-            return ein.Call(operation, flatten_args(args))
+            return ein.Call(ein.Literal(operation), flatten_args(args))
 
         # combine args from left to right (i.e a / b / c -> (a / b) / c)
-        return ein.Call(operation, args)
+        return ein.Call(ein.Literal(operation), args)
 
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
     def lower_to_pointwise(
@@ -187,7 +187,7 @@ class EinsumLowerer:
                     )
                 )
                 return ein.Access(
-                    alias=ein.Alias(aggregate_einsum_alias),
+                    tns=aggregate_einsum_alias,
                     idxs=tuple(ein.Index(field.name) for field in ex.fields),
                 )
             case _:
