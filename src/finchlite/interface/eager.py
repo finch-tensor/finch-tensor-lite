@@ -223,6 +223,12 @@ class EagerTensor(OverrideTensor, ABC):
     def __ne__(self, other):
         return not_equal(self, other)
 
+    def __divmod__(self, other):
+        return divmod(self, other)
+
+    def __rdivmod__(self, other):
+        return divmod(other, self)
+
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
@@ -1328,3 +1334,16 @@ def einsum(*args, **kwargs):
     if builtins.any(isinstance(v, lazy.LazyTensor) for v in args):
         return lazy.einsum(*args, **kwargs)
     return compute(lazy.einsum(*args, **kwargs))
+
+
+def divmod(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.divmod(x1, x2)
+    return compute(lazy.divmod(x1, x2))
+
+
+def divmod_arrays(x1, x2):
+    q, r = lazy.divmod_arrays(x1, x2)
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return q, r
+    return compute(q), compute(r)

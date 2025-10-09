@@ -1379,3 +1379,79 @@ def test_flatten(array_shape, expected_shape, wrapper):
         result = finchlite.compute(result)
 
     assert_equal(result, expected, strict=True)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
+        (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
+        (np.array([[2, 0], [1, 3]]), 2),
+        (3, np.array([[2, 0], [1, 3]])),
+        (np.array([[2, 0], [1, 3]]), True),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestEagerTensor,
+        finchlite.defer,
+    ],
+)
+def test_divmod_pair(a, b, a_wrap, b_wrap):
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="invalid value encountered in",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            message="divide by zero encountered in",
+        )
+
+        expected_q = np.floor_divide(a, b)
+        expected_r = np.mod(a, b)
+
+        q, r = finchlite.divmod(wa, wb)
+        if isinstance(wa, finchlite.LazyTensor) or isinstance(wb, finchlite.LazyTensor):
+            q, r = finchlite.compute((q, r))
+
+        assert_equal(q, expected_q)
+        assert_equal(r, expected_r)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
+        (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
+        (np.array([[2, 0], [1, 3]]), 2),
+        (3, np.array([[2, 0], [1, 3]])),
+        (np.array([[2, 0], [1, 3]]), True),
+        (np.array([[10], [20], [30]]), np.array([4, 6])),
+    ],
+)
+def test_divmod_arrays(a, b):
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        expected_q = np.floor_divide(a, b)
+        expected_r = np.mod(a, b)
+
+    q, r = finchlite.divmod_arrays(a, b)
+
+    np.testing.assert_array_equal(q, expected_q)
+    np.testing.assert_array_equal(r, expected_r)
