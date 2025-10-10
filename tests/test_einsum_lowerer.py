@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 import numpy as np
@@ -10,7 +12,6 @@ from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
 from finchlite.interface.fuse import compute
 from finchlite.interface.lazy import defer
 from finchlite.symbolic import gensym
-from typing import cast
 
 
 @pytest.fixture
