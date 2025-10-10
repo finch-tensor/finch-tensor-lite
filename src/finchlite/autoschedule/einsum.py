@@ -1,22 +1,22 @@
-from numpy import isin
-from finchlite.algebra.tensor import Tensor
+from collections.abc import Callable
+from typing import Any
+
 import finchlite.finch_einsum as ein
+from finchlite.algebra import init_value, is_commutative, overwrite
+from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic import (
+    Aggregate,
+    Alias,
+    Literal,
+    LogicNode,
+    MapJoin,
     Plan,
     Produces,
     Query,
-    Alias,
-    Table,
-    LogicNode,
-    MapJoin,
-    Literal,
-    Reorder,
-    Aggregate,
     Relabel,
+    Reorder,
+    Table,
 )
-from finchlite.algebra import overwrite, init_value, is_commutative
-from collections.abc import Callable
-from typing import Any
 from finchlite.interface import Scalar
 
 

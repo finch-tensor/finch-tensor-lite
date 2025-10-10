@@ -1,14 +1,15 @@
 import pytest
+
 import numpy as np
+
 import finchlite
-from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.autoschedule import optimize
+from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.finch_einsum import EinsumInterpreter
+from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
 from finchlite.interface.fuse import compute
-from finchlite.finch_logic import Plan, Query, Produces, Alias, LogicNode
 from finchlite.interface.lazy import defer
 from finchlite.symbolic import gensym
-from finchlite.compile.bufferized_ndarray import BufferizedNDArray
 
 
 @pytest.fixture

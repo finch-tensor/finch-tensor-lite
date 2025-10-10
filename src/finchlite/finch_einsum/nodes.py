@@ -351,9 +351,9 @@ class EinsumPrinterContext(Context):
                     ctx_2(body)
                 self.exec(ctx_2.emit())
                 return None
-            case Produces(args):
-                args = tuple(self(arg) for arg in args)
-                self.exec(f"{feed}return {args}\n")
-                return None
+            #case Produces(args):
+            #    args = tuple(self(arg) for arg in args)
+            #    self.exec(f"{feed}return {args}\n")
+            #    return None
             case _:
                 raise ValueError(f"Unknown expression type: {type(prgm)}")
