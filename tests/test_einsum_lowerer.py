@@ -10,6 +10,7 @@ from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
 from finchlite.interface.fuse import compute
 from finchlite.interface.lazy import defer
 from finchlite.symbolic import gensym
+from typing import cast
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ def lower_and_execute(ir: LogicNode):
     # Optimize into a plan
     var = Alias(gensym("result"))
     plan = Plan((Query(var, ir), Produces((var,))))
-    optimized_plan = optimize(plan)
+    optimized_plan = cast(Plan, optimize(plan))
 
     # Lower to einsum IR
     lowerer = EinsumLowerer()

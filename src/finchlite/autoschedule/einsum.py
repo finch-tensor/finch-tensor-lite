@@ -1,6 +1,8 @@
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
+
 import finchlite.finch_einsum as ein
 from finchlite.algebra import init_value, is_commutative, overwrite
 from finchlite.algebra.tensor import Tensor
@@ -19,18 +21,16 @@ from finchlite.finch_logic import (
 )
 from finchlite.interface import Scalar
 
+from finchlite.symbolic import gensym
 
 class EinsumLowerer:
-    alias_counter: int = 0
-
     def __call__(self, prgm: Plan) -> tuple[ein.Plan, dict[str, Any]]:
         parameters: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}
         return self.compile_plan(prgm, parameters, definitions), parameters
 
     def get_next_alias(self) -> ein.Alias:
-        self.alias_counter += 1
-        return ein.Alias(f"einsum_{self.alias_counter}")
+        return ein.Alias(gensym("einsum"))
 
     def rename_einsum(
         self,
@@ -66,7 +66,7 @@ class EinsumLowerer:
                 case Query(Alias(name), Table(Literal(tns), _)) if isinstance(
                     tns, Tensor
                 ):
-                    parameters[name] = tns.to_numpy()
+                    parameters[name] = np.asarray(tns)
                 case Query(Alias(name), rhs):
                     einsums.append(
                         self.rename_einsum(
@@ -76,12 +76,18 @@ class EinsumLowerer:
                         )
                     )
                 case Produces(args):
-                    returnValue = [
-                        ein.Alias(arg.name)
-                        if isinstance(arg, Alias)
-                        else self.lower_to_einsum(arg, einsums, parameters, definitions)
-                        for arg in args
-                    ]
+                    returnValue = []
+                    for arg in args:
+                        if isinstance(arg, Alias):
+                            returnValue.append(ein.Alias(arg.name))
+                        else:
+                            einsum = self.rename_einsum(
+                                self.lower_to_einsum(arg, einsums, parameters, definitions),
+                                self.get_next_alias(),
+                                definitions,
+                            )
+                            einsums.append(einsum)
+                            returnValue.append(einsum.tns)
                     break
                 case _:
                     einsums.append(
