@@ -1,3 +1,6 @@
+from abc import ABC, abstractmethod
+
+
 class BasicBlock:
     """A basic block of FinchAssembly's Control Flow Graph."""
 
@@ -68,3 +71,106 @@ class ControlFlowGraph:
         # Use list comprehension with join for better performance
         block_strings = [str(block) for block in blocks]
         return "\n\n".join(block_strings)
+
+
+class DataFlowAnalysis(ABC):
+    def __init__(self, cfg: ControlFlowGraph):
+        self.cfg: ControlFlowGraph = cfg
+        self.input_states: dict[str, dict] = {
+            block.id: {} for block in cfg.blocks.values()
+        }
+        self.output_states: dict[str, dict] = {
+            block.id: {} for block in cfg.blocks.values()
+        }
+
+    @abstractmethod
+    def __str__(self) -> str:
+        """Print the dataflow analysis results in a structured format."""
+        ...
+
+    @abstractmethod
+    def transfer(self, stmts, state: dict) -> dict:
+        """
+        Transfer function for the data flow analysis.
+        This should be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def join(self, state_1: dict, state_2: dict) -> dict:
+        """
+        Join function for the data flow analysis.
+        This should be implemented by subclasses.
+        """
+        ...
+
+    @abstractmethod
+    def direction(self) -> str:
+        """
+        Return the direction of the data flow analysis, either "forward" or "backward".
+        This should be implemented by subclasses.
+        """
+        ...
+
+    def analyze(self):
+        """
+        Perform the data flow analysis on the control flow graph.
+        This method initializes the work list and processes each block.
+        """
+        if self.direction() == "forward":
+            work_list: list[BasicBlock] = list(self.cfg.blocks.values())
+            while work_list:
+                block = work_list.pop(0)
+
+                # get current input state based on the predecessors output states
+                if not block.predecessors:
+                    input_state = {}
+                else:
+                    pred_outputs = [
+                        self.output_states.get(pred.id, {})
+                        for pred in block.predecessors
+                    ]
+                    input_state = pred_outputs[0].copy()
+                    for pred_output in pred_outputs[1:]:
+                        input_state = self.join(input_state, pred_output)
+
+                self.input_states[block.id] = input_state
+
+                # perform transfer based on the statements in the current basic block
+                output_state = self.transfer(block.statements, input_state)
+
+                # check if output_state changed
+                if output_state != self.output_states.get(block.id, {}):
+                    self.output_states[block.id] = output_state
+
+                    for successor in block.successors:
+                        if successor not in work_list:
+                            work_list.append(successor)
+        else:
+            work_list: list[BasicBlock] = list(self.cfg.blocks.values())
+            while work_list:
+                block = work_list.pop(0)
+
+                # get current input state based on the successors output states
+                if not block.successors:
+                    input_state = {}
+                else:
+                    succ_outputs = [
+                        self.output_states.get(succ.id, {}) for succ in block.successors
+                    ]
+                    input_state = succ_outputs[0].copy()
+                    for succ_output in succ_outputs[1:]:
+                        input_state = self.join(input_state, succ_output)
+
+                self.input_states[block.id] = input_state
+
+                # perform trasnfer based on the statements in the current basic block
+                output_state = self.transfer(block.statements, input_state)
+
+                # check if output state changed
+                if output_state != self.output_states.get(block.id, {}):
+                    self.output_states[block.id] = output_state
+
+                    for predecessor in block.predecessors:
+                        if predecessor not in work_list:
+                            work_list.append(predecessor)

@@ -1,0 +1,36 @@
+INPUT_STATES:
+    ENTRY_0: #succs=[dot_product_2]
+        (empty)
+    EXIT_1: #succs=[]
+        (empty)
+    dot_product_2: #succs=[dot_product_4, dot_product_5]
+        (empty)
+    dot_product_3: #succs=[EXIT_1]
+        (empty)
+    dot_product_4: #succs=[dot_product_2]
+        c = 0.0
+        j = 0
+    dot_product_5: #succs=[dot_product_3]
+        c = 0.0
+        j = 0
+    dot_product_6: #succs=[dot_product_3]
+        (empty)
+
+OUTPUT_STATES:
+    ENTRY_0: #succs=[dot_product_2]
+        (empty)
+    EXIT_1: #succs=[]
+        (empty)
+    dot_product_2: #succs=[dot_product_4, dot_product_5]
+        c = 0.0
+        j = 0
+    dot_product_3: #succs=[EXIT_1]
+        (empty)
+    dot_product_4: #succs=[dot_product_2]
+        c = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))
+        j = add(j_0, 1)
+    dot_product_5: #succs=[dot_product_3]
+        c = 0.0
+        j = 0
+    dot_product_6: #succs=[dot_product_3]
+        (empty)

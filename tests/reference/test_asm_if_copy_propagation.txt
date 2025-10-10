@@ -1,0 +1,47 @@
+INPUT_STATES:
+    ENTRY_0: #succs=[if_else_2]
+        (empty)
+    EXIT_1: #succs=[]
+        (empty)
+    if_else_2: #succs=[if_else_4, if_else_5]
+        (empty)
+    if_else_3: #succs=[EXIT_1]
+        (empty)
+    if_else_4: #succs=[if_else_6]
+        a = 5
+    if_else_5: #succs=[if_else_6]
+        a = 5
+    if_else_6: #succs=[if_else_7, if_else_8]
+        (empty)
+    if_else_7: #succs=[if_else_9]
+        (empty)
+    if_else_8: #succs=[if_else_9]
+        (empty)
+    if_else_9: #succs=[if_else_3]
+        (empty)
+    if_else_10: #succs=[if_else_3]
+        (empty)
+
+OUTPUT_STATES:
+    ENTRY_0: #succs=[if_else_2]
+        (empty)
+    EXIT_1: #succs=[]
+        (empty)
+    if_else_2: #succs=[if_else_4, if_else_5]
+        a = 5
+    if_else_3: #succs=[EXIT_1]
+        (empty)
+    if_else_4: #succs=[if_else_6]
+        a = add(a_3, 10)
+    if_else_5: #succs=[if_else_6]
+        a = 5
+    if_else_6: #succs=[if_else_7, if_else_8]
+        (empty)
+    if_else_7: #succs=[if_else_9]
+        a = sub(a_6, 3)
+    if_else_8: #succs=[if_else_9]
+        a = mul(a_8, 2)
+    if_else_9: #succs=[if_else_3]
+        (empty)
+    if_else_10: #succs=[if_else_3]
+        (empty)
