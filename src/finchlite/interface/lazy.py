@@ -1805,7 +1805,8 @@ def std(
 
 def einop(prgm, **kwargs):
     stmt = ein.parse_einop(prgm)
-    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    prgm = ein.Plan((stmt, ), (stmt.tns,))
+
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
     return ctx(prgm)[0]
@@ -1813,7 +1814,8 @@ def einop(prgm, **kwargs):
 
 def einsum(prgm, *args, **kwargs):
     stmt, bindings = ein.parse_einsum(prgm, *args)
-    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    prgm = ein.Plan((stmt, ), (stmt.tns,))
+
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp, bindings)
     return ctx(prgm)[0]

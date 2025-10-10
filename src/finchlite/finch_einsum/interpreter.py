@@ -109,7 +109,7 @@ class EinsumInterpreter:
                     self(body) #execute each einsum statement individually
                 
                 if returnValues: #return and evaluate the return values seperately
-                    return tuple(self(rv) for rv in returnValues) if len(returnValues) > 1 else self(returnValues[0])
+                    return tuple(self(rv) for rv in returnValues)
                 return None
             case ein.Produces(args):
                 return tuple(self(arg) for arg in args)

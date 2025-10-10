@@ -36,7 +36,7 @@ def lower_and_execute(ir: LogicNode):
     
     # Interpret and execute
     interpreter = EinsumInterpreter(bindings=plan_parameters)
-    return interpreter(einsum_plan)
+    return interpreter(einsum_plan)[0]
 
 
 def test_simple_addition(rng):
