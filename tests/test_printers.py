@@ -542,8 +542,8 @@ def test_einsum_printer(file_regression):
                     ein.parse_einop("E[i] min= A[i,k] + D[k,j] << 1"),
                 )
             ),
-            ein.Produces((ein.Alias("C"), ein.Alias("E"))),
-        )
+        ),
+        (ein.Alias("C"), ein.Alias("E"))
     )
 
     file_regression.check(str(prgm), extension=".txt")

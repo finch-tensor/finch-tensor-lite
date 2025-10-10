@@ -319,7 +319,7 @@ class EinsumPrinterContext(Context):
         return blk
 
     def __call__(self, prgm: EinsumNode):
-        feed = self.feed
+        #feed = self.feed
         match prgm:
             case Literal(value):
                 return qual_str(value).replace("\n", "")
@@ -344,12 +344,19 @@ class EinsumPrinterContext(Context):
                     f"{op_str}= {self(arg)}"
                 )
                 return None
-            case Plan(bodies):
+            case Plan(bodies, returnValues):
                 self.exec(f"{self.feed}plan:")
                 ctx_2 = self.subblock()
                 for body in bodies:
                     ctx_2(body)
                 self.exec(ctx_2.emit())
+
+                if len(returnValues) > 0:
+                    self.exec(f"{self.feed}returnValues:")
+                    ctx_3 = self.subblock()
+                    for returnValue in returnValues:
+                        ctx_3.exec(f"{ctx_3.feed}{ctx_3(returnValue)}")
+                    self.exec(ctx_3.emit())
                 return None
             #case Produces(args):
             #    args = tuple(self(arg) for arg in args)
