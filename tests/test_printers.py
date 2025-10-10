@@ -543,7 +543,7 @@ def test_einsum_printer(file_regression):
                 )
             ),
         ),
-        (ein.Alias("C"), ein.Alias("E"))
+        (ein.Alias("C"), ein.Alias("E")),
     )
 
     file_regression.check(str(prgm), extension=".txt")
