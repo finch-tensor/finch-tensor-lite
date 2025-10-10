@@ -66,7 +66,7 @@ class EinsumLowerer:
                 case Query(Alias(name), Table(Literal(tns), _)) if isinstance(
                     tns, Tensor
                 ):
-                    parameters[name] = np.asarray(tns)
+                    parameters[name] = tns.to_numpy() if hasattr(tns, "to_numpy") else np.asarray(tns)  # type: ignore[attr-defined]
                 case Query(Alias(name), rhs):
                     einsums.append(
                         self.rename_einsum(
