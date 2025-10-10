@@ -78,3 +78,45 @@ def test_element_wise_operations(rng):
 
     expected = compute(D)
     assert np.allclose(result, expected)
+
+def test_sum_reduction(rng):
+    """Test sum reduction using +="""
+    A = defer(rng.random((3, 4)))
+
+    B = finchlite.sum(A, axis=1)
+
+    result = lower_and_execute(B.data)
+    
+    expected = compute(B)
+    assert np.allclose(result, expected)
+
+def test_maximum_reduction(rng):
+    """Test maximum reduction using max="""
+    A = defer(rng.random((3, 4)))
+
+    B = finchlite.max(A, axis=1)
+
+    result = lower_and_execute(B.data)
+    expected = compute(B)
+    assert np.allclose(result, expected)
+
+def test_batch_matrix_multiplication(rng):
+    """Test batch matrix multiplication using +="""
+    A = defer(rng.random((2, 3, 4)))
+    B = defer(rng.random((2, 4, 5)))
+
+    C = finchlite.matmul(A, B)
+
+    result = lower_and_execute(C.data)
+    expected = compute(C)
+    assert np.allclose(result, expected)
+
+def test_minimum_reduction(rng):
+    """Test minimum reduction using min="""
+    A = defer(rng.random((3, 4)))
+
+    B = finchlite.min(A, axis=1)
+
+    result = lower_and_execute(B.data)
+    expected = compute(B)
+    assert np.allclose(result, expected)
