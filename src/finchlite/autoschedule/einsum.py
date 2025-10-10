@@ -1,3 +1,5 @@
+from numpy import isin
+from finchlite.algebra.tensor import Tensor
 import finchlite.finch_einsum as ein
 from finchlite.finch_logic import (
     Plan,
@@ -14,12 +16,14 @@ from finchlite.finch_logic import (
 )
 from finchlite.algebra import overwrite, init_value, is_commutative
 from collections.abc import Callable
+from typing import Any
+from finchlite.interface import Scalar
 
 class EinsumLowerer:
     alias_counter: int = 0
 
-    def __call__(self, prgm: Plan) -> tuple[ein.Plan, dict[str, Table]]:
-        parameters: dict[str, Table] = {}
+    def __call__(self, prgm: Plan) -> tuple[ein.Plan, dict[str, Any]]:
+        parameters: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}
         return self.compile_plan(prgm, parameters, definitions), parameters
 
@@ -33,8 +37,13 @@ class EinsumLowerer:
         definitions[new_alias.name] = einsum
         return ein.Einsum(einsum.op, new_alias, einsum.idxs, einsum.arg)
 
+    def reorder_einsum(
+        self, einsum: ein.Einsum, idxs: tuple[ein.Index, ...]
+    ) -> ein.Einsum:
+        return ein.Einsum(einsum.op, einsum.tns, idxs, einsum.arg)
+
     def compile_plan(
-        self, plan: Plan, parameters: dict[str, Table], definitions: dict[str, ein.Einsum]
+        self, plan: Plan, parameters: dict[str, Any], definitions: dict[str, ein.Einsum]
     ) -> ein.Plan:
         einsums: list[ein.Einsum] = []
         returnValue: list[ein.EinsumExpr] = []
@@ -46,8 +55,10 @@ class EinsumLowerer:
                     einsums.extend(inner_plan.bodies)
                     returnValue.extend(inner_plan.returnValues)
                     break
-                case Query(Alias(name), Table(_, _)):
-                    parameters[name] = body.rhs
+                case Query(Alias(name), Table(Literal(val), _)) if isinstance(val, Scalar):
+                    parameters[name] = val.val
+                case Query(Alias(name), Table(Literal(tns), _)) if isinstance(tns, Tensor):
+                    parameters[name] = tns.to_numpy()
                 case Query(Alias(name), rhs):
                     einsums.append(
                         self.rename_einsum(
@@ -81,7 +92,7 @@ class EinsumLowerer:
         self,
         ex: LogicNode,
         einsums: list[ein.Einsum],
-        parameters: dict[str, Table],
+        parameters: dict[str, Any],
         definitions: dict[str, ein.Einsum],
     ) -> ein.Einsum:
         match ex:
@@ -102,9 +113,10 @@ class EinsumLowerer:
                     arg=pointwise_expr,
                 )
             case Reorder(arg, idxs):
-                return self.lower_to_einsum(
-                    arg, einsums, parameters, definitions
-                ).reorder(idxs)
+                return self.reorder_einsum(
+                    self.lower_to_einsum(arg, einsums, parameters, definitions),
+                    tuple(ein.Index(field.name) for field in idxs)
+                )
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
                     raise Exception(f"""
@@ -154,7 +166,7 @@ class EinsumLowerer:
         self,
         ex: LogicNode,
         einsums: list[ein.Einsum],
-        parameters: dict[str, Table],
+        parameters: dict[str, Any],
         definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
         match ex:
