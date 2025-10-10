@@ -9,7 +9,7 @@ from .nodes import (
     Index,
     Literal,
     Plan,
-#    Produces,
+    #    Produces,
 )
 from .parser import parse_einop, parse_einsum
 
@@ -27,7 +27,7 @@ __all__ = [
     "Index",
     "Literal",
     "Plan",
-#    "Produces",
+    #    "Produces",
     "parse_einop",
     "parse_einsum",
 ]

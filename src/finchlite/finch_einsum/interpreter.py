@@ -106,12 +106,12 @@ class EinsumInterpreter:
                 )
             case ein.Plan(bodies, returnValues):
                 for body in bodies:
-                    self(body) #execute each einsum statement individually
-                
-                if returnValues: #return and evaluate the return values seperately
+                    self(body)  # execute each einsum statement individually
+
+                if returnValues:  # return and evaluate the return values seperately
                     return tuple(self(rv) for rv in returnValues)
                 return None
-            #case ein.Produces(args):
+            # case ein.Produces(args):
             #    return tuple(self(arg) for arg in args)
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
                 # This is the main entry point for einsum execution

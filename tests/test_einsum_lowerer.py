@@ -10,6 +10,7 @@ from finchlite.interface.lazy import defer
 from finchlite.symbolic import gensym
 from finchlite.compile.bufferized_ndarray import BufferizedNDArray
 
+
 @pytest.fixture
 def rng():
     return np.random.default_rng(42)
@@ -18,10 +19,10 @@ def rng():
 def lower_and_execute(ir: LogicNode):
     """
     Helper function to optimize, lower, and execute a Logic IR plan.
-    
+
     Args:
         plan: The Logic IR plan to execute
-    
+
     Returns:
         The result of executing the einsum plan
     """
@@ -29,11 +30,11 @@ def lower_and_execute(ir: LogicNode):
     var = Alias(gensym("result"))
     plan = Plan((Query(var, ir), Produces((var,))))
     optimized_plan = optimize(plan)
-    
+
     # Lower to einsum IR
     lowerer = EinsumLowerer()
     einsum_plan, plan_parameters = lowerer(optimized_plan)
-    
+
     # Interpret and execute
     interpreter = EinsumInterpreter(bindings=plan_parameters)
     return interpreter(einsum_plan)[0]
@@ -79,6 +80,7 @@ def test_element_wise_operations(rng):
     expected = compute(D)
     assert np.allclose(result, expected)
 
+
 def test_sum_reduction(rng):
     """Test sum reduction using +="""
     A = defer(rng.random((3, 4)))
@@ -86,9 +88,10 @@ def test_sum_reduction(rng):
     B = finchlite.sum(A, axis=1)
 
     result = lower_and_execute(B.data)
-    
+
     expected = compute(B)
     assert np.allclose(result, expected)
+
 
 def test_maximum_reduction(rng):
     """Test maximum reduction using max="""
@@ -100,6 +103,7 @@ def test_maximum_reduction(rng):
     expected = compute(B)
     assert np.allclose(result, expected)
 
+
 def test_batch_matrix_multiplication(rng):
     """Test batch matrix multiplication using +="""
     A = defer(rng.random((2, 3, 4)))
@@ -110,6 +114,7 @@ def test_batch_matrix_multiplication(rng):
     result = lower_and_execute(C.data)
     expected = compute(C)
     assert np.allclose(result, expected)
+
 
 def test_minimum_reduction(rng):
     """Test minimum reduction using min="""

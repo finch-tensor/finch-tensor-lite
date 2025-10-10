@@ -19,6 +19,7 @@ from collections.abc import Callable
 from typing import Any
 from finchlite.interface import Scalar
 
+
 class EinsumLowerer:
     alias_counter: int = 0
 
@@ -32,7 +33,10 @@ class EinsumLowerer:
         return ein.Alias(f"einsum_{self.alias_counter}")
 
     def rename_einsum(
-        self, einsum: ein.Einsum, new_alias: ein.Alias, definitions: dict[str, ein.Einsum]
+        self,
+        einsum: ein.Einsum,
+        new_alias: ein.Alias,
+        definitions: dict[str, ein.Einsum],
     ) -> ein.Einsum:
         definitions[new_alias.name] = einsum
         return ein.Einsum(einsum.op, new_alias, einsum.idxs, einsum.arg)
@@ -55,9 +59,13 @@ class EinsumLowerer:
                     einsums.extend(inner_plan.bodies)
                     returnValue.extend(inner_plan.returnValues)
                     break
-                case Query(Alias(name), Table(Literal(val), _)) if isinstance(val, Scalar):
+                case Query(Alias(name), Table(Literal(val), _)) if isinstance(
+                    val, Scalar
+                ):
                     parameters[name] = val.val
-                case Query(Alias(name), Table(Literal(tns), _)) if isinstance(tns, Tensor):
+                case Query(Alias(name), Table(Literal(tns), _)) if isinstance(
+                    tns, Tensor
+                ):
                     parameters[name] = tns.to_numpy()
                 case Query(Alias(name), rhs):
                     einsums.append(
@@ -107,15 +115,13 @@ class EinsumLowerer:
                 return ein.Einsum(
                     op=ein.Literal(overwrite),
                     tns=self.get_next_alias(),
-                    idxs=tuple(
-                        ein.Index(field.name) for field in ex.fields
-                    ),
+                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
                     arg=pointwise_expr,
                 )
             case Reorder(arg, idxs):
                 return self.reorder_einsum(
                     self.lower_to_einsum(arg, einsums, parameters, definitions),
-                    tuple(ein.Index(field.name) for field in idxs)
+                    tuple(ein.Index(field.name) for field in idxs),
                 )
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
                 if init != init_value(operation, type(init)):
@@ -128,10 +134,10 @@ class EinsumLowerer:
                     arg, einsums, parameters, definitions
                 )
                 return ein.Einsum(
-                    op = ein.Literal(operation),
-                    tns = self.get_next_alias(),
-                    idxs = tuple(ein.Index(field.name) for field in ex.fields),
-                    arg = aggregate_expr
+                    op=ein.Literal(operation),
+                    tns=self.get_next_alias(),
+                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
+                    arg=aggregate_expr,
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")

@@ -244,8 +244,8 @@ class Plan(EinsumTree):
         return [*self.bodies, self.returnValues]
 
 
-#@dataclass(eq=True, frozen=True)
-#class Produces(EinsumTree):
+# @dataclass(eq=True, frozen=True)
+# class Produces(EinsumTree):
 #    """
 #    Represents a logical AST statement that returns `args...` from the current plan.
 #    Halts execution of the program.
