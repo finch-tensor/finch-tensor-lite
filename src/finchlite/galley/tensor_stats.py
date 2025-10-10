@@ -30,7 +30,10 @@ class TensorStats(ABC):
     @staticmethod
     @abstractmethod
     def aggregate(
-        op: Callable, fields: Iterable[str], arg: "TensorStats"
+        op: Callable[..., Any],
+        init: Any | None,
+        reduce_indices: Iterable[str],
+        stats: "TensorStats",
     ) -> "TensorStats":
         """
         Return a new statistic representing the tensor resulting
