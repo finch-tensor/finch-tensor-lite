@@ -244,26 +244,26 @@ class Plan(EinsumTree):
         return [*self.bodies, self.returnValues]
 
 
-@dataclass(eq=True, frozen=True)
-class Produces(EinsumTree):
-    """
-    Represents a logical AST statement that returns `args...` from the current plan.
-    Halts execution of the program.
+#@dataclass(eq=True, frozen=True)
+#class Produces(EinsumTree):
+#    """
+#    Represents a logical AST statement that returns `args...` from the current plan.
+#    Halts execution of the program.
+#
+#    Attributes:
+#        args: The arguments to return.
+#    """
 
-    Attributes:
-        args: The arguments to return.
-    """
+#    args: tuple[EinsumNode, ...]
 
-    args: tuple[EinsumNode, ...]
+#    @property
+#    def children(self):
+#        """Returns the children of the node."""
+#        return [*self.args]
 
-    @property
-    def children(self):
-        """Returns the children of the node."""
-        return [*self.args]
-
-    @classmethod
-    def from_children(cls, *args):
-        return cls(args)
+#    @classmethod
+#    def from_children(cls, *args):
+#        return cls(args)
 
 
 infix_strs = {
