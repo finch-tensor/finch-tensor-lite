@@ -95,20 +95,24 @@ class EinsumInterpreter:
             case ein.Access(tns, idxs):
                 assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
+
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
                 tns = self(tns)
+
                 tns = xp.permute_dims(tns, perm)
                 return xp.expand_dims(
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
-            case ein.Plan(bodies):
-                res = None
+            case ein.Plan(bodies, returnValues):
                 for body in bodies:
-                    res = self(body)
-                return res
-            case ein.Produces(args):
-                return tuple(self(arg) for arg in args)
+                    self(body)  # execute each einsum statement individually
+
+                if returnValues:  # return and evaluate the return values seperately
+                    return tuple(self(rv) for rv in returnValues)
+                return None
+            # case ein.Produces(args):
+            #    return tuple(self(arg) for arg in args)
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()

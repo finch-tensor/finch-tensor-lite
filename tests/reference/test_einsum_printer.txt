@@ -3,4 +3,6 @@ plan:
     plan:
         D[i, j] += (A[i, k] * B[k, j])
         E[i] min= lshift((A[i, k] + D[k, j]), 1)
-    return ('C', 'E')
+returnValues:
+    C
+    E
