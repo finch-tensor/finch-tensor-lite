@@ -20,6 +20,10 @@ from ..algebra import (
     fixpoint_type,
     identity,
     init_value,
+    last,
+    maxby,
+    minby,
+    pair,
     promote_max,
     promote_min,
     promote_type,
@@ -31,7 +35,6 @@ from ..algebra import (
     conjugate as conj,
 )
 from ..compile import BufferizedNDArray
-from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -58,7 +61,7 @@ class LazyTensorFType(TensorFType):
     _element_type: Any
     _shape_type: Any
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: TupleFType):
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple):
         self._fill_value = _fill_value
         self._element_type = _element_type
         self._shape_type = _shape_type
@@ -88,6 +91,17 @@ class LazyTensorFType(TensorFType):
         return self._shape_type
 
 
+"""
+# Added to solve error associated with no iscomplxobj in lazy.py
+def iscomplexobj(x):
+
+    try:
+        return np.issubdtype(x.element_type, np.complexfloating)
+    except AttributeError:
+        return False
+"""
+
+
 class LazyTensor(OverrideTensor):
     def __init__(
         self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
@@ -102,7 +116,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=ftype(self._shape),
+            _shape_type=tuple(type(dim) for dim in self.shape),
         )
 
     @property
@@ -714,6 +728,106 @@ def prod(
     return reduce(operator.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
+#######################################
+@dataclass(frozen=True)
+class LinearIndicesTensorFType(TensorFType):
+    _shape_type: tuple[type, ...]
+    _element_type: Any = int
+    _fill_value: Any = 0
+
+    @property
+    def shape_type(self) -> tuple[type, ...]:
+        return self._shape_type
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+
+class LinearIndicesTensor(Tensor):
+    def __init__(self, shape):
+        self.shape_ = shape
+
+    def __getitem__(self, idxs):
+        flat_index = idxs[0]
+        for i in range(1, self.ndim):
+            flat_index = flat_index * self.shape_[i] + idxs[i]
+        return flat_index
+
+    @property
+    def shape(self):
+        return self.shape_
+
+    @property
+    def ftype(self):
+        shape_type = tuple(type(dim) for dim in self.shape)
+        return LinearIndicesTensorFType(shape_type, int, 0)
+
+
+register_property(LinearIndicesTensor, "promote_type", "__attr__", lambda x: int)
+
+
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    dtype=None,
+    keepdims: bool = False,
+):
+    x = defer(x)
+    shape = x.shape
+
+    if axis is None:
+        indices = defer(LinearIndicesTensor(shape))
+
+    else:
+        broadcast_indices = LazyTensor(
+            "i",
+            shape=(x.shape[axis],),
+            fill_value=x.fill_value,
+            element_type=x.element_type,
+        )
+        indices = expand_dims(
+            broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
+        )
+
+    paired = elementwise(pair, x, indices)
+    reduced = reduce(
+        minby, paired, axis=axis, init=(float("inf"), 0), keepdims=keepdims
+    )
+
+    return elementwise(last, reduced)
+
+
+def argmax(x, axis=None):
+    x = defer(x)
+    shape = x.shape
+
+    if axis is None:
+        indices = LinearIndicesTensor(shape)
+
+    else:
+        broadcast_indices = LazyTensor(
+            "i",
+            shape=(x.shape[axis],),
+            fill_value=x.fill_value,
+            element_type=x.element_type,
+        )
+        indices = expand_dims(
+            broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
+        )
+
+    paired = elementwise(pair, x, indices)
+    reduced = reduce(maxby, paired, axis=axis, init=(float("inf"), 0))
+
+    return elementwise(last, reduced)
+
+
 def any(
     x,
     /,
@@ -1223,6 +1337,7 @@ class ConcatTensor(Tensor):
         `fill_value` is taken from the first tensor.
         `element_type` is casted according to array_api specification.
         """
+
         self._ndim = len(tensor.shape)
 
         shape_without_axis = tensor.shape[:axis] + tensor.shape[axis + 1 :]
