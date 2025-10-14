@@ -225,45 +225,43 @@ class Plan(EinsumTree):
     """
 
     bodies: tuple[Einsum, ...] = ()
-    returnValues: tuple[EinsumExpr, ...] = ()
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         # The last child is the returnValues tuple, all others are bodies
         if len(children) < 1:
             raise ValueError("Plan expects at least 1 child")
-        *bodies, returnValues = children
+        bodies = children
 
         return cls(
             tuple(cast(Einsum, b) for b in bodies),
-            cast(tuple[EinsumExpr, ...], returnValues),
         )
 
     @property
     def children(self):
-        return [*self.bodies, self.returnValues]
+        return [*self.bodies]
 
 
-# @dataclass(eq=True, frozen=True)
-# class Produces(EinsumTree):
-#    """
-#    Represents a logical AST statement that returns `args...` from the current plan.
-#    Halts execution of the program.
-#
-#    Attributes:
-#        args: The arguments to return.
-#    """
+@dataclass(eq=True, frozen=True)
+class Produces(EinsumTree):
+    """
+    Represents a logical AST statement that returns `args...` from the current plan.
+    Halts execution of the program.
 
-#    args: tuple[EinsumNode, ...]
+    Attributes:
+        args: The arguments to return.
+    """
 
-#    @property
-#    def children(self):
-#        """Returns the children of the node."""
-#        return [*self.args]
+    args: tuple[EinsumNode, ...]
 
-#    @classmethod
-#    def from_children(cls, *args):
-#        return cls(args)
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
+
+    @classmethod
+    def from_children(cls, *args):
+        return cls(args)
 
 
 infix_strs = {
@@ -319,7 +317,7 @@ class EinsumPrinterContext(Context):
         return blk
 
     def __call__(self, prgm: EinsumNode):
-        # feed = self.feed
+        feed = self.feed
         match prgm:
             case Literal(value):
                 return qual_str(value).replace("\n", "")
@@ -344,23 +342,16 @@ class EinsumPrinterContext(Context):
                     f"{op_str}= {self(arg)}"
                 )
                 return None
-            case Plan(bodies, returnValues):
+            case Plan(bodies):
                 self.exec(f"{self.feed}plan:")
                 ctx_2 = self.subblock()
                 for body in bodies:
                     ctx_2(body)
                 self.exec(ctx_2.emit())
-
-                if len(returnValues) > 0:
-                    self.exec(f"{self.feed}returnValues:")
-                    ctx_3 = self.subblock()
-                    for returnValue in returnValues:
-                        ctx_3.exec(f"{ctx_3.feed}{ctx_3(returnValue)}")
-                    self.exec(ctx_3.emit())
                 return None
-            # case Produces(args):
-            #    args = tuple(self(arg) for arg in args)
-            #    self.exec(f"{feed}return {args}\n")
-            #    return None
+            case Produces(args):
+                args = tuple(self(arg) for arg in args)
+                self.exec(f"{feed}return {args}\n")
+                return None
             case _:
                 raise ValueError(f"Unknown expression type: {type(prgm)}")
