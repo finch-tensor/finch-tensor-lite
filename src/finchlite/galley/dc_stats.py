@@ -1175,8 +1175,33 @@ class DCStats(TensorStats):
         return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
 
     @staticmethod
-    def aggregate(op, dims, *args, **kwargs):
-        pass
+    def aggregate(
+        op: Callable[..., Any],
+        init: Any | None,
+        reduce_indices: Iterable[str],
+        stats: "TensorStats",
+    ) -> "TensorStats":
+        """
+        Reduce DC statistics over specified indices.
+
+        Args:
+            op (Callable[..., Any]): Reduction operator.
+            init (Any | None): Optional initial value forwarded to TensorDef.aggregate.
+            reduce_indices (Iterable[str]): Indices to eliminate during the reduction.
+            stats (TensorStats): Input statistics (expected: DCStats).
+
+        Returns:
+            DCStats: Statistics with a reduced TensorDef (over `reduce_indices`) and the
+            same DC set carried over from the input.
+        """
+        fields = list(reduce_indices)
+        if len(fields) == 0:
+            new_def = stats.tensordef.copy()
+        else:
+            new_def = TensorDef.aggregate(op, init, fields, stats.tensordef)
+
+        dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        return DCStats.from_def(new_def, dcs)
 
     @staticmethod
     def issimilar(*args, **kwargs):
@@ -1196,7 +1221,7 @@ class DCStats(TensorStats):
         """
         idx: frozenset[str] = frozenset(self.tensordef.dim_sizes.keys())
         if len(idx) == 0:
-            return 0.0
+            return 1.0
 
         best: dict[frozenset[str], float] = {frozenset(): 1.0}
         frontier: set[frozenset[str]] = {frozenset()}
