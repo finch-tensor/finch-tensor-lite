@@ -49,15 +49,13 @@ class EinsumLowerer:
     def compile_plan(
         self, plan: Plan, parameters: dict[str, Any], definitions: dict[str, ein.Einsum]
     ) -> ein.Plan:
-        einsums: list[ein.Einsum] = []
-        returnValue: list[ein.EinsumExpr] = []
+        bodies: list[ein.EinsumNode] = []
 
         for body in plan.bodies:
             match body:
                 case Plan(_):
                     inner_plan = self.compile_plan(body, parameters, definitions)
-                    einsums.extend(inner_plan.bodies)
-                    returnValue.extend(inner_plan.returnValues)
+                    bodies.extend(inner_plan.bodies)
                     break
                 case Query(Alias(name), Table(Literal(val), _)) if isinstance(
                     val, Scalar
@@ -70,41 +68,42 @@ class EinsumLowerer:
                         tns.to_numpy() if hasattr(tns, "to_numpy") else np.asarray(tns)
                     )  # type: ignore[attr-defined]
                 case Query(Alias(name), rhs):
-                    einsums.append(
+                    bodies.append(
                         self.rename_einsum(
-                            self.lower_to_einsum(rhs, einsums, parameters, definitions),
+                            self.lower_to_einsum(rhs, bodies, parameters, definitions),
                             ein.Alias(name),
                             definitions,
                         )
                     )
                 case Produces(args):
-                    returnValue = []
+                    returnValues = []
                     for arg in args:
                         if isinstance(arg, Alias):
-                            returnValue.append(ein.Alias(arg.name))
+                            returnValues.append(ein.Alias(arg.name))
                         else:
                             einsum = self.rename_einsum(
                                 self.lower_to_einsum(
-                                    arg, einsums, parameters, definitions
+                                    arg, bodies, parameters, definitions
                                 ),
                                 self.get_next_alias(),
                                 definitions,
                             )
-                            einsums.append(einsum)
-                            returnValue.append(einsum.tns)
-                    break
+                            bodies.append(einsum)
+                            returnValues.append(einsum.tns)
+                    
+                    bodies.append(ein.Produces(tuple(returnValues)))
                 case _:
-                    einsums.append(
+                    bodies.append(
                         self.rename_einsum(
                             self.lower_to_einsum(
-                                body, einsums, parameters, definitions
+                                body, bodies, parameters, definitions
                             ),
                             self.get_next_alias(),
                             definitions,
                         )
                     )
 
-        return ein.Plan(tuple(einsums), tuple(returnValue))
+        return ein.Plan(tuple(bodies))
 
     def lower_to_einsum(
         self,

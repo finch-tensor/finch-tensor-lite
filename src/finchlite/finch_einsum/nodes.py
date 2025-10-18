@@ -224,7 +224,7 @@ class Plan(EinsumTree):
     Basically a list of einsums and some return values.
     """
 
-    bodies: tuple[Einsum, ...] = ()
+    bodies: tuple[EinsumNode, ...] = ()
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -234,7 +234,7 @@ class Plan(EinsumTree):
         bodies = children
 
         return cls(
-            tuple(cast(Einsum, b) for b in bodies),
+            tuple(cast(EinsumNode, b) for b in bodies),
         )
 
     @property

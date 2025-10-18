@@ -104,15 +104,13 @@ class EinsumInterpreter:
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
-            case ein.Plan(bodies, returnValues):
+            case ein.Plan(bodies):
+                returnVal = None
                 for body in bodies:
-                    self(body)  # execute each einsum statement individually
-
-                if returnValues:  # return and evaluate the return values seperately
-                    return tuple(self(rv) for rv in returnValues)
-                return None
-            # case ein.Produces(args):
-            #    return tuple(self(arg) for arg in args)
+                    returnVal = self(body)  # execute each einsum statement individually
+                return returnVal
+            case ein.Produces(args):
+                return tuple(self(arg) for arg in args)
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()
