@@ -108,7 +108,7 @@ class EinsumLowerer:
     def lower_to_einsum(
         self,
         ex: LogicNode,
-        einsums: list[ein.Einsum],
+        bodies: list[ein.EinsumNode],
         parameters: dict[str, Any],
         definitions: dict[str, ein.Einsum],
     ) -> ein.Einsum:
@@ -117,7 +117,7 @@ class EinsumLowerer:
                 raise Exception("Plans within plans are not supported.")
             case MapJoin(Literal(operation), args):
                 args_list = [
-                    self.lower_to_pointwise(arg, einsums, parameters, definitions)
+                    self.lower_to_pointwise(arg, bodies, parameters, definitions)
                     for arg in args
                 ]
                 pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
@@ -129,7 +129,7 @@ class EinsumLowerer:
                 )
             case Reorder(arg, idxs):
                 return self.reorder_einsum(
-                    self.lower_to_einsum(arg, einsums, parameters, definitions),
+                    self.lower_to_einsum(arg, bodies, parameters, definitions),
                     tuple(ein.Index(field.name) for field in idxs),
                 )
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
@@ -140,7 +140,7 @@ class EinsumLowerer:
                     Non standard init values are not supported.
                     """)
                 aggregate_expr = self.lower_to_pointwise(
-                    arg, einsums, parameters, definitions
+                    arg, bodies, parameters, definitions
                 )
                 return ein.Einsum(
                     op=ein.Literal(operation),
@@ -180,16 +180,16 @@ class EinsumLowerer:
     def lower_to_pointwise(
         self,
         ex: LogicNode,
-        einsums: list[ein.Einsum],
+        bodies: list[ein.EinsumNode],
         parameters: dict[str, Any],
         definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
         match ex:
             case Reorder(arg, idxs):
-                return self.lower_to_pointwise(arg, einsums, parameters, definitions)
+                return self.lower_to_pointwise(arg, bodies, parameters, definitions)
             case MapJoin(Literal(operation), args):
                 args_list = [
-                    self.lower_to_pointwise(arg, einsums, parameters, definitions)
+                    self.lower_to_pointwise(arg, bodies, parameters, definitions)
                     for arg in args
                 ]
                 return self.lower_to_pointwise_op(operation, tuple(args_list))
@@ -206,9 +206,9 @@ class EinsumLowerer:
                 _, _, _, _
             ):  # aggregate has to be computed seperatley as it's own einsum
                 aggregate_einsum_alias = self.get_next_alias()
-                einsums.append(
+                bodies.append(
                     self.rename_einsum(
-                        self.lower_to_einsum(ex, einsums, parameters, definitions),
+                        self.lower_to_einsum(ex, bodies, parameters, definitions),
                         aggregate_einsum_alias,
                         definitions,
                     )
