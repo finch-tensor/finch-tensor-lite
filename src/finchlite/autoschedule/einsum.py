@@ -90,14 +90,12 @@ class EinsumLowerer:
                             )
                             bodies.append(einsum)
                             returnValues.append(einsum.tns)
-                    
+
                     bodies.append(ein.Produces(tuple(returnValues)))
                 case _:
                     bodies.append(
                         self.rename_einsum(
-                            self.lower_to_einsum(
-                                body, bodies, parameters, definitions
-                            ),
+                            self.lower_to_einsum(body, bodies, parameters, definitions),
                             self.get_next_alias(),
                             definitions,
                         )
