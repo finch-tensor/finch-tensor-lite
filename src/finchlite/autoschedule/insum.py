@@ -18,6 +18,9 @@ from finchlite.algebra import (
 from finchlite.autoschedule import (
     EinsumLowerer
 )
+from finchlite.tensor import (
+    SparseTensorFType
+)
 
 class InsumLowerer:
     def __init__(self):
@@ -27,6 +30,15 @@ class InsumLowerer:
         """
         Checks if an einsum node can be optimized via indirect einsums.
         Specifically it checks whether node is an einsum that references any sparse tensor binding/parameter.
+
+        Arguments:
+            en: The einsum node to check.
+            sparse: The set of aliases of sparse tensor bindings/parameters.
+
+        Returns:
+            A tuple containing:
+                - A boolean indicating if the einsum node can be optimized.
+                - A dictionary mapping sparse binding aliases to the indices they are referenced with.
         """
         if not isinstance(en, ein.Einsum):
             return False
@@ -56,7 +68,25 @@ class InsumLowerer:
         pass
 
     def get_sparse_params(self, bindings: dict[str, Any]) -> set[str]:
-        pass
+        """
+        Gets the set of sparse binding aliases from the bindings dictionary.
+
+        Arguments:
+            bindings: The bindings dictionary.
+
+        Returns:
+            A set of sparse binding aliases.
+        """
+        
+        sparse = set()
+
+        for alias, value in bindings.items():
+            match value:
+                case logic.Table(logic.Literal(tensor_value), _):
+                    if isinstance(ftype(tensor_value), SparseTensorFType):
+                        sparse.add(alias)
+
+        return sparse
 
     def optimize_plan(self, plan: ein.Plan, bindings: dict[str, Any]) -> tuple[ein.Plan, dict[str, Any]]:
         pass
