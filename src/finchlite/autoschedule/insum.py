@@ -1,3 +1,4 @@
+from ast import alias
 import operator
 from typing import Any, cast
 
@@ -65,6 +66,22 @@ class InsumLowerer:
         PostWalk(sparse_detect)(einsum.arg)
 
     def optimize_einsum(self, einsum: ein.Einsum, sparse: str, sparse_idxs: tuple[ein.Index, ...]) -> list[ein.EinsumNode]:
+        #bodies: list[ein.EinsumNode] = []
+
+        # initialize mask tensor T which is a boolean that represents whether each reduced fiber in the sparse tensor has non-zero elements or not
+        # Essentially T[idxs...] = whether the sparse tensor fiber being reduced at idxs... has any non-zero elements in it
+        #T_idxs = tuple(idx for idx in einsum.idxs if idx in sparse_idxs)
+        #bodies.append(ein.Einsum( #initialize every element of T to 0
+        #    op=ein.Literal(overwrite),
+        #    alias=ein.Alias(gensym(f"{sparse}_T")),
+        #    idxs=T_idxs,
+        #    arg=ein.Literal(0)
+        #))
+        #bodies.append(ein.Einsum(
+        #    op=ein.Literal(operator.add),
+        #    alias=ein.Alias(gensym(f"{sparse}_T")),
+        #    idxs=
+        #))
         pass
 
     def get_sparse_params(self, bindings: dict[str, Any]) -> set[str]:
