@@ -27,8 +27,8 @@ class InsumLowerer:
     def optimize_einsum(self, einsum: ein.Einsum, sparse_param: str, sparse_param_idxs: tuple[ein.Index, ...]) -> list[ein.EinsumNode]:
         pass
 
-    def get_sparse_params(self, parameters: dict[str, Table]) -> set[str]:
+    def get_sparse_params(self, bindings: dict[str, Any]) -> set[str]:
         pass
 
-    def optimize_plan(self, plan: ein.Plan, parameters: dict[str, Any]) -> tuple[ein.Plan, dict[str, Any]]:
+    def optimize_plan(self, plan: ein.Plan, bindings: dict[str, Any]) -> tuple[ein.Plan, dict[str, Any]]:
         pass
