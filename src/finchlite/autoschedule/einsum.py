@@ -25,9 +25,9 @@ from finchlite.symbolic import gensym
 
 class EinsumLowerer:
     def __call__(self, prgm: Plan) -> tuple[ein.Plan, dict[str, Any]]:
-        parameters: dict[str, Any] = {}
+        bindings: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}
-        return self.compile_plan(prgm, parameters, definitions), parameters
+        return self.compile_plan(prgm, bindings, definitions), bindings
 
     def get_next_alias(self) -> ein.Alias:
         return ein.Alias(gensym("einsum"))
@@ -47,30 +47,30 @@ class EinsumLowerer:
         return ein.Einsum(einsum.op, einsum.tns, idxs, einsum.arg)
 
     def compile_plan(
-        self, plan: Plan, parameters: dict[str, Any], definitions: dict[str, ein.Einsum]
+        self, plan: Plan, bindings: dict[str, Any], definitions: dict[str, ein.Einsum]
     ) -> ein.Plan:
         bodies: list[ein.EinsumNode] = []
 
         for body in plan.bodies:
             match body:
                 case Plan(_):
-                    inner_plan = self.compile_plan(body, parameters, definitions)
+                    inner_plan = self.compile_plan(body, bindings, definitions)
                     bodies.extend(inner_plan.bodies)
                     break
                 case Query(Alias(name), Table(Literal(val), _)) if isinstance(
                     val, Scalar
                 ):
-                    parameters[name] = val.val
+                    bindings[name] = val.val
                 case Query(Alias(name), Table(Literal(tns), _)) if isinstance(
                     tns, Tensor
                 ):
-                    parameters[name] = (
+                    bindings[name] = (
                         tns.to_numpy() if hasattr(tns, "to_numpy") else np.asarray(tns)
                     )  # type: ignore[attr-defined]
                 case Query(Alias(name), rhs):
                     bodies.append(
                         self.rename_einsum(
-                            self.lower_to_einsum(rhs, bodies, parameters, definitions),
+                            self.lower_to_einsum(rhs, bodies, bindings, definitions),
                             ein.Alias(name),
                             definitions,
                         )
@@ -83,7 +83,7 @@ class EinsumLowerer:
                         else:
                             einsum = self.rename_einsum(
                                 self.lower_to_einsum(
-                                    arg, bodies, parameters, definitions
+                                    arg, bodies, bindings, definitions
                                 ),
                                 self.get_next_alias(),
                                 definitions,
@@ -95,7 +95,7 @@ class EinsumLowerer:
                 case _:
                     bodies.append(
                         self.rename_einsum(
-                            self.lower_to_einsum(body, bodies, parameters, definitions),
+                            self.lower_to_einsum(body, bodies, bindings, definitions),
                             self.get_next_alias(),
                             definitions,
                         )
@@ -107,7 +107,7 @@ class EinsumLowerer:
         self,
         ex: LogicNode,
         bodies: list[ein.EinsumNode],
-        parameters: dict[str, Any],
+        bindings: dict[str, Any],
         definitions: dict[str, ein.Einsum],
     ) -> ein.Einsum:
         match ex:
@@ -115,7 +115,7 @@ class EinsumLowerer:
                 raise Exception("Plans within plans are not supported.")
             case MapJoin(Literal(operation), args):
                 args_list = [
-                    self.lower_to_pointwise(arg, bodies, parameters, definitions)
+                    self.lower_to_pointwise(arg, bodies, bindings, definitions)
                     for arg in args
                 ]
                 pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
@@ -127,7 +127,7 @@ class EinsumLowerer:
                 )
             case Reorder(arg, idxs):
                 return self.reorder_einsum(
-                    self.lower_to_einsum(arg, bodies, parameters, definitions),
+                    self.lower_to_einsum(arg, bodies, bindings, definitions),
                     tuple(ein.Index(field.name) for field in idxs),
                 )
             case Aggregate(Literal(operation), Literal(init), arg, idxs):
@@ -138,7 +138,7 @@ class EinsumLowerer:
                     Non standard init values are not supported.
                     """)
                 aggregate_expr = self.lower_to_pointwise(
-                    arg, bodies, parameters, definitions
+                    arg, bodies, bindings, definitions
                 )
                 return ein.Einsum(
                     op=ein.Literal(operation),
@@ -179,15 +179,15 @@ class EinsumLowerer:
         self,
         ex: LogicNode,
         bodies: list[ein.EinsumNode],
-        parameters: dict[str, Any],
+        bindings: dict[str, Any],
         definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
         match ex:
             case Reorder(arg, idxs):
-                return self.lower_to_pointwise(arg, bodies, parameters, definitions)
+                return self.lower_to_pointwise(arg, bodies, bindings, definitions)
             case MapJoin(Literal(operation), args):
                 args_list = [
-                    self.lower_to_pointwise(arg, bodies, parameters, definitions)
+                    self.lower_to_pointwise(arg, bodies, bindings, definitions)
                     for arg in args
                 ]
                 return self.lower_to_pointwise_op(operation, tuple(args_list))
@@ -206,7 +206,7 @@ class EinsumLowerer:
                 aggregate_einsum_alias = self.get_next_alias()
                 bodies.append(
                     self.rename_einsum(
-                        self.lower_to_einsum(ex, bodies, parameters, definitions),
+                        self.lower_to_einsum(ex, bodies, bindings, definitions),
                         aggregate_einsum_alias,
                         definitions,
                     )
