@@ -54,102 +54,49 @@ class EinsumLowerer:
         for body in plan.bodies:
             match body:
                 case Plan(_):
-                    inner_plan = self.compile_plan(body, bindings, definitions)
-                    bodies.extend(inner_plan.bodies)
-                    break
-                case Query(Alias(name), Table(Literal(val), _)) if isinstance(
-                    val, Scalar
-                ):
-                    bindings[name] = val.val
-                case Query(Alias(name), Table(Literal(tns), _)) if isinstance(
-                    tns, Tensor
-                ):
-                    bindings[name] = (
-                        tns.to_numpy() if hasattr(tns, "to_numpy") else np.asarray(tns)
-                    )  # type: ignore[attr-defined]
-                case Query(Alias(name), rhs):
-                    bodies.append(
-                        self.rename_einsum(
-                            self.lower_to_einsum(rhs, bodies, bindings, definitions),
-                            ein.Alias(name),
-                            definitions,
-                        )
-                    )
+                    bodies.append(self.compile_plan(body, bindings, definitions))
+                case Query(Alias(name), Table(Literal(val), _)):
+                    bindings[name] = val
+                case Query(Alias(name), MapJoin(Literal(operation), args)):
+                    args_list = [
+                        self.compile_operand(arg, bodies, bindings, definitions)
+                        for arg in args
+                    ]
+                    bodies.append(ein.Einsum(
+                        op=ein.Literal(overwrite),
+                        tns=ein.Alias(name),
+                        idxs=tuple(ein.Index(field.name) for field in body.rhs.fields),
+                        arg= self.compile_expr(operation, tuple(args_list)),
+                    ))
+                case Query(Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)):
+                    remaining_idxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
+                    if init != init_value(operation, type(init)):
+                        bodies.append(ein.Einsum(
+                            op = ein.Literal(overwrite),
+                            tns=ein.Alias(name),
+                            idxs=remaining_idxs,
+                            arg=ein.Literal(init),
+                        ))
+                    bodies.append(ein.Einsum(
+                        op = ein.Literal(operation),
+                        tns=ein.Alias(name),
+                        idxs=remaining_idxs,
+                        arg=self.compile_operand(arg, bodies, bindings, definitions),
+                    ))
                 case Produces(args):
                     returnValues = []
                     for arg in args:
-                        if isinstance(arg, Alias):
-                            returnValues.append(ein.Alias(arg.name))
-                        else:
-                            einsum = self.rename_einsum(
-                                self.lower_to_einsum(
-                                    arg, bodies, bindings, definitions
-                                ),
-                                self.get_next_alias(),
-                                definitions,
-                            )
-                            bodies.append(einsum)
-                            returnValues.append(einsum.tns)
+                        if not isinstance(arg, Alias):
+                            raise Exception(f"Unrecognized logic: {arg}")
+                        returnValues.append(ein.Alias(arg.name))
 
                     bodies.append(ein.Produces(tuple(returnValues)))
                 case _:
-                    bodies.append(
-                        self.rename_einsum(
-                            self.lower_to_einsum(body, bodies, bindings, definitions),
-                            self.get_next_alias(),
-                            definitions,
-                        )
-                    )
+                    raise Exception(f"Unrecognized logic: {body}")
 
         return ein.Plan(tuple(bodies))
 
-    def lower_to_einsum(
-        self,
-        ex: LogicNode,
-        bodies: list[ein.EinsumNode],
-        bindings: dict[str, Any],
-        definitions: dict[str, ein.Einsum],
-    ) -> ein.Einsum:
-        match ex:
-            case Plan(_):
-                raise Exception("Plans within plans are not supported.")
-            case MapJoin(Literal(operation), args):
-                args_list = [
-                    self.lower_to_pointwise(arg, bodies, bindings, definitions)
-                    for arg in args
-                ]
-                pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
-                return ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=self.get_next_alias(),
-                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
-                    arg=pointwise_expr,
-                )
-            case Reorder(arg, idxs):
-                return self.reorder_einsum(
-                    self.lower_to_einsum(arg, bodies, bindings, definitions),
-                    tuple(ein.Index(field.name) for field in idxs),
-                )
-            case Aggregate(Literal(operation), Literal(init), arg, idxs):
-                if init != init_value(operation, type(init)):
-                    raise Exception(f"""
-                    Init value {init} is not the default value
-                    for operation {operation} of type {type(init)}.
-                    Non standard init values are not supported.
-                    """)
-                aggregate_expr = self.lower_to_pointwise(
-                    arg, bodies, bindings, definitions
-                )
-                return ein.Einsum(
-                    op=ein.Literal(operation),
-                    tns=self.get_next_alias(),
-                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
-                    arg=aggregate_expr,
-                )
-            case _:
-                raise Exception(f"Unrecognized logic: {ex}")
-
-    def lower_to_pointwise_op(
+    def compile_expr(
         self, operation: Callable, args: tuple[ein.EinsumExpr, ...]
     ) -> ein.EinsumExpr:
         # if operation is commutative, we simply pass
@@ -175,7 +122,7 @@ class EinsumLowerer:
         return ein.Call(ein.Literal(operation), args)
 
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
-    def lower_to_pointwise(
+    def compile_operand(
         self,
         ex: LogicNode,
         bodies: list[ein.EinsumNode],
@@ -184,13 +131,13 @@ class EinsumLowerer:
     ) -> ein.EinsumExpr:
         match ex:
             case Reorder(arg, idxs):
-                return self.lower_to_pointwise(arg, bodies, bindings, definitions)
+                return self.compile_operand(arg, bodies, bindings, definitions)
             case MapJoin(Literal(operation), args):
                 args_list = [
-                    self.lower_to_pointwise(arg, bodies, bindings, definitions)
+                    self.compile_operand(arg, bodies, bindings, definitions)
                     for arg in args
                 ]
-                return self.lower_to_pointwise_op(operation, tuple(args_list))
+                return self.compile_expr(operation, tuple(args_list))
             case Relabel(
                 Alias(name), idxs
             ):  # relable is really just a glorified pointwise access
