@@ -57,40 +57,37 @@ class EinsumLowerer:
                     inner_plan = self.compile_plan(body, bindings, definitions)
                     bodies.extend(inner_plan.bodies)
                     break
-                case Query(Alias(name), Table(Literal(val), _)) if isinstance(
-                    val, Scalar
-                ):
-                    bindings[name] = val.val
-                case Query(Alias(name), Table(Literal(tns), _)) if isinstance(
-                    tns, Tensor
-                ):
-                    bindings[name] = (
-                        tns.to_numpy() if hasattr(tns, "to_numpy") else np.asarray(tns)
-                    )  # type: ignore[attr-defined]
-                case Query(Alias(name), rhs):
-                    bodies.append(
-                        self.rename_einsum(
-                            self.lower_to_einsum(rhs, bodies, bindings, definitions),
-                            ein.Alias(name),
-                            definitions,
-                        )
+                case Query(Alias(name), Table(Literal(val), _)):
+                    bindings[name] = val
+                case Query(Alias(name), Aggregate(Literal(op), init, arg, idxs2)):
+                    arg2 = self.lower_to_pointwise(
+                        arg, bodies, bindings, definitions
+                    )
+                    #TODO what to do with init?
+                    idxs3 = [idx for idx in idxs1 if idx not in idxs2]
+                    return ein.Einsum(
+                        op=ein.Literal(op.val),
+                        tns=name,
+                        idxs=tuple(ein.Index(field.name) for field in idxs3),
+                        arg=arg2,
+                    )
+                case Query(Alias(name), arg):
+                    arg2 = self.lower_to_pointwise(
+                        arg, bodies, bindings, definitions
+                    )
+                    #TODO what to do with init?
+                    idxs3 = [idx for idx in idxs1 if idx not in idxs2]
+                    return ein.Einsum(
+                        op=ein.Literal(overwrite),
+                        tns=name,
+                        idxs=tuple(ein.Index(field.name) for field in arg.fields),
+                        arg=arg2,
                     )
                 case Produces(args):
                     returnValues = []
                     for arg in args:
-                        if isinstance(arg, Alias):
-                            returnValues.append(ein.Alias(arg.name))
-                        else:
-                            einsum = self.rename_einsum(
-                                self.lower_to_einsum(
-                                    arg, bodies, bindings, definitions
-                                ),
-                                self.get_next_alias(),
-                                definitions,
-                            )
-                            bodies.append(einsum)
-                            returnValues.append(einsum.tns)
-
+                        assert isinstance(arg, Alias)
+                        returnValues.append(ein.Alias(arg.name))
                     bodies.append(ein.Produces(tuple(returnValues)))
                 case _:
                     bodies.append(
@@ -103,51 +100,51 @@ class EinsumLowerer:
 
         return ein.Plan(tuple(bodies))
 
-    def lower_to_einsum(
-        self,
-        ex: LogicNode,
-        bodies: list[ein.EinsumNode],
-        bindings: dict[str, Any],
-        definitions: dict[str, ein.Einsum],
-    ) -> ein.Einsum:
-        match ex:
-            case Plan(_):
-                raise Exception("Plans within plans are not supported.")
-            case MapJoin(Literal(operation), args):
-                args_list = [
-                    self.lower_to_pointwise(arg, bodies, bindings, definitions)
-                    for arg in args
-                ]
-                pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
-                return ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=self.get_next_alias(),
-                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
-                    arg=pointwise_expr,
-                )
-            case Reorder(arg, idxs):
-                return self.reorder_einsum(
-                    self.lower_to_einsum(arg, bodies, bindings, definitions),
-                    tuple(ein.Index(field.name) for field in idxs),
-                )
-            case Aggregate(Literal(operation), Literal(init), arg, idxs):
-                if init != init_value(operation, type(init)):
-                    raise Exception(f"""
-                    Init value {init} is not the default value
-                    for operation {operation} of type {type(init)}.
-                    Non standard init values are not supported.
-                    """)
-                aggregate_expr = self.lower_to_pointwise(
-                    arg, bodies, bindings, definitions
-                )
-                return ein.Einsum(
-                    op=ein.Literal(operation),
-                    tns=self.get_next_alias(),
-                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
-                    arg=aggregate_expr,
-                )
-            case _:
-                raise Exception(f"Unrecognized logic: {ex}")
+#    def lower_to_einsum(
+#        self,
+#        ex: LogicNode,
+#        bodies: list[ein.EinsumNode],
+#        bindings: dict[str, Any],
+#        definitions: dict[str, ein.Einsum],
+#    ) -> ein.Einsum:
+#        match ex:
+#            case Plan(_):
+#                raise Exception("Plans within plans are not supported.")
+#            case MapJoin(Literal(operation), args):
+#                args_list = [
+#                    self.lower_to_pointwise(arg, bodies, bindings, definitions)
+#                    for arg in args
+#                ]
+#                pointwise_expr = self.lower_to_pointwise_op(operation, tuple(args_list))
+#                return ein.Einsum(
+#                    op=ein.Literal(overwrite),
+#                    tns=self.get_next_alias(),
+#                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
+#                    arg=pointwise_expr,
+#                )
+#            case Reorder(arg, idxs):
+#                return self.reorder_einsum(
+#                    self.lower_to_einsum(arg, bodies, bindings, definitions),
+#                    tuple(ein.Index(field.name) for field in idxs),
+#                )
+#            case Aggregate(Literal(operation), Literal(init), arg, idxs):
+#                if init != init_value(operation, type(init)):
+#                    raise Exception(f"""
+#                    Init value {init} is not the default value
+#                    for operation {operation} of type {type(init)}.
+#                    Non standard init values are not supported.
+#                    """)
+#                aggregate_expr = self.lower_to_pointwise(
+#                    arg, bodies, bindings, definitions
+#                )
+#                return ein.Einsum(
+#                    op=ein.Literal(operation),
+#                    tns=self.get_next_alias(),
+#                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
+#                    arg=aggregate_expr,
+#                )
+#            case _:
+#                raise Exception(f"Unrecognized logic: {ex}")
 
     def lower_to_pointwise_op(
         self, operation: Callable, args: tuple[ein.EinsumExpr, ...]
@@ -200,20 +197,20 @@ class EinsumLowerer:
                 )
             case Literal(value):
                 return ein.Literal(val=value)
-            case Aggregate(
-                _, _, _, _
-            ):  # aggregate has to be computed seperatley as it's own einsum
-                aggregate_einsum_alias = self.get_next_alias()
-                bodies.append(
-                    self.rename_einsum(
-                        self.lower_to_einsum(ex, bodies, bindings, definitions),
-                        aggregate_einsum_alias,
-                        definitions,
-                    )
-                )
-                return ein.Access(
-                    tns=aggregate_einsum_alias,
-                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
-                )
+            #case Aggregate(
+            #    _, _, _, _
+            #):  # aggregate has to be computed seperatley as it's own einsum
+            #    aggregate_einsum_alias = self.get_next_alias()
+            #    bodies.append(
+            #        self.rename_einsum(
+            #            self.lower_to_einsum(ex, bodies, bindings, definitions),
+            #            aggregate_einsum_alias,
+            #            definitions,
+            #        )
+            #    )
+            #    return ein.Access(
+            #        tns=aggregate_einsum_alias,
+            #        idxs=tuple(ein.Index(field.name) for field in ex.fields),
+            #    )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")

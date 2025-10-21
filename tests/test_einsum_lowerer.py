@@ -37,6 +37,12 @@ def lower_and_execute(ir: LogicNode):
     # Lower to einsum IR
     lowerer = EinsumLowerer()
     einsum_plan, plan_parameters = lowerer(optimized_plan)
+    
+    for k, v in plan_parameters.items():
+        if hasattr(v, "to_numpy"):
+            plan_parameters[k] = v.to_numpy()
+        elif isinstance(v, finchlite.interface.Scalar):
+            plan_parameters[k] = v.val
 
     # Interpret and execute
     interpreter = EinsumInterpreter(bindings=plan_parameters)
