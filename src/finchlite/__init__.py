@@ -10,7 +10,7 @@ from .compile import (
     NotationContext,
     dimension,
 )
-from .galley.TensorStats import (
+from .galley import (
     DC,
     DCStats,
     DenseStats,
