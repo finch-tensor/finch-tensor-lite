@@ -6,9 +6,10 @@ from finchlite.algebra import init_value, is_commutative, overwrite
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
+    Field,
     Literal,
-    LogicNode,
     LogicExpression,
+    LogicNode,
     MapJoin,
     Plan,
     Produces,
@@ -17,7 +18,6 @@ from finchlite.finch_logic import (
     Relabel,
     Reorder,
     Table,
-    Field
 )
 from finchlite.symbolic import gensym
 
@@ -34,27 +34,35 @@ class EinsumLowerer:
         return ein.Einsum(einsum.op, einsum.tns, idxs, einsum.arg)
 
     def compile_mapjoin(
-        self, bodies: list[ein.EinsumNode], bindings: dict[str, Any], 
-        definitions: dict[str, ein.Einsum], name: str, fields: tuple[Field, ...],
-        operation: Callable, args: tuple[LogicExpression, ...]
+        self,
+        bodies: list[ein.EinsumNode],
+        bindings: dict[str, Any],
+        definitions: dict[str, ein.Einsum],
+        name: str,
+        fields: tuple[Field, ...],
+        operation: Callable,
+        args: tuple[LogicExpression, ...],
     ) -> ein.EinsumNode:
         args_list = [
-            self.compile_operand(arg, bodies, bindings, definitions)
-            for arg in args
+            self.compile_operand(arg, bodies, bindings, definitions) for arg in args
         ]
         return ein.Einsum(
             op=ein.Literal(overwrite),
             tns=ein.Alias(name),
-            idxs=tuple(
-                ein.Index(field.name) for field in fields
-            ),
+            idxs=tuple(ein.Index(field.name) for field in fields),
             arg=self.compile_expr(operation, tuple(args_list)),
         )
 
     def compile_aggregate(
-        self, bodies: list[ein.EinsumNode], bindings: dict[str, Any], 
-        definitions: dict[str, ein.Einsum], name: str, fields: tuple[Field, ...], 
-        operation: Callable, init: Any, arg: LogicExpression
+        self,
+        bodies: list[ein.EinsumNode],
+        bindings: dict[str, Any],
+        definitions: dict[str, ein.Einsum],
+        name: str,
+        fields: tuple[Field, ...],
+        operation: Callable,
+        init: Any,
+        arg: LogicExpression,
     ) -> ein.EinsumNode:
         einidxs = tuple(ein.Index(field.name) for field in fields)
         bodies = []
@@ -72,9 +80,7 @@ class EinsumLowerer:
                 op=ein.Literal(operation),
                 tns=ein.Alias(name),
                 idxs=einidxs,
-                arg=self.compile_operand(
-                    arg, bodies, bindings, definitions
-                ),
+                arg=self.compile_operand(arg, bodies, bindings, definitions),
             )
         )
         return ein.Plan(tuple(bodies))
@@ -90,36 +96,85 @@ class EinsumLowerer:
                     bodies.append(self.compile_plan(body, bindings, definitions))
                 case Query(Alias(name), Table(Literal(val), _)):
                     bindings[name] = val
-                case Query(Alias(name), MapJoin(Literal(operation), args)): 
-                    bodies.append(self.compile_mapjoin(
-                        bodies, bindings, definitions, 
-                        name, body.rhs.fields, operation, args
-                    ))
+                case Query(Alias(name), MapJoin(Literal(operation), args)):
+                    bodies.append(
+                        self.compile_mapjoin(
+                            bodies,
+                            bindings,
+                            definitions,
+                            name,
+                            body.rhs.fields,
+                            operation,
+                            args,
+                        )
+                    )
                 case Query(Alias(name), Reformat(_, MapJoin(Literal(operation), args))):
-                    bodies.append(self.compile_mapjoin(
-                        bodies, bindings, definitions, 
-                        name, body.rhs.fields, operation, args
-                    ))
-                case Query(Alias(name), Reorder(MapJoin(Literal(operation), args), idxs)):
-                    bodies.append(self.compile_mapjoin(
-                        bodies, bindings, definitions, 
-                        name, idxs, operation, args
-                    ))
-                case Query(Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)):
-                    bodies.append(self.compile_aggregate(
-                        bodies, bindings, definitions, 
-                        name, body.rhs.fields, operation, init, arg
-                    ))
-                case Query(Alias(name), Reformat(_, Aggregate(Literal(operation), Literal(init), arg, _))):
-                    bodies.append(self.compile_aggregate(
-                        bodies, bindings, definitions, 
-                        name, body.rhs.fields, operation, init, arg
-                    ))
-                case Query(Alias(name), Reorder(Aggregate(Literal(operation), Literal(init), arg, _), idxs)):
-                    bodies.append(self.compile_aggregate(
-                        bodies, bindings, definitions, 
-                        name, idxs, operation, init, arg
-                    ))
+                    bodies.append(
+                        self.compile_mapjoin(
+                            bodies,
+                            bindings,
+                            definitions,
+                            name,
+                            body.rhs.fields,
+                            operation,
+                            args,
+                        )
+                    )
+                case Query(
+                    Alias(name), Reorder(MapJoin(Literal(operation), args), idxs)
+                ):
+                    bodies.append(
+                        self.compile_mapjoin(
+                            bodies, bindings, definitions, name, idxs, operation, args
+                        )
+                    )
+                case Query(
+                    Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
+                ):
+                    bodies.append(
+                        self.compile_aggregate(
+                            bodies,
+                            bindings,
+                            definitions,
+                            name,
+                            body.rhs.fields,
+                            operation,
+                            init,
+                            arg,
+                        )
+                    )
+                case Query(
+                    Alias(name),
+                    Reformat(_, Aggregate(Literal(operation), Literal(init), arg, _)),
+                ):
+                    bodies.append(
+                        self.compile_aggregate(
+                            bodies,
+                            bindings,
+                            definitions,
+                            name,
+                            body.rhs.fields,
+                            operation,
+                            init,
+                            arg,
+                        )
+                    )
+                case Query(
+                    Alias(name),
+                    Reorder(Aggregate(Literal(operation), Literal(init), arg, _), idxs),
+                ):
+                    bodies.append(
+                        self.compile_aggregate(
+                            bodies,
+                            bindings,
+                            definitions,
+                            name,
+                            idxs,
+                            operation,
+                            init,
+                            arg,
+                        )
+                    )
                 case Produces(args):
                     returnValues = []
                     for ret_arg in args:
@@ -187,11 +242,18 @@ class EinsumLowerer:
             case Aggregate(Literal(operation), Literal(init), arg, _):
                 alias = gensym("E")
                 remaining_idxs = tuple(ein.Index(field.name) for field in ex.fields)
-                bodies.append(self.compile_aggregate(
-                    bodies, bindings, definitions, 
-                    alias, tuple(ex.fields), 
-                    operation, init, arg
-                ))
+                bodies.append(
+                    self.compile_aggregate(
+                        bodies,
+                        bindings,
+                        definitions,
+                        alias,
+                        tuple(ex.fields),
+                        operation,
+                        init,
+                        arg,
+                    )
+                )
                 return ein.Access(
                     tns=ein.Alias(alias),
                     idxs=remaining_idxs,
