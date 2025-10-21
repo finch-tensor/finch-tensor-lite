@@ -34,8 +34,8 @@ class EinsumLowerer:
 
     def compile_mapjoin(
         self, bodies: list[ein.EinsumNode], bindings: dict[str, Any], 
-        definitions: dict[str, ein.Einsum], name: str, fields: list[Field],
-        operation: Callable, args: tuple[ein.EinsumExpr, ...]
+        definitions: dict[str, ein.Einsum], name: str, fields: tuple[Field, ...],
+        operation: Callable, args: tuple[LogicNode, ...]
     ) -> ein.EinsumExpr:
         args_list = [
             self.compile_operand(arg, bodies, bindings, definitions)
@@ -52,7 +52,7 @@ class EinsumLowerer:
 
     def compile_aggregate(
         self, bodies: list[ein.EinsumNode], bindings: dict[str, Any], 
-        definitions: dict[str, ein.Einsum], name: str, fields: list[Field], 
+        definitions: dict[str, ein.Einsum], name: str, fields: tuple[Field, ...], 
         operation: Callable, init: Any, arg: LogicNode
     ) -> ein.Plan:
         einidxs = tuple(ein.Index(field.name) for field in fields)
