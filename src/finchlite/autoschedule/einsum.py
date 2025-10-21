@@ -8,6 +8,7 @@ from finchlite.finch_logic import (
     Alias,
     Literal,
     LogicNode,
+    LogicExpression,
     MapJoin,
     Plan,
     Produces,
@@ -35,8 +36,8 @@ class EinsumLowerer:
     def compile_mapjoin(
         self, bodies: list[ein.EinsumNode], bindings: dict[str, Any], 
         definitions: dict[str, ein.Einsum], name: str, fields: tuple[Field, ...],
-        operation: Callable, args: tuple[LogicNode, ...]
-    ) -> ein.EinsumExpr:
+        operation: Callable, args: tuple[LogicExpression, ...]
+    ) -> ein.EinsumNode:
         args_list = [
             self.compile_operand(arg, bodies, bindings, definitions)
             for arg in args
@@ -53,8 +54,8 @@ class EinsumLowerer:
     def compile_aggregate(
         self, bodies: list[ein.EinsumNode], bindings: dict[str, Any], 
         definitions: dict[str, ein.Einsum], name: str, fields: tuple[Field, ...], 
-        operation: Callable, init: Any, arg: LogicNode
-    ) -> ein.Plan:
+        operation: Callable, init: Any, arg: LogicExpression
+    ) -> ein.EinsumNode:
         einidxs = tuple(ein.Index(field.name) for field in fields)
         bodies = []
         if init != init_value(operation, type(init)):
@@ -184,14 +185,15 @@ class EinsumLowerer:
             case Literal(value):
                 return ein.Literal(val=value)
             case Aggregate(Literal(operation), Literal(init), arg, _):
-                alias = ein.Alias(gensym("E"))
+                alias = gensym("E")
                 remaining_idxs = tuple(ein.Index(field.name) for field in ex.fields)
                 bodies.append(self.compile_aggregate(
                     bodies, bindings, definitions, 
-                    alias, ex.fields, operation, init, arg
+                    alias, tuple(ex.fields), 
+                    operation, init, arg
                 ))
                 return ein.Access(
-                    tns=alias,
+                    tns=ein.Alias(alias),
                     idxs=remaining_idxs,
                 )
             case _:
