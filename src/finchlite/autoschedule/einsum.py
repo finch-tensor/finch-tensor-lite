@@ -122,10 +122,10 @@ class EinsumLowerer:
                     ))
                 case Produces(args):
                     returnValues = []
-                    for arg in args:
-                        if not isinstance(arg, Alias):
-                            raise Exception(f"Unrecognized logic: {arg}")
-                        returnValues.append(ein.Alias(arg.name))
+                    for ret_arg in args:
+                        if not isinstance(ret_arg, Alias):
+                            raise Exception(f"Unrecognized logic: {ret_arg}")
+                        returnValues.append(ein.Alias(ret_arg.name))
 
                     bodies.append(ein.Produces(tuple(returnValues)))
                 case _:
