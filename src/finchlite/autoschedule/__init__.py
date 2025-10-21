@@ -17,6 +17,7 @@ from ..finch_logic import (
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler
 from .einsum import EinsumLowerer
+from .insum import InsumLowerer
 from .optimize import (
     DefaultLogicOptimizer,
     concordize,
@@ -45,6 +46,7 @@ __all__ = [
     "Alias",
     "DefaultLogicOptimizer",
     "EinsumLowerer",
+    "InsumLowerer",
     "Field",
     "Literal",
     "LogicCompiler",
