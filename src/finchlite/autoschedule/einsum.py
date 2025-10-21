@@ -1,11 +1,7 @@
 from collections.abc import Callable
 from typing import Any
-
-import numpy as np
-
 import finchlite.finch_einsum as ein
 from finchlite.algebra import init_value, is_commutative, overwrite
-from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -19,7 +15,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.interface import Scalar
 from finchlite.symbolic import gensym
 
 
@@ -31,15 +26,6 @@ class EinsumLowerer:
 
     def get_next_alias(self) -> ein.Alias:
         return ein.Alias(gensym("einsum"))
-
-    def rename_einsum(
-        self,
-        einsum: ein.Einsum,
-        new_alias: ein.Alias,
-        definitions: dict[str, ein.Einsum],
-    ) -> ein.Einsum:
-        definitions[new_alias.name] = einsum
-        return ein.Einsum(einsum.op, new_alias, einsum.idxs, einsum.arg)
 
     def reorder_einsum(
         self, einsum: ein.Einsum, idxs: tuple[ein.Index, ...]
@@ -147,20 +133,25 @@ class EinsumLowerer:
                 )
             case Literal(value):
                 return ein.Literal(val=value)
-            case Aggregate(
-                _, _, _, _
-            ):  # aggregate has to be computed seperatley as it's own einsum
-                aggregate_einsum_alias = self.get_next_alias()
-                bodies.append(
-                    self.rename_einsum(
-                        self.lower_to_einsum(ex, bodies, bindings, definitions),
-                        aggregate_einsum_alias,
-                        definitions,
-                    )
-                )
+            case Aggregate(Literal(operation), Literal(init), arg, _):
+                alias = self.get_next_alias()
+                remaining_idxs = tuple(ein.Index(field.name) for field in ex.fields)
+                if init != init_value(operation, type(init)):
+                    bodies.append(ein.Einsum(
+                        op = ein.Literal(overwrite),
+                        tns=ein.Alias(alias),
+                        idxs=remaining_idxs,
+                        arg=ein.Literal(init),
+                    ))
+                bodies.append(ein.Einsum(
+                    op = ein.Literal(operation),
+                    tns=ein.Alias(alias),
+                    idxs=remaining_idxs,
+                    arg=self.compile_operand(arg, bodies, bindings, definitions),
+                ))
                 return ein.Access(
-                    tns=aggregate_einsum_alias,
-                    idxs=tuple(ein.Index(field.name) for field in ex.fields),
+                    tns=alias,
+                    idxs=remaining_idxs,
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
