@@ -13,10 +13,10 @@ from finchlite.finch_logic import (
     Query,
     Relabel,
     Reorder,
+    Reformat,
     Table,
 )
 from finchlite.symbolic import gensym
-
 
 class EinsumLowerer:
     def __call__(self, prgm: Plan) -> tuple[ein.Plan, dict[str, Any]]:
@@ -43,7 +43,8 @@ class EinsumLowerer:
                     bodies.append(self.compile_plan(body, bindings, definitions))
                 case Query(Alias(name), Table(Literal(val), _)):
                     bindings[name] = val
-                case Query(Alias(name), MapJoin(Literal(operation), args)):
+                case Query(Alias(name), MapJoin(Literal(operation), args)) |\
+                    Query(Alias(name), Reformat(_, MapJoin(Literal(operation), args))):
                     args_list = [
                         self.compile_operand(arg, bodies, bindings, definitions)
                         for arg in args
@@ -54,7 +55,8 @@ class EinsumLowerer:
                         idxs=tuple(ein.Index(field.name) for field in body.rhs.fields),
                         arg= self.compile_expr(operation, tuple(args_list)),
                     ))
-                case Query(Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)):
+                case Query(Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)) |\
+                    Query(Alias(name), Reformat(_, Aggregate(Literal(operation), Literal(init), arg, _))):
                     remaining_idxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
                     if init != init_value(operation, type(init)):
                         bodies.append(ein.Einsum(
