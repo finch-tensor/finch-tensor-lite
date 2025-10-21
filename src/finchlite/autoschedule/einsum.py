@@ -4,8 +4,12 @@ from typing import Any
 import numpy as np
 
 import finchlite.finch_einsum as ein
-from finchlite.algebra import init_value, is_commutative, overwrite
-from finchlite.algebra.tensor import Tensor
+from finchlite.algebra import (
+    init_value, 
+    is_commutative, 
+    overwrite,
+    Tensor
+)
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
