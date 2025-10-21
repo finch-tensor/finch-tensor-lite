@@ -1,11 +1,8 @@
-from ast import alias
 import operator
 from typing import Any, cast
 
-from numpy import isin
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as logic
-from finchlite.finch_logic.nodes import Alias, Table
 from finchlite.symbolic import (
     ftype,
     PostWalk,
@@ -65,6 +62,7 @@ class InsumLowerer:
             return None
 
         PostWalk(sparse_detect)(einsum.arg)
+        return len(refed_sparse) > 0, refed_sparse
 
     def to_insum(self, einsum: ein.Einsum, sparse: str, sparse_idxs: tuple[ein.Index, ...]) -> list[ein.EinsumNode]:
         bodies: list[ein.EinsumNode] = []
@@ -219,4 +217,16 @@ class InsumLowerer:
         return sparse
 
     def optimize_plan(self, plan: ein.Plan, bindings: dict[str, Any]) -> tuple[ein.Plan, dict[str, Any]]:
-        pass
+        sparse = self.get_sparse_params(bindings)
+
+        new_bodies = []
+        for body in plan.bodies:
+            can_optimize, all_sparse = self.can_optimize(body, sparse)
+            if can_optimize:
+                sparse_binding, sparse_idxs = next(iter(all_sparse))
+                new_bodies.extend(self.to_insum(body, sparse_binding, sparse_idxs))
+            else:
+                new_bodies.append(body)
+
+        return ein.Plan(new_bodies), bindings
+            
