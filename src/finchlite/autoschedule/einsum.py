@@ -39,6 +39,26 @@ class EinsumLowerer:
                     bodies.append(self.compile_plan(body, bindings, definitions))
                 case Query(Alias(name), Table(Literal(val), _)):
                     bindings[name] = val
+                case Query(Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
+                ) | Query(Alias(name), Aggregate(Literal(operation), Literal(init), Reorder(arg, _), _)):
+                    einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
+                    if init != init_value(operation, type(init)):
+                        bodies.append(
+                            ein.Einsum(
+                                op=ein.Literal(overwrite),
+                                tns=ein.Alias(name),
+                                idxs=einidxs,
+                                arg=ein.Literal(init),
+                            )
+                        )
+                    bodies.append(
+                        ein.Einsum(
+                            op=ein.Literal(operation),
+                            tns=ein.Alias(name),
+                            idxs=einidxs,
+                            arg=self.compile_operand(arg, bodies, bindings, definitions),
+                        )
+                    )
                 case Query(Alias(name), rhs):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
                     bodies.append(ein.Einsum(
@@ -63,27 +83,6 @@ class EinsumLowerer:
                         idxs=idxs,
                         arg=einarg,
                     ))
-                case Query(
-                    Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
-                ):
-                    einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
-                    if init != init_value(operation, type(init)):
-                        bodies.append(
-                            ein.Einsum(
-                                op=ein.Literal(overwrite),
-                                tns=ein.Alias(name),
-                                idxs=einidxs,
-                                arg=ein.Literal(init),
-                            )
-                        )
-                    bodies.append(
-                        ein.Einsum(
-                            op=ein.Literal(operation),
-                            tns=ein.Alias(name),
-                            idxs=einidxs,
-                            arg=self.compile_operand(arg, bodies, bindings, definitions),
-                        )
-                    )
                 case Produces(args):
                     returnValues = []
                     for ret_arg in args:
