@@ -42,7 +42,7 @@ def file_cache(*, ext: str, domain: str) -> Callable:
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         def inner(*args):
-            id = uuid.uuid5(finch_uuid, str((f.__name__, f.__module__, args)))
+            id = uuid.uuid5(finch_uuid, repr((f.__name__, f.__module__, args)))
             filename = cache_dir / f"{f.__name__}_{id}.{ext}"
             if not config.get("cache_enable") or not filename.exists():
                 f(str(filename), *args)

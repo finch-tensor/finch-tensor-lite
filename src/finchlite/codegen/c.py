@@ -297,9 +297,7 @@ class CCompiler:
         self.ctx = CGenerator() if ctx is None else ctx
 
     def __call__(self, prgm):
-        ctx = CContext()
-        ctx(prgm)
-        c_code = ctx.emit_global()
+        c_code = self.ctx(prgm)
         logger.info(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
@@ -560,7 +558,8 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 
 
 class CGenerator:
-    def __call__(self, prgm: asm.AssemblyNode):
+    @file_cache(ext=".c", domain="c_generator")
+    def __call__(self, prgm: asm.AssemblyNode, finch_state=?, finch_code_hash="", word_size=size(np.int_)):
         ctx = CContext()
         ctx(prgm)
         return ctx.emit_global()
