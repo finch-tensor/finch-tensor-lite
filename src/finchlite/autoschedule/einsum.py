@@ -6,9 +6,7 @@ from finchlite.algebra import init_value, is_commutative, overwrite
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
-    Field,
     Literal,
-    LogicExpression,
     LogicNode,
     MapJoin,
     Plan,
@@ -19,7 +17,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.symbolic import gensym
 
 
 class EinsumLowerer:
@@ -39,8 +36,12 @@ class EinsumLowerer:
                     bodies.append(self.compile_plan(body, bindings, definitions))
                 case Query(Alias(name), Table(Literal(val), _)):
                     bindings[name] = val
-                case Query(Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
-                ) | Query(Alias(name), Aggregate(Literal(operation), Literal(init), Reorder(arg, _), _)):
+                case Query(
+                    Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
+                ) | Query(
+                    Alias(name),
+                    Aggregate(Literal(operation), Literal(init), Reorder(arg, _), _),
+                ):
                     einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
                     if init != init_value(operation, type(init)):
                         bodies.append(
@@ -56,33 +57,45 @@ class EinsumLowerer:
                             op=ein.Literal(operation),
                             tns=ein.Alias(name),
                             idxs=einidxs,
-                            arg=self.compile_operand(arg, bodies, bindings, definitions),
+                            arg=self.compile_operand(
+                                arg, bodies, bindings, definitions
+                            ),
                         )
                     )
                 case Query(Alias(name), rhs):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
-                    bodies.append(ein.Einsum(
-                        op=ein.Literal(overwrite),
-                        tns=ein.Alias(name),
-                        idxs=tuple(ein.Index(field.name) for field in body.rhs.fields),
-                        arg=einarg,
-                    ))
+                    bodies.append(
+                        ein.Einsum(
+                            op=ein.Literal(overwrite),
+                            tns=ein.Alias(name),
+                            idxs=tuple(
+                                ein.Index(field.name) for field in body.rhs.fields
+                            ),
+                            arg=einarg,
+                        )
+                    )
                 case Query(Alias(name), Reformat(_, rhs)):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
-                    bodies.append(ein.Einsum(
-                        op=ein.Literal(overwrite),
-                        tns=ein.Alias(name),
-                        idxs=tuple(ein.Index(field.name) for field in body.rhs.fields),
-                        arg=einarg,
-                    ))
+                    bodies.append(
+                        ein.Einsum(
+                            op=ein.Literal(overwrite),
+                            tns=ein.Alias(name),
+                            idxs=tuple(
+                                ein.Index(field.name) for field in body.rhs.fields
+                            ),
+                            arg=einarg,
+                        )
+                    )
                 case Query(Alias(name), Reorder(rhs, idxs)):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
-                    bodies.append(ein.Einsum(
-                        op=ein.Literal(overwrite),
-                        tns=ein.Alias(name),
-                        idxs=idxs,
-                        arg=einarg,
-                    ))
+                    bodies.append(
+                        ein.Einsum(
+                            op=ein.Literal(overwrite),
+                            tns=ein.Alias(name),
+                            idxs=tuple(ein.Index(idx.name) for idx in idxs),
+                            arg=einarg,
+                        )
+                    )
                 case Produces(args):
                     returnValues = []
                     for ret_arg in args:
