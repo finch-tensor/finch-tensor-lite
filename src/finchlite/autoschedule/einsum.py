@@ -28,11 +28,6 @@ class EinsumLowerer:
         definitions: dict[str, ein.Einsum] = {}
         return self.compile_plan(prgm, bindings, definitions), bindings
 
-    def reorder_einsum(
-        self, einsum: ein.Einsum, idxs: tuple[ein.Index, ...]
-    ) -> ein.Einsum:
-        return ein.Einsum(einsum.op, einsum.tns, idxs, einsum.arg)
-
     def compile_mapjoin(
         self,
         bodies: list[ein.EinsumNode],
@@ -52,38 +47,6 @@ class EinsumLowerer:
             idxs=tuple(ein.Index(field.name) for field in fields),
             arg=self.compile_expr(operation, tuple(args_list)),
         )
-
-    def compile_aggregate(
-        self,
-        bodies: list[ein.EinsumNode],
-        bindings: dict[str, Any],
-        definitions: dict[str, ein.Einsum],
-        name: str,
-        fields: tuple[Field, ...],
-        operation: Callable,
-        init: Any,
-        arg: LogicExpression,
-    ) -> ein.EinsumNode:
-        einidxs = tuple(ein.Index(field.name) for field in fields)
-        bodies = []
-        if init != init_value(operation, type(init)):
-            bodies.append(
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias(name),
-                    idxs=einidxs,
-                    arg=ein.Literal(init),
-                )
-            )
-        bodies.append(
-            ein.Einsum(
-                op=ein.Literal(operation),
-                tns=ein.Alias(name),
-                idxs=einidxs,
-                arg=self.compile_operand(arg, bodies, bindings, definitions),
-            )
-        )
-        return ein.Plan(tuple(bodies))
 
     def compile_plan(
         self, plan: Plan, bindings: dict[str, Any], definitions: dict[str, ein.Einsum]
@@ -131,48 +94,22 @@ class EinsumLowerer:
                 case Query(
                     Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
                 ):
-                    bodies.append(
-                        self.compile_aggregate(
-                            bodies,
-                            bindings,
-                            definitions,
-                            name,
-                            body.rhs.fields,
-                            operation,
-                            init,
-                            arg,
+                    einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
+                    if init != init_value(operation, type(init)):
+                        bodies.append(
+                            ein.Einsum(
+                                op=ein.Literal(overwrite),
+                                tns=ein.Alias(name),
+                                idxs=einidxs,
+                                arg=ein.Literal(init),
+                            )
                         )
-                    )
-                case Query(
-                    Alias(name),
-                    Reformat(_, Aggregate(Literal(operation), Literal(init), arg, _)),
-                ):
                     bodies.append(
-                        self.compile_aggregate(
-                            bodies,
-                            bindings,
-                            definitions,
-                            name,
-                            body.rhs.fields,
-                            operation,
-                            init,
-                            arg,
-                        )
-                    )
-                case Query(
-                    Alias(name),
-                    Reorder(Aggregate(Literal(operation), Literal(init), arg, _), idxs),
-                ):
-                    bodies.append(
-                        self.compile_aggregate(
-                            bodies,
-                            bindings,
-                            definitions,
-                            name,
-                            idxs,
-                            operation,
-                            init,
-                            arg,
+                        ein.Einsum(
+                            op=ein.Literal(operation),
+                            tns=ein.Alias(name),
+                            idxs=einidxs,
+                            arg=self.compile_operand(arg, bodies, bindings, definitions),
                         )
                     )
                 case Produces(args):
@@ -239,24 +176,5 @@ class EinsumLowerer:
                 )
             case Literal(value):
                 return ein.Literal(val=value)
-            case Aggregate(Literal(operation), Literal(init), arg, _):
-                alias = gensym("E")
-                remaining_idxs = tuple(ein.Index(field.name) for field in ex.fields)
-                bodies.append(
-                    self.compile_aggregate(
-                        bodies,
-                        bindings,
-                        definitions,
-                        alias,
-                        tuple(ex.fields),
-                        operation,
-                        init,
-                        arg,
-                    )
-                )
-                return ein.Access(
-                    tns=ein.Alias(alias),
-                    idxs=remaining_idxs,
-                )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
