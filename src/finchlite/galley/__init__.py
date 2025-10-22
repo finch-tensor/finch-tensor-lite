@@ -1,3 +1,6 @@
+from .LogicalOptimizer import (
+    annotated_query,
+)
 from .TensorStats import (
     DC,
     DCStats,
@@ -10,4 +13,5 @@ __all__ = [
     "DCStats",
     "DenseStats",
     "TensorDef",
+    "annotated_query",
 ]
