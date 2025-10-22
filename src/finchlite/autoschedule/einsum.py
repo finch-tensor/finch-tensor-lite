@@ -28,26 +28,6 @@ class EinsumLowerer:
         definitions: dict[str, ein.Einsum] = {}
         return self.compile_plan(prgm, bindings, definitions), bindings
 
-    def compile_mapjoin(
-        self,
-        bodies: list[ein.EinsumNode],
-        bindings: dict[str, Any],
-        definitions: dict[str, ein.Einsum],
-        name: str,
-        fields: tuple[Field, ...],
-        operation: Callable,
-        args: tuple[LogicExpression, ...],
-    ) -> ein.EinsumNode:
-        args_list = [
-            self.compile_operand(arg, bodies, bindings, definitions) for arg in args
-        ]
-        return ein.Einsum(
-            op=ein.Literal(overwrite),
-            tns=ein.Alias(name),
-            idxs=tuple(ein.Index(field.name) for field in fields),
-            arg=self.compile_expr(operation, tuple(args_list)),
-        )
-
     def compile_plan(
         self, plan: Plan, bindings: dict[str, Any], definitions: dict[str, ein.Einsum]
     ) -> ein.Plan:
@@ -59,38 +39,30 @@ class EinsumLowerer:
                     bodies.append(self.compile_plan(body, bindings, definitions))
                 case Query(Alias(name), Table(Literal(val), _)):
                     bindings[name] = val
-                case Query(Alias(name), MapJoin(Literal(operation), args)):
-                    bodies.append(
-                        self.compile_mapjoin(
-                            bodies,
-                            bindings,
-                            definitions,
-                            name,
-                            body.rhs.fields,
-                            operation,
-                            args,
-                        )
-                    )
-                case Query(Alias(name), Reformat(_, MapJoin(Literal(operation), args))):
-                    bodies.append(
-                        self.compile_mapjoin(
-                            bodies,
-                            bindings,
-                            definitions,
-                            name,
-                            body.rhs.fields,
-                            operation,
-                            args,
-                        )
-                    )
-                case Query(
-                    Alias(name), Reorder(MapJoin(Literal(operation), args), idxs)
-                ):
-                    bodies.append(
-                        self.compile_mapjoin(
-                            bodies, bindings, definitions, name, idxs, operation, args
-                        )
-                    )
+                case Query(Alias(name), rhs):
+                    einarg = self.compile_operand(rhs, bodies, bindings, definitions)
+                    bodies.append(ein.Einsum(
+                        op=ein.Literal(overwrite),
+                        tns=ein.Alias(name),
+                        idxs=tuple(ein.Index(field.name) for field in body.rhs.fields),
+                        arg=einarg,
+                    ))
+                case Query(Alias(name), Reformat(_, rhs)):
+                    einarg = self.compile_operand(rhs, bodies, bindings, definitions)
+                    bodies.append(ein.Einsum(
+                        op=ein.Literal(overwrite),
+                        tns=ein.Alias(name),
+                        idxs=tuple(ein.Index(field.name) for field in body.rhs.fields),
+                        arg=einarg,
+                    ))
+                case Query(Alias(name), Reorder(rhs, idxs)):
+                    einarg = self.compile_operand(rhs, bodies, bindings, definitions)
+                    bodies.append(ein.Einsum(
+                        op=ein.Literal(overwrite),
+                        tns=ein.Alias(name),
+                        idxs=idxs,
+                        arg=einarg,
+                    ))
                 case Query(
                     Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
                 ):
