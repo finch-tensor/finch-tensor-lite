@@ -936,6 +936,7 @@ def test_e2e_numba():
 )
 def test_print(compiler, capsys, file_regression):
     # TODO: Test all types of variables
+    # TODO: Capture compiler0(C++)'s output since it runs in another process than pytest one?
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))
     x = (np.int64(1), np.int64(4))

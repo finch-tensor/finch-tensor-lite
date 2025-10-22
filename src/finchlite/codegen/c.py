@@ -941,17 +941,18 @@ class CContext(Context):
                     self(func)
                 return None
             case asm.Print(args):
+                # TODO: formatting?
                 self.add_header("#include <stdio.h>")
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
                             var_ctype = c_type(t)
                             if var_ctype in ctype_print_fmt:
-                                fmt_str = f'"{ctype_print_fmt[var_ctype]}  "'
+                                fmt_str = f'"{ctype_print_fmt[var_ctype]}    "'
                                 arg_str = f"{name}"
                             else:
                                 t_name = self.ctype_name(var_ctype)
-                                fmt_str = '"%s  "'
+                                fmt_str = '"%s    "'
                                 arg_str = f'"{t_name}"'
                             self.exec(f"{feed}printf({fmt_str}, {arg_str});")
                         case _:
