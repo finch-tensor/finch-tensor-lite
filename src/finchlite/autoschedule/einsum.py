@@ -3,46 +3,33 @@ from typing import Any
 
 import finchlite.finch_einsum as ein
 from finchlite.algebra import init_value, is_commutative, overwrite
-from finchlite.finch_logic import (
-    Aggregate,
-    Alias,
-    Literal,
-    LogicNode,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Reformat,
-    Relabel,
-    Reorder,
-    Table,
-)
-
+import finchlite.finch_logic as lgc
+from finchlite.finch_logic import LogicNode
 
 class EinsumLowerer:
-    def __call__(self, prgm: Plan) -> tuple[ein.Plan, dict[str, Any]]:
+    def __call__(self, prgm: lgc.Plan) -> tuple[ein.Plan, dict[str, Any]]:
         bindings: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}
         return self.compile_plan(prgm, bindings, definitions), bindings
 
     def compile_plan(
-        self, plan: Plan, bindings: dict[str, Any], definitions: dict[str, ein.Einsum]
+        self, plan: lgc.Plan, bindings: dict[str, Any], definitions: dict[str, ein.Einsum]
     ) -> ein.Plan:
         bodies: list[ein.EinsumNode] = []
 
         for body in plan.bodies:
             match body:
-                case Plan(_):
+                case lgc.Plan(_):
                     bodies.append(self.compile_plan(body, bindings, definitions))
-                case Query(Alias(name), Table(Literal(val), _)):
+                case lgc.Query(lgc.Alias(name), lgc.Table(lgc.Literal(val), _)):
                     bindings[name] = val
-                case Query(
-                    Alias(name), Aggregate(Literal(operation), Literal(init), arg, _)
-                ) | Query(
-                    Alias(name),
-                    Aggregate(Literal(operation), Literal(init), Reorder(arg, _), _),
+                case lgc.Query(
+                    lgc.Alias(name), lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, idxs)
+                ) | lgc.Query(
+                    lgc.Alias(name),
+                    lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), lgc.Reorder(arg, _), idxs),
                 ):
-                    einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
+                    einidxs = tuple(ein.Index(field.name) for field in idxs)
                     if init != init_value(operation, type(init)):
                         bodies.append(
                             ein.Einsum(
@@ -62,7 +49,7 @@ class EinsumLowerer:
                             ),
                         )
                     )
-                case Query(Alias(name), rhs):
+                case lgc.Query(lgc.Alias(name), rhs):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
                     bodies.append(
                         ein.Einsum(
@@ -74,7 +61,7 @@ class EinsumLowerer:
                             arg=einarg,
                         )
                     )
-                case Query(Alias(name), Reformat(_, rhs)):
+                case lgc.Query(lgc.Alias(name), lgc.Reformat(_, rhs)):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
                     bodies.append(
                         ein.Einsum(
@@ -86,7 +73,7 @@ class EinsumLowerer:
                             arg=einarg,
                         )
                     )
-                case Query(Alias(name), Reorder(rhs, idxs)):
+                case lgc.Query(lgc.Alias(name), lgc.Reorder(rhs, idxs)):
                     einarg = self.compile_operand(rhs, bodies, bindings, definitions)
                     bodies.append(
                         ein.Einsum(
@@ -96,10 +83,10 @@ class EinsumLowerer:
                             arg=einarg,
                         )
                     )
-                case Produces(args):
+                case lgc.Produces(args):
                     returnValues = []
                     for ret_arg in args:
-                        if not isinstance(ret_arg, Alias):
+                        if not isinstance(ret_arg, lgc.Alias):
                             raise Exception(f"Unrecognized logic: {ret_arg}")
                         returnValues.append(ein.Alias(ret_arg.name))
 
@@ -143,22 +130,22 @@ class EinsumLowerer:
         definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
         match ex:
-            case Reorder(arg, idxs):
+            case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg, bodies, bindings, definitions)
-            case MapJoin(Literal(operation), args):
+            case lgc.MapJoin(lgc.Literal(operation), args):
                 args_list = [
                     self.compile_operand(arg, bodies, bindings, definitions)
                     for arg in args
                 ]
                 return self.compile_expr(operation, tuple(args_list))
-            case Relabel(
-                Alias(name), idxs
+            case lgc.Relabel(
+                lgc.Alias(name), idxs
             ):  # relable is really just a glorified pointwise access
                 return ein.Access(
                     tns=ein.Alias(name),
                     idxs=tuple(ein.Index(idx.name) for idx in idxs),
                 )
-            case Literal(value):
+            case lgc.Literal(value):
                 return ein.Literal(val=value)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
