@@ -1,4 +1,4 @@
-from .dataflow import BasicBlock, ControlFlowGraph
+from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
 from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
 from .ftype import FType, FTyped, fisinstance, ftype
 from .gensym import gensym
@@ -22,6 +22,7 @@ __all__ = [
     "Chain",
     "Context",
     "ControlFlowGraph",
+    "DataFlowAnalysis",
     "FType",
     "FTyped",
     "Fixpoint",
