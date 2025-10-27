@@ -71,15 +71,15 @@ class EinsumLowerer:
 
         return ein.Plan(tuple(bodies))
 
-    def compile_expr(
-        self, operation: Callable, args: tuple[ein.EinsumExpr, ...]
+    # lowers nested mapjoin logic IR nodes into a single pointwise expression
+    def compile_operand(
+        self,
+        ex: lgc.LogicNode,
+        bodies: list[ein.EinsumNode],
+        bindings: dict[str, Any],
+        definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
-        # if operation is commutative, we simply pass
-        # all the args to the pointwise op since
-        # order of args does not matter
-        if is_commutative(operation):
-
-            def flatten_args(
+        def flatten_args(
                 m_args: tuple[ein.EinsumExpr, ...],
             ) -> tuple[ein.EinsumExpr, ...]:
                 ret_args: list[ein.EinsumExpr] = []
@@ -90,31 +90,19 @@ class EinsumLowerer:
                         case _:
                             ret_args.append(arg)
                 return tuple(ret_args)
-
-            return ein.Call(ein.Literal(operation), flatten_args(args))
-
-        # combine args from left to right (i.e a / b / c -> (a / b) / c)
-        return ein.Call(ein.Literal(operation), args)
-
-    # lowers nested mapjoin logic IR nodes into a single pointwise expression
-    def compile_operand(
-        self,
-        ex: lgc.LogicNode,
-        bodies: list[ein.EinsumNode],
-        bindings: dict[str, Any],
-        definitions: dict[str, ein.Einsum],
-    ) -> ein.EinsumExpr:
+        
         match ex:
             case lgc.Reformat(_, rhs):
                 return self.compile_operand(rhs, bodies, bindings, definitions)
             case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg, bodies, bindings, definitions)
             case lgc.MapJoin(lgc.Literal(operation), args):
-                args_list = [
+                args = tuple([
                     self.compile_operand(arg, bodies, bindings, definitions)
                     for arg in args
-                ]
-                return self.compile_expr(operation, tuple(args_list))
+                ])
+                return ein.Call(ein.Literal(operation), args 
+                    if is_commutative(operation) else flatten_args(args))
             case lgc.Relabel(
                 lgc.Alias(name), idxs
             ):  # relable is really just a glorified pointwise access
