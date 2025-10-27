@@ -41,13 +41,11 @@ class EinsumLowerer:
                             op=ein.Literal(operation),
                             tns=ein.Alias(name),
                             idxs=einidxs,
-                            arg=self.compile_operand(
-                                arg, bodies, bindings, definitions
-                            ),
+                            arg=self.compile_operand(arg),
                         )
                     )
                 case lgc.Query(lgc.Alias(name), rhs):
-                    einarg = self.compile_operand(rhs, bodies, bindings, definitions)
+                    einarg = self.compile_operand(rhs)
                     bodies.append(
                         ein.Einsum(
                             op=ein.Literal(overwrite),
@@ -75,9 +73,6 @@ class EinsumLowerer:
     def compile_operand(
         self,
         ex: lgc.LogicNode,
-        bodies: list[ein.EinsumNode],
-        bindings: dict[str, Any],
-        definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
         def flatten_args(
                 m_args: tuple[ein.EinsumExpr, ...],
@@ -93,12 +88,12 @@ class EinsumLowerer:
         
         match ex:
             case lgc.Reformat(_, rhs):
-                return self.compile_operand(rhs, bodies, bindings, definitions)
+                return self.compile_operand(rhs)
             case lgc.Reorder(arg, idxs):
-                return self.compile_operand(arg, bodies, bindings, definitions)
+                return self.compile_operand(arg)
             case lgc.MapJoin(lgc.Literal(operation), args):
                 args = tuple([
-                    self.compile_operand(arg, bodies, bindings, definitions)
+                    self.compile_operand(arg)
                     for arg in args
                 ])
                 return ein.Call(ein.Literal(operation), args 
