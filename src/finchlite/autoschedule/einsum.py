@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
@@ -9,14 +9,14 @@ class EinsumLowerer:
     def __call__(self, prgm: lgc.Plan) -> tuple[ein.Plan, dict[str, Any]]:
         bindings: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}
-        return self.compile_plan(prgm, bindings, definitions), bindings
+        return cast(ein.Plan,self.compile_plan(prgm, bindings, definitions)), bindings
 
     def compile_plan(
         self,
         node: lgc.LogicNode,
         bindings: dict[str, Any],
         definitions: dict[str, ein.Einsum],
-    ) -> ein.EinsumNode:
+    ) -> ein.EinsumNode | None:
         match node:
             case lgc.Plan(bodies):
                 ein_bodies = [self.compile_plan(body, bindings, definitions) for body in bodies]
