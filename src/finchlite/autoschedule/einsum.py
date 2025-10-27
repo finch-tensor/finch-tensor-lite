@@ -25,9 +25,6 @@ class EinsumLowerer:
                     bindings[name] = val
                 case lgc.Query(
                     lgc.Alias(name), lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _)
-                ) | lgc.Query(
-                    lgc.Alias(name),
-                    lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), lgc.Reorder(arg, _), _),
                 ):
                     einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
                     if init != init_value(operation, type(init)):
@@ -58,28 +55,6 @@ class EinsumLowerer:
                             idxs=tuple(
                                 ein.Index(field.name) for field in body.rhs.fields
                             ),
-                            arg=einarg,
-                        )
-                    )
-                case lgc.Query(lgc.Alias(name), lgc.Reformat(_, rhs)):
-                    einarg = self.compile_operand(rhs, bodies, bindings, definitions)
-                    bodies.append(
-                        ein.Einsum(
-                            op=ein.Literal(overwrite),
-                            tns=ein.Alias(name),
-                            idxs=tuple(
-                                ein.Index(field.name) for field in body.rhs.fields
-                            ),
-                            arg=einarg,
-                        )
-                    )
-                case lgc.Query(lgc.Alias(name), lgc.Reorder(rhs, idxs)):
-                    einarg = self.compile_operand(rhs, bodies, bindings, definitions)
-                    bodies.append(
-                        ein.Einsum(
-                            op=ein.Literal(overwrite),
-                            tns=ein.Alias(name),
-                            idxs=tuple(ein.Index(idx.name) for idx in idxs),
                             arg=einarg,
                         )
                     )
