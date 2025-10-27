@@ -105,6 +105,8 @@ class EinsumLowerer:
         definitions: dict[str, ein.Einsum],
     ) -> ein.EinsumExpr:
         match ex:
+            case lgc.Reformat(_, rhs):
+                return self.compile_operand(rhs, bodies, bindings, definitions)
             case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg, bodies, bindings, definitions)
             case lgc.MapJoin(lgc.Literal(operation), args):
