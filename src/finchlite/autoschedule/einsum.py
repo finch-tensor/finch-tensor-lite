@@ -1,9 +1,8 @@
-from collections.abc import Callable
 from typing import Any
 
 import finchlite.finch_einsum as ein
-from finchlite.algebra import init_value, is_commutative, overwrite
 import finchlite.finch_logic as lgc
+from finchlite.algebra import init_value, is_commutative, overwrite
 
 
 class EinsumLowerer:
@@ -13,7 +12,10 @@ class EinsumLowerer:
         return self.compile_plan(prgm, bindings, definitions), bindings
 
     def compile_plan(
-        self, plan: lgc.Plan, bindings: dict[str, Any], definitions: dict[str, ein.Einsum]
+        self,
+        plan: lgc.Plan,
+        bindings: dict[str, Any],
+        definitions: dict[str, ein.Einsum],
     ) -> ein.Plan:
         bodies: list[ein.EinsumNode] = []
 
@@ -24,7 +26,8 @@ class EinsumLowerer:
                 case lgc.Query(lgc.Alias(name), lgc.Table(lgc.Literal(val), _)):
                     bindings[name] = val
                 case lgc.Query(
-                    lgc.Alias(name), lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _)
+                    lgc.Alias(name),
+                    lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
                 ):
                     einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
                     if init != init_value(operation, type(init)):
@@ -75,29 +78,28 @@ class EinsumLowerer:
         ex: lgc.LogicNode,
     ) -> ein.EinsumExpr:
         def flatten_args(
-                m_args: tuple[ein.EinsumExpr, ...],
-            ) -> tuple[ein.EinsumExpr, ...]:
-                ret_args: list[ein.EinsumExpr] = []
-                for arg in m_args:
-                    match arg:
-                        case ein.Call(ein.Literal(op2), _) if op2 == operation:
-                            ret_args.extend(flatten_args(arg.args))
-                        case _:
-                            ret_args.append(arg)
-                return tuple(ret_args)
-        
+            m_args: tuple[ein.EinsumExpr, ...],
+        ) -> tuple[ein.EinsumExpr, ...]:
+            ret_args: list[ein.EinsumExpr] = []
+            for arg in m_args:
+                match arg:
+                    case ein.Call(ein.Literal(op2), _) if op2 == operation:
+                        ret_args.extend(flatten_args(arg.args))
+                    case _:
+                        ret_args.append(arg)
+            return tuple(ret_args)
+
         match ex:
             case lgc.Reformat(_, rhs):
                 return self.compile_operand(rhs)
             case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg)
             case lgc.MapJoin(lgc.Literal(operation), lgcargs):
-                args = tuple([
-                    self.compile_operand(arg)
-                    for arg in lgcargs
-                ])
-                return ein.Call(ein.Literal(operation), args 
-                    if is_commutative(operation) else flatten_args(args))
+                args = tuple([self.compile_operand(arg) for arg in lgcargs])
+                return ein.Call(
+                    ein.Literal(operation),
+                    args if is_commutative(operation) else flatten_args(args),
+                )
             case lgc.Relabel(
                 lgc.Alias(name), idxs
             ):  # relable is really just a glorified pointwise access
