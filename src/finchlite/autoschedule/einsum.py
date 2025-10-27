@@ -9,7 +9,7 @@ class EinsumLowerer:
     def __call__(self, prgm: lgc.Plan) -> tuple[ein.Plan, dict[str, Any]]:
         bindings: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}
-        return cast(ein.Plan,self.compile_plan(prgm, bindings, definitions)), bindings
+        return cast(ein.Plan, self.compile_plan(prgm, bindings, definitions)), bindings
 
     def compile_plan(
         self,
@@ -19,7 +19,9 @@ class EinsumLowerer:
     ) -> ein.EinsumNode | None:
         match node:
             case lgc.Plan(bodies):
-                ein_bodies = [self.compile_plan(body, bindings, definitions) for body in bodies]
+                ein_bodies = [
+                    self.compile_plan(body, bindings, definitions) for body in bodies
+                ]
                 not_none_bodies = [body for body in ein_bodies if body is not None]
                 return ein.Plan(tuple(not_none_bodies))
             case lgc.Query(lgc.Alias(name), lgc.Table(lgc.Literal(val), _)):
@@ -54,12 +56,10 @@ class EinsumLowerer:
                 return ein.Einsum(
                     op=ein.Literal(overwrite),
                     tns=ein.Alias(name),
-                    idxs=tuple(
-                        ein.Index(field.name) for field in node.rhs.fields
-                    ),
+                    idxs=tuple(ein.Index(field.name) for field in node.rhs.fields),
                     arg=einarg,
                 )
-                
+
             case lgc.Produces(args):
                 returnValues = []
                 for ret_arg in args:
