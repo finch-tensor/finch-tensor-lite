@@ -2,7 +2,7 @@ from typing import Any
 
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
-from finchlite.algebra import init_value, is_commutative, overwrite
+from finchlite.algebra import init_value, overwrite
 
 
 class EinsumLowerer:
@@ -77,18 +77,6 @@ class EinsumLowerer:
         self,
         ex: lgc.LogicNode,
     ) -> ein.EinsumExpr:
-        def flatten_args(
-            m_args: tuple[ein.EinsumExpr, ...],
-        ) -> tuple[ein.EinsumExpr, ...]:
-            ret_args: list[ein.EinsumExpr] = []
-            for arg in m_args:
-                match arg:
-                    case ein.Call(ein.Literal(op2), _) if op2 == operation:
-                        ret_args.extend(flatten_args(arg.args))
-                    case _:
-                        ret_args.append(arg)
-            return tuple(ret_args)
-
         match ex:
             case lgc.Reformat(_, rhs):
                 return self.compile_operand(rhs)
@@ -96,10 +84,7 @@ class EinsumLowerer:
                 return self.compile_operand(arg)
             case lgc.MapJoin(lgc.Literal(operation), lgcargs):
                 args = tuple([self.compile_operand(arg) for arg in lgcargs])
-                return ein.Call(
-                    ein.Literal(operation),
-                    args if is_commutative(operation) else flatten_args(args),
-                )
+                return ein.Call(ein.Literal(operation), args)
             case lgc.Relabel(
                 lgc.Alias(name), idxs
             ):  # relable is really just a glorified pointwise access
