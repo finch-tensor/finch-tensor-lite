@@ -91,10 +91,10 @@ class EinsumLowerer:
                 return self.compile_operand(rhs)
             case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg)
-            case lgc.MapJoin(lgc.Literal(operation), args):
+            case lgc.MapJoin(lgc.Literal(operation), lgcargs):
                 args = tuple([
                     self.compile_operand(arg)
-                    for arg in args
+                    for arg in lgcargs
                 ])
                 return ein.Call(ein.Literal(operation), args 
                     if is_commutative(operation) else flatten_args(args))
