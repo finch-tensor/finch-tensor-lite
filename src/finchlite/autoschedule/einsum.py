@@ -13,64 +13,63 @@ class EinsumLowerer:
 
     def compile_plan(
         self,
-        plan: lgc.Plan,
+        node: lgc.LogicNode,
         bindings: dict[str, Any],
         definitions: dict[str, ein.Einsum],
-    ) -> ein.Plan:
-        bodies: list[ein.EinsumNode] = []
-
-        for body in plan.bodies:
-            match body:
-                case lgc.Plan(_):
-                    bodies.append(self.compile_plan(body, bindings, definitions))
-                case lgc.Query(lgc.Alias(name), lgc.Table(lgc.Literal(val), _)):
-                    bindings[name] = val
-                case lgc.Query(
-                    lgc.Alias(name),
-                    lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
-                ):
-                    einidxs = tuple(ein.Index(field.name) for field in body.rhs.fields)
-                    if init != init_value(operation, type(init)):
-                        bodies.append(
-                            ein.Einsum(
-                                op=ein.Literal(overwrite),
-                                tns=ein.Alias(name),
-                                idxs=einidxs,
-                                arg=ein.Literal(init),
-                            )
-                        )
-                    bodies.append(
-                        ein.Einsum(
-                            op=ein.Literal(operation),
-                            tns=ein.Alias(name),
-                            idxs=einidxs,
-                            arg=self.compile_operand(arg),
-                        )
-                    )
-                case lgc.Query(lgc.Alias(name), rhs):
-                    einarg = self.compile_operand(rhs)
-                    bodies.append(
+    ) -> ein.EinsumNode:
+        match node:
+            case lgc.Plan(bodies):
+                ein_bodies = [self.compile_plan(body, bindings, definitions) for body in bodies]
+                not_none_bodies = [body for body in ein_bodies if body is not None]
+                return ein.Plan(tuple(not_none_bodies))
+            case lgc.Query(lgc.Alias(name), lgc.Table(lgc.Literal(val), _)):
+                bindings[name] = val
+                return None
+            case lgc.Query(
+                lgc.Alias(name),
+                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
+            ):
+                einidxs = tuple(ein.Index(field.name) for field in node.rhs.fields)
+                my_bodies = []
+                if init != init_value(operation, type(init)):
+                    my_bodies.append(
                         ein.Einsum(
                             op=ein.Literal(overwrite),
                             tns=ein.Alias(name),
-                            idxs=tuple(
-                                ein.Index(field.name) for field in body.rhs.fields
-                            ),
-                            arg=einarg,
+                            idxs=einidxs,
+                            arg=ein.Literal(init),
                         )
                     )
-                case lgc.Produces(args):
-                    returnValues = []
-                    for ret_arg in args:
-                        if not isinstance(ret_arg, lgc.Alias):
-                            raise Exception(f"Unrecognized logic: {ret_arg}")
-                        returnValues.append(ein.Alias(ret_arg.name))
+                my_bodies.append(
+                    ein.Einsum(
+                        op=ein.Literal(operation),
+                        tns=ein.Alias(name),
+                        idxs=einidxs,
+                        arg=self.compile_operand(arg),
+                    )
+                )
+                return ein.Plan(tuple(my_bodies))
+            case lgc.Query(lgc.Alias(name), rhs):
+                einarg = self.compile_operand(rhs)
+                return ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias(name),
+                    idxs=tuple(
+                        ein.Index(field.name) for field in node.rhs.fields
+                    ),
+                    arg=einarg,
+                )
+                
+            case lgc.Produces(args):
+                returnValues = []
+                for ret_arg in args:
+                    if not isinstance(ret_arg, lgc.Alias):
+                        raise Exception(f"Unrecognized logic: {ret_arg}")
+                    returnValues.append(ein.Alias(ret_arg.name))
 
-                    bodies.append(ein.Produces(tuple(returnValues)))
-                case _:
-                    raise Exception(f"Unrecognized logic: {body}")
-
-        return ein.Plan(tuple(bodies))
+                return ein.Produces(tuple(returnValues))
+            case _:
+                raise Exception(f"Unrecognized logic: {node}")
 
     # lowers nested mapjoin logic IR nodes into a single pointwise expression
     def compile_operand(
