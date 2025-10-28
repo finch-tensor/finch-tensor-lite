@@ -54,7 +54,7 @@ class SparseTensor(EagerTensor):
         coords = np.where(dense_tensor != 0)
         data = dense_tensor[coords]
         shape = dense_tensor.shape
-        element_type = dense_tensor.dtype.type  
+        element_type = dense_tensor.dtype.type
         coords_array = np.array(coords).T
         return cls(data, coords_array, shape, element_type)
 
