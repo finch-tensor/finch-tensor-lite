@@ -38,8 +38,8 @@ class SparseTensorFType(TensorFType):
 class SparseTensor(EagerTensor):
     def __init__(
         self,
-        data: np.array,
-        coords: np.ndarray,
+        data: np.typing.NDArray,
+        coords: np.typing.NDArray,
         shape: tuple,
         element_type=np.float64,
     ):
@@ -54,8 +54,7 @@ class SparseTensor(EagerTensor):
         coords = np.where(dense_tensor != 0)
         data = dense_tensor[coords]
         shape = dense_tensor.shape
-        element_type = dense_tensor.dtype.type  # Get the type, not the dtype
-        # Convert coords from tuple of arrays to array of coordinates
+        element_type = dense_tensor.dtype.type  
         coords_array = np.array(coords).T
         return cls(data, coords_array, shape, element_type)
 
@@ -68,8 +67,8 @@ class SparseTensor(EagerTensor):
         return self._shape
 
     @property
-    def ndim(self) -> int:
-        return len(self._shape)
+    def ndim(self) -> np.intp:
+        return np.intp(len(self._shape))
 
     # calculates the ratio of non-zero elements to the total number of elements
     @property
