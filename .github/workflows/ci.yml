@@ -23,9 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install Poetry
-        run: |
-          pip install poetry==2.2.1
-          poetry --version
+        uses: snok/install-poetry@v1
       - name: Install package
         run: |
           poetry install --extras test
