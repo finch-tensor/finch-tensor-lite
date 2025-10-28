@@ -629,6 +629,19 @@ class NumbaContext(Context):
                         )
                     self(func)
                 return None
+            case asm.Print(args):
+                # TODO: print out the value of variables in simple types
+                args_str = ""
+                for arg in args:
+                    match arg:
+                        case asm.Variable(name, t):
+                            args_str = (
+                                args_str + f"{name}:{self.full_name(numba_type(t))}    "
+                            )
+                        case _:
+                            args_str = args_str + "UnknownType    "
+                self.exec(f'{feed}print("{args_str}")')
+                return None
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
 
