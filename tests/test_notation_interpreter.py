@@ -92,11 +92,11 @@ def test_matrix_multiplication(a, b):
                             i,
                             m,
                             ntn.Loop(
-                                j,
-                                n,
+                                k,
+                                p,
                                 ntn.Loop(
-                                    k,
-                                    p,
+                                    j,
+                                    n,
                                     ntn.Block(
                                         (
                                             ntn.Assign(

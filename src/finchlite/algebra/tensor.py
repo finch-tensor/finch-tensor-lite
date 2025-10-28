@@ -34,6 +34,11 @@ class TensorFType(FType, ABC):
         e.g. dtypes, formats, or types, and so that we can easily index it."""
         ...
 
+    @abstractmethod
+    def __init__(self, *args):
+        """TensorFType instance initializer."""
+        ...
+
 
 class Tensor(FTyped, ABC):
     """

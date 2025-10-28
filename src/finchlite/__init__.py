@@ -135,6 +135,9 @@ from .tensor import (
     DenseLevelFType,
     ElementLevelFType,
     FiberTensorFType,
+    dense,
+    element,
+    fiber_tensor,
 )
 
 __all__ = [
@@ -188,7 +191,9 @@ __all__ = [
     "cos",
     "cosh",
     "defer",
+    "dense",
     "dimension",
+    "element",
     "divide",
     "einop",
     "einsum",
@@ -197,6 +202,7 @@ __all__ = [
     "equal",
     "exp",
     "expand_dims",
+    "fiber_tensor",
     "expm1",
     "extent",
     "fill_value",
