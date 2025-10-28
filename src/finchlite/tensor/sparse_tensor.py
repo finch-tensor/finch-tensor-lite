@@ -1,6 +1,8 @@
+import numpy as np
+
 from finchlite.algebra import TensorFType
 from finchlite.interface.eager import EagerTensor
-import numpy as np
+
 
 class SparseTensorFType(TensorFType):
     def __init__(self, shape: tuple, element_type: type):
@@ -31,9 +33,16 @@ class SparseTensorFType(TensorFType):
     def fill_value(self):
         return 0
 
+
 # currently implemented with COO tensor
 class SparseTensor(EagerTensor):
-    def __init__(self, data: np.array, coords: np.ndarray, shape: tuple, element_type=np.float64):
+    def __init__(
+        self,
+        data: np.array,
+        coords: np.ndarray,
+        shape: tuple,
+        element_type=np.float64,
+    ):
         self.coords = coords
         self.data = data
         self._shape = shape
@@ -42,7 +51,6 @@ class SparseTensor(EagerTensor):
     # converts an eager tensor to a sparse tensor
     @classmethod
     def from_dense_tensor(cls, dense_tensor: np.ndarray):
-
         coords = np.where(dense_tensor != 0)
         data = dense_tensor[coords]
         shape = dense_tensor.shape
@@ -81,7 +89,10 @@ class SparseTensor(EagerTensor):
         return 0
 
     def __str__(self):
-        return f"SparseTensor(data={self.data}, coords={self.coords}, shape={self.shape}, element_type={self._element_type})"
+        return (
+            f"SparseTensor(data={self.data}, coords={self.coords},"
+            f" shape={self.shape}, element_type={self._element_type})"
+        )
 
     def to_dense(self) -> np.ndarray:
         dense_tensor = np.zeros(self.shape, dtype=self._element_type)
