@@ -43,6 +43,9 @@ class SparseTensor(EagerTensor):
         shape: tuple,
         element_type=np.float64,
     ):
+        if data.shape[0] != coords.shape[0]:
+            raise ValueError("data and coords must have the same number of rows")
+
         self.coords = coords
         self.data = data
         self._shape = shape
