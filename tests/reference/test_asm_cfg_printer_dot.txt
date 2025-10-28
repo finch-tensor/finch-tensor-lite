@@ -1,0 +1,27 @@
+ENTRY_0: #succs=[dot_product_2]
+
+EXIT_1: #succs=[]
+
+dot_product_2: #succs=[dot_product_4, dot_product_5]
+    a_0: np_buf_t(float64) = a_0
+    b_0: np_buf_t(float64) = b_0
+    c_0: float64 = 0.0
+    a_: np_buf_t(float64) = unpack(a_1)
+    b_: np_buf_t(float64) = unpack(b_1)
+    j_0: int64 = 0
+
+dot_product_3: #succs=[EXIT_1]
+
+dot_product_4: #succs=[dot_product_2]
+    assert(lt(j_0, length(slot(a_, np_buf_t(float64)))))
+    i_0: int64 = j_0
+    c_1: float64 = add(c_2, mul(load(slot(a_, np_buf_t(float64)), i_1), load(slot(b_, np_buf_t(float64)), i_2)))
+    j_0: int64 = add(j_0, 1)
+
+dot_product_5: #succs=[dot_product_3]
+    assert(not_(lt(j_0, length(slot(a_, np_buf_t(float64))))))
+    repack(a_)
+    repack(b_)
+    return c_3
+
+dot_product_6: #succs=[dot_product_3]

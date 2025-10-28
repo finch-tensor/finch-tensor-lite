@@ -7,10 +7,6 @@ from .tensor_stats import TensorStats
 
 class DenseStats(TensorStats):
     @classmethod
-    def from_tensor(cls, tensor: Any, fields: Iterable[str]) -> None:
-        return None
-
-    @classmethod
     def from_def(cls, d: TensorDef) -> Self:
         ds = object.__new__(cls)
         ds.tensordef = d.copy()
@@ -40,11 +36,14 @@ class DenseStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable, fields: Iterable[str], arg: TensorStats
+        op: Callable[..., Any],
+        init: Any | None,
+        reduce_indices: Iterable[str],
+        stats: "TensorStats",
     ) -> "DenseStats":
-        new_axes = set(arg.index_set) - set(fields)
-        new_dims = {m: arg.get_dim_size(m) for m in new_axes}
-        new_fill = arg.fill_value
+        new_axes = set(stats.index_set) - set(reduce_indices)
+        new_dims = {m: stats.get_dim_size(m) for m in new_axes}
+        new_fill = stats.fill_value
 
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)

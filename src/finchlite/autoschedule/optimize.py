@@ -36,7 +36,6 @@ from ..symbolic import (
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
-from .compiler import LogicCompiler
 
 T = TypeVar("T", bound="LogicNode")
 
@@ -774,7 +773,7 @@ def materialize_squeeze_expand_productions(root):
 
 
 class DefaultLogicOptimizer:
-    def __init__(self, ctx: LogicCompiler):
+    def __init__(self, ctx):
         self.ctx = ctx
 
     def __call__(self, prgm: LogicNode):

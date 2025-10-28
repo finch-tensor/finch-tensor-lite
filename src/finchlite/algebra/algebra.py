@@ -61,7 +61,6 @@ import numpy as np
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
-
 StableNumber = bool | int | float | complex | np.generic
 
 
@@ -345,6 +344,34 @@ register_property(np.logical_and, "__call__", "is_associative", lambda op: True)
 register_property(np.logical_or, "__call__", "is_associative", lambda op: True)
 register_property(np.logical_xor, "__call__", "is_associative", lambda op: True)
 
+# Commutative properties
+
+for op in (
+    operator.add,
+    operator.mul,
+    operator.and_,
+    operator.or_,
+    operator.xor,
+    np.logical_and,
+    np.logical_or,
+    np.logical_xor,
+):
+    register_property(op, "__call__", "is_commutative", lambda op: True)
+
+for op in (
+    operator.sub,
+    operator.truediv,
+    operator.floordiv,
+    operator.pow,
+    operator.lshift,
+    operator.rshift,
+):
+    register_property(op, "__call__", "is_commutative", lambda op: False)
+
+
+def is_commutative(op: Any) -> bool:
+    return query_property(op, "__call__", "is_commutative")
+
 
 def is_identity(op: Any, val: Any) -> bool:
     """
@@ -371,6 +398,7 @@ register_property(operator.truediv, "__call__", "is_identity", lambda op, val: v
 register_property(operator.lshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.rshift, "__call__", "is_identity", lambda op, val: val == 0)
 register_property(operator.pow, "__call__", "is_identity", lambda op, val: val == 1)
+register_property(np.divide, "__call__", "is_identity", lambda op, val: val == 1)
 register_property(
     np.logaddexp, "__call__", "is_identity", lambda op, val: val == -math.inf
 )
@@ -628,6 +656,7 @@ for fn in [
     register_property(fn, "__call__", "is_idempotent", lambda op: False)
 
 for unary in (
+    np.reciprocal,
     np.sin,
     np.cos,
     np.tan,
@@ -640,10 +669,20 @@ for unary in (
     np.acos,
     np.acosh,
     np.atanh,
+    np.round,
+    np.floor,
+    np.ceil,
+    np.trunc,
+    np.exp,
+    np.expm1,
     np.log,
     np.log1p,
     np.log2,
     np.log10,
+    np.signbit,
+    np.sqrt,
+    np.square,
+    np.sign,
 ):
 
     def unary_type(op, a):
@@ -668,8 +707,13 @@ for unary in (
     )
 
 for binary_op in (
+    np.divide,
+    np.remainder,
+    np.hypot,
     np.atan2,
     np.logaddexp,
+    np.copysign,
+    np.nextafter,
 ):
     register_property(
         binary_op,
@@ -677,6 +721,10 @@ for binary_op in (
         "return_type",
         lambda op, a, b, _binary_op=binary_op: float,
     )
+
+register_property(np.isfinite, "__call__", "return_type", lambda op, a: bool)
+register_property(np.isinf, "__call__", "return_type", lambda op, a: bool)
+register_property(np.isnan, "__call__", "return_type", lambda op, a: bool)
 
 for logical in (
     np.logical_and,
@@ -690,6 +738,24 @@ for logical in (
         lambda op, a, b, _logical=logical: bool,
     )
 register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
+
+
+for complex_op in (np.real, np.imag):
+    register_property(
+        complex_op,
+        "__call__",
+        "return_type",
+        lambda op, a, _complex_op=complex_op: float,
+    )
+
+
+for ternary_op in (np.clip,):
+    register_property(
+        ternary_op,
+        "__call__",
+        "return_type",
+        lambda op, a, b, c, _ternary_op=ternary_op: float,
+    )
 
 # Register return types for numpy comparison ufuncs
 for comparison in (

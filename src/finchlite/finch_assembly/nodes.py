@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Context, PostWalk, Rewrite, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 from .buffer import element_type, length_type
 
@@ -79,7 +79,7 @@ class Literal(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(AssemblyExpression):
+class Variable(AssemblyExpression, NamedTerm):
     """
     Represents a logical AST expression for a variable named `name`, which
     will hold a value of type `type`.
@@ -99,6 +99,10 @@ class Variable(AssemblyExpression):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
+
+    @property
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
@@ -168,6 +172,10 @@ class Slot(AssemblyExpression):
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
 
+    @property
+    def symbol(self) -> str:
+        return self.name
+
 
 @dataclass(eq=True, frozen=True)
 class Unpack(AssemblyTree):
@@ -219,7 +227,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable | Stack
+    lhs: TaggedVariable | Variable | Stack
     rhs: AssemblyExpression
 
     @property
@@ -465,6 +473,24 @@ class If(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
+class Assert(AssemblyTree):
+    """
+    Represents an assert node which asserts that expression is true.
+    Used in the dataflow analysis to assert conditions in conditionals and loops.
+
+    Attributes:
+        exp: Expression which is being asserted.
+    """
+
+    exp: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.exp]
+
+
+@dataclass(eq=True, frozen=True)
 class IfElse(AssemblyTree):
     """
     Represents an if-else statement that executes the body if the condition
@@ -589,6 +615,23 @@ class Module(AssemblyTree):
         return cls(funcs)
 
 
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree):
+    """
+    Print values of give variables.
+
+    Attributes:
+        args: list of variables to be printed.
+    """
+
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
+
+
 class AssemblyPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -618,6 +661,8 @@ class AssemblyPrinterContext(Context):
         match prgm:
             case Literal(value):
                 return qual_str(value)
+            case Assert(exp):
+                return f"assert({self(exp)})"
             case TaggedVariable(Variable(name, _), id):
                 return f"{name}_{id}"
             case Variable(name, _):
@@ -753,24 +798,15 @@ class AssemblyPrinterContext(Context):
                         )
                     self(func)
                 return None
+            case Print(args):
+                args_value_str = ""
+                for arg in args:
+                    if isinstance(arg, Variable):
+                        args_value_str = args_value_str + f"{{{self(arg)}}} "
+                self.exec(f"{feed}print(f'{args_value_str}')")
+                return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
                 return None
             case node:
                 raise NotImplementedError(node)
-
-
-def number_assembly_ast(root: AssemblyNode) -> AssemblyNode:
-    """
-    Number every Variable occurrence in a post-order traversal.
-    """
-    counters: dict[str, int] = {}
-
-    def rule(node):
-        match node:
-            case Variable(name, _) as var:
-                idx = counters.get(name, 0)
-                counters[name] = idx + 1
-                return TaggedVariable(var, idx)
-
-    return Rewrite(PostWalk(rule))(root)

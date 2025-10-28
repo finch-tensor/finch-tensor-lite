@@ -10,15 +10,6 @@ class TensorStats(ABC):
 
     def __init__(self, tensor: Any, fields: Iterable[str]):
         self.tensordef = TensorDef.from_tensor(tensor, fields)
-        self.from_tensor(tensor, fields)
-
-    @classmethod
-    @abstractmethod
-    def from_tensor(self, tensor: Any, fields: Iterable[str]) -> None:
-        """
-        Populate this instance’s state from (tensor, fields).
-        """
-        ...
 
     @abstractmethod
     def estimate_non_fill_values(arg: "TensorStats") -> float:
@@ -39,7 +30,10 @@ class TensorStats(ABC):
     @staticmethod
     @abstractmethod
     def aggregate(
-        op: Callable, fields: Iterable[str], arg: "TensorStats"
+        op: Callable[..., Any],
+        init: Any | None,
+        reduce_indices: Iterable[str],
+        stats: "TensorStats",
     ) -> "TensorStats":
         """
         Return a new statistic representing the tensor resulting
