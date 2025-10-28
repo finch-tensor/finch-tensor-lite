@@ -26,7 +26,7 @@ jobs:
         uses: snok/install-poetry@v1
       - name: Configure Poetry
         run: |
-          poetry env use $(which python)
+          poetry env use python${{ matrix.python }}
       - name: Install package
         run: |
           poetry install --extras test
