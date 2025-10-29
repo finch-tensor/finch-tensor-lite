@@ -2,7 +2,6 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
 
-from finchlite.galley.TensorStats.tensor_stats import TensorStats
 from finchlite.finch_logic import LogicNode
 
 
@@ -10,8 +9,8 @@ from finchlite.finch_logic import LogicNode
 class AnnotatedQuery:
     ST: type
     output_name: Any
-    output_order: Optional[list["Field"]] = None
-    output_format: Optional[list[Any]] = None
+    output_order: list[str] | None = None
+    output_format: list[Any] | None = None
     reduce_idxs: list[str]
     point_expr: "LogicNode"
     idx_lowest_root: OrderedDict[str, int]

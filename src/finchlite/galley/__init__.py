@@ -10,8 +10,8 @@ from .TensorStats import (
 
 __all__ = [
     "DC",
+    "AnnotatedQuery",
     "DCStats",
     "DenseStats",
     "TensorDef",
-    "AnnotatedQuery",
 ]

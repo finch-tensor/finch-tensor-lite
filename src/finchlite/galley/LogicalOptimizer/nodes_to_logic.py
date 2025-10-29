@@ -1,22 +1,27 @@
 from __future__ import annotations
+
 from collections import OrderedDict
-from typing import Any, Optional
 
 from finchlite.finch_logic import (
-  LogicNode, Literal, Value, Field, Alias, Table, MapJoin, Aggregate,
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    LogicNode,
+    MapJoin,
+    Table,
+    Value,
 )
-from finchlite.galley.TensorStats.dc_stats import DCStats
 from finchlite.galley.TensorStats.tensor_stats import TensorStats
-from finchlite.galley.TensorStats.tensor_def import TensorDef
+
 
 def _insert_statistics(
     ST,
-    node: "LogicNode",
-    bindings: "OrderedDict[Alias, TensorStats]",
+    node: LogicNode,
+    bindings: OrderedDict[Alias, TensorStats],
     replace: bool,
-    cache: "dict[object, TensorStats]",
-) -> "TensorStats":
-
+    cache: dict[object, TensorStats],
+) -> TensorStats:
     if node in cache:
         return cache[node]
 
@@ -38,13 +43,15 @@ def _insert_statistics(
             raise TypeError("Aggregate.op must be Literal(...).")
         if not isinstance(node.init, Literal):
             raise TypeError("Aggregate.init must be Literal(...).")
-        op   = node.op.val
+        op = node.op.val
         init = node.init.val
 
         arg = _insert_statistics(ST, node.arg, bindings, replace, cache)
-        reduce_indices = list(dict.fromkeys(
-            [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
-        ))
+        reduce_indices = list(
+            dict.fromkeys(
+                [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
+            )
+        )
 
         st = ST.aggregate(op, init, reduce_indices, arg)
         cache[node] = st
