@@ -24,6 +24,13 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install Poetry
         uses: snok/install-poetry@v1
+      - name: Configure Poetry
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            poetry env use python
+          else
+            poetry env use python${{ matrix.python }}
+          fi
       - name: Install package
         run: |
           poetry install --extras test
