@@ -23,10 +23,10 @@ class SuperTensor():
     def from_logical(cls, tns: np.ndarray, map: List[List[int]]):
         shape = tns.shape
 
-        base_shape = []
-        for logical_idx_group in map:
+        base_shape = [0] * len(map)
+        for b, logical_idx_group in enumerate(map):
             dims = [shape[m] for m in logical_idx_group]
-            base_shape.append(np.prod(dims) if dims else 1)
+            base_shape[b] = np.prod(dims) if dims else 1
 
         perm = [i for logical_idx_group in map for i in logical_idx_group]
         permuted_tns = np.transpose(tns, perm)
@@ -56,5 +56,4 @@ class SuperTensor():
         logical_tns = np.empty(self.shape, dtype=self.base.dtype)
         for idx in np.ndindex(self.shape):
             logical_tns[idx] = self[idx]
-
         return f"SuperTensor(shape={self.shape}, base.shape={self.base.shape}, map={self.map})\n{logical_tns}"
