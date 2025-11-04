@@ -1133,7 +1133,7 @@ class DCStats(TensorStats):
     @staticmethod
     def mapjoin(op: Callable[..., Any], *all_stats: "TensorStats") -> "TensorStats":
         """
-        Merge DC statistics for an elementwise binary operation.
+        Merge DC statistics for an elementwise operation.
 
         Args:
             op: The elementwise operator (e.g., operator.add, operator.mul).

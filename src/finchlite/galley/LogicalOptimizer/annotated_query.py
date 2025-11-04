@@ -14,7 +14,7 @@ class AnnotatedQuery:
     idx_lowest_root: OrderedDict[str, int]
     idx_op: OrderedDict[str, Any]
     idx_init: OrderedDict[str, Any]
-    id_to_node: OrderedDict[int, "LogicNode"]
+    hash_to_node: OrderedDict[int, "LogicNode"]
     parent_idxs: OrderedDict[str, list[str]]
     original_idx: OrderedDict[str, str]
     connected_components: list[list[str]]
@@ -32,7 +32,7 @@ def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
         idx_lowest_root=OrderedDict(aq.idx_lowest_root.items()),
         idx_op=OrderedDict(aq.idx_op.items()),
         idx_init=OrderedDict(aq.idx_init.items()),
-        id_to_node=OrderedDict(aq.id_to_node.items()),
+        hash_to_node=OrderedDict(aq.hash_to_node.items()),
         parent_idxs=OrderedDict((m, list(n)) for m, n in aq.parent_idxs.items()),
         original_idx=OrderedDict(aq.original_idx.items()),
         connected_components=[list(n) for n in aq.connected_components],
