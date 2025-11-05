@@ -5,7 +5,7 @@ import numpy as np
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
 from ..tensor import SparseTensor, SparseTensorFType
-from ..symbolic import ftype
+from ..symbolic import ftype, gensym
 
 
 nary_ops = {
@@ -96,18 +96,33 @@ class EinsumInterpreter:
                 vals = [self(arg) for arg in args]
                 return func(*vals)
             case ein.Access(tns, idxs):
-                assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
+                
+                dummy_idxs = {idx: ein.Index(gensym("dummy")) for idx in idxs if not isinstance(idx, ein.Index)}
+                # evaluate the idxs that are not indices
+                evaled_idxs = {idx: self(idx) for idx in idxs if not isinstance(idx, ein.Index)}
+                idxs_to_perm = [idx if idx in dummy_idxs else dummy_idxs[idx] for idx in idxs]
 
                 #convert named idxs to positional, integer indices
-                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+                perm = [idxs_to_perm.index(idx) for idx in self.loops if idx in idxs_to_perm]
                 
                 tns = self(tns) #evaluate the tensor
                 tns = xp.permute_dims(tns, perm) #permute the dimensions
-                return xp.expand_dims(
+                tns = xp.expand_dims( #broadcast the tensor to the new dimensions
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
+
+                # we need to remove indicies not accessed by dummy tensors
+                for dummy_idx, evaled_idx in evaled_idxs.items():
+                    axis_to_crop = idxs_to_perm.index(dummy_idx) 
+                    axis_size = tns.shape[axis_to_crop]
+
+                    idxs_to_crop = np.setdiff1d(np.arange(axis_size), evaled_idx)
+                    tns = xp.delete(tns, idxs_to_crop, axis=axis_to_crop)
+
+                return tns
+
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
