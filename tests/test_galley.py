@@ -787,11 +787,24 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     ],
 )
 def test_merge_dc_union(new_dims, inputs, expected_dcs):
+    cache = {}
+
     stats_objs = []
     for idx_set, dcs in inputs:
+        fields = tuple(Field(ax) for ax in sorted(idx_set))
+        shape = (1,) * max(1, len(fields))
+        node = Table(Literal(np.zeros(shape, dtype=int)), fields)
+
+        _insert_statistics(
+            ST=DCStats,
+            node=node,
+            bindings=OrderedDict(),
+            replace=False,
+            cache=cache,
+        )
+
         td = TensorDef(frozenset(idx_set), {k: new_dims[k] for k in idx_set}, 0)
-        s = DCStats.from_def(td, set(dcs))
-        stats_objs.append(s)
+        stats_objs.append(DCStats.from_def(td, set(dcs)))
 
     new_def = TensorDef(frozenset(new_dims.keys()), new_dims, 0)
     out = DCStats._merge_dc_union(new_def, stats_objs)
@@ -799,7 +812,6 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
     assert out.tensordef.index_set == set(new_dims.keys())
     assert dict(out.tensordef.dim_sizes) == new_dims
     assert out.dcs == expected_dcs
-
 
 @pytest.mark.parametrize(
     "dims1, dcs1, dims2, dcs2, expected_nnz",
