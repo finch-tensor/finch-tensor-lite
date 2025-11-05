@@ -122,6 +122,8 @@ class EinsumInterpreter:
                 )
 
                 # we need to remove indicies not accessed by dummy tensors
+                # we basically remove all indicies not accessed 
+                # the dummy tensor system assumes all indicies are accessed at first
                 for dummy_idx, evaled_idx in evaled_idxs.items():
                     axis_to_crop = idxs_to_perm.index(dummy_idx) 
                     axis_size = tns.shape[axis_to_crop]
