@@ -96,12 +96,20 @@ class EinsumInterpreter:
                 vals = [self(arg) for arg in args]
                 return func(*vals)
             case ein.Access(tns, idxs):
+                assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
                 
-                dummy_idxs = {idx: ein.Index(gensym("dummy")) for idx in idxs if not isinstance(idx, ein.Index)}
-                # evaluate the idxs that are not indices
-                evaled_idxs = {idx: self(idx) for idx in idxs if not isinstance(idx, ein.Index)}
-                idxs_to_perm = [idx if idx in dummy_idxs else dummy_idxs[idx] for idx in idxs]
+                if len(idxs) == 1 and not isinstance(idxs[0], ein.Index):
+                    evaled_idxs = self(idxs[0])
+                    idx_count = evaled_idxs.size[1]
+
+                    idxs_to_perm = [ein.Index(gensym("dummy")) for _ in range(idx_count)]
+                    evaled_idxs = {idxs_to_perm[i]: evaled_idxs[:, i] for i in range(idx_count)}
+                else:
+                    dummy_idxs = {idx: ein.Index(gensym("dummy")) for idx in idxs if not isinstance(idx, ein.Index)}
+                    # evaluate the idxs that are not indices
+                    evaled_idxs = {idx: self(idx) for idx in idxs if not isinstance(idx, ein.Index)}
+                    idxs_to_perm = [idx if idx in dummy_idxs else dummy_idxs[idx] for idx in idxs]
 
                 #convert named idxs to positional, integer indices
                 perm = [idxs_to_perm.index(idx) for idx in self.loops if idx in idxs_to_perm]
