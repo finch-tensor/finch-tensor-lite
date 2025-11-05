@@ -183,11 +183,14 @@ class GetAttribute(EinsumExpr, EinsumTree):
     Attributes:
         obj: The object to get the attribute from.
         attr: The name of the attribute to get.
+        
+        dim: The dimension to get the attribute from. 
+        Note this is an integer index, not a named index.
     """
 
     obj: EinsumExpr
     attr: Literal
-    idx: Optional[Index]
+    dim: Optional[int]
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -196,18 +199,16 @@ class GetAttribute(EinsumExpr, EinsumTree):
             raise ValueError("GetAttribute expects 3 children (obj + attr + idx)")
         obj = cast(EinsumExpr, children[0])
         attr = cast(Literal, children[1])
-        idx = cast(Optional[Index], children[2])
-        return cls(obj, attr, idx)
+        dim = cast(Optional[int], children[2])
+        return cls(obj, attr, dim)
 
     @property
     def children(self):
-        return [self.obj, self.attr, self.idx]
+        return [self.obj, self.attr, self.dim]
 
     def get_idxs(self) -> set["Index"]:
         idxs = set()
         idxs.update(self.obj.get_idxs())
-        if self.idx is not None:
-            idxs.update(self.idx.get_idxs())
         return idxs
 
 

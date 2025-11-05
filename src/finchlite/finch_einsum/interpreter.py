@@ -4,6 +4,9 @@ import numpy as np
 
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
+from ..tensor import SparseTensor, SparseTensorFType
+from ..symbolic import ftype
+
 
 nary_ops = {
     operator.add: "add",
@@ -95,9 +98,12 @@ class EinsumInterpreter:
             case ein.Access(tns, idxs):
                 assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
+
+                #convert named idxs to positional, integer indices
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                tns = self(tns)
-                tns = xp.permute_dims(tns, perm)
+                
+                tns = self(tns) #evaluate the tensor
+                tns = xp.permute_dims(tns, perm) #permute the dimensions
                 return xp.expand_dims(
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
@@ -109,6 +115,21 @@ class EinsumInterpreter:
                 return res
             case ein.Produces(args):
                 return tuple(self(arg) for arg in args)
+
+            #get non-zero elements/data array of a sparse tensor
+            case ein.GetAttribute(obj, ein.Literal("elems"), _):
+                obj = self(obj)
+                assert isinstance(ftype(obj), SparseTensorFType)
+                assert isinstance(obj, SparseTensor)
+                return obj.data 
+            #get coord array of a sparse tensor
+            case ein.GetAttribute(obj, ein.Literal("coords"), dim):
+                obj = self(obj)
+                assert isinstance(ftype(obj), SparseTensorFType)
+                assert isinstance(obj, SparseTensor)
+
+                # return the coord array for the given dimension or all dimensions
+                return obj.coords if dim is None else obj.coords[dim, :]
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()

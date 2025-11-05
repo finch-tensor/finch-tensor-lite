@@ -4,6 +4,8 @@ from .level import (
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
+    SparseTensor,
+    SparseTensorFType,
     dense,
     element,
 )
@@ -17,6 +19,8 @@ __all__ = [
     "FiberTensorFType",
     "Level",
     "LevelFType",
+    "SparseTensor",
+    "SparseTensorFType",
     "dense",
     "element",
     "tensor",
