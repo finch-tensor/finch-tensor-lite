@@ -1,5 +1,28 @@
-p:Numba_Point    
-x:Numba_tuple    
-p:Numba_Point    x:Numba_tuple    
-res:float64    
-p:Numba_Point    x:Numba_tuple    res:float64    
+import _operator, builtins
+from numba import njit
+import numpy
+from numpy import int64, float64
+
+
+@njit
+def simple_struct(p: Numba_Point, x: Numba_tuple) -> float64:
+    print("Numba_Point")
+    print("Numba_tuple")
+    print("Numba_Point")
+    print("Numba_tuple")
+    res: float64 = _operator.mul(p.x, x.element_0)
+    res = _operator.add(res, _operator.mul(p.y, x.element_1))
+    print(res)
+    print("Numba_Point")
+    print("Numba_tuple")
+    print(res)
+    return res
+
+Numba_Point
+Numba_tuple
+Numba_Point
+Numba_tuple
+9.0
+Numba_Point
+Numba_tuple
+9.0

@@ -21,6 +21,18 @@ numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {}
 
+numba_simple_types = [
+    np.int8, 
+    np.int16, 
+    np.int32, 
+    np.int64, 
+    np.float16, 
+    np.float32, 
+    np.float64, 
+    np.float128, 
+    np.bool_, 
+    np.str_,
+]
 
 def numba_type(t):
     """
@@ -338,6 +350,7 @@ class NumbaCompiler:
 
     def __call__(self, prgm: asm.Module):
         numba_code = self.ctx(prgm)
+        print(numba_code)
         logger.info(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
         _globals |= numba_globals
@@ -630,17 +643,17 @@ class NumbaContext(Context):
                     self(func)
                 return None
             case asm.Print(args):
-                # TODO: print out the value of variables in simple types
-                args_str = ""
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            args_str = (
-                                args_str + f"{name}:{self.full_name(numba_type(t))}    "
-                            )
+                            if t in numba_simple_types:
+                                self.exec(f'{feed}print({name})')
+                            else:
+                                self.exec(
+                                    f'{feed}print("{self.full_name(numba_type(t))}")'
+                                )
                         case _:
-                            args_str = args_str + "UnknownType    "
-                self.exec(f'{feed}print("{args_str}")')
+                            self.exec(f'{feed}print("UnknownType")')
                 return None
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")

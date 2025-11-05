@@ -935,15 +935,32 @@ def test_e2e_numba():
     ],
 )
 def test_print(compiler, capsys, file_regression):
-    # TODO: Test all types of variables
-    # TODO: Capture compiler0(C++)'s output since it runs in another process than pytest one?
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))
     x = (np.int64(1), np.int64(4))
+    # int16_var = np.int16(32767)
+    # float16_var = np.float16(1.0)
+    # int32_var = np.int32(65536)
+    # float32_var = np.float32(1.0)
+    # int64_var = np.int64(65536)
+    # float64_var = np.float64(1.0)
+    # bool_var = np.bool_(True)
+    # str_var = np.str_("Test String")
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
+
+    # i16_var = asm.Variable("int16_var", np.int16)
+    # f16_var = asm.Variable("float16_var", np.float16)
+    # i32_var = asm.Variable("int32_var", np.int32)
+    # f32_var = asm.Variable("float32_var", np.float32)
+    # i64_var = asm.Variable("int64_var", np.int64)
+    # f64_var = asm.Variable("float64_var", np.float64)
+    # b_var = asm.Variable("bool_var", np.bool_)
+    # s_var = asm.Variable("str_var", np.str_)
+
     res_var = asm.Variable("res", np.float64)
+
     prgm = compiler(
         asm.Module(
             (
@@ -952,6 +969,15 @@ def test_print(compiler, capsys, file_regression):
                     (p_var, x_var),
                     asm.Block(
                         (
+                            # asm.Print((i16_var,)),
+                            # asm.Print((f16_var,)),
+                            # asm.Print((i32_var,)),
+                            # asm.Print((f32_var,)),
+                            # asm.Print((i64_var,)),
+                            # asm.Print((f64_var,)),
+                            # asm.Print((b_var,)),
+                            # asm.Print((s_var,)),
+
                             asm.Print((p_var,)),
                             asm.Print((x_var,)),
                             asm.Print((p_var, x_var)),
