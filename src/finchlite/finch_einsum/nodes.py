@@ -369,6 +369,10 @@ class EinsumPrinterContext(Context):
                 if len(args) == 1 and fn.val in unary_strs:
                     return f"{unary_strs[fn.val]}{args_e[0]}"
                 return f"{self(fn)}({', '.join(args_e)})"
+            case GetAttribute(obj, attr, idx):
+                if idx is not None:
+                    return f"{self(obj)}.{self(attr)}[{self(idx)}]"
+                return f"{self(obj)}.{self(attr)}"
             case Einsum(op, tns, idxs, arg):
                 op_str = infix_strs.get(op.val, op.val.__name__)
                 self.exec(
