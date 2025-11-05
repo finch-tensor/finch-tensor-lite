@@ -43,18 +43,14 @@ def _insert_statistics(
     if isinstance(node, Aggregate):
         if not isinstance(node.op, Literal):
             raise TypeError("Aggregate.op must be Literal(...).")
-        if not isinstance(node.init, Literal):
-            raise TypeError("Aggregate.init must be Literal(...).")
         op = node.op.val
-        init = node.init.val
-
+        init = node.init.val if isinstance(node.init, Literal) else None
         arg = _insert_statistics(ST, node.arg, bindings, replace, cache)
         reduce_indices = list(
             dict.fromkeys(
                 [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
             )
         )
-
         st = ST.aggregate(op, init, reduce_indices, arg)
         cache[node] = st
         return st
