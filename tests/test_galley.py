@@ -11,7 +11,6 @@ from finchlite.galley.TensorStats.dc_stats import DC, DCStats
 from finchlite.galley.TensorStats.dense_stat import DenseStats
 from finchlite.galley.TensorStats.tensor_def import TensorDef
 
-
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
 
@@ -271,7 +270,8 @@ def test_estimate_non_fill_values(shape, expected):
 #         Literal(op.mul),
 #         (ta, tb)
 #     )
-#     dsm = _insert_statistics(ST=DenseStats, node=node_mul, bindings=OrderedDict(), replace=False, cache=cache)
+#     dsm = _insert_statistics(ST=DenseStats, node=node_mul, bindings=OrderedDict(),
+#     replace=False, cache=cache)
 
 #     assert dsm.index_set == {"i", "j", "k"}
 #     assert dsm.get_dim_size("i") == 2.0
@@ -283,12 +283,14 @@ def test_estimate_non_fill_values(shape, expected):
 #         Literal(op.add),
 #         (ta, ta2)
 #     )
-#     ds_sum = _insert_statistics(ST=DenseStats, node=node_add, bindings=OrderedDict(), replace=False, cache=cache)
+#     ds_sum = _insert_statistics(ST=DenseStats, node=node_add, bindings=OrderedDict(),
+#     replace=False, cache=cache)
 
 #     assert ds_sum.index_set == {"i", "j"}
 #     assert ds_sum.get_dim_size("i") == 2.0
 #     assert ds_sum.get_dim_size("j") == 3.0
 #     assert ds_sum.fill_value == 1.0 + 2.0
+
 
 def test_mapjoin_mul_and_add():
     A = np.ones((2, 3))
@@ -306,6 +308,7 @@ def test_mapjoin_mul_and_add():
     dsa2 = DenseStats(2 * A, ["i", "j"])
     ds_sum = DenseStats.mapjoin(op.add, dsa, dsa2)
     assert ds_sum.fill_value == 1 + 2
+
 
 def test_aggregate_and_issimilar():
     table = Table(
