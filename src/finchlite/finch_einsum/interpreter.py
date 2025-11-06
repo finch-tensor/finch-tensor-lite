@@ -4,7 +4,6 @@ import numpy as np
 
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
-from ..tensor import SparseTensor, SparseTensorFType
 from ..symbolic import ftype, gensym
 
 
@@ -81,6 +80,11 @@ class EinsumInterpreter:
         self.loops = loops
 
     def __call__(self, node):
+        from ..tensor import (
+            SparseTensor,
+            SparseTensorFType,
+        )
+
         xp = self.xp
         match node:
             case ein.Literal(val):
@@ -109,7 +113,7 @@ class EinsumInterpreter:
                     dummy_idxs = {idx: ein.Index(gensym("dummy")) for idx in idxs if not isinstance(idx, ein.Index)}
                     # evaluate the idxs that are not indices
                     evaled_idxs = {idx: self(idx) for idx in idxs if not isinstance(idx, ein.Index)}
-                    idxs_to_perm = [idx if idx in dummy_idxs else dummy_idxs[idx] for idx in idxs]
+                    idxs_to_perm = [(dummy_idxs[idx] if idx in dummy_idxs else idx) for idx in idxs]
 
                 #convert named idxs to positional, integer indices
                 perm = [idxs_to_perm.index(idx) for idx in self.loops if idx in idxs_to_perm]

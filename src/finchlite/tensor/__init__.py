@@ -4,11 +4,11 @@ from .level import (
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
-    SparseTensor,
-    SparseTensorFType,
     dense,
     element,
 )
+from .sparse_tensor import SparseTensor, SparseTensorFType
+
 
 __all__ = [
     "DenseLevel",
