@@ -2,9 +2,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
 
-from finch_logic import Alias
-
-from finchlite.finch_logic import LogicNode
+from finchlite.finch_logic import Alias, LogicNode
 
 
 @dataclass
