@@ -2,13 +2,15 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
 
+from finch_logic import Alias
+
 from finchlite.finch_logic import LogicNode
 
 
 @dataclass
 class AnnotatedQuery:
     ST: type
-    output_name: Any
+    output_name: Alias | None
     reduce_idxs: list[str]
     point_expr: "LogicNode"
     idx_lowest_root: OrderedDict[str, int]
