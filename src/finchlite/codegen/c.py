@@ -567,12 +567,14 @@ ctype_print_fmt: dict[Any, str] = {
     ctypes.c_ubyte: "%d",
     ctypes.c_int8: "%d",
     ctypes.c_int16: "%d",
-    ctypes.c_int32: "%ld",
-    ctypes.c_int64: "%lld",
+    ctypes.c_int32: "%d",
+    ctypes.c_int64: "%ld",
     ctypes.c_uint8: "%u",
     ctypes.c_uint16: "%u",
-    ctypes.c_uint32: "%lu",
-    ctypes.c_uint64: "%llu",
+    ctypes.c_uint32: "%u",
+    ctypes.c_uint64: "%lu",
+    ctypes.c_char_p: "%s",
+    ctypes.c_wchar_p: "%s",
     # use standard types instead of aliases
     # ctypes.c_short: "",
     # ctypes.c_ushort: "",
@@ -941,7 +943,6 @@ class CContext(Context):
                     self(func)
                 return None
             case asm.Print(args):
-                # TODO: formatting?
                 self.add_header("#include <stdio.h>")
                 for arg in args:
                     match arg:

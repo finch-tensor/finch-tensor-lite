@@ -29,7 +29,6 @@ numba_simple_types = [
     np.float16, 
     np.float32, 
     np.float64, 
-    np.float128, 
     np.bool_, 
     np.str_,
 ]
@@ -350,7 +349,6 @@ class NumbaCompiler:
 
     def __call__(self, prgm: asm.Module):
         numba_code = self.ctx(prgm)
-        print(numba_code)
         logger.info(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
         _globals |= numba_globals
