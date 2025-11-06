@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..algebra import overwrite, promote_max, promote_min
+from ..algebra import overwrite, promote_max, promote_min, TensorFType
 from . import nodes as ein
 from ..symbolic import ftype, gensym
 
@@ -103,13 +103,13 @@ class EinsumInterpreter:
                 assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
                 
-                if len(idxs) == 1 and not isinstance(idxs[0], ein.Index):
+                if len(idxs) == 1 and not isinstance(idxs[0], ein.Index): #pass in the full coords array
                     evaled_idxs = self(idxs[0])
-                    idx_count = evaled_idxs.size[1]
+                    idx_count = evaled_idxs.shape[1]
 
                     idxs_to_perm = [ein.Index(gensym("dummy")) for _ in range(idx_count)]
                     evaled_idxs = {idxs_to_perm[i]: evaled_idxs[:, i] for i in range(idx_count)}
-                else:
+                else: #pass in a mixture of indicies and other expressions
                     dummy_idxs = {idx: ein.Index(gensym("dummy")) for idx in idxs if not isinstance(idx, ein.Index)}
                     # evaluate the idxs that are not indices
                     evaled_idxs = {idx: self(idx) for idx in idxs if not isinstance(idx, ein.Index)}
@@ -119,6 +119,10 @@ class EinsumInterpreter:
                 perm = [idxs_to_perm.index(idx) for idx in self.loops if idx in idxs_to_perm]
                 
                 tns = self(tns) #evaluate the tensor
+                
+                if isinstance(ftype(tns), TensorFType) and len(perm) < tns.ndim:
+                    perm += [i for i in range(len(perm), tns.ndim)]
+
                 tns = xp.permute_dims(tns, perm) #permute the dimensions
                 tns = xp.expand_dims( #broadcast the tensor to the new dimensions
                     tns,
@@ -162,6 +166,7 @@ class EinsumInterpreter:
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()
+                
                 assert set(idxs).issubset(loops)
                 loops = sorted(loops, key=lambda x: x.name)
                 ctx = EinsumInterpreter(self.xp, self.bindings, loops)

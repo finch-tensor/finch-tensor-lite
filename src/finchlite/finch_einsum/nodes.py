@@ -250,6 +250,12 @@ class Einsum(EinsumTree):
     def children(self):
         return [self.op, self.tns, self.idxs, self.arg]
 
+    def get_idxs(self) -> set["Index"]:
+        idxs = list()
+        for idx in self.idxs:
+            idxs.extend(idx.get_idxs())
+        return idxs
+
 
 @dataclass(eq=True, frozen=True)
 class Plan(EinsumTree):

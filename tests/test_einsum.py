@@ -1,8 +1,14 @@
+from typing import Any
 import pytest
 
 import numpy as np
 
 import finchlite
+
+import finchlite.finch_einsum as ein
+from finchlite.algebra import overwrite
+import operator
+from finchlite.tensor import SparseTensor
 
 
 @pytest.fixture
@@ -1123,3 +1129,51 @@ class TestEinsumDataTypes:
         expected = np.einsum("ij", A)
 
         assert np.allclose(result, expected)
+
+
+class TestEinsumIndirectAccess:
+    """Test einsum with indirect access"""
+
+    def run_einsum_plan(self, prgm: ein.Plan, bindings: dict[str, Any], expected: np.ndarray):
+        """Runs an einsum plan and returns the result"""
+        interpreter = ein.EinsumInterpreter(bindings=bindings)
+        result = interpreter(prgm)[0]
+        assert np.allclose(result, expected)
+
+    def test_indirect_access(self, rng):
+        """Test indirect access"""
+
+        A = rng.random((5, 5))
+        B = rng.random((5, 5))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+
+        prgm = ein.Plan((
+            ein.Einsum(
+                op=ein.Literal(overwrite),
+                tns=ein.Alias("C"),
+                idxs=(ein.Index("i"),),
+                arg=ein.Call(
+                    op=ein.Literal(operator.mul),
+                    args=(
+                        ein.Access(
+                            tns=ein.GetAttribute(obj=ein.Alias("A"), attr=ein.Literal("elems"), dim=None),
+                            idxs=(ein.Index("i"),),
+                        ),
+                        ein.Access(
+                            tns=ein.Alias("B"),
+                            idxs=(
+                                ein.Access(
+                                    tns=ein.GetAttribute(obj=ein.Alias("A"), attr=ein.Literal("coords"), dim=None), 
+                                    idxs=(ein.Index("i"),)
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            ein.Produces((ein.Alias("C"),)),
+        ))
+
+        result = finchlite.multiply(A, B)
+        self.run_einsum_plan(prgm, {"A": sparse_A, "B": B}, result)
