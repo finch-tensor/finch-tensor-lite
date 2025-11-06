@@ -73,13 +73,22 @@ class Literal(LogicNode):
     val: Any
 
     def __hash__(self):
-        return hash(ftype(self.val))
+        try:
+            return hash(self.val)
+        except TypeError:
+            return hash(id(self.val))
 
-    def __eq__(self, other):
-        if not isinstance(other, Literal):
+    def __eq__(self, value):
+        if not isinstance(value, Literal):
             return False
-        return ftype(self.val) == ftype(other.val)
-
+        equality = self.val == value.val
+        if isinstance(equality, bool):
+            return equality
+        elif hasattr(equality, "all"):
+            return equality.all()
+        else:
+            raise ValueError(f'Cannot determine equality of {ftype(self.val)}.')
+        
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
 
