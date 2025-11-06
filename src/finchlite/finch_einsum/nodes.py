@@ -224,24 +224,22 @@ class Plan(EinsumTree):
     Basically a list of einsums and some return values.
     """
 
-    bodies: tuple[Einsum, ...] = ()
-    returnValues: tuple[EinsumExpr, ...] = ()
+    bodies: tuple[EinsumNode, ...] = ()
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
         # The last child is the returnValues tuple, all others are bodies
         if len(children) < 1:
             raise ValueError("Plan expects at least 1 child")
-        *bodies, returnValues = children
+        bodies = children
 
         return cls(
-            tuple(cast(Einsum, b) for b in bodies),
-            cast(tuple[EinsumExpr, ...], returnValues),
+            tuple(cast(EinsumNode, b) for b in bodies),
         )
 
     @property
     def children(self):
-        return [*self.bodies, self.returnValues]
+        return [*self.bodies]
 
 
 @dataclass(eq=True, frozen=True)
