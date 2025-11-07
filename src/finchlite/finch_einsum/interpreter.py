@@ -136,10 +136,14 @@ class EinsumInterpreter:
                 assert len(idxs) == len(tns.shape)
 
                 # evaluate all the indirect access indicies, and evaluate field indicies as a "grab all"
-                evaled_idxs = [(xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) else self(idx)) for i, idx in enumerate(idxs)]
+                evaled_idxs = [
+                    (xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) else self(idx)) 
+                    for i, idx in enumerate(idxs)
+                ]
+
                 # evaluate the output tensor as a flat array
                 flat_idx = xp.ravel_multi_index(xp.vstack(evaled_idxs), tns.shape)
-                tns = tns.flat[flat_idx]
+                tns = xp.take(tns, flat_idx)
                 
                 # calculate the final shape of the tensor
                 # we assert that all the indirect access indicies from the parent idxs have the same size
@@ -192,6 +196,15 @@ class EinsumInterpreter:
 
                 # return the coord array for the given dimension or all dimensions
                 return obj.coords if dim is None else obj.coords[:, dim]
+            # gets the shape of a sparse tensor at a given dimension
+            case ein.GetAttribute(obj, ein.Literal("shape"), dim):
+                obj = self(obj)
+                assert isinstance(ftype(obj), SparseTensorFType)
+                assert isinstance(obj, SparseTensor)
+                assert dim is not None
+
+                # return the shape for the given dimension
+                return obj.shape[dim]
 
             # standard einsum
             case ein.Einsum(op, ein.Alias(tns), idxs, arg) if all(isinstance(idx, ein.Index) for idx in idxs):
@@ -217,10 +230,6 @@ class EinsumInterpreter:
 
             # indirect einsum
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
-                loops = arg.get_idxs()
-                true_idxs = node.get_idxs()
-                assert true_idxs.issubset(loops)
-
                 raise NotImplementedError("Indirect einsum is not implemented yet")
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
