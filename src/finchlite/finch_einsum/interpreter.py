@@ -99,7 +99,9 @@ class EinsumInterpreter:
                     func = getattr(xp, nary_ops[func])
                 vals = [self(arg) for arg in args]
                 return func(*vals)
-            case ein.Access(tns, idxs):
+
+            #access a tensor with only indices
+            case ein.Access(tns, idxs) if all(isinstance(idx, ein.Index) for idx in idxs):
                 assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
 
@@ -112,7 +114,22 @@ class EinsumInterpreter:
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
-                
+
+            #access a tensor with only one indirect access index
+            case ein.Access(tns, idxs):
+                assert len(idxs) == 1
+                true_idx = node.get_idxs()[0]
+                assert isinstance(true_idx, ein.Index)
+
+                raise NotImplementedError("Access with only one indirect access index is not implemented")
+
+            #access a tensor with a mixture of indices and other expressions
+            case ein.Access(tns, idxs):
+                true_idxs = node.get_idxs() #true field iteratior indicies
+                assert all(isinstance(idx, ein.Index) for idx in true_idxs)
+                assert self.loops is not None
+
+                raise NotImplementedError("Access with a mixture of indices and other expressions is not implemented")
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
