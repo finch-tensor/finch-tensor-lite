@@ -102,45 +102,17 @@ class EinsumInterpreter:
             case ein.Access(tns, idxs):
                 assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
-                
-                if len(idxs) == 1 and not isinstance(idxs[0], ein.Index): #pass in the full coords array
-                    evaled_idxs = self(idxs[0])
-                    idx_count = evaled_idxs.shape[1]
-
-                    idxs_to_perm = [ein.Index(gensym("dummy")) for _ in range(idx_count)]
-                    evaled_idxs = {idxs_to_perm[i]: evaled_idxs[:, i] for i in range(idx_count)}
-                else: #pass in a mixture of indicies and other expressions
-                    dummy_idxs = {idx: ein.Index(gensym("dummy")) for idx in idxs if not isinstance(idx, ein.Index)}
-                    # evaluate the idxs that are not indices
-                    evaled_idxs = {idx: self(idx) for idx in idxs if not isinstance(idx, ein.Index)}
-                    idxs_to_perm = [(dummy_idxs[idx] if idx in dummy_idxs else idx) for idx in idxs]
 
                 #convert named idxs to positional, integer indices
-                perm = [idxs_to_perm.index(idx) for idx in self.loops if idx in idxs_to_perm]
+                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
                 
                 tns = self(tns) #evaluate the tensor
-                
-                if isinstance(ftype(tns), TensorFType) and len(perm) < tns.ndim:
-                    perm += [i for i in range(len(perm), tns.ndim)]
-
                 tns = xp.permute_dims(tns, perm) #permute the dimensions
-                tns = xp.expand_dims( #broadcast the tensor to the new dimensions
+                return xp.expand_dims(
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
-
-                # we need to remove indicies not accessed by dummy tensors
-                # we basically remove all indicies not accessed 
-                # the dummy tensor system assumes all indicies are accessed at first
-                for dummy_idx, evaled_idx in evaled_idxs.items():
-                    axis_to_crop = idxs_to_perm.index(dummy_idx) 
-                    axis_size = tns.shape[axis_to_crop]
-
-                    idxs_to_crop = np.setdiff1d(np.arange(axis_size), evaled_idx)
-                    tns = xp.delete(tns, idxs_to_crop, axis=axis_to_crop)
-
-                return tns
-
+                
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
