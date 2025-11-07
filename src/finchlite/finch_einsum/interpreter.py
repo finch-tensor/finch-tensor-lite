@@ -192,7 +192,9 @@ class EinsumInterpreter:
 
                 # return the coord array for the given dimension or all dimensions
                 return obj.coords if dim is None else obj.coords[:, dim]
-            case ein.Einsum(op, ein.Alias(tns), idxs, arg):
+
+            # standard einsum
+            case ein.Einsum(op, ein.Alias(tns), idxs, arg) if all(isinstance(idx, ein.Index) for idx in idxs):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()
                 
@@ -212,5 +214,13 @@ class EinsumInterpreter:
                 axis = [dropped.index(idx) for idx in idxs]
                 self.bindings[tns] = xp.permute_dims(val, axis)
                 return (tns,)
+
+            # indirect einsum
+            case ein.Einsum(op, ein.Alias(tns), idxs, arg):
+                loops = arg.get_idxs()
+                true_idxs = node.get_idxs()
+                assert true_idxs.issubset(loops)
+
+                raise NotImplementedError("Indirect einsum is not implemented yet")
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
