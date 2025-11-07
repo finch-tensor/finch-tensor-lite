@@ -127,7 +127,18 @@ class EinsumInterpreter:
 
             #access a tensor with a mixture of indices and other expressions
             case ein.Access(tns, idxs):
-                raise NotImplementedError("Access with a mixture of indices and other expressions is not implemented")
+                assert self.loops is not None
+                true_idxs = node.get_idxs() #true field iteratior indicies
+                assert all(isinstance(idx, ein.Index) for idx in true_idxs)
+
+                tns = self(tns)
+                assert len(idxs) == len(tns.shape)
+
+                # evaluate all the indirect access indicies, and evaluate field indicies as a "grab all"
+                evaled_idxs = [(xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) else self(idx)) for i, idx in enumerate(idxs)]
+                evaled_idxs = xp.vstack(evaled_idxs)
+                flat_idx = xp.ravel_multi_index(evaled_idxs, tns.shape)
+                return tns.flat[flat_idx]
 
             case ein.Plan(bodies):
                 res = None
@@ -150,7 +161,7 @@ class EinsumInterpreter:
                 assert isinstance(obj, SparseTensor)
 
                 # return the coord array for the given dimension or all dimensions
-                return obj.coords if dim is None else obj.coords[dim, :]
+                return obj.coords if dim is None else obj.coords[:, dim]
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()
