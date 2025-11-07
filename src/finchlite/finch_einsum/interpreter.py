@@ -228,8 +228,45 @@ class EinsumInterpreter:
                 self.bindings[tns] = xp.permute_dims(val, axis)
                 return (tns,)
 
+            # indirect einsum with no reduction
+            case ein.Einsum(op, ein.Alias(tns), idxs, arg) if op == overwrite:
+                loops = arg.get_idxs()
+                true_idxs = node.get_idxs()
+                assert true_idxs.equals(loops)
+
+                # evalaute the tensor to access/write to
+                # output tensor must exist with initial reduction values
+                assert tns in self.bindings 
+                tns = self.bindings[tns]
+                assert len(idxs) == len(tns.shape)
+
+                # evaluate all the indirect assignment indicies, and evaluate field indicies as a "grab all"
+                evaled_idxs = [
+                    (xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) else self(idx)) 
+                    for i, idx in enumerate(idxs)
+                ]
+                evaled_idxs = xp.vstack(evaled_idxs)
+                flat_idx = xp.ravel_multi_index(evaled_idxs, tns.shape)
+
+                arg = self(arg)
+                tns.flat[flat_idx] = arg #no need to assign to bindings
+                return (tns,)
+
             # indirect einsum
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
+                loops = arg.get_idxs()
+                true_idxs = node.get_idxs()
+                assert true_idxs.issubset(loops)
+
+                # evalaute the tensor to access/write to
+                # output tensor must exist with initial reduction values
+                assert tns in self.bindings 
+                tns = self.bindings[tns]
+                assert len(idxs) == len(tns.shape)
+
+                reduced_axis = [idx for idx in loops if idx in true_idxs]
+
+                # evaluate all the indirect assignment indicies, and evaluate field indicies as a "grab all"
                 raise NotImplementedError("Indirect einsum is not implemented yet")
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
