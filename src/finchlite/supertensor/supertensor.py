@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Tuple, TypeVar, Generic
+from typing import List, Tuple
 
 class SuperTensor():
     shape: Tuple[int, ...]
