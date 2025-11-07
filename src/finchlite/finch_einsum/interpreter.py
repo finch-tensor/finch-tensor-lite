@@ -118,18 +118,17 @@ class EinsumInterpreter:
             #access a tensor with only one indirect access index
             case ein.Access(tns, idxs):
                 assert len(idxs) == 1
-                true_idx = node.get_idxs()[0]
-                assert isinstance(true_idx, ein.Index)
 
-                raise NotImplementedError("Access with only one indirect access index is not implemented")
+                idx = self(idxs[0])
+                tns = self(tns) #evaluate the tensor
+
+                flat_idx = xp.ravel_multi_index(idx.T, tns.shape)
+                return tns.flat[flat_idx] #return a 1-d array by definition
 
             #access a tensor with a mixture of indices and other expressions
             case ein.Access(tns, idxs):
-                true_idxs = node.get_idxs() #true field iteratior indicies
-                assert all(isinstance(idx, ein.Index) for idx in true_idxs)
-                assert self.loops is not None
-
                 raise NotImplementedError("Access with a mixture of indices and other expressions is not implemented")
+
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
