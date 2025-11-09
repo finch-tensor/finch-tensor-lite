@@ -1,5 +1,10 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
+from .cfg_builder import (
+    AssemblyCFGBuilder,
+    assembly_build_cfg,
+    assembly_number_uses,
+)
+from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -36,6 +41,7 @@ from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check
 
 __all__ = [
     "AssemblyCFGBuilder",
+    "AssemblyCopyPropagation",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
@@ -75,6 +81,7 @@ __all__ = [
     "WhileLoop",
     "assembly_build_cfg",
     "assembly_check_types",
+    "assembly_copy_propagation",
     "assembly_number_uses",
     "element_type",
     "length_type",
