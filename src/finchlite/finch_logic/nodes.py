@@ -84,10 +84,8 @@ class Literal(LogicNode):
         equality = self.val == value.val
         if isinstance(equality, bool):
             return equality
-        elif hasattr(equality, "all"):
-            return equality.all()
         else:
-            raise ValueError(f'Cannot determine equality of {ftype(self.val)}.')
+            return id(self.val) == id(value.val)
         
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
