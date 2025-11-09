@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Generic, Self, TypeVar
 
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 
 
@@ -84,9 +84,8 @@ class Literal(LogicNode):
         equality = self.val == value.val
         if isinstance(equality, bool):
             return equality
-        else:
-            return id(self.val) == id(value.val)
-        
+        return id(self.val) == id(value.val)
+
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
 
