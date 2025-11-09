@@ -53,4 +53,22 @@ def test_matrix_multiplication(a, b):
 
     assert_equal(result, expected)
 
+
+def test_plan_repr():
+    i = Field("i")
+    j = Field("j")
+    k = Field("k")
+    # To avoid equality issues with numpy arrays, we use string literals here instead
+    p = Plan(
+        (
+            Query(Alias("A"), Table(Literal("A"), (i, k))),
+            Query(Alias("B"), Table(Literal("B"), (k, j))),
+            Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
+            Query(
+                Alias("C"),
+                Reorder(Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)), (i, j)),
+            ),
+            Produces((Alias("C"),)),
+        )
+    )
     assert p == eval(repr(p))
