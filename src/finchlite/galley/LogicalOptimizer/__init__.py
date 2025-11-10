@@ -4,7 +4,7 @@ from .utility import PostOrderDFS, PreOrderDFS
 
 __all__ = [
     "AnnotatedQuery",
-    "_insert_statistics",
     "PostOrderDFS",
     "PreOrderDFS",
+    "_insert_statistics",
 ]

@@ -16,6 +16,7 @@ from finchlite.finch_logic import (
     Produces,
     Table,
 )
+from finchlite.galley.LogicalOptimizer.annotated_query import intree, isdescendant
 from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
 from finchlite.galley.LogicalOptimizer.utility import PostOrderDFS, PreOrderDFS
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
@@ -1326,6 +1327,24 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+# ─────────────────────────────── Annotated_Query tests ─────────────────────────────
+def test_intree_and_isdescendant():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    ta = Table(Literal("A"), (i, j))
+    tb = Table(Literal("B"), (j, k))
+    op = Field("op")
+    mj = MapJoin(op, (ta, tb))
+    prog = Plan((Produces((mj,)),))
+
+    assert intree(prog, prog)
+    assert intree(mj, prog)
+    assert intree(ta, prog)
+    assert intree(tb, prog)
+    assert isdescendant(mj, prog)
+    assert isdescendant(ta, prog)
+    assert isdescendant(tb, prog)
 
 
 # ─────────────────────────────── Utility tests ─────────────────────────────
