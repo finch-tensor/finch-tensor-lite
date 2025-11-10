@@ -1336,7 +1336,7 @@ def logic_neighbors(n: LogicNode):
         yield from n.children
 
 
-def test_preorder_logic_program_simple():
+def test_preorder_logic():
     ta = Table(
         Literal("A"),
         (Field("i"), Field("j")),
@@ -1388,7 +1388,7 @@ def test_preorder_logic_program_simple():
     return cond1 and cond2 and cond3 and cond4
 
 
-def test_postorder_logic_program_simple():
+def test_postorder_logic():
     ta = Table(
         Literal("A"),
         (Field("i"), Field("j")),
