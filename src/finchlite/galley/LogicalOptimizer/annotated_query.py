@@ -1,8 +1,9 @@
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable, Iterable
 
 from finchlite.finch_logic import Alias, LogicNode
+from .utility import PreOrderDFS
 
 
 @dataclass
@@ -44,3 +45,21 @@ def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
 
 def get_reducible_idxs(aq: AnnotatedQuery) -> list[str]:
     return [idx for idx in aq.reduce_idxs if len(aq.parent_idxs.get(idx, [])) == 0]
+
+def intree(n1, n2):
+    """
+    Return True iff `n1` occurs in the subtree rooted at `n2`.
+    """
+    for n in PreOrderDFS(n2):
+        if n == n1:
+            return True
+    return False
+
+
+def isdescendant(n1, n2):
+    """
+    True iff `n1` is a strict descendant of `n2`.
+    """
+    if n1 == n2:
+        return False
+    return intree(n1, n2)
