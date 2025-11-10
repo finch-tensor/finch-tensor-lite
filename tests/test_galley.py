@@ -5,8 +5,19 @@ import pytest
 
 import numpy as np
 
-from finchlite.finch_logic import Aggregate, Field, Literal, MapJoin, Table
+from finchlite.finch_logic import (
+    Aggregate,
+    Field,
+    Literal,
+    LogicNode,
+    LogicTree,
+    MapJoin,
+    Plan,
+    Produces,
+    Table,
+)
 from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
+from finchlite.galley.LogicalOptimizer.utility import PostOrderDFS, PreOrderDFS
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
 from finchlite.galley.TensorStats.dense_stat import DenseStats
 from finchlite.galley.TensorStats.tensor_def import TensorDef
@@ -1315,3 +1326,116 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+# ─────────────────────────────── Utility tests ─────────────────────────────
+
+
+def logic_neighbors(n: LogicNode):
+    if isinstance(n, LogicTree):
+        yield from n.children
+
+
+def test_preorder_logic_program_simple():
+    ta = Table(
+        Literal("A"),
+        (Field("i"), Field("j")),
+    )
+
+    tb = Table(
+        Literal("B"),
+        (Field("j"), Field("k")),
+    )
+
+    prog = Plan(
+        (
+            Produces(
+                (
+                    MapJoin(
+                        Field("op"),
+                        (ta, tb),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    pre = PreOrderDFS(prog, logic_neighbors)
+    type_names = [type(x).__name__ for x in pre]
+
+    # 1) must start with ["Plan", "Produces", "MapJoin"]
+    cond1 = type_names[:3] == ["Plan", "Produces", "MapJoin"]
+
+    # 2) next element must be the operator field
+    cond2 = len(type_names) > 3 and type_names[3] == "Field"
+
+    # 3) there must be exactly two Table nodes after MapJoin’s op
+    table_positions = [i for i, t in enumerate(type_names) if t == "Table"]
+    cond3 = len(table_positions) == 2
+
+    # 4) each Table should have its subtree immediately following it:
+    #    "Table" nodes are followed by their children (Literal + Fields)
+    cond4 = True
+    for pos in table_positions:
+        if pos + 3 > len(type_names):
+            cond4 = False
+            break
+        window = type_names[pos : pos + 4]
+        if not ("Literal" in window and window.count("Field") == 2):
+            cond4 = False
+            break
+
+    return cond1 and cond2 and cond3 and cond4
+
+
+def test_postorder_logic_program_simple():
+    ta = Table(
+        Literal("A"),
+        (Field("i"), Field("j")),
+    )
+
+    tb = Table(
+        Literal("B"),
+        (Field("j"), Field("k")),
+    )
+
+    prog = Plan(
+        (
+            Produces(
+                (
+                    MapJoin(
+                        Field("op"),
+                        (ta, tb),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    post = PostOrderDFS(prog, logic_neighbors)
+    type_names = [type(x).__name__ for x in post]
+
+    # 1) must end with ["MapJoin", "Produces", "Plan"]
+    cond1 = type_names[-3:] == ["MapJoin", "Produces", "Plan"]
+
+    # 2) first element must be "Field"
+    cond2 = type_names[0] == "Field"
+
+    # 3) each Table must appear before MapJoin
+    table_positions = [i for i, t in enumerate(type_names) if t == "Table"]
+    cond3 = len(table_positions) == 2 and all(
+        pos < len(type_names) - 3 for pos in table_positions
+    )
+
+    # 4) each Table’s immediate predecessors must be its children (2 Fields + 1 Literal)
+    cond4 = True
+    for pos in table_positions:
+        if pos < 3:
+            cond4 = False
+            break
+        kids = type_names[pos - 3 : pos]
+        if not (kids.count("Field") == 2 and kids.count("Literal") == 1):
+            cond4 = False
+            break
+
+    return cond1 and cond2 and cond3 and cond4

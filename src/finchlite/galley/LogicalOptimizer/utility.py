@@ -1,13 +1,15 @@
 from __future__ import annotations
-from collections.abc import Callable, Iterable, Iterator
-from typing import Any, Hashable, List, Optional, Set, Tuple
+
+from collections.abc import Callable, Hashable, Iterable, Iterator
+from typing import Any
+
 
 def PreOrderDFS(
     roots: Iterable[Any] | Any,
     neighbors: Callable[[Any], Iterable[Any]],
     *,
-    key: Optional[Callable[[Any], Hashable]] = None,
-) -> List[Any]:
+    key: Callable[[Any], Hashable] | None = None,
+) -> list[Any]:
     """Return nodes in depth-first PRE-ORDER."""
     if isinstance(roots, Iterable) and not isinstance(roots, (str, bytes)):
         root_iter: Iterable[Any] = roots
@@ -15,8 +17,8 @@ def PreOrderDFS(
         root_iter = [roots]
 
     k = key or id
-    visited: Set[Hashable] = set()
-    out: List[Any] = []
+    visited: set[Hashable] = set()
+    out: list[Any] = []
 
     for r in root_iter:
         kr = k(r)
@@ -24,7 +26,7 @@ def PreOrderDFS(
             continue
         visited.add(kr)
         out.append(r)
-        stack: List[Tuple[Any, Iterator[Any]]] = [(r, iter(neighbors(r)))]
+        stack: list[tuple[Any, Iterator[Any]]] = [(r, iter(neighbors(r)))]
         while stack:
             node, it = stack[-1]
             try:
@@ -40,12 +42,13 @@ def PreOrderDFS(
             stack.append((nxt, iter(neighbors(nxt))))
     return out
 
+
 def PostOrderDFS(
     roots: Iterable[Any] | Any,
     neighbors: Callable[[Any], Iterable[Any]],
     *,
-    key: Optional[Callable[[Any], Hashable]] = None,
-) -> List[Any]:
+    key: Callable[[Any], Hashable] | None = None,
+) -> list[Any]:
     """Return nodes in depth-first POST-ORDER."""
     if isinstance(roots, Iterable) and not isinstance(roots, (str, bytes)):
         root_iter: Iterable[Any] = roots
@@ -53,14 +56,14 @@ def PostOrderDFS(
         root_iter = [roots]
 
     k = key or id
-    visited: Set[Hashable] = set()
-    out: List[Any] = []
+    visited: set[Hashable] = set()
+    out: list[Any] = []
 
     for r in root_iter:
         kr = k(r)
         if kr in visited:
             continue
-        stack: List[Tuple[Any, Iterator[Any], bool]] = [(r, iter(neighbors(r)), False)]
+        stack: list[tuple[Any, Iterator[Any], bool]] = [(r, iter(neighbors(r)), False)]
         visited.add(kr)
         while stack:
             node, it, expanded = stack.pop()
