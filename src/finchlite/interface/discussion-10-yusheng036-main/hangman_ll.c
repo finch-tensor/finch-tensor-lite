@@ -34,7 +34,7 @@ struct wordbank get_wordbank() {
         /* Reminder: make sure to copy the string from input_word to the new node */
         /* Also remember to update the wordbank's length field!*/
     }
-   
+
     return wb;
 }
 
@@ -73,7 +73,7 @@ void update_display_string(char* display_string, char* answer_string, char guess
 }
 
 
-/* Returns true (1) if guess character is in answer_string 
+/* Returns true (1) if guess character is in answer_string
 */
 _Bool guess_in_answer(char* answer_string, char guess){
 
@@ -81,7 +81,7 @@ _Bool guess_in_answer(char* answer_string, char guess){
 
 int main(void) {
     char display_string_buffer[100]; // space for our display string
-    
+
     int lives = 3;
 
     struct wordbank wb = get_wordbank();
@@ -110,11 +110,11 @@ int main(void) {
         // scan the single-character user guess from STDIN into the variable guess
         printf("Guess: ");
         char guess;
-        scanf(" %c", &guess); 
+        scanf(" %c", &guess);
 
-        /* 
+        /*
         TODO:
-        Call guess_in_answer and decrement lives if the guess is incorrect, 
+        Call guess_in_answer and decrement lives if the guess is incorrect,
         update display string otherwise.
         */
 

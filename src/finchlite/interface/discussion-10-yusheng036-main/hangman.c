@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 
-/* TODO: complete the definition of the possible_words[] array. 
+/* TODO: complete the definition of the possible_words[] array.
 *  You may populate it however you'd like.
 *  Make sure to update the macro for NUM_WORDS to match the length of your
 *  possible words array.
@@ -35,7 +35,7 @@ void update_display_string(char* display_string, char* answer_string, char guess
 }
 
 
-/* Returns true (1) if guess character is in answer_string 
+/* Returns true (1) if guess character is in answer_string
 */
 _Bool guess_in_answer(char* answer_string, char guess){
 
@@ -43,7 +43,7 @@ _Bool guess_in_answer(char* answer_string, char guess){
 
 int main(void) {
     char display_string_buffer[100]; // space for our display string
-    
+
     int lives = 3;
 
     int random_index = random_number(0, NUM_WORDS);
@@ -66,11 +66,11 @@ int main(void) {
         // scan the single-character user guess from STDIN into the variable guess
         printf("Guess: ");
         char guess;
-        scanf(" %c", &guess); 
+        scanf(" %c", &guess);
 
-        /* 
+        /*
         TODO:
-        Call guess_in_answer and decrement lives if the guess is incorrect, 
+        Call guess_in_answer and decrement lives if the guess is incorrect,
         update display string otherwise.
         */
 

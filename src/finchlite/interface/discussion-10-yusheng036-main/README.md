@@ -15,22 +15,22 @@ Playing a game of hangman looks like this:
 ```
 $ ./hangman
 LIVES: 3
-_ _ _ _ _ 
+_ _ _ _ _
 Guess: a
 LIVES: 2
-_ _ _ _ _ 
+_ _ _ _ _
 Guess: h
 LIVES: 2
-h _ _ _ _ 
+h _ _ _ _
 Guess: e
 LIVES: 2
-h e _ _ _ 
+h e _ _ _
 Guess: l
 LIVES: 2
-h e l l _ 
+h e l l _
 Guess: y
 LIVES: 1
-h e l l _ 
+h e l l _
 Guess: i
 YOU LOSE! The word: hello
 ```
@@ -71,10 +71,10 @@ Later on, in your code, you may use the macro `MY_MACRO`, and at compile-time, t
 Fill in the body for the following function:
 
 ```
-/* Returns true (1) if guess character is in answer_string 
+/* Returns true (1) if guess character is in answer_string
 */
 _Bool guess_in_answer(char* answer_string, char guess){
-    
+
 }
 ```
 Something to consder:
@@ -91,7 +91,7 @@ Fill in the body for the following function:
  * the display string buffer will contain {'_', '_' , '_','\0'}
 */
 void generate_display_string(char* display_string, int length) {
-   
+
 }
 ```
 
@@ -107,7 +107,7 @@ Fill in the body for the following function:
  * update the display string to "__ll_" and value of letters_remaining to 3.
 */
 void update_display_string(char* display_string, char* answer_string, char guess, int* letters_remaining) {
-  
+
 }
 ```
 Something to consder:
@@ -144,19 +144,19 @@ $ ./hangman_ll
 Enter word for wordbank or (quit): hello
 Enter word for wordbank or (quit): world
 Enter word for wordbank or (quit): computer
-Enter word for wordbank or (quit): apple 
+Enter word for wordbank or (quit): apple
 Enter word for wordbank or (quit): quit
 LIVES: 3
-_ _ _ _ _ 
+_ _ _ _ _
 Guess: e
 LIVES: 3
-_ e _ _ _ 
+_ e _ _ _
 Guess: o
 LIVES: 3
-_ e _ _ o 
+_ e _ _ o
 Guess: h
 LIVES: 3
-h e _ _ o 
+h e _ _ o
 Guess: l
 YOU WIN! The word: hello
 ```
@@ -187,7 +187,7 @@ Test your program. You should now be able to input several words for your wordba
 
 ### Step 9: Free the wordlist.
 
-You will notice we do not free our wordbank before our program completes. 
+You will notice we do not free our wordbank before our program completes.
 Implement `free_wordlist`.
 
 Now when you run your program with a special debugging program called `valgrind`, you can check if there are any memory leaks. Remember, a memory leak occurs when we forget to free memory on the heap!
@@ -199,43 +199,43 @@ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose -
 ```
 Interact with your program as normal.
 
-Once the program has finished running, open the output file `valgrind-out.txt`. 
+Once the program has finished running, open the output file `valgrind-out.txt`.
 
 At the end of the file, if correctly implemented you should see:
 
 ```
-==178847== 
+==178847==
 ==178847== HEAP SUMMARY:
 ==178847==     in use at exit: 0 bytes in 0 blocks
 ==178847==   total heap usage: 3 allocs, 3 frees, 2,160 bytes allocated
-==178847== 
+==178847==
 ==178847== All heap blocks were freed -- no leaks are possible
-==178847== 
+==178847==
 ==178847== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
 ```
 
 If you have a leak you will see an error like the following:
 
 ```
-==179158== 
+==179158==
 ==179158== HEAP SUMMARY:
 ==179158==     in use at exit: 112 bytes in 1 blocks
 ==179158==   total heap usage: 3 allocs, 2 frees, 2,160 bytes allocated
-==179158== 
+==179158==
 ==179158== Searching for pointers to 1 not-freed blocks
 ==179158== Checked 108,128 bytes
-==179158== 
+==179158==
 ==179158== 112 bytes in 1 blocks are definitely lost in loss record 1 of 1
 ==179158==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
 ==179158==    by 0x109308: get_wordbank (hangman_ll.c:29)
 ==179158==    by 0x109560: main (hangman_ll.c:120)
-==179158== 
+==179158==
 ==179158== LEAK SUMMARY:
 ==179158==    definitely lost: 112 bytes in 1 blocks
 ==179158==    indirectly lost: 0 bytes in 0 blocks
 ==179158==      possibly lost: 0 bytes in 0 blocks
 ==179158==    still reachable: 0 bytes in 0 blocks
 ==179158==         suppressed: 0 bytes in 0 blocks
-==179158== 
+==179158==
 ==179158== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
 ```
