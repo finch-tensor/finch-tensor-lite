@@ -159,12 +159,6 @@ class EinsumInterpreter:
                         if (parent_idx in child_idx.get_idxs())
                     ] for parent_idx in true_idxs 
                 }
-                #calculate parent idxs, just inverse of child_idxs dictionary
-                parent_idxs = {
-                    child_idx: parent_idx
-                    for parent_idx in true_idxs
-                    for child_idx in child_idxs[parent_idx]
-                }
 
                 # we assert that all the indirect access indicies from the parent idxs have the same size
                 assert all(
