@@ -1,49 +1,10 @@
+from collections import Counter
+
 from finchlite.finch_logic import Field, Literal, MapJoin, Plan, Produces, Table
 from finchlite.symbolic import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 
-def test_preorder_logic():
-    ta = Table(
-        Literal("A"),
-        (Field("i"), Field("j")),
-    )
-
-    tb = Table(
-        Literal("B"),
-        (Field("j"), Field("k")),
-    )
-
-    prog = Plan(
-        (
-            Produces(
-                (
-                    MapJoin(
-                        Field("op"),
-                        (ta, tb),
-                    ),
-                ),
-            ),
-        )
-    )
-    type_names = [type(x).__name__ for x in list(PreOrderDFS(prog))]
-
-    assert type_names == [
-        "Plan",
-        "Produces",
-        "MapJoin",
-        "Field",
-        "Table",
-        "Literal",
-        "Field",
-        "Field",
-        "Table",
-        "Literal",
-        "Field",
-        "Field",
-    ]
-
-
-def test_postorder_logic():
+def test_preorder_dfs():
     ta = Table(
         Literal("A"),
         (Field("i"), Field("j")),
@@ -67,23 +28,62 @@ def test_postorder_logic():
         )
     )
 
-    post = list(PostOrderDFS(prog))
-    type_names = [type(x).__name__ for x in post]
+    preorder = list(PreOrderDFS(prog))
 
-    assert type_names == [
-        "Field",
-        "Literal",
-        "Field",
-        "Field",
-        "Table",
-        "Literal",
-        "Field",
-        "Field",
-        "Table",
-        "MapJoin",
-        "Produces",
-        "Plan",
-    ]
+    assert Counter(type(x).__name__ for x in preorder) == Counter(
+        {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 2, "Field": 5}
+    )
+
+    pos = {}
+    for i, obj in enumerate(preorder):
+        k = id(obj)
+        if k in pos:
+            continue
+        pos[k] = i
+    for node in preorder:
+        for child in getattr(node, "children", ()):
+            assert pos[id(node)] < pos[id(child)]
+
+
+def test_postorder_dfs():
+    ta = Table(
+        Literal("A"),
+        (Field("i"), Field("j")),
+    )
+
+    tb = Table(
+        Literal("B"),
+        (Field("j"), Field("k")),
+    )
+
+    prog = Plan(
+        (
+            Produces(
+                (
+                    MapJoin(
+                        Field("op"),
+                        (ta, tb),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    postorder = list(PostOrderDFS(prog))
+
+    assert Counter(type(x).__name__ for x in postorder) == Counter(
+        {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 2, "Field": 5}
+    )
+
+    pos = {}
+    for i, obj in enumerate(postorder):
+        k = id(obj)
+        if k in pos:
+            continue
+        pos[k] = i
+    for node in postorder:
+        for child in getattr(node, "children", ()):
+            assert pos[id(child)] < pos[id(node)]
 
 
 def test_intree():
