@@ -14,7 +14,7 @@ from finchlite.finch_logic import (
     Produces,
     Table,
 )
-from finchlite.galley.LogicalOptimizer.annotated_query import intree, isdescendant
+from finchlite.galley.LogicalOptimizer.annotated_query import intree, isdescendant, get_reducible_idxs, AnnotatedQuery
 from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
 from finchlite.galley.LogicalOptimizer.utility import PostOrderDFS, PreOrderDFS
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
@@ -1328,6 +1328,41 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
 
 
 # ─────────────────────────────── Annotated_Query tests ─────────────────────────────
+@pytest.mark.parametrize(
+    "reduce_idxs,parent_idxs,expected",
+    [
+        # Some indices have parents
+        (["i", "j", "k"], {"i": [], "j": ["i"], "k": []}, ["i", "k"]),
+        # Keys missing from parent map should be treated as zero parents.
+        (["i", "j", "k"], {"j": ["i"]}, ["i", "k"]),
+        # All have parents
+        (["a", "b"], {"a": ["b"], "b": ["a"]}, []),
+        # Empty input
+        ([], {}, []),
+        # Order preserved among reducible indices
+        (["x", "y", "z"], {"y": ["x"]}, ["x", "z"]),
+    ],
+)
+def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
+    aq = AnnotatedQuery(
+        ST=object,
+        output_name=None,
+        reduce_idxs=list(reduce_idxs),
+        point_expr=None,
+        idx_lowest_root=OrderedDict(),
+        idx_op=OrderedDict(),
+        idx_init=OrderedDict(),
+        hash_to_node=OrderedDict(),
+        parent_idxs=OrderedDict((k, list(v)) for k, v in parent_idxs.items()),
+        original_idx=OrderedDict(),
+        connected_components=[],
+        connected_idxs=OrderedDict(),
+        output_order=None,
+        output_format=None,
+    )
+
+    assert get_reducible_idxs(aq) == expected
+
 def test_intree_and_isdescendant():
     i, j, k = Field("i"), Field("j"), Field("k")
     ta = Table(Literal("A"), (i, j))
@@ -1343,7 +1378,6 @@ def test_intree_and_isdescendant():
     assert isdescendant(mj, prog)
     assert isdescendant(ta, prog)
     assert isdescendant(tb, prog)
-
 
 # ─────────────────────────────── Utility tests ─────────────────────────────
 
