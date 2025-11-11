@@ -1,8 +1,3 @@
-from __future__ import annotations
-
-from collections.abc import Callable, Hashable, Iterable, Iterator
-from typing import Any
-
 from finchlite.finch_logic import LogicTree
 
 def intree(n1, n2):

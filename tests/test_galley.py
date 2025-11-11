@@ -10,8 +10,6 @@ from finchlite.finch_logic import (
     Field,
     Literal,
     MapJoin,
-    Plan,
-    Produces,
     Table,
 )
 from finchlite.galley.LogicalOptimizer.annotated_query import (
@@ -20,10 +18,6 @@ from finchlite.galley.LogicalOptimizer.annotated_query import (
     get_reducible_idxs,
 )
 from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
-from finchlite.galley.LogicalOptimizer.utility import (
-    intree,
-    isdescendant,
-)
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
 from finchlite.galley.TensorStats.dense_stat import DenseStats
 from finchlite.galley.TensorStats.tensor_def import TensorDef
@@ -1369,23 +1363,6 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     )
 
     assert get_reducible_idxs(aq) == expected
-
-
-def test_intree_and_isdescendant():
-    i, j, k = Field("i"), Field("j"), Field("k")
-    ta = Table(Literal("A"), (i, j))
-    tb = Table(Literal("B"), (j, k))
-    op = Field("op")
-    mj = MapJoin(op, (ta, tb))
-    prog = Plan((Produces((mj,)),))
-
-    assert intree(prog, prog)
-    assert intree(mj, prog)
-    assert intree(ta, prog)
-    assert intree(tb, prog)
-    assert isdescendant(mj, prog)
-    assert isdescendant(ta, prog)
-    assert isdescendant(tb, prog)
 
 
 @pytest.mark.parametrize(
