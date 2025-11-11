@@ -123,27 +123,18 @@ def pretty_labels(root: LogicNode) -> LogicNode:
 
     return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
 
-
 @overload
-def _lift_subqueries_expr(  # type: ignore[overload-overlap]
-    node: Subquery, bindings: dict[LogicNode, LogicNode]
+def _lift_subqueries_expr(
+    node: LogicExpression, bindings: dict[Alias, LogicExpression]
 ) -> LogicExpression: ...
 
-
 @overload
 def _lift_subqueries_expr(
-    node: LogicTree, bindings: dict[LogicNode, LogicNode]
-) -> LogicTree: ...
-
-
-@overload
-def _lift_subqueries_expr(
-    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+    node: LogicNode, bindings: dict[Alias, LogicExpression]
 ) -> LogicNode: ...
 
-
 def _lift_subqueries_expr(
-    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+    node: LogicNode, bindings: dict[Alias, LogicExpression]
 ) -> LogicNode:
     match node:
         case Subquery(lhs, arg):
@@ -165,7 +156,7 @@ def lift_subqueries(node: LogicNode) -> LogicNode:
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
         case Query(lhs, rhs):
-            bindings: dict[LogicNode, LogicNode] = {}
+            bindings: dict[Alias, LogicExpression] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
@@ -612,7 +603,7 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
-def _set_loop_order(node: LogicNode, perms: dict[LogicNode, LogicNode]) -> LogicNode:
+def _set_loop_order(node: LogicNode, perms: dict[LogicNode, LogicExpression]) -> LogicNode:
     match node:
         case Plan(bodies):
             return Plan(tuple(_set_loop_order(body, perms) for body in bodies))

@@ -368,6 +368,8 @@ def defer(arr) -> LazyTensor:
     Returns:
     - LazyTensor: A lazy representation of the input array.
     """
+    if arr is None:
+        raise ValueError("Input array cannot be None")
     if isinstance(arr, LazyTensor):
         return arr
     if np.isscalar(arr):

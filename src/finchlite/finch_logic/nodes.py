@@ -113,7 +113,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode, NamedTerm):
+class Alias(LogicExpression, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -128,6 +128,10 @@ class Alias(LogicNode, NamedTerm):
     def symbol(self) -> str:
         return self.name
 
+    @property
+    def fields(self) -> list[Field]:
+        """Returns fields of the node."""
+        raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
 
 @dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):
@@ -294,7 +298,7 @@ class Reformat(LogicTree, LogicExpression):
     """
 
     tns: LogicNode
-    arg: LogicNode
+    arg: LogicExpression
 
     @property
     def children(self):
@@ -319,8 +323,8 @@ class Subquery(LogicTree, LogicExpression):
         arg: The argument to evaluate.
     """
 
-    lhs: LogicNode
-    arg: LogicNode
+    lhs: Alias
+    arg: LogicExpression
 
     @property
     def children(self):
@@ -346,7 +350,7 @@ class Query(LogicTree):
     """
 
     lhs: LogicNode
-    rhs: LogicNode
+    rhs: LogicExpression
 
     @property
     def children(self):

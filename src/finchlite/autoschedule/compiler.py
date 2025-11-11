@@ -484,14 +484,14 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
             levels_to_add = [
                 idx for idx, f in enumerate(result_fields) if f not in fields
             ]
-            result_rep = result_rep.add_levels(levels_to_add)
-            kwargs = result_rep.to_kwargs()
+            result_rep = result_rep.add_levels(levels_to_add) # type: ignore[attr-defined]
+            kwargs = result_rep.to_kwargs()# type: ignore[attr-defined]
             kwargs.update(
                 element_type=NumpyBufferFType(dtype),
                 ndim=np.intp(len(result_fields)),
                 dimension_type=tuple(field_type_map[f] for f in result_fields),
             )
-            return result_rep.from_kwargs(**kwargs)
+            return result_rep.from_kwargs(**kwargs)# type: ignore[attr-defined]
         case Aggregate(Literal(op), init, arg, idxs):
             init_suitable_rep = find_suitable_rep(init, table_vars)
             arg_suitable_rep = find_suitable_rep(arg, table_vars)
@@ -510,14 +510,14 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                     strides_t.append(st)
                 else:
                     levels_to_remove.append(idx)
-            arg_suitable_rep = arg_suitable_rep.remove_levels(levels_to_remove)
-            kwargs = arg_suitable_rep.to_kwargs()
+            arg_suitable_rep = arg_suitable_rep.remove_levels(levels_to_remove)# type: ignore[attr-defined]
+            kwargs = arg_suitable_rep.to_kwargs()# type: ignore[attr-defined]
             kwargs.update(
                 buffer_type=buf_t,
                 ndim=np.intp(len(strides_t)),
                 dimension_type=tuple(strides_t),
             )
-            return arg_suitable_rep.from_kwargs(**kwargs)
+            return arg_suitable_rep.from_kwargs(**kwargs)# type: ignore[attr-defined]
         case LogicTree() as tree:
             for child in tree.children:
                 suitable_rep = find_suitable_rep(child, table_vars)
@@ -550,7 +550,7 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict[Alias, Table]]:
+    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict[Alias, ntn.Variable], dict[Alias, Table]]:
         prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
             record_tables(prgm)
         )
