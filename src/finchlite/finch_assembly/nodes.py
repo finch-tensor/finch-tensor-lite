@@ -352,6 +352,73 @@ class Store(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
+class ExistsMap(AssemblyExpression, AssemblyTree):
+    """
+    Represents checking whether an integer key is in a map.
+
+    Attributes:
+        map: The map to load from.
+        index1: The first integer in the pair
+        index2: The second integer in the pair
+    """
+
+    map: Slot | Stack
+    index1: AssemblyExpression
+    index2: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index1, self.index2]
+
+    def result_format(self):
+        return bool
+
+
+@dataclass(eq=True, frozen=True)
+class LoadMap(AssemblyExpression, AssemblyTree):
+    """
+    Represents loading a value from a map given an integer pair key.
+
+    Attributes:
+        map: The map to load from.
+        index1: The first integer in the pair
+        index2: The second integer in the pair
+    """
+
+    map: Slot | Stack
+    index1: AssemblyExpression
+    index2: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index1, self.index2]
+
+    def result_format(self):
+        return element_format(self.map.result_format)
+
+
+@dataclass(eq=True, frozen=True)
+class StoreMap(AssemblyTree):
+    """
+    Represents storing a value into a buffer given an integer pair key.
+
+    Attributes:
+        map: The map to load from.
+        index1: The first integer in the pair
+        index2: The second integer in the pair
+    """
+
+    map: Slot | Stack
+    index1: AssemblyExpression
+    index2: AssemblyExpression
+    value: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index1, self.index2, self.value]
+
+
+@dataclass(eq=True, frozen=True)
 class Resize(AssemblyTree):
     """
     Represents resizing a buffer to a new size.
@@ -692,10 +759,15 @@ class AssemblyPrinterContext(Context):
                 return None
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
+            case LoadMap(map, idx1, idx2):
+                return f"loadmap({self(map)}, {self(idx1)}, {self(idx2)})"
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
+                return None
+            case StoreMap(map, idx1, idx2, val):
+                self.exec(f"{feed}storemap({self(map)}, {self(idx1)}, {self(idx2)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")

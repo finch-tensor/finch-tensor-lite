@@ -212,6 +212,18 @@ class AssemblyInterpreter:
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
+            case asm.LoadMap(map, idx1, idx2):
+                assert isinstance(map, asm.Slot)
+                map_e = self(map)
+                idx1_e = self(idx1)
+                idx2_e = self(idx2)
+                return map_e.load(idx1_e, idx2_e)
+            case asm.ExistsMap(map, idx1, idx2):
+                assert isinstance(map, asm.Slot)
+                map_e = self(map)
+                idx1_e = self(idx1)
+                idx2_e = self(idx2)
+                return map_e.exists(idx1_e, idx2_e)
             case asm.Store(buf, idx, val):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -219,6 +231,13 @@ class AssemblyInterpreter:
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
+            case asm.StoreMap(map, idx1, idx2, val):
+                assert isinstance(map, asm.Slot)
+                map_e = self(map)
+                idx1_e = self(idx1)
+                idx2_e = self(idx2)
+                val_e = self(val)
+                return map_e.store(idx1_e, idx2_e, val_e)
             case asm.Resize(buf, len_):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)

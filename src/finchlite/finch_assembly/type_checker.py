@@ -7,6 +7,7 @@ from ..symbolic import FType, ScopedDict, ftype
 from . import nodes as asm
 from .buffer import BufferFType
 from .struct import AssemblyStructFType
+from .map import MapFType
 
 
 class AssemblyTypeError(Exception):
@@ -81,6 +82,12 @@ class AssemblyTypeChecker:
                 f"The variable '{var_n}' is not defined in the current context."
             ) from KeyError
 
+    def check_map(self, map):
+        map_type = self.check_expr(map)
+        if isinstance(map_type, MapFType):
+            return map_type
+        raise AssemblyTypeError(f"Expected map, got {map_type}.")
+
     def check_buffer(self, buffer):
         buffer_type = self.check_expr(buffer)
         if isinstance(buffer_type, BufferFType):
@@ -134,6 +141,20 @@ class AssemblyTypeChecker:
             case asm.Length(buffer):
                 buffer_type = self.check_buffer(buffer)
                 return buffer_type.length_type
+            case asm.ExistsMap(map, index1, index2):
+                map_type = self.check_map(map)
+                index1_type = self.check_expr(index1)
+                index2_type = self.check_expr(index2)
+                check_type_match(map_type.length_type, index1_type)
+                check_type_match(map_type.length_type, index2_type)
+                return bool
+            case asm.LoadMap(map, index1, index2):
+                map_type = self.check_map(map)
+                index1_type = self.check_expr(index1)
+                index2_type = self.check_expr(index2)
+                check_type_match(map_type.length_type, index1_type)
+                check_type_match(map_type.length_type, index2_type)
+                return map_type.element_type
             case _:
                 raise ValueError(f"Ill-formed AssemblyExpression:  {type(expr)}.")
 
@@ -180,6 +201,15 @@ class AssemblyTypeChecker:
                 check_type_match(buffer_type.length_type, index_type)
                 value_type = self.check_expr(value)
                 check_type_match(buffer_type.element_type, value_type)
+                return None
+            case asm.StoreMap(map, index1, index2, value):
+                map_type = self.check_map(map)
+                index1_type = self.check_expr(index1)
+                index2_type = self.check_expr(index2)
+                value_type = self.check_expr(value)
+                check_type_match(map_type.length_type, index1_type)
+                check_type_match(map_type.length_type, index2_type)
+                check_type_match(map_type.element_type, value_type)
                 return None
             case asm.Resize(buffer, new_size):
                 buffer_type = self.check_buffer(buffer)
