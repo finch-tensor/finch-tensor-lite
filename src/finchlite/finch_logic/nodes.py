@@ -177,7 +177,7 @@ class MapJoin(LogicTree, LogicExpression):
         args: The arguments to map the function across.
     """
 
-    op: LogicNode
+    op: Literal | Value
     args: tuple[LogicExpression, ...]
 
     @property
@@ -209,10 +209,10 @@ class Aggregate(LogicTree, LogicExpression):
         idxs: The dimensions to reduce.
     """
 
-    op: LogicNode
-    init: LogicNode
+    op: Literal | Value
+    init: Literal | Value
     arg: LogicExpression
-    idxs: tuple[LogicNode, ...]
+    idxs: tuple[Field, ...]
 
     @property
     def children(self):
@@ -341,7 +341,7 @@ class Subquery(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Query(LogicTree):
+class Query(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`.
@@ -351,7 +351,7 @@ class Query(LogicTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: LogicNode
+    lhs: Alias
     rhs: LogicExpression
 
     @property
@@ -361,7 +361,7 @@ class Query(LogicTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Produces(LogicTree):
+class Produces(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that returns `args...` from the current plan.
     Halts execution of the program.
@@ -370,7 +370,7 @@ class Produces(LogicTree):
         args: The arguments to return.
     """
 
-    args: tuple[LogicNode, ...]
+    args: tuple[LogicExpression, ...]
 
     @property
     def children(self):
@@ -383,7 +383,7 @@ class Produces(LogicTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Plan(LogicTree):
+class Plan(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that executes a sequence of statements
     `bodies...`. Returns the last statement.
