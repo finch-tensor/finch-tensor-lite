@@ -9,8 +9,6 @@ from finchlite.finch_logic import (
     Aggregate,
     Field,
     Literal,
-    LogicNode,
-    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -1350,11 +1348,6 @@ def test_intree_and_isdescendant():
 # ─────────────────────────────── Utility tests ─────────────────────────────
 
 
-def logic_neighbors(n: LogicNode):
-    if isinstance(n, LogicTree):
-        yield from n.children
-
-
 def test_preorder_logic():
     ta = Table(
         Literal("A"),
@@ -1379,7 +1372,7 @@ def test_preorder_logic():
         )
     )
 
-    pre = PreOrderDFS(prog, logic_neighbors)
+    pre = PreOrderDFS(prog, lambda n: getattr(n, "children", ()))
     type_names = [type(x).__name__ for x in pre]
 
     # 1) must start with ["Plan", "Produces", "MapJoin"]
@@ -1392,11 +1385,10 @@ def test_preorder_logic():
     table_positions = [i for i, t in enumerate(type_names) if t == "Table"]
     cond3 = len(table_positions) == 2
 
-    # 4) each Table should have its subtree immediately following it:
-    #    "Table" nodes are followed by their children (Literal + Fields)
+    # 4) each Table’s following window contains 1 Literal + 2 Fields
     cond4 = True
     for pos in table_positions:
-        if pos + 3 > len(type_names):
+        if pos + 4 > len(type_names):
             cond4 = False
             break
         window = type_names[pos : pos + 4]
@@ -1404,7 +1396,7 @@ def test_preorder_logic():
             cond4 = False
             break
 
-    return cond1 and cond2 and cond3 and cond4
+    assert cond1 and cond2 and cond3 and cond4
 
 
 def test_postorder_logic():
@@ -1431,7 +1423,7 @@ def test_postorder_logic():
         )
     )
 
-    post = PostOrderDFS(prog, logic_neighbors)
+    post = PostOrderDFS(prog, lambda n: getattr(n, "children", ()))
     type_names = [type(x).__name__ for x in post]
 
     # 1) must end with ["MapJoin", "Produces", "Plan"]
