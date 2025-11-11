@@ -14,7 +14,12 @@ from finchlite.finch_logic import (
     Produces,
     Table,
 )
-from finchlite.galley.LogicalOptimizer.annotated_query import intree, isdescendant, get_reducible_idxs, AnnotatedQuery
+from finchlite.galley.LogicalOptimizer.annotated_query import (
+    AnnotatedQuery,
+    get_reducible_idxs,
+    intree,
+    isdescendant,
+)
 from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
 from finchlite.galley.LogicalOptimizer.utility import PostOrderDFS, PreOrderDFS
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
@@ -1363,6 +1368,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
 
     assert get_reducible_idxs(aq) == expected
 
+
 def test_intree_and_isdescendant():
     i, j, k = Field("i"), Field("j"), Field("k")
     ta = Table(Literal("A"), (i, j))
@@ -1378,6 +1384,7 @@ def test_intree_and_isdescendant():
     assert isdescendant(mj, prog)
     assert isdescendant(ta, prog)
     assert isdescendant(tb, prog)
+
 
 # ─────────────────────────────── Utility tests ─────────────────────────────
 
