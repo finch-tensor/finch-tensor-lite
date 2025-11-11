@@ -228,46 +228,8 @@ class EinsumInterpreter:
                 self.bindings[tns] = xp.permute_dims(val, axis)
                 return (tns,)
 
-            # indirect einsum with reduction
+            # indirect einsum
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
-                loops = arg.get_idxs()
-                true_idxs = node.get_idxs()
-                assert true_idxs.issubset(loops)
-
-                # evalaute the tensor to access/write to
-                # output tensor must exist with initial reduction values
-                assert tns in self.bindings     
-                tns_out = self.bindings[tns]
-                assert len(idxs) == len(tns_out.shape)
-
-                #Evaluate arg with full loop context
-                loops_sorted = sorted(loops, key=lambda x: x.name)
-                ctx = EinsumInterpreter(self.xp, self.bindings, loops_sorted)
-                arg_val = ctx(arg)
-
-                #Reduce over non-true_idxs axes using the reduction op
-                reduce_axes = tuple(i for i in range(len(loops_sorted)) 
-                                if loops_sorted[i] not in true_idxs)
-                if reduce_axes:
-                    op_func = self(op)  # Get the actual operation
-                    reduce_func = getattr(xp, reduction_ops[op_func])
-                    reduced_val = reduce_func(arg_val, axis=reduce_axes)
-                else:
-                    reduced_val = arg_val
-
-                # Evaluate indirect index expressions (same context)
-                evaled_idxs = [
-                    (xp.arange(tns_out.shape[i]) if isinstance(idx, ein.Index) else ctx(idx)) 
-                    for i, idx in enumerate(idxs)
-                ]
-                flat_idx = xp.ravel_multi_index(xp.vstack(evaled_idxs), tns_out.shape)
-
-                # Scatter/accumulate using the SAME operation's ufunc
-                scatter_func = getattr(xp, nary_ops[op_func])
-                scatter_func.at(tns_out.flat, flat_idx, reduced_val)
-                
-                # assign the output tensor to the bindings
-                self.bindings[tns] = tns_out
-                return (tns,)
+                raise NotImplementedError("Indirect einsum assignment is not implemented")
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
