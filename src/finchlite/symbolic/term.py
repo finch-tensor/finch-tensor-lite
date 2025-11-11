@@ -82,17 +82,3 @@ def literal_repr(name: str, fields: dict[str, Any]) -> str:
     return (
         name + "(" + ", ".join([f"{k}={_get_repr(v)}" for k, v in fields.items()]) + ")"
     )
-
-
-def PostOrderDFS(node: Term) -> Iterator[Term]:
-    if isinstance(node, TermTree):
-        for arg in node.children:
-            yield from PostOrderDFS(arg)
-    yield node
-
-
-def PreOrderDFS(node: Term) -> Iterator[Term]:
-    yield node
-    if isinstance(node, TermTree):
-        for arg in node.children:
-            yield from PreOrderDFS(arg)
