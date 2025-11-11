@@ -124,8 +124,8 @@ class EinsumInterpreter:
             case ein.Access(tns, idxs) if len(idxs) == 1:
                 idx = self(idxs[0])
                 tns = self(tns) #evaluate the tensor
-
-                flat_idx = xp.ravel_multi_index(idx.T, tns.shape)
+            
+                flat_idx = idx if idx.ndim == 1 else xp.ravel_multi_index(idx.T, tns.shape)
                 return tns.flat[flat_idx] #return a 1-d array by definition
 
             #access a tensor with a mixture of indices and other expressions
