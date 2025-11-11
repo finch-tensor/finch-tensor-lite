@@ -3,7 +3,16 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from finchlite.finch_logic import Alias, LogicNode, LogicTree
+from utility import PostOrderDFS
+
+from finchlite.finch_logic import (
+    Aggregate,
+    Alias,
+    LogicNode,
+    MapJoin,
+    Plan,
+    Query,
+)
 
 
 @dataclass
@@ -62,31 +71,6 @@ def get_reducible_idxs(aq: AnnotatedQuery) -> list[str]:
     """
     return [idx for idx in aq.reduce_idxs if len(aq.parent_idxs.get(idx, [])) == 0]
 
-
-def intree(n1, n2):
-    """
-    Return True iff `n1` occurs in the subtree rooted at `n2`.
-    """
-    target = n1
-    stack = [n2]
-    while stack:
-        n = stack.pop()
-        if n == target:
-            return True
-        if isinstance(n, LogicTree):
-            stack.extend(n.children)
-    return False
-
-
-def isdescendant(n1, n2):
-    """
-    True iff `n1` is a strict descendant of `n2`.
-    """
-    if n1 == n2:
-        return False
-    return intree(n1, n2)
-
-
 def get_idx_connected_components(
     parent_idxs: dict[str, Iterable[str]],
     connected_idxs: dict[str, Iterable[str]],
@@ -99,7 +83,6 @@ def get_idx_connected_components(
     ----------
     parent_idxs : Dict[str, Iterable[str]]
         Mapping from an index to the set/iterable of its parent indices.
-        (Used only for ordering and to ignore parent edges during connectivity.)
     connected_idxs : Dict[str, Iterable[str]]
         Mapping from an index to the set/iterable of indices considered
         "connected" to it (undirected neighbors). Only connections between
