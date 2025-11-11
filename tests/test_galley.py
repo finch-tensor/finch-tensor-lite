@@ -16,6 +16,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.galley.LogicalOptimizer.annotated_query import (
     AnnotatedQuery,
+    get_idx_connected_components,
     get_reducible_idxs,
     intree,
     isdescendant,
@@ -1384,6 +1385,52 @@ def test_intree_and_isdescendant():
     assert isdescendant(mj, prog)
     assert isdescendant(ta, prog)
     assert isdescendant(tb, prog)
+
+
+@pytest.mark.parametrize(
+    "parent_idxs, connected_idxs, expected",
+    [
+        # Single component; order within component follows connected_idxs key order
+        (
+            {},
+            {"a": ["b"], "b": ["a"]},
+            [["a", "b"]],
+        ),
+        # Two components: {a,b} and {c}
+        (
+            {},
+            {"a": ["b"], "b": ["a"], "c": []},
+            [["a", "b"], ["c"]],
+        ),
+        # Parent edge is ignored for connectivity
+        (
+            {"b": ["a"]},
+            {"a": ["b"], "b": ["a"]},
+            [["a"], ["b"]],
+        ),
+        # Ordering across components is enforced
+        (
+            {"b": ["a"]},
+            {"b": [], "a": []},
+            [["a"], ["b"]],
+        ),
+        # Chain of three separate components with parents
+        (
+            {"b": ["a"], "c": ["b"]},
+            {"c": [], "b": [], "a": []},
+            [["a"], ["b"], ["c"]],
+        ),
+        # Single big component
+        (
+            {"b": ["a"], "c": ["b"]},
+            {"a": ["b"], "b": ["a", "c"], "c": ["b"]},
+            [["a"], ["b"], ["c"]],
+        ),
+    ],
+)
+def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
+    out = get_idx_connected_components(parent_idxs, connected_idxs)
+    assert out == expected
 
 
 # ─────────────────────────────── Utility tests ─────────────────────────────
