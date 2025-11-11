@@ -140,41 +140,72 @@ class EinsumInterpreter:
 
                 # evaluate all the indirect access indicies, and evaluate field indicies as a "grab all"
                 evaled_idxs = [
-                    (xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) else self(idx)) 
+                    (xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) else self(idx).flatten()) 
                     for i, idx in enumerate(idxs)
                 ]
-
-                # evaluate the output tensor as a flat array
-                flat_idx = xp.ravel_multi_index(xp.vstack(evaled_idxs), tns.shape)
-                tns = xp.take(tns, flat_idx)
                 
-                # calculate the final shape of the tensor
-                # we assert that all the indirect access indicies from the parent idxs have the same size
+                combo_idxs = xp.meshgrid(*evaled_idxs, indexing="ij")
+                combo_idxs = xp.stack(combo_idxs, axis=-1)
+                combo_idxs = combo_idxs.reshape(-1, len(idxs))
+ 
+                # evaluate the output tensor as a flat array
+                flat_idx = xp.ravel_multi_index(combo_idxs.T, tns.shape)
+                tns = xp.take(tns, flat_idx)
+
                 #calculate child idxs, idxs computed using the parent "true idxs"
                 child_idxs = { 
-                    idx: [
-                        child_idx for child_idx in child_idxs 
+                    parent_idx: [
+                        child_idx for child_idx in idxs 
                         if (parent_idx in child_idx.get_idxs())
                     ] for parent_idx in true_idxs 
                 }
+                #calculate parent idxs, just inverse of child_idxs dictionary
+                parent_idxs = {
+                    child_idx: parent_idx
+                    for parent_idx in true_idxs
+                    for child_idx in child_idxs[parent_idx]
+                }
+
+                # we assert that all the indirect access indicies from the parent idxs have the same size
                 assert all(
                     child_idxs[parent_idx].count(child_idxs[parent_idx][0]) == len(child_idxs[parent_idx]) 
                     for parent_idx in true_idxs
                 )
+
+                # calculate the shape of the tensor truest to its current form
+                current_shape = tuple(
+                    evaled_idxs[idxs.index(idx)].size
+                    for idx in idxs
+                )
+                tns = tns.reshape(current_shape)
+
+                # a mapping from each idx to its axis wrt to current shape
+                idxs_axis = {idx: i for i, idx in enumerate(idxs)}
+
+                true_idxs = list(true_idxs)
+                
+                # reorder the axis so that each child idx of a parent idx are consecutive
+                new_axes = [
+                    idxs_axis[child_idx]
+                    for true_idx in true_idxs
+                    for child_idx in child_idxs[true_idx]
+                ]
+                tns = xp.transpose(tns, axes=new_axes)
+
+                # calculate the final shape of the tensor
                 # we merge the child idxs to get the final shape that matches the true idxs
                 final_shape = tuple(
-                    evaled_idxs[idxs.index(idx)].size 
-                    for idx in idxs if idx in true_idxs
+                    np.prod([evaled_idxs[idxs.index(child_idx)].size for child_idx in child_idxs[parent_idx]]) 
+                    for parent_idx in true_idxs
                 )
                 tns = tns.reshape(final_shape)
-                idxs = [idx for idx in idxs if idx in true_idxs]
 
                 # permute and broadcast the tensor to be compatible with rest of expression
-                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+                perm = [true_idxs.index(idx) for idx in self.loops if idx in true_idxs]
                 tns = xp.permute_dims(tns, perm)
                 return xp.expand_dims(
                     tns, 
-                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs]
+                    [i for i in range(len(self.loops)) if self.loops[i] not in true_idxs]
                 )
 
             case ein.Plan(bodies):
@@ -198,7 +229,8 @@ class EinsumInterpreter:
                 assert isinstance(obj, SparseTensor)
 
                 # return the coord array for the given dimension or all dimensions
-                return obj.coords if dim is None else obj.coords[:, dim]
+                toReturn = obj.coords if dim is None else obj.coords[:, dim]
+                return toReturn
             # gets the shape of a sparse tensor at a given dimension
             case ein.GetAttribute(obj, ein.Literal("shape"), dim):
                 obj = self(obj)

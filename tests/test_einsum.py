@@ -1138,6 +1138,10 @@ class TestEinsumIndirectAccess:
         """Runs an einsum plan and returns the result"""
         interpreter = ein.EinsumInterpreter(bindings=bindings)
         result = interpreter(prgm)[0]
+
+        print(result)
+        print(expected)
+
         assert np.allclose(result, expected)
 
     def test_indirect_elementwise_multiplication(self, rng):
@@ -1506,7 +1510,7 @@ class TestEinsumIndirectAccess:
 
         # Expected: A rows indexed by B's coords, all columns
         b_coords = sparse_B.coords
-        expected = A[b_coords, :]
+        expected = A[b_coords.flatten(), :]
         self.run_einsum_plan(prgm, {"A": A, "B": sparse_B}, expected)
 
     def test_mixed_direct_indirect_indexing_reversed(self, rng):
