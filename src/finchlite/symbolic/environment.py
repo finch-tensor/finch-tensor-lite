@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Generic, Optional, TypeVar
 
-from .term import PostOrderDFS, Term
+from .term import Term
+from .traversal import PostOrderDFS
 
 
 class NamedTerm(Term, ABC):
