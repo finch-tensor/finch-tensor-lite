@@ -1,5 +1,6 @@
 from finchlite.finch_logic import LogicTree
 
+
 def intree(n1, n2):
     """
     Return True iff `n1` occurs in the subtree rooted at `n2`.
