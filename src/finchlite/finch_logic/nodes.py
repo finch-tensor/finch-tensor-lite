@@ -81,10 +81,14 @@ class Literal(LogicNode):
     def __eq__(self, value):
         if not isinstance(value, Literal):
             return False
-        equality = self.val == value.val
-        if isinstance(equality, bool):
-            return equality
-        return id(self.val) == id(value.val)
+        # For consistency with __hash__, we fall back to pointer equality
+        # when the value is unhashable
+        try:
+            hash(value.val)
+            hash(self.val)
+            return self.val == value.val
+        except TypeError:
+            return id(self.val) == id(value.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
