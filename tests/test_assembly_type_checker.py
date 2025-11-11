@@ -8,7 +8,15 @@ import numpy as np
 import finchlite.finch_assembly as asm
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import assembly_check_types
-from finchlite.symbolic import FType, ftype
+from finchlite.symbolic import FType, ftype, PostOrderDFS, PreOrderDFS
+from finchlite.finch_logic import (
+    Plan,
+    Produces,
+    Table,
+    Literal,
+    Field,
+    MapJoin,
+)
 
 
 def test_lit_basic():
@@ -685,3 +693,71 @@ def test_simple_struct():
     )
 
     assembly_check_types(mod)
+
+def test_preorder_logic():
+    ta = Table(
+        Literal("A"),
+        (Field("i"), Field("j")),
+    )
+
+    tb = Table(
+        Literal("B"),
+        (Field("j"), Field("k")),
+    )
+
+    prog = Plan(
+        (
+            Produces(
+                (
+                    MapJoin(
+                        Field("op"),
+                        (ta, tb),
+                    ),
+                ),
+            ),
+        )
+    )
+    type_names = [type(x).__name__ for x in list(PreOrderDFS(prog))]
+
+    assert type_names == [
+        "Plan",
+        "Produces",
+        "MapJoin",
+        "Field",
+        "Table", "Literal", "Field", "Field",
+        "Table", "Literal", "Field", "Field",
+    ]
+
+def test_postorder_logic():
+    ta = Table(
+        Literal("A"),
+        (Field("i"), Field("j")),
+    )
+
+    tb = Table(
+        Literal("B"),
+        (Field("j"), Field("k")),
+    )
+
+    prog = Plan(
+        (
+            Produces(
+                (
+                    MapJoin(
+                        Field("op"),
+                        (ta, tb),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    post = list(PostOrderDFS(prog))
+    type_names = [type(x).__name__ for x in post]
+
+    assert type_names == [
+        "Field",
+        "Literal", "Field", "Field", "Table",
+        "Literal", "Field", "Field", "Table",
+        "MapJoin", "Produces", "Plan",
+    ]
