@@ -1140,8 +1140,8 @@ class TestEinsumIndirectAccess:
         result = interpreter(prgm)[0]
         assert np.allclose(result, expected)
 
-    def test_indirect_access(self, rng):
-        """Test indirect access"""
+    def test_indirect_elementwise_multiplication(self, rng):
+        """Test indirect elementwise multiplication but no indirect assignment"""
 
         A = rng.random((5, 5))
         B = rng.random((5, 5))
