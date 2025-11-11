@@ -18,7 +18,7 @@ from .nodes import (
     Table,
     Value,
 )
-from .utility import (isdescendant, intree)
+from .utility import intree, isdescendant
 
 __all__ = [
     "Aggregate",

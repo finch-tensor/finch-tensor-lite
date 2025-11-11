@@ -14,7 +14,6 @@ from .term import (
     TermTree,
     literal_repr,
 )
-
 from .traversal import PostOrderDFS, PreOrderDFS
 
 __all__ = [

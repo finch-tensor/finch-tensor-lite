@@ -8,9 +8,8 @@ import numpy as np
 import finchlite.finch_assembly as asm
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import assembly_check_types
-from finchlite.symbolic import FType, ftype
-from finchlite.finch_logic import Plan, Produces, MapJoin, Table, Field, Literal
-from finchlite.symbolic import PreOrderDFS, PostOrderDFS
+from finchlite.finch_logic import Field, Literal, MapJoin, Plan, Produces, Table
+from finchlite.symbolic import FType, PostOrderDFS, PreOrderDFS, ftype
 
 
 def test_lit_basic():
@@ -688,6 +687,7 @@ def test_simple_struct():
 
     assembly_check_types(mod)
 
+
 def test_preorder_logic():
     ta = Table(
         Literal("A"),
@@ -770,4 +770,3 @@ def test_postorder_logic():
         "Produces",
         "Plan",
     ]
-
