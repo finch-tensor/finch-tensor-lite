@@ -32,26 +32,24 @@ class SuperTensorEinsumInterpreter:
             case ein.Einsum(op, ein.Alias(output_name), output_idxs, arg):
                 accesses = SuperTensorEinsumInterpreter._collect_accesses(arg)
 
-                # ========== STEP 1 ==========
                 # Group the indices which appear in exactly the same set of tensors.
-                input_idxs = []
+                output_idxs = [idx.name for idx in output_idxs]
+
+                input_idx_list = []
                 for access in accesses:
                     tns_name = access.tns.name
                     idxs = [idx.name for idx in access.idxs]
-                    input_idxs.append((tns_name, idxs))
+                    input_idx_list.append((tns_name, idxs))
+                
+                idx_groups = SuperTensorEinsumInterpreter._group_indices(output_name, output_idxs, input_idx_list)
 
-                output_idxs = [idx.name for idx in output_idxs]
-                idx_groups = SuperTensorEinsumInterpreter._group_indices(output_idxs, input_idxs)
-
-                # ========== STEP 2 ==========
                 # Assign a new index name to each group of original indices.
-                tensor_set_to_new_idx = {}
+                new_idxs = {}
                 for k, (tensor_set, _) in enumerate(idx_groups):
-                    tensor_set_to_new_idx[tensor_set] = f"i{k}"
+                    new_idxs[tensor_set] = f"i{k}"
 
-                # ========== STEP 3 ==========
+
                 # Compute the corrected SuperTensor representation for each tensor.
-
                 inputs = []
                 for access in accesses:
                     tns_name = access.tns.name
@@ -61,21 +59,19 @@ class SuperTensorEinsumInterpreter:
 
                 corrected_bindings = {}
                 corrected_idx_lists = {}
-
-                for tns_name, supertensor, input_idxs in inputs:
-                    map = []
-                    idx_list = []
-
+                for tns_name, supertensor, input_idx_list in inputs:
+                    new_idx_list = []
+                    mode_map = []
                     for (tns_set, idx_group) in idx_groups:
                         if tns_name in tns_set:
-                            new_idx = tensor_set_to_new_idx[tns_set]
-                            idx_list.append(new_idx)
+                            new_idx = new_idxs[tns_set]
+                            new_idx_list.append(new_idx)
 
                             logical_modes = []
                             for idx in idx_group:
-                                logical_modes.append(input_idxs.index(idx))
+                                logical_modes.append(input_idx_list.index(idx))
 
-                            map.append(logical_modes)
+                            mode_map.append(logical_modes)
 
                     # Restore the logical shape of the SuperTensor.
                     logical_tns = np.empty(supertensor.shape, dtype=supertensor.base.dtype)
@@ -83,122 +79,124 @@ class SuperTensorEinsumInterpreter:
                         logical_tns[idx] = supertensor[idx]
 
                     # Reshape the base tensor using the updated mode map.
-                    corrected_supertensor = stns.SuperTensor.from_logical(logical_tns, map)
+                    corrected_supertensor = stns.SuperTensor.from_logical(logical_tns, mode_map)
 
-                    # Map the original tensor name to its corrected SuperTensor representation and corresponding index list.
-                    corrected_bindings[tns_name] = corrected_supertensor
-                    corrected_idx_lists[tns_name] = idx_list
+                    # Map the tensor name to its corrected base representation and index list. 
+                    corrected_bindings[tns_name] = corrected_supertensor.base
+                    corrected_idx_lists[tns_name] = new_idx_list
 
-                # ========== STEP 4 ==========
-                # Construct the correct mode map for the output SuperTensor.
+                # Construct the correct mode map and index list for the output SuperTensor.
                 # TODO: Fix the code repetition here...
 
-                output_supertensor = self.bindings[output_name]
-
-                output_map = []
-                output_idx_list = []
-
+                new_output_idx_list = []
+                output_mode_map = []          
                 for (tns_set, idx_group) in idx_groups:
                     if output_name in tns_set:
-                        new_idx = tensor_set_to_new_idx[tns_set]
-                        output_idx_list.append(new_idx)
+                        new_idx = new_idxs[tns_set]
+                        new_output_idx_list.append(new_idx)
 
                         logical_modes = []
                         for idx in idx_group:
                             logical_modes.append(output_idxs.index(idx))
 
-                        output_map.append(logical_modes)
+                        output_mode_map.append(logical_modes)
 
-                # Restore the logical shape of the SuperTensor.
-                logical_output_tns = np.empty(output_supertensor.shape, dtype=output_supertensor.base.dtype)
-                for idx in np.ndindex(output_supertensor.shape):
-                    logical_output_tns[idx] = output_supertensor[idx]
+                corrected_idx_lists[output_name] = new_output_idx_list
 
-                # Reshape the base tensor using the updated mode map.
-                corrected_output_supertensor = stns.SuperTensor.from_logical(logical_output_tns, output_map)
+                # Compute the shape of the output SuperTensor.
+                output_shape = [0] * len(output_mode_map)
+                for idx in new_output_idx_list:
+                    # Find an input SuperTensor which contains this index.
+                    for base_tns, idx_list in zip(corrected_bindings.values(), corrected_idx_lists.values()):
+                        if idx in idx_list:
+                            dim = base_tns.shape[idx_list.index(idx)]
+                            output_shape[new_output_idx_list.index(idx)] = dim
+                            break
+                output_shape = tuple(output_shape)
 
-                # Map the original tensor name to its corrected SuperTensor representation and corresponding index list.
-                corrected_bindings[output_name] = corrected_output_supertensor
-                corrected_idx_lists[output_name] = output_idx_list
-
-                # ========== STEP 5 ==========
-                # Use postwalk to replace each ein.Alias node with the proper SuperTensor representation (i.e., alias can stay the same, but update the indices).
+                # Replace each ein.Alias node with the proper base representation (i.e., update index lists).
                 def reshape_supertensors(node):
                     match node:
-                        case ein.Access(tns, idxs):
+                        case ein.Access(tns, _):
+                            # TODO: What to do when tns isn't an ein.Alias?
+                            if not isinstance(tns, ein.Alias):
+                                return node
                             updated_idxs = [ein.Index(idx) for idx in corrected_idx_lists[tns.name]]
                             return ein.Access(tns, tuple(updated_idxs))
-                        case ein.Einsum(op, ein.Alias(output_name), output_idxs, arg):
+                        case ein.Einsum(op, ein.Alias(output_name), _, arg):
                             updated_output_idxs = [ein.Index(idx) for idx in corrected_idx_lists[output_name]]
                             return ein.Einsum(op, ein.Alias(output_name), tuple(updated_output_idxs), arg)
                         case _:
                             return node
-                corrected_AST = sym.PostWalk(reshape_supertensors)
+                        
+                corrected_AST = sym.Rewrite(sym.PostWalk(reshape_supertensors))(node)
 
-                # ========== STEP 6 ==========
                 # Use a regular EinsumInterpreter to execute the einsum on the SuperTensors.
                 ctx = ein.EinsumInterpreter(bindings=corrected_bindings)
                 result_alias = ctx(corrected_AST)  
                 output_base = corrected_bindings[result_alias[0]]
 
-                self.bindings[output_name] = stns.SuperTensor(output_supertensor.shape, output_base, output_map)
+                self.bindings[output_name] = stns.SuperTensor(output_shape, output_base, output_mode_map)
                 return (output_name,)
-
             case _:
-                raise ValueError(f"Unknown einsum type: {type(node)}")
+                pass
 
     @classmethod
     def _collect_accesses(cls, node: ein.EinsumExpr) -> List[ein.Access]:
         """
-        Use a postorder traversal to collect all ein.Access nodes in an einsum AST.
-
-        TODO: Not sure if this (plus the algo above) is general enough to handle nested einsum expressions?
+        Collect all `ein.Access` nodes in an einsum AST.
 
         Args:
-            node: ein.EinsumExpr
-                The root node of the einsum AST, i.e., the arg field of an ein.Einsum node.
+            node: `ein.EinsumExpr`
+                The root node of the einsum expression AST, i.e., the `arg` field of an `ein.Einsum` node.
 
         Returns:
-            List[ein.Access]
-                List of ein.Access nodes found in the AST.
+            `List[ein.Access]`
+                A list of `ein.Access` nodes found in the AST.
         """
     
         accesses = []
 
         def postorder(curr):
-            if isinstance(curr, ein.Access):
-                accesses.append(curr)
-            if hasattr(curr, "children"):
-                for c in curr.children:
-                    postorder(c)
+            match curr:
+                case ein.Access():
+                    for child in curr.children:
+                        postorder(child)
+                    accesses.append(curr)
+                case _:
+                    if hasattr(curr, "children"):
+                        for child in curr.children:
+                            postorder(child)
             
         postorder(node)
         return accesses
     
     @classmethod
-    def _group_indices(cls, output_idxs: List[str], inputs: List[Tuple[str, List[str]]]) -> List[Tuple[FrozenSet[str], List[str]]]:
+    def _group_indices(cls, output_name: str, output_idxs: List[str], inputs: List[Tuple[str, List[str]]]) -> List[Tuple[FrozenSet[str], List[str]]]:
         """
         Groups indices based on the set of tensors they appear in.
 
-        This function establishes the canonical ordering for the indices within each group and also for the groups themselves.
+        Establishes the canonical ordering for the indices within each group and also for the groups themselves.
 
         Args:
-            output_idxs: List[str]
-                List of output indices.
-            inputs: List[Tuple[str, List[str]]]
-                List of input tensors, each represented by a tuple containing the tensor name and its list of indices.
+            output_name: `str`
+                The name of output tensor.
+            output_idxs: `List[str]`
+                The list of indices in the output tensor.
+            inputs: `List[Tuple[str, List[str]]]`
+                The list of input tensors, each represented by a tuple containing the tensor name and its list of indices.
 
         Returns:
-            List[Tuple[FrozenSet[str], List[str]]]
-                List of tuples, each containing a set of tensor names and the corresponding list of indices that appear in exactly those tensors.
+            `List[Tuple[FrozenSet[str], List[str]]]`
+                A list of tuples, each containing a set of tensor names and the corresponding list of indices that appear in exactly those tensors.
         """
 
-        # Associate each tensor with its index set.
+        # Associate each tensor name with its index set.
         tensors = [(name, set(idxs)) for (name, idxs) in inputs]
-        tensors.append(("out", set(output_idxs)))
+        tensors.append((output_name, set(output_idxs)))
 
         # Generate all non-empty subsets of the set of tensors.
-        powerset = chain.from_iterable(combinations(tensors, t) for t in range(1, len(tensors) + 1))
+        powerset = chain.from_iterable(combinations(tensors, n) for n in range(1, len(tensors) + 1))
         
         # Associate each subset of tensors to the group of indices that appear in exactly those tensors.
         groups = []
@@ -208,12 +206,11 @@ class SuperTensorEinsumInterpreter:
             excluded_idx_sets = [idxs for (name, idxs) in tensors if name not in included_tensors]
             
             included_intersection = set.intersection(*included_idx_sets)
-            excluded_union = set.union(*excluded_idx_sets) if excluded_idx_sets else set()
-            
+            excluded_union = set.union(*excluded_idx_sets) if excluded_idx_sets else set()            
             idx_group = included_intersection.difference(excluded_union)
+
             if idx_group:
                 tensor_set = frozenset(included_tensors)
                 groups.append((tensor_set, sorted(list(idx_group))))
             
-        return groups
-    
+        return groups    

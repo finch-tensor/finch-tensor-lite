@@ -2,6 +2,24 @@ import numpy as np
 from typing import List, Tuple
 
 class SuperTensor():
+    """
+    Represents a tensor using a base tensor of lower order.
+
+    Attributes:
+        shape: `Tuple[int, ...]`
+            The logical shape of the tensor.
+        base: `np.ndarray`
+            The base tensor.
+        map: `List[List[int]]`
+            Maps each mode of the base tensor to a ordered list of the logical modes which are flattened into the base mode.
+            The ordering of each list defines the order in which the logical modes are flattened.
+
+            Example: map = [[0, 2], [3], [4, 1]] indicates that the base tensor has three modes and the logical tensor has five modes.
+                - Base mode 0 corresponds to logical modes 0 and 2.
+                - Base mode 1 corresponds to logical mode 3.
+                - Base mode 2 corresponds to logical modes 4 and 1.
+    """
+
     shape: Tuple[int, ...]
     base: np.ndarray
     map: List[List[int]]
@@ -21,6 +39,15 @@ class SuperTensor():
     
     @classmethod
     def from_logical(cls, tns: np.ndarray, map: List[List[int]]):
+        """
+        Constructs a SuperTensor from a logical tensor and a mode map.
+
+        Args:
+            tns: `np.ndarray`
+                The logical tensor.
+            map: `List[List[int]]`
+                The mode map.
+        """
         shape = tns.shape
 
         base_shape = [0] * len(map)
@@ -35,6 +62,20 @@ class SuperTensor():
         return SuperTensor(shape, base, map)
 
     def __getitem__(self, coords: Tuple[int, ...]):
+        """
+        Accesses an element of the SuperTensor using logical coordinates.
+
+        Args:
+            coords: `Tuple[int, ...]`
+                The logical coordinates to access.
+
+        Returns:
+            The value in the SuperTensor at the given logical coordinates.
+
+        Raises:
+            IndexError: The number of input coordinates does not match the order of the logical tensor.
+        """
+
         if len(coords) != len(self.shape):
             raise IndexError(f"Expected {len(self.shape)} indices, got {len(coords)} indices")
         
@@ -53,6 +94,14 @@ class SuperTensor():
         return self.base[tuple(base_coords)]
     
     def __repr__(self):
+        """
+        Returns a string representation of the SuperTensor.
+
+        Includes the logical shape, the base shape, the mode map, and the logical tensor itself.
+
+        Returns:
+            A string representation of the SuperTensor.
+        """
         logical_tns = np.empty(self.shape, dtype=self.base.dtype)
         for idx in np.ndindex(self.shape):
             logical_tns[idx] = self[idx]
