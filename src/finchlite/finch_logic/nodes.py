@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Self
 
 from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
@@ -40,11 +40,6 @@ class LogicNode(Term, ABC):
         return res if res is not None else ctx.emit()
 
 
-# experiment with type variables
-LNVar1 = TypeVar("LNVar1", bound=LogicNode)
-LNVar2 = TypeVar("LNVar2", bound=LogicNode)
-
-
 @dataclass(eq=True, frozen=True)
 class LogicTree(LogicNode, TermTree, ABC):
     @property
@@ -60,6 +55,8 @@ class LogicExpression(LogicNode):
         """Returns fields of the node."""
         ...
 
+class LogicStatement(LogicNode):
+    ...
 
 @dataclass(eq=True, frozen=True)
 class Literal(LogicNode):
@@ -118,7 +115,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode, NamedTerm):
+class Alias(LogicExpression, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -133,6 +130,10 @@ class Alias(LogicNode, NamedTerm):
     def symbol(self) -> str:
         return self.name
 
+    @property
+    def fields(self) -> list[Field]:
+        """Returns fields of the node."""
+        raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
 
 @dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):
@@ -299,7 +300,7 @@ class Reformat(LogicTree, LogicExpression):
     """
 
     tns: LogicNode
-    arg: LogicNode
+    arg: LogicExpression
 
     @property
     def children(self):
@@ -324,8 +325,8 @@ class Subquery(LogicTree, LogicExpression):
         arg: The argument to evaluate.
     """
 
-    lhs: LogicNode
-    arg: LogicNode
+    lhs: Alias
+    arg: LogicExpression
 
     @property
     def children(self):
@@ -340,7 +341,7 @@ class Subquery(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Query(LogicTree, Generic[LNVar1, LNVar2]):
+class Query(LogicTree):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`.
@@ -350,8 +351,8 @@ class Query(LogicTree, Generic[LNVar1, LNVar2]):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: LNVar1
-    rhs: LNVar2
+    lhs: LogicNode
+    rhs: LogicExpression
 
     @property
     def children(self):
