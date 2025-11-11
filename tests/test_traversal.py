@@ -1,6 +1,7 @@
 from finchlite.finch_logic import Field, Literal, MapJoin, Plan, Produces, Table
 from finchlite.symbolic import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
+
 def test_preorder_logic():
     ta = Table(
         Literal("A"),
@@ -83,6 +84,7 @@ def test_postorder_logic():
         "Produces",
         "Plan",
     ]
+
 
 def test_intree():
     i, j, k = Field("i"), Field("j"), Field("k")
