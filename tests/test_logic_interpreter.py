@@ -20,7 +20,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.finch_logic.utility import intree, isdescendant
 
 
 @pytest.mark.parametrize(
@@ -55,20 +54,3 @@ def test_matrix_multiplication(a, b):
     assert_equal(result, expected)
 
     assert p == eval(repr(p))
-
-
-def test_intree_and_isdescendant():
-    i, j, k = Field("i"), Field("j"), Field("k")
-    ta = Table(Literal("A"), (i, j))
-    tb = Table(Literal("B"), (j, k))
-    op = Field("op")
-    mj = MapJoin(op, (ta, tb))
-    prog = Plan((Produces((mj,)),))
-
-    assert intree(prog, prog)
-    assert intree(mj, prog)
-    assert intree(ta, prog)
-    assert intree(tb, prog)
-    assert isdescendant(mj, prog)
-    assert isdescendant(ta, prog)
-    assert isdescendant(tb, prog)

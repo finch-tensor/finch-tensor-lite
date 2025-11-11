@@ -14,7 +14,7 @@ from .term import (
     TermTree,
     literal_repr,
 )
-from .traversal import PostOrderDFS, PreOrderDFS
+from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 __all__ = [
     "BasicBlock",
@@ -39,5 +39,7 @@ __all__ = [
     "fisinstance",
     "ftype",
     "gensym",
+    "intree",
+    "isdescendant",
     "literal_repr",
 ]
