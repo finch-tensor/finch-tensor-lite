@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Hashable, Iterable, Iterator
 from typing import Any
+
 from finchlite.finch_logic import LogicTree
 
 
@@ -79,6 +80,7 @@ def PostOrderDFS(
             else:
                 out.append(node)
     return out
+
 
 def intree(n1, n2):
     """

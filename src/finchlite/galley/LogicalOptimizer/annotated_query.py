@@ -3,15 +3,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from utility import PostOrderDFS
-
 from finchlite.finch_logic import (
-    Aggregate,
     Alias,
     LogicNode,
-    MapJoin,
-    Plan,
-    Query,
 )
 
 
@@ -70,6 +64,7 @@ def get_reducible_idxs(aq: AnnotatedQuery) -> list[str]:
         Indices in `aq.reduce_idxs` with zero parents.
     """
     return [idx for idx in aq.reduce_idxs if len(aq.parent_idxs.get(idx, [])) == 0]
+
 
 def get_idx_connected_components(
     parent_idxs: dict[str, Iterable[str]],
