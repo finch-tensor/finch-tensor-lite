@@ -18,11 +18,9 @@ from finchlite.galley.LogicalOptimizer.annotated_query import (
     AnnotatedQuery,
     get_idx_connected_components,
     get_reducible_idxs,
-    intree,
-    isdescendant,
 )
 from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
-from finchlite.galley.LogicalOptimizer.utility import PostOrderDFS, PreOrderDFS
+from finchlite.galley.LogicalOptimizer.utility import PostOrderDFS, PreOrderDFS, intree, isdescendant
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
 from finchlite.galley.TensorStats.dense_stat import DenseStats
 from finchlite.galley.TensorStats.tensor_def import TensorDef
