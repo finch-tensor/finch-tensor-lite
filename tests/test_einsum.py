@@ -1148,6 +1148,8 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensor.from_dense_tensor(A)
 
+        # A is sparse
+        # C[i] = AElems[i] * B[ACoords[i]]
         prgm = ein.Plan((
             ein.Einsum(
                 op=ein.Literal(overwrite),
@@ -1175,5 +1177,5 @@ class TestEinsumIndirectAccess:
             ein.Produces((ein.Alias("C"),)),
         ))
 
-        result = finchlite.multiply(A, B)
+        result = finchlite.multiply(A, B).flatten()
         self.run_einsum_plan(prgm, {"A": sparse_A, "B": B}, result)

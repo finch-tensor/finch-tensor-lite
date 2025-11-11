@@ -2,7 +2,7 @@ import operator
 
 import numpy as np
 
-from ..algebra import overwrite, promote_max, promote_min, TensorFType
+from ..algebra import Tensor, overwrite, promote_max, promote_min, TensorFType
 from . import nodes as ein
 from ..symbolic import ftype, gensym
 
@@ -109,6 +109,11 @@ class EinsumInterpreter:
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
                 
                 tns = self(tns) #evaluate the tensor
+
+                #if there are fewer indicies than dimensions, add the remaining dimensions as if they werent permutated
+                if hasattr(tns, "ndim") and len(perm) < tns.ndim: 
+                    perm = perm + [i for i in range(len(perm), tns.ndim)]
+
                 tns = xp.permute_dims(tns, perm) #permute the dimensions
                 return xp.expand_dims(
                     tns,
@@ -116,9 +121,7 @@ class EinsumInterpreter:
                 )
 
             #access a tensor with only one indirect access index
-            case ein.Access(tns, idxs):
-                assert len(idxs) == 1
-
+            case ein.Access(tns, idxs) if len(idxs) == 1:
                 idx = self(idxs[0])
                 tns = self(tns) #evaluate the tensor
 
