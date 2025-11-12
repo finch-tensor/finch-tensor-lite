@@ -1139,6 +1139,10 @@ class TestEinsumIndirectAccess:
         interpreter = ein.EinsumInterpreter(bindings=bindings)
         result = interpreter(prgm)[0]
 
+        import numpy as np
+        import sys
+        np.set_printoptions(threshold=sys.maxsize)
+
         print(result)
         print(expected)
 
@@ -1544,7 +1548,7 @@ class TestEinsumIndirectAccess:
 
         # Expected: all rows of A, columns indexed by B's coords
         b_coords = sparse_B.coords
-        expected = A[:, b_coords]
+        expected = A[:, b_coords.flatten()]
         self.run_einsum_plan(prgm, {"A": A, "B": sparse_B}, expected)
 
     def test_both_indices_indirect_same_source(self, rng):
@@ -1581,14 +1585,14 @@ class TestEinsumIndirectAccess:
 
         # Expected: A[coords, coords] - pseudo-diagonal at indirect positions
         b_coords = sparse_B.coords
-        expected = A[b_coords, b_coords]
+        expected = A[b_coords.flatten(), b_coords.flatten()]
         self.run_einsum_plan(prgm, {"A": A, "B": sparse_B}, expected)
 
     def test_both_indices_indirect_different_sources(self, rng):
         """Test both indices indirect from different sources: A[BCoords[i], CCoords[i]]"""
 
-        A = rng.random((5, 6))
-        B = rng.random((5,))
+        A = rng.random((6, 6))
+        B = rng.random((6,))
         C = rng.random((6,))
         
         sparse_B = SparseTensor.from_dense_tensor(B)
@@ -1619,10 +1623,9 @@ class TestEinsumIndirectAccess:
 
         # Expected: A indexed by pairs of coords from B and C
         # This requires both to have the same number of non-zero elements
-        b_coords = sparse_B.coords
-        c_coords = sparse_C.coords
-        min_len = min(len(b_coords), len(c_coords))
-        expected = A[b_coords[:min_len], c_coords[:min_len]]
+        b_coords = sparse_B.coords.flatten()
+        c_coords = sparse_C.coords.flatten()
+        expected = A[b_coords, c_coords]
         self.run_einsum_plan(prgm, {"A": A, "B": sparse_B, "C": sparse_C}, expected)
 
     def test_double_indirection_with_operation(self, rng):
@@ -1632,7 +1635,6 @@ class TestEinsumIndirectAccess:
         B = np.array([0, 1, 2, 3, 4, 5, 6, 7])
         rng.shuffle(B)
         C = rng.random((8,))
-        D = rng.random((8,))
         
         sparse_C = SparseTensor.from_dense_tensor(C)
 
@@ -1670,15 +1672,16 @@ class TestEinsumIndirectAccess:
             ein.Produces((ein.Alias("E"),)),
         ))
 
-        c_coords = sparse_C.coords
-        c_elems = sparse_C.elems
+        c_coords = sparse_C.coords.flatten()
+        c_elems = sparse_C.data
         expected = A[B[c_coords]] * c_elems
+
         self.run_einsum_plan(prgm, {"A": A, "B": B, "C": sparse_C}, expected)
 
     def test_mixed_indexing_with_computation(self, rng):
         """Test mixed direct/indirect indexing with computation"""
 
-        A = rng.random((4, 5))
+        A = rng.random((5, 5))
         B = rng.random((4,))
         C = rng.random((5,))
         
@@ -1714,8 +1717,8 @@ class TestEinsumIndirectAccess:
             ein.Produces((ein.Alias("D"),)),
         ))
 
-        b_coords = sparse_B.coords
-        b_elems = sparse_B.elems
+        b_coords = sparse_B.coords.flatten()
+        b_elems = sparse_B.data
         # Broadcasting: A[coords, :] has shape (len(coords), 5), b_elems has shape (len(coords),)
         expected = A[b_coords, :] + b_elems[:, np.newaxis]
         self.run_einsum_plan(prgm, {"A": A, "B": sparse_B}, expected)
@@ -1750,6 +1753,6 @@ class TestEinsumIndirectAccess:
             ein.Produces((ein.Alias("C"),)),
         ))
 
-        b_coords = sparse_B.coords
+        b_coords = sparse_B.coords.flatten()
         expected = A[:, b_coords, :]
         self.run_einsum_plan(prgm, {"A": A, "B": sparse_B}, expected)
