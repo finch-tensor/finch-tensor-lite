@@ -432,7 +432,7 @@ def test_function_basic():
         )
         checker(fun)
     with pytest.raises(asm.AssemblyTypeError):
-        other_fun = asm.Function(
+        fun = asm.Function(
             asm.Variable("sub", np.float64),
             (
                 asm.Variable("x", np.int64),
@@ -440,7 +440,6 @@ def test_function_basic():
             ),
             asm.Block(
                 (
-                    fun,
                     asm.Return(
                         asm.Call(
                             asm.Literal(operator.sub),
@@ -453,7 +452,7 @@ def test_function_basic():
                 )
             ),
         )
-        checker(other_fun)
+        checker(fun)
 
 
 def test_return_basic():

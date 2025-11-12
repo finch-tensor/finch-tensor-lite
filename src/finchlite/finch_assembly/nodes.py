@@ -582,7 +582,7 @@ class Block(AssemblyTree, AssemblyStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyNode, ...] = ()
+    bodies: tuple[AssemblyStatement, ...] = ()
 
     @property
     def children(self):
@@ -604,7 +604,7 @@ class Module(AssemblyTree):
         funcs: The functions defined in the module.
     """
 
-    funcs: tuple[AssemblyNode, ...]
+    funcs: tuple[Function, ...]
 
     @property
     def children(self):
