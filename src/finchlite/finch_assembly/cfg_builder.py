@@ -40,7 +40,9 @@ from .nodes import (
 
 def assembly_build_cfg(node: AssemblyNode):
     ctx = AssemblyCFGBuilder(namespace=Namespace(node))
-    return ctx.build(node)
+
+    # build cfg based on the numbered AST and return it
+    return ctx.build(assembly_number_uses(node))
 
 
 def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:
@@ -134,7 +136,8 @@ class AssemblyCFGBuilder:
                 self.current_block.add_statement(Assert(cond))
                 self(body, after_block, return_block)
 
-                self.current_block.add_successor(before_block)
+                self.current_block.add_successor(body_block)
+                self.current_block.add_successor(after_block)
                 self.current_block = after_block
                 self.current_block.add_statement(
                     Assert(
