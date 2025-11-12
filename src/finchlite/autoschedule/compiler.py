@@ -22,6 +22,7 @@ from ..finch_logic import (
     Field,
     Literal,
     LogicExpression,
+    LogicStatement,
     LogicNode,
     LogicTree,
     MapJoin,
@@ -128,7 +129,7 @@ class PointwiseLowerer:
         slot_vars: dict[Alias, ntn.Slot],
         field_relabels: dict[Field, Field],
         field_types: dict[Field, type],
-    ) -> ntn.NotationNode:
+    ) -> ntn.NotationExpression:
         match ex:
             case MapJoin(Literal(op), args):
                 return ntn.Call(
@@ -171,13 +172,13 @@ def compile_pointwise_logic(
     slot_vars: dict[Alias, ntn.Slot],
     field_relabels: dict[Field, Field],
     field_types: dict[Field, type],
-) -> tuple[ntn.NotationNode, list[Field], list[Alias]]:
+) -> tuple[ntn.NotationExpression, list[Field], list[Alias]]:
     ctx = PointwiseLowerer(loop_idxs=loop_idxs)
     code = ctx(ex, slot_vars, field_relabels, field_types)
     return code, ctx.bound_idxs, ctx.required_slots
 
 
-def compile_logic_constant(ex: LogicNode) -> ntn.NotationNode:
+def compile_logic_constant(ex: LogicNode) -> ntn.NotationExpression:
     match ex:
         case Literal(val):
             return ntn.Literal(val)
@@ -190,6 +191,36 @@ def compile_logic_constant(ex: LogicNode) -> ntn.NotationNode:
 class LogicLowerer:
     def __init__(self, mode: str = "fast"):
         self.mode = mode
+
+    @overload
+    def __call__(
+        self,
+        ex: LogicStatement,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationStatement: ...
+
+    @overload
+    def __call__(
+        self,
+        ex: LogicExpression,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationExpression: ...
+
+    @overload
+    def __call__(
+        self,
+        ex: LogicNode,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationNode: ...
 
     def __call__(
         self,
@@ -312,9 +343,10 @@ class LogicLowerer:
                 )
                 for idx in reversed(idxs_2):
                     idx_type = field_types[idx]
+                    idx_var = ntn.Variable(field_relabels.get(idx, idx).name, idx_type)
                     if idx in rhs_idxs:
                         body = ntn.Loop(
-                            ntn.Variable(field_relabels.get(idx, idx).name, idx_type),
+                            idx_var,
                             ntn.Variable(
                                 f"{field_relabels.get(idx, idx).name}_size",
                                 ExtentFType(idx_type, idx_type),  # type: ignore[abstract]
@@ -323,9 +355,12 @@ class LogicLowerer:
                         )
                     elif idx in lhs_idxs:
                         body = ntn.Loop(
-                            ntn.Literal(idx_type(1)),
-                            ntn.Literal(idx_type(1)),
-                            body,
+                            idx_var,
+                            ExtentFType.stack(
+                                ntn.Literal(idx_type(1)),
+                                ntn.Literal(idx_type(1)),
+                            ),
+                            body
                         )
 
                 return ntn.Block(

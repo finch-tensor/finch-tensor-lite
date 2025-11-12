@@ -59,6 +59,8 @@ class NotationExpression(NotationNode):
         """
         ...
 
+class NotationStatement(NotationNode):
+    pass
 
 @dataclass(eq=True, frozen=True)
 class Literal(NotationExpression):
@@ -129,7 +131,7 @@ class Call(NotationTree, NotationExpression):
     """
 
     op: Literal
-    args: tuple[NotationNode, ...]
+    args: tuple[NotationExpression, ...]
 
     @property
     def result_format(self):
@@ -180,9 +182,9 @@ class Access(NotationTree, NotationExpression):
     `idx...`.
     """
 
-    tns: NotationNode
+    tns: NotationExpression
     mode: AccessMode
-    idxs: tuple[NotationNode, ...]
+    idxs: tuple[NotationExpression, ...]
 
     @property
     def result_format(self):
@@ -223,7 +225,7 @@ class Update(AccessMode, NotationTree):
         op: The operation used to update the value of the tensor.
     """
 
-    op: NotationNode
+    op: Literal
 
     @property
     def children(self):
@@ -231,13 +233,13 @@ class Update(AccessMode, NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Increment(NotationTree):
+class Increment(NotationTree, NotationStatement):
     """
     Notation AST statement that updates the value `lhs` using `rhs`.
     """
 
-    lhs: NotationNode
-    rhs: NotationNode
+    lhs: Access
+    rhs: NotationExpression
 
     @property
     def children(self):
@@ -245,7 +247,7 @@ class Increment(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Unwrap(NotationTree):
+class Unwrap(NotationTree, NotationExpression):
     """
     Notation AST statement that unwraps the scalar value from a 0-dimensional
     tensor `arg`.
@@ -273,9 +275,8 @@ class Cached(NotationTree, NotationExpression):
     `arg`, but we still wish to refer to the original expression to prove
     properties about it.
     """
-
-    arg: NotationNode
-    ref: NotationNode
+    arg: NotationExpression
+    ref: NotationExpression
 
     @property
     def result_format(self):
@@ -287,14 +288,14 @@ class Cached(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Loop(NotationTree):
+class Loop(NotationTree, NotationStatement):
     """
     Notation AST statement that runs `body` for each value of `idx` in `ext`.
     """
 
-    idx: NotationNode
-    ext: NotationNode
-    body: NotationNode
+    idx: Variable
+    ext: NotationExpression
+    body: NotationStatement
 
     @property
     def children(self):
@@ -302,13 +303,13 @@ class Loop(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class If(NotationTree):
+class If(NotationTree, NotationStatement):
     """
     Notation AST statement that only executes `body` if `cond` is true.
     """
 
-    cond: NotationNode
-    body: NotationNode
+    cond: NotationExpression
+    body: NotationStatement
 
     @property
     def children(self):
@@ -316,15 +317,15 @@ class If(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(NotationTree):
+class IfElse(NotationTree, NotationStatement):
     """
     Notation AST statement that executes `then_body` if `cond` is true, otherwise
     executes `else_body`.
     """
 
-    cond: NotationNode
-    then_body: NotationNode
-    else_body: NotationNode
+    cond: NotationExpression
+    then_body: NotationStatement
+    else_body: NotationStatement
 
     @property
     def children(self):
@@ -332,13 +333,13 @@ class IfElse(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(NotationTree):
+class Assign(NotationTree, NotationStatement):
     """
     Notation AST statement that defines `lhs` as having the value `rhs`.
     """
 
-    lhs: NotationNode
-    rhs: NotationNode
+    lhs: Variable
+    rhs: NotationExpression
 
     @property
     def children(self):
@@ -393,7 +394,7 @@ class Slot(NotationExpression, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Unpack(NotationTree):
+class Unpack(NotationTree, NotationStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
@@ -414,7 +415,7 @@ class Unpack(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Repack(NotationTree):
+class Repack(NotationTree, NotationStatement):
     """
     Registers updates from a symbolic object `val` with the original
     object `obj`. The original object may now be accessed and modified.
@@ -434,16 +435,16 @@ class Repack(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Declare(NotationTree, NotationExpression):
+class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
     with `op` in the current scope.
     """
 
-    tns: NotationNode
-    init: NotationNode
-    op: NotationNode
-    shape: tuple[NotationNode, ...]
+    tns: NotationExpression
+    init: Literal
+    op: Literal
+    shape: tuple[NotationExpression, ...]
 
     @property
     def children(self):
@@ -471,14 +472,14 @@ class Declare(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Freeze(NotationTree, NotationExpression):
+class Freeze(NotationTree, NotationStatement):
     """
     Notation AST statement that freezes `tns` in the current scope after
     modifications with `op`.
     """
 
-    tns: NotationNode
-    op: NotationNode
+    tns: NotationExpression
+    op: Literal
 
     @property
     def children(self):
@@ -498,14 +499,14 @@ class Freeze(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Thaw(NotationTree, NotationExpression):
+class Thaw(NotationTree, NotationStatement):
     """
     Notation AST statement that thaws `tns` in the current scope, moving the tensor
     from read-only mode to update-only mode with a reduction operator `op`.
     """
 
-    tns: NotationNode
-    op: NotationNode
+    tns: NotationExpression
+    op: Literal
 
     @property
     def children(self):
@@ -525,12 +526,12 @@ class Thaw(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Block(NotationTree):
+class Block(NotationTree, NotationStatement):
     """
     Notation AST statement that executes each of its arguments in turn.
     """
 
-    bodies: tuple[NotationNode, ...]
+    bodies: tuple[NotationStatement, ...]
 
     @classmethod
     def from_children(cls, *bodies):
@@ -557,7 +558,7 @@ class Function(NotationTree):
 
     name: Variable
     args: tuple[Variable, ...]
-    body: NotationNode
+    body: NotationStatement
 
     @property
     def children(self):
@@ -572,13 +573,13 @@ class Function(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Return(NotationTree):
+class Return(NotationTree, NotationStatement):
     """
     Notation AST statement that returns the value of `val` from the current
     function.
     """
 
-    val: NotationNode
+    val: NotationExpression
 
     @property
     def children(self):
@@ -600,7 +601,7 @@ class Module(NotationTree):
         funcs: The functions defined in the module.
     """
 
-    funcs: tuple[NotationNode, ...]
+    funcs: tuple[Function, ...]
 
     @property
     def children(self):
