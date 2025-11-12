@@ -138,80 +138,83 @@ class EinsumInterpreter:
                 tns = self(tns)
                 assert len(idxs) == len(tns.shape)
                 
-                # Build a mapping of which positions belong to which true_idx groups
-                idx_groups = []  # List of (position, group_type, group_id)
-                idx_sizes = []
+                # Classify indices and determine their parent groups
+                idx_sizes = []  # Track size of each index dimension
                 
+                # For each index, determine which true_idx it depends on
+                parent_indices = []
                 for i, idx in enumerate(idxs):
                     if isinstance(idx, ein.Index):
-                        # Direct ein.Index
-                        idx_groups.append((i, 'ein', idx))
+                        parent_indices.append(idx)
                         idx_sizes.append(tns.shape[i])
                     else:
-                        # Indirect access - find which true_idx it depends on
-                        child_true_idxs = idx.get_idxs()
-                        # Should depend on exactly one true_idx for this to work
-                        if len(child_true_idxs) == 1:
-                            parent_idx = list(child_true_idxs)[0]
-                            idx_groups.append((i, 'indirect', parent_idx))
-                        else:
-                            # Complex case - for now treat as independent
-                            idx_groups.append((i, 'indirect_complex', idx))
-                        idx_sizes.append(None)  # Will be determined after evaluation
+                        child_idxs = idx.get_idxs()
+                        parent_indices.append(
+                            list(child_idxs)[0] if len(child_idxs) == 1 else idx
+                        )
+                        idx_sizes.append(None)  # Will be determined later
                 
-                # Group positions by their parent true index
-                groups_by_parent = {}
-                for pos, group_type, group_id in idx_groups:
-                    if group_id not in groups_by_parent:
-                        groups_by_parent[group_id] = []
-                    groups_by_parent[group_id].append((pos, group_type))
+                # Find unique parent groups and their positions
+                # Create a mapping from parent to group index
+                unique_parents = []
+                parent_to_group = {}
+                for parent in parent_indices:
+                    found = False
+                    for i, up in enumerate(unique_parents):
+                        # For ein.Index, compare by name; for others by identity
+                        if isinstance(parent, ein.Index) and isinstance(up, ein.Index):
+                            if parent.name == up.name:
+                                parent_to_group[id(parent)] = i
+                                found = True
+                                break
+                        elif parent is up:
+                            parent_to_group[id(parent)] = i
+                            found = True
+                            break
+                    if not found:
+                        parent_to_group[id(parent)] = len(unique_parents)
+                        unique_parents.append(parent)
                 
-                # Build ranges for the cartesian product
-                # Each group contributes one dimension to the product
+                # Build group positions from the mapping
+                group_positions = [[] for _ in range(len(unique_parents))]
+                for i, parent in enumerate(parent_indices):
+                    group_idx = parent_to_group[id(parent)]
+                    group_positions[group_idx].append(i)
+                
+                # Build ranges for cartesian product
                 group_ranges = []
-                group_positions = []  # Track which positions belong to each group
+                for group_idx, positions in enumerate(group_positions):
+                    first_pos = positions[0]
+                    if isinstance(idxs[first_pos], ein.Index):
+                        group_ranges.append(xp.arange(tns.shape[first_pos]))
+                    else:
+                        indirect_vals = self(idxs[first_pos]).flatten()
+                        group_ranges.append(xp.arange(len(indirect_vals)))
+                        # Update sizes for all positions in this group
+                        for p in positions:
+                            idx_sizes[p] = len(indirect_vals)
                 
-                # Process groups in position order (based on first occurrence)
-                processed_groups = []
-                for pos, group_type, group_id in idx_groups:
-                    if group_id not in processed_groups:
-                        processed_groups.append(group_id)
-                        positions = [p for p, _ in groups_by_parent[group_id]]
-                        group_positions.append(positions)
-                        
-                        if group_type == 'ein':
-                            # For ein.Index, use the range
-                            group_ranges.append(xp.arange(tns.shape[pos]))
-                        else:
-                            # For indirect group, evaluate the first position to get size
-                            # All positions in the group should have the same size
-                            first_pos = positions[0]
-                            indirect_vals = self(idxs[first_pos]).flatten()
-                            group_ranges.append(xp.arange(len(indirect_vals)))
-                            # Update sizes for all positions in this group
-                            for p in positions:
-                                idx_sizes[p] = len(indirect_vals)
-                
-                # Compute cartesian product of group indices
-                # This gives us which "iteration" of each group we're on
+                # Compute cartesian product
                 group_grids = xp.meshgrid(*group_ranges, indexing='ij')
                 group_combos = xp.stack([g.flatten() for g in group_grids], axis=-1)
                 
-                # Now build the actual index combinations
+                # Build index combinations
                 combo_idxs = xp.empty((group_combos.shape[0], len(idxs)), dtype=xp.int64)
                 
-                for group_idx, (group_id, positions) in enumerate(zip(processed_groups, group_positions)):
+                # Pre-evaluate all indirect indices
+                indirect_vals_cache = {}
+                for i, idx in enumerate(idxs):
+                    if not isinstance(idx, ein.Index):
+                        indirect_vals_cache[i] = self(idx).flatten()
+                
+                # Fill combo_idxs using vectorized operations where possible
+                for group_idx, positions in enumerate(group_positions):
                     group_iterations = group_combos[:, group_idx]
-                    
-                    # Fill in values for all positions in this group
                     for pos in positions:
                         if isinstance(idxs[pos], ein.Index):
-                            # Direct index - use the iteration number
                             combo_idxs[:, pos] = group_iterations
                         else:
-                            # Indirect access - evaluate and index with iteration
-                            indirect_vals = self(idxs[pos]).flatten()
-                            combo_idxs[:, pos] = indirect_vals[group_iterations]
+                            combo_idxs[:, pos] = indirect_vals_cache[pos][group_iterations]
                 
                 # evaluate the output tensor as a flat array
                 flat_idx = xp.ravel_multi_index(combo_idxs.T, tns.shape)
