@@ -142,144 +142,50 @@ class EinsumInterpreter:
                 tns = self(tns)
                 assert len(idxs) == len(tns.shape)
 
-                # Classify indices and determine their parent groups
-                idx_sizes = []  # Track size of each index dimension
-
-                # For each index, determine which true_idx it depends on
-                parent_indices = []
-                for i, idx in enumerate(idxs):
-                    if isinstance(idx, ein.Index):
-                        parent_indices.append(idx)
-                        idx_sizes.append(tns.shape[i])
-                    else:
-                        child_idxs = idx.get_idxs()
-                        parent_indices.append(
-                            list(child_idxs)[0] if len(child_idxs) == 1 else idx
-                        )
-                        idx_sizes.append(None)  # Will be determined later
-
-                # Find unique parent groups and their positions
-                # Create a mapping from parent to group index
-                unique_parents = []
-                parent_to_group = {}
-                for parent in parent_indices:
-                    found = False
-                    for i, up in enumerate(unique_parents):
-                        # For ein.Index, compare by name; for others by identity
-                        if isinstance(parent, ein.Index) and isinstance(up, ein.Index):
-                            if parent.name == up.name:
-                                parent_to_group[id(parent)] = i
-                                found = True
-                                break
-                        elif parent is up:
-                            parent_to_group[id(parent)] = i
-                            found = True
-                            break
-                    if not found:
-                        parent_to_group[id(parent)] = len(unique_parents)
-                        unique_parents.append(parent)
-
-                # Build group positions from the mapping
-                group_positions = [[] for _ in range(len(unique_parents))]
-                for i, parent in enumerate(parent_indices):
-                    group_idx = parent_to_group[id(parent)]
-                    group_positions[group_idx].append(i)
-
-                # Build ranges for cartesian product
-                group_ranges = []
-                for positions in group_positions:
-                    first_pos = positions[0]
-                    if isinstance(idxs[first_pos], ein.Index):
-                        group_ranges.append(xp.arange(tns.shape[first_pos]))
-                    else:
-                        indirect_vals = self(idxs[first_pos]).flatten()
-                        group_ranges.append(xp.arange(len(indirect_vals)))
-                        # Update sizes for all positions in this group
-                        for p in positions:
-                            idx_sizes[p] = len(indirect_vals)
-
-                # Compute cartesian product
-                group_grids = xp.meshgrid(*group_ranges, indexing="ij")
-                group_combos = xp.stack([g.flatten() for g in group_grids], axis=-1)
-
-                # Build index combinations
-                combo_idxs = xp.empty(
-                    (group_combos.shape[0], len(idxs)), dtype=xp.int64
-                )
-
-                # Pre-evaluate all indirect indices
-                indirect_vals_cache = {}
-                for i, idx in enumerate(idxs):
-                    if not isinstance(idx, ein.Index):
-                        indirect_vals_cache[i] = self(idx).flatten()
-
-                # Fill combo_idxs using vectorized operations where possible
-                for group_idx, positions in enumerate(group_positions):
-                    group_iterations = group_combos[:, group_idx]
-                    for pos in positions:
-                        if isinstance(idxs[pos], ein.Index):
-                            combo_idxs[:, pos] = group_iterations
-                        else:
-                            combo_idxs[:, pos] = indirect_vals_cache[pos][
-                                group_iterations
-                            ]
+                # Evaluate all indices into arrays
+                idx_arrays = [xp.arange(tns.shape[i]) if isinstance(idx, ein.Index) 
+                             else self(idx).flatten() for i, idx in enumerate(idxs)]
+                
+                # Identify unique parent indices and their positions
+                parents = [idx if isinstance(idx, ein.Index) else list(idx.get_idxs())[0] 
+                          for idx in idxs]
+                unique_parents = list(dict.fromkeys(parents))
+                parent_to_idx = {p: i for i, p in enumerate(unique_parents)}
+                pos_groups = [[i for i, p in enumerate(parents) if p == up] 
+                             for up in unique_parents]
+                
+                # Create meshgrid only for unique groups
+                unique_arrays = [idx_arrays[g[0]] for g in pos_groups]
+                grids = xp.meshgrid(*unique_arrays, indexing='ij')
+                grid_flat = xp.stack([g.ravel() for g in grids], axis=-1)
+                
+                # Build final index combinations
+                group_idx_map = [parent_to_idx[p] for p in parents]
+                combo_idxs = xp.stack([idx_arrays[i][grid_flat[:, group_idx_map[i]]] 
+                                      for i in range(len(idxs))], axis=1)
 
                 # evaluate the output tensor as a flat array
                 flat_idx = xp.ravel_multi_index(combo_idxs.T, tns.shape)
                 tns = xp.take(tns, flat_idx)
 
-                # calculate child idxs, idxs computed using the parent "true idxs"
-                child_idxs = {
-                    parent_idx: [
-                        child_idx
-                        for child_idx in idxs
-                        if (parent_idx in child_idx.get_idxs())
-                    ]
-                    for parent_idx in true_idxs
-                }
-
-                # we assert that all the indirect access indicies
-                # from the parent idxs have the same size
-                child_idxs_size = {
-                    parent_idx: [
-                        idx_sizes[idxs.index(child_idx)]
-                        for child_idx in child_idxs[parent_idx]
-                    ]
-                    for parent_idx in true_idxs
-                }
-                assert all(
-                    child_idxs_size[parent_idx].count(child_idxs_size[parent_idx][0])
-                    == len(child_idxs_size[parent_idx])
-                    for parent_idx in true_idxs
-                )
-
-                # a mapping from each idx to its axis wrt to current shape
-                idxs_axis = {idx: i for i, idx in enumerate(idxs)}
-
-                true_idxs = list(true_idxs)
-                true_idxs = sorted(
-                    true_idxs, key=lambda idx: idxs_axis[child_idxs[idx][0]]
-                )
-
-                # calculate the final shape of the tensor
-                # we merge the child idxs to get the final shape
-                # that matches the true idxs
-                final_shape = tuple(
-                    idx_sizes[idxs.index(child_idxs[parent_idx][0])]
-                    for parent_idx in true_idxs
-                )
+                # Calculate final shape and permutation
+                true_idx_pos = {idx: pos_groups[unique_parents.index(idx)][0] 
+                               for idx in true_idxs}
+                true_idxs_sorted = sorted(true_idxs, key=true_idx_pos.get)
+                final_shape = tuple(len(unique_arrays[unique_parents.index(idx)]) 
+                                   for idx in true_idxs_sorted)
                 tns = tns.reshape(final_shape)
 
                 # permute and broadcast the tensor to be
                 # compatible with rest of expression
-                perm = [true_idxs.index(idx) for idx in self.loops if idx in true_idxs]
+                perm = [true_idxs_sorted.index(idx) for idx in self.loops if idx in true_idxs_sorted]
                 tns = xp.permute_dims(tns, perm)
                 return xp.expand_dims(
                     tns,
                     [
                         i
                         for i in range(len(self.loops))
-                        if self.loops[i] not in true_idxs
+                        if self.loops[i] not in true_idxs_sorted
                     ],
                 )
 
