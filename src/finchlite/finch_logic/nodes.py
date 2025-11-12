@@ -392,7 +392,7 @@ class Plan(LogicTree, LogicStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[LogicNode, ...] = ()
+    bodies: tuple[LogicStatement, ...] = ()
 
     @property
     def children(self):
