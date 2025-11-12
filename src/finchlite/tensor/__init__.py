@@ -9,7 +9,6 @@ from .level import (
 )
 from .sparse_tensor import SparseTensor, SparseTensorFType
 
-
 __all__ = [
     "DenseLevel",
     "DenseLevelFType",

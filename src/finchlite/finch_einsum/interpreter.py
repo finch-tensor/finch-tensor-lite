@@ -2,10 +2,9 @@ import operator
 
 import numpy as np
 
-from ..algebra import Tensor, overwrite, promote_max, promote_min, TensorFType
+from ..algebra import overwrite, promote_max, promote_min
+from ..symbolic import ftype
 from . import nodes as ein
-from ..symbolic import ftype, gensym
-
 
 nary_ops = {
     operator.add: "add",
@@ -100,47 +99,52 @@ class EinsumInterpreter:
                 vals = [self(arg) for arg in args]
                 return func(*vals)
 
-            #access a tensor with only indices
-            case ein.Access(tns, idxs) if all(isinstance(idx, ein.Index) for idx in idxs):
+            # access a tensor with only indices
+            case ein.Access(tns, idxs) if all(
+                isinstance(idx, ein.Index) for idx in idxs
+            ):
                 assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
 
-                #convert named idxs to positional, integer indices
+                # convert named idxs to positional, integer indices
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                
-                tns = self(tns) #evaluate the tensor
 
-                #if there are fewer indicies than dimensions, add the remaining dimensions as if they werent permutated
-                if hasattr(tns, "ndim") and len(perm) < tns.ndim: 
-                    perm = perm + [i for i in range(len(perm), tns.ndim)]
+                tns = self(tns)  # evaluate the tensor
 
-                tns = xp.permute_dims(tns, perm) #permute the dimensions
+                # if there are fewer indicies than dimensions, add the remaining
+                # dimensions as if they werent permutated
+                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
+                    perm += list(range(len(perm), tns.ndim))
+
+                tns = xp.permute_dims(tns, perm)  # permute the dimensions
                 return xp.expand_dims(
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
 
-            #access a tensor with only one indirect access index
+            # access a tensor with only one indirect access index
             case ein.Access(tns, idxs) if len(idxs) == 1:
                 idx = self(idxs[0])
-                tns = self(tns) #evaluate the tensor
-            
-                flat_idx = idx if idx.ndim == 1 else xp.ravel_multi_index(idx.T, tns.shape)
-                return tns.flat[flat_idx] #return a 1-d array by definition
+                tns = self(tns)  # evaluate the tensor
 
-            #access a tensor with a mixture of indices and other expressions
+                flat_idx = (
+                    idx if idx.ndim == 1 else xp.ravel_multi_index(idx.T, tns.shape)
+                )
+                return tns.flat[flat_idx]  # return a 1-d array by definition
+
+            # access a tensor with a mixture of indices and other expressions
             case ein.Access(tns, idxs):
                 assert self.loops is not None
-                true_idxs = node.get_idxs() #true field iteratior indicies
+                true_idxs = node.get_idxs()  # true field iteratior indicies
                 assert all(isinstance(idx, ein.Index) for idx in true_idxs)
 
                 # evaluate the tensor to access
                 tns = self(tns)
                 assert len(idxs) == len(tns.shape)
-                
+
                 # Classify indices and determine their parent groups
                 idx_sizes = []  # Track size of each index dimension
-                
+
                 # For each index, determine which true_idx it depends on
                 parent_indices = []
                 for i, idx in enumerate(idxs):
@@ -153,7 +157,7 @@ class EinsumInterpreter:
                             list(child_idxs)[0] if len(child_idxs) == 1 else idx
                         )
                         idx_sizes.append(None)  # Will be determined later
-                
+
                 # Find unique parent groups and their positions
                 # Create a mapping from parent to group index
                 unique_parents = []
@@ -174,16 +178,16 @@ class EinsumInterpreter:
                     if not found:
                         parent_to_group[id(parent)] = len(unique_parents)
                         unique_parents.append(parent)
-                
+
                 # Build group positions from the mapping
                 group_positions = [[] for _ in range(len(unique_parents))]
                 for i, parent in enumerate(parent_indices):
                     group_idx = parent_to_group[id(parent)]
                     group_positions[group_idx].append(i)
-                
+
                 # Build ranges for cartesian product
                 group_ranges = []
-                for group_idx, positions in enumerate(group_positions):
+                for positions in group_positions:
                     first_pos = positions[0]
                     if isinstance(idxs[first_pos], ein.Index):
                         group_ranges.append(xp.arange(tns.shape[first_pos]))
@@ -193,20 +197,22 @@ class EinsumInterpreter:
                         # Update sizes for all positions in this group
                         for p in positions:
                             idx_sizes[p] = len(indirect_vals)
-                
+
                 # Compute cartesian product
-                group_grids = xp.meshgrid(*group_ranges, indexing='ij')
+                group_grids = xp.meshgrid(*group_ranges, indexing="ij")
                 group_combos = xp.stack([g.flatten() for g in group_grids], axis=-1)
-                
+
                 # Build index combinations
-                combo_idxs = xp.empty((group_combos.shape[0], len(idxs)), dtype=xp.int64)
-                
+                combo_idxs = xp.empty(
+                    (group_combos.shape[0], len(idxs)), dtype=xp.int64
+                )
+
                 # Pre-evaluate all indirect indices
                 indirect_vals_cache = {}
                 for i, idx in enumerate(idxs):
                     if not isinstance(idx, ein.Index):
                         indirect_vals_cache[i] = self(idx).flatten()
-                
+
                 # Fill combo_idxs using vectorized operations where possible
                 for group_idx, positions in enumerate(group_positions):
                     group_iterations = group_combos[:, group_idx]
@@ -214,27 +220,36 @@ class EinsumInterpreter:
                         if isinstance(idxs[pos], ein.Index):
                             combo_idxs[:, pos] = group_iterations
                         else:
-                            combo_idxs[:, pos] = indirect_vals_cache[pos][group_iterations]
-                
+                            combo_idxs[:, pos] = indirect_vals_cache[pos][
+                                group_iterations
+                            ]
+
                 # evaluate the output tensor as a flat array
                 flat_idx = xp.ravel_multi_index(combo_idxs.T, tns.shape)
                 tns = xp.take(tns, flat_idx)
 
-                #calculate child idxs, idxs computed using the parent "true idxs"
-                child_idxs = { 
+                # calculate child idxs, idxs computed using the parent "true idxs"
+                child_idxs = {
                     parent_idx: [
-                        child_idx for child_idx in idxs 
+                        child_idx
+                        for child_idx in idxs
                         if (parent_idx in child_idx.get_idxs())
-                    ] for parent_idx in true_idxs 
+                    ]
+                    for parent_idx in true_idxs
                 }
 
-                # we assert that all the indirect access indicies from the parent idxs have the same size         
+                # we assert that all the indirect access indicies
+                # from the parent idxs have the same size
                 child_idxs_size = {
-                    parent_idx: [idx_sizes[idxs.index(child_idx)] for child_idx in child_idxs[parent_idx]]
+                    parent_idx: [
+                        idx_sizes[idxs.index(child_idx)]
+                        for child_idx in child_idxs[parent_idx]
+                    ]
                     for parent_idx in true_idxs
                 }
                 assert all(
-                    child_idxs_size[parent_idx].count(child_idxs_size[parent_idx][0]) == len(child_idxs_size[parent_idx]) 
+                    child_idxs_size[parent_idx].count(child_idxs_size[parent_idx][0])
+                    == len(child_idxs_size[parent_idx])
                     for parent_idx in true_idxs
                 )
 
@@ -242,22 +257,30 @@ class EinsumInterpreter:
                 idxs_axis = {idx: i for i, idx in enumerate(idxs)}
 
                 true_idxs = list(true_idxs)
-                true_idxs = sorted(true_idxs, key=lambda idx: idxs_axis[child_idxs[idx][0]])
+                true_idxs = sorted(
+                    true_idxs, key=lambda idx: idxs_axis[child_idxs[idx][0]]
+                )
 
                 # calculate the final shape of the tensor
-                # we merge the child idxs to get the final shape that matches the true idxs
+                # we merge the child idxs to get the final shape
+                # that matches the true idxs
                 final_shape = tuple(
-                    idx_sizes[idxs.index(child_idxs[parent_idx][0])] 
+                    idx_sizes[idxs.index(child_idxs[parent_idx][0])]
                     for parent_idx in true_idxs
                 )
                 tns = tns.reshape(final_shape)
 
-                # permute and broadcast the tensor to be compatible with rest of expression
+                # permute and broadcast the tensor to be
+                # compatible with rest of expression
                 perm = [true_idxs.index(idx) for idx in self.loops if idx in true_idxs]
                 tns = xp.permute_dims(tns, perm)
                 return xp.expand_dims(
-                    tns, 
-                    [i for i in range(len(self.loops)) if self.loops[i] not in true_idxs]
+                    tns,
+                    [
+                        i
+                        for i in range(len(self.loops))
+                        if self.loops[i] not in true_idxs
+                    ],
                 )
 
             case ein.Plan(bodies):
@@ -268,21 +291,20 @@ class EinsumInterpreter:
             case ein.Produces(args):
                 return tuple(self(arg) for arg in args)
 
-            #get non-zero elements/data array of a sparse tensor
+            # get non-zero elements/data array of a sparse tensor
             case ein.GetAttribute(obj, ein.Literal("elems"), _):
                 obj = self(obj)
                 assert isinstance(ftype(obj), SparseTensorFType)
                 assert isinstance(obj, SparseTensor)
-                return obj.data 
-            #get coord array of a sparse tensor
+                return obj.data
+            # get coord array of a sparse tensor
             case ein.GetAttribute(obj, ein.Literal("coords"), dim):
                 obj = self(obj)
                 assert isinstance(ftype(obj), SparseTensorFType)
                 assert isinstance(obj, SparseTensor)
 
                 # return the coord array for the given dimension or all dimensions
-                toReturn = obj.coords if dim is None else obj.coords[:, dim]
-                return toReturn
+                return obj.coords if dim is None else obj.coords[:, dim]
             # gets the shape of a sparse tensor at a given dimension
             case ein.GetAttribute(obj, ein.Literal("shape"), dim):
                 obj = self(obj)
@@ -294,10 +316,12 @@ class EinsumInterpreter:
                 return obj.shape[dim]
 
             # standard einsum
-            case ein.Einsum(op, ein.Alias(tns), idxs, arg) if all(isinstance(idx, ein.Index) for idx in idxs):
+            case ein.Einsum(op, ein.Alias(tns), idxs, arg) if all(
+                isinstance(idx, ein.Index) for idx in idxs
+            ):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()
-                
+
                 assert set(idxs).issubset(loops)
                 loops = sorted(loops, key=lambda x: x.name)
                 ctx = EinsumInterpreter(self.xp, self.bindings, loops)
@@ -317,6 +341,8 @@ class EinsumInterpreter:
 
             # indirect einsum
             case ein.Einsum(op, ein.Alias(tns), idxs, arg):
-                raise NotImplementedError("Indirect einsum assignment is not implemented")
+                raise NotImplementedError(
+                    "Indirect einsum assignment is not implemented"
+                )
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")

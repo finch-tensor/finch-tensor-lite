@@ -1,7 +1,7 @@
 import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Self, cast
+from typing import Any, Self, cast
 
 from finchlite.algebra import (
     overwrite,
@@ -183,14 +183,14 @@ class GetAttribute(EinsumExpr, EinsumTree):
     Attributes:
         obj: The object to get the attribute from.
         attr: The name of the attribute to get.
-        
-        dim: The dimension to get the attribute from. 
+
+        dim: The dimension to get the attribute from.
         Note this is an integer index, not a named index.
     """
 
     obj: EinsumExpr
     attr: Literal
-    dim: Optional[int]
+    dim: int | None
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -199,7 +199,7 @@ class GetAttribute(EinsumExpr, EinsumTree):
             raise ValueError("GetAttribute expects 3 children (obj + attr + idx)")
         obj = cast(EinsumExpr, children[0])
         attr = cast(Literal, children[1])
-        dim = cast(Optional[int], children[2])
+        dim = cast(int | None, children[2])
         return cls(obj, attr, dim)
 
     @property
@@ -251,7 +251,7 @@ class Einsum(EinsumTree):
         return [self.op, self.tns, self.idxs, self.arg]
 
     def get_idxs(self) -> set["Index"]:
-        idxs = list()
+        idxs = []
         for idx in self.idxs:
             idxs.extend(idx.get_idxs())
         return idxs
