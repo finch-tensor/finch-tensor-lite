@@ -251,9 +251,9 @@ class Einsum(EinsumTree):
         return [self.op, self.tns, self.idxs, self.arg]
 
     def get_idxs(self) -> set["Index"]:
-        idxs = []
+        idxs = set()
         for idx in self.idxs:
-            idxs.extend(idx.get_idxs())
+            idxs.update(idx.get_idxs())
         return idxs
 
 
@@ -378,7 +378,7 @@ class EinsumPrinterContext(Context):
                 return f"{self(fn)}({', '.join(args_e)})"
             case GetAttribute(obj, attr, idx):
                 if idx is not None:
-                    return f"{self(obj)}.{self(attr)}[{self(idx)}]"
+                    return f"{self(obj)}.{self(attr)}[{idx}]"
                 return f"{self(obj)}.{self(attr)}"
             case Einsum(op, tns, idxs, arg):
                 op_str = infix_strs.get(op.val, op.val.__name__)
