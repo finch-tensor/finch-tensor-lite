@@ -260,66 +260,47 @@ def test_estimate_non_fill_values(shape, expected):
     assert stats.estimate_non_fill_values() == expected
 
 
-# def test_mapjoin_mul_and_add():
-
-#     ta  = Table(
-#         Literal(np.ones((2, 3))),
-#         (Field("i"), Field("j"))
-#     )
-#     tb  = Table(
-#         Literal(np.ones((3, 4))),
-#         (Field("j"), Field("k"))
-#     )
-#     ta2 = Table(
-#         Literal(2 * np.ones((2, 3))),
-#         (Field("i"), Field("j"))
-#     )
-
-#     cache = {}
-
-#     node_mul = MapJoin(
-#         Literal(op.mul),
-#         (ta, tb)
-#     )
-#     dsm = _insert_statistics(ST=DenseStats, node=node_mul, bindings=OrderedDict(),
-#     replace=False, cache=cache)
-
-#     assert dsm.index_set == {"i", "j", "k"}
-#     assert dsm.get_dim_size("i") == 2.0
-#     assert dsm.get_dim_size("j") == 3.0
-#     assert dsm.get_dim_size("k") == 4.0
-#     assert dsm.fill_value == 0.0
-
-#     node_add = MapJoin(
-#         Literal(op.add),
-#         (ta, ta2)
-#     )
-#     ds_sum = _insert_statistics(ST=DenseStats, node=node_add, bindings=OrderedDict(),
-#     replace=False, cache=cache)
-
-#     assert ds_sum.index_set == {"i", "j"}
-#     assert ds_sum.get_dim_size("i") == 2.0
-#     assert ds_sum.get_dim_size("j") == 3.0
-#     assert ds_sum.fill_value == 1.0 + 2.0
-
-
 def test_mapjoin_mul_and_add():
-    A = np.ones((2, 3))
-    B = np.ones((3, 4))
-    dsa = DenseStats(A, ["i", "j"])
-    dsb = DenseStats(B, ["j", "k"])
 
-    dsm = DenseStats.mapjoin(op.mul, dsa, dsb)
+    ta  = Table(
+        Literal(np.ones((2, 3))),
+        (Field("i"), Field("j"))
+    )
+    tb  = Table(
+        Literal(np.ones((3, 4))),
+        (Field("j"), Field("k"))
+    )
+    ta2 = Table(
+        Literal(2 * np.ones((2, 3))),
+        (Field("i"), Field("j"))
+    )
+
+    cache = {}
+
+    node_mul = MapJoin(
+        Literal(op.mul),
+        (ta, tb)
+    )
+    dsm = _insert_statistics(ST=DenseStats, node=node_mul, bindings=OrderedDict(),
+    replace=False, cache=cache)
+
     assert dsm.index_set == {"i", "j", "k"}
     assert dsm.get_dim_size("i") == 2.0
     assert dsm.get_dim_size("j") == 3.0
     assert dsm.get_dim_size("k") == 4.0
     assert dsm.fill_value == 0.0
 
-    dsa2 = DenseStats(2 * A, ["i", "j"])
-    ds_sum = DenseStats.mapjoin(op.add, dsa, dsa2)
-    assert ds_sum.fill_value == 1 + 2
+    node_add = MapJoin(
+        Literal(op.add),
+        (ta, ta2)
+    )
+    ds_sum = _insert_statistics(ST=DenseStats, node=node_add, bindings=OrderedDict(),
+    replace=False, cache=cache)
 
+    assert ds_sum.index_set == {"i", "j"}
+    assert ds_sum.get_dim_size("i") == 2.0
+    assert ds_sum.get_dim_size("j") == 3.0
+    assert ds_sum.fill_value == 1.0 + 2.0
 
 def test_aggregate_and_issimilar():
     table = Table(
