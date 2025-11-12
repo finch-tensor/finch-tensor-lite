@@ -16,7 +16,7 @@ class EinsumLowerer:
         node: lgc.LogicNode,
         bindings: dict[str, Any],
         definitions: dict[str, ein.Einsum],
-    ) -> ein.EinsumNode | None:
+    ) -> ein.EinsumStatement | None:
         match node:
             case lgc.Plan(bodies):
                 ein_bodies = [

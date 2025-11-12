@@ -51,6 +51,8 @@ class EinsumExpr(EinsumNode, ABC):
     def get_idxs(self) -> set["Index"]:
         pass
 
+class EinsumStatement(EinsumNode):
+    pass
 
 @dataclass(eq=True, frozen=True)
 class Literal(EinsumExpr):
@@ -177,7 +179,7 @@ class Call(EinsumExpr, EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Einsum(EinsumTree):
+class Einsum(EinsumTree, EinsumStatement):
     """
     Einsum
 
@@ -216,7 +218,7 @@ class Einsum(EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Plan(EinsumTree):
+class Plan(EinsumTree, EinsumStatement):
     """
     Plan
 
@@ -224,7 +226,7 @@ class Plan(EinsumTree):
     Basically a list of einsums and some return values.
     """
 
-    bodies: tuple[EinsumNode, ...] = ()
+    bodies: tuple[EinsumStatement, ...] = ()
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -234,7 +236,7 @@ class Plan(EinsumTree):
         bodies = children
 
         return cls(
-            tuple(cast(EinsumNode, b) for b in bodies),
+            tuple(cast(EinsumStatement, b) for b in bodies),
         )
 
     @property
@@ -243,7 +245,7 @@ class Plan(EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Produces(EinsumTree):
+class Produces(EinsumTree, EinsumStatement):
     """
     Represents a logical AST statement that returns `args...` from the current plan.
     Halts execution of the program.
