@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Self
 
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 
 
@@ -78,12 +78,22 @@ class Literal(LogicNode):
     val: Any
 
     def __hash__(self):
-        return hash(ftype(self.val))
+        try:
+            return hash(self.val)
+        except TypeError:
+            return hash(id(self.val))
 
-    def __eq__(self, other):
-        if not isinstance(other, Literal):
+    def __eq__(self, value):
+        if not isinstance(value, Literal):
             return False
-        return ftype(self.val) == ftype(other.val)
+        # For consistency with __hash__, we fall back to pointer equality
+        # when the value is unhashable
+        try:
+            hash(value.val)
+            hash(self.val)
+            return self.val == value.val
+        except TypeError:
+            return id(self.val) == id(value.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
