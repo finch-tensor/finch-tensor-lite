@@ -75,7 +75,7 @@ class EinsumLowerer:
     def compile_operand(
         self,
         ex: lgc.LogicNode,
-    ) -> ein.EinsumExpr:
+    ) -> ein.EinsumExpression:
         match ex:
             case lgc.Reformat(_, rhs):
                 return self.compile_operand(rhs)

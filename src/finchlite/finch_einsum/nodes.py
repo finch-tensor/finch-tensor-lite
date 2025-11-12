@@ -35,7 +35,7 @@ class EinsumNode(Term):
 
 class EinsumTree(EinsumNode, TermTree):
     """
-    EinsumExpr
+    EinsumExpression
 
     Represents a pointwise expression in the Einsum IR
     """
@@ -46,7 +46,7 @@ class EinsumTree(EinsumNode, TermTree):
         ...
 
 
-class EinsumExpr(EinsumNode, ABC):
+class EinsumExpression(EinsumNode, ABC):
     @abstractmethod
     def get_idxs(self) -> set["Index"]:
         pass
@@ -55,7 +55,7 @@ class EinsumStatement(EinsumNode):
     pass
 
 @dataclass(eq=True, frozen=True)
-class Literal(EinsumExpr):
+class Literal(EinsumExpression):
     """
     Literal
     """
@@ -73,7 +73,7 @@ class Literal(EinsumExpr):
 
 
 @dataclass(eq=True, frozen=True)
-class Index(EinsumExpr):
+class Index(EinsumExpression):
     """
     Represents a  AST expression for an index named `name`.
 
@@ -88,7 +88,7 @@ class Index(EinsumExpr):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(EinsumExpr):
+class Alias(EinsumExpression):
     """
     Represents a  AST expression for an index named `name`.
 
@@ -103,7 +103,7 @@ class Alias(EinsumExpr):
 
 
 @dataclass(eq=True, frozen=True)
-class Access(EinsumExpr, EinsumTree):
+class Access(EinsumExpression, EinsumTree):
     """
     Access
 
@@ -114,8 +114,8 @@ class Access(EinsumExpr, EinsumTree):
         idxs: The indices at which to access the tensor.
     """
 
-    tns: EinsumExpr
-    idxs: tuple[EinsumExpr, ...]  # (Field('i'), Field('j'))
+    tns: EinsumExpression
+    idxs: tuple[EinsumExpression, ...]  # (Field('i'), Field('j'))
     # Children: None (leaf)
 
     @classmethod
@@ -123,8 +123,8 @@ class Access(EinsumExpr, EinsumTree):
         # First child is tns, rest are indices
         if len(children) < 1:
             raise ValueError("Access expects at least 1 child")
-        tns = cast(EinsumExpr, children[0])
-        idxs = cast(tuple[EinsumExpr, ...], children[1:])
+        tns = cast(EinsumExpression, children[0])
+        idxs = cast(tuple[EinsumExpression, ...], children[1:])
         return cls(tns, tuple(idxs))
 
     @property
@@ -139,7 +139,7 @@ class Access(EinsumExpr, EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(EinsumExpr, EinsumTree):
+class Call(EinsumExpression, EinsumTree):
     """
     Call
 
@@ -154,7 +154,7 @@ class Call(EinsumExpr, EinsumTree):
     """
 
     op: Literal  # the function to apply e.g., operator.add
-    args: tuple[EinsumExpr, ...]  # Subtrees
+    args: tuple[EinsumExpression, ...]  # Subtrees
     # input_fields: tuple[tuple[Field, ...], ...]
     # Children: The args
 
@@ -164,7 +164,7 @@ class Call(EinsumExpr, EinsumTree):
         if len(children) < 2:
             raise ValueError("Call expects at least 2 children (op + 1 arg)")
         op = cast(Literal, children[0])
-        args = cast(tuple[EinsumExpr, ...], children[1:])
+        args = cast(tuple[EinsumExpression, ...], children[1:])
         return cls(op, tuple(args))
 
     @property
@@ -198,8 +198,8 @@ class Einsum(EinsumTree, EinsumStatement):
 
     op: Literal
     tns: Alias
-    idxs: tuple[EinsumExpr, ...]
-    arg: EinsumExpr
+    idxs: tuple[EinsumExpression, ...]
+    arg: EinsumExpression
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
@@ -208,8 +208,8 @@ class Einsum(EinsumTree, EinsumStatement):
             raise ValueError(f"Einsum expects 4 children, got {len(children)}")
         op = cast(Literal, children[0])
         tns = cast(Alias, children[1])
-        idxs = cast(tuple[EinsumExpr, ...], children[2])
-        arg = cast(EinsumExpr, children[3])
+        idxs = cast(tuple[EinsumExpression, ...], children[2])
+        arg = cast(EinsumExpression, children[3])
         return cls(op, tns, idxs, arg)
 
     @property
