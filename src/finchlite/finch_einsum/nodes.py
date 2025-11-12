@@ -34,12 +34,6 @@ class EinsumNode(Term):
 
 
 class EinsumTree(EinsumNode, TermTree):
-    """
-    EinsumExpression
-
-    Represents a pointwise expression in the Einsum IR
-    """
-
     @property
     @abstractmethod
     def children(self) -> list[EinsumNode]:  # type: ignore[override]
@@ -47,12 +41,24 @@ class EinsumTree(EinsumNode, TermTree):
 
 
 class EinsumExpression(EinsumNode, ABC):
+    """
+    EinsumExpression
+
+    Represents a pointwise expression in the Einsum IR
+    """
+
     @abstractmethod
     def get_idxs(self) -> set["Index"]:
         pass
 
+
 class EinsumStatement(EinsumNode):
-    pass
+    """
+    EinsumStatement
+
+    Represents a statement in the Einsum IR
+    """
+
 
 @dataclass(eq=True, frozen=True)
 class Literal(EinsumExpression):

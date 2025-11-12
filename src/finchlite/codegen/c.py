@@ -798,7 +798,7 @@ class CContext(Context):
                     ctx_2(body)
                 self.exec(ctx_2.emit())
                 return None
-            case asm.ForLoop(asm.Variable(_,_) as var, start, end, body):
+            case asm.ForLoop(asm.Variable(_, _) as var, start, end, body):
                 var_t = self.ctype_name(c_type(var.result_format))
                 var_2 = self(var)
                 start = self(start)
@@ -814,7 +814,7 @@ class CContext(Context):
                     f"\n{feed}}}"
                 )
                 return None
-            case asm.BufferLoop(buf, asm.Variable(_,_) as var, body):
+            case asm.BufferLoop(buf, asm.Variable(_, _) as var, body):
                 idx = asm.Variable(
                     self.freshen(var.name + "_i"), buf.result_format.shape_type()
                 )

@@ -49,14 +49,22 @@ class LogicTree(LogicNode, TermTree, ABC):
 
 
 class LogicExpression(LogicNode):
+    """
+    Logic AST expression base class.
+    """
+
     @property
     @abstractmethod
     def fields(self) -> list[Field]:
         """Returns fields of the node."""
         ...
 
+
 class LogicStatement(LogicNode):
-    ...
+    """
+    Logic AST statement base class.
+    """
+
 
 @dataclass(eq=True, frozen=True)
 class Literal(LogicNode):
@@ -134,6 +142,7 @@ class Alias(LogicExpression, NamedTerm):
     def fields(self) -> list[Field]:
         """Returns fields of the node."""
         raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
+
 
 @dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):

@@ -13,8 +13,8 @@ from ..finch_logic import (
     Field,
     Literal,
     LogicExpression,
-    LogicStatement,
     LogicNode,
+    LogicStatement,
     LogicTree,
     MapJoin,
     Plan,
@@ -124,15 +124,18 @@ def pretty_labels(root: LogicNode) -> LogicNode:
 
     return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
 
+
 @overload
 def _lift_subqueries_expr(
     node: LogicExpression, bindings: dict[Alias, LogicExpression]
 ) -> LogicExpression: ...
 
+
 @overload
 def _lift_subqueries_expr(
     node: LogicNode, bindings: dict[Alias, LogicExpression]
 ) -> LogicNode: ...
+
 
 def _lift_subqueries_expr(
     node: LogicNode, bindings: dict[Alias, LogicExpression]
@@ -151,11 +154,14 @@ def _lift_subqueries_expr(
         case _:
             return node
 
+
 @overload
 def lift_subqueries(node: LogicStatement) -> LogicStatement: ...
 
+
 @overload
 def lift_subqueries(node: LogicNode) -> LogicNode: ...
+
 
 def lift_subqueries(node: LogicNode) -> LogicNode:
     match node:
@@ -354,7 +360,9 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
 
 
 @overload
-def _propagate_fields(root: LogicStatement, fields: dict[LogicNode, Iterable[Field]]) -> LogicStatement: ...
+def _propagate_fields(
+    root: LogicStatement, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicStatement: ...
 
 
 @overload
@@ -362,15 +370,18 @@ def _propagate_fields(
     root: LogicExpression, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicExpression: ...
 
+
 @overload
 def _propagate_fields(
     root: LogicTree, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicTree: ...
 
+
 @overload
 def _propagate_fields(
     root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicNode: ...
+
 
 def _propagate_fields(
     root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
@@ -601,12 +612,20 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
 
 
 @overload
-def _set_loop_order(node: LogicStatement, perms: dict[LogicNode, LogicExpression]) -> LogicStatement: ...
+def _set_loop_order(
+    node: LogicStatement, perms: dict[LogicNode, LogicExpression]
+) -> LogicStatement: ...
+
 
 @overload
-def _set_loop_order(node: LogicNode, perms: dict[LogicNode, LogicExpression]) -> LogicNode: ...
+def _set_loop_order(
+    node: LogicNode, perms: dict[LogicNode, LogicExpression]
+) -> LogicNode: ...
 
-def _set_loop_order(node: LogicNode, perms: dict[LogicNode, LogicExpression]) -> LogicNode:
+
+def _set_loop_order(
+    node: LogicNode, perms: dict[LogicNode, LogicExpression]
+) -> LogicNode:
     match node:
         case Plan(bodies):
             return Plan(tuple(_set_loop_order(body, perms) for body in bodies))

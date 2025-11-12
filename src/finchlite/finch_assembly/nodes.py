@@ -51,14 +51,22 @@ class AssemblyTree(AssemblyNode, TermTree):
 
 
 class AssemblyExpression(AssemblyNode):
+    """
+    Assembly AST expression base class.
+    """
+
     @property
     @abstractmethod
     def result_format(self):
         """Returns the type of the expression."""
         ...
 
+
 class AssemblyStatement(AssemblyNode):
-    ...
+    """
+    Assembly AST statement base class.
+    """
+
 
 @dataclass(eq=True, frozen=True)
 class Literal(AssemblyExpression):
@@ -403,6 +411,7 @@ class ForLoop(AssemblyTree, AssemblyStatement):
         end: The ending value of the range.
         body: The body of the loop to execute.
     """
+
     var: Variable | TaggedVariable
     start: AssemblyExpression
     end: AssemblyExpression

@@ -554,7 +554,7 @@ class NumbaContext(Context):
                     ctx_2(body)
                 self.exec(ctx_2.emit())
                 return None
-            case asm.ForLoop(asm.Variable(_,_) as var, start, end, body):
+            case asm.ForLoop(asm.Variable(_, _) as var, start, end, body):
                 var_2 = self(var)
                 start = self(start)
                 end = self(end)

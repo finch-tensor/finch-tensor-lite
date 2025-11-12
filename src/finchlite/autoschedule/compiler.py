@@ -22,8 +22,8 @@ from ..finch_logic import (
     Field,
     Literal,
     LogicExpression,
-    LogicStatement,
     LogicNode,
+    LogicStatement,
     LogicTree,
     MapJoin,
     Plan,
@@ -360,7 +360,7 @@ class LogicLowerer:
                                 ntn.Literal(idx_type(1)),
                                 ntn.Literal(idx_type(1)),
                             ),
-                            body
+                            body,
                         )
 
                 return ntn.Block(

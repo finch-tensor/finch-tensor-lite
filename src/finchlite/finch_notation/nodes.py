@@ -59,8 +59,12 @@ class NotationExpression(NotationNode):
         """
         ...
 
+
 class NotationStatement(NotationNode):
-    pass
+    """
+    Notation AST statement base class.
+    """
+
 
 @dataclass(eq=True, frozen=True)
 class Literal(NotationExpression):
@@ -275,6 +279,7 @@ class Cached(NotationTree, NotationExpression):
     `arg`, but we still wish to refer to the original expression to prove
     properties about it.
     """
+
     arg: NotationExpression
     ref: NotationExpression
 

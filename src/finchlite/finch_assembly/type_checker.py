@@ -265,7 +265,7 @@ class AssemblyTypeChecker:
                         f"Function '{func_name}' is not guaranteed to return."
                     )
                 check_type_match(return_type, body_type)
-                return None
+                return
             case _:
                 raise ValueError(f"Ill-formed function:  {type(func)}.")
 
@@ -298,7 +298,6 @@ class AssemblyTypeChecker:
         if isinstance(prgm, asm.AssemblyExpression):
             return self.check_expr(prgm)
         raise ValueError(f"Ill-formed program:  {type(prgm)}.")
-        
 
 
 def check_is_index_type(index_type):
