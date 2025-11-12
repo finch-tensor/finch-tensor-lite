@@ -17,7 +17,7 @@ from finchlite.galley.LogicalOptimizer.annotated_query import (
     get_idx_connected_components,
     get_reducible_idxs,
 )
-from finchlite.galley.LogicalOptimizer.logic_to_stats import _insert_statistics
+from finchlite.galley.LogicalOptimizer.logic_to_stats import insert_statistics
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
 from finchlite.galley.TensorStats.dense_stat import DenseStats
 from finchlite.galley.TensorStats.tensor_def import TensorDef
@@ -222,7 +222,7 @@ def test_tensordef_aggregate(
 def test_from_tensor_and_getters():
     arr = np.zeros((2, 3))
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = _insert_statistics(
+    stats = insert_statistics(
         ST=DenseStats,
         node=node,
         bindings=OrderedDict(),
@@ -248,7 +248,7 @@ def test_estimate_non_fill_values(shape, expected):
     arr = np.zeros(shape)
     node = Table(Literal(arr), tuple(Field(a) for a in axes))
 
-    stats = _insert_statistics(
+    stats = insert_statistics(
         ST=DenseStats,
         node=node,
         bindings=OrderedDict(),
@@ -261,28 +261,16 @@ def test_estimate_non_fill_values(shape, expected):
 
 
 def test_mapjoin_mul_and_add():
-
-    ta  = Table(
-        Literal(np.ones((2, 3))),
-        (Field("i"), Field("j"))
-    )
-    tb  = Table(
-        Literal(np.ones((3, 4))),
-        (Field("j"), Field("k"))
-    )
-    ta2 = Table(
-        Literal(2 * np.ones((2, 3))),
-        (Field("i"), Field("j"))
-    )
+    ta = Table(Literal(np.ones((2, 3))), (Field("i"), Field("j")))
+    tb = Table(Literal(np.ones((3, 4))), (Field("j"), Field("k")))
+    ta2 = Table(Literal(2 * np.ones((2, 3))), (Field("i"), Field("j")))
 
     cache = {}
 
-    node_mul = MapJoin(
-        Literal(op.mul),
-        (ta, tb)
+    node_mul = MapJoin(Literal(op.mul), (ta, tb))
+    dsm = insert_statistics(
+        ST=DenseStats, node=node_mul, bindings=OrderedDict(), replace=False, cache=cache
     )
-    dsm = _insert_statistics(ST=DenseStats, node=node_mul, bindings=OrderedDict(),
-    replace=False, cache=cache)
 
     assert dsm.index_set == {"i", "j", "k"}
     assert dsm.get_dim_size("i") == 2.0
@@ -290,24 +278,23 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size("k") == 4.0
     assert dsm.fill_value == 0.0
 
-    node_add = MapJoin(
-        Literal(op.add),
-        (ta, ta2)
+    node_add = MapJoin(Literal(op.add), (ta, ta2))
+    ds_sum = insert_statistics(
+        ST=DenseStats, node=node_add, bindings=OrderedDict(), replace=False, cache=cache
     )
-    ds_sum = _insert_statistics(ST=DenseStats, node=node_add, bindings=OrderedDict(),
-    replace=False, cache=cache)
 
     assert ds_sum.index_set == {"i", "j"}
     assert ds_sum.get_dim_size("i") == 2.0
     assert ds_sum.get_dim_size("j") == 3.0
     assert ds_sum.fill_value == 1.0 + 2.0
 
+
 def test_aggregate_and_issimilar():
     table = Table(
         Literal(np.ones((2, 3))),
         (Field("i"), Field("j")),
     )
-    dsa = _insert_statistics(
+    dsa = insert_statistics(
         ST=DenseStats, node=table, bindings=OrderedDict(), replace=False, cache={}
     )
 
@@ -318,7 +305,7 @@ def test_aggregate_and_issimilar():
         idxs=(Field("j"),),
     )
 
-    ds_agg = _insert_statistics(
+    ds_agg = insert_statistics(
         ST=DenseStats, node=node_add, bindings=OrderedDict(), replace=False, cache={}
     )
 
@@ -344,7 +331,7 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(Field(f) for f in fields),
     )
-    stats = _insert_statistics(
+    stats = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -394,7 +381,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(Field(f) for f in fields),
     )
-    stats = _insert_statistics(
+    stats = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -447,7 +434,7 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(Field(f) for f in fields),
     )
-    stats = _insert_statistics(
+    stats = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -510,7 +497,7 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(Field(f) for f in fields),
     )
-    stats = _insert_statistics(
+    stats = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -536,7 +523,7 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
 )
 def test_single_tensor_card(dims, dcs, expected_nnz):
     node = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
-    stat = _insert_statistics(
+    stat = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -567,7 +554,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
     node = Table(
         Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
     )
-    stat = _insert_statistics(
+    stat = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -599,7 +586,7 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
         Literal(np.zeros((1, 1, 1, 1), dtype=int)),
         (Field("i"), Field("j"), Field("k"), Field("l")),
     )
-    stat = _insert_statistics(
+    stat = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -636,7 +623,7 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
     node = Table(
         Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
     )
-    stat = _insert_statistics(
+    stat = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -673,7 +660,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
     node = Table(
         Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
     )
-    stat = _insert_statistics(
+    stat = insert_statistics(
         ST=DCStats,
         node=node,
         bindings=OrderedDict(),
@@ -729,7 +716,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     stats_objs = []
     for dcs in dcs_list:
         node = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
-        s = _insert_statistics(
+        s = insert_statistics(
             ST=DCStats,
             node=node,
             bindings=OrderedDict(),
@@ -822,7 +809,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         shape = (1,) * max(1, len(fields))
         node = Table(Literal(np.zeros(shape, dtype=int)), fields)
 
-        _insert_statistics(
+        insert_statistics(
             ST=DCStats,
             node=node,
             bindings=OrderedDict(),
@@ -857,21 +844,21 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     cache = {}
 
     node1 = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
-    s1 = _insert_statistics(
+    s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i"}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
-    s2 = _insert_statistics(
+    s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
     s2.tensordef = TensorDef(frozenset({"i"}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -894,21 +881,21 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     cache = {}
 
     node1 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
-    s1 = _insert_statistics(
+    s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
-    s2 = _insert_statistics(
+    s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
     s2.tensordef = TensorDef(frozenset({"i", "j"}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -931,21 +918,21 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     cache = {}
 
     node1 = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
-    s1 = _insert_statistics(
+    s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i"}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(np.zeros((1,), dtype=int)), (Field("j"),))
-    s2 = _insert_statistics(
+    s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
     s2.tensordef = TensorDef(frozenset({"j"}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -971,7 +958,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         Literal(np.zeros((1, 1), dtype=int)),
         (Field("i"), Field("j")),
     )
-    s1 = _insert_statistics(
+    s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 0)
@@ -981,14 +968,14 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         Literal(np.zeros((1, 1), dtype=int)),
         (Field("j"), Field("k")),
     )
-    s2 = _insert_statistics(
+    s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
     s2.tensordef = TensorDef(frozenset({"j", "k"}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -1018,14 +1005,14 @@ def test_large_disjoint_disjunction_dc_card(
     cache = {}
 
     node1 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
-    s1 = _insert_statistics(
+    s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 1)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("j"), Field("k")))
-    s2 = _insert_statistics(
+    s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
     s2.tensordef = TensorDef(frozenset({"j", "k"}), dims2, 1)
@@ -1034,7 +1021,7 @@ def test_large_disjoint_disjunction_dc_card(
     node3 = Table(
         Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
     )
-    s3 = _insert_statistics(
+    s3 = insert_statistics(
         ST=DCStats, node=node3, bindings=OrderedDict(), replace=False, cache=cache
     )
     s3.tensordef = TensorDef(frozenset({"i", "j", "k"}), dims3, 1)
@@ -1044,7 +1031,7 @@ def test_large_disjoint_disjunction_dc_card(
 
     parent = MapJoin(Literal(op.mul), (map, node3))
 
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -1071,14 +1058,14 @@ def test_mixture_disjoint_disjunction_dc_card(
     cache = {}
 
     node1 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
-    s1 = _insert_statistics(
+    s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 1)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("j"), Field("k")))
-    s2 = _insert_statistics(
+    s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
     s2.tensordef = TensorDef(frozenset(["j", "k"]), dims2, 1)
@@ -1087,7 +1074,7 @@ def test_mixture_disjoint_disjunction_dc_card(
     node3 = Table(
         Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
     )
-    s3 = _insert_statistics(
+    s3 = insert_statistics(
         ST=DCStats, node=node3, bindings=OrderedDict(), replace=False, cache=cache
     )
     s3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 0)
@@ -1096,7 +1083,7 @@ def test_mixture_disjoint_disjunction_dc_card(
     map = MapJoin(Literal(op.mul), (node1, node2))
     parent = MapJoin(Literal(op.mul), (map, node3))
 
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats,
         node=parent,
         bindings=OrderedDict(),
@@ -1134,7 +1121,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         Literal(np.zeros((1, 1, 1), dtype=int)),
         (Field("i"), Field("j"), Field("k")),
     )
-    stat = _insert_statistics(
+    stat = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
     stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
@@ -1146,7 +1133,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         idxs=(Field("i"), Field("j"), Field("k")),
         arg=node,
     )
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -1180,7 +1167,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         Literal(np.zeros((1, 1, 1), dtype=int)),
         (Field("i"), Field("j"), Field("k")),
     )
-    st = _insert_statistics(
+    st = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
     st.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
@@ -1192,7 +1179,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         idxs=(Field("i"), Field("j")),
         arg=node,
     )
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -1226,7 +1213,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         Literal(np.zeros((1, 1, 1), dtype=int)),
         (Field("i"), Field("j"), Field("k")),
     )
-    st = _insert_statistics(
+    st = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
     st.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
@@ -1238,7 +1225,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         idxs=(Field("i"),),
         arg=node,
     )
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
     )
 
@@ -1289,7 +1276,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         Literal(np.zeros((1, 1, 1), dtype=int)),
         (Field("i"), Field("j"), Field("k")),
     )
-    st = _insert_statistics(
+    st = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
     st.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
@@ -1302,7 +1289,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         idxs=reduce_fields,
         arg=node,
     )
-    reduce_stats = _insert_statistics(
+    reduce_stats = insert_statistics(
         ST=DCStats, node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
     )
 

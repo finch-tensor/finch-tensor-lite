@@ -1,7 +1,4 @@
-from .LogicalOptimizer import (
-    AnnotatedQuery,
-    _insert_statistics,
-)
+from .LogicalOptimizer import AnnotatedQuery, insert_node_ids, insert_statistics
 from .TensorStats import (
     DC,
     DCStats,
@@ -15,5 +12,6 @@ __all__ = [
     "DCStats",
     "DenseStats",
     "TensorDef",
-    "_insert_statistics",
+    "insert_node_ids",
+    "insert_statistics",
 ]

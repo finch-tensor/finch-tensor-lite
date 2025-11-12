@@ -18,7 +18,6 @@ from .nodes import (
     Table,
     Value,
 )
-from .utility import intree, isdescendant
 
 __all__ = [
     "Aggregate",
@@ -39,6 +38,4 @@ __all__ = [
     "Subquery",
     "Table",
     "Value",
-    "intree",
-    "isdescendant",
 ]

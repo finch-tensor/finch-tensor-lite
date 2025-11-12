@@ -15,9 +15,10 @@ from finchlite.finch_logic import (
     Value,
 )
 from finchlite.galley.TensorStats.tensor_stats import TensorStats
+from finchlite.symbolic.traversal import PreOrderDFS
 
 
-def _insert_statistics(
+def insert_statistics(
     ST,
     node: LogicNode,
     bindings: OrderedDict[Alias, TensorStats],
@@ -32,7 +33,7 @@ def _insert_statistics(
             raise TypeError("MapJoin.op must be Literal(...).")
         op = node.op.val
 
-        args = [_insert_statistics(ST, a, bindings, replace, cache) for a in node.args]
+        args = [insert_statistics(ST, a, bindings, replace, cache) for a in node.args]
         if not args:
             raise ValueError("MapJoin expects at least one argument with stats.")
 
@@ -45,7 +46,7 @@ def _insert_statistics(
             raise TypeError("Aggregate.op must be Literal(...).")
         op = node.op.val
         init = node.init.val if isinstance(node.init, Literal) else None
-        arg = _insert_statistics(ST, node.arg, bindings, replace, cache)
+        arg = insert_statistics(ST, node.arg, bindings, replace, cache)
         reduce_indices = list(
             dict.fromkeys(
                 [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
@@ -61,7 +62,7 @@ def _insert_statistics(
         return st
 
     if isinstance(node, (Reformat, Reorder)):
-        child = _insert_statistics(ST, node.arg, bindings, replace, cache)
+        child = insert_statistics(ST, node.arg, bindings, replace, cache)
         cache[node] = child
         return child
 
@@ -83,3 +84,15 @@ def _insert_statistics(
         return st
 
     raise TypeError(f"Unsupported node type: {type(node).__name__}")
+
+
+def insert_node_ids(root: LogicNode):
+    """
+    Return a dict: node -> int id, with parent ids < child ids.
+    """
+    ids = {}
+    cur = 1
+    for node in PreOrderDFS(root):
+        ids[node] = cur
+        cur += 1
+    return ids
