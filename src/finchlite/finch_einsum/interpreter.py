@@ -292,13 +292,13 @@ class EinsumInterpreter:
                 return tuple(self(arg) for arg in args)
 
             # get non-zero elements/data array of a sparse tensor
-            case ein.GetAttribute(obj, ein.Literal("elems"), _):
+            case ein.GetAttr(obj, ein.Literal("elems"), _):
                 obj = self(obj)
                 assert isinstance(ftype(obj), SparseTensorFType)
                 assert isinstance(obj, SparseTensor)
                 return obj.data
             # get coord array of a sparse tensor
-            case ein.GetAttribute(obj, ein.Literal("coords"), dim):
+            case ein.GetAttr(obj, ein.Literal("coords"), dim):
                 obj = self(obj)
                 assert isinstance(ftype(obj), SparseTensorFType)
                 assert isinstance(obj, SparseTensor)
@@ -306,7 +306,7 @@ class EinsumInterpreter:
                 # return the coord array for the given dimension or all dimensions
                 return obj.coords if dim is None else obj.coords[:, dim]
             # gets the shape of a sparse tensor at a given dimension
-            case ein.GetAttribute(obj, ein.Literal("shape"), dim):
+            case ein.GetAttr(obj, ein.Literal("shape"), dim):
                 obj = self(obj)
                 assert isinstance(ftype(obj), SparseTensorFType)
                 assert isinstance(obj, SparseTensor)

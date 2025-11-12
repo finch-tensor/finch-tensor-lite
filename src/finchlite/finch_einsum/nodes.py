@@ -177,7 +177,7 @@ class Call(EinsumExpr, EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
-class GetAttribute(EinsumExpr, EinsumTree):
+class GetAttr(EinsumExpr, EinsumTree):
     """
     Gets an attribute of a tensor.
     Attributes:
@@ -376,7 +376,7 @@ class EinsumPrinterContext(Context):
                 if len(args) == 1 and fn.val in unary_strs:
                     return f"{unary_strs[fn.val]}{args_e[0]}"
                 return f"{self(fn)}({', '.join(args_e)})"
-            case GetAttribute(obj, attr, idx):
+            case GetAttr(obj, attr, idx):
                 if idx is not None:
                     return f"{self(obj)}.{self(attr)}[{idx}]"
                 return f"{self(obj)}.{self(attr)}"
