@@ -10,6 +10,8 @@ from finchlite.finch_logic import (
     Field,
     Literal,
     MapJoin,
+    Plan,
+    Produces,
     Table,
 )
 from finchlite.galley.LogicalOptimizer.annotated_query import (
@@ -17,10 +19,14 @@ from finchlite.galley.LogicalOptimizer.annotated_query import (
     get_idx_connected_components,
     get_reducible_idxs,
 )
-from finchlite.galley.LogicalOptimizer.logic_to_stats import insert_statistics
+from finchlite.galley.LogicalOptimizer.logic_to_stats import (
+    insert_node_ids,
+    insert_statistics,
+)
 from finchlite.galley.TensorStats.dc_stats import DC, DCStats
 from finchlite.galley.TensorStats.dense_stat import DenseStats
 from finchlite.galley.TensorStats.tensor_def import TensorDef
+from finchlite.symbolic.traversal import PreOrderDFS
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
@@ -1377,3 +1383,45 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
 def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
     out = get_idx_connected_components(parent_idxs, connected_idxs)
     assert out == expected
+
+
+# ─────────────────────────────── logic_to_stats tests ─────────────────────────────
+
+
+def test_insert_node_ids():
+    ta = Table(
+        Literal("A"),
+        (Field("i"), Field("j")),
+    )
+
+    tb = Table(
+        Literal("B"),
+        (Field("j"), Field("k")),
+    )
+
+    prog = Plan(
+        (
+            Produces(
+                (
+                    MapJoin(
+                        Field("op"),
+                        (ta, tb),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    ids = insert_node_ids(prog)
+
+    # The set of labeled nodes equals the set of visited nodes
+    visited = list(PreOrderDFS(prog))
+    unique_visited = set(visited)
+    assert set(ids.keys()) == unique_visited
+    assert len(ids) == len(unique_visited)
+
+    # Parent id < child id for every edge
+    for node in visited:
+        parent_id = ids[node]
+        for child in getattr(node, "children", ()):
+            assert parent_id < ids[child]
