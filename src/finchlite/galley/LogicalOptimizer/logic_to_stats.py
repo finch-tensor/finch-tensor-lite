@@ -15,7 +15,6 @@ from finchlite.finch_logic import (
     Value,
 )
 from finchlite.galley.TensorStats.tensor_stats import TensorStats
-from finchlite.symbolic.traversal import PreOrderDFS
 
 
 def insert_statistics(
@@ -84,15 +83,3 @@ def insert_statistics(
         return st
 
     raise TypeError(f"Unsupported node type: {type(node).__name__}")
-
-
-def insert_node_ids(root: LogicNode):
-    """
-    Return a dict: node -> int id, with parent ids < child ids.
-    """
-    ids = {}
-    cur = 1
-    for node in PreOrderDFS(root):
-        ids[node] = cur
-        cur += 1
-    return ids
