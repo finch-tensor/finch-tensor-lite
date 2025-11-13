@@ -1,6 +1,8 @@
 import numpy as np
 
-from finchlite import finch_einsum as ein, symbolic as sym, supertensor as stns
+from ..finch_einsum import nodes as ein, EinsumInterpreter
+from ..symbolic import PostOrderDFS, PostWalk, Rewrite, Namespace
+from . import SuperTensor
 
 class SuperTensorEinsumInterpreter:
     def __init__(self, xp=None, bindings=None):
@@ -22,7 +24,7 @@ class SuperTensorEinsumInterpreter:
                 return tuple(self(arg) for arg in args)
             case ein.Einsum(op, output_tns, output_idxs, arg):
                 # Collect all Access nodes in the einsum AST.
-                accesses = [node for node in sym.PostOrderDFS(arg) if isinstance(node, ein.Access)]
+                accesses = [node for node in PostOrderDFS(arg) if isinstance(node, ein.Access)]
 
                 # For each index, collect the set of tensors in which the index appears.
                 idx_appearances: dict[ein.Index, set[ein.Alias]] = {}
@@ -41,7 +43,7 @@ class SuperTensorEinsumInterpreter:
                 idx_groups: dict[ein.Index, list[ein.Index]] = {}       
                 old_to_new_idx_map: dict[ein.Index, ein.Index] = {}
 
-                namespace = sym.Namespace()
+                namespace = Namespace()
                 for _, idx_group in tensor_sets.items():
                     new_idx = ein.Index(namespace.freshen("i"))
                     idx_groups[new_idx] = idx_group
@@ -62,7 +64,7 @@ class SuperTensorEinsumInterpreter:
                         logical_tns[idx] = supertensor[idx]
 
                     # Reshape the base tensor using the corrected mode map.
-                    corrected_supertensor = stns.SuperTensor.from_logical(logical_tns, mode_map)
+                    corrected_supertensor = SuperTensor.from_logical(logical_tns, mode_map)
 
                     # Map the tensor name to its corrected base tensor and index list. 
                     corrected_bindings[access.tns.name] = corrected_supertensor.base
@@ -95,15 +97,15 @@ class SuperTensorEinsumInterpreter:
                             return ein.Einsum(op, tns, tuple(updated_output_idxs), arg)
                         case _:
                             return node                        
-                corrected_AST = sym.Rewrite(sym.PostWalk(reshape_supertensors))(node)
+                corrected_AST = Rewrite(PostWalk(reshape_supertensors))(node)
 
                 # Compute the output base tensor by using a regular EinsumInterpreter to execute the einsum on the corrected base tensors.
-                ctx = ein.EinsumInterpreter(bindings=corrected_bindings)
+                ctx = EinsumInterpreter(bindings=corrected_bindings)
                 result = ctx(corrected_AST)  
                 output_base = corrected_bindings[result[0]]
 
                 # Wrap the output base tensor into a SuperTensor.
-                self.bindings[output_tns.name] = stns.SuperTensor(output_shape, output_base, output_mode_map)
+                self.bindings[output_tns.name] = SuperTensor(output_shape, output_base, output_mode_map)
                 return (output_tns.name,)
             case _:
                 pass
