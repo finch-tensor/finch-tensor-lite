@@ -12,17 +12,13 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
-from finchlite.galley.LogicalOptimizer.annotated_query import (
+from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
     get_idx_connected_components,
     get_reducible_idxs,
-)
-from finchlite.galley.LogicalOptimizer.logic_to_stats import (
     insert_statistics,
 )
-from finchlite.galley.TensorStats.dc_stats import DC, DCStats
-from finchlite.galley.TensorStats.dense_stat import DenseStats
-from finchlite.galley.TensorStats.tensor_def import TensorDef
+from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
