@@ -1,9 +1,9 @@
-from .c import CArgumentFType, CBufferFType, CCompiler, CGenerator, CKernel, CModule
+from .c import CArgumentFType, CBufferFType, CCompiler, CGenerator, CKernel, CLibrary
 from .numba_backend import (
     NumbaCompiler,
     NumbaGenerator,
     NumbaKernel,
-    NumbaModule,
+    NumbaLibrary,
 )
 from .numpy_buffer import NumpyBuffer, NumpyBufferFType
 from .safe_buffer import SafeBuffer, SafeBufferFType
@@ -14,13 +14,13 @@ __all__ = [
     "CCompiler",
     "CGenerator",
     "CKernel",
-    "CModule",
+    "CLibrary",
     "CStruct",
     "CStructFTypeNumbaCompiler",
     "NumbaCompiler",
     "NumbaGenerator",
     "NumbaKernel",
-    "NumbaModule",
+    "NumbaLibrary",
     "NumbaStruct",
     "NumbaStructFType",
     "NumpyBuffer",

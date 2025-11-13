@@ -290,7 +290,7 @@ class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
         return "list[numpy.ndarray]"
 
 
-class NumbaModule:
+class NumbaLibrary:
     """
     A class to represent a Numba module.
     """
@@ -363,7 +363,7 @@ class NumbaCompiler:
                         f"Unrecognized function type: {type(func)}"
                     )
 
-        return NumbaModule(kernels)
+        return NumbaLibrary(kernels)
 
 
 class NumbaGenerator:

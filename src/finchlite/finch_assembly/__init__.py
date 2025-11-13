@@ -5,6 +5,7 @@ from .cfg_builder import (
     assembly_number_uses,
 )
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
+from .stages import AssemblyLibrary, AssemblyKernel, AssemblyLoader, AssemblyTransform
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -48,6 +49,10 @@ __all__ = [
     "AssemblyStructFType",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
+    "AssemblyLibrary",
+    "AssemblyKernel",
+    "AssemblyLoader",
+    "AssemblyTransform",
     "Assert",
     "Assign",
     "Block",

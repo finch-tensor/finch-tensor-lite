@@ -261,7 +261,7 @@ class CKernel:
         return self.ret_type(res)
 
 
-class CModule:
+class CLibrary:
     """
     A class to represent a C module.
     """
@@ -323,7 +323,7 @@ class CCompiler:
                     raise NotImplementedError(
                         f"Unrecognized function type: {type(func)}"
                     )
-        return CModule(lib, kernels)
+        return CLibrary(lib, kernels)
 
 
 def c_function_name(op: Any, ctx, *args: Any) -> str:

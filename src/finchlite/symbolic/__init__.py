@@ -16,6 +16,7 @@ from .term import (
     TermTree,
     literal_repr,
 )
+from .stage import Stage
 
 __all__ = [
     "BasicBlock",
@@ -35,6 +36,7 @@ __all__ = [
     "Reflector",
     "Rewrite",
     "ScopedDict",
+    "Stage",
     "Term",
     "TermTree",
     "fisinstance",

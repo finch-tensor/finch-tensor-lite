@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 from ..symbolic import ScopedDict, fisinstance
 from . import nodes as asm
+from .stages import AssemblyLoader, AssemblyKernel, AssemblyLibrary
 
 
-class AssemblyInterpreterKernel:
+class AssemblyInterpreterKernel(AssemblyKernel):
     """
     A kernel for interpreting FinchAssembly code.
     This is a simple interpreter that executes the assembly code.
@@ -23,7 +24,7 @@ class AssemblyInterpreterKernel:
         return self.ctx(asm.Call(self.func, args_i))
 
 
-class AssemblyInterpreterModule:
+class AssemblyInterpreterLibrary(AssemblyLibrary):
     """
     A class to represent an interpreted module of FinchAssembly.
     """
@@ -59,7 +60,7 @@ def check_isinstance(obj, cls):
     return isinstance(obj, cls)
 
 
-class AssemblyInterpreter:
+class AssemblyInterpreter(AssemblyLoader):
     """
     An interpreter for FinchAssembly.
     """
@@ -135,7 +136,13 @@ class AssemblyInterpreter:
             and self.function_state.should_halt
         )
 
-    def __call__(self, prgm: asm.AssemblyNode):
+    @overload
+    def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
+
+    @overload
+    def __call__(self, prgm: asm.AssemblyNode) -> Any: ...
+    
+    def __call__(self, prgm):
         """
         Run the program.
         """
@@ -342,7 +349,7 @@ class AssemblyInterpreter:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return AssemblyInterpreterModule(self, kernels)
+                return AssemblyInterpreterLibrary(self, kernels)
             case asm.Print(args):
                 args_value_str = ""
                 for arg in args:
