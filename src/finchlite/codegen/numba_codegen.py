@@ -12,6 +12,7 @@ from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
+from .stages import NumbaLowerer
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
-    from ..codegen.numba_backend import (
+    from .numba_codegen import (
         numba_globals,
         numba_jitclass_type,
         numba_structnames,
@@ -290,7 +291,7 @@ class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
         return "list[numpy.ndarray]"
 
 
-class NumbaLibrary:
+class NumbaLibrary(asm.AssemblyLibrary):
     """
     A class to represent a Numba module.
     """
@@ -307,7 +308,7 @@ class NumbaLibrary:
         )
 
 
-class NumbaKernel:
+class NumbaKernel(asm.AssemblyKernel):
     def __init__(self, numba_func, ret_type: type, arg_types):
         self.numba_func = numba_func
         self.ret_type = ret_type
@@ -330,14 +331,14 @@ class NumbaKernel:
         return construct_from_numba(self.ret_type, res)
 
 
-class NumbaCompiler:
-    def __init__(self, ctx=None):
+class NumbaCompiler(asm.AssemblyLoader):
+    def __init__(self, ctx:NumbaLowerer|None=None):
         if ctx is None:
             ctx = NumbaGenerator()
-        self.ctx = ctx
+        self.ctx: NumbaLowerer = ctx
 
-    def __call__(self, prgm: asm.Module):
-        numba_code = self.ctx(prgm)
+    def __call__(self, prgm: asm.Module) -> NumbaLibrary:
+        numba_code = self.ctx(prgm).code
         logger.info(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
         _globals |= numba_globals
@@ -366,7 +367,7 @@ class NumbaCompiler:
         return NumbaLibrary(kernels)
 
 
-class NumbaGenerator:
+class NumbaGenerator(NumbaLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = NumbaContext()
         ctx(prgm)

@@ -6,7 +6,7 @@ from typing import Any, overload
 
 from ..symbolic import ScopedDict, fisinstance
 from . import nodes as asm
-from .stages import AssemblyLoader, AssemblyKernel, AssemblyLibrary
+from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 
 
 class AssemblyInterpreterKernel(AssemblyKernel):
@@ -141,7 +141,7 @@ class AssemblyInterpreter(AssemblyLoader):
 
     @overload
     def __call__(self, prgm: asm.AssemblyNode) -> Any: ...
-    
+
     def __call__(self, prgm):
         """
         Run the program.

@@ -5,7 +5,6 @@ from .cfg_builder import (
     assembly_number_uses,
 )
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
-from .stages import AssemblyLibrary, AssemblyKernel, AssemblyLoader, AssemblyTransform
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -37,6 +36,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 
@@ -45,14 +45,14 @@ __all__ = [
     "AssemblyCopyPropagation",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
+    "AssemblyKernel",
+    "AssemblyLibrary",
+    "AssemblyLoader",
     "AssemblyNode",
     "AssemblyStructFType",
+    "AssemblyTransform",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
-    "AssemblyLibrary",
-    "AssemblyKernel",
-    "AssemblyLoader",
-    "AssemblyTransform",
     "Assert",
     "Assign",
     "Block",

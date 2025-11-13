@@ -9,6 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
+from .stage import Stage
 from .term import (
     PostOrderDFS,
     PreOrderDFS,
@@ -16,7 +17,6 @@ from .term import (
     TermTree,
     literal_repr,
 )
-from .stage import Stage
 
 __all__ = [
     "BasicBlock",

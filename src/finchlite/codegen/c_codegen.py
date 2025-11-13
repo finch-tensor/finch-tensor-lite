@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import NoneType
 from typing import Any
+from .stages import CCode, CLowerer
 
 import numpy as np
 
@@ -225,7 +226,7 @@ register_property(
 # deserialize_to_c should modify in place. TODO: implement
 
 
-class CKernel:
+class CKernel(asm.AssemblyKernel):
     """
     A class to represent a C kernel.
     """
@@ -261,7 +262,7 @@ class CKernel:
         return self.ret_type(res)
 
 
-class CLibrary:
+class CLibrary(asm.AssemblyLibrary):
     """
     A class to represent a C module.
     """
@@ -279,12 +280,12 @@ class CLibrary:
         )
 
 
-class CCompiler:
+class CCompiler(asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None):
+    def __init__(self, ctx:CLowerer|None = None, cc=None, cflags=None, shared_cflags=None):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -294,12 +295,10 @@ class CCompiler:
         self.cc = cc
         self.cflags = cflags
         self.shared_cflags = shared_cflags
-        self.ctx = CGenerator() if ctx is None else ctx
+        self.ctx:CLowerer = CGenerator() if ctx is None else ctx
 
-    def __call__(self, prgm):
-        ctx = CContext()
-        ctx(prgm)
-        c_code = ctx.emit_global()
+    def __call__(self, prgm: asm.Module) -> CLibrary:
+        c_code = self.ctx(prgm).code
         logger.info(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
@@ -559,7 +558,7 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CGenerator:
+class CGenerator(CLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = CContext()
         ctx(prgm)
