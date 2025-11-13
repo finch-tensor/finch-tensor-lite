@@ -10,7 +10,6 @@ from functools import lru_cache
 from pathlib import Path
 from types import NoneType
 from typing import Any
-from .stages import CCode, CLowerer
 
 import numpy as np
 
@@ -20,6 +19,7 @@ from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
+from .stages import CCode, CLowerer
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +285,9 @@ class CCompiler(asm.AssemblyLoader):
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(self, ctx:CLowerer|None = None, cc=None, cflags=None, shared_cflags=None):
+    def __init__(
+        self, ctx: CLowerer | None = None, cc=None, cflags=None, shared_cflags=None
+    ):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -295,7 +297,7 @@ class CCompiler(asm.AssemblyLoader):
         self.cc = cc
         self.cflags = cflags
         self.shared_cflags = shared_cflags
-        self.ctx:CLowerer = CGenerator() if ctx is None else ctx
+        self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
     def __call__(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
@@ -562,7 +564,7 @@ class CGenerator(CLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = CContext()
         ctx(prgm)
-        return ctx.emit_global()
+        return CCode(ctx.emit_global())
 
 
 class CContext(Context):

@@ -23,7 +23,11 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c_codegen import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.c_codegen import (
+    construct_from_c,
+    deserialize_from_c,
+    serialize_to_c,
+)
 from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_codegen import (
     construct_from_numba,
@@ -80,7 +84,9 @@ def test_buffer_function():
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
     f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
-    k = finchlite.codegen.c_codegen.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
+    k = finchlite.codegen.c_codegen.CKernel(
+        f, type(None), [NumpyBufferFType(np.float64)]
+    )
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
@@ -412,7 +418,7 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
         )
     )
 
-    file_regression.check(compiler(prgm), extension=extension)
+    file_regression.check(str(compiler(prgm)), extension=extension)
 
 
 @pytest.mark.parametrize(
@@ -481,7 +487,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
         )
     )
 
-    file_regression.check(compiler(prgm), extension=extension)
+    file_regression.check(str(compiler(prgm)), extension=extension)
 
 
 @pytest.mark.parametrize(
@@ -686,7 +692,7 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
         )
     )
     output = compiler(mod)
-    file_regression.check(output, extension=extension)
+    file_regression.check(str(output), extension=extension)
 
 
 @pytest.mark.parametrize(

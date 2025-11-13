@@ -12,7 +12,7 @@ from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
-from .stages import NumbaLowerer
+from .stages import NumbaCode, NumbaLowerer
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +332,7 @@ class NumbaKernel(asm.AssemblyKernel):
 
 
 class NumbaCompiler(asm.AssemblyLoader):
-    def __init__(self, ctx:NumbaLowerer|None=None):
+    def __init__(self, ctx: NumbaLowerer | None = None):
         if ctx is None:
             ctx = NumbaGenerator()
         self.ctx: NumbaLowerer = ctx
@@ -371,7 +371,7 @@ class NumbaGenerator(NumbaLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = NumbaContext()
         ctx(prgm)
-        return ctx.emit_global()
+        return NumbaCode(ctx.emit_global())
 
 
 class NumbaContext(Context):
