@@ -23,9 +23,9 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.c_codegen import construct_from_c, deserialize_from_c, serialize_to_c
 from finchlite.codegen.malloc_buffer import MallocBuffer
-from finchlite.codegen.numba_backend import (
+from finchlite.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,
     serialize_to_numba,
@@ -40,7 +40,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finchlite.codegen.c.load_shared_lib(c_code).add
+    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -79,8 +79,8 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
-    f = finchlite.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finchlite.codegen.c.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
+    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
+    k = finchlite.codegen.c_codegen.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
