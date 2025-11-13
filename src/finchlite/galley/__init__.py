@@ -4,6 +4,7 @@ from .TensorStats import (
     DCStats,
     DenseStats,
     TensorDef,
+    TensorStats,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "DCStats",
     "DenseStats",
     "TensorDef",
+    "TensorStats",
 ]

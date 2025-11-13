@@ -14,7 +14,7 @@ from finchlite.finch_logic import (
     Table,
     Value,
 )
-from finchlite.galley.TensorStats.tensor_stats import TensorStats
+from finchlite.galley.TensorStats import TensorStats
 
 
 def insert_statistics(
