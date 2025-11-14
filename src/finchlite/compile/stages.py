@@ -1,7 +1,9 @@
 from abc import abstractmethod
+
 from .. import finch_assembly as asm
-from ..symbolic import Stage
 from .. import finch_notation as ntn
+from ..symbolic import Stage
+
 
 class NotationLowerer(Stage):
     @abstractmethod

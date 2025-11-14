@@ -5,6 +5,7 @@ from typing import Any, overload
 
 import numpy as np
 
+from .. import finch_assembly as asm
 from ..algebra import (
     Tensor,
     TensorFType,
@@ -14,10 +15,9 @@ from ..algebra import (
     register_property,
     shape_type,
 )
-from .. import finch_assembly as asm
-from .stages import NotationLoader
 from ..symbolic import ScopedDict, fisinstance, ftype
 from . import nodes as ntn
+from .stages import NotationLoader
 
 
 class TensorViewFType(TensorFType):

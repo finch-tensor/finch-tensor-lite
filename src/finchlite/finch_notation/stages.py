@@ -1,7 +1,9 @@
 from abc import abstractmethod
+
 from .. import finch_assembly as asm
 from ..symbolic import Stage
 from . import nodes as ntn
+
 
 class NotationLoader(Stage):
     @abstractmethod
@@ -9,6 +11,7 @@ class NotationLoader(Stage):
         """
         Load the given notation program into a runnable module.
         """
+
 
 class NotationTransform(Stage):
     @abstractmethod
