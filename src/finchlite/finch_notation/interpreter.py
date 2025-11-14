@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
 
@@ -14,7 +14,8 @@ from ..algebra import (
     register_property,
     shape_type,
 )
-from ..finch_assembly import nodes as asm
+from .. import finch_assembly as asm
+from .stages import NotationLoader
 from ..symbolic import ScopedDict, fisinstance, ftype
 from . import nodes as ntn
 
@@ -228,7 +229,7 @@ def thaw(tns, op):
         return tns
 
 
-class NotationInterpreterKernel:
+class NotationInterpreterKernel(asm.AssemblyKernel):
     """
     A kernel for interpreting FinchNotation code.
     This is a simple interpreter that executes the assembly code.
@@ -243,7 +244,7 @@ class NotationInterpreterKernel:
         return self.ctx(ntn.Call(self.func, args_i))
 
 
-class NotationInterpreterModule:
+class NotationInterpreterLibrary(asm.AssemblyLibrary):
     """
     A class to represent an interpreted module of FinchNotation.
     """
@@ -272,7 +273,7 @@ class HaltState:
     return_value: Any = None
 
 
-class NotationInterpreter:
+class NotationInterpreter(NotationLoader):
     """
     An interpreter for FinchNotation.
     """
@@ -326,6 +327,12 @@ class NotationInterpreter:
             loop_state=loop_state,
             function_state=function_state,
         )
+
+    @overload
+    def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
+
+    @overload
+    def __call__(self, prgm: ntn.NotationNode | asm.AssemblyNode) -> Any: ...
 
     def __call__(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         """
@@ -507,7 +514,7 @@ class NotationInterpreter:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return NotationInterpreterModule(self, kernels)
+                return NotationInterpreterLibrary(self, kernels)
             case ntn.Stack(val):
                 raise NotImplementedError(
                     "NotationInterpreter does not support symbolic, no target language"

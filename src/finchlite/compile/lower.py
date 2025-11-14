@@ -5,12 +5,20 @@ from typing import Any
 
 import numpy as np
 
+from finchlite.finch_assembly.interpreter import AssemblyInterpreter
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
-from ..finch_assembly import AssemblyStructFType
+from ..finch_assembly import (
+    AssemblyLibrary,
+    AssemblyLoader,
+    AssemblyStructFType,
+)
+from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
+from .stages import NotationLowerer
 
 
 class FinchTensorFType(TensorFType, ABC):
@@ -258,14 +266,35 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler:
-    def __init__(self, ctx):
-        self.ctx = ctx
+class NotationCompiler(NotationLoader):
+    def __init__(
+        self,
+        ctx_load: AssemblyLoader | None = None,
+        ctx_lower: NotationLowerer | None = None,
+    ):
+        if ctx_load is None:
+            ctx_load = AssemblyInterpreter()
+        if ctx_lower is None:
+            ctx_lower = AssemblyGenerator()
+        self.ctx_lower: NotationLowerer = ctx_lower
+        self.ctx_load: AssemblyLoader = ctx_load
 
-    def __call__(self, prgm):
-        ctx_2 = NotationContext()
+    def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
+        asm_code = self.ctx_lower(prgm)
+        return self.ctx_load(asm_code)
 
-        return self.ctx(ctx_2(prgm))
+
+class AssemblyGenerator(NotationLowerer):
+    """
+    Compiles Finch Notation to Finch Assembly.
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, term: ntn.Module) -> asm.Module:
+        ctx = NotationContext()
+        return ctx(term)
 
 
 class NotationContext(Context):

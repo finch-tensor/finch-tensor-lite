@@ -37,7 +37,7 @@ class AssemblyLoader(Stage):
 
 class AssemblyTransform(Stage):
     @abstractmethod
-    def __call__(self, term: asm.AssemblyNode) -> asm.AssemblyNode:
+    def __call__(self, term: asm.Module) -> asm.Module:
         """
         Transform the given assembly term into another assembly term.
         """

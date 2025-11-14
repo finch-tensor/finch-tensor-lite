@@ -28,6 +28,7 @@ from .nodes import (
     Value,
     Variable,
 )
+from .stages import NotationLoader, NotationTransform
 
 __all__ = [
     "Access",
@@ -47,6 +48,8 @@ __all__ = [
     "NotationExpression",
     "NotationInterpreter",
     "NotationNode",
+    "NotationLoader",
+    "NotationTransform",
     "Read",
     "Repack",
     "Return",
