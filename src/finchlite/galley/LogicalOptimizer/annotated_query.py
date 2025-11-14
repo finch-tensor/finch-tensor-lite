@@ -15,10 +15,9 @@ class AnnotatedQuery:
     output_name: Alias | None
     reduce_idxs: list[str]
     point_expr: "LogicNode"
-    idx_lowest_root: OrderedDict[str, int]
+    idx_lowest_root: OrderedDict[str, LogicNode]
     idx_op: OrderedDict[str, Any]
     idx_init: OrderedDict[str, Any]
-    hash_to_node: OrderedDict[int, "LogicNode"]
     parent_idxs: OrderedDict[str, list[str]]
     original_idx: OrderedDict[str, str]
     connected_components: list[list[str]]
@@ -36,10 +35,9 @@ def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
         output_name=aq.output_name,
         reduce_idxs=list(aq.reduce_idxs),
         point_expr=aq.point_expr,
-        idx_lowest_root=OrderedDict(aq.idx_lowest_root.items()),
+        idx_lowest_root=aq.idx_lowest_root.copy(),
         idx_op=OrderedDict(aq.idx_op.items()),
         idx_init=OrderedDict(aq.idx_init.items()),
-        hash_to_node=OrderedDict(aq.hash_to_node.items()),
         parent_idxs=OrderedDict((m, list(n)) for m, n in aq.parent_idxs.items()),
         original_idx=OrderedDict(aq.original_idx.items()),
         connected_components=[list(n) for n in aq.connected_components],
@@ -88,8 +86,7 @@ def get_idx_connected_components(
     List[List[str]]
         A list of components, each a list of index names. Components are
         ordered so that any component containing a parent appears before any
-        component containing its child. Within a component, indices are kept
-        in the insertion order of `connected_idxs`.
+        component containing its child.
     """
     parent_map = {k: set(v) for k, v in parent_idxs.items()}
     conn_map: OrderedDict[str, set[str]] = OrderedDict(

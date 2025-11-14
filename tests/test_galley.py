@@ -1319,7 +1319,6 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
         idx_lowest_root=OrderedDict(),
         idx_op=OrderedDict(),
         idx_init=OrderedDict(),
-        hash_to_node=OrderedDict(),
         parent_idxs=OrderedDict((k, list(v)) for k, v in parent_idxs.items()),
         original_idx=OrderedDict(),
         connected_components=[],
