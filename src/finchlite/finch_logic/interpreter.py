@@ -1,7 +1,4 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
 from itertools import product
-from typing import Any
 
 import numpy as np
 
@@ -19,18 +16,9 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    TableValue,
     Value,
 )
-
-
-@dataclass(eq=True, frozen=True)
-class TableValue:
-    tns: Any
-    idxs: Iterable[Any]
-
-    def __post_init__(self):
-        if isinstance(self.tns, TableValue):
-            raise ValueError("The tensor (tns) cannot be a TableValue")
 
 
 class FinchLogicInterpreter:
