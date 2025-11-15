@@ -11,6 +11,9 @@ dependencies = ['numpy>=1.19,<2.4', 'numba>=0.61,<0.63.1', 'donfig>=0.8.1.post1,
 packages = [{include = "finchlite", from = "src"}]
 requires-poetry = '>=2.0,<3.0'
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+
 [project.optional-dependencies]
 test = [
     "pytest>=7.4.4,<7.6",
