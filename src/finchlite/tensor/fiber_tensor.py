@@ -46,6 +46,14 @@ class LevelFType(FinchTensorFType, ABC):
 
     @property
     @abstractmethod
+    def shape_type(self):
+        """
+        Tuple of types of the dimensions in the shape.
+        """
+        ...
+
+    @property
+    @abstractmethod
     def position_type(self):
         """
         Type of positions within the levels.
