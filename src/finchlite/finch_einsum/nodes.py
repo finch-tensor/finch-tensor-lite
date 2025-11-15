@@ -1,7 +1,7 @@
 import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Self, cast
+from typing import Any, Optional, Self, cast
 
 from finchlite.algebra import (
     overwrite,
@@ -175,6 +175,41 @@ class Call(EinsumExpr, EinsumTree):
             idxs.update(arg.get_idxs())
         return idxs
 
+@dataclass(eq=True, frozen=True)
+class GetAttribute(EinsumExpr, EinsumTree):
+    """
+    Gets an attribute of a tensor.
+
+    Attributes:
+        obj: The object to get the attribute from.
+        attr: The name of the attribute to get.
+    """
+    
+    obj: EinsumExpr
+    attr: Literal
+    idx: Optional[Index]
+
+    @classmethod
+    def from_children(cls, *children: Term) -> Self:
+        # Expects 3 children: obj, attr, idx
+        if len(children) != 3:
+            raise ValueError("GetAttribute expects 3 children (obj + attr + idx)")
+        obj = cast(EinsumExpr, children[0])
+        attr = cast(Literal, children[1])
+        idx = cast(Optional[Index], children[2])
+        return cls(obj, attr, idx)
+
+    @property
+    def children(self):
+        return [self.obj, self.attr, self.idx]
+
+    def get_idxs(self) -> set["Index"]:
+        idxs = set()
+        idxs.update(self.obj.get_idxs())
+        if self.idx is not None:
+            idxs.update(self.idx.get_idxs())
+        return idxs
+
 
 @dataclass(eq=True, frozen=True)
 class Einsum(EinsumTree):
@@ -334,6 +369,10 @@ class EinsumPrinterContext(Context):
                 if len(args) == 1 and fn.val in unary_strs:
                     return f"{unary_strs[fn.val]}{args_e[0]}"
                 return f"{self(fn)}({', '.join(args_e)})"
+            case GetAttribute(obj, attr, idx):
+                if idx is not None:
+                    return f"{self(obj)}.{self(attr)}[{self(idx)}]"
+                return f"{self(obj)}.{self(attr)}"
             case Einsum(op, tns, idxs, arg):
                 op_str = infix_strs.get(op.val, op.val.__name__)
                 self.exec(
