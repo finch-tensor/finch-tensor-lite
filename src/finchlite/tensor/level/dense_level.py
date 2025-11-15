@@ -21,7 +21,7 @@ class DenseLevelFields(NamedTuple):
 
 @dataclass(unsafe_hash=True)
 class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
-    lvl_t: LevelFType
+    _lvl_t: LevelFType
     dimension_type: Any = None
     op: Any = None
 
@@ -60,6 +60,14 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     @property
     def ndim(self):
         return 1 + self.lvl_t.ndim
+
+    @property
+    def lvl_t(self):
+        return self._lvl_t
+
+    @lvl_t.setter
+    def lvl_t(self, value):
+        self._lvl_t = value
 
     @property
     def fill_value(self):
@@ -104,7 +112,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             dimension_type = shape_type[0]
             kwargs["shape_type"] = shape_type[1:]
         op = kwargs.get("op", self.op)
-        return DenseLevelFType(self.lvl_t.from_kwargs(**kwargs), dimension_type, op)
+        return DenseLevelFType(self.lvl_t.from_kwargs(**kwargs), dimension_type, op)  # type: ignore[abstract]
 
     def to_kwargs(self):
         return {

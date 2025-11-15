@@ -40,6 +40,14 @@ class LevelFType(FinchTensorFType, ABC):
     @abstractmethod
     def buffer_type(self): ...
 
+    @property
+    @abstractmethod
+    def lvl_t(self):
+        """
+        Property returning nested level
+        """
+        ...
+
 
 class Level(FTyped, ABC):
     """
@@ -241,7 +249,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
 
     def from_kwargs(self, **kwargs) -> "FiberTensorFType":
         pos_t = kwargs.get("position_type", self.position_type)
-        return FiberTensorFType(self.lvl_t.from_kwargs(**kwargs), pos_t)
+        return FiberTensorFType(self.lvl_t.from_kwargs(**kwargs), pos_t)  # type: ignore[abstract]
 
     def to_kwargs(self):
         return {
@@ -258,7 +266,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         for idx in range(max(idxs) + 1):
             if idx in idxs:
                 lvl.lvl_t = dense(lvl.lvl_t, dimension_type=np.intp)
-            lvl = lvl.lvl_t
+            lvl = lvl.lvl_t  # type: ignore[assignment]
         return copy
 
     # TODO: temporary approach for suitable rep and traits
@@ -268,7 +276,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         for i in range(self.ndim):
             if i in idxs:
                 lvl.lvl_t = lvl.lvl_t.lvl_t
-            lvl = lvl.lvl_t
+            lvl = lvl.lvl_t  # type: ignore[assignment]
         return copy
 
     def unfurl(self, ctx, tns, ext, mode, proto):

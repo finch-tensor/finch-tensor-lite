@@ -98,7 +98,7 @@ class BufferizedNDArray(Tensor):
         """
         if isinstance(index, tuple):
             index = 0 if index == () else np.dot(index, self.strides)
-        return self.buf.load(index)
+        return self.val.load(index)
 
     def __setitem__(self, index, value):
         """

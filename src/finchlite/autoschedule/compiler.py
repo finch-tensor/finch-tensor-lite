@@ -550,7 +550,9 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict[Alias, Table]]:
+    def __call__(
+        self, prgm: LogicNode
+    ) -> tuple[ntn.NotationNode, dict[Alias, ntn.Variable], dict[Alias, Table]]:
         prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
             record_tables(prgm)
         )

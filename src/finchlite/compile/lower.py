@@ -164,7 +164,7 @@ class ExtentFType(AssemblyStructFType):
     def from_kwargs(self, **kwargs) -> "ExtentFType":
         start = kwargs.get("start", self.start)
         end = kwargs.get("end", self.end)
-        return ExtentFType(start, end)
+        return ExtentFType(start, end)  # type: ignore[abstract]
 
     def to_kwargs(self):
         return asdict(self)

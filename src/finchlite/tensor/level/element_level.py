@@ -65,13 +65,17 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def ndim(self):
         return 0
 
+    @property
+    def lvl_t(self):
+        raise Exception("ElementLevel is a leaf level.")
+
     def from_kwargs(self, **kwargs) -> "ElementLevelFType":
         f_v = kwargs.get("fill_value", self.fill_value)
         e_t = kwargs.get("element_type", self.element_type)
         p_t = kwargs.get("position_type", self.position_type)
         b_f = kwargs.get("buffer_factory", self.buffer_factory)
         v_f = kwargs.get("buffer_type", self.buffer_type)
-        return ElementLevelFType(f_v, e_t, p_t, b_f, v_f)
+        return ElementLevelFType(f_v, e_t, p_t, b_f, v_f)  # type: ignore[abstract]
 
     def to_kwargs(self):
         return asdict(self)

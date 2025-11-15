@@ -158,7 +158,7 @@ def get_default_scheduler():
 
 
 def provision_tensors(
-    prgm: Any, table_vars: dict[Alias, asm.Variable], tables: dict[Alias, Table]
+    prgm: Any, table_vars: dict[Alias, ntn.Variable], tables: dict[Alias, Table]
 ) -> list[Tensor]:
     args: list[Tensor] = []
     dims_dict: dict[Field, int] = {}
