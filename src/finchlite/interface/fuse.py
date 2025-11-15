@@ -60,7 +60,7 @@ from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
 from ..codegen import NumbaCompiler
-from ..compile import BufferizedNDArray, NotationCompiler
+from ..compile import NotationCompiler
 from ..finch_logic import (
     Alias,
     Field,
@@ -103,9 +103,9 @@ def set_default_scheduler(
         ntn_interp = ntn.NotationInterpreter()
 
         def fn_compile(plan):
-            prgm, tables = optimizer(plan)
+            prgm, table_vars, tables = optimizer(plan)
             mod = ntn_interp(prgm)
-            args = provision_tensors(prgm, tables)
+            args = provision_tensors(prgm, table_vars, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -116,10 +116,10 @@ def set_default_scheduler(
         asm_interp = asm.AssemblyInterpreter()
 
         def fn_compile(plan):
-            ntn_prgm, tables = optimizer(plan)
+            ntn_prgm, table_vars, tables = optimizer(plan)
             asm_prgm = notation_compiler(ntn_prgm)
             mod = asm_interp(asm_prgm)
-            args = provision_tensors(asm_prgm, tables)
+            args = provision_tensors(asm_prgm, table_vars, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -132,12 +132,12 @@ def set_default_scheduler(
         def fn_compile(plan):
             # TODO: proper logging
             # print("Logic: \n", plan)
-            ntn_prgm, tables = optimizer(plan)
+            ntn_prgm, table_vars, tables = optimizer(plan)
             # print("Notation: \n", ntn_prgm)
             asm_prgm = notation_compiler(ntn_prgm)
             # print("Assembler: \n", asm_prgm)
             mod = numba_compiler(asm_prgm)
-            args = provision_tensors(asm_prgm, tables)
+            args = provision_tensors(asm_prgm, table_vars, tables)
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
@@ -157,16 +157,19 @@ def get_default_scheduler():
     return _DEFAULT_SCHEDULER
 
 
-def provision_tensors(prgm: Any, tables: dict[Alias, Table]) -> list[Tensor]:
+def provision_tensors(
+    prgm: Any, table_vars: dict[Alias, ntn.Variable], tables: dict[Alias, Table]
+) -> list[Tensor]:
     args: list[Tensor] = []
     dims_dict: dict[Field, int] = {}
     for arg in prgm.funcs[0].args:
         table = tables[Alias(arg.name)]
+        table_var = table_vars[Alias(arg.name)]
         match table:
             case Table(Literal(val), idxs):
                 if isinstance(val, TensorPlaceholder):
                     shape = tuple(dims_dict[field] for field in idxs)
-                    tensor = BufferizedNDArray(np.zeros(dtype=val.dtype, shape=shape))
+                    tensor = table_var.type_(val=np.zeros(dtype=val.dtype, shape=shape))
                 else:
                     for idx, field in enumerate(table.idxs):
                         dims_dict[field] = val.shape[idx]
