@@ -7,6 +7,7 @@ from .level import (
     dense,
     element,
 )
+from .sparse_tensor import SparseTensor, SparseTensorFType
 
 __all__ = [
     "DenseLevel",
@@ -17,6 +18,8 @@ __all__ = [
     "FiberTensorFType",
     "Level",
     "LevelFType",
+    "SparseTensor",
+    "SparseTensorFType",
     "dense",
     "element",
     "tensor",

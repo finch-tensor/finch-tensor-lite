@@ -177,6 +177,42 @@ class Call(EinsumExpr, EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
+class GetAttr(EinsumExpr, EinsumTree):
+    """
+    Gets an attribute of a tensor.
+    Attributes:
+        obj: The object to get the attribute from.
+        attr: The name of the attribute to get.
+
+        dim: The dimension to get the attribute from.
+        Note this is an integer index, not a named index.
+    """
+
+    obj: EinsumExpr
+    attr: Literal
+    dim: int | None
+
+    @classmethod
+    def from_children(cls, *children: Term) -> Self:
+        # Expects 3 children: obj, attr, idx
+        if len(children) != 3:
+            raise ValueError("GetAttribute expects 3 children (obj + attr + idx)")
+        obj = cast(EinsumExpr, children[0])
+        attr = cast(Literal, children[1])
+        dim = cast(int | None, children[2])
+        return cls(obj, attr, dim)
+
+    @property
+    def children(self):
+        return [self.obj, self.attr, self.dim]
+
+    def get_idxs(self) -> set["Index"]:
+        idxs = set()
+        idxs.update(self.obj.get_idxs())
+        return idxs
+
+
+@dataclass(eq=True, frozen=True)
 class Einsum(EinsumTree):
     """
     Einsum
@@ -213,6 +249,12 @@ class Einsum(EinsumTree):
     @property
     def children(self):
         return [self.op, self.tns, self.idxs, self.arg]
+
+    def get_idxs(self) -> set["Index"]:
+        idxs = set()
+        for idx in self.idxs:
+            idxs.update(idx.get_idxs())
+        return idxs
 
 
 @dataclass(eq=True, frozen=True)
@@ -334,6 +376,10 @@ class EinsumPrinterContext(Context):
                 if len(args) == 1 and fn.val in unary_strs:
                     return f"{unary_strs[fn.val]}{args_e[0]}"
                 return f"{self(fn)}({', '.join(args_e)})"
+            case GetAttr(obj, attr, idx):
+                if idx is not None:
+                    return f"{self(obj)}.{self(attr)}[{idx}]"
+                return f"{self(obj)}.{self(attr)}"
             case Einsum(op, tns, idxs, arg):
                 op_str = infix_strs.get(op.val, op.val.__name__)
                 self.exec(
