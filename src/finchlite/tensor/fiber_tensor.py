@@ -22,6 +22,30 @@ class LevelFType(FinchTensorFType, ABC):
 
     @property
     @abstractmethod
+    def ndim(self):
+        """
+        Number of dimensions of the fibers in the structure.
+        """
+        ...
+
+    @property
+    @abstractmethod
+    def fill_value(self):
+        """
+        Fill value of the fibers, or `None` if dynamic.
+        """
+        ...
+
+    @property
+    @abstractmethod
+    def element_type(self):
+        """
+        Type of elements stored in the fibers.
+        """
+        ...
+
+    @property
+    @abstractmethod
     def position_type(self):
         """
         Type of positions within the levels.
