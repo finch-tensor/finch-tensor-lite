@@ -4,8 +4,36 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Generic, Self, TypeVar
 
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from ..symbolic import (
+    Context,
+    FType,
+    FTyped,
+    NamedTerm,
+    Term,
+    TermTree,
+    ftype,
+    literal_repr,
+)
 from ..util import qual_str
+
+
+@dataclass(eq=True, frozen=True)
+class TableValueFType(FType):
+    tns_ftype: Any
+    idxs: tuple[Field, ...] = ()
+
+
+@dataclass(eq=True, frozen=True)
+class TableValue(FTyped):
+    tns: Any
+    idxs: tuple[Field]
+
+    def ftype(self):
+        return TableValueFType(ftype(self.tns), self.idxs)
+
+    def __post_init__(self):
+        if isinstance(self.tns, TableValue):
+            raise ValueError("The tensor (tns) cannot be a TableValue")
 
 
 @dataclass(eq=True, frozen=True)
