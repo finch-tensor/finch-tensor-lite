@@ -3,14 +3,19 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from finchlite.algebra import is_distributive
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
+    Field,
+    Literal,
     LogicExpression,
     LogicNode,
     MapJoin,
     Plan,
     Query,
+    Table,
+    cansplitpush,
 )
 
 
@@ -194,10 +199,9 @@ def replace_and_remove_nodes(
         return new_node
 
     if isinstance(expr, (Plan, Query, Aggregate)):
-        msg = (
+        raise ValueError(
             f"There should be no {type(expr).__name__} nodes in a pointwise expression."
         )
-        raise ValueError(msg)
 
     if isinstance(expr, MapJoin):
         nodes_to_remove = set(nodes_to_remove)
@@ -212,3 +216,55 @@ def replace_and_remove_nodes(
 
         return MapJoin(expr.op, tuple(new_args))
     return expr
+
+
+def find_lowest_roots(
+    op: LogicNode, idx: Field, root: LogicExpression
+) -> list[LogicExpression]:
+    """
+    Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
+    safely pushed down to in a logical expression.
+
+    Parameters
+    ----------
+    op : LogicNode
+        The reduction operator node (e.g., a Literal wrapping `operator.add`)
+        that we are trying to push down.
+    idx : Field
+        The index (dimension) being reduced over.
+    root : LogicExpression
+        The root logical expression under which we search for the lowest
+        pushdown positions for the reduction.
+
+    Returns
+    -------
+    list[LogicExpression]
+        A list of expression nodes representing the lowest positions in
+        the expression tree where the reduction over `idx` with operator
+        `op` can be safely applied.
+    """
+    if isinstance(root, MapJoin):
+        if not isinstance(root.op, Literal):
+            raise TypeError(
+                f"Expected MapJoin.op to be a Literal, got {type(root.op).__name__}"
+            )
+        args_with = [arg for arg in root.args if idx in arg.fields]
+        args_without = [arg for arg in root.args if idx not in arg.fields]
+
+        if is_distributive(root.op.val, op) and len(args_with) == 1:
+            return find_lowest_roots(op, idx, args_with[0])
+
+        if cansplitpush(root.op.val, op):
+            roots_without: list[LogicExpression] = list(args_without)
+            roots_with: list[LogicExpression] = []
+            for arg in args_with:
+                roots_with.extend(find_lowest_roots(op, idx, arg))
+            return roots_without + roots_with
+        return [root]
+
+    if isinstance(root, (Alias, Table)):
+        return [root]
+
+    raise ValueError(
+        f"There shouldn't be nodes of type {type(root).__name__} during root pushdown."
+    )

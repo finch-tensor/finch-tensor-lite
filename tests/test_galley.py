@@ -14,6 +14,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
+    find_lowest_roots,
     get_idx_connected_components,
     get_reducible_idxs,
     insert_statistics,
@@ -1412,3 +1413,57 @@ def test_replace_and_remove_nodes(
     actual_names = [tbl.idxs[0].name for tbl in out.args]
 
     assert actual_names == expected_names
+
+
+@pytest.mark.parametrize(
+    "root, idx_name, expected_labels",
+    [
+        # Distributive case:
+        # root = MapJoin(add, [A(i), B(j)]), reduce over i → [A]
+        (
+            MapJoin(
+                Literal(op.add),
+                (
+                    Table(Literal("A"), (Field("i"),)),
+                    Table(Literal("B"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            ["A"],
+        ),
+        # Split-push case:
+        # root = MapJoin(add, [A(i), B(i), C(j)]), reduce over i → [C, A, B]
+        (
+            MapJoin(
+                Literal(op.add),
+                (
+                    Table(Literal("A"), (Field("i"),)),
+                    Table(Literal("B"), (Field("i"),)),
+                    Table(Literal("C"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            ["C", "A", "B"],
+        ),
+        # Leaf case:
+        # root = Table(A(i)), reduce over i → [A]
+        (
+            Table(Literal("A"), (Field("i"),)),
+            "i",
+            ["A"],
+        ),
+    ],
+)
+def test_find_lowest_roots(root, idx_name, expected_labels):
+    red_op = Literal(op.add)
+    idx = Field(idx_name)
+
+    roots = find_lowest_roots(red_op, idx, root)
+
+    actual_labels: list[str] = []
+    for node in roots:
+        assert isinstance(node, Table)
+        assert isinstance(node.tns, Literal)
+        actual_labels.append(node.tns.val)
+
+    assert actual_labels == expected_labels
