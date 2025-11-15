@@ -10,12 +10,11 @@ from .rewriters import (
     Rewrite,
 )
 from .term import (
-    PostOrderDFS,
-    PreOrderDFS,
     Term,
     TermTree,
     literal_repr,
 )
+from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 __all__ = [
     "BasicBlock",
@@ -40,5 +39,7 @@ __all__ = [
     "fisinstance",
     "ftype",
     "gensym",
+    "intree",
+    "isdescendant",
     "literal_repr",
 ]

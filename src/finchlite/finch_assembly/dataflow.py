@@ -111,9 +111,9 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                         new_state.pop(name)
 
                     # after all copies invalidated, add new state for variable `var`
-                    root_rhs = self._resolve_root(rhs, new_state)
-                    if root_rhs is not None:
-                        new_state[var_name] = root_rhs
+                    # only if rhs is a TaggedVariable (only direct copies)
+                    if isinstance(rhs, TaggedVariable):
+                        new_state[var_name] = rhs
 
         return new_state
 
@@ -129,35 +129,3 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                 result[var_name] = state_1[var_name]
 
         return result
-
-    def _resolve_root(self, value, state: dict):
-        """Follow copy links to the ultimate TaggedVariable.
-
-        Starting from ``value``, chase simple copies through ``state`` until a
-        non-copied value is reached. Returns the final TaggedVariable if the
-        chain stays within variables; otherwise returns ``None`` for expressions
-        and literals.
-        """
-        current = value
-        visited: set[str] = set()
-
-        while True:
-            match current:
-                case TaggedVariable(Variable(name, _), _):
-                    # reached an already visited variable
-                    if name in visited:
-                        return current
-
-                    visited.add(name)
-                    nxt = state.get(name)
-
-                    # root lattice value found
-                    # or next lattice value is not TaggedVariable
-                    if nxt is None or not isinstance(nxt, TaggedVariable):
-                        return current
-
-                    # continue iterating
-                    current = nxt
-                    continue
-                case _:
-                    return None
