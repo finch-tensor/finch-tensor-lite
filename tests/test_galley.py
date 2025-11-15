@@ -17,6 +17,7 @@ from finchlite.galley.LogicalOptimizer import (
     get_idx_connected_components,
     get_reducible_idxs,
     insert_statistics,
+    replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
 
@@ -1374,3 +1375,40 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
 def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
     out = get_idx_connected_components(parent_idxs, connected_idxs)
     assert out == expected
+
+
+@pytest.mark.parametrize(
+    "arg_names,node_to_replace,nodes_to_remove,expected_names",
+    [
+        (["a", "b", "c"], "b", [], ["a", "a", "c"]),
+        (["a", "b", "c"], "b", ["c"], ["a", "a"]),
+        (["a", "b", "c"], "c", ["c"], ["a", "b"]),
+        (["a", "b", "c"], "b", ["b"], ["a", "c"]),
+        (["a", "b", "c"], "c", [], ["a", "b", "a"]),
+    ],
+)
+def test_replace_and_remove_nodes(
+    arg_names,
+    node_to_replace,
+    nodes_to_remove,
+    expected_names,
+):
+    args = [Table(Literal(name), (Field(name),)) for name in arg_names]
+    node_to_replace_node = next(
+        tbl for tbl in args if tbl.idxs[0].name == node_to_replace
+    )
+    new_node = args[0]
+
+    nodes_to_remove_nodes = {tbl for tbl in args if tbl.idxs[0].name in nodes_to_remove}
+
+    expr_node = MapJoin(Literal("op"), tuple(args))
+
+    out = replace_and_remove_nodes(
+        expr=expr_node,
+        node_to_replace=node_to_replace_node,
+        new_node=new_node,
+        nodes_to_remove=nodes_to_remove_nodes,
+    )
+    actual_names = [tbl.idxs[0].name for tbl in out.args]
+
+    assert actual_names == expected_names

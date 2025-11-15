@@ -1,11 +1,16 @@
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from finchlite.finch_logic import (
+    Aggregate,
     Alias,
+    LogicExpression,
     LogicNode,
+    MapJoin,
+    Plan,
+    Query,
 )
 
 
@@ -153,3 +158,57 @@ def get_idx_connected_components(
 
     components.sort(key=lambda c: component_order[tuple(c)])
     return components
+
+
+def replace_and_remove_nodes(
+    expr: LogicNode,
+    node_to_replace: LogicExpression,
+    new_node: LogicExpression,
+    nodes_to_remove: Collection[LogicExpression],
+) -> LogicNode:
+    """
+    Replace and/or remove arguments of a pointwise MapJoin expression.
+
+    Parameters
+    ----------
+    expr : LogicNode
+        The expression to transform. Typically a `MapJoin` in a pointwise
+        subexpression.
+    node_to_replace : LogicNode
+        The node to replace when it appears as an argument to `expr`, or as
+        `expr` itself.
+    new_node : LogicNode
+        The node that replaces `node_to_replace` wherever it is found.
+    nodes_to_remove : Collection[LogicNode]
+        A collection of nodes that, if present as arguments to a `MapJoin`,
+        should be removed from its argument list.
+
+    Returns
+    -------
+    LogicNode
+        A new `MapJoin` node with updated arguments if `expr` is a `MapJoin`,
+        `new_node` if `expr == node_to_replace`, or the original `expr`
+        otherwise.
+    """
+    if expr == node_to_replace:
+        return new_node
+
+    if isinstance(expr, (Plan, Query, Aggregate)):
+        msg = (
+            f"There should be no {type(expr).__name__} nodes in a pointwise expression."
+        )
+        raise ValueError(msg)
+
+    if isinstance(expr, MapJoin):
+        nodes_to_remove = set(nodes_to_remove)
+        new_args: list[LogicExpression] = []
+
+        for arg in expr.args:
+            if arg in nodes_to_remove:
+                continue
+            if arg == node_to_replace:
+                arg = new_node
+            new_args.append(arg)
+
+        return MapJoin(expr.op, tuple(new_args))
+    return expr
