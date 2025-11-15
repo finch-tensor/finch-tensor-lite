@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import TypeVar, overload
+from typing import overload
 
 import numpy as np
 
@@ -39,54 +39,36 @@ from ..finch_logic import (
 from ..symbolic import Fixpoint, PostWalk, Rewrite, ftype
 from ._utils import extend_uniqe, intersect, setdiff, with_subsequence
 
-T = TypeVar("T", bound="LogicNode")
-
 
 @overload
 def compute_structure(
     node: Field, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Field: ...
-
-
 @overload
 def compute_structure(
     node: Alias, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Alias: ...
-
-
 @overload
 def compute_structure(
     node: Subquery, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Subquery: ...
-
-
 @overload
 def compute_structure(
     node: Table, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Table: ...
-
-
 @overload
 def compute_structure(
     node: LogicTree, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicTree: ...
-
-
 @overload
 def compute_structure(
     node: LogicExpression, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicExpression: ...
-
-
 @overload
 def compute_structure(
     node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicNode: ...
-
-
-def compute_structure(
-    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> LogicNode:
+def compute_structure(node, fields, aliases):
     match node:
         case Field(name):
             return fields.setdefault(name, Field(f"{len(fields) + len(aliases)}"))
@@ -201,7 +183,6 @@ class LogicLowerer:
         dim_size_vars: dict[ntn.Variable, ntn.Call],
         field_relabels: dict[Field, Field],
     ) -> ntn.NotationStatement: ...
-
     @overload
     def __call__(
         self,
@@ -211,7 +192,6 @@ class LogicLowerer:
         dim_size_vars: dict[ntn.Variable, ntn.Call],
         field_relabels: dict[Field, Field],
     ) -> ntn.NotationExpression: ...
-
     @overload
     def __call__(
         self,
@@ -221,15 +201,14 @@ class LogicLowerer:
         dim_size_vars: dict[ntn.Variable, ntn.Call],
         field_relabels: dict[Field, Field],
     ) -> ntn.NotationNode: ...
-
     def __call__(
         self,
-        ex: LogicNode,
-        table_vars: dict[Alias, ntn.Variable],
-        slot_vars: dict[Alias, ntn.Slot],
-        dim_size_vars: dict[ntn.Variable, ntn.Call],
-        field_relabels: dict[Field, Field],
-    ) -> ntn.NotationNode:
+        ex,
+        table_vars,
+        slot_vars,
+        dim_size_vars,
+        field_relabels,
+    ):
         match ex:
             case Query(Alias(name), Table(Literal(val) as tns, _)):
                 return ntn.Assign(
