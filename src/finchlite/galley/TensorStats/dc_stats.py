@@ -10,7 +10,7 @@ import numpy as np
 import finchlite.finch_notation as ntn
 from finchlite.algebra import is_annihilator
 from finchlite.compile import dimension
-from finchlite.finch_notation.nodes import (
+from finchlite.finch_notation import (
     Literal,
 )
 
@@ -1133,7 +1133,7 @@ class DCStats(TensorStats):
     @staticmethod
     def mapjoin(op: Callable[..., Any], *all_stats: "TensorStats") -> "TensorStats":
         """
-        Merge DC statistics for an elementwise binary operation.
+        Merge DC statistics for an elementwise operation.
 
         Args:
             op: The elementwise operator (e.g., operator.add, operator.mul).
