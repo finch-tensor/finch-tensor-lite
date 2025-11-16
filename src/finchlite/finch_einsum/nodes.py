@@ -42,9 +42,9 @@ class EinsumTree(EinsumNode, TermTree):
 
 class EinsumExpression(EinsumNode, ABC):
     """
-    EinsumExpression
+    Einsum AST expression base class.
 
-    Represents a pointwise expression in the Einsum IR
+    Represents a pointwise expression in the Einsum IR, which evaluates to a scalar.
     """
 
     @abstractmethod
@@ -54,9 +54,11 @@ class EinsumExpression(EinsumNode, ABC):
 
 class EinsumStatement(EinsumNode):
     """
-    EinsumStatement
+    Einsum AST statement base class.
 
-    Represents a statement in the Einsum IR
+    Represents a statement in the Einsum IR. An Einsum statement may modify
+    the state of the machine by assigning tensor values to variables. Einsum
+    statements evaluate to a tuple of tensor values.
     """
 
 

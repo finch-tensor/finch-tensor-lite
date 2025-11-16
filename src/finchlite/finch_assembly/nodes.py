@@ -53,6 +53,8 @@ class AssemblyTree(AssemblyNode, TermTree):
 class AssemblyExpression(AssemblyNode):
     """
     Assembly AST expression base class.
+
+    An assembly expression is a program node which evaluates to a value.
     """
 
     @property
@@ -65,6 +67,9 @@ class AssemblyExpression(AssemblyNode):
 class AssemblyStatement(AssemblyNode):
     """
     Assembly AST statement base class.
+
+    An assembly statement is a program node nested inside a function which does
+    not produce a value, but may modify the state of the machine.
     """
 
 

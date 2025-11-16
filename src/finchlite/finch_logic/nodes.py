@@ -51,6 +51,9 @@ class LogicTree(LogicNode, TermTree, ABC):
 class LogicExpression(LogicNode):
     """
     Logic AST expression base class.
+
+    A Logic expression is a program node which evaluates to a TableValue, a
+    tensor with named dimensions.
     """
 
     @property
@@ -63,6 +66,9 @@ class LogicExpression(LogicNode):
 class LogicStatement(LogicNode):
     """
     Logic AST statement base class.
+
+    A Logic statement may modify the state of the machine by assigning table
+    values to Aliases. Logic statements evaluate to a tuple of table values.
     """
 
 

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, query_property, return_type
+from ..algebra import element_type, return_type
 from ..finch_assembly import AssemblyNode
 from ..symbolic import Context, FType, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
@@ -49,6 +49,8 @@ class NotationTree(NotationNode, TermTree):
 class NotationExpression(NotationNode):
     """
     Notation AST expression base class.
+
+    A Notation expression is a program node which evaluates to a value.
     """
 
     @property
@@ -63,6 +65,9 @@ class NotationExpression(NotationNode):
 class NotationStatement(NotationNode):
     """
     Notation AST statement base class.
+
+    A Notation statement is a program node nested inside a function which does
+    not produce a value, but may modify the state of the machine.
     """
 
 
@@ -462,19 +467,6 @@ class Declare(NotationTree, NotationStatement):
         """
         return cls(tns, init, op, shape)
 
-    @property
-    def result_format(self):
-        """
-        Returns the type of the declared tensor.
-        """
-        return query_property(
-            self.tns.result_format,
-            "declare",
-            "return_type",
-            self.op.result_format,
-            *[s.result_format for s in self.shape],
-        )
-
 
 @dataclass(eq=True, frozen=True)
 class Freeze(NotationTree, NotationStatement):
@@ -490,18 +482,6 @@ class Freeze(NotationTree, NotationStatement):
     def children(self):
         return [self.tns, self.op]
 
-    @property
-    def result_format(self):
-        """
-        Returns the type of the frozen tensor.
-        """
-        return query_property(
-            self.tns.result_format,
-            "freeze",
-            "return_type",
-            self.op.result_format,
-        )
-
 
 @dataclass(eq=True, frozen=True)
 class Thaw(NotationTree, NotationStatement):
@@ -516,18 +496,6 @@ class Thaw(NotationTree, NotationStatement):
     @property
     def children(self):
         return [self.tns, self.op]
-
-    @property
-    def result_format(self):
-        """
-        Returns the type of the thawed tensor.
-        """
-        return query_property(
-            self.tns.result_format,
-            "thaw",
-            "return_type",
-            self.op.result_format,
-        )
 
 
 @dataclass(eq=True, frozen=True)
