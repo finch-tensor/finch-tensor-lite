@@ -49,11 +49,27 @@ class LogicTree(LogicNode, TermTree, ABC):
 
 
 class LogicExpression(LogicNode):
+    """
+    Logic AST expression base class.
+
+    A Logic expression is a program node which evaluates to a TableValue, a
+    tensor with named dimensions.
+    """
+
     @property
     @abstractmethod
     def fields(self) -> list[Field]:
         """Returns fields of the node."""
         ...
+
+
+class LogicStatement(LogicNode):
+    """
+    Logic AST statement base class.
+
+    A Logic statement may modify the state of the machine by assigning table
+    values to Aliases. Logic statements evaluate to a tuple of table values.
+    """
 
 
 @dataclass(eq=True, frozen=True)
@@ -123,7 +139,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode, NamedTerm):
+class Alias(LogicExpression, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -137,6 +153,11 @@ class Alias(LogicNode, NamedTerm):
     @property
     def symbol(self) -> str:
         return self.name
+
+    @property
+    def fields(self) -> list[Field]:
+        """Returns fields of the node."""
+        raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
 
 
 @dataclass(eq=True, frozen=True)
@@ -181,7 +202,7 @@ class MapJoin(LogicTree, LogicExpression):
         args: The arguments to map the function across.
     """
 
-    op: LogicNode
+    op: Literal | Value
     args: tuple[LogicExpression, ...]
 
     @property
@@ -213,10 +234,10 @@ class Aggregate(LogicTree, LogicExpression):
         idxs: The dimensions to reduce.
     """
 
-    op: LogicNode
-    init: LogicNode
+    op: Literal | Value
+    init: Literal | Value
     arg: LogicExpression
-    idxs: tuple[LogicNode, ...]
+    idxs: tuple[Field, ...]
 
     @property
     def children(self):
@@ -304,7 +325,7 @@ class Reformat(LogicTree, LogicExpression):
     """
 
     tns: LogicNode
-    arg: LogicNode
+    arg: LogicExpression
 
     @property
     def children(self):
@@ -329,8 +350,8 @@ class Subquery(LogicTree, LogicExpression):
         arg: The argument to evaluate.
     """
 
-    lhs: LogicNode
-    arg: LogicNode
+    lhs: Alias
+    arg: LogicExpression
 
     @property
     def children(self):
@@ -345,7 +366,7 @@ class Subquery(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Query(LogicTree):
+class Query(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
     `lhs`.
@@ -355,8 +376,8 @@ class Query(LogicTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: LogicNode
-    rhs: LogicNode
+    lhs: Alias
+    rhs: LogicExpression
 
     @property
     def children(self):
@@ -365,7 +386,7 @@ class Query(LogicTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Produces(LogicTree):
+class Produces(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that returns `args...` from the current plan.
     Halts execution of the program.
@@ -374,7 +395,7 @@ class Produces(LogicTree):
         args: The arguments to return.
     """
 
-    args: tuple[LogicNode, ...]
+    args: tuple[LogicExpression, ...]
 
     @property
     def children(self):
@@ -387,7 +408,7 @@ class Produces(LogicTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Plan(LogicTree):
+class Plan(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that executes a sequence of statements
     `bodies...`. Returns the last statement.
@@ -396,7 +417,7 @@ class Plan(LogicTree):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[LogicNode, ...] = ()
+    bodies: tuple[LogicStatement, ...] = ()
 
     @property
     def children(self):

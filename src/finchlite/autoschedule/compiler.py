@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import TypeVar, overload
+from typing import overload
 
 import numpy as np
 
@@ -22,6 +22,7 @@ from ..finch_logic import (
     Literal,
     LogicExpression,
     LogicNode,
+    LogicStatement,
     LogicTree,
     MapJoin,
     Plan,
@@ -37,54 +38,36 @@ from ..finch_logic import (
 from ..symbolic import Fixpoint, PostWalk, Rewrite, ftype
 from ._utils import extend_uniqe, intersect, setdiff, with_subsequence
 
-T = TypeVar("T", bound="LogicNode")
-
 
 @overload
 def compute_structure(
     node: Field, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Field: ...
-
-
 @overload
 def compute_structure(
     node: Alias, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Alias: ...
-
-
 @overload
 def compute_structure(
     node: Subquery, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Subquery: ...
-
-
 @overload
 def compute_structure(
     node: Table, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> Table: ...
-
-
 @overload
 def compute_structure(
     node: LogicTree, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicTree: ...
-
-
 @overload
 def compute_structure(
     node: LogicExpression, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicExpression: ...
-
-
 @overload
 def compute_structure(
     node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
 ) -> LogicNode: ...
-
-
-def compute_structure(
-    node: LogicNode, fields: dict[str, Field], aliases: dict[str, Alias]
-) -> LogicNode:
+def compute_structure(node, fields, aliases):
     match node:
         case Field(name):
             return fields.setdefault(name, Field(f"{len(fields) + len(aliases)}"))
@@ -127,7 +110,7 @@ class PointwiseLowerer:
         slot_vars: dict[Alias, ntn.Slot],
         field_relabels: dict[Field, Field],
         field_types: dict[Field, type],
-    ) -> ntn.NotationNode:
+    ) -> ntn.NotationExpression:
         match ex:
             case MapJoin(Literal(op), args):
                 return ntn.Call(
@@ -170,13 +153,13 @@ def compile_pointwise_logic(
     slot_vars: dict[Alias, ntn.Slot],
     field_relabels: dict[Field, Field],
     field_types: dict[Field, type],
-) -> tuple[ntn.NotationNode, list[Field], list[Alias]]:
+) -> tuple[ntn.NotationExpression, list[Field], list[Alias]]:
     ctx = PointwiseLowerer(loop_idxs=loop_idxs)
     code = ctx(ex, slot_vars, field_relabels, field_types)
     return code, ctx.bound_idxs, ctx.required_slots
 
 
-def compile_logic_constant(ex: LogicNode) -> ntn.NotationNode:
+def compile_logic_constant(ex: LogicNode) -> ntn.NotationExpression:
     match ex:
         case Literal(val):
             return ntn.Literal(val)
@@ -190,6 +173,25 @@ class LogicLowerer:
     def __init__(self, mode: str = "fast"):
         self.mode = mode
 
+    @overload
+    def __call__(
+        self,
+        ex: LogicStatement,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationStatement: ...
+    @overload
+    def __call__(
+        self,
+        ex: LogicExpression,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationExpression: ...
+    @overload
     def __call__(
         self,
         ex: LogicNode,
@@ -197,7 +199,15 @@ class LogicLowerer:
         slot_vars: dict[Alias, ntn.Slot],
         dim_size_vars: dict[ntn.Variable, ntn.Call],
         field_relabels: dict[Field, Field],
-    ) -> ntn.NotationNode:
+    ) -> ntn.NotationNode: ...
+    def __call__(
+        self,
+        ex,
+        table_vars,
+        slot_vars,
+        dim_size_vars,
+        field_relabels,
+    ):
         match ex:
             case Query(Alias(name), Table(Literal(val) as tns, _)):
                 return ntn.Assign(
@@ -307,9 +317,10 @@ class LogicLowerer:
                 )
                 for idx in reversed(idxs_2):
                     idx_type = field_types[idx]
+                    idx_var = ntn.Variable(field_relabels.get(idx, idx).name, idx_type)
                     if idx in rhs_idxs:
                         body = ntn.Loop(
-                            ntn.Variable(field_relabels.get(idx, idx).name, idx_type),
+                            idx_var,
                             ntn.Variable(
                                 f"{field_relabels.get(idx, idx).name}_size",
                                 ExtentFType(idx_type, idx_type),  # type: ignore[abstract]
@@ -318,8 +329,11 @@ class LogicLowerer:
                         )
                     elif idx in lhs_idxs:
                         body = ntn.Loop(
-                            ntn.Literal(idx_type(1)),
-                            ntn.Literal(idx_type(1)),
+                            idx_var,
+                            ExtentFType.stack(
+                                ntn.Literal(idx_type(1)),
+                                ntn.Literal(idx_type(1)),
+                            ),
                             body,
                         )
 

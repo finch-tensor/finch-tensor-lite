@@ -202,7 +202,7 @@ lark_parser = Lark("""
 """)
 
 
-def _parse_einop_expr(t: Tree) -> ein.EinsumExpr:
+def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
     match t:
         case Tree(
             "start"
