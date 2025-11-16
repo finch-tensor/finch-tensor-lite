@@ -1419,17 +1419,17 @@ def test_replace_and_remove_nodes(
     "root, idx_name, expected_labels",
     [
         # Distributive case:
-        # root = MapJoin(add, [A(i), B(j)]), reduce over i → [A]
+        # root = MapJoin(mul, [A(i), B(j)]), reduce over j → [B]
         (
             MapJoin(
-                Literal(op.add),
+                Literal(op.mul),
                 (
                     Table(Literal("A"), (Field("i"),)),
                     Table(Literal("B"), (Field("j"),)),
                 ),
             ),
-            "i",
-            ["A"],
+            "j",
+            ["B"],
         ),
         # Split-push case:
         # root = MapJoin(add, [A(i), B(i), C(j)]), reduce over i → [C, A, B]

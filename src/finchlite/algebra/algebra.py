@@ -427,6 +427,7 @@ def is_distributive(op, other_op):
 
 
 for fn, func in [
+    (operator.add, lambda op, other_op: other_op == operator.add),
     (operator.mul, lambda op, other_op: other_op in (operator.add, operator.sub)),
     (operator.and_, lambda op, other_op: other_op in (operator.or_, operator.xor)),
     (operator.or_, lambda op, other_op: other_op == operator.and_),

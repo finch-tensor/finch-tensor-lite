@@ -240,8 +240,8 @@ def find_lowest_roots(
     list[LogicExpression]
         A list of expression nodes representing the lowest positions in
         the expression tree where the reduction over `idx` with operator
-        `op` can be safely applied.
     """
+
     if isinstance(root, MapJoin):
         if not isinstance(root.op, Literal):
             raise TypeError(
@@ -250,10 +250,10 @@ def find_lowest_roots(
         args_with = [arg for arg in root.args if idx in arg.fields]
         args_without = [arg for arg in root.args if idx not in arg.fields]
 
-        if is_distributive(root.op.val, op) and len(args_with) == 1:
+        if is_distributive(root.op.val, op.val) and len(args_with) == 1:
             return find_lowest_roots(op, idx, args_with[0])
 
-        if cansplitpush(root.op.val, op):
+        if cansplitpush(op.val, root.op.val):
             roots_without: list[LogicExpression] = list(args_without)
             roots_with: list[LogicExpression] = []
             for arg in args_with:
