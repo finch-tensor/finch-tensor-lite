@@ -101,7 +101,7 @@ class Level(FTyped, ABC):
 
     @property
     @abstractmethod
-    def buf(self) -> Any: ...
+    def val(self) -> Any: ...
 
     @property
     def ndim(self):
@@ -170,8 +170,8 @@ class FiberTensor(Tensor, Generic[Tp]):
         return self.lvl.stride
 
     @property
-    def buf(self):
-        return self.lvl.buf
+    def val(self):
+        return self.lvl.val
 
     @property
     def ndim(self):
@@ -203,7 +203,7 @@ class FiberTensor(Tensor, Generic[Tp]):
 
     def to_numpy(self) -> np.ndarray:
         # TODO: temporary for dense only. TBD in sparse_level PR
-        return np.reshape(self.buf.arr, self.shape, copy=False)
+        return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
 
 class FiberTensorFields(NamedTuple):

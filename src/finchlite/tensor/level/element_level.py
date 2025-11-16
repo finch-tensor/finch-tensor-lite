@@ -162,11 +162,11 @@ class ElementLevel(Level):
     """
 
     _format: ElementLevelFType
-    val: Any | None = None
+    _val: Any | None = None
 
     def __post_init__(self):
-        if self.val is None:
-            self.val = self._format.buffer_type(
+        if self._val is None:
+            self._val = self._format.buffer_type(
                 len=0, dtype=self._format.element_type()
             )
 
@@ -183,5 +183,5 @@ class ElementLevel(Level):
         return self._format
 
     @property
-    def buf(self):
-        return self.val
+    def val(self) -> Any:
+        return self._val

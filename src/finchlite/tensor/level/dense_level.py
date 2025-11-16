@@ -214,5 +214,5 @@ class DenseLevel(Level):
         return self._format
 
     @property
-    def buf(self):
-        return self.lvl.buf
+    def val(self) -> Any:
+        return self.lvl.val
