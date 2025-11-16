@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from finchlite.algebra import is_distributive
+from finchlite.algebra import cansplitpush, is_distributive
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -15,7 +15,6 @@ from finchlite.finch_logic import (
     Plan,
     Query,
     Table,
-    cansplitpush,
 )
 
 

@@ -18,7 +18,6 @@ from .nodes import (
     Table,
     Value,
 )
-from .utility import cansplitpush, repeat_operator
 
 __all__ = [
     "Aggregate",
@@ -39,6 +38,4 @@ __all__ = [
     "Subquery",
     "Table",
     "Value",
-    "cansplitpush",
-    "repeat_operator",
 ]
