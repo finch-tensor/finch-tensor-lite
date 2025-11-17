@@ -218,7 +218,7 @@ def replace_and_remove_nodes(
 
 
 def find_lowest_roots(
-    op: LogicNode, idx: Field, root: LogicExpression
+    op: Literal, idx: Field, root: LogicExpression
 ) -> list[LogicExpression]:
     """
     Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
@@ -250,7 +250,7 @@ def find_lowest_roots(
         args_with = [arg for arg in root.args if idx in arg.fields]
         args_without = [arg for arg in root.args if idx not in arg.fields]
 
-        if is_distributive(root.op.val, op.val) and len(args_with) == 1:
+        if len(args_with) == 1 and is_distributive(root.op.val, op.val):
             return find_lowest_roots(op, idx, args_with[0])
 
         if cansplitpush(op.val, root.op.val):
