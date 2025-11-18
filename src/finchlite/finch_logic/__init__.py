@@ -20,6 +20,7 @@ from .nodes import (
     TableValueFType,
     Value,
 )
+from .stages import LogicEvaluator, LogicLowerer, LogicTransform
 
 __all__ = [
     "Aggregate",
@@ -27,8 +28,11 @@ __all__ = [
     "Field",
     "FinchLogicInterpreter",
     "Literal",
+    "LogicEvaluator",
     "LogicExpression",
+    "LogicLowerer",
     "LogicNode",
+    "LogicTransform",
     "LogicTree",
     "MapJoin",
     "Plan",

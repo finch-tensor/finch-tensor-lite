@@ -19,15 +19,18 @@ from .nodes import (
     TableValue,
     Value,
 )
+from .stages import LogicEvaluator
 
 
-class FinchLogicInterpreter:
+class FinchLogicInterpreter(LogicEvaluator):
     def __init__(self, *, make_tensor=np.full, verbose=False):
         self.verbose = verbose
         self.bindings = {}
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def __call__(self, node):
+    def __call__(self, node, bindings=None):
+        if bindings is not None:
+            self.bindings = bindings.copy()
         # Example implementation for evaluating an expression
         if self.verbose:
             print(f"Evaluating: {node}")
