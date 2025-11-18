@@ -55,7 +55,7 @@ class HashTable(Map):
     """
 
     def __init__(
-        self, key_len, value_len, map: "dict[tuple[int,int],int] | None" = None
+        self, key_len, value_len, map: "dict[tuple,tuple] | None" = None
     ):
         """
         Constructor for the Hash Table, which maps integer tuples to integer tuples. Takes three arguments:
@@ -118,6 +118,9 @@ class HashTableFType(MapFType, CMapFType, CStackFType, NumbaMapFType, NumbaStack
             return False
         return self.key_len == other.key_len and self.value_len == other.value_len
 
+    def __call__(self):
+        return HashTable(self.key_len, self.value_len, {})
+
     def __str__(self):
         return f"hashtable_t({self.key_len}, {self.value_len})"
 
@@ -138,6 +141,17 @@ class HashTableFType(MapFType, CMapFType, CStackFType, NumbaMapFType, NumbaStack
         This is typically the same as the dtype used to create the buffer.
         """
         return self._value_type
+
+    def __hash__(self):
+        """
+        Needs to be here because you are going to be using this type as a key
+        in dictionaries.
+        """
+        return hash(("HashTableFType", self.key_len, self.value_len))
+
+    """
+    Methods for the Numba Backend
+    """
 
     def numba_jitclass_type(self) -> numba.types.Type:
         key_t = numba.types.UniTuple(numba.types.int64, self.key_len)
@@ -199,24 +213,34 @@ class HashTableFType(MapFType, CMapFType, CStackFType, NumbaMapFType, NumbaStack
         """
         return HashTable(self.key_len, self.value_len, numba_buffer[0])
 
-    def __hash__(self):
-        """
-        Needs to be here because you are going to be using this type as a key
-        in dictionaries.
-        """
-        return hash(("HashTableFType", self.key_len, self.value_len))
-
-    def __call__(self):
-        return HashTable(self.key_len, self.value_len, {})
+    """
+    Methods for the C Backend
+    This requires an external library (stc) to work.
+    """
 
     def c_type(self):
         return ctypes.POINTER(CHashMap)
 
-    def c_load(self, ctx: "CContext", buf, idx):
-        return f"({buf.obj.data})[{ctx(idx)}]"
+    def c_existsmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
+        # TODO: call in the methods from the c library.
+        assert isinstance(map.obj, CMapFields)
+        return ""
 
-    def c_store(self, ctx: "CContext", buf, idx, value):
-        ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
+    def c_existsmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
+        # TODO: call in the methods from the c library to do existence check.
+        assert isinstance(map.obj, CMapFields)
+        return ""
+
+    def c_storemap(
+        self,
+        ctx: "NumbaContext",
+        map: "Stack",
+        idx: "AssemblyExpression",
+        value: "AssemblyExpression",
+    ):
+        # TODO: pull in library code to do this.
+        assert isinstance(map.obj, CMapFields)
+        ctx.exec("")
 
     def serialize_to_c(self, obj):
         """

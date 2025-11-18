@@ -13,6 +13,8 @@ from typing import Any
 
 import numpy as np
 
+from finchlite.finch_assembly.nodes import AssemblyExpression
+
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
@@ -1071,7 +1073,7 @@ register_property(
 )
 
 
-def struct_c_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
+def struct_c_getattr(fmt: AssemblyStructFType, ctx: "CContext", obj: str, attr: str):
     return f"{obj}->{attr}"
 
 
@@ -1083,8 +1085,9 @@ register_property(
 )
 
 
-def struct_c_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
-    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+def struct_c_setattr(fmt: AssemblyStructFType, ctx: "CContext", obj: str, attr, val: str):
+    # here, val has already been computed.
+    ctx.exec(f"{ctx.feed}{obj}->{attr} = {val};")
     return
 
 
