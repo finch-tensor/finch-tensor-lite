@@ -141,20 +141,16 @@ class AssemblyTypeChecker:
             case asm.Length(buffer):
                 buffer_type = self.check_buffer(buffer)
                 return buffer_type.length_type
-            case asm.ExistsMap(map, index1, index2):
+            case asm.ExistsMap(map, index):
                 map_type = self.check_map(map)
-                index1_type = self.check_expr(index1)
-                index2_type = self.check_expr(index2)
-                check_type_match(map_type.length_type, index1_type)
-                check_type_match(map_type.length_type, index2_type)
+                index_type = self.check_expr(index)
+                check_type_match(map_type.key_type, index_type)
                 return bool
-            case asm.LoadMap(map, index1, index2):
+            case asm.LoadMap(map, index):
                 map_type = self.check_map(map)
-                index1_type = self.check_expr(index1)
-                index2_type = self.check_expr(index2)
-                check_type_match(map_type.length_type, index1_type)
-                check_type_match(map_type.length_type, index2_type)
-                return map_type.element_type
+                index_type = self.check_expr(index)
+                check_type_match(map_type.key_type, index_type)
+                return map_type.value_type
             case _:
                 raise ValueError(f"Ill-formed AssemblyExpression:  {type(expr)}.")
 
@@ -202,14 +198,12 @@ class AssemblyTypeChecker:
                 value_type = self.check_expr(value)
                 check_type_match(buffer_type.element_type, value_type)
                 return None
-            case asm.StoreMap(map, index1, index2, value):
+            case asm.StoreMap(map, index, value):
                 map_type = self.check_map(map)
-                index1_type = self.check_expr(index1)
-                index2_type = self.check_expr(index2)
+                index_type = self.check_expr(index)
                 value_type = self.check_expr(value)
-                check_type_match(map_type.length_type, index1_type)
-                check_type_match(map_type.length_type, index2_type)
-                check_type_match(map_type.element_type, value_type)
+                check_type_match(map_type.key_type, index_type)
+                check_type_match(map_type.value_type, value_type)
                 return None
             case asm.Resize(buffer, new_size):
                 buffer_type = self.check_buffer(buffer)

@@ -6,7 +6,9 @@ from typing import Any
 
 import numpy as np
 
-import numba  # type: ignore[import-untyped]
+import numba
+
+from finchlite.finch_assembly.map import MapFType  # type: ignore[import-untyped]
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -252,6 +254,33 @@ register_property(
     lambda fmt, numba_obj: fmt(numba_obj),
 )
 
+
+class NumbaMapFType(MapFType, NumbaArgumentFType, ABC):
+    """
+    Abstract base class for the ftype of datastructures. The ftype defines how
+    the data in a Map is organized and accessed.
+    """
+
+    @abstractmethod
+    def numba_existsmap(self, ctx: "NumbaContext", map, idx):
+        """
+        Return numba code which checks whether a given key exists in a map.
+        """
+        ...
+
+    @abstractmethod
+    def numba_loadmap(self, ctx, buffer, idx):
+        """
+        Return numba code which gets a value corresponding to a certain key.
+        """
+        ...
+
+    @abstractmethod
+    def numba_storemap(self, ctx, buffer, idx, value):
+        """
+        Return C code which stores a certain value given a certain integer tuple key.
+        """
+        ...
 
 class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
     @abstractmethod

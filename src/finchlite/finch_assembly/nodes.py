@@ -354,7 +354,7 @@ class Store(AssemblyTree):
 @dataclass(eq=True, frozen=True)
 class ExistsMap(AssemblyExpression, AssemblyTree):
     """
-    Represents checking whether an integer key is in a map.
+    Represents checking whether an integer tuple key is in a map.
 
     Attributes:
         map: The map to load from.
@@ -363,12 +363,11 @@ class ExistsMap(AssemblyExpression, AssemblyTree):
     """
 
     map: Slot | Stack
-    index1: AssemblyExpression
-    index2: AssemblyExpression
+    index: AssemblyExpression
 
     @property
     def children(self):
-        return [self.map, self.index1, self.index2]
+        return [self.map, self.index]
 
     def result_format(self):
         return bool
@@ -377,7 +376,7 @@ class ExistsMap(AssemblyExpression, AssemblyTree):
 @dataclass(eq=True, frozen=True)
 class LoadMap(AssemblyExpression, AssemblyTree):
     """
-    Represents loading a value from a map given an integer pair key.
+    Represents loading a value from a map given an integer tuple key.
 
     Attributes:
         map: The map to load from.
@@ -386,12 +385,11 @@ class LoadMap(AssemblyExpression, AssemblyTree):
     """
 
     map: Slot | Stack
-    index1: AssemblyExpression
-    index2: AssemblyExpression
+    index: AssemblyExpression
 
     @property
     def children(self):
-        return [self.map, self.index1, self.index2]
+        return [self.map, self.index]
 
     def result_format(self):
         return element_format(self.map.result_format)
@@ -400,7 +398,7 @@ class LoadMap(AssemblyExpression, AssemblyTree):
 @dataclass(eq=True, frozen=True)
 class StoreMap(AssemblyTree):
     """
-    Represents storing a value into a buffer given an integer pair key.
+    Represents storing a value into a buffer given an integer tuple key.
 
     Attributes:
         map: The map to load from.
@@ -409,13 +407,12 @@ class StoreMap(AssemblyTree):
     """
 
     map: Slot | Stack
-    index1: AssemblyExpression
-    index2: AssemblyExpression
+    index: AssemblyExpression
     value: AssemblyExpression
 
     @property
     def children(self):
-        return [self.map, self.index1, self.index2, self.value]
+        return [self.map, self.index, self.value]
 
 
 @dataclass(eq=True, frozen=True)

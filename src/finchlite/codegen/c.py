@@ -939,27 +939,27 @@ class CArgumentFType(ABC):
 class CMapFType(BufferFType, CArgumentFType, ABC):
     """
     Abstract base class for the ftype of datastructures. The ftype defines how
-    the data in an Buffer is organized and accessed.
+    the data in a Map is organized and accessed.
     """
 
     @abstractmethod
-    def c_existsmap(self, ctx, map, idx1, idx2):
+    def c_existsmap(self, ctx, map, idx):
         """
         Return C code which checks whether a given key exists in a map.
         """
         ...
 
     @abstractmethod
-    def c_loadmap(self, ctx, buffer, idx1, idx2):
+    def c_loadmap(self, ctx, buffer, idx):
         """
         Return C code which gets a value corresponding to a certain key.
         """
         ...
 
     @abstractmethod
-    def c_storemap(self, ctx, buffer, idx1, idx2, value):
+    def c_storemap(self, ctx, buffer, idx, value):
         """
-        Return C code which stores a certain value given a certain key (idx1, idx2)
+        Return C code which stores a certain value given a certain integer tuple key.
         """
         ...
 

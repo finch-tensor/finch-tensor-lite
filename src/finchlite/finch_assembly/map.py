@@ -29,21 +29,21 @@ class Map(FTyped, ABC):
         return self.ftype.length_type()
 
     @abstractmethod
-    def load(self, idx1: int, idx2: int):
+    def load(self, idx: tuple):
         """
         Method to access some element in the map. Will panic if the key doesn't exist.
         """
         ...
 
     @abstractmethod
-    def exists(self, idx1: int, idx2: int) -> bool:
+    def exists(self, idx: tuple) -> bool:
         """
         Method to check if the element exists in the map.
         """
         ...
 
     @abstractmethod
-    def store(self, idx1: int, idx2: int, val):
+    def store(self, idx: tuple, val):
         """
         Method to store elements in the map. Ideally it should just create new
         elements.
@@ -65,7 +65,7 @@ class MapFType(FType):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def value_type(self):
         """
         Return the type of elements stored in the map.
         This is typically the same as the dtype used to create the map.
@@ -73,8 +73,9 @@ class MapFType(FType):
         ...
 
     @property
-    def length_type(self):
+    @abstractmethod
+    def key_type(self):
         """
         Returns the type used for the length of the map.
         """
-        return int
+        ...
