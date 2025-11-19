@@ -41,3 +41,14 @@ class AssemblyTransform(Stage):
         """
         Transform the given assembly term into another assembly term.
         """
+
+
+class OptAssemblyLoader(AssemblyLoader):
+    def __init__(self, *opts: AssemblyTransform, ctx: AssemblyLoader):
+        self.ctx = ctx
+        self.opts = opts
+
+    def __call__(self, term: asm.Module) -> AssemblyLibrary:
+        for opt in self.opts:
+            term = opt(term)
+        return self.ctx(term)

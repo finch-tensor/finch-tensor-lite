@@ -24,6 +24,7 @@ from ..finch_logic import (
     Reorder,
     Subquery,
     Table,
+    TableValueFType,
 )
 from ..symbolic import (
     Chain,
@@ -36,6 +37,7 @@ from ..symbolic import (
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
+from .stages import LogicLoader
 
 T = TypeVar("T", bound="LogicNode")
 
@@ -771,10 +773,12 @@ def materialize_squeeze_expand_productions(root):
     return Rewrite(PostWalk(rule_1))(root)
 
 
-class DefaultLogicOptimizer:
-    def __init__(self, ctx):
-        self.ctx = ctx
+class DefaultLogicOptimizer(LogicLoader):
+    def __init__(self, ctx: LogicLoader):
+        self.ctx: LogicLoader = ctx
 
-    def __call__(self, prgm: LogicNode):
+    def __call__(
+        self, prgm: LogicNode, bindings: dict[Alias, TableValueFType]
+    ) -> tuple[LogicNode, dict[Alias, TableValueFType]]:
         prgm = optimize(prgm)
-        return self.ctx(prgm)
+        return self.ctx(prgm, bindings)

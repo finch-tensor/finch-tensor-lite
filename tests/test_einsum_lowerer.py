@@ -6,7 +6,7 @@ import numpy as np
 
 import finchlite
 from finchlite.autoschedule import optimize
-from finchlite.autoschedule.einsum import EinsumLowerer
+from finchlite.autoschedule.einsum import EinsumGenerator
 from finchlite.finch_einsum import EinsumInterpreter
 from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
 from finchlite.interface.fuse import compute
@@ -35,7 +35,7 @@ def lower_and_execute(ir: LogicNode):
     optimized_plan = cast(Plan, optimize(plan))
 
     # Lower to einsum IR
-    lowerer = EinsumLowerer()
+    lowerer = EinsumGenerator()
     einsum_plan, bindings = lowerer(optimized_plan)
 
     for k, v in bindings.items():

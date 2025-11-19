@@ -19,3 +19,14 @@ class NotationTransform(Stage):
         """
         Transform the given assembly term into another assembly term.
         """
+
+
+class OptNotationLoader(NotationLoader):
+    def __init__(self, *opts: NotationTransform, ctx: NotationLoader):
+        self.ctx = ctx
+        self.opts = opts
+
+    def __call__(self, term: ntn.Module) -> asm.AssemblyLibrary:
+        for opt in self.opts:
+            term = opt(term)
+        return self.ctx(term)
