@@ -148,6 +148,14 @@ class ExtentFType(AssemblyStructFType):
     start: Any
     end: Any
 
+    def __eq__(self, other):
+        if not isinstance(other, ExtentFType):
+            return False
+        return self.start == other.start and self.end == other.end
+    
+    def __hash__(self):
+        return hash((self.start, self.end))
+
     def __repr__(self):
         return f"ExtentFType(start={qual_str(self.start)}, end={qual_str(self.end)})"
 

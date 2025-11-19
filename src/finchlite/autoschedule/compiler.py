@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import TypeVar
+from typing import TypeVar, overload
 
 import numpy as np
 
@@ -104,7 +104,7 @@ def compile_logic_constant(ex: LogicNode) -> ntn.NotationNode:
             raise Exception(f"Invalid constant: {ex}")
 
 
-class NotationGeneratorContext(LogicNotationLowerer):
+class NotationGeneratorContext():
     def __init__(
         self,
         table_vars: dict[lgc.Alias, ntn.Variable],
@@ -290,25 +290,7 @@ class NotationGeneratorContext(LogicNotationLowerer):
                 return ntn.Return(tbl_var)
 
             case lgc.Plan(bodies):
-                func_block = ntn.Block(tuple(self(body) for body in bodies))
-                last_statement = func_block.bodies[-1]
-                match last_statement:
-                    case ntn.Return(ntn.Variable(_, return_type)):
-                        return ntn.Module(
-                            (
-                                ntn.Function(
-                                    ntn.Variable("func", return_type),
-                                    tuple(var for var in self.table_vars.values()),
-                                    func_block,
-                                ),
-                            )
-                        )
-                    case _:
-                        raise Exception(
-                            "Last function's statement should be Return, "
-                            f"but is: {last_statement}."
-                        )
-
+                return ntn.Block(tuple(self(body) for body in bodies))
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -321,7 +303,7 @@ def record_tables(
     dict[lgc.Alias, ntn.Variable],
     dict[lgc.Alias, ntn.Slot],
     dict[ntn.Variable, ntn.Call],
-    dict[lgc.Alias, lgc.Table],
+    dict[lgc.Alias, lgc.TableValueFType],
     dict[lgc.Field, lgc.Field],
 ]:
     """
@@ -336,7 +318,7 @@ def record_tables(
     # store loop extent variable
     dim_size_vars: dict[ntn.Variable, ntn.Call] = {}
     # actual tables
-    tables: dict[lgc.Alias, lgc.Table] = {}
+    tables: dict[lgc.Alias, lgc.TableValueFType] = {}
     # field relabels mapping to actual fields
     field_relabels: dict[lgc.Field, lgc.Field] = {}
 
@@ -361,17 +343,17 @@ def record_tables(
                     ntn.Literal(dimension), (table_var, ntn.Literal(idx))
                 )
 
-    def rule_0(node: LogicNode) -> LogicNode:
+    def rule_0(node: LogicNode) -> LogicNode | None:
         match node:
             case lgc.Query(lgc.Alias(name) as alias, rhs):
                 suitable_rep = find_suitable_rep(rhs, table_vars)
                 table_vars[alias] = ntn.Variable(name, suitable_rep)
-                tables[alias] = lgc.Table(
-                    lgc.Literal(TensorPlaceholder(dtype=suitable_rep.element_type)),
+                tables[alias] = lgc.TableValueFType(
+                    TensorPlaceholder(dtype=suitable_rep.element_type),
                     rhs.fields,
                 )
 
-                return lgc.Query(alias, lgc.Reformat(suitable_rep, rhs))
+                return lgc.Query(alias, rhs)
 
             case lgc.Relabel(lgc.Alias(_) as alias, idxs) as relabel:
                 field_relabels.update(
@@ -382,6 +364,8 @@ def record_tables(
                     }
                 )
                 return relabel
+            case _:
+                return None
 
     processed_root = Rewrite(PostWalk(rule_0))(root)
     return processed_root, table_vars, slot_vars, dim_size_vars, tables, field_relabels
@@ -452,6 +436,10 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
             raise Exception(f"Unrecognized node: {root}")
 
 
+@overload
+def merge_blocks(root: ntn.Module) -> ntn.Module: ...
+@overload
+def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode: ...
 def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:
     """
     Removes empty blocks and flattens nested blocks. Such blocks
@@ -471,9 +459,17 @@ class NotationGenerator(LogicNotationLowerer):
         self, prgm: LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]
     ) -> tuple[ntn.Module, dict[lgc.Alias, lgc.TableValueFType]]:
         prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
-            record_tables(prgm)
+            record_tables(prgm, bindings)
         )
-        lowered_prgm = self.ll(
-            prgm, table_vars, slot_vars, dim_size_vars, field_relabels
+        ll = NotationGeneratorContext( table_vars, slot_vars, dim_size_vars, field_relabels)
+        func_block = ll(prgm)
+        mod = ntn.Module(
+            (
+                ntn.Function(
+                    ntn.Variable("main", return_type),
+                    tuple(var for var in table_vars.values()),
+                    func_block,
+                ),
+            )
         )
-        return merge_blocks(lowered_prgm), tables
+        return merge_blocks(mod), tables

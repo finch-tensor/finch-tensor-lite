@@ -7,7 +7,7 @@ from ..finch_logic import (
     LogicNode,
 )
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
-from .compiler import LogicCompiler
+from .loader import LogicCompiler
 
 
 def extract_tables(
@@ -44,10 +44,10 @@ def extract_tables(
 
 
 class LogicFieldsContext:
-    def __init__(self, bindings: dict[lgc.Alias, tuple[lgc.Field, ...]] = None):
+    def __init__(self, bindings: dict[lgc.Alias, tuple[lgc.Field, ...]] | None = None):
         if bindings is None:
             bindings = {}
-        self.bindings = bindings
+        self.bindings: dict[lgc.Alias, tuple[lgc.Field, ...]] = bindings
 
     def __call__(
         self, node: lgc.LogicNode
