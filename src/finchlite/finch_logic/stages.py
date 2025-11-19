@@ -14,7 +14,7 @@ class LogicEvaluator(Stage):
         self,
         term: lgc.LogicNode,
         bindings: dict[lgc.Alias, lgc.TableValue] | None = None,
-    ) -> lgc.TableValue | tuple[lgc.TableValue]:
+    ) -> lgc.TableValue | tuple[lgc.TableValue, ...]:
         """
         Evaluate the given logic.
         """
@@ -47,7 +47,7 @@ class LogicEinsumLowerer(ABC):
     @abstractmethod
     def __call__(
         self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[ein.Module, dict[lgc.Alias, TableValueFType]]:
+    ) -> tuple[ein.EinsumNode, dict[lgc.Alias, TableValueFType]]:
         """
         Generate Finch Einsum from the given logic and input types,
         types for all aliases.
@@ -73,7 +73,7 @@ class OptLogicLoader(LogicLoader):
         self,
         term: lgc.LogicNode,
         bindings: dict[lgc.Alias, lgc.TableValueFType],
-    ) -> AssemblyLibrary:
+    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
         return self.ctx(term, bindings)

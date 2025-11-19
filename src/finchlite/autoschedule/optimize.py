@@ -7,6 +7,7 @@ from typing import TypeVar, overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 
+from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -37,7 +38,7 @@ from ..symbolic import (
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
-from .stages import LogicLoader
+from ..finch_logic import LogicLoader
 
 T = TypeVar("T", bound="LogicNode")
 
@@ -779,6 +780,6 @@ class DefaultLogicOptimizer(LogicLoader):
 
     def __call__(
         self, prgm: LogicNode, bindings: dict[Alias, TableValueFType]
-    ) -> tuple[LogicNode, dict[Alias, TableValueFType]]:
+    ) -> tuple[AssemblyLibrary, dict[Alias, TableValueFType]]:
         prgm = optimize(prgm)
         return self.ctx(prgm, bindings)

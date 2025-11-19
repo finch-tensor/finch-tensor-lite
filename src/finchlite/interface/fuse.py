@@ -99,6 +99,13 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
 
     elif mode == Mode.INTERPRET_NOTATION:
+        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
+
+    else:
+        raise Exception(f"Invalid scheduler mode: {mode}")
+
+    """
+    elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         ntn_interp = ntn.NotationInterpreter()
 
@@ -109,7 +116,6 @@ def set_default_scheduler(
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
-
     elif mode == Mode.INTERPRET_ASSEMBLY:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         notation_compiler = NotationCompiler(Reflector())
@@ -144,9 +150,7 @@ def set_default_scheduler(
 
     elif mode == Mode.COMPILE_C:
         raise NotImplementedError
-
-    else:
-        raise Exception(f"Invalid scheduler mode: {mode}")
+    """
 
 
 set_default_scheduler()

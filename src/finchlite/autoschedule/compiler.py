@@ -469,7 +469,7 @@ def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:
 class NotationGenerator(LogicNotationLowerer):
     def __call__(
         self, prgm: LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]
-    ) -> tuple[ntn.NotationModule, dict[lgc.Alias, lgc.TableValueFType]]:
+    ) -> tuple[ntn.Module, dict[lgc.Alias, lgc.TableValueFType]]:
         prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
             record_tables(prgm)
         )

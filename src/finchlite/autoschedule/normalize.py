@@ -13,15 +13,17 @@ class LogicNormalizer(LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
     def __call__(
-        self, prgm: LogicNode, bindings: dict[Alias, TableValue]
-    ) -> tuple[LogicNode, dict[Alias, TableValue]]:
+        self, prgm: LogicNode, bindings: dict[Alias, TableValue]|None=None
+    ) -> TableValue | tuple[TableValue, ...]:
+        if bindings is None:
+            bindings = {}
         spc = Namespace(prgm)
         for var in bindings:
             spc.freshen(var.name)
-        renames = {}
-        unrenames = {}
+        renames: dict[str, str] = {}
+        unrenames: dict[str, str] = {}
 
-        def rule_0(node: LogicNode) -> LogicNode:
+        def rule_0(node: LogicNode) -> LogicNode | None:
             match node:
                 case Alias(name):
                     if name in renames:
