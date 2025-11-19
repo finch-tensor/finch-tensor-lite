@@ -120,21 +120,17 @@ class NotationGeneratorContext():
     def __call__(
         self,
         ex: LogicStatement,
-        table_vars: dict[Alias, ntn.Variable],
-        slot_vars: dict[Alias, ntn.Slot],
-        dim_size_vars: dict[ntn.Variable, ntn.Call],
-        field_relabels: dict[Field, Field],
     ) -> ntn.NotationStatement: ...
     @overload
     def __call__(
         self,
         ex: LogicExpression,
-        table_vars: dict[Alias, ntn.Variable],
-        slot_vars: dict[Alias, ntn.Slot],
-        dim_size_vars: dict[ntn.Variable, ntn.Call],
-        field_relabels: dict[Field, Field],
     ) -> ntn.NotationExpression: ...
     @overload
+    def __call__(
+        self,
+        ex: LogicNode,
+    ) -> ntn.NotationNode: ...
     def __call__(
         self,
         ex: LogicNode,
@@ -253,10 +249,9 @@ class NotationGeneratorContext():
                 )
                 for idx in reversed(idxs_2):
                     idx_type = field_types[idx]
-                    idx_var = ntn.Variable(field_relabels.get(idx, idx).name, idx_type)
+                    idx_var = ntn.Variable(self.field_relabels.get(idx, idx).name, idx_type)
                     if idx in rhs_idxs:
                         body = ntn.Loop(
-                            idx_var,
                             ntn.Variable(
                                 self.field_relabels.get(idx, idx).name, idx_type
                             ),
@@ -373,7 +368,7 @@ def record_tables(
                 table_vars[alias] = ntn.Variable(name, suitable_rep)
                 tables[alias] = lgc.TableValueFType(
                     TensorPlaceholder(dtype=suitable_rep.element_type),
-                    rhs.fields,
+                    tuple(rhs.fields),
                 )
 
                 return lgc.Query(alias, rhs)
@@ -485,6 +480,10 @@ class NotationGenerator(LogicNotationLowerer):
             record_tables(prgm, bindings)
         )
         ll = NotationGeneratorContext( table_vars, slot_vars, dim_size_vars, field_relabels)
+        if isinstance(prgm, lgc.LogicExpression):
+            prgm = lgc.Plan((lgc.Produces((prgm,)),))
+        if not isinstance(prgm, lgc.LogicStatement):
+            raise Exception(f"Unrecognized logic: {prgm}")
         func_block = ll(prgm)
         mod = ntn.Module(
             (
