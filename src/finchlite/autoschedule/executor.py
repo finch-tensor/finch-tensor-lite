@@ -1,35 +1,13 @@
-from ..symbolic import gensym, Namespace
-from .compiler import LogicCompiler
-from ..finch_logic import LogicEvaluator, LogicLoader
+from functools import cache
 
-import operator
-from functools import lru_cache, reduce
-from typing import TypeVar, overload
-
-import numpy as np
-
-from .. import finch_assembly as asm
 from .. import finch_logic as lgc
-from .. import finch_notation as ntn
-from ..algebra import (
-    InitWrite,
-    TensorFType,
-    TensorPlaceholder,
-    query_property,
-    return_type,
-)
-from ..codegen import NumpyBufferFType
-from ..compile import BufferizedNDArrayFType, ExtentFType, dimension
-from ..finch_assembly import TupleFType
 from ..finch_logic import (
-    LogicExpression,
+    LogicEvaluator,
     LogicLoader,
     LogicNode,
-    LogicNotationLowerer,
-    LogicTree,
 )
-from ..symbolic import Fixpoint, PostWalk, Rewrite, ftype
-from ._utils import extend_uniqe, intersect, setdiff, with_subsequence
+from ..symbolic import Namespace, PostWalk, Rewrite, ftype
+from .compiler import LogicCompiler
 
 
 def extract_tables(
@@ -40,9 +18,9 @@ def extract_tables(
     Extracts tables from logic plan, replacing them with aliases.
     """
     bindings = bindings.copy()
-    ids: dict[int, lgc.Alias] = {id(val.tns) : key for key, val in bindings.items()}
+    ids: dict[int, lgc.Alias] = {id(val.tns): key for key, val in bindings.items()}
     spc = Namespace(root)
-    for alias in bindings.keys():
+    for alias in bindings:
         spc.freshen(alias.name)
 
     def rule_0(node):
@@ -55,24 +33,25 @@ def extract_tables(
                     var = ids[id(tns)]
                     if bindings[var].idxs == idxs:
                         return var
-                    else:
-                        return lgc.Relabel(var, idxs)
-                else:
-                    var = lgc.Alias(spc.freshen("A"))
-                    ids[id(tns)] = var
-                    bindings[var] = lgc.TableValue(tns, idxs)
-                    return var
+                    return lgc.Relabel(var, idxs)
+                var = lgc.Alias(spc.freshen("A"))
+                ids[id(tns)] = var
+                bindings[var] = lgc.TableValue(tns, idxs)
+                return var
 
     root = Rewrite(PostWalk(rule_0))(root)
     return root, bindings
+
 
 class LogicFieldsContext:
     def __init__(self, bindings: dict[lgc.Alias, tuple[lgc.Field, ...]] = None):
         if bindings is None:
             bindings = {}
         self.bindings = bindings
-    
-    def __call__(self, node: lgc.LogicNode) -> tuple[lgc.Field, ...] | tuple[tuple[lgc.Field, ...], ...]:
+
+    def __call__(
+        self, node: lgc.LogicNode
+    ) -> tuple[lgc.Field, ...] | tuple[tuple[lgc.Field, ...], ...]:
         match node:
             case lgc.Alias(_):
                 if node not in self.bindings:
@@ -110,30 +89,47 @@ class LogicFieldsContext:
             case _:
                 raise ValueError(f"Unknown expression type: {type(node)}")
 
-@lru_cache(maxsize=None)
-def get_return_fields(prgm: lgc.LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+
+@cache
+def get_return_fields(
+    prgm: lgc.LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]
+):
     ctx = LogicFieldsContext({var: tbl.idxs for var, tbl in bindings.items()})
     return ctx(prgm)
 
 
 class LogicExecutor(LogicEvaluator):
-    def __init__(self, ctx: LogicLoader=LogicCompiler(), verbose: bool = False):
+    def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
+        if ctx is None:
+            ctx = LogicCompiler()
         self.ctx: LogicLoader = ctx
         self.verbose: bool = verbose
- 
-    def __call__(self, prgm, bindings:dict[lgc.Alias, lgc.TableValue] | None = None):
+
+    def __call__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValue] | None = None):
         if bindings is None:
             bindings = {}
         prgm, bindings = extract_tables(prgm, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 
-        mod,  = self.ctx(prgm, binding_ftypes)
+        sizes = {
+            idx: dim
+            for tbl in bindings.values()
+            for (idx, dim) in zip(tbl.idxs, tbl.tns.shape, strict=True)
+        }
 
-        res = mod.main(*(tbl.tns for tbl in bindings.values()))
+        mod, workspace_ftypes = self.ctx(prgm, binding_ftypes)
 
-        res_ftype = get_return_fields(prgm, {var: tbl.idxs for var, tbl in bindings.items()})
+        inputs = [tbl.tns for tbl in bindings.values()]
+        workspaces = [
+            tbl.tns(sizes[idx] for idx in tbl.idxs) for tbl in workspace_ftypes
+        ]
+
+        res = mod.main(*inputs, *workspaces)
+
+        res_ftype = get_return_fields(
+            prgm, {var: tbl.idxs for var, tbl in bindings.items()}
+        )
 
         if isinstance(res, tuple):
-            return (t(tns) for t, tns in zip(res_ftype, res))
-        else:
-            return res_ftype(res)
+            return (t(tns) for t, tns in zip(res_ftype, res, strict=True))
+        return res_ftype(res)

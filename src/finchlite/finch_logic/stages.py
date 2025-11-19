@@ -24,10 +24,11 @@ class LogicLoader(ABC):
     @abstractmethod
     def __call__(
         self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> AssemblyLibrary:
+    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, TableValueFType]]:
         """
-        Generate Finch Library from the given logic and input types,
-        with a single method called main which implements the logic.
+        Generate Finch Library from the given logic and input types, with a
+        single method called main which implements the logic. Also return a
+        dictionary including additional tables needed to run the kernel.
         """
 
 
@@ -37,8 +38,8 @@ class LogicNotationLowerer(ABC):
         self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
     ) -> tuple[ntn.Module, dict[lgc.Alias, TableValueFType]]:
         """
-        Generate Finch Notation from the given logic and input types,
-        types for all aliases.
+        Generate Finch Notation from the given logic and input types.  Also
+        return a dictionary including additional tables needed to run the kernel.
         """
 
 
