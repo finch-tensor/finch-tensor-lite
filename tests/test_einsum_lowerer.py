@@ -8,7 +8,7 @@ import finchlite
 from finchlite.autoschedule import optimize
 from finchlite.autoschedule.einsum import EinsumGenerator
 from finchlite.finch_einsum import EinsumInterpreter
-from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
+from finchlite.finch_logic import Alias, LogicExpression, Plan, Produces, Query
 from finchlite.interface.fuse import compute
 from finchlite.interface.lazy import defer
 from finchlite.symbolic import gensym
@@ -19,7 +19,7 @@ def rng():
     return np.random.default_rng(42)
 
 
-def lower_and_execute(ir: LogicNode):
+def lower_and_execute(ir: LogicExpression):
     """
     Helper function to optimize, lower, and execute a Logic IR plan.
 

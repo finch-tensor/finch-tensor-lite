@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import TypeVar, overload
+from typing import overload
 
 import numpy as np
 
@@ -21,12 +21,11 @@ from ..finch_logic import (
     LogicExpression,
     LogicNode,
     LogicNotationLowerer,
+    LogicStatement,
     LogicTree,
 )
 from ..symbolic import Fixpoint, PostWalk, Rewrite, ftype
 from ._utils import extend_uniqe, intersect, setdiff, with_subsequence
-
-T = TypeVar("T", bound="LogicNode")
 
 
 class PointwiseContext:
@@ -45,7 +44,7 @@ class PointwiseContext:
         slot_vars: dict[lgc.Alias, ntn.Slot],
         field_relabels: dict[lgc.Field, lgc.Field],
         field_types: dict[lgc.Field, type],
-    ) -> ntn.NotationNode:
+    ) -> ntn.NotationExpression:
         match ex:
             case lgc.MapJoin(lgc.Literal(op), args):
                 return ntn.Call(
@@ -88,13 +87,13 @@ def compile_pointwise_logic(
     slot_vars: dict[lgc.Alias, ntn.Slot],
     field_relabels: dict[lgc.Field, lgc.Field],
     field_types: dict[lgc.Field, type],
-) -> tuple[ntn.NotationNode, list[lgc.Field], list[lgc.Alias]]:
+) -> tuple[ntn.NotationExpression, list[lgc.Field], list[lgc.Alias]]:
     ctx = PointwiseContext(loop_idxs=loop_idxs)
     code = ctx(ex, slot_vars, field_relabels, field_types)
     return code, ctx.bound_idxs, ctx.required_slots
 
 
-def compile_logic_constant(ex: LogicNode) -> ntn.NotationNode:
+def compile_logic_constant(ex: LogicNode) -> ntn.NotationExpression:
     match ex:
         case lgc.Literal(val):
             return ntn.Literal(val)
@@ -117,6 +116,25 @@ class NotationGeneratorContext():
         self.dim_size_vars = dim_size_vars
         self.field_relabels = field_relabels
 
+    @overload
+    def __call__(
+        self,
+        ex: LogicStatement,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationStatement: ...
+    @overload
+    def __call__(
+        self,
+        ex: LogicExpression,
+        table_vars: dict[Alias, ntn.Variable],
+        slot_vars: dict[Alias, ntn.Slot],
+        dim_size_vars: dict[ntn.Variable, ntn.Call],
+        field_relabels: dict[Field, Field],
+    ) -> ntn.NotationExpression: ...
+    @overload
     def __call__(
         self,
         ex: LogicNode,
@@ -235,8 +253,10 @@ class NotationGeneratorContext():
                 )
                 for idx in reversed(idxs_2):
                     idx_type = field_types[idx]
+                    idx_var = ntn.Variable(field_relabels.get(idx, idx).name, idx_type)
                     if idx in rhs_idxs:
                         body = ntn.Loop(
+                            idx_var,
                             ntn.Variable(
                                 self.field_relabels.get(idx, idx).name, idx_type
                             ),
@@ -248,8 +268,11 @@ class NotationGeneratorContext():
                         )
                     elif idx in lhs_idxs:
                         body = ntn.Loop(
-                            ntn.Literal(idx_type(1)),
-                            ntn.Literal(idx_type(1)),
+                            idx_var,
+                            ExtentFType.stack(
+                                ntn.Literal(idx_type(1)),
+                                ntn.Literal(idx_type(1)),
+                            ),
                             body,
                         )
 

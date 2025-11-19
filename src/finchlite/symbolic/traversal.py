@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from finchlite.symbolic.term import Term, TermTree
+from .term import Term, TermTree
 
 
 def PostOrderDFS(node: Term) -> Iterator[Term]:
