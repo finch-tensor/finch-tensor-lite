@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
-from finchlite.algebra.tensor import TensorFType
+from ..algebra import TensorFType
+from ..finch_assembly import AssemblyLibrary
 
 from .. import finch_notation as ntn
 from ..symbolic import Stage
@@ -12,6 +13,17 @@ class LogicEvaluator(Stage):
     def __call__(self, term: lgc.LogicNode, bindings: dict[lgc.Alias, lgc.TableValue]|None=None) -> lgc.TableValue | tuple[lgc.TableValue]:
         """
         Evaluate the given logic.
+        """
+
+
+class LogicLoader(ABC):
+    @abstractmethod
+    def __call__(
+        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TensorFType]
+    ) -> AssemblyLibrary:
+        """
+        Generate Finch Library from the given logic and input types,
+        with a single method called main which implements the logic.
         """
 
 
