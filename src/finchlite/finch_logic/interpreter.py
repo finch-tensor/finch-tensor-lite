@@ -1,7 +1,4 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
 from itertools import product
-from typing import Any
 
 import numpy as np
 
@@ -19,27 +16,21 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    TableValue,
     Value,
 )
+from .stages import LogicEvaluator
 
 
-@dataclass(eq=True, frozen=True)
-class TableValue:
-    tns: Any
-    idxs: Iterable[Any]
-
-    def __post_init__(self):
-        if isinstance(self.tns, TableValue):
-            raise ValueError("The tensor (tns) cannot be a TableValue")
-
-
-class FinchLogicInterpreter:
+class FinchLogicInterpreter(LogicEvaluator):
     def __init__(self, *, make_tensor=np.full, verbose=False):
         self.verbose = verbose
         self.bindings = {}
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def __call__(self, node):
+    def __call__(self, node, bindings=None):
+        if bindings is not None:
+            self.bindings = bindings.copy()
         # Example implementation for evaluating an expression
         if self.verbose:
             print(f"Evaluating: {node}")

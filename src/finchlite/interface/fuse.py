@@ -55,12 +55,8 @@ from typing import Any
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
-from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
-from ..codegen import NumbaCompiler
-from ..compile import BufferizedNDArray, NotationCompiler
+from ..compile import BufferizedNDArray
 from ..finch_logic import (
     Alias,
     Field,
@@ -71,7 +67,7 @@ from ..finch_logic import (
     Query,
     Table,
 )
-from ..symbolic import Reflector, gensym
+from ..symbolic import gensym
 from .lazy import defer
 
 _DEFAULT_SCHEDULER = None
@@ -95,9 +91,13 @@ def set_default_scheduler(
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
 
-    elif mode == Mode.INTERPRET_LOGIC:
+    elif mode == Mode.INTERPRET_LOGIC or mode == Mode.INTERPRET_NOTATION:
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
 
+    else:
+        raise Exception(f"Invalid scheduler mode: {mode}")
+
+    """
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         ntn_interp = ntn.NotationInterpreter()
@@ -109,7 +109,6 @@ def set_default_scheduler(
             return (mod.func(*args),)
 
         _DEFAULT_SCHEDULER = fn_compile
-
     elif mode == Mode.INTERPRET_ASSEMBLY:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
         notation_compiler = NotationCompiler(Reflector())
@@ -144,9 +143,7 @@ def set_default_scheduler(
 
     elif mode == Mode.COMPILE_C:
         raise NotImplementedError
-
-    else:
-        raise Exception(f"Invalid scheduler mode: {mode}")
+    """
 
 
 set_default_scheduler()

@@ -7,12 +7,14 @@ from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 
+from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
     Literal,
     LogicExpression,
+    LogicLoader,
     LogicNode,
     LogicStatement,
     LogicTree,
@@ -25,6 +27,7 @@ from ..finch_logic import (
     Reorder,
     Subquery,
     Table,
+    TableValueFType,
 )
 from ..symbolic import (
     Chain,
@@ -156,7 +159,7 @@ def lift_subqueries(node):
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
         case Query(lhs, rhs):
-            bindings: dict[Alias, LogicExpression] = {}
+            bindings = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
@@ -757,10 +760,12 @@ def materialize_squeeze_expand_productions(root):
     return Rewrite(PostWalk(rule_1))(root)
 
 
-class DefaultLogicOptimizer:
-    def __init__(self, ctx):
-        self.ctx = ctx
+class DefaultLogicOptimizer(LogicLoader):
+    def __init__(self, ctx: LogicLoader):
+        self.ctx: LogicLoader = ctx
 
-    def __call__(self, prgm: LogicNode):
+    def __call__(
+        self, prgm: LogicNode, bindings: dict[Alias, TableValueFType]
+    ) -> tuple[AssemblyLibrary, dict[Alias, TableValueFType]]:
         prgm = optimize(prgm)
-        return self.ctx(prgm)
+        return self.ctx(prgm, bindings)

@@ -3,7 +3,12 @@ from pathlib import Path
 
 import numpy as np
 
-from finchlite.codegen.c import CBufferFType, CStackFType, c_type, load_shared_lib
+from finchlite.codegen.c_codegen import (
+    CBufferFType,
+    CStackFType,
+    c_type,
+    load_shared_lib,
+)
 from finchlite.codegen.numpy_buffer import CBufferFields
 from finchlite.finch_assembly import Buffer
 from finchlite.util import qual_str

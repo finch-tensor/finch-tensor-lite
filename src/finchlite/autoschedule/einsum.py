@@ -1,11 +1,11 @@
 from typing import Any, cast
 
-import finchlite.finch_einsum as ein
-import finchlite.finch_logic as lgc
-from finchlite.algebra import init_value, overwrite
+from .. import finch_einsum as ein
+from .. import finch_logic as lgc
+from ..algebra import init_value, overwrite
 
 
-class EinsumLowerer:
+class EinsumGenerator:
     def __call__(self, prgm: lgc.Plan) -> tuple[ein.Plan, dict[str, Any]]:
         bindings: dict[str, Any] = {}
         definitions: dict[str, ein.Einsum] = {}

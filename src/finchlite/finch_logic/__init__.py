@@ -17,7 +17,16 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    TableValue,
+    TableValueFType,
     Value,
+)
+from .stages import (
+    LogicEinsumLowerer,
+    LogicEvaluator,
+    LogicLoader,
+    LogicNotationLowerer,
+    LogicTransform,
 )
 
 __all__ = [
@@ -26,9 +35,14 @@ __all__ = [
     "Field",
     "FinchLogicInterpreter",
     "Literal",
+    "LogicEinsumLowerer",
+    "LogicEvaluator",
     "LogicExpression",
+    "LogicLoader",
     "LogicNode",
+    "LogicNotationLowerer",
     "LogicStatement",
+    "LogicTransform",
     "LogicTree",
     "MapJoin",
     "Plan",
@@ -39,5 +53,7 @@ __all__ = [
     "Reorder",
     "Subquery",
     "Table",
+    "TableValue",
+    "TableValueFType",
     "Value",
 ]
