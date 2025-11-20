@@ -1,4 +1,5 @@
 from functools import cache
+from typing import overload
 
 from .. import finch_logic as lgc
 from ..finch_logic import (
@@ -49,9 +50,13 @@ class LogicFieldsContext:
             bindings = {}
         self.bindings: dict[lgc.Alias, tuple[lgc.Field, ...]] = bindings
 
-    def __call__(
-        self, node: lgc.LogicNode
-    ) -> tuple[lgc.Field, ...] | tuple[tuple[lgc.Field, ...], ...]:
+    @overload
+    def __call__(self, node: lgc.LogicExpression) -> tuple[lgc.Field, ...]: ...
+    @overload
+    def __call__(self, node: lgc.LogicStatement) -> tuple[tuple[lgc.Field, ...], ...]: ...
+    @overload
+    def __call__(self, node: lgc.LogicNode) -> tuple[lgc.Field, ...] | tuple[tuple[lgc.Field, ...], ...]: ...
+    def __call__(self, node):
         match node:
             case lgc.Alias(_):
                 if node not in self.bindings:
@@ -90,11 +95,10 @@ class LogicFieldsContext:
                 raise ValueError(f"Unknown expression type: {type(node)}")
 
 
-@cache
 def get_return_fields(
-    prgm: lgc.LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]
+    prgm: lgc.LogicNode, bindings: dict[lgc.Alias, tuple[lgc.Field, ...]]
 ):
-    ctx = LogicFieldsContext({var: tbl.idxs for var, tbl in bindings.items()})
+    ctx = LogicFieldsContext(bindings)
     return ctx(prgm)
 
 
@@ -121,7 +125,7 @@ class LogicExecutor(LogicEvaluator):
 
         inputs = [tbl.tns for tbl in bindings.values()]
         workspaces = [
-            tbl.tns(sizes[idx] for idx in tbl.idxs) for tbl in workspace_ftypes
+            tbl.tns(sizes[idx] for idx in tbl.idxs) for tbl in workspace_ftypes.values()
         ]
 
         res = mod.main(*inputs, *workspaces)
