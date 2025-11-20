@@ -4,7 +4,11 @@ from .cfg_builder import (
     assembly_build_cfg,
     assembly_number_uses,
 )
-from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
+from .dataflow import (
+    AssemblyAvailableExpressions,
+    AssemblyCopyPropagation,
+    assembly_copy_propagation,
+)
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyNode,
@@ -40,6 +44,7 @@ from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 
 __all__ = [
+    "AssemblyAvailableExpressions",
     "AssemblyCFGBuilder",
     "AssemblyCopyPropagation",
     "AssemblyInterpreter",

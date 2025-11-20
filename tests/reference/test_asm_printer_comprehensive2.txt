@@ -1,0 +1,12 @@
+def avail_demo(a: int64, b: int64, c: int64, cond: bool) -> int64:
+    t1: int64 = add(a, b)
+    t2: int64 = add(a, b)
+    t3: int64 = mul(b, c)
+    t1: int64 = add(add(a, b), mul(b, c))
+    if cond:
+        t2: int64 = add(add(a, b), 1)
+    else:
+        a: int64 = 0
+        t3: int64 = sub(a, c)
+    t3: int64 = add(t1, t2)
+    return t3

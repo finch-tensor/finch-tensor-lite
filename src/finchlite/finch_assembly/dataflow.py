@@ -2,12 +2,7 @@ from abc import abstractmethod
 
 from ..symbolic import DataFlowAnalysis, PostOrderDFS
 from .cfg_builder import assembly_build_cfg
-from .nodes import (
-    AssemblyNode,
-    Assign,
-    TaggedVariable,
-    Variable,
-)
+from .nodes import AssemblyNode, Assign, TaggedVariable, Variable
 
 
 def assembly_copy_propagation(node: AssemblyNode):
@@ -22,6 +17,21 @@ def assembly_copy_propagation(node: AssemblyNode):
     ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
     ctx.analyze()
     return ctx
+
+
+# def assembly_available_expressions(node: AssemblyNode):
+#     """Run available-expressions analysis on a FinchAssembly node.
+
+#     Args:
+#         node: Root FinchAssembly node to analyze.
+
+#     Returns:
+#         AssemblyAvailableExpressions: The completed analysis context.
+#     """
+
+#     ctx = AssemblyAvailableExpressions(assembly_build_cfg(node))
+#     ctx.analyze()
+#     return ctx
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
@@ -129,3 +139,19 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                 result[var_name] = state_1[var_name]
 
         return result
+
+
+class AssemblyAvailableExpressions(AbstractAssemblyDataflow):
+    """Available expressions analysis for FinchAssembly."""
+
+    def direction(self) -> str:
+        return "forward"
+
+    def transfer(self, stmts, state: dict) -> dict:
+        pass
+
+    def join(self, state_1: dict, state_2: dict) -> dict:
+        pass
+
+    def print_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
+        pass

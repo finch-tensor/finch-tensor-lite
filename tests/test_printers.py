@@ -281,6 +281,71 @@ def test_tagged_asm_printer_if(file_regression):
     file_regression.check(str(root), extension=".txt")
 
 
+def test_asm_printer_comprehensive2(file_regression):
+    a = asm.Variable("a", np.int64)
+    b = asm.Variable("b", np.int64)
+    c = asm.Variable("c", np.int64)
+    cond = asm.Variable("cond", np.bool_)
+    t1 = asm.Variable("t1", np.int64)
+    t2 = asm.Variable("t2", np.int64)
+    t3 = asm.Variable("t3", np.int64)
+
+    add_ab = asm.Call(asm.Literal(operator.add), (a, b))
+    mul_bc = asm.Call(asm.Literal(operator.mul), (b, c))
+    sub_ac = asm.Call(asm.Literal(operator.sub), (a, c))
+    nested = asm.Call(asm.Literal(operator.add), (add_ab, mul_bc))
+
+    root = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("avail_demo", np.int64),
+                (a, b, c, cond),
+                asm.Block(
+                    (
+                        asm.Assign(t1, add_ab),
+                        asm.Assign(t2, add_ab),
+                        asm.Assign(t3, mul_bc),
+                        asm.Assign(
+                            t1,
+                            nested,
+                        ),
+                        asm.IfElse(
+                            cond,
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        t2,
+                                        asm.Call(
+                                            asm.Literal(operator.add),
+                                            (add_ab, asm.Literal(np.int64(1))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(a, asm.Literal(np.int64(0))),
+                                    asm.Assign(t3, sub_ac),
+                                )
+                            ),
+                        ),
+                        asm.Assign(
+                            t3,
+                            asm.Call(
+                                asm.Literal(operator.add),
+                                (t1, t2),
+                            ),
+                        ),
+                        asm.Return(t3),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(root), extension=".txt")
+
+
 def test_asm_printer_dot(file_regression):
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)

@@ -5,7 +5,9 @@ import numpy as np
 import finchlite.finch_assembly as asm
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.finch_assembly.cfg_builder import assembly_build_cfg
-from finchlite.finch_assembly.dataflow import assembly_copy_propagation
+from finchlite.finch_assembly.dataflow import (
+    assembly_copy_propagation,
+)
 
 
 def test_asm_cfg_printer_if(file_regression):
@@ -666,3 +668,69 @@ def test_asm_copy_propagation_comprehensive(file_regression):
 
     copy_propagation = assembly_copy_propagation(root)
     file_regression.check(str(copy_propagation), extension=".txt")
+
+
+# def test_asm_avail_exp_comprehensive2(file_regression):
+#     a = asm.Variable("a", np.int64)
+#     b = asm.Variable("b", np.int64)
+#     c = asm.Variable("c", np.int64)
+#     cond = asm.Variable("cond", np.bool_)
+#     t1 = asm.Variable("t1", np.int64)
+#     t2 = asm.Variable("t2", np.int64)
+#     t3 = asm.Variable("t3", np.int64)
+
+#     add_ab = asm.Call(asm.Literal(operator.add), (a, b))
+#     mul_bc = asm.Call(asm.Literal(operator.mul), (b, c))
+#     sub_ac = asm.Call(asm.Literal(operator.sub), (a, c))
+#     nested = asm.Call(asm.Literal(operator.add), (add_ab, mul_bc))
+
+#     root = asm.Module(
+#         (
+#             asm.Function(
+#                 asm.Variable("avail_demo", np.int64),
+#                 (a, b, c, cond),
+#                 asm.Block(
+#                     (
+#                         asm.Assign(t1, add_ab),
+#                         asm.Assign(t2, add_ab),
+#                         asm.Assign(t3, mul_bc),
+#                         asm.Assign(
+#                             t1,
+#                             nested,
+#                         ),
+#                         asm.IfElse(
+#                             cond,
+#                             asm.Block(
+#                                 (
+#                                     asm.Assign(
+#                                         t2,
+#                                         asm.Call(
+#                                             asm.Literal(operator.add),
+#                                             (add_ab, asm.Literal(np.int64(1))),
+#                                         ),
+#                                     ),
+#                                 )
+#                             ),
+#                             asm.Block(
+#                                 (
+#                                     asm.Assign(a, asm.Literal(np.int64(0))),
+#                                     asm.Assign(t3, sub_ac),
+#                                 )
+#                             ),
+#                         ),
+#                         asm.Assign(
+#                             t3,
+#                             asm.Call(
+#                                 asm.Literal(operator.add),
+#                                 (t1, t2),
+#                             ),
+#                         ),
+#                         asm.Return(t3),
+#                     )
+#                 ),
+#             ),
+#         )
+#     )
+
+#     avail_exp = assembly_available_expressions(root)
+#     file_regression.check(str(avail_exp), extension=".txt")
