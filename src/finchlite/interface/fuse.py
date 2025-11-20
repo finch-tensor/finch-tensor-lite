@@ -55,12 +55,8 @@ from typing import Any
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
-from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
-from ..codegen import NumbaCompiler
-from ..compile import BufferizedNDArray, NotationCompiler
+from ..compile import BufferizedNDArray
 from ..finch_logic import (
     Alias,
     Field,
@@ -71,7 +67,7 @@ from ..finch_logic import (
     Query,
     Table,
 )
-from ..symbolic import Reflector, gensym
+from ..symbolic import gensym
 from .lazy import defer
 
 _DEFAULT_SCHEDULER = None
@@ -95,10 +91,7 @@ def set_default_scheduler(
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
 
-    elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
-
-    elif mode == Mode.INTERPRET_NOTATION:
+    elif mode == Mode.INTERPRET_LOGIC or mode == Mode.INTERPRET_NOTATION:
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
 
     else:

@@ -13,7 +13,7 @@ class LogicNormalizer(LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
     def __call__(
-        self, prgm: LogicNode, bindings: dict[Alias, TableValue]|None=None
+        self, prgm: LogicNode, bindings: dict[Alias, TableValue] | None = None
     ) -> TableValue | tuple[TableValue, ...]:
         if bindings is None:
             bindings = {}
@@ -48,7 +48,9 @@ class LogicNormalizer(LogicEvaluator):
                 tbl.tns, tuple(Field(names[idx.name]) for idx in tbl.idxs)
             )
 
-        bindings = {Rewrite(rule_0)(var): reidx(tbl, renames) for var, tbl in bindings.items()}
+        bindings = {
+            Rewrite(rule_0)(var): reidx(tbl, renames) for var, tbl in bindings.items()
+        }
         res = self.ctx(root, bindings)
 
         if isinstance(res, tuple):

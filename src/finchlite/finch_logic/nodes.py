@@ -26,7 +26,7 @@ class TableValueFType(FType):
         if not isinstance(other, TableValueFType):
             return False
         return self.tns == other.tns and self.idxs == other.idxs
-    
+
     def __hash__(self):
         return hash((self.tns, self.idxs))
 

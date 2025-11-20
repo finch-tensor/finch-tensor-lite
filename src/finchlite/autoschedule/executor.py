@@ -1,4 +1,3 @@
-from functools import cache
 from typing import overload
 
 from .. import finch_logic as lgc
@@ -53,9 +52,13 @@ class LogicFieldsContext:
     @overload
     def __call__(self, node: lgc.LogicExpression) -> tuple[lgc.Field, ...]: ...
     @overload
-    def __call__(self, node: lgc.LogicStatement) -> tuple[tuple[lgc.Field, ...], ...]: ...
+    def __call__(
+        self, node: lgc.LogicStatement
+    ) -> tuple[tuple[lgc.Field, ...], ...]: ...
     @overload
-    def __call__(self, node: lgc.LogicNode) -> tuple[lgc.Field, ...] | tuple[tuple[lgc.Field, ...], ...]: ...
+    def __call__(
+        self, node: lgc.LogicNode
+    ) -> tuple[lgc.Field, ...] | tuple[tuple[lgc.Field, ...], ...]: ...
     def __call__(self, node):
         match node:
             case lgc.Alias(_):

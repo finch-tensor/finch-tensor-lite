@@ -103,7 +103,7 @@ def compile_logic_constant(ex: LogicNode) -> ntn.NotationExpression:
             raise Exception(f"Invalid constant: {ex}")
 
 
-class NotationGeneratorContext():
+class NotationGeneratorContext:
     def __init__(
         self,
         table_vars: dict[lgc.Alias, ntn.Variable],
@@ -249,7 +249,9 @@ class NotationGeneratorContext():
                 )
                 for idx in reversed(idxs_2):
                     idx_type = field_types[idx]
-                    idx_var = ntn.Variable(self.field_relabels.get(idx, idx).name, idx_type)
+                    idx_var = ntn.Variable(
+                        self.field_relabels.get(idx, idx).name, idx_type
+                    )
                     if idx in rhs_idxs:
                         body = ntn.Loop(
                             ntn.Variable(
@@ -479,7 +481,9 @@ class NotationGenerator(LogicNotationLowerer):
         prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
             record_tables(prgm, bindings)
         )
-        ll = NotationGeneratorContext( table_vars, slot_vars, dim_size_vars, field_relabels)
+        ll = NotationGeneratorContext(
+            table_vars, slot_vars, dim_size_vars, field_relabels
+        )
         if isinstance(prgm, lgc.LogicExpression):
             prgm = lgc.Plan((lgc.Produces((prgm,)),))
         if not isinstance(prgm, lgc.LogicStatement):

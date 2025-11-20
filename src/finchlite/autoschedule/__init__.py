@@ -16,6 +16,8 @@ from ..finch_logic import (
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import NotationGenerator
+from .loader import LogicCompiler
+from .normalize import LogicNormalizer
 from .optimize import (
     DefaultLogicOptimizer,
     concordize,
@@ -38,8 +40,6 @@ from .optimize import (
     push_fields,
     set_loop_order,
 )
-from .normalize import LogicNormalizer
-from .loader import LogicCompiler
 
 __all__ = [
     "Aggregate",
@@ -48,7 +48,10 @@ __all__ = [
     "Field",
     "Literal",
     "LogicCompiler",
+    "LogicCompiler",
+    "LogicNormalizer",
     "MapJoin",
+    "NotationGenerator",
     "Plan",
     "PostOrderDFS",
     "PostWalk",
@@ -77,11 +80,8 @@ __all__ = [
     "propagate_fields",
     "propagate_into_reformats",
     "propagate_map_queries",
-    "NotationGenerator",
-    "LogicCompiler",
     "propagate_map_queries_backward",
     "propagate_transpose_queries",
     "push_fields",
     "set_loop_order",
-    "LogicNormalizer",
 ]

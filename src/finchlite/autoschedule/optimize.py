@@ -14,6 +14,7 @@ from ..finch_logic import (
     Field,
     Literal,
     LogicExpression,
+    LogicLoader,
     LogicNode,
     LogicStatement,
     LogicTree,
@@ -39,7 +40,6 @@ from ..symbolic import (
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
-from ..finch_logic import LogicLoader
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
