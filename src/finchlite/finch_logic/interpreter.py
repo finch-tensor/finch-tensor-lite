@@ -14,7 +14,9 @@ from .nodes import (
     Query,
     Relabel,
     Reorder,
+    Submaterialize,
     Subquery,
+    Materialize,
     Table,
     TableValue,
     Value,
@@ -116,6 +118,12 @@ class FinchLogicInterpreter:
                 rhs = self(rhs)
                 self.bindings[lhs] = rhs
                 return (rhs,)
+            case Materialize(lhs, rhs):
+                rhs = self(rhs)
+                lhs = self(lhs)
+                for crds in product(*[range(dim) for dim in rhs.tns.shape]):
+                    lhs.tns[*crds] = rhs.tns[*crds]
+                return (rhs,)
             case Plan(bodies):
                 res = ()
                 for body in bodies:
@@ -129,5 +137,11 @@ class FinchLogicInterpreter:
                     res = self(arg)
                     self.bindings[lhs] = res
                 return res
+            case Submaterialize(lhs, arg):
+                lhs = self(lhs)
+                arg = self(arg)
+                for crds in product(*[range(dim) for dim in arg.tns.shape]):
+                    lhs.tns[*crds] = arg.tns[*crds]
+                return arg
             case _:
                 raise ValueError(f"Unknown expression type: {type(node)}")
