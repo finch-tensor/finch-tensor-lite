@@ -77,7 +77,7 @@ class EinsumLowerer:
         ex: lgc.LogicNode,
     ) -> ein.EinsumExpression:
         match ex:
-            case lgc.SubMaterialize(_, rhs):
+            case lgc.Submaterialize(_, rhs):
                 return self.compile_operand(rhs)
             case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg)

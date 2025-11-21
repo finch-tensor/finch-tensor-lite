@@ -29,9 +29,9 @@ from ..finch_logic import (
     Plan,
     Produces,
     Query,
-    SubMaterialize,
     Relabel,
     Reorder,
+    Submaterialize,
     Subquery,
     Table,
     Value,
@@ -227,8 +227,9 @@ class LogicLowerer:
                 return ntn.Block(())
             case Query(
                 Alias(_) as lhs,
-                SubMaterialize(
-                    tns, Reorder(Relabel(LogicExpression() as arg, idxs_1), idxs_2)
+                Submaterialize(
+                    Table(tns, _),
+                    Reorder(Relabel(LogicExpression() as arg, idxs_1), idxs_2),
                 ),
             ):
                 loop_idxs = with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
@@ -246,7 +247,9 @@ class LogicLowerer:
 
             case Query(
                 Alias(_) as lhs,
-                SubMaterialize(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
+                Submaterialize(
+                    Table(tns, _), Reorder(MapJoin(Literal(op), args), _) as reorder
+                ),
             ):
                 assert isinstance(tns, TensorFType)
                 # TODO (mtsokol): fetch fill value the right way
@@ -254,8 +257,8 @@ class LogicLowerer:
                 return self(
                     Query(
                         lhs,
-                        SubMaterialize(
-                            tns,
+                        Submaterialize(
+                            Table(tns, reorder.fields),
                             Aggregate(Literal(InitWrite(fv)), Literal(fv), reorder, ()),
                         ),
                     ),
@@ -267,8 +270,8 @@ class LogicLowerer:
 
             case Query(
                 Alias(name) as lhs,
-                SubMaterialize(
-                    tns,
+                Submaterialize(
+                    Table(tns, _),
                     Aggregate(
                         Literal(op),
                         Literal(init),
@@ -456,7 +459,9 @@ def record_tables(
                     rhs.fields,
                 )
 
-                return Query(alias, SubMaterialize(suitable_rep, rhs))
+                return Query(
+                    alias, Submaterialize(Table(suitable_rep, rhs.fields), rhs)
+                )
 
             case Relabel(Alias(_) as alias, idxs) as relabel:
                 field_relabels.update(

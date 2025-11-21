@@ -4,7 +4,16 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Self
 
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr, ftype, FTyped, FType
+from ..symbolic import (
+    Context,
+    FType,
+    FTyped,
+    NamedTerm,
+    Term,
+    TermTree,
+    ftype,
+    literal_repr,
+)
 from ..util import qual_str
 
 
@@ -342,35 +351,12 @@ class Relabel(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class SubMaterialize(LogicTree, LogicExpression):
-    """
-    Represents a logical AST statement that SubMaterializes `arg` into the tensor `tns`.
-
-    Attributes:
-        tns: The target tensor.
-        arg: The argument to SubMaterialize.
-    """
-
-    tns: LogicNode
-    arg: LogicExpression
-
-    @property
-    def children(self):
-        """Returns the children of the node."""
-        return [self.tns, self.arg]
-
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return self.arg.fields
-
-
-@dataclass(eq=True, frozen=True)
 class Subquery(LogicTree, LogicExpression):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to
-    `lhs`, and returns `rhs`.
+    Represents a logical AST expression that evaluates `rhs`, binding the result
+    to `lhs`, and returns `rhs`. Note that nodes are visited in post-order, so
+    different rhs in the same expression will return the outermost leftmost
+    Subquery.
 
     Attributes:
         lhs: The left-hand side of the binding.
@@ -410,6 +396,58 @@ class Query(LogicTree, LogicStatement):
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Materialize(LogicTree, LogicStatement):
+    """
+    Represents a logical AST statement that writes `rhs` into the mutable table
+    `lhs`. Note that all nodes other than Alias and Table or Submaterialize will
+    create new tables, so this is only useful when `lhs` is an Alias referring
+    to a mutable table or a Table node referring to a mutable tensor.
+
+    Attributes:
+        lhs: The left-hand side of the binding.
+        rhs: The right-hand side to evaluate.
+    """
+
+    lhs: LogicExpression
+    rhs: LogicExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.rhs]
+
+
+@dataclass(eq=True, frozen=True)
+class Submaterialize(LogicTree, LogicExpression):
+    """
+    Represents a logical AST expression that writes `arg` into the mutable table
+    `tns`. Note that all nodes other than Alias and Table or Submaterialize will
+    create new tables, so this is only useful when `tns` is an Alias referring
+    to a mutable table or a Table node referring to a mutable tensor. Returns the
+    mutated tensor. Note that nodes are visited in post-order, so different rhs
+    in the same expression will return the outermost leftmost Submaterialize.
+
+    Attributes:
+        tns: The target table
+        arg: The argument to write
+    """
+
+    tns: LogicExpression
+    arg: LogicExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.tns, self.arg]
+
+    @property
+    def fields(self) -> list[Field]:
+        """Returns fields of the node."""
+        assert isinstance(self.arg, LogicExpression)
+        return self.arg.fields
 
 
 @dataclass(eq=True, frozen=True)
