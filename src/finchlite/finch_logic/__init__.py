@@ -12,11 +12,13 @@ from .nodes import (
     Plan,
     Produces,
     Query,
-    Reformat,
+    SubMaterialize,
     Relabel,
     Reorder,
     Subquery,
     Table,
+    TableValue,
+    TableValueFType,
     Value,
 )
 
@@ -34,10 +36,12 @@ __all__ = [
     "Plan",
     "Produces",
     "Query",
-    "Reformat",
+    "SubMaterialize",
     "Relabel",
     "Reorder",
     "Subquery",
     "Table",
+    "TableValue",
+    "TableValueFType",
     "Value",
 ]

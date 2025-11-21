@@ -29,7 +29,7 @@ from ..finch_logic import (
     Plan,
     Produces,
     Query,
-    Reformat,
+    SubMaterialize,
     Relabel,
     Reorder,
     Subquery,
@@ -227,7 +227,7 @@ class LogicLowerer:
                 return ntn.Block(())
             case Query(
                 Alias(_) as lhs,
-                Reformat(
+                SubMaterialize(
                     tns, Reorder(Relabel(LogicExpression() as arg, idxs_1), idxs_2)
                 ),
             ):
@@ -246,7 +246,7 @@ class LogicLowerer:
 
             case Query(
                 Alias(_) as lhs,
-                Reformat(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
+                SubMaterialize(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
             ):
                 assert isinstance(tns, TensorFType)
                 # TODO (mtsokol): fetch fill value the right way
@@ -254,7 +254,7 @@ class LogicLowerer:
                 return self(
                     Query(
                         lhs,
-                        Reformat(
+                        SubMaterialize(
                             tns,
                             Aggregate(Literal(InitWrite(fv)), Literal(fv), reorder, ()),
                         ),
@@ -267,7 +267,7 @@ class LogicLowerer:
 
             case Query(
                 Alias(name) as lhs,
-                Reformat(
+                SubMaterialize(
                     tns,
                     Aggregate(
                         Literal(op),
@@ -456,7 +456,7 @@ def record_tables(
                     rhs.fields,
                 )
 
-                return Query(alias, Reformat(suitable_rep, rhs))
+                return Query(alias, SubMaterialize(suitable_rep, rhs))
 
             case Relabel(Alias(_) as alias, idxs) as relabel:
                 field_relabels.update(

@@ -20,7 +20,7 @@ from ..finch_logic import (
     Plan,
     Produces,
     Query,
-    Reformat,
+    SubMaterialize,
     Relabel,
     Reorder,
     Subquery,
@@ -44,7 +44,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = propagate_map_queries_backward(prgm)
 
-    prgm = isolate_reformats(prgm)
+    prgm = isolate_SubMaterializes(prgm)
     prgm = isolate_aggregates(prgm)
     prgm = isolate_tables(prgm)
     prgm = lift_subqueries(prgm)
@@ -70,7 +70,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
     prgm = materialize_squeeze_expand_productions(prgm)
     prgm = propagate_copy_queries(prgm)
 
-    prgm = propagate_into_reformats(prgm)
+    prgm = propagate_into_SubMaterializes(prgm)
     prgm = propagate_copy_queries(prgm)
 
     return normalize_names(prgm)
@@ -86,10 +86,10 @@ def isolate_aggregates(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(rule_0))(root)
 
 
-def isolate_reformats(root: LogicNode) -> LogicNode:
+def isolate_SubMaterializes(root: LogicNode) -> LogicNode:
     def rule_0(node):
         match node:
-            case Reformat() as ref:
+            case SubMaterialize() as ref:
                 name = Alias(gensym("A"))
                 return Subquery(name, ref)
 
@@ -307,7 +307,7 @@ def propagate_copy_queries(root):
     return Rewrite(PostWalk(Chain([lambda node: copies.get(node), rule_0])))(root)
 
 
-def propagate_into_reformats(root: LogicNode) -> LogicNode:
+def propagate_into_SubMaterializes(root: LogicNode) -> LogicNode:
     @dataclass
     class Entry:
         node: Query
@@ -321,7 +321,7 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
                 queries: list[Entry] = []
                 for idx, node in enumerate(bodies):
                     match node:
-                        case Query(_, Reformat(_, arg)) as que_ref:
+                        case Query(_, SubMaterialize(_, arg)) as que_ref:
                             for q in queries[::-1]:
                                 if q.node.lhs == arg:
                                     q.matched = que_ref
@@ -337,9 +337,9 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
                         if q.node.lhs not in PostOrderDFS(
                             Plan(tuple(new_bodies[q.node_pos + 1 :]))
                         ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
-                            assert isinstance(q.matched.rhs, Reformat)
+                            assert isinstance(q.matched.rhs, SubMaterialize)
                             new_bodies[q.node_pos] = Query(
-                                q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
+                                q.matched.lhs, SubMaterialize(q.matched.rhs.tns, q.node.rhs)
                             )
                             return Plan(tuple(new_bodies))
         return None
@@ -490,8 +490,8 @@ def lift_fields(root):
 
     def rule_2(ex):
         match ex:
-            case Query(lhs, Reformat(tns, MapJoin() as arg)):
-                return Query(lhs, Reformat(tns, Reorder(arg, tuple(arg.fields))))
+            case Query(lhs, SubMaterialize(tns, MapJoin() as arg)):
+                return Query(lhs, SubMaterialize(tns, Reorder(arg, tuple(arg.fields))))
 
     return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
 
@@ -601,14 +601,14 @@ def _set_loop_order(node, perms):
     match node:
         case Plan(bodies):
             return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
-        case Query(lhs, Reformat(tns, Alias(_) as rhs)):
+        case Query(lhs, SubMaterialize(tns, Alias(_) as rhs)):
             rhs_2 = perms[rhs]
             perms[lhs] = lhs
-            return Query(lhs, Reformat(tns, rhs_2))
-        case Query(lhs, Reformat(tns, rhs)):
+            return Query(lhs, SubMaterialize(tns, rhs_2))
+        case Query(lhs, SubMaterialize(tns, rhs)):
             arg = Alias(gensym("A"))
             return _set_loop_order(
-                Plan((Query(arg, rhs), Query(lhs, Reformat(tns, arg)))), perms
+                Plan((Query(arg, rhs), Query(lhs, SubMaterialize(tns, arg)))), perms
             )
         case Query(lhs, Table(tns, idxs)) as q:
             perms[lhs] = lhs

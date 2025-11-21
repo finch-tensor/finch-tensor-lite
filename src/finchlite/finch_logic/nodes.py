@@ -4,8 +4,35 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any, Self
 
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr, ftype, FTyped, FType
 from ..util import qual_str
+
+
+@dataclass(eq=True, frozen=True)
+class TableValueFType(FType):
+    tns: Any
+    idxs: tuple[Field, ...]
+
+    def __eq__(self, other):
+        if not isinstance(other, TableValueFType):
+            return False
+        return self.tns == other.tns and self.idxs == other.idxs
+
+    def __hash__(self):
+        return hash((self.tns, self.idxs))
+
+
+@dataclass(eq=True, frozen=True)
+class TableValue(FTyped):
+    tns: Any
+    idxs: tuple[Field, ...]
+
+    def ftype(self):
+        return TableValueFType(ftype(self.tns), self.idxs)
+
+    def __post_init__(self):
+        if isinstance(self.tns, TableValue):
+            raise ValueError("The tensor (tns) cannot be a TableValue")
 
 
 @dataclass(eq=True, frozen=True)
@@ -315,13 +342,13 @@ class Relabel(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Reformat(LogicTree, LogicExpression):
+class SubMaterialize(LogicTree, LogicExpression):
     """
-    Represents a logical AST statement that reformats `arg` into the tensor `tns`.
+    Represents a logical AST statement that SubMaterializes `arg` into the tensor `tns`.
 
     Attributes:
         tns: The target tensor.
-        arg: The argument to reformat.
+        arg: The argument to SubMaterialize.
     """
 
     tns: LogicNode

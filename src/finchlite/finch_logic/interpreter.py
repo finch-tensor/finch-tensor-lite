@@ -19,18 +19,9 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    TableValue,
     Value,
 )
-
-
-@dataclass(eq=True, frozen=True)
-class TableValue:
-    tns: Any
-    idxs: Iterable[Any]
-
-    def __post_init__(self):
-        if isinstance(self.tns, TableValue):
-            raise ValueError("The tensor (tns) cannot be a TableValue")
 
 
 class FinchLogicInterpreter:

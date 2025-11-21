@@ -8,7 +8,7 @@ from finchlite.autoschedule import (
     concordize,
     flatten_plans,
     isolate_aggregates,
-    isolate_reformats,
+    isolate_SubMaterializes,
     isolate_tables,
     lift_fields,
     lift_subqueries,
@@ -18,7 +18,7 @@ from finchlite.autoschedule import (
     pretty_labels,
     propagate_copy_queries,
     propagate_fields,
-    propagate_into_reformats,
+    propagate_into_SubMaterializes,
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
@@ -34,7 +34,7 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reformat,
+    SubMaterialize,
     Relabel,
     Reorder,
     Subquery,
@@ -170,7 +170,7 @@ def test_propagate_fields():
             Aggregate(Literal(""), Literal(""), Reorder(Literal(""), ()), ()),
             isolate_aggregates,
         ),
-        (Reformat(Literal(""), Reorder(Literal(""), ())), isolate_reformats),
+        (SubMaterialize(Literal(""), Reorder(Literal(""), ())), isolate_SubMaterializes),
         (Table(Literal(""), ()), isolate_tables),
     ],
 )
@@ -310,7 +310,7 @@ def test_propagate_copy_queries():
     assert result == expected
 
 
-def test_propagate_into_reformats():
+def test_propagate_into_SubMaterializes():
     plan = Plan(
         (
             Query(Alias("A1"), Alias("A0")),
@@ -323,8 +323,8 @@ def test_propagate_into_reformats():
                 Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
             ),
             Literal(1),
-            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
-            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
+            Query(Alias("C0"), SubMaterialize(Literal(3), Alias("B0"))),
+            Query(Alias("E0"), SubMaterialize(Literal(4), Alias("D0"))),
             Literal(2),
         )
     )
@@ -334,14 +334,14 @@ def test_propagate_into_reformats():
             Query(Alias("A1"), Alias("A0")),
             Query(
                 Alias("E0"),
-                Reformat(
+                SubMaterialize(
                     Literal(4),
                     Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
                 ),
             ),
             Query(
                 Alias("C0"),
-                Reformat(
+                SubMaterialize(
                     Literal(3),
                     Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
                 ),
@@ -351,7 +351,7 @@ def test_propagate_into_reformats():
         )
     )
 
-    result = propagate_into_reformats(plan)
+    result = propagate_into_SubMaterializes(plan)
     assert result == expected
 
 
@@ -413,7 +413,7 @@ def test_lift_fields():
             ),
             Query(
                 Alias("A0"),
-                Reformat(
+                SubMaterialize(
                     Literal(0),
                     MapJoin(
                         Literal("*"),
@@ -453,7 +453,7 @@ def test_lift_fields():
             ),
             Query(
                 Alias("A0"),
-                Reformat(
+                SubMaterialize(
                     Literal(0),
                     Reorder(
                         MapJoin(
