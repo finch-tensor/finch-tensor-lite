@@ -187,7 +187,7 @@ class Call(EinsumExpression, EinsumTree):
 
 
 @dataclass(eq=True, frozen=True)
-class GetAttr(EinsumExpr, EinsumTree):
+class GetAttr(EinsumExpression, EinsumTree):
     """
     Gets an attribute of a tensor.
     Attributes:
@@ -198,7 +198,7 @@ class GetAttr(EinsumExpr, EinsumTree):
         Note this is an integer index, not a named index.
     """
 
-    obj: EinsumExpr
+    obj: EinsumExpression
     attr: Literal
     dim: int | None
 
@@ -207,7 +207,7 @@ class GetAttr(EinsumExpr, EinsumTree):
         # Expects 3 children: obj, attr, idx
         if len(children) != 3:
             raise ValueError("GetAttribute expects 3 children (obj + attr + idx)")
-        obj = cast(EinsumExpr, children[0])
+        obj = cast(EinsumExpression, children[0])
         attr = cast(Literal, children[1])
         dim = cast(int | None, children[2])
         return cls(obj, attr, dim)
