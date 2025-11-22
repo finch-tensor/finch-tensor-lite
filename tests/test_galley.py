@@ -1452,6 +1452,40 @@ def test_replace_and_remove_nodes(
             "i",
             ["A"],
         ),
+        # Nested case:
+        # root = MapJoin(mul, [A(i,j), B(i)]), reduce over i → [A]
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("i"), Field("j"))),
+                    Table(Literal("B"), (Field("i"),)),
+                ),
+            ),
+            "i",
+            ["A"],
+        ),
+        # Special case: max(C(i), D(j)), reduce over i → [max(C,D)]
+        (
+            MapJoin(
+                Literal(max),
+                (
+                    Table(Literal("C"), (Field("i"),)),
+                    Table(Literal("D"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            # expected root is the entire max node
+            [
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal("C"), (Field("i"),)),
+                        Table(Literal("D"), (Field("j"),)),
+                    ),
+                )
+            ],
+        ),
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected_labels):
@@ -1460,6 +1494,17 @@ def test_find_lowest_roots(root, idx_name, expected_labels):
 
     roots = find_lowest_roots(red_op, idx, root)
 
+    # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
+    if (
+        isinstance(root, MapJoin)
+        and isinstance(root.op, Literal)
+        and root.op.val is max
+        and idx_name == "i"
+    ):
+        assert roots == expected_labels
+        return
+
+    # All other cases
     actual_labels: list[str] = []
     for node in roots:
         assert isinstance(node, Table)

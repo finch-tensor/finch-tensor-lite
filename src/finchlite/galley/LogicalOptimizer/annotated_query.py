@@ -4,12 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from finchlite.algebra import (
-    InitWrite,
     cansplitpush,
-    is_associative,
-    is_commutative,
     is_distributive,
-    repeat_operator,
 )
 from finchlite.finch_logic import (
     Aggregate,
@@ -22,12 +18,7 @@ from finchlite.finch_logic import (
     Plan,
     Query,
     Table,
-    Value,
 )
-from finchlite.galley.TensorStats import TensorStats
-from finchlite.symbolic import Chain, PostWalk, Rewrite, intree, isdescendant
-
-from .logic_to_stats import insert_statistics
 
 
 @dataclass
@@ -45,151 +36,6 @@ class AnnotatedQuery:
     connected_idxs: OrderedDict[str, set[str]]
     output_order: list[str] | None = None
     output_format: list[Any] | None = None
-
-    # @classmethod
-    # def from_query(cls, q: LogicNode, ST: type) -> "AnnotatedQuery":
-    #     if not isinstance(q, Query):
-    #         raise ValueError(
-    #             "Annotated Queries can only be built from queries of the form: "
-    #             "Query(name, Materialize(formats, index_order, agg_map_expr)) or "
-    #             "Query(name, agg_map_expr)"
-    #         )
-    #     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
-    #     cache: dict[object, TensorStats] = {}
-    #     insert_statistics(ST, q, bindings=bindings, replace=False, cache=cache)
-    #     output_name = q.lhs
-    #     expr = q.rhs
-    #     output_format = None
-    #     output_order = None
-    #     starting_reduce_idxs: list[Field] = []
-    #     idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
-    #     idx_top_order: OrderedDict[Field, int] = OrderedDict()
-    #     top_counter = 1
-    #     idx_op: OrderedDict[Field, Any] = OrderedDict()
-    #     idx_init: OrderedDict[Field, Any] = OrderedDict()
-
-    #     def aggregate_annotation_rule(node: LogicNode) -> LogicNode:
-    #         nonlocal top_counter
-    #         match node:
-    #             case Aggregate(Literal() as op, Literal() as init, arg, idxs):
-    #                 for idx in idxs:
-    #                     idx_starting_root[idx] = arg
-    #                     idx_top_order[idx] = top_counter
-    #                     top_counter += 1
-
-    #                     if op.val == None:
-    #                         idx_op[idx] = InitWrite(cache[arg].fill_value)
-    #                         idx_init[idx] = cache[arg].fill_value
-    #                     else:
-    #                         idx_op[idx] = op.val
-    #                         idx_init[idx] = init.val
-
-    #                     starting_reduce_idxs.append(idx)
-    #                 return arg
-
-    #             case _:
-    #                 return node
-
-    #     point_expr = Rewrite(PostWalk(Chain([aggregate_annotation_rule])))(expr)
-
-    #     bindings_point: OrderedDict[Alias, TensorStats] = OrderedDict()
-    #     cache_point: dict[object, TensorStats] = {}
-    #     insert_statistics(
-    #         ST, point_expr, bindings=bindings_point, replace=False, cache=cache_point
-    #     )
-
-    #     reduce_idxs: list[Field] = []
-    #     original_idx: OrderedDict[Field, Field] = OrderedDict(
-    #         (Field(idx), Field(idx)) for idx in cache[q.rhs].index_set
-    #     )
-    #     idx_lowest_root: OrderedDict[Field, LogicNode] = OrderedDict()
-    #     for idx in starting_reduce_idxs:
-    #         agg_op = idx_op[idx]
-    #         stats_point = cache_point[point_expr]
-    #         idx_dim_size = stats_point.dim_sizes[idx.name]
-    #         lowest_roots = find_lowest_roots(agg_op, idx, idx_starting_root[idx])
-    #         original_idx[idx] = idx
-    #         if len(lowest_roots) == 1:
-    #             idx_lowest_root[idx] = lowest_roots[0]
-    #             reduce_idxs.append(idx)
-    #         else:
-    #             new_idxs = [
-    #                 Field(f"{idx.name}_{i}")
-    #                 for i, _ in enumerate(lowest_roots, start=1)
-    #             ]
-    #             for i, node in enumerate(lowest_roots):
-    #                 if idx.name not in cache_point[node].index_set:
-    #                     # If the lowest root doesn't contain the reduction index, we attempt
-    #                     # to remove the reduction via a repeat_operator, i.e.
-    #                     # ∑_i B_j = B_j*|Dom(i)|
-    #                     if repeat_operator(agg_op) == None:
-    #                         continue
-    #                     f = repeat_operator(agg_op)
-    #                     dim_val = Value(idx_dim_size, type(idx_dim_size))
-    #                     cache_point[dim_val] = ST(idx_dim_size)
-    #                     new_node = MapJoin(Literal(f), (node, dim_val))
-    #                     cache_point[new_node] = ST.mapjoin(
-    #                         f, cache_point[node], cache_point[dim_val]
-    #                     )
-    #                     point_expr = replace_and_remove_nodes(
-    #                         point_expr,
-    #                         node_to_replace=node,
-    #                         new_node=new_node,
-    #                         nodes_to_remove=set(),
-    #                     )
-    #                     continue
-    #                 new_idx = new_idxs[i]
-    #                 idx_op[new_idx] = agg_op
-    #                 idx_init[new_idx] = idx_init[idx]
-    #                 idx_lowest_root[new_idx] = node
-    #                 idx_starting_root[new_idx] = idx_starting_root[idx]
-    #                 original_idx[new_idx] = idx
-    #                 reduce_idxs.append(new_idx)
-    #     parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict(
-    #         (i, []) for i in reduce_idxs
-    #     )
-    #     connected_idxs: OrderedDict[Field, set[Field]] = OrderedDict(
-    #         (i, set()) for i in reduce_idxs
-    #     )
-    #     for idx1 in reduce_idxs:
-    #         idx1_op = idx_op[idx1]
-    #         idx1_bottom_root = idx_lowest_root[idx1]
-    #         for idx2 in reduce_idxs:
-    #             idx2_op = idx_op[idx2]
-    #             idx2_top_root = idx_starting_root[idx2]
-    #             idx2_bottom_root = idx_lowest_root[idx2]
-    #             if intree(idx2_bottom_root, idx1_bottom_root):
-    #                 connected_idxs[idx1].add(idx2)
-    #             mergeable_agg_op = (
-    #                 idx1_op == idx2_op
-    #                 and is_associative(idx1_op)
-    #                 and is_commutative(idx1_op)
-    #             )
-    #             # If idx1 isn't a parent of idx2, then idx2 can't restrict the summation of idx1
-    #             if isdescendant(idx2_top_root, idx1_bottom_root) or (
-    #                 not mergeable_agg_op
-    #                 and idx_top_order[original_idx[idx2]]
-    #                 < idx_top_order[original_idx[idx1]]
-    #             ):
-    #                 parent_idxs[idx1].append(idx2)
-
-    #     connected_components = get_idx_connected_components(parent_idxs, connected_idxs)
-
-    #     return cls(
-    #         ST=ST,
-    #         output_name=output_name,
-    #         reduce_idxs=reduce_idxs,
-    #         point_expr=point_expr,
-    #         idx_lowest_root=idx_lowest_root,
-    #         idx_op=idx_op,
-    #         idx_init=idx_init,
-    #         parent_idxs=parent_idxs,
-    #         original_idx=original_idx,
-    #         connected_components=connected_components,
-    #         connected_idxs=connected_idxs,
-    #         output_order=output_order,
-    #         output_format=output_format,
-    #     )
 
 
 def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
@@ -409,6 +255,10 @@ def find_lowest_roots(
 
         if len(args_with) == 1 and is_distributive(root.op.val, op.val):
             return find_lowest_roots(op, idx, args_with[0])
+
+        special_args_with = [arg for arg in args_with if len(arg.fields) > 1]
+        if len(special_args_with) == 1 and is_distributive(root.op.val, op.val):
+            return find_lowest_roots(op, idx, special_args_with[0])
 
         if cansplitpush(op.val, root.op.val):
             roots_without: list[LogicExpression] = list(args_without)
