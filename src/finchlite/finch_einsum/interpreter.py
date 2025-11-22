@@ -133,81 +133,31 @@ class EinsumInterpreter:
                 return tns.flat[flat_idx]  # return a 1-d array by definition
 
             # access a tensor with a mixture of indices and other expressions
+            # note evalaution order is not standard left to right, but rather
+            # tns, idx0, tns, idx1, tns, idx2, ...
             case ein.Access(tns, idxs):
                 assert self.loops is not None
-                true_idxs = node.get_idxs()  # true field iteratior indicies
-                assert all(isinstance(idx, ein.Index) for idx in true_idxs)
-
-                # evaluate the tensor to access
+                
                 tns = self(tns)
-                assert len(idxs) == len(tns.shape)
+                current_idx = idxs[0]
 
-                # Evaluate all indices into arrays
-                idx_arrays = [
-                    xp.arange(tns.shape[i])
-                    if isinstance(idx, ein.Index)
-                    else self(idx).flatten()
-                    for i, idx in enumerate(idxs)
-                ]
+                if not isinstance(current_idx, ein.Index):
+                    current_idx = self(current_idx)
+                    tns = xp.take(tns, current_idx, axis=0)    
+                
+                # rotate current axis to the end
+                tns = xp.moveaxis(tns, 0, -1)
 
-                # Identify unique parent indices and their positions
-                parents = [
-                    idx if isinstance(idx, ein.Index) else list(idx.get_idxs())[0]
-                    for idx in idxs
-                ]
-                unique_parents = list(dict.fromkeys(parents))
-                parent_to_idx = {p: i for i, p in enumerate(unique_parents)}
-                pos_groups = [
-                    [i for i, p in enumerate(parents) if p == up]
-                    for up in unique_parents
-                ]
+                remaining_idxs = idxs[1:]
+                if len(remaining_idxs) > 0:
+                    new_access = ein.Access(tns, remaining_idxs)
+                    tns = self(new_access)
 
-                # Create meshgrid only for unique groups
-                unique_arrays = [idx_arrays[g[0]] for g in pos_groups]
-                grids = xp.meshgrid(*unique_arrays, indexing="ij")
-                grid_flat = xp.stack([g.ravel() for g in grids], axis=-1)
+                # rearrange the axis to conform with self.loops
+                if len(idxs) == tns.ndim: 
+                    pass
 
-                # Build final index combinations
-                group_idx_map = [parent_to_idx[p] for p in parents]
-                combo_idxs = xp.stack(
-                    [
-                        idx_arrays[i][grid_flat[:, group_idx_map[i]]]
-                        for i in range(len(idxs))
-                    ],
-                    axis=1,
-                )
-
-                # evaluate the output tensor as a flat array
-                flat_idx = xp.ravel_multi_index(combo_idxs.T, tns.shape)
-                tns = xp.take(tns, flat_idx)
-
-                # Calculate final shape and permutation
-                true_idx_pos = {
-                    idx: pos_groups[unique_parents.index(idx)][0] for idx in true_idxs
-                }
-                true_idxs_sorted = sorted(true_idxs, key=true_idx_pos.get)
-                final_shape = tuple(
-                    len(unique_arrays[unique_parents.index(idx)])
-                    for idx in true_idxs_sorted
-                )
-                tns = tns.reshape(final_shape)
-
-                # permute and broadcast the tensor to be
-                # compatible with rest of expression
-                perm = [
-                    true_idxs_sorted.index(idx)
-                    for idx in self.loops
-                    if idx in true_idxs_sorted
-                ]
-                tns = xp.permute_dims(tns, perm)
-                return xp.expand_dims(
-                    tns,
-                    [
-                        i
-                        for i in range(len(self.loops))
-                        if self.loops[i] not in true_idxs_sorted
-                    ],
-                )
+                return tns
 
             case ein.Plan(bodies):
                 res = None
