@@ -151,7 +151,7 @@ class EinsumInterpreter:
                     for idx in current_idxs
                 ]
 
-                dest_axes = [i for i in range(len(current_idxs))]
+                dest_axes = list(range(len(current_idxs)))
                 tns = xp.moveaxis(tns, target_axes, dest_axes)
                 
                 # access the tensor with the evaled idxs
