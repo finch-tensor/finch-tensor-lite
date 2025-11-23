@@ -118,7 +118,9 @@ class EinsumInterpreter:
                     idx for idx in idxs
                     if not isinstance(idx, ein.Index)
                 ]
-                if len(indirect_idxs) == 0:
+
+                # base case: no indirect indices, just permute the dimensions
+                if len(indirect_idxs) == 0: 
                     perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
                     if hasattr(tns, "ndim") and len(perm) < tns.ndim:
                         perm += list(range(len(perm), tns.ndim))
@@ -129,32 +131,25 @@ class EinsumInterpreter:
                         [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                     )
 
-                start_index = idxs.index(indirect_idxs[0])
-                iterator_idxs = indirect_idxs[0].get_idxs()
+                start_index = idxs.index(indirect_idxs[0]) # index of first indirect access
+                iterator_idxs = indirect_idxs[0].get_idxs() # iterator indicies of the first indirect access
                 assert len(iterator_idxs) == 1
 
-                current_idxs = [
-                    idx for idx in idxs[start_index:] 
+                # get the axes of the idxs that are associated with the current iterator indicies
+                target_axes = [
+                    i for i, idx in enumerate(idxs[start_index:], start_index)
                     if idx.get_idxs().issubset(iterator_idxs)
                 ]
 
+                # get associated access indicies w/ the first indirect access
+                current_idxs = [idxs[i] for i in target_axes]
+
+                # evaluate the associated access indicies
                 evaled_idxs = [
                     xp.arange(tns.shape[idxs.index(idx)]) 
                     if isinstance(idx, ein.Index) else self(idx).flat 
                     for idx in current_idxs
                 ]
-
-                # move the axis to access tns with the evaled idxs 
-                #old_target_axes = [idxs.index(idx) for idx in current_idxs]
-                target_axes = []
-                current_idxs_i = 0
-                for i, idx in enumerate(idxs):
-                    if idx == current_idxs[current_idxs_i]:
-                        target_axes.append(i)
-                        current_idxs_i += 1
-                    if current_idxs_i == len(current_idxs):
-                        break
-                assert current_idxs_i == len(current_idxs)
 
                 dest_axes = [i for i in range(len(current_idxs))]
                 tns = xp.moveaxis(tns, target_axes, dest_axes)
@@ -167,17 +162,10 @@ class EinsumInterpreter:
 
                 # we recursiveley call the interpreter with the remaining idxs
                 iterator_idx = next(iter(iterator_idxs))
-
-                new_idxs = []
-                current_idxs_i = 0
-                for i, idx in enumerate(idxs):
-                    if current_idxs_i < len(current_idxs) and idx == current_idxs[current_idxs_i]:
-                        if current_idxs_i == 0:
-                            new_idxs.append(iterator_idx)
-                        current_idxs_i += 1
-                    else:
-                        new_idxs.append(idx)
-                assert current_idxs_i == len(current_idxs)
+                new_idxs = list(idxs[:start_index]) + [iterator_idx] + [
+                    idx for idx in idxs[start_index + 1:]
+                    if idx not in current_idxs
+                ]
 
                 new_access = ein.Access(ein.Literal(tns), new_idxs)
                 return self(new_access)
