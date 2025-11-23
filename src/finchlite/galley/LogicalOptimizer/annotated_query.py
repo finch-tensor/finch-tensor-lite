@@ -25,15 +25,15 @@ from finchlite.finch_logic import (
 class AnnotatedQuery:
     ST: type
     output_name: Alias | None
-    reduce_idxs: list[str]
-    point_expr: "LogicNode"
+    reduce_idxs: list[Field]
+    point_expr: LogicNode
     idx_lowest_root: OrderedDict[str, LogicNode]
     idx_op: OrderedDict[str, Any]
     idx_init: OrderedDict[str, Any]
-    parent_idxs: OrderedDict[str, list[str]]
+    parent_idxs: OrderedDict[Field, list[Field]]
     original_idx: OrderedDict[str, str]
     connected_components: list[list[str]]
-    connected_idxs: OrderedDict[str, set[str]]
+    connected_idxs: OrderedDict[Field, set[Field]]
     output_order: list[str] | None = None
     output_format: list[Any] | None = None
 
@@ -47,7 +47,7 @@ def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
         output_name=aq.output_name,
         reduce_idxs=list(aq.reduce_idxs),
         point_expr=aq.point_expr,
-        idx_lowest_root=aq.idx_lowest_root.copy(),
+        idx_lowest_root=OrderedDict(aq.idx_lowest_root.items()),
         idx_op=OrderedDict(aq.idx_op.items()),
         idx_init=OrderedDict(aq.idx_init.items()),
         parent_idxs=OrderedDict((m, list(n)) for m, n in aq.parent_idxs.items()),
@@ -59,7 +59,7 @@ def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
     )
 
 
-def get_reducible_idxs(aq: AnnotatedQuery) -> list[str]:
+def get_reducible_idxs(aq: AnnotatedQuery) -> list[Field]:
     """
     Indices eligible to be reduced immediately (no parents).
 
@@ -70,44 +70,45 @@ def get_reducible_idxs(aq: AnnotatedQuery) -> list[str]:
 
     Returns
     -------
-    list[str]
-        Indices in `aq.reduce_idxs` with zero parents.
+    list[Field]
+        Field objects in `aq.reduce_idxs` with zero parents.
     """
     return [idx for idx in aq.reduce_idxs if len(aq.parent_idxs.get(idx, [])) == 0]
 
 
 def get_idx_connected_components(
-    parent_idxs: dict[str, Iterable[str]],
-    connected_idxs: dict[str, Iterable[str]],
-) -> list[list[str]]:
+    parent_idxs: dict[Field, Iterable[Field]],
+    connected_idxs: dict[Field, Iterable[Field]],
+) -> list[list[Field]]:
     """
-    Compute connected components of indices and order those components by
-    parent/child constraints.
+    Compute connected components of indices (Field objects) and order those
+    components by parent/child constraints.
 
     Parameters
     ----------
-    parent_idxs : Dict[str, Iterable[str]]
-        Mapping from an index to the set/iterable of its parent indices.
-    connected_idxs : Dict[str, Iterable[str]]
-        Mapping from an index to the set/iterable of indices considered
+    parent_idxs : Dict[Field, Iterable[Field]]
+        Mapping from an index to the iterable of its parent indices.
+    connected_idxs : Dict[Field, Iterable[Field]]
+        Mapping from an index to the iterable of indices considered
         "connected" to it (undirected neighbors). Only connections between
         non-parent pairs are used to form components.
 
     Returns
     -------
-    List[List[str]]
-        A list of components, each a list of index names. Components are
+    List[List[Field]]
+        A list of components, each a list of Field objects. Components are
         ordered so that any component containing a parent appears before any
         component containing its child.
     """
-    parent_map = {k: set(v) for k, v in parent_idxs.items()}
-    conn_map: OrderedDict[str, set[str]] = OrderedDict(
+    parent_map: dict[Field, set[Field]] = {k: set(v) for k, v in parent_idxs.items()}
+    conn_map: OrderedDict[Field, set[Field]] = OrderedDict(
         (k, set(v)) for k, v in connected_idxs.items()
     )
 
-    component_ids: OrderedDict[str, int] = OrderedDict(
+    component_ids: OrderedDict[Field, int] = OrderedDict(
         (x, i) for i, x in enumerate(conn_map.keys())
     )
+
     finished = False
     while not finished:
         finished = True
@@ -123,12 +124,12 @@ def get_idx_connected_components(
                 component_ids[idx1] = min(component_ids[idx2], component_ids[idx1])
 
     unique_ids = list(OrderedDict.fromkeys(component_ids[idx] for idx in conn_map))
-    components: list[list[str]] = []
+    components: list[list[Field]] = []
     for id in unique_ids:
         members = [idx for idx in conn_map if component_ids[idx] == id]
         components.append(members)
 
-    component_order: OrderedDict[tuple, int] = OrderedDict(
+    component_order: OrderedDict[tuple[Field, ...], int] = OrderedDict(
         (tuple(c), i) for i, c in enumerate(components)
     )
 

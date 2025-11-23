@@ -1298,7 +1298,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
 
 # ─────────────────────────────── Annotated_Query tests ─────────────────────────────
 @pytest.mark.parametrize(
-    "reduce_idxs,parent_idxs,expected",
+    "reduce_idx_names,parent_idx_names,expected_names",
     [
         # Some indices have parents
         (["i", "j", "k"], {"i": [], "j": ["i"], "k": []}, ["i", "k"]),
@@ -1312,16 +1312,28 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         (["x", "y", "z"], {"y": ["x"]}, ["x", "z"]),
     ],
 )
-def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
+def test_get_reducible_idxs(reduce_idx_names, parent_idx_names, expected_names):
+    names = set(reduce_idx_names)
+    names.update(parent_idx_names.keys())
+    for i in parent_idx_names.values():
+        names.update(i)
+
+    fields: dict[str, Field] = {x: Field(x) for x in names}
+    reduce_idxs: list[Field] = [fields[name] for name in reduce_idx_names]
+    parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict(
+        (fields[key], [fields[p] for p in parents])
+        for key, parents in parent_idx_names.items()
+    )
+
     aq = AnnotatedQuery(
         ST=object,
         output_name=None,
-        reduce_idxs=list(reduce_idxs),
+        reduce_idxs=reduce_idxs,
         point_expr=None,
         idx_lowest_root=OrderedDict(),
         idx_op=OrderedDict(),
         idx_init=OrderedDict(),
-        parent_idxs=OrderedDict((k, list(v)) for k, v in parent_idxs.items()),
+        parent_idxs=parent_idxs,
         original_idx=OrderedDict(),
         connected_components=[],
         connected_idxs=OrderedDict(),
@@ -1329,7 +1341,8 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
         output_format=None,
     )
 
-    assert get_reducible_idxs(aq) == expected
+    result_names = [field.name for field in get_reducible_idxs(aq)]
+    assert result_names == expected_names
 
 
 @pytest.mark.parametrize(
@@ -1374,8 +1387,27 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     ],
 )
 def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
-    out = get_idx_connected_components(parent_idxs, connected_idxs)
-    assert out == expected
+    names: set[str] = set(parent_idxs.keys()) | set(connected_idxs.keys())
+    for i in parent_idxs.values():
+        names.update(i)
+    for j in connected_idxs.values():
+        names.update(j)
+
+    name = {x: Field(x) for x in names}
+
+    parent_field_idxs: dict[Field, list[Field]] = {
+        name[k]: [name[p] for p in v] for k, v in parent_idxs.items()
+    }
+    connected_field_idxs: dict[Field, list[Field]] = {
+        name[k]: [name[n] for n in v] for k, v in connected_idxs.items()
+    }
+
+    out_components = get_idx_connected_components(
+        parent_field_idxs, connected_field_idxs
+    )
+    out_names = [[field.name for field in comp] for comp in out_components]
+
+    assert out_names == expected
 
 
 @pytest.mark.parametrize(
