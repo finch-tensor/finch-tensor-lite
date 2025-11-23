@@ -1298,7 +1298,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
 
 # ─────────────────────────────── Annotated_Query tests ─────────────────────────────
 @pytest.mark.parametrize(
-    "reduce_idx,parent_idx,expected",
+    "reduce_idxs,parent_idxs,expected",
     [
         # Some indices have parents
         (["i", "j", "k"], {"i": [], "j": ["i"], "k": []}, ["i", "k"]),
@@ -1312,17 +1312,17 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         (["x", "y", "z"], {"y": ["x"]}, ["x", "z"]),
     ],
 )
-def test_get_reducible_idxs(reduce_idx, parent_idx, expected):
-    names = set(reduce_idx)
-    names.update(parent_idx.keys())
-    for i in parent_idx.values():
+def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
+    names = set(reduce_idxs)
+    names.update(parent_idxs.keys())
+    for i in parent_idxs.values():
         names.update(i)
 
     fields: dict[str, Field] = {x: Field(x) for x in names}
-    reduce_idxs: list[Field] = [fields[name] for name in reduce_idx]
+    reduce_idxs: list[Field] = [fields[name] for name in reduce_idxs]
     parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict(
         (fields[key], [fields[p] for p in parents])
-        for key, parents in parent_idx.items()
+        for key, parents in parent_idxs.items()
     )
 
     aq = AnnotatedQuery(
