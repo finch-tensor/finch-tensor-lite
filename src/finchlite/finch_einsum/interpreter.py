@@ -133,31 +133,52 @@ class EinsumInterpreter:
                 return tns.flat[flat_idx]  # return a 1-d array by definition
 
             # access a tensor with a mixture of indices and other expressions
-            # note evalaution order is not standard left to right, but rather
-            # tns, idx0, tns, idx1, tns, idx2, ...
             case ein.Access(tns, idxs):
                 assert self.loops is not None
                 
                 tns = self(tns)
-                current_idx = idxs[0]
+                indirect_idxs = [
+                    idx for idx in idxs
+                    if not isinstance(idx, ein.Index)
+                ]
+                if len(indirect_idxs) == 0:
+                    return tns
 
-                if not isinstance(current_idx, ein.Index):
-                    current_idx = self(current_idx)
-                    tns = xp.take(tns, current_idx, axis=0)    
+                start_index = idxs.index(indirect_idxs[0])
+                iterator_idxs = indirect_idxs[0].get_idxs()
+                assert len(iterator_idxs) == 1
+
+                current_idxs = [
+                    idx for idx in idxs[start_index:] 
+                    if idx.get_idxs().issubset(iterator_idxs)
+                ]
+
+                evaled_idxs = [
+                    xp.arange(tns.shape[idxs.index(idx)]) 
+                    if isinstance(idx, ein.Index) else self(idx) 
+                    for idx in current_idxs
+                ]
+
+                # move the axis to access tns with the evaled idxs 
+                target_axes = [idxs.index(idx) for idx in current_idxs]
+                dest_axes = [i for i in range(len(current_idxs))]
+                tns = xp.moveaxis(tns, target_axes, dest_axes)
                 
-                # rotate current axis to the end
-                tns = xp.moveaxis(tns, 0, -1)
+                # access the tensor with the evaled idxs
+                tns = tns[tuple(evaled_idxs)]
+                
+                # restore original tensor axis order
+                tns = xp.moveaxis(tns, source=0, destination=target_axes[0])
 
-                remaining_idxs = idxs[1:]
-                if len(remaining_idxs) > 0:
-                    new_access = ein.Access(tns, remaining_idxs)
-                    tns = self(new_access)
+                # we recursiveley call the interpreter with the remaining idxs
+                new_idxs = [
+                    iterator_idxs[0] if idx in current_idxs else idx
+                    for idx in idxs
+                    if idx not in current_idxs[1:]
+                ]
 
-                # rearrange the axis to conform with self.loops
-                if len(idxs) == tns.ndim: 
-                    pass
-
-                return tns
+                new_access = ein.Access(tns, new_idxs)
+                return self(new_access)
 
             case ein.Plan(bodies):
                 res = None
