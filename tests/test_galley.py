@@ -1341,8 +1341,8 @@ def test_get_reducible_idxs(reduce_idx, parent_idx, expected):
         output_format=None,
     )
 
-    result_names = [field.name for field in get_reducible_idxs(aq)]
-    assert result_names == expected
+    result = [field.name for field in get_reducible_idxs(aq)]
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -1402,12 +1402,10 @@ def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
         name[k]: [name[n] for n in v] for k, v in connected_idxs.items()
     }
 
-    out_components = get_idx_connected_components(
-        parent_field_idxs, connected_field_idxs
-    )
-    out_names = [[field.name for field in comp] for comp in out_components]
+    components = get_idx_connected_components(parent_field_idxs, connected_field_idxs)
+    result = [[field.name for field in comp] for comp in components]
 
-    assert out_names == expected
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -1442,13 +1440,13 @@ def test_replace_and_remove_nodes(
         new_node=new_node,
         nodes_to_remove=nodes_to_remove_nodes,
     )
-    actual_names = [tbl.idxs[0].name for tbl in out.args]
+    result = [tbl.idxs[0].name for tbl in out.args]
 
-    assert actual_names == expected_names
+    assert result == expected_names
 
 
 @pytest.mark.parametrize(
-    "root, idx_name, expected_labels",
+    "root, idx_name, expected",
     [
         # Distributive case:
         # root = MapJoin(mul, [A(i), B(j)]), reduce over j → [B]
@@ -1520,7 +1518,7 @@ def test_replace_and_remove_nodes(
         ),
     ],
 )
-def test_find_lowest_roots(root, idx_name, expected_labels):
+def test_find_lowest_roots(root, idx_name, expected):
     roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
@@ -1530,14 +1528,13 @@ def test_find_lowest_roots(root, idx_name, expected_labels):
         and root.op.val is max
         and idx_name == "i"
     ):
-        assert roots == expected_labels
-        return
+        assert roots == expected
+    else:
+        # All other cases:
+        result: list[str] = []
+        for node in roots:
+            assert isinstance(node, Table)
+            assert isinstance(node.tns, Literal)
+            result.append(node.tns.val)
 
-    # All other cases
-    actual_labels: list[str] = []
-    for node in roots:
-        assert isinstance(node, Table)
-        assert isinstance(node.tns, Literal)
-        actual_labels.append(node.tns.val)
-
-    assert actual_labels == expected_labels
+        assert result == expected
