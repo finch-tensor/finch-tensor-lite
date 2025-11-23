@@ -1521,10 +1521,7 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected_labels):
-    red_op = Literal(op.add)
-    idx = Field(idx_name)
-
-    roots = find_lowest_roots(red_op, idx, root)
+    roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if (

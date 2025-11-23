@@ -27,14 +27,14 @@ class AnnotatedQuery:
     output_name: Alias | None
     reduce_idxs: list[Field]
     point_expr: LogicNode
-    idx_lowest_root: OrderedDict[str, LogicNode]
-    idx_op: OrderedDict[str, Any]
-    idx_init: OrderedDict[str, Any]
+    idx_lowest_root: OrderedDict[Field, LogicExpression]
+    idx_op: OrderedDict[Field, Any]
+    idx_init: OrderedDict[Field, Any]
     parent_idxs: OrderedDict[Field, list[Field]]
-    original_idx: OrderedDict[str, str]
-    connected_components: list[list[str]]
+    original_idx: OrderedDict[Field, Field]
+    connected_components: list[list[Field]]
     connected_idxs: OrderedDict[Field, set[Field]]
-    output_order: list[str] | None = None
+    output_order: list[Field] | None = None
     output_format: list[Any] | None = None
 
 
@@ -225,25 +225,26 @@ def find_lowest_roots(
     op: Literal, idx: Field, root: LogicExpression
 ) -> list[LogicExpression]:
     """
-    Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
-    safely pushed down to in a logical expression.
+        Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
+        safely pushed down to in a logical expression.
 
-    Parameters
-    ----------
-    op : LogicNode
-        The reduction operator node (e.g., a Literal wrapping `operator.add`)
-        that we are trying to push down.
-    idx : Field
-        The index (dimension) being reduced over.
-    root : LogicExpression
-        The root logical expression under which we search for the lowest
-        pushdown positions for the reduction.
+        Parameters
+        ----------
+        op : Literal
+            The reduction operator node (e.g., Literal(operator.add))
+            that we are trying to push down.
+        idx : Field
+            The index (dimension) being reduced over.
+        root : LogicExpression
+            The root logical expression under which we search for the lowest
+            pushdown positions for the reduction.
 
-    Returns
-    -------
-    list[LogicExpression]
-        A list of expression nodes representing the lowest positions in
-        the expression tree where the reduction over `idx` with operator
+        Returns
+        -------
+        list[LogicExpression]
+    `        A list of expression nodes representing the lowest positions in
+            the expression tree where the reduction over `idx` with operator
+            `op` can be safely pushed down.
     """
 
     if isinstance(root, MapJoin):
