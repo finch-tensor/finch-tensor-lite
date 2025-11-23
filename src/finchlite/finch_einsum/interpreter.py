@@ -3,6 +3,7 @@ import operator
 import numpy as np
 
 from ..algebra import overwrite, promote_max, promote_min
+from ..symbolic import ftype
 from . import nodes as ein
 
 nary_ops = {
@@ -78,6 +79,11 @@ class EinsumInterpreter:
         self.loops = loops
 
     def __call__(self, node):
+        from ..tensor import (
+            SparseTensor,
+            SparseTensorFType,
+        )
+
         xp = self.xp
         match node:
             case ein.Literal(val):
@@ -92,16 +98,93 @@ class EinsumInterpreter:
                     func = getattr(xp, nary_ops[func])
                 vals = [self(arg) for arg in args]
                 return func(*vals)
-            case ein.Access(tns, idxs):
-                assert len(idxs) == len(set(idxs))
-                assert self.loops is not None
-                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                tns = self(tns)
-                tns = xp.permute_dims(tns, perm)
-                return xp.expand_dims(
-                    tns,
-                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
+
+            # access a tensor with only one indirect access index
+            case ein.Access(tns, idxs) if len(idxs) == 1 and not isinstance(
+                idxs[0], ein.Index
+            ):
+                idx = self(idxs[0])
+                tns = self(tns)  # evaluate the tensor
+
+                flat_idx = (
+                    idx if idx.ndim == 1 else xp.ravel_multi_index(idx.T, tns.shape)
                 )
+                return tns.flat[flat_idx]  # return a 1-d array by definition
+
+            # access a tensor with a mixture of indices and other expressions
+            case ein.Access(tns, idxs):
+                assert self.loops is not None
+
+                tns = self(tns)
+                indirect_idxs = [idx for idx in idxs if not isinstance(idx, ein.Index)]
+
+                # base case: no indirect indices, just permute the dimensions
+                if len(indirect_idxs) == 0:
+                    perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+                    if hasattr(tns, "ndim") and len(perm) < tns.ndim:
+                        perm += list(range(len(perm), tns.ndim))
+
+                    tns = xp.permute_dims(tns, perm)  # permute the dimensions
+                    return xp.expand_dims(
+                        tns,
+                        [
+                            i
+                            for i in range(len(self.loops))
+                            if self.loops[i] not in idxs
+                        ],
+                    )
+
+                start_index = idxs.index(
+                    indirect_idxs[0]
+                )  # index of first indirect access
+                iterator_idxs = indirect_idxs[
+                    0
+                ].get_idxs()  # iterator indicies of the first indirect access
+                assert len(iterator_idxs) == 1
+
+                # get the axes of the idxs that are associated
+                # with the current iterator indicies
+                target_axes = [
+                    i
+                    for i, idx in enumerate(idxs[start_index:], start_index)
+                    if idx.get_idxs().issubset(iterator_idxs)
+                ]
+
+                # get associated access indicies w/ the first indirect access
+                current_idxs = [idxs[i] for i in target_axes]
+
+                # evaluate the associated access indicies
+                evaled_idxs = [
+                    xp.arange(tns.shape[idxs.index(idx)])
+                    if isinstance(idx, ein.Index)
+                    else self(idx).flat
+                    for idx in current_idxs
+                ]
+
+                dest_axes = list(range(len(current_idxs)))
+                tns = xp.moveaxis(tns, target_axes, dest_axes)
+
+                # access the tensor with the evaled idxs
+                tns = tns[tuple(evaled_idxs)]
+
+                # restore original tensor axis order
+                tns = xp.moveaxis(tns, source=0, destination=target_axes[0])
+
+                # we recursiveley call the interpreter with the remaining idxs
+                iterator_idx = next(iter(iterator_idxs))
+                new_idxs = (
+                    list(idxs[:start_index])
+                    + [iterator_idx]
+                    + [
+                        idx
+                        for idx in idxs[start_index + 1 :]
+                        if idx not in current_idxs
+                    ]
+                )
+
+                new_access = ein.Access(ein.Literal(tns), new_idxs)
+                return self(new_access)
+
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
@@ -109,9 +192,38 @@ class EinsumInterpreter:
                 return res
             case ein.Produces(args):
                 return tuple(self(arg) for arg in args)
-            case ein.Einsum(op, ein.Alias(tns), idxs, arg):
+
+            # get non-zero elements/data array of a sparse tensor
+            case ein.GetAttr(obj, ein.Literal("elems"), _):
+                obj = self(obj)
+                assert isinstance(ftype(obj), SparseTensorFType)
+                assert isinstance(obj, SparseTensor)
+                return obj.data
+            # get coord array of a sparse tensor
+            case ein.GetAttr(obj, ein.Literal("coords"), dim):
+                obj = self(obj)
+                assert isinstance(ftype(obj), SparseTensorFType)
+                assert isinstance(obj, SparseTensor)
+
+                # return the coord array for the given dimension or all dimensions
+                return obj.coords if dim is None else obj.coords[:, dim].flat
+            # gets the shape of a sparse tensor at a given dimension
+            case ein.GetAttr(obj, ein.Literal("shape"), dim):
+                obj = self(obj)
+                assert isinstance(ftype(obj), SparseTensorFType)
+                assert isinstance(obj, SparseTensor)
+                assert dim is not None
+
+                # return the shape for the given dimension
+                return obj.shape[dim]
+
+            # standard einsum
+            case ein.Einsum(op, ein.Alias(tns), idxs, arg) if all(
+                isinstance(idx, ein.Index) for idx in idxs
+            ):
                 # This is the main entry point for einsum execution
                 loops = arg.get_idxs()
+
                 assert set(idxs).issubset(loops)
                 loops = sorted(loops, key=lambda x: x.name)
                 ctx = EinsumInterpreter(self.xp, self.bindings, loops)
@@ -128,5 +240,11 @@ class EinsumInterpreter:
                 axis = [dropped.index(idx) for idx in idxs]
                 self.bindings[tns] = xp.permute_dims(val, axis)
                 return (tns,)
+
+            # indirect einsum
+            case ein.Einsum(op, ein.Alias(tns), idxs, arg):
+                raise NotImplementedError(
+                    "Indirect einsum assignment is not implemented"
+                )
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
