@@ -100,7 +100,9 @@ class EinsumInterpreter:
                 return func(*vals)
 
             # access a tensor with only one indirect access index
-            case ein.Access(tns, idxs) if len(idxs) == 1 and not isinstance(idxs[0], ein.Index):
+            case ein.Access(tns, idxs) if len(idxs) == 1 and not isinstance(
+                idxs[0], ein.Index
+            ):
                 idx = self(idxs[0])
                 tns = self(tns)  # evaluate the tensor
 
@@ -112,32 +114,39 @@ class EinsumInterpreter:
             # access a tensor with a mixture of indices and other expressions
             case ein.Access(tns, idxs):
                 assert self.loops is not None
-                
+
                 tns = self(tns)
-                indirect_idxs = [
-                    idx for idx in idxs
-                    if not isinstance(idx, ein.Index)
-                ]
+                indirect_idxs = [idx for idx in idxs if not isinstance(idx, ein.Index)]
 
                 # base case: no indirect indices, just permute the dimensions
-                if len(indirect_idxs) == 0: 
+                if len(indirect_idxs) == 0:
                     perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
                     if hasattr(tns, "ndim") and len(perm) < tns.ndim:
                         perm += list(range(len(perm), tns.ndim))
-                    
+
                     tns = xp.permute_dims(tns, perm)  # permute the dimensions
                     return xp.expand_dims(
                         tns,
-                        [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
+                        [
+                            i
+                            for i in range(len(self.loops))
+                            if self.loops[i] not in idxs
+                        ],
                     )
 
-                start_index = idxs.index(indirect_idxs[0]) # index of first indirect access
-                iterator_idxs = indirect_idxs[0].get_idxs() # iterator indicies of the first indirect access
+                start_index = idxs.index(
+                    indirect_idxs[0]
+                )  # index of first indirect access
+                iterator_idxs = indirect_idxs[
+                    0
+                ].get_idxs()  # iterator indicies of the first indirect access
                 assert len(iterator_idxs) == 1
 
-                # get the axes of the idxs that are associated with the current iterator indicies
+                # get the axes of the idxs that are associated
+                # with the current iterator indicies
                 target_axes = [
-                    i for i, idx in enumerate(idxs[start_index:], start_index)
+                    i
+                    for i, idx in enumerate(idxs[start_index:], start_index)
                     if idx.get_idxs().issubset(iterator_idxs)
                 ]
 
@@ -146,26 +155,32 @@ class EinsumInterpreter:
 
                 # evaluate the associated access indicies
                 evaled_idxs = [
-                    xp.arange(tns.shape[idxs.index(idx)]) 
-                    if isinstance(idx, ein.Index) else self(idx).flat 
+                    xp.arange(tns.shape[idxs.index(idx)])
+                    if isinstance(idx, ein.Index)
+                    else self(idx).flat
                     for idx in current_idxs
                 ]
 
                 dest_axes = list(range(len(current_idxs)))
                 tns = xp.moveaxis(tns, target_axes, dest_axes)
-                
+
                 # access the tensor with the evaled idxs
                 tns = tns[tuple(evaled_idxs)]
-                
+
                 # restore original tensor axis order
                 tns = xp.moveaxis(tns, source=0, destination=target_axes[0])
 
                 # we recursiveley call the interpreter with the remaining idxs
                 iterator_idx = next(iter(iterator_idxs))
-                new_idxs = list(idxs[:start_index]) + [iterator_idx] + [
-                    idx for idx in idxs[start_index + 1:]
-                    if idx not in current_idxs
-                ]
+                new_idxs = (
+                    list(idxs[:start_index])
+                    + [iterator_idx]
+                    + [
+                        idx
+                        for idx in idxs[start_index + 1 :]
+                        if idx not in current_idxs
+                    ]
+                )
 
                 new_access = ein.Access(ein.Literal(tns), new_idxs)
                 return self(new_access)
