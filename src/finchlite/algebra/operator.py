@@ -1,3 +1,4 @@
+from ..finch_assembly import TupleFType
 from . import algebra
 
 
@@ -15,6 +16,45 @@ def not_test(a):
 
 def ifelse(a, b, c):
     return a if c else b
+
+
+# Assuming we are passing tuples which are values and its corresponding indices
+def minby(a, b):
+    return a if a[0] <= b[0] else b
+
+
+algebra.register_property(
+    minby,
+    "__call__",
+    "return_type",
+    lambda op, a, b: (
+        algebra.promote_type(a[0], b[0])
+        if not isinstance(a[0], type) and not isinstance(b[0], type)
+        else float,
+        algebra.promote_type(a[1], b[1])
+        if not isinstance(a[1], type) and not isinstance(b[1], type)
+        else int,
+    ),
+)
+
+
+def maxby(a, b):
+    return a if a[0] >= b[0] else b
+
+
+algebra.register_property(
+    maxby,
+    "__call__",
+    "return_type",
+    lambda op, a, b: (
+        algebra.promote_type(a[0], b[0])
+        if not isinstance(a[0], type) and not isinstance(b[0], type)
+        else float,
+        algebra.promote_type(a[1], b[1])
+        if not isinstance(a[1], type) and not isinstance(b[1], type)
+        else int,
+    ),
+)
 
 
 def promote_min(a, b):
@@ -55,6 +95,7 @@ algebra.register_property(
     "return_type",
     lambda obj, x: x,
 )
+
 
 algebra.register_property(
     promote_min,
@@ -115,6 +156,30 @@ algebra.register_property(
     "__call__",
     "return_type",
     lambda op, x, y: y,
+)
+
+
+def last(tup):
+    return tup[-1]
+
+
+algebra.register_property(
+    last,
+    "__call__",
+    "return_type",
+    lambda op, tup: tup[-1],
+)
+
+
+def pair(a, b):
+    return (a, b)
+
+
+algebra.register_property(
+    pair,
+    "__call__",
+    "return_type",
+    lambda op, a, b: TupleFType((a, b)),
 )
 
 
