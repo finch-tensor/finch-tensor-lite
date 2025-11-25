@@ -1,7 +1,7 @@
 import ctypes
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple, TypeAlias, TypedDict
+from typing import NamedTuple, TypedDict
 
 import numba
 
@@ -317,8 +317,7 @@ class HashTable(Map):
 # class HashTableFType(MapFType, CMapFType, CStackFType, NumbaMapFType, NumbaStackFType):
 class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
     """
-    A ftype for buffers that uses NumPy arrays. This is a concrete implementation
-    of the BufferFType class.
+    An implementation of Hash Tables using the stc library.
     """
 
     def __init__(self, key_len: int, value_len: int):
@@ -399,9 +398,7 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
         self, ctx: "NumbaContext", var_n: str, val: "AssemblyExpression"
     ) -> NumbaMapFields:
         """
-        Unpack the buffer into Numba context.
-        This is part of a step that will create a new slot for var_n
-        that contains variable names corresponding to the unpacked fields.
+        Unpack the map into numba context.
         """
         # the val field will always be asm.Variable(var_n, var_t)
         map = ctx.freshen(var_n, "map")
@@ -411,7 +408,7 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
 
     def numba_repack(self, ctx: "NumbaContext", lhs: str, obj: "NumbaMapFields"):
         """
-        Repack the buffer from Numba context.
+        Repack the map from Numba context.
         """
         # obj is the fields corresponding to the self.slots[lhs]
         ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.map}")
@@ -427,11 +424,11 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
     def deserialize_from_numba(self, obj: "HashTable", numba_map: "list[dict]"):
         obj.map = numba_map[0]
 
-    def construct_from_numba(self, numba_buffer):
+    def construct_from_numba(self, numba_map):
         """
-        Construct a numba buffer from a Numba-compatible object.
+        Construct a numba map from a Numba-compatible object.
         """
-        return HashTable(self.key_len, self.value_len, numba_buffer[0])
+        return HashTable(self.key_len, self.value_len, numba_map[0])
 
     """
     Methods for the C Backend
@@ -513,17 +510,20 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
 
     def deserialize_from_c(self, obj: CHashTable, res):
         """
-        Update this buffer based on how the C call modified the CNumpyBuffer structure.
+        Update our hash table based on how the C call modified the CHashMapStruct.
         """
         assert isinstance(res, ctypes.POINTER(CHashMapStruct))
         assert isinstance(res.contents.obj, CHashTable)
+
         obj.map = res.contents.map
 
     def construct_from_c(self, c_map):
         """
-        Construct a NumpyBuffer from a C-compatible structure.
+        Construct a CHashTable from a C-compatible structure.
 
         c_map is a pointer to a CHashMapStruct
+
+        I am going to refrain from doing this because lifecycle management is horrible.
         """
         raise NotImplementedError
 
