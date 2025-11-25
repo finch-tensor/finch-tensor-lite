@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,11 +19,12 @@ from finchlite.finch_logic import (
     Query,
     Table,
 )
+from finchlite.galley.TensorStats import TensorStats
 
 
 @dataclass
 class AnnotatedQuery:
-    ST: type
+    ST: type[TensorStats]
     output_name: Alias | None
     reduce_idxs: list[Field]
     point_expr: LogicNode
@@ -42,21 +43,22 @@ def copy_aq(aq: AnnotatedQuery) -> AnnotatedQuery:
     """
     Make a structured copy of an AnnotatedQuery.
     """
-    return AnnotatedQuery(
-        ST=aq.ST,
-        output_name=aq.output_name,
-        reduce_idxs=list(aq.reduce_idxs),
-        point_expr=aq.point_expr,
-        idx_lowest_root=OrderedDict(aq.idx_lowest_root.items()),
-        idx_op=OrderedDict(aq.idx_op.items()),
-        idx_init=OrderedDict(aq.idx_init.items()),
-        parent_idxs=OrderedDict((m, list(n)) for m, n in aq.parent_idxs.items()),
-        original_idx=OrderedDict(aq.original_idx.items()),
-        connected_components=[list(n) for n in aq.connected_components],
-        connected_idxs=OrderedDict((m, set(n)) for m, n in aq.connected_idxs.items()),
-        output_order=None if aq.output_order is None else list(aq.output_order),
-        output_format=None if aq.output_format is None else list(aq.output_format),
-    )
+    new = object.__new__(AnnotatedQuery)
+    new.ST = aq.ST
+    new.output_name = aq.output_name
+    new.point_expr = aq.point_expr
+    new.reduce_idxs = list(aq.reduce_idxs)
+    new.idx_lowest_root = OrderedDict(aq.idx_lowest_root.items())
+    new.idx_op = OrderedDict(aq.idx_op.items())
+    new.idx_init = OrderedDict(aq.idx_init.items())
+    new.parent_idxs = OrderedDict((m, list(n)) for m, n in aq.parent_idxs.items())
+    new.original_idx = OrderedDict(aq.original_idx.items())
+    new.connected_components = [list(n) for n in aq.connected_components]
+    new.connected_idxs = OrderedDict((m, set(n)) for m, n in aq.connected_idxs.items())
+    new.output_order = None if aq.output_order is None else list(aq.output_order)
+    new.output_format = None if aq.output_format is None else list(aq.output_format)
+
+    return new
 
 
 def get_reducible_idxs(aq: AnnotatedQuery) -> list[Field]:
@@ -77,8 +79,8 @@ def get_reducible_idxs(aq: AnnotatedQuery) -> list[Field]:
 
 
 def get_idx_connected_components(
-    parent_idxs: dict[Field, Iterable[Field]],
-    connected_idxs: dict[Field, Iterable[Field]],
+    parent_idxs: Mapping[Field, Iterable[Field]],
+    connected_idxs: Mapping[Field, Iterable[Field]],
 ) -> list[list[Field]]:
     """
     Compute connected components of indices (Field objects) and order those
@@ -257,10 +259,6 @@ def find_lowest_roots(
 
         if len(args_with) == 1 and is_distributive(root.op.val, op.val):
             return find_lowest_roots(op, idx, args_with[0])
-
-        special_args_with = [arg for arg in args_with if len(arg.fields) > 1]
-        if len(special_args_with) == 1 and is_distributive(root.op.val, op.val):
-            return find_lowest_roots(op, idx, special_args_with[0])
 
         if cansplitpush(op.val, root.op.val):
             roots_without: list[LogicExpression] = list(args_without)

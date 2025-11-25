@@ -1319,27 +1319,26 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
         names.update(i)
 
     fields: dict[str, Field] = {x: Field(x) for x in names}
-    reduce_idxs: list[Field] = [fields[name] for name in reduce_idxs]
-    parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict(
+    reduce_fields: list[Field] = [fields[name] for name in reduce_idxs]
+    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(
         (fields[key], [fields[p] for p in parents])
         for key, parents in parent_idxs.items()
     )
 
-    aq = AnnotatedQuery(
-        ST=object,
-        output_name=None,
-        reduce_idxs=reduce_idxs,
-        point_expr=None,
-        idx_lowest_root=OrderedDict(),
-        idx_op=OrderedDict(),
-        idx_init=OrderedDict(),
-        parent_idxs=parent_idxs,
-        original_idx=OrderedDict(),
-        connected_components=[],
-        connected_idxs=OrderedDict(),
-        output_order=None,
-        output_format=None,
-    )
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = object
+    aq.output_name = None
+    aq.reduce_idxs = reduce_fields
+    aq.point_expr = None
+    aq.idx_lowest_root = OrderedDict()
+    aq.idx_op = OrderedDict()
+    aq.idx_init = OrderedDict()
+    aq.parent_idxs = parent_fields
+    aq.original_idx = OrderedDict()
+    aq.connected_components = []
+    aq.connected_idxs = OrderedDict()
+    aq.output_order = None
+    aq.output_format = None
 
     result = [field.name for field in get_reducible_idxs(aq)]
     assert result == expected
@@ -1489,7 +1488,7 @@ def test_replace_and_remove_nodes(
                 Literal(op.mul),
                 (
                     Table(Literal("A"), (Field("i"), Field("j"))),
-                    Table(Literal("B"), (Field("i"),)),
+                    Table(Literal("B"), (Field("j"),)),
                 ),
             ),
             "i",
