@@ -207,7 +207,7 @@ class FiberTensor(Tensor, Generic[Tp]):
 
 
 class FiberTensorFields(NamedTuple):
-    lvl: asm.Variable
+    lvl: asm.Variable  # TODO: lvl is misleading - rename it
     buf_s: asm.Slot
 
 
@@ -322,10 +322,10 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         return self.lvl_t.unfurl(ctx, ntn.Stack(obj, self.lvl_t), ext, mode, proto)
 
     def lower_freeze(self, ctx, tns, op):
-        return tns
+        return self.lvl_t.lower_freeze(ctx, tns.obj.buf_s, op)
 
     def lower_thaw(self, ctx, tns, op):
-        raise NotImplementedError
+        return self.lvl_t.lower_thaw(ctx, tns.obj.buf_s, op)
 
     def lower_unwrap(self, ctx, obj):
         raise NotImplementedError

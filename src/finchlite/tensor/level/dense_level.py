@@ -131,13 +131,13 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         return self.lvl_t.lower_declare(ctx, tns, init, op, shape)
 
     def lower_freeze(self, ctx, tns, op):
-        raise NotImplementedError("DenseLevelFType does not support lower_freeze.")
+        return self.lvl_t.lower_freeze(ctx, tns, op)
+
+    def lower_thaw(self, ctx, tns, op):
+        return self.lvl_t.lower_thaw(ctx, tns, op)
 
     def lower_increment(self, ctx, obj, val):
         raise NotImplementedError("DenseLevelFType does not support lower_increment.")
-
-    def lower_thaw(self, ctx, tns, op):
-        raise NotImplementedError("DenseLevelFType does not support lower_thaw.")
 
     def lower_unwrap(self, ctx, obj):
         raise NotImplementedError("DenseLevelFType does not support lower_unwrap.")

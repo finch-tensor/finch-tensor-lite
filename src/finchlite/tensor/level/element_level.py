@@ -117,10 +117,10 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         )
 
     def lower_freeze(self, ctx, tns, op):
-        raise NotImplementedError("ElementLevelFType does not support lower_freeze.")
+        return tns
 
     def lower_thaw(self, ctx, tns, op):
-        raise NotImplementedError("ElementLevelFType does not support lower_thaw.")
+        return tns
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         raise NotImplementedError("ElementLevelFType does not support unfurl.")
