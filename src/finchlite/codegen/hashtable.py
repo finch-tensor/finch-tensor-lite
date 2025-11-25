@@ -94,7 +94,7 @@ class CHashTable(Map):
         assert isinstance(value_type, TupleFType)
 
         key_len = len(key_type.struct_fields)
-        value_len = len(key_type.struct_fields)
+        value_len = len(value_type.struct_fields)
         # dereference both key and value types; as given, they are both pointers.
         keytype_c = ctx.ctype_name(c_type(key_type)._type_)
         valuetype_c = ctx.ctype_name(c_type(value_type)._type_)
@@ -252,7 +252,7 @@ void {methods['cleanup']}(void* ptr) {{
         KeyStruct = c_type(self.ftype().key_type)._type_
         ValueStruct = c_type(self.ftype().value_type)._type_
         c_key = KeyStruct(*idx)
-        c_value = ValueStruct()
+        c_value = ValueStruct(*val)
         getattr(self.lib.library, self.lib.methods["store"])(
             self.map, ctypes.byref(c_key), ctypes.byref(c_value)
         )
@@ -445,7 +445,7 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
         # TODO: call in the methods from the c library.
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
-        return (f"{ctx.feed}{methods['store']}({map.obj.map}, {ctx(idx)})")
+        return (f"{ctx.feed}{methods['exists']}({map.obj.map}, {ctx(idx)})")
 
     def c_storemap(
         self,
@@ -456,7 +456,7 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
     ):
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
-        ctx.exec(f"{methods['exists']}({map.obj.map}, {ctx(idx)}, {ctx(value)})")
+        ctx.exec(f"{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)})")
 
     def c_loadmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
         """
@@ -506,6 +506,9 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
         assert isinstance(obj, CHashTable)
         map = ctypes.c_void_p(obj.map)
         struct = CHashMapStruct(map, obj)
+        # We NEED this for stupid ownership reasons.
+        obj._self_obj = ctypes.py_object(obj) # type: ignore
+        obj._struct = struct # type: ignore
         return ctypes.pointer(struct)
 
     def deserialize_from_c(self, obj: CHashTable, res):
