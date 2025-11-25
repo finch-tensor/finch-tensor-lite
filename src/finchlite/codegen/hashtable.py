@@ -52,6 +52,10 @@ def _is_integer_tuple(tup, size):
     return True
 
 
+def _int_tuple_ftype(size: int):
+    return TupleFType.from_tuple(tuple(int for _ in range(size)))
+
+
 class CHashMapStruct(ctypes.Structure):
     _fields_ = [
         ("map", ctypes.c_void_p),
@@ -113,7 +117,7 @@ class CHashTable(Map):
             "cleanup": ctx.freshen("finch_hmap_cleanup", key_len, value_len),
         }
         # register these methods in the datastructures.
-        ctx.datastructures[HashTableFType(key_len, value_len)] = methods
+        ctx.datastructures[CHashTableFType(key_len, value_len)] = methods
 
         # basically for the load functions, you need to provide a variable that
         # can be copied.
@@ -141,7 +145,7 @@ void {methods['cleanup']}(void* ptr) {{
     free(hptr);
 }}
         """
-        ctx.exec(lib_code)
+        ctx.add_header(lib_code)
 
         return methods, hmap_t
 
@@ -152,8 +156,8 @@ void {methods['cleanup']}(void* ptr) {{
         """
         if (key_len, value_len) in cls.libraries:
             return cls.libraries[(key_len, value_len)]
-        key_type = TupleFType.from_tuple(tuple(int for _ in range(key_len)))
-        value_type = TupleFType.from_tuple(tuple(int for _ in range(value_len)))
+        key_type = _int_tuple_ftype(key_len)
+        value_type = _int_tuple_ftype(value_len)
 
         ctx = CContext()
         methods, hmap_t = cls.gen_code(ctx, key_type, value_type)
@@ -229,7 +233,7 @@ void {methods['cleanup']}(void* ptr) {{
 
     def exists(self, idx: tuple) -> bool:
         assert _is_integer_tuple(idx, self.key_len)
-        KeyStruct = c_type(self.ftype().key_type)._type_
+        KeyStruct = c_type(self.ftype.key_type)._type_
         c_key = KeyStruct(*idx)
         func = getattr(self.lib.library, self.lib.methods["exists"])
         func.restype = ctypes.c_bool
@@ -237,8 +241,8 @@ void {methods['cleanup']}(void* ptr) {{
 
     def load(self, idx):
         assert _is_integer_tuple(idx, self.key_len)
-        KeyStruct = c_type(self.ftype().key_type)._type_
-        ValueStruct = c_type(self.ftype().value_type)._type_
+        KeyStruct = c_type(self.ftype.key_type)._type_
+        ValueStruct = c_type(self.ftype.value_type)._type_
         c_key = KeyStruct(*idx)
         c_value = ValueStruct()
         getattr(self.lib.library, self.lib.methods["load"])(
@@ -249,8 +253,8 @@ void {methods['cleanup']}(void* ptr) {{
     def store(self, idx, val):
         assert _is_integer_tuple(idx, self.key_len)
         assert _is_integer_tuple(val, self.value_len)
-        KeyStruct = c_type(self.ftype().key_type)._type_
-        ValueStruct = c_type(self.ftype().value_type)._type_
+        KeyStruct = c_type(self.ftype.key_type)._type_
+        ValueStruct = c_type(self.ftype.value_type)._type_
         c_key = KeyStruct(*idx)
         c_value = ValueStruct(*val)
         getattr(self.lib.library, self.lib.methods["store"])(
@@ -258,13 +262,160 @@ void {methods['cleanup']}(void* ptr) {{
         )
 
     def __str__(self):
-        return f"hashtable({self.map})"
+        return f"c_hashtable({self.map})"
 
+    @property
     def ftype(self):
-        return HashTableFType(self.key_len, self.value_len)
+        return CHashTableFType(self.key_len, self.value_len)
 
 
-class HashTable(Map):
+class CHashTableFType(CMapFType, CStackFType):
+    """
+    An implementation of Hash Tables using the stc library.
+    """
+
+    def __init__(self, key_len: int, value_len: int):
+        self.key_len = key_len
+        self.value_len = value_len
+        self._key_type = _int_tuple_ftype(key_len)
+        self._value_type = _int_tuple_ftype(value_len)
+
+    def __eq__(self, other):
+        if not isinstance(other, CHashTableFType):
+            return False
+        return self.key_len == other.key_len and self.value_len == other.value_len
+
+    def __call__(self):
+        return CHashTable(self.key_len, self.value_len, {})
+
+    def __str__(self):
+        return f"chashtable_t({self.key_len}, {self.value_len})"
+
+    def __repr__(self):
+        return f"cHashTableFType({self.key_len}, {self.value_len})"
+
+    @property
+    def key_type(self):
+        """
+        Returns the type of elements used as the keys of the hash table.
+        (some integer tuple)
+        """
+        return self._key_type
+
+    @property
+    def value_type(self):
+        """
+        Returns the type of elements used as the value of the hash table.
+        (some integer tuple)
+        """
+        return self._value_type
+
+    def __hash__(self):
+        """
+        This method needs to be here because you are going to be using this
+        type as a key in dictionaries.
+        """
+        return hash(("CHashTableFType", self.key_len, self.value_len))
+
+    """
+    Methods for the C Backend
+    This requires an external library (stc) to work.
+    """
+
+    def c_type(self):
+        return ctypes.POINTER(CHashMapStruct)
+
+    def c_existsmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
+        # TODO: call in the methods from the c library.
+        assert isinstance(map.obj, CMapFields)
+        methods: CHashMethods = ctx.datastructures[self]
+        return f"{ctx.feed}{methods['exists']}({map.obj.map}, {ctx(idx)})"
+
+    def c_storemap(
+        self,
+        ctx: "CContext",
+        map: "Stack",
+        idx: "AssemblyExpression",
+        value: "AssemblyExpression",
+    ):
+        assert isinstance(map.obj, CMapFields)
+        methods: CHashMethods = ctx.datastructures[self]
+        ctx.exec(f"{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)});")
+
+    def c_loadmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
+        """
+        Get an expression where we can get the value corresponding to a key.
+
+        TODO: Do we want to use pointers to tuples (standard across everything
+        but requires lifecycle management)
+        Or do we want to just use tuple values?
+
+        This load is incomplete without this design decision.
+        """
+        assert isinstance(map.obj, CMapFields)
+        methods: CHashMethods = ctx.datastructures[self]
+
+        valuetype_c = ctx.ctype_name(c_type(self.value_type)._type_)
+        value = ctx.freshen("value")
+        ctx.exec(f"{ctx.feed}{valuetype_c} {value};")
+        ctx.exec(f"{ctx.feed}{methods['load']}({map.obj.map}, {ctx(idx)}, &{value});")
+        return value
+
+    def c_unpack(self, ctx: "CContext", var_n: str, val: AssemblyExpression):
+        """
+        Unpack the map into C context.
+        """
+        assert val.result_format == self
+        data = ctx.freshen(var_n, "data")
+        # Add all the stupid header stuff from above.
+        ctx.add_datastructure(
+            self, lambda ctx: CHashTable.gen_code(ctx, self.key_type, self.value_type)
+        )
+
+        ctx.exec(f"{ctx.feed}void* {data} = {ctx(val)}->map;")
+        return CMapFields(data, var_n)
+
+    def c_repack(self, ctx: "CContext", lhs: str, obj: "CMapFields"):
+        """
+        Repack the map out of C context.
+        """
+        ctx.exec(f"{ctx.feed}{lhs}->map = {obj.map}")
+
+    def serialize_to_c(self, obj: CHashTable):
+        """
+        Serialize the Hash Map to a CHashMap structure.
+        This datatype will then immediately get turned into a struct.
+        """
+        assert isinstance(obj, CHashTable)
+        map = ctypes.c_void_p(obj.map)
+        struct = CHashMapStruct(map, obj)
+        # We NEED this for stupid ownership reasons.
+        obj._self_obj = ctypes.py_object(obj)  # type: ignore
+        obj._struct = struct  # type: ignore
+        return ctypes.pointer(struct)
+
+    def deserialize_from_c(self, obj: CHashTable, res):
+        """
+        Update our hash table based on how the C call modified the CHashMapStruct.
+        """
+        assert isinstance(res, ctypes.POINTER(CHashMapStruct))
+        assert isinstance(res.contents.obj, CHashTable)
+
+        obj.map = res.contents.map
+
+    def construct_from_c(self, c_map):
+        """
+        Construct a CHashTable from a C-compatible structure.
+
+        c_map is a pointer to a CHashMapStruct
+
+        I am going to refrain from doing this because lifecycle management is horrible.
+        Should we move?
+        """
+        raise NotImplementedError
+
+
+class NumbaHashTable(Map):
     """
     A Hash Table that maps Z^{in_len} to Z^{out_len}
     """
@@ -295,7 +446,7 @@ class HashTable(Map):
         """
         Returns the finch type of this hash table.
         """
-        return HashTableFType(self.key_len, self.value_len)
+        return NumbaHashTableFType(self.key_len, self.value_len)
 
     def exists(self, idx) -> bool:
         assert _is_integer_tuple(idx, self.key_len)
@@ -311,11 +462,10 @@ class HashTable(Map):
         self.map[idx] = val
 
     def __str__(self):
-        return f"hashtable({self.map})"
+        return f"numba_hashtable({self.map})"
 
 
-# class HashTableFType(MapFType, CMapFType, CStackFType, NumbaMapFType, NumbaStackFType):
-class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
+class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
     """
     An implementation of Hash Tables using the stc library.
     """
@@ -323,19 +473,19 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
     def __init__(self, key_len: int, value_len: int):
         self.key_len = key_len
         self.value_len = value_len
-        self._key_type = TupleFType.from_tuple(tuple(int for _ in range(key_len)))
-        self._value_type = TupleFType.from_tuple(tuple(int for _ in range(value_len)))
+        self._key_type = _int_tuple_ftype(key_len)
+        self._value_type = _int_tuple_ftype(value_len)
 
     def __eq__(self, other):
-        if not isinstance(other, HashTableFType):
+        if not isinstance(other, NumbaHashTableFType):
             return False
         return self.key_len == other.key_len and self.value_len == other.value_len
 
     def __call__(self):
-        return HashTable(self.key_len, self.value_len, {})
+        return NumbaHashTable(self.key_len, self.value_len, {})
 
     def __str__(self):
-        return f"hashtable_t({self.key_len}, {self.value_len})"
+        return f"numba_hashtable_t({self.key_len}, {self.value_len})"
 
     def __repr__(self):
         return f"HashTableFType({self.key_len}, {self.value_len})"
@@ -361,7 +511,7 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
         This method needs to be here because you are going to be using this
         type as a key in dictionaries.
         """
-        return hash(("HashTableFType", self.key_len, self.value_len))
+        return hash(("NumbaHashTableFType", self.key_len, self.value_len))
 
     """
     Methods for the Numba Backend
@@ -413,7 +563,7 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
         # obj is the fields corresponding to the self.slots[lhs]
         ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.map}")
 
-    def serialize_to_numba(self, obj: "HashTable"):
+    def serialize_to_numba(self, obj: "NumbaHashTable"):
         """
         Serialize the hashmap to a Numba-compatible object.
 
@@ -421,111 +571,14 @@ class HashTableFType(CMapFType, NumbaMapFType, CStackFType, NumbaStackFType):
         """
         return numba.typed.List([obj.map])
 
-    def deserialize_from_numba(self, obj: "HashTable", numba_map: "list[dict]"):
+    def deserialize_from_numba(self, obj: "NumbaHashTable", numba_map: "list[dict]"):
         obj.map = numba_map[0]
 
     def construct_from_numba(self, numba_map):
         """
         Construct a numba map from a Numba-compatible object.
         """
-        return HashTable(self.key_len, self.value_len, numba_map[0])
-
-    """
-    Methods for the C Backend
-    This requires an external library (stc) to work.
-    """
-
-    def c_type(self):
-        return ctypes.POINTER(CHashMapStruct)
-
-    def c_existsmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
-        # TODO: call in the methods from the c library.
-        assert isinstance(map.obj, CMapFields)
-        methods: CHashMethods = ctx.datastructures[self]
-        return (f"{ctx.feed}{methods['exists']}({map.obj.map}, {ctx(idx)})")
-
-    def c_storemap(
-        self,
-        ctx: "CContext",
-        map: "Stack",
-        idx: "AssemblyExpression",
-        value: "AssemblyExpression",
-    ):
-        assert isinstance(map.obj, CMapFields)
-        methods: CHashMethods = ctx.datastructures[self]
-        ctx.exec(f"{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)})")
-
-    def c_loadmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
-        """
-        Get an expression where we can get the value corresponding to a key.
-
-        TODO: Do we want to use pointers to tuples (standard across everything
-        but requires lifecycle management)
-        Or do we want to just use tuple values?
-
-        This load is incomplete without this design decision.
-        """
-        assert isinstance(map.obj, CMapFields)
-        methods: CHashMethods = ctx.datastructures[self]
-
-        valuetype_c = ctx.ctype_name(c_type(self.value_type)._type_)
-        value = ctx.freshen("value")
-        ctx.exec(f"{ctx.feed}{valuetype_c} {value};")
-        ctx.exec(f"{ctx.feed}{methods['load']}({map.obj.map}, {ctx(idx)}, &{value})")
-        return value
-
-    def c_unpack(self, ctx: "CContext", var_n: str, val: AssemblyExpression):
-        """
-        Unpack the map into C context.
-        """
-        assert val.result_format == self
-        data = ctx.freshen(var_n, "data")
-        # Add all the stupid header stuff from above.
-        ctx.add_datastructure(
-            self,
-            lambda ctx: CHashTable.gen_code(ctx, self.key_type, self.value_type)
-        )
-
-        ctx.exec(f"{ctx.feed}void* {data} = {ctx(val)}->map;")
-        return CMapFields(data, var_n)
-
-    def c_repack(self, ctx: "CContext", lhs: str, obj: "CMapFields"):
-        """
-        Repack the map out of C context.
-        """
-        ctx.exec(f"{ctx.feed}{lhs}->map = {obj.map}")
-
-    def serialize_to_c(self, obj: CHashTable):
-        """
-        Serialize the Hash Map to a CHashMap structure.
-        This datatype will then immediately get turned into a struct.
-        """
-        assert isinstance(obj, CHashTable)
-        map = ctypes.c_void_p(obj.map)
-        struct = CHashMapStruct(map, obj)
-        # We NEED this for stupid ownership reasons.
-        obj._self_obj = ctypes.py_object(obj) # type: ignore
-        obj._struct = struct # type: ignore
-        return ctypes.pointer(struct)
-
-    def deserialize_from_c(self, obj: CHashTable, res):
-        """
-        Update our hash table based on how the C call modified the CHashMapStruct.
-        """
-        assert isinstance(res, ctypes.POINTER(CHashMapStruct))
-        assert isinstance(res.contents.obj, CHashTable)
-
-        obj.map = res.contents.map
-
-    def construct_from_c(self, c_map):
-        """
-        Construct a CHashTable from a C-compatible structure.
-
-        c_map is a pointer to a CHashMapStruct
-
-        I am going to refrain from doing this because lifecycle management is horrible.
-        """
-        raise NotImplementedError
+        return NumbaHashTable(self.key_len, self.value_len, numba_map[0])
 
 
 if __name__ == "__main__":

@@ -577,6 +577,15 @@ class NumbaContext(Context):
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 return buf.result_format.numba_length(self, buf)
+            case asm.LoadMap(map, idx):
+                map = self.resolve(map)
+                return map.result_format.numba_loadmap(self, map, idx)
+            case asm.ExistsMap(map, idx):
+                map = self.resolve(map)
+                return map.result_format.numba_existsmap(self, map, idx)
+            case asm.StoreMap(map, idx, val):
+                map = self.resolve(map)
+                return map.result_format.numba_storemap(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:

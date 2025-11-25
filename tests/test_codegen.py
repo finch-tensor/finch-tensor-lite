@@ -12,6 +12,7 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
+from finchlite.codegen.hashtable import CHashTable
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -30,7 +31,6 @@ from finchlite.codegen.numba_backend import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-
 
 def test_add_function():
     c_code = """
@@ -925,3 +925,39 @@ def test_e2e_numba():
     assert_equal(result, a @ b)
 
     finchlite.set_default_scheduler(ctx=ctx)
+
+def test_hashtable_c():
+    table = CHashTable(2, 3)
+
+    table_v = asm.Variable("a", ftype(table))
+    table_slt = asm.Slot("a_", ftype(table))
+
+    key_type = table.ftype.key_type
+    val_type = table.ftype.value_type
+    key_v = asm.Variable("key", key_type)
+    val_v = asm.Variable("val", val_type)
+
+    module = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("setidx", np.intp),
+                (table_v, key_v, val_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.StoreMap(
+                            table_slt,
+                            key_v,
+                            val_v,
+                        ),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+    compiled = CCompiler()(module)
+    key = key_type(1, 2)
+    val = val_type(2, 3, 4)
+    compiled.setidx(table, key, val)
+    assert table.exists((1, 2))

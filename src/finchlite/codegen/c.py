@@ -810,6 +810,15 @@ class CContext(Context):
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 return buf.result_format.c_length(self, buf)
+            case asm.LoadMap(map, idx):
+                map = self.resolve(map)
+                return map.result_format.c_loadmap(self, map, idx)
+            case asm.ExistsMap(map, idx):
+                map = self.resolve(map)
+                return map.result_format.c_existsmap(self, map, idx)
+            case asm.StoreMap(map, idx, val):
+                map = self.resolve(map)
+                return map.result_format.c_storemap(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -892,6 +901,7 @@ class CContext(Context):
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
+                            print("Trying to get c type of", t)
                             t_name = self.ctype_name(c_type(t))
                             arg_decls.append(f"{t_name} {name}")
                             ctx_2.types[name] = t

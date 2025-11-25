@@ -395,8 +395,7 @@ class LoadMap(AssemblyExpression, AssemblyTree):
 
     Attributes:
         map: The map to load from.
-        index1: The first integer in the pair
-        index2: The second integer in the pair
+        index: The key value
     """
 
     map: Slot | Stack

@@ -35,6 +35,9 @@ from .nodes import (
     Unpack,
     Variable,
     WhileLoop,
+    StoreMap,
+    ExistsMap,
+    LoadMap
 )
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
@@ -56,6 +59,7 @@ __all__ = [
     "BufferFType",
     "BufferLoop",
     "Call",
+    "ExistsMap",
     "ForLoop",
     "Function",
     "GetAttr",
@@ -64,6 +68,7 @@ __all__ = [
     "Length",
     "Literal",
     "Load",
+    "LoadMap",
     "Module",
     "NamedTupleFType",
     "Print",
@@ -74,6 +79,7 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
+    "StoreMap",
     "TaggedVariable",
     "TupleFType",
     "Unpack",
