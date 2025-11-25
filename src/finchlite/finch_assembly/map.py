@@ -10,7 +10,8 @@ class Map(FTyped, ABC):
     """
 
     @abstractmethod
-    def __init__(self, length: int, dtype: type): ...
+    def __init__(self, key_len: int, value_len: int, map: "dict[tuple,tuple] | None"):
+        ...
 
     @property
     def element_type(self):

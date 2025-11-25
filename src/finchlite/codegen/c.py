@@ -9,10 +9,11 @@ from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
+from finchlite.finch_assembly.map import MapFType, FType
 from finchlite.finch_assembly.nodes import AssemblyExpression
 
 from .. import finch_assembly as asm
@@ -571,6 +572,9 @@ class CGenerator:
 class CContext(Context):
     """
     A class to represent a C environment.
+
+    The context has functionality to track which datastructure definitions need
+    to get declared via the stc library.
     """
 
     def __init__(
@@ -599,11 +603,23 @@ class CContext(Context):
         self.fptr = fptr
         self.types = types
         self.slots = slots
+        self.datastructures: dict[FType, Any] = {}
 
     def add_header(self, header):
         if header not in self._headerset:
             self.headers.append(header)
             self._headerset.add(header)
+
+    def add_datastructure(self, ftype: FType, handler: 'Callable[[CContext], Any]'):
+        """
+        Code to add a datastructure declaration.
+        This is the minimum required to prevent redundancy.
+        """
+        if ftype in self.datastructures:
+            return
+        # at least mark something is there.
+        self.datastructures[ftype] = None
+        handler(self)
 
     def emit_global(self):
         """
@@ -938,7 +954,7 @@ class CArgumentFType(ABC):
         """
 
 
-class CMapFType(BufferFType, CArgumentFType, ABC):
+class CMapFType(MapFType, CArgumentFType, ABC):
     """
     Abstract base class for the ftype of datastructures. The ftype defines how
     the data in a Map is organized and accessed.
@@ -952,7 +968,7 @@ class CMapFType(BufferFType, CArgumentFType, ABC):
         ...
 
     @abstractmethod
-    def c_loadmap(self, ctx, buffer, idx):
+    def c_loadmap(self, ctx, map, idx):
         """
         Return C code which gets a value corresponding to a certain key.
         """

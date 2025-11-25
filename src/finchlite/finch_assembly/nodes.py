@@ -411,7 +411,7 @@ class LoadMap(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class StoreMap(AssemblyTree):
+class StoreMap(AssemblyTree, AssemblyStatement):
     """
     Represents storing a value into a buffer given an integer tuple key.
 
