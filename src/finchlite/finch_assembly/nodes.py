@@ -51,11 +51,26 @@ class AssemblyTree(AssemblyNode, TermTree):
 
 
 class AssemblyExpression(AssemblyNode):
+    """
+    Assembly AST expression base class.
+
+    An assembly expression is a program node which evaluates to a value.
+    """
+
     @property
     @abstractmethod
     def result_format(self):
         """Returns the type of the expression."""
         ...
+
+
+class AssemblyStatement(AssemblyNode):
+    """
+    Assembly AST statement base class.
+
+    An assembly statement is a program node nested inside a function which does
+    not produce a value, but may modify the state of the machine.
+    """
 
 
 @dataclass(eq=True, frozen=True)
@@ -178,7 +193,7 @@ class Slot(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Unpack(AssemblyTree):
+class Unpack(AssemblyTree, AssemblyStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
@@ -199,7 +214,7 @@ class Unpack(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Repack(AssemblyTree):
+class Repack(AssemblyTree, AssemblyStatement):
     """
     Registers updates from a symbolic object `val` with the original
     object. The original object may now be accessed and modified.
@@ -217,7 +232,7 @@ class Repack(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(AssemblyTree):
+class Assign(AssemblyTree, AssemblyStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
     to `lhs`.
@@ -227,7 +242,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: TaggedVariable | Variable | Stack
+    lhs: TaggedVariable | Variable
     rhs: AssemblyExpression
 
     @property
@@ -260,7 +275,7 @@ class GetAttr(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class SetAttr(AssemblyTree):
+class SetAttr(AssemblyTree, AssemblyStatement):
     """
     Represents a setter for an attribute `attr` of an object `obj`.
     Attributes:
@@ -332,7 +347,7 @@ class Load(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Store(AssemblyTree):
+class Store(AssemblyTree, AssemblyStatement):
     """
     Represents storing a value into a buffer at a given index.
 
@@ -352,7 +367,7 @@ class Store(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Resize(AssemblyTree):
+class Resize(AssemblyTree, AssemblyStatement):
     """
     Represents resizing a buffer to a new size.
 
@@ -391,7 +406,7 @@ class Length(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class ForLoop(AssemblyTree):
+class ForLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a for loop that iterates over a range of values.
 
@@ -402,10 +417,10 @@ class ForLoop(AssemblyTree):
         body: The body of the loop to execute.
     """
 
-    var: Variable
+    var: Variable | TaggedVariable
     start: AssemblyExpression
     end: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -414,7 +429,7 @@ class ForLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class BufferLoop(AssemblyTree):
+class BufferLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a loop that iterates over the elements of a buffer.
 
@@ -425,8 +440,8 @@ class BufferLoop(AssemblyTree):
     """
 
     buffer: Slot | Stack
-    var: Variable
-    body: AssemblyNode
+    var: Variable | TaggedVariable
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -435,7 +450,7 @@ class BufferLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class WhileLoop(AssemblyTree):
+class WhileLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a while loop that executes as long as the condition is true.
 
@@ -445,7 +460,7 @@ class WhileLoop(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -454,7 +469,7 @@ class WhileLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class If(AssemblyTree):
+class If(AssemblyTree, AssemblyStatement):
     """
     Represents an if statement that executes the body if the condition is true.
 
@@ -464,7 +479,7 @@ class If(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -473,7 +488,7 @@ class If(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assert(AssemblyTree):
+class Assert(AssemblyTree, AssemblyStatement):
     """
     Represents an assert node which asserts that expression is true.
     Used in the dataflow analysis to assert conditions in conditionals and loops.
@@ -491,7 +506,7 @@ class Assert(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(AssemblyTree):
+class IfElse(AssemblyTree, AssemblyStatement):
     """
     Represents an if-else statement that executes the body if the condition
     is true, otherwise executes else_body.
@@ -503,8 +518,8 @@ class IfElse(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
-    else_body: AssemblyNode
+    body: AssemblyStatement
+    else_body: AssemblyStatement
 
     @property
     def children(self):
@@ -528,7 +543,7 @@ class Function(AssemblyTree):
 
     name: Variable
     args: tuple[Variable, ...]
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -543,7 +558,7 @@ class Function(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Return(AssemblyTree):
+class Return(AssemblyTree, AssemblyStatement):
     """
     Represents a return statement that returns `arg` from the current function.
     Halts execution of the function body.
@@ -561,7 +576,7 @@ class Return(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Break(AssemblyTree):
+class Break(AssemblyTree, AssemblyStatement):
     """
     Represents a break statement that exits the current loop.
     """
@@ -573,7 +588,7 @@ class Break(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Block(AssemblyTree):
+class Block(AssemblyTree, AssemblyStatement):
     """
     Represents a statement that executes a sequence of statements `bodies...`.
 
@@ -581,7 +596,7 @@ class Block(AssemblyTree):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyNode, ...] = ()
+    bodies: tuple[AssemblyStatement, ...] = ()
 
     @property
     def children(self):
@@ -603,7 +618,7 @@ class Module(AssemblyTree):
         funcs: The functions defined in the module.
     """
 
-    funcs: tuple[AssemblyNode, ...]
+    funcs: tuple[Function, ...]
 
     @property
     def children(self):
@@ -616,7 +631,7 @@ class Module(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Print(AssemblyTree):
+class Print(AssemblyTree, AssemblyStatement):
     """
     Print values of give variables.
 

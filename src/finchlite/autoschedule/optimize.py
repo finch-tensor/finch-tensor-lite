@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import reduce
 from itertools import chain as join_chains
-from typing import TypeVar, overload
+from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 
@@ -14,6 +14,7 @@ from ..finch_logic import (
     Literal,
     LogicExpression,
     LogicNode,
+    LogicStatement,
     LogicTree,
     MapJoin,
     Plan,
@@ -36,8 +37,6 @@ from ..symbolic import (
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
-
-T = TypeVar("T", bound="LogicNode")
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
@@ -125,26 +124,14 @@ def pretty_labels(root: LogicNode) -> LogicNode:
 
 
 @overload
-def _lift_subqueries_expr(  # type: ignore[overload-overlap]
-    node: Subquery, bindings: dict[LogicNode, LogicNode]
+def _lift_subqueries_expr(
+    node: LogicExpression, bindings: dict[Alias, LogicExpression]
 ) -> LogicExpression: ...
-
-
 @overload
 def _lift_subqueries_expr(
-    node: LogicTree, bindings: dict[LogicNode, LogicNode]
-) -> LogicTree: ...
-
-
-@overload
-def _lift_subqueries_expr(
-    node: LogicNode, bindings: dict[LogicNode, LogicNode]
+    node: LogicNode, bindings: dict[Alias, LogicExpression]
 ) -> LogicNode: ...
-
-
-def _lift_subqueries_expr(
-    node: LogicNode, bindings: dict[LogicNode, LogicNode]
-) -> LogicNode:
+def _lift_subqueries_expr(node, bindings):
     match node:
         case Subquery(lhs, arg):
             if lhs not in bindings:
@@ -160,12 +147,16 @@ def _lift_subqueries_expr(
             return node
 
 
-def lift_subqueries(node: LogicNode) -> LogicNode:
+@overload
+def lift_subqueries(node: LogicStatement) -> LogicStatement: ...
+@overload
+def lift_subqueries(node: LogicNode) -> LogicNode: ...
+def lift_subqueries(node):
     match node:
         case Plan(bodies):
             return Plan(tuple(map(lift_subqueries, bodies)))
         case Query(lhs, rhs):
-            bindings: dict[LogicNode, LogicNode] = {}
+            bindings: dict[Alias, LogicExpression] = {}
             rhs_2 = _lift_subqueries_expr(rhs, bindings)
             return Plan(
                 (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
@@ -321,7 +312,7 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
     class Entry:
         node: Query
         node_pos: int
-        matched: Query[LogicNode, Reformat] | None = None
+        matched: Query | None = None
         matched_pos: int | None = None
 
     def rule_0(ex: LogicNode) -> LogicNode | None:
@@ -346,6 +337,7 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
                         if q.node.lhs not in PostOrderDFS(
                             Plan(tuple(new_bodies[q.node_pos + 1 :]))
                         ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
+                            assert isinstance(q.matched.rhs, Reformat)
                             new_bodies[q.node_pos] = Query(
                                 q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
                             )
@@ -356,36 +348,22 @@ def propagate_into_reformats(root: LogicNode) -> LogicNode:
 
 
 @overload
-def _propagate_fields(root: Plan, fields: dict[LogicNode, Iterable[Field]]) -> Plan: ...
-
-
+def _propagate_fields(
+    root: LogicStatement, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicStatement: ...
 @overload
 def _propagate_fields(
-    root: Query, fields: dict[LogicNode, Iterable[Field]]
-) -> Query: ...
-
-
-@overload
-def _propagate_fields(
-    root: Alias, fields: dict[LogicNode, Iterable[Field]]
-) -> Relabel: ...
-
-
+    root: LogicExpression, fields: dict[LogicNode, Iterable[Field]]
+) -> LogicExpression: ...
 @overload
 def _propagate_fields(
     root: LogicTree, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicTree: ...
-
-
 @overload
 def _propagate_fields(
     root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
 ) -> LogicNode: ...
-
-
-def _propagate_fields(
-    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
-) -> LogicNode:
+def _propagate_fields(root, fields):
     match root:
         case Plan(bodies):
             return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
@@ -611,7 +589,15 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
-def _set_loop_order(node: LogicNode, perms: dict[LogicNode, LogicNode]) -> LogicNode:
+@overload
+def _set_loop_order(
+    node: LogicStatement, perms: dict[LogicNode, LogicExpression]
+) -> LogicStatement: ...
+@overload
+def _set_loop_order(
+    node: LogicNode, perms: dict[LogicNode, LogicExpression]
+) -> LogicNode: ...
+def _set_loop_order(node, perms):
     match node:
         case Plan(bodies):
             return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
