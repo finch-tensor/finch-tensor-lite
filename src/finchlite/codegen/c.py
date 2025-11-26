@@ -901,7 +901,6 @@ class CContext(Context):
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            print("Trying to get c type of", t)
                             t_name = self.ctype_name(c_type(t))
                             arg_decls.append(f"{t_name} {name}")
                             ctx_2.types[name] = t

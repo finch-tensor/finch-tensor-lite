@@ -12,7 +12,7 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
-from finchlite.codegen.hashtable import CHashTable
+from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -958,6 +958,45 @@ def test_hashtable_c():
     )
     compiled = CCompiler()(module)
     key = key_type(1, 2)
-    val = val_type(2, 3, 4)
+    val = key_type(2, 3, 4)
     compiled.setidx(table, key, val)
     assert table.exists((1, 2))
+    assert not table.exists((1, 3))
+
+
+def test_hashtable_numba():
+    table = NumbaHashTable(2, 3)
+
+    table_v = asm.Variable("a", ftype(table))
+    table_slt = asm.Slot("a_", ftype(table))
+
+    key_type = table.ftype.key_type
+    val_type = table.ftype.value_type
+    key_v = asm.Variable("key", key_type)
+    val_v = asm.Variable("val", val_type)
+
+    module = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("setidx", np.intp),
+                (table_v, key_v, val_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.StoreMap(
+                            table_slt,
+                            key_v,
+                            val_v,
+                        ),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+    compiled = NumbaCompiler()(module)
+    key = key_type(1, 2)
+    val = key_type(2, 3, 4)
+    compiled.setidx(table, key, val)
+    assert table.exists((1, 2))
+    assert not table.exists((1, 3))

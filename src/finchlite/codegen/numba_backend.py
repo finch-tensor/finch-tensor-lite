@@ -126,6 +126,13 @@ register_property(
 )
 
 register_property(
+    int,
+    "numba_jitclass_type",
+    "__attr__",
+    lambda t: numba.int32,
+)
+
+register_property(
     AssemblyStructFType,
     "numba_jitclass_type",
     "__attr__",

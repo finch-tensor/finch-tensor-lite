@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import NamedTuple, TypedDict
 
 import numba
+import numpy as np
 
 from finchlite.codegen.c import (
     CContext,
@@ -123,7 +124,6 @@ class CHashTable(Map):
         # can be copied.
         # Yeah, so which API's should we use for load and store?
         lib_code = f"""
-#include <stdio.h>
 void* {methods['init']}() {{
     void* ptr = malloc(sizeof({hmap_t}));
     memset(ptr, 0, sizeof({hmap_t}));
@@ -522,6 +522,9 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
         value_t = numba.types.UniTuple(numba.types.int64, self.value_len)
         return numba.types.ListType(numba.types.DictType(key_t, value_t))
 
+    def numba_type(self):
+        return list[dict]
+
     def numba_existsmap(
         self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
     ):
@@ -542,7 +545,7 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
         value: "AssemblyExpression",
     ):
         assert isinstance(map.obj, NumbaMapFields)
-        ctx.exec(f"{map.obj.map}[{ctx(idx)}] = {ctx(value)}")
+        ctx.exec(f"{ctx.feed}{map.obj.map}[{ctx(idx)}] = {ctx(value)}")
 
     def numba_unpack(
         self, ctx: "NumbaContext", var_n: str, val: "AssemblyExpression"
