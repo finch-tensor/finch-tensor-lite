@@ -73,6 +73,11 @@ class Tensor(FTyped, ABC):
         should be an actual tuple, rather than a tuple type, so that it can hold
         e.g. dtypes, formats, or types, and so that we can easily index it."""
         return self.ftype.shape_type
+    
+    @abstractmethod
+    def copy(self) -> "Tensor":
+        """Create a copy of the tensor."""
+        ...
 
 
 def fill_value(arg: Any) -> Any:

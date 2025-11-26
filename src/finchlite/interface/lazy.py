@@ -115,6 +115,9 @@ class LazyTensor(OverrideTensor):
 
     def override_module(self):
         return sys.modules[__name__]
+    
+    def copy(self) -> "LazyTensor":
+        raise NotImplementedError("Cannot copy LazyTensor")
 
     def __add__(self, other):
         return add(self, other)
@@ -1160,6 +1163,9 @@ class NoneTensor(Tensor):
 
     def asarray(self):
         return self
+    
+    def copy(self):
+        return self
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
@@ -1285,6 +1291,9 @@ class ConcatTensor(Tensor):
     def asarray(self):
         return self
 
+    def copy(self):
+        return ConcatTensor(
+            *(t.copy() for t in self.tensors), axis=self.concat_axis)
 
 def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     """
@@ -1403,6 +1412,9 @@ class SplitDimsTensor(Tensor):
 
     def asarray(self):
         return self
+    
+    def copy(self):
+        return SplitDimsTensor(self.tensor.copy(), self.axis, self.split_shape)
 
 
 @dataclass(frozen=True)
@@ -1507,6 +1519,8 @@ class CombineDimsTensor(Tensor):
     def asarray(self):
         return self
 
+    def copy(self):
+        return self
 
 def _compute(arg, ctx=None):
     from finchlite import compute

@@ -94,6 +94,18 @@ class MallocBuffer(Buffer):
         ]
         return f"malloc_buf({array})"
 
+    def copy(self):
+        new_buf = MallocBuffer(self.length(), self._dtype)
+        cast_src = ctypes.cast(
+            self.buffer.contents.data, ctypes.POINTER(self._c_dtype)
+        )
+        cast_dst = ctypes.cast(
+            new_buf.buffer.contents.data, ctypes.POINTER(self._c_dtype)
+        )
+        for i in range(self.length()):
+            cast_dst[i] = cast_src[i]
+        return new_buf
+
 
 class MallocBufferFType(CBufferFType, CStackFType):
     """

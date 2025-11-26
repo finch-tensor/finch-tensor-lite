@@ -51,6 +51,13 @@ class Buffer(FTyped, ABC):
         Resize the buffer to the new length.
         """
         ...
+    
+    @abstractmethod
+    def copy(self):
+        """
+        Create a copy of the buffer.
+        """
+        ...
 
 
 def length_type(arg: Any):

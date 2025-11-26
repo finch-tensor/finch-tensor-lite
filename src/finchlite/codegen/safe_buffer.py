@@ -36,6 +36,9 @@ class SafeBuffer(Buffer):
     def __str__(self) -> str:
         return f"safe({self._underlying})"
 
+    def copy(self):
+        return SafeBuffer(self._underlying.copy())
+
     @property
     def underlying(self):
         return self._underlying

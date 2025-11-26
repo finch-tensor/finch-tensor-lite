@@ -76,6 +76,9 @@ class NumpyBuffer(Buffer):
         arr_str = str(self.arr).replace("\n", "")
         return f"np_buf({arr_str})"
 
+    def copy(self):
+        return NumpyBuffer(self.arr.copy())
+
 
 class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     """

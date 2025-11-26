@@ -98,6 +98,10 @@ class Level(FTyped, ABC):
     def buffer_factory(self):
         return self.ftype.buffer_factory
 
+    @abstractmethod
+    def copy(self):
+        ...
+
 
 Tp = TypeVar("Tp")
 
@@ -159,6 +163,9 @@ class FiberTensor(Tensor, Generic[Tp]):
         This is typically a NumpyBufferFType or similar.
         """
         return self.lvl.buffer_factory
+
+    def copy(self):
+        return FiberTensor(self.lvl.copy(), self.pos)
 
 
 @dataclass(unsafe_hash=True)

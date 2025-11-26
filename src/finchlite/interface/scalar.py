@@ -53,6 +53,9 @@ class Scalar(EagerTensor):
     def __getitem__(self, idx):
         return self.val
 
+    def copy(self):
+        return Scalar(self.val, self._fill_value)
+
 
 register_property(object, "asarray", "__attr__", lambda x: Scalar(x))
 register_property(Scalar, "asarray", "__attr__", lambda x: x)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Self
+from typing import Any, Self, Tuple
 
 from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
@@ -11,7 +11,7 @@ from ..util import qual_str
 @dataclass(eq=True, frozen=True)
 class TableValue:
     tns: Any
-    idxs: Iterable[Any]
+    idxs: Tuple[Any, ...]
 
     def __post_init__(self):
         if isinstance(self.tns, TableValue):

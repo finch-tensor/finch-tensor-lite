@@ -63,7 +63,6 @@ class DenseLevelFType(LevelFType, ABC):
         """
         return self.lvl.buffer_factory
 
-
 def dense(lvl, dimension_type=None):
     return DenseLevelFType(lvl, dimension_type=dimension_type)
 
@@ -85,3 +84,6 @@ class DenseLevel(Level):
     @property
     def ftype(self):
         return self._format
+
+    def copy(self):
+        return DenseLevel(self._format, self.lvl.copy(), self.dimension)

@@ -145,6 +145,9 @@ class TensorView(Tensor):
         self.tns[*self.idxs] = self.op(self.tns[*self.idxs], val)
         return
 
+    def copy(self):
+        return TensorView(self.idxs, self.tns.copy(), self.op)
+
 
 def access(tns, idxs, op=None):
     """

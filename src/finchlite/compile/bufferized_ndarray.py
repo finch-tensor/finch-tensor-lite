@@ -111,6 +111,13 @@ class BufferizedNDArray(Tensor):
     def __repr__(self):
         return f"BufferizedNDArray(shape={self.shape})"
 
+    def copy(self):
+        return BufferizedNDArray(
+            self.buf,
+            shape=self.shape,
+            strides=self.strides,
+        )
+
 
 class BufferizedNDArrayFields(NamedTuple):
     stride: tuple[asm.Variable, ...]
@@ -300,6 +307,11 @@ class BufferizedNDArrayAccessor(Tensor):
         assert self.ndim == 0, "Cannot unwrap a tensor view with non-zero dimension."
         self.tns.buf.store(self.pos, self.op(self.tns.buf.load(self.pos), val))
         return self
+    
+    def copy(self):
+        return BufferizedNDArrayAccessor(
+            self.tns.copy(), self.nind, self.pos, self.op
+        )
 
 
 class BufferizedNDArrayAccessorFields(NamedTuple):

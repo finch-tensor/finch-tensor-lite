@@ -111,3 +111,6 @@ class ElementLevel(Level):
     @property
     def ftype(self):
         return self._format
+
+    def copy(self):
+        return ElementLevel(self._format, self.val.copy())
