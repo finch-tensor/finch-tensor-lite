@@ -9,6 +9,18 @@ from ..util import qual_str
 
 
 @dataclass(eq=True, frozen=True)
+class TableValue:
+    tns: Any
+    idxs: Iterable[Any]
+
+    def __post_init__(self):
+        if isinstance(self.tns, TableValue):
+            raise ValueError("The tensor (tns) cannot be a TableValue")
+    
+    def copy(self) -> "TableValue":
+        return TableValue(self.tns.copy(), self.idxs)
+
+@dataclass(eq=True, frozen=True)
 class LogicNode(Term, ABC):
     """
     LogicNode

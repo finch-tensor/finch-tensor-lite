@@ -17,8 +17,10 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
+    Subquery,
     Reorder,
     Table,
+    TableValue,
 )
 
 
@@ -72,3 +74,51 @@ def test_plan_repr():
         )
     )
     assert p == eval(repr(p))
+
+def test_materialize():
+    i = Field("i")
+    j = Field("j")
+
+    C = np.array([[0, 0], [0, 0]])
+
+    p = Plan(
+        (
+            Query(Alias("A"), Table(Literal(np.array([[1, 2], [3, 4]])), (i, j))),
+            Query(Alias("B"), Table(Literal(np.array([[1, 1], [1, 1]])), (i, j))),
+            Query(Alias("C"), MapJoin(Literal(add), (Alias("A"), Alias("B")))),
+            Query(Alias("D"), MapJoin(Literal(mul), (Alias("C"), Alias("A")))),
+            Query(Alias("C"), Alias("B")),
+            Produces((Alias("D"), Alias("C"))),
+        )
+    )
+
+    result = FinchLogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
+
+    expected = np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]])
+
+    assert_equal(result, expected)
+    assert_equal(C, np.array([[1, 1], [1, 1]]))
+
+def test_submaterialize():
+    i = Field("i")
+    j = Field("j")
+
+    C = np.array([[0, 0], [0, 0]])
+
+    p = Plan(
+        (
+            Query(Alias("A"), Table(Literal(np.array([[1, 2], [3, 4]])), (i, j))),
+            Query(Alias("B"), Table(Literal(np.array([[1, 1], [1, 1]])), (i, j))),
+            Query(Alias("E"), Subquery(Alias("C"), MapJoin(Literal(add), (Alias("A"), Alias("B"))))),
+            Query(Alias("D"), MapJoin(Literal(mul), (Alias("C"), Alias("A")))),
+            Query(Alias("C"), Alias("B")),
+            Produces((Alias("D"), Alias("C"))),
+        )
+    )
+
+    result = FinchLogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
+
+    expected = np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]])
+
+    assert_equal(result, expected)
+    assert_equal(C, np.array([[1, 1], [1, 1]]))
