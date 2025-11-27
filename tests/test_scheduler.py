@@ -127,49 +127,55 @@ def test_isolate_passes(node, pass_fn):
 
 
 def test_isolate_aggregates():
-    plan = Plan((
-        Query(
-            Alias("A0"),
-            Aggregate(
-                Literal("+"),
-                Literal(0),
-                Aggregate(
-                    Literal("*"),
-                    Literal(1),
-                    Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
-                    (Field("i2"),),
-                ),
-                (Field("i1"),),
-            ),
-        ),
-    ))
-
-    expected = Plan((
-        Plan((
+    plan = Plan(
+        (
             Query(
-                Alias(f"#A#{_sg.counter}"),
-                Aggregate(
-                    Literal("*"),
-                    Literal(1),
-                    Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
-                    (Field("i2"),)
-                ),
-            ),
-            Query(
-                Alias(f"#A#{_sg.counter + 1}"),
+                Alias("A0"),
                 Aggregate(
                     Literal("+"),
                     Literal(0),
-                    Alias(f"#A#{_sg.counter}"),
+                    Aggregate(
+                        Literal("*"),
+                        Literal(1),
+                        Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                        (Field("i2"),),
+                    ),
                     (Field("i1"),),
                 ),
             ),
-            Query(
-                Alias("A0"),
-                Alias(f"#A#{_sg.counter + 1}"),
+        )
+    )
+
+    expected = Plan(
+        (
+            Plan(
+                (
+                    Query(
+                        Alias(f"#A#{_sg.counter}"),
+                        Aggregate(
+                            Literal("*"),
+                            Literal(1),
+                            Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                            (Field("i2"),),
+                        ),
+                    ),
+                    Query(
+                        Alias(f"#A#{_sg.counter + 1}"),
+                        Aggregate(
+                            Literal("+"),
+                            Literal(0),
+                            Alias(f"#A#{_sg.counter}"),
+                            (Field("i1"),),
+                        ),
+                    ),
+                    Query(
+                        Alias("A0"),
+                        Alias(f"#A#{_sg.counter + 1}"),
+                    ),
+                )
             ),
-        )),
-    ))
+        )
+    )
 
     result = isolate_aggregates(plan)
     assert result == expected
