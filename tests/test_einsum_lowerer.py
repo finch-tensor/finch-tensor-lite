@@ -8,9 +8,9 @@ import finchlite
 from finchlite.autoschedule import optimize
 from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.finch_einsum import EinsumInterpreter
-from finchlite.finch_logic import Alias, LogicExpression, Plan, Produces, Query
+from finchlite.finch_logic import Alias, Plan, Produces, Query
 from finchlite.interface.fuse import compute
-from finchlite.interface.lazy import defer
+from finchlite.interface.lazy import LazyTensor, defer
 from finchlite.symbolic import gensym
 
 
@@ -19,7 +19,7 @@ def rng():
     return np.random.default_rng(42)
 
 
-def lower_and_execute(ir: LogicExpression):
+def lower_and_execute(tns: LazyTensor):
     """
     Helper function to optimize, lower, and execute a Logic IR plan.
 
@@ -29,9 +29,10 @@ def lower_and_execute(ir: LogicExpression):
     Returns:
         The result of executing the einsum plan
     """
+    ir = tns.data
     # Optimize into a plan
     var = Alias(gensym("result"))
-    plan = Plan((Query(var, ir), Produces((var,))))
+    plan = Plan(tns.ctx.trace() + (Query(var, ir), Produces((var,))))
     optimized_plan = cast(Plan, optimize(plan))
 
     # Lower to einsum IR
@@ -57,7 +58,7 @@ def test_simple_addition(rng):
     C = finchlite.add(A, B)
 
     # Execute the plan
-    result = lower_and_execute(C.data)
+    result = lower_and_execute(C)
 
     # Compare with expected
     expected = compute(A + B)
@@ -70,7 +71,7 @@ def test_scalar_multiplication(rng):
 
     B = finchlite.multiply(2, A)
 
-    result = lower_and_execute(B.data)
+    result = lower_and_execute(B)
 
     expected = compute(B)
     assert np.allclose(result, expected)
@@ -84,7 +85,7 @@ def test_element_wise_operations(rng):
 
     D = finchlite.add(finchlite.multiply(A, B), C)
 
-    result = lower_and_execute(D.data)
+    result = lower_and_execute(D)
 
     expected = compute(D)
     assert np.allclose(result, expected)
@@ -96,7 +97,7 @@ def test_sum_reduction(rng):
 
     B = finchlite.sum(A, axis=1)
 
-    result = lower_and_execute(B.data)
+    result = lower_and_execute(B)
 
     expected = compute(B)
     assert np.allclose(result, expected)
@@ -108,7 +109,7 @@ def test_maximum_reduction(rng):
 
     B = finchlite.max(A, axis=1)
 
-    result = lower_and_execute(B.data)
+    result = lower_and_execute(B)
     expected = compute(B)
     assert np.allclose(result, expected)
 
@@ -120,7 +121,7 @@ def test_batch_matrix_multiplication(rng):
 
     C = finchlite.matmul(A, B)
 
-    result = lower_and_execute(C.data)
+    result = lower_and_execute(C)
     expected = compute(C)
     assert np.allclose(result, expected)
 
@@ -131,6 +132,6 @@ def test_minimum_reduction(rng):
 
     B = finchlite.min(A, axis=1)
 
-    result = lower_and_execute(B.data)
+    result = lower_and_execute(B)
     expected = compute(B)
     assert np.allclose(result, expected)
