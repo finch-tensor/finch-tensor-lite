@@ -260,7 +260,7 @@ def test_malloc_resize(new_size):
         )
     )
     mod = CCompiler()(prgm)
-    assert mod.length(ab).value == new_size
+    assert mod.length(ab) == new_size
     assert ab.length() == new_size
     for i in range(new_size):
         assert ab.load(i) == 0 if i >= len(a) else a[i]
