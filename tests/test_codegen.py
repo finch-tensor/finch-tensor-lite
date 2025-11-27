@@ -24,7 +24,7 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.c import c_type, construct_from_c, deserialize_from_c, serialize_to_c
 from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_backend import (
     construct_from_numba,
@@ -940,7 +940,7 @@ def test_hashtable_c():
     module = asm.Module(
         (
             asm.Function(
-                asm.Variable("setidx", np.intp),
+                asm.Variable("setidx", val_type),
                 (table_v, key_v, val_v),
                 asm.Block(
                     (
@@ -950,18 +950,38 @@ def test_hashtable_c():
                             key_v,
                             val_v,
                         ),
-                        asm.Return(asm.Literal(0)),
+                        asm.Return(
+                            asm.LoadMap(
+                                table_slt,
+                                key_v
+                            )
+                        ),
                     )
                 ),
             ),
+            asm.Function(
+                asm.Variable("exists", bool),
+                (table_v, key_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.Return(
+                            asm.ExistsMap(
+                                table_slt,
+                                key_v
+                            )
+                        )
+                    )
+                )
+            )
         )
     )
     compiled = CCompiler()(module)
-    key = key_type(1, 2)
-    val = key_type(2, 3, 4)
-    compiled.setidx(table, key, val)
-    assert table.exists((1, 2))
-    assert not table.exists((1, 3))
+    assert compiled.setidx(table, (1, 2), (2, 3, 4)) == (2, 3, 4)
+    assert compiled.setidx(table, (1, 4), (3, 4, 1)) == (3, 4, 1)
+    assert compiled.exists(table, (1, 2))
+    assert not compiled.exists(table, (1, 3))
+    assert not compiled.exists(table, (2, 3))
 
 
 def test_hashtable_numba():
@@ -978,7 +998,7 @@ def test_hashtable_numba():
     module = asm.Module(
         (
             asm.Function(
-                asm.Variable("setidx", np.intp),
+                asm.Variable("setidx", val_type),
                 (table_v, key_v, val_v),
                 asm.Block(
                     (
@@ -988,7 +1008,12 @@ def test_hashtable_numba():
                             key_v,
                             val_v,
                         ),
-                        asm.Return(asm.Literal(0)),
+                        asm.Return(
+                            asm.LoadMap(
+                                table_slt,
+                                key_v
+                            )
+                        ),
                     )
                 ),
             ),
@@ -997,6 +1022,6 @@ def test_hashtable_numba():
     compiled = NumbaCompiler()(module)
     key = key_type(1, 2)
     val = key_type(2, 3, 4)
-    compiled.setidx(table, key, val)
+    result = compiled.setidx(table, key, val)
     assert table.exists((1, 2))
     assert not table.exists((1, 3))

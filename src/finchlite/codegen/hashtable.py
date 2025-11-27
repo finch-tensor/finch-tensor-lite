@@ -15,7 +15,7 @@ from finchlite.codegen.c import (
     load_shared_lib,
     serialize_to_c,
 )
-from finchlite.codegen.numba_backend import NumbaContext, NumbaMapFType, NumbaStackFType
+from finchlite.codegen.numba_backend import NumbaContext, NumbaMapFType, NumbaStackFType, numba_type
 from finchlite.finch_assembly.map import Map, MapFType
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.finch_assembly.struct import TupleFType
@@ -95,6 +95,7 @@ class CHashTable(Map):
         ctx: "CContext",
         key_type: "TupleFType",
         value_type: "TupleFType",
+        inline: bool = False,
     ) -> tuple[CHashMethods, str]:
 
         assert isinstance(key_type, TupleFType)
@@ -107,10 +108,13 @@ class CHashTable(Map):
         valuetype_c = ctx.ctype_name(c_type(value_type))
         hmap_t = ctx.freshen(f"hmap", key_len, value_len)
 
-        ctx.add_header(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
-        ctx.add_header("#define i_eq c_memcmp_eq")
         ctx.add_header("#include <stdlib.h>")
-        ctx.add_header(f'#include "{hashmap_h}"')
+
+        # these headers should just be added to the headers list.
+        # deduplication is catastrohpic here.
+        ctx.headers.append(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
+        ctx.headers.append("#define i_eq c_memcmp_eq")
+        ctx.headers.append(f'#include "{hashmap_h}"')
 
         methods: CHashMethods = {
             "init": ctx.freshen("finch_hmap_init", key_len, value_len),
@@ -121,27 +125,28 @@ class CHashTable(Map):
         }
         # register these methods in the datastructures.
         ctx.datastructures[CHashTableFType(key_len, value_len)] = methods
+        inline_s = "static inline " if inline else ""
 
         # basically for the load functions, you need to provide a variable that
         # can be copied.
         # Yeah, so which API's should we use for load and store?
         lib_code = f"""
-inline void* {methods['init']}() {{
+{inline_s}void* {methods['init']}() {{
     void* ptr = malloc(sizeof({hmap_t}));
     memset(ptr, 0, sizeof({hmap_t}));
     return ptr;
 }}
-inline bool {methods['exists']}({hmap_t} *map, {keytype_c} key) {{
+{inline_s}bool {methods['exists']}({hmap_t} *map, {keytype_c} key) {{
     return {hmap_t}_contains(map, key);
 }}
-inline {valuetype_c} {methods['load']}({hmap_t} *map, {keytype_c} key) {{
+{inline_s}{valuetype_c} {methods['load']}({hmap_t} *map, {keytype_c} key) {{
     const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
     return *internal_val;
 }}
-inline void {methods['store']}({hmap_t} *map, {keytype_c} key, {valuetype_c} value) {{
+{inline_s}void {methods['store']}({hmap_t} *map, {keytype_c} key, {valuetype_c} value) {{
     {hmap_t}_insert_or_assign(map, key, value);
 }}
-inline void {methods['cleanup']}(void* ptr) {{
+{inline_s}void {methods['cleanup']}(void* ptr) {{
     {hmap_t}* hptr = ptr;
     {hmap_t}_drop(hptr);
     free(hptr);
@@ -243,10 +248,10 @@ inline void {methods['cleanup']}(void* ptr) {{
         assert _is_integer_tuple(idx, self.key_len)
         KeyStruct = c_type(self.ftype.key_type)
         c_key = KeyStruct(*idx)
-        c_value = getattr(self.lib.library, self.lib.methods["load"])(
-            self.map, c_key
+        c_value = getattr(self.lib.library, self.lib.methods["load"])(self.map, c_key)
+        return tuple(
+            getattr(c_value, f) for f in self.ftype.value_type.struct_fieldnames
         )
-        return tuple(getattr(c_value, f) for f in self.ftype.value_type.struct_fieldnames)
 
     def store(self, idx, val):
         assert _is_integer_tuple(idx, self.key_len)
@@ -255,9 +260,7 @@ inline void {methods['cleanup']}(void* ptr) {{
         ValueStruct = c_type(self.ftype.value_type)
         c_key = KeyStruct(*idx)
         c_value = ValueStruct(*val)
-        getattr(self.lib.library, self.lib.methods["store"])(
-            self.map, c_key, c_value
-        )
+        getattr(self.lib.library, self.lib.methods["store"])(self.map, c_key, c_value)
 
     def __str__(self):
         return f"c_hashtable({self.map})"
@@ -337,7 +340,7 @@ class CHashTableFType(CMapFType, CStackFType):
     ):
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
-        ctx.exec(f"{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)});")
+        ctx.exec(f"{ctx.feed}{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)});")
 
     def c_loadmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
         """
@@ -346,7 +349,7 @@ class CHashTableFType(CMapFType, CStackFType):
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
 
-        return (f"{methods['load']}({map.obj.map}, {ctx(idx)})")
+        return f"{methods['load']}({map.obj.map}, {ctx(idx)})"
 
     def c_unpack(self, ctx: "CContext", var_n: str, val: AssemblyExpression):
         """
@@ -356,7 +359,10 @@ class CHashTableFType(CMapFType, CStackFType):
         data = ctx.freshen(var_n, "data")
         # Add all the stupid header stuff from above.
         ctx.add_datastructure(
-            self, lambda ctx: CHashTable.gen_code(ctx, self.key_type, self.value_type)
+            self,
+            lambda ctx: CHashTable.gen_code(
+                ctx, self.key_type, self.value_type, inline=True
+            ),
         )
 
         ctx.exec(f"{ctx.feed}void* {data} = {ctx(val)}->map;")
@@ -510,7 +516,8 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
         return numba.types.ListType(numba.types.DictType(key_t, value_t))
 
     def numba_type(self):
-        return list[dict]
+        return self.numba_jitclass_type()
+        # return list[dict[key_t, val_t]]
 
     def numba_existsmap(
         self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
