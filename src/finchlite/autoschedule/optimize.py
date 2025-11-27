@@ -77,11 +77,27 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
 
 def isolate_aggregates(root: LogicNode) -> LogicNode:
-    def rule_0(node):
-        match node:
-            case Aggregate() as agg:
-                name = Alias(gensym("A"))
-                return Subquery(name, agg)
+    def rule_0(stmt):
+        stack = []
+
+        def rule_1(ex):
+            match ex:
+                case Aggregate(_, _, _, _) as agg:
+                    var = Alias(gensym("A"))
+                    stack.append(Query(var, agg))
+                    return var
+                case _:
+                    return None
+
+        match stmt:
+            case Query(lhs, rhs):
+                rhs = Rewrite(PostWalk(rule_1))(rhs)
+                return Plan((*stack, Query(lhs, rhs)))
+            case Produces(args):
+                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
+                return Plan((*stack, Produces(args)))
+            case _:
+                return None
 
     return Rewrite(PostWalk(rule_0))(root)
 

@@ -11,7 +11,6 @@ from finchlite.autoschedule import (
     isolate_reformats,
     isolate_tables,
     lift_fields,
-    lift_subqueries,
     materialize_squeeze_expand_productions,
     normalize_names,
     optimize,
@@ -69,63 +68,6 @@ def test_propagate_map_queries():
     assert result == expected
 
 
-def test_lift_subqueries():
-    plan = Plan(
-        (
-            Query(
-                Alias("A10"),
-                Plan(
-                    (
-                        Subquery(Alias("C10"), Literal(0)),
-                        Subquery(
-                            Alias("B10"),
-                            MapJoin(
-                                Literal("+"),
-                                (
-                                    Subquery(Alias("C10"), Literal(0)),
-                                    Literal("[1,2,3]"),
-                                ),
-                            ),
-                        ),
-                        Subquery(Alias("B10"), Literal(0)),
-                        Produces((Alias("B10"),)),
-                    )
-                ),
-            ),
-            Produces((Alias("A10"),)),
-        )
-    )
-
-    expected = Plan(
-        (
-            Plan(
-                (
-                    Query(Alias("C10"), Literal(0)),
-                    Query(
-                        Alias("B10"),
-                        MapJoin(Literal("+"), (Alias("C10"), Literal("[1,2,3]"))),
-                    ),
-                    Query(
-                        Alias("A10"),
-                        Plan(
-                            (
-                                Alias("C10"),
-                                Alias("B10"),
-                                Alias("B10"),
-                                Produces((Alias("B10"),)),
-                            )
-                        ),
-                    ),
-                ),
-            ),
-            Produces((Alias("A10"),)),
-        )
-    )
-
-    result = lift_subqueries(plan)
-    assert result == expected
-
-
 def test_propagate_fields():
     plan = Plan(
         (
@@ -166,10 +108,6 @@ def test_propagate_fields():
 @pytest.mark.parametrize(
     "node,pass_fn",
     [
-        (
-            Aggregate(Literal(""), Literal(""), Reorder(Literal(""), ()), ()),
-            isolate_aggregates,
-        ),
         (Reformat(Literal(""), Reorder(Literal(""), ())), isolate_reformats),
         (Table(Literal(""), ()), isolate_tables),
     ],
@@ -185,6 +123,55 @@ def test_isolate_passes(node, pass_fn):
     )
 
     result = pass_fn(plan)
+    assert result == expected
+
+
+def test_isolate_aggregates():
+    plan = Plan((
+        Query(
+            Alias("A0"),
+            Aggregate(
+                Literal("+"),
+                Literal(0),
+                Aggregate(
+                    Literal("*"),
+                    Literal(1),
+                    Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                    (Field("i2"),),
+                ),
+                (Field("i1"),),
+            ),
+        ),
+    ))
+
+    expected = Plan((
+        Plan((
+            Query(
+                Alias(f"#A#{_sg.counter}"),
+                Aggregate(
+                    Literal("*"),
+                    Literal(1),
+                    Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                    (Field("i2"),)
+                ),
+            ),
+            Query(
+                Alias(f"#A#{_sg.counter + 1}"),
+                Aggregate(
+                    Literal("+"),
+                    Literal(0),
+                    Alias(f"#A#{_sg.counter}"),
+                    (Field("i1"),),
+                ),
+            ),
+            Query(
+                Alias("A0"),
+                Alias(f"#A#{_sg.counter + 1}"),
+            ),
+        )),
+    ))
+
+    result = isolate_aggregates(plan)
     assert result == expected
 
 
