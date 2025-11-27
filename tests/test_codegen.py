@@ -12,7 +12,6 @@ import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
-from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 import finchlite.finch_assembly as asm
 from finchlite import ftype
 from finchlite.codegen import (
@@ -24,13 +23,19 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import c_type, construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.c import (
+    construct_from_c,
+    deserialize_from_c,
+    serialize_to_c,
+)
+from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_backend import (
     construct_from_numba,
     deserialize_from_numba,
     serialize_to_numba,
 )
+
 
 def test_add_function():
     c_code = """
@@ -926,6 +931,7 @@ def test_e2e_numba():
 
     finchlite.set_default_scheduler(ctx=ctx)
 
+
 def test_hashtable_c():
     table = CHashTable(2, 3)
 
@@ -950,12 +956,7 @@ def test_hashtable_c():
                             key_v,
                             val_v,
                         ),
-                        asm.Return(
-                            asm.LoadMap(
-                                table_slt,
-                                key_v
-                            )
-                        ),
+                        asm.Return(asm.LoadMap(table_slt, key_v)),
                     )
                 ),
             ),
@@ -965,15 +966,10 @@ def test_hashtable_c():
                 asm.Block(
                     (
                         asm.Unpack(table_slt, table_v),
-                        asm.Return(
-                            asm.ExistsMap(
-                                table_slt,
-                                key_v
-                            )
-                        )
+                        asm.Return(asm.ExistsMap(table_slt, key_v)),
                     )
-                )
-            )
+                ),
+            ),
         )
     )
     compiled = CCompiler()(module)
@@ -1008,12 +1004,7 @@ def test_hashtable_numba():
                             key_v,
                             val_v,
                         ),
-                        asm.Return(
-                            asm.LoadMap(
-                                table_slt,
-                                key_v
-                            )
-                        ),
+                        asm.Return(asm.LoadMap(table_slt, key_v)),
                     )
                 ),
             ),

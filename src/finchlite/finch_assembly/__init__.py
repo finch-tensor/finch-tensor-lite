@@ -14,6 +14,7 @@ from .nodes import (
     Break,
     BufferLoop,
     Call,
+    ExistsMap,
     ForLoop,
     Function,
     GetAttr,
@@ -22,6 +23,7 @@ from .nodes import (
     Length,
     Literal,
     Load,
+    LoadMap,
     Module,
     Print,
     Repack,
@@ -31,13 +33,11 @@ from .nodes import (
     Slot,
     Stack,
     Store,
+    StoreMap,
     TaggedVariable,
     Unpack,
     Variable,
     WhileLoop,
-    StoreMap,
-    ExistsMap,
-    LoadMap
 )
 from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types

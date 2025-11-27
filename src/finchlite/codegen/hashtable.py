@@ -4,19 +4,20 @@ from pathlib import Path
 from typing import NamedTuple, TypedDict
 
 import numba
-import numpy as np
 
 from finchlite.codegen.c import (
     CContext,
     CMapFType,
     CStackFType,
     c_type,
-    construct_from_c,
     load_shared_lib,
-    serialize_to_c,
 )
-from finchlite.codegen.numba_backend import NumbaContext, NumbaMapFType, NumbaStackFType, numba_type
-from finchlite.finch_assembly.map import Map, MapFType
+from finchlite.codegen.numba_backend import (
+    NumbaContext,
+    NumbaMapFType,
+    NumbaStackFType,
+)
+from finchlite.finch_assembly.map import Map
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.finch_assembly.struct import TupleFType
 
@@ -97,7 +98,6 @@ class CHashTable(Map):
         value_type: "TupleFType",
         inline: bool = False,
     ) -> tuple[CHashMethods, str]:
-
         assert isinstance(key_type, TupleFType)
         assert isinstance(value_type, TupleFType)
 
@@ -106,7 +106,7 @@ class CHashTable(Map):
         # dereference both key and value types; as given, they are both pointers.
         keytype_c = ctx.ctype_name(c_type(key_type))
         valuetype_c = ctx.ctype_name(c_type(value_type))
-        hmap_t = ctx.freshen(f"hmap", key_len, value_len)
+        hmap_t = ctx.freshen("hmap", key_len, value_len)
 
         ctx.add_header("#include <stdlib.h>")
 
@@ -131,22 +131,22 @@ class CHashTable(Map):
         # can be copied.
         # Yeah, so which API's should we use for load and store?
         lib_code = f"""
-{inline_s}void* {methods['init']}() {{
+{inline_s}void* {methods["init"]}() {{
     void* ptr = malloc(sizeof({hmap_t}));
     memset(ptr, 0, sizeof({hmap_t}));
     return ptr;
 }}
-{inline_s}bool {methods['exists']}({hmap_t} *map, {keytype_c} key) {{
+{inline_s}bool {methods["exists"]}({hmap_t} *map, {keytype_c} key) {{
     return {hmap_t}_contains(map, key);
 }}
-{inline_s}{valuetype_c} {methods['load']}({hmap_t} *map, {keytype_c} key) {{
+{inline_s}{valuetype_c} {methods["load"]}({hmap_t} *map, {keytype_c} key) {{
     const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
     return *internal_val;
 }}
-{inline_s}void {methods['store']}({hmap_t} *map, {keytype_c} key, {valuetype_c} value) {{
+{inline_s}void {methods["store"]}({hmap_t} *map, {keytype_c} key, {valuetype_c} value) {{
     {hmap_t}_insert_or_assign(map, key, value);
 }}
-{inline_s}void {methods['cleanup']}(void* ptr) {{
+{inline_s}void {methods["cleanup"]}(void* ptr) {{
     {hmap_t}* hptr = ptr;
     {hmap_t}_drop(hptr);
     free(hptr);
@@ -340,7 +340,9 @@ class CHashTableFType(CMapFType, CStackFType):
     ):
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
-        ctx.exec(f"{ctx.feed}{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)});")
+        ctx.exec(
+            f"{ctx.feed}{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)});"
+        )
 
     def c_loadmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
         """

@@ -289,6 +289,7 @@ class NumbaMapFType(MapFType, NumbaArgumentFType, ABC):
         """
         ...
 
+
 class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
     @abstractmethod
     def numba_length(self, ctx: "NumbaContext", buffer):

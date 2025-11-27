@@ -137,7 +137,13 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         assert isinstance(buf.obj, CBufferFields)
         return f"({buf.obj.data})[{ctx(idx)}]"
 
-    def c_store(self, ctx: "CContext", buf: "Stack", idx: "AssemblyExpression", value: "AssemblyExpression"):
+    def c_store(
+        self,
+        ctx: "CContext",
+        buf: "Stack",
+        idx: "AssemblyExpression",
+        value: "AssemblyExpression",
+    ):
         assert isinstance(buf.obj, CBufferFields)
         ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
 

@@ -373,8 +373,7 @@ class ExistsMap(AssemblyExpression, AssemblyTree):
 
     Attributes:
         map: The map to load from.
-        index1: The first integer in the pair
-        index2: The second integer in the pair
+        index: The key to check for existence.
     """
 
     map: Slot | Stack
@@ -770,15 +769,17 @@ class AssemblyPrinterContext(Context):
                 return None
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
-            case LoadMap(map, idx1, idx2):
-                return f"loadmap({self(map)}, {self(idx1)}, {self(idx2)})"
+            case LoadMap(map, idx):
+                return f"loadmap({self(map)}, {self(idx)})"
+            case ExistsMap(map, idx):
+                return f"existsmap({self(map)}, {self(idx)})"
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
                 return None
-            case StoreMap(map, idx1, idx2, val):
-                self.exec(f"{feed}storemap({self(map)}, {self(idx1)}, {self(idx2)}, {self(val)})")
+            case StoreMap(map, idx, val):
+                self.exec(f"{feed}storemap({self(map)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")

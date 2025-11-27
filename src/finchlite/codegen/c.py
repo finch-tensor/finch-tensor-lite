@@ -6,15 +6,15 @@ import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
 from finchlite.finch_assembly.map import FType, MapFType
-from finchlite.finch_assembly.nodes import AssemblyExpression
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -1178,9 +1178,11 @@ register_property(
     serialize_tuple_to_c,
 )
 
+
 def tuple_construct_from_c(fmt: TupleFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return tuple(args)
+
 
 register_property(
     TupleFType,

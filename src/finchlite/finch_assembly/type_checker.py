@@ -6,8 +6,8 @@ from .. import algebra
 from ..symbolic import FType, ScopedDict, ftype
 from . import nodes as asm
 from .buffer import BufferFType
-from .struct import AssemblyStructFType
 from .map import MapFType
+from .struct import AssemblyStructFType
 
 
 class AssemblyTypeError(Exception):
