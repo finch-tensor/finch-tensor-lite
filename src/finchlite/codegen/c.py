@@ -313,7 +313,7 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    #return_t = c_type(return_t)
+                    # return_t = c_type(return_t)
                     arg_ts = [arg.result_format for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
@@ -1112,9 +1112,11 @@ register_property(
     serialize_tuple_to_c,
 )
 
+
 def tuple_construct_from_c(fmt: TupleFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return tuple(args)
+
 
 register_property(
     TupleFType,
