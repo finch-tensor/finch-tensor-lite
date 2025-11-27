@@ -207,12 +207,24 @@ for t in (
     register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
     register_property(t, "numba_type", "__attr__", lambda t: t)
 
+
+def scalar_to_ctypes_copy(fmt, obj):
+    """
+    This hack is required because it turns out that scalars don't own memory or smth
+    """
+    arr = np.array([obj], dtype=obj.dtype, copy=True)
+    scalar_ctype = np.ctypeslib.as_ctypes_type(obj.dtype)
+    ptr_ctype = ctypes.POINTER(scalar_ctype)
+    return arr.ctypes.data_as(ptr_ctype).contents
+
+
 register_property(
     np.generic,
     "serialize_to_c",
     "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(obj),
+    scalar_to_ctypes_copy,
 )
+
 # pass by value -> no op
 register_property(
     np.generic,
@@ -316,7 +328,6 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    #return_t = c_type(return_t)
                     arg_ts = [arg.result_format for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
