@@ -143,7 +143,7 @@ def construct_from_c(fmt, c_obj):
         return fmt.construct_from_c(c_obj)
     try:
         return query_property(fmt, "construct_from_c", "__attr__", c_obj)
-    except NotImplementedError:
+    except AttributeError:
         return fmt(c_obj)
 
 
@@ -257,11 +257,9 @@ class CKernel:
             self.argtypes, args, serial_args, strict=False
         ):
             deserialize_from_c(type_, arg, serial_arg)
-        if hasattr(self.ret_type, "construct_from_c"):
-            return construct_from_c(res.ftype, res)
         if self.ret_type is type(None):
             return None
-        return self.ret_type(res)
+        return construct_from_c(self.ret_type, res)
 
 
 class CModule:
@@ -318,7 +316,7 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    return_t = c_type(return_t)
+                    #return_t = c_type(return_t)
                     arg_ts = [arg.result_format for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
@@ -1168,11 +1166,16 @@ register_property(
     "__attr__",
     serialize_tuple_to_c,
 )
+
+def tuple_construct_from_c(fmt: TupleFType, c_struct):
+    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
+    return tuple(args)
+
 register_property(
     TupleFType,
     "construct_from_c",
     "__attr__",
-    lambda fmt, obj, c_tuple: tuple(c_tuple),
+    tuple_construct_from_c,
 )
 
 register_property(
