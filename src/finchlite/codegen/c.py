@@ -1048,8 +1048,7 @@ def struct_c_type_wrapper(fmt: AssemblyStructFType):
     t = struct_c_type(fmt)
     if fmt.is_mutable:
         return ctypes.POINTER(t)
-    else:
-        return t
+    return t
 
 
 register_property(
@@ -1064,8 +1063,7 @@ def struct_c_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
     if fmt.is_mutable:
         # we are passing things in as a pointer (reference c_type_wrapper)
         return f"{obj}->{attr}"
-    else:
-        return f"{obj}.{attr}"
+    return f"{obj}.{attr}"
 
 
 register_property(
