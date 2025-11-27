@@ -17,8 +17,8 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    TableValue,
     Value,
-    TableValue
 )
 
 __all__ = [
@@ -40,6 +40,6 @@ __all__ = [
     "Reorder",
     "Subquery",
     "Table",
-    "Value",
     "TableValue",
+    "Value",
 ]

@@ -74,6 +74,7 @@ def test_plan_repr():
     )
     assert p == eval(repr(p))
 
+
 def test_materialize():
     i = Field("i")
     j = Field("j")
@@ -93,7 +94,9 @@ def test_materialize():
 
     result = FinchLogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
 
-    expected = np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]])
+    expected = np.array(
+        [[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]]
+    )
 
     assert_equal(result, expected)
     assert_equal(C, np.array([[1, 1], [1, 1]]))

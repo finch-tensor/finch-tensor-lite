@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Self, Tuple
+from typing import Any, Self
 
 from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
@@ -11,14 +11,15 @@ from ..util import qual_str
 @dataclass(eq=True, frozen=True)
 class TableValue:
     tns: Any
-    idxs: Tuple[Any, ...]
+    idxs: tuple[Any, ...]
 
     def __post_init__(self):
         if isinstance(self.tns, TableValue):
             raise ValueError("The tensor (tns) cannot be a TableValue")
-    
-    def copy(self) -> "TableValue":
+
+    def copy(self) -> TableValue:
         return TableValue(self.tns.copy(), self.idxs)
+
 
 @dataclass(eq=True, frozen=True)
 class LogicNode(Term, ABC):

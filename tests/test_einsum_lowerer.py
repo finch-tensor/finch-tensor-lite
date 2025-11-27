@@ -8,11 +8,10 @@ import finchlite
 from finchlite.autoschedule import optimize
 from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.finch_einsum import EinsumInterpreter
-from finchlite.finch_logic import Alias, LogicExpression, Plan, Produces, Query
+from finchlite.finch_logic import Alias, Plan, Produces, Query
 from finchlite.interface.fuse import compute
-from finchlite.interface.lazy import defer
+from finchlite.interface.lazy import LazyTensor, defer
 from finchlite.symbolic import gensym
-from finchlite.interface.lazy import LazyTensor
 
 
 @pytest.fixture

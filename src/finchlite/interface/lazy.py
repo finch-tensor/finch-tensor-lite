@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import bisect
 import builtins
 import operator
@@ -38,16 +39,14 @@ from ..finch_logic import (
     Alias,
     Field,
     Literal,
-    LogicNode,
+    LogicExpression,
+    LogicStatement,
     MapJoin,
-    Relabel,
-    Reorder,
-    Subquery,
     Plan,
     Query,
+    Relabel,
+    Reorder,
     Table,
-    LogicStatement,
-    LogicExpression,
 )
 from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
@@ -87,14 +86,20 @@ class LazyTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+
 effect_stamp = 0
+
 
 class EffectBlob:
     stamp: int
     stmt: LogicStatement
     blobs: tuple[EffectBlob, ...]
 
-    def __init__(self, stmt: LogicStatement | None = None, blobs: tuple[EffectBlob, ...] | None = None):
+    def __init__(
+        self,
+        stmt: LogicStatement | None = None,
+        blobs: tuple[EffectBlob, ...] | None = None,
+    ):
         global effect_stamp
         if stmt is None:
             stmt = Plan()
@@ -104,16 +109,16 @@ class EffectBlob:
         self.blobs = blobs
         self.stamp = effect_stamp
         effect_stamp += 1
-    
-    def exec(self, stmt: LogicStatement) -> EffectBlob:
-        return EffectBlob(stmt = stmt, blobs = (self,))
 
-    def eval(self, ex:LogicExpression) -> tuple[Alias, EffectBlob]:
+    def exec(self, stmt: LogicStatement) -> EffectBlob:
+        return EffectBlob(stmt=stmt, blobs=(self,))
+
+    def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
         var = Alias(gensym("A"))
         return var, self.exec(Query(var, ex))
 
     def join(self, *blobs: EffectBlob) -> EffectBlob:
-        return EffectBlob(blobs = (self, *blobs))
+        return EffectBlob(blobs=(self, *blobs))
 
     def trace(self) -> tuple[LogicStatement, ...]:
         stmts = list[tuple[int, LogicStatement]]()
@@ -121,7 +126,7 @@ class EffectBlob:
         self._trace(seen, stmts)
         stmts.sort()
         return tuple(stmt for _, stmt in stmts)
-    
+
     def _trace(self, seen: set[int], stmts: list[tuple[int, LogicStatement]]) -> None:
         if id(self) not in seen:
             seen.add(id(self))
@@ -129,11 +134,17 @@ class EffectBlob:
             for blob in self.blobs:
                 blob._trace(seen, stmts)
 
+
 class LazyTensor(OverrideTensor):
     def __init__(
-        self, data: LogicExpression, ctx: EffectBlob, shape: tuple, fill_value: Any, element_type: Any
+        self,
+        data: LogicExpression,
+        ctx: EffectBlob,
+        shape: tuple,
+        fill_value: Any,
+        element_type: Any,
     ):
-        self.data : LogicExpression = data
+        self.data: LogicExpression = data
         self.ctx = ctx
         self._shape = shape
         self._fill_value = fill_value
@@ -415,7 +426,7 @@ def defer(arr) -> LazyTensor:
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    ctx = EffectBlob(stmt = Query(tns, Table(Literal(arr), idxs)))
+    ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
     return LazyTensor(tns, ctx, shape, fill_value(arr), element_type(arr))
 
 

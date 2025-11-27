@@ -1,7 +1,4 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
 from itertools import product
-from typing import Any
 
 import numpy as np
 
@@ -19,8 +16,8 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
-    Value,
     TableValue,
+    Value,
 )
 
 
@@ -28,7 +25,7 @@ class FinchLogicInterpreter:
     def __init__(self, *, make_tensor=np.full, verbose=False):
         self.verbose = verbose
         self.make_tensor = make_tensor  # Added make_tensor argument
-    
+
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
@@ -36,6 +33,7 @@ class FinchLogicInterpreter:
             make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
         )
         return machine(node)
+
 
 class FinchLogicMachine:
     def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
