@@ -11,7 +11,9 @@ from finchlite.codegen.c import (
     CMapFType,
     CStackFType,
     c_type,
+    construct_from_c,
     load_shared_lib,
+    serialize_to_c,
 )
 from finchlite.codegen.numba_backend import NumbaContext, NumbaMapFType, NumbaStackFType
 from finchlite.finch_assembly.map import Map, MapFType
@@ -101,8 +103,8 @@ class CHashTable(Map):
         key_len = len(key_type.struct_fields)
         value_len = len(value_type.struct_fields)
         # dereference both key and value types; as given, they are both pointers.
-        keytype_c = ctx.ctype_name(c_type(key_type)._type_)
-        valuetype_c = ctx.ctype_name(c_type(value_type)._type_)
+        keytype_c = ctx.ctype_name(c_type(key_type))
+        valuetype_c = ctx.ctype_name(c_type(value_type))
         hmap_t = ctx.freshen(f"hmap", key_len, value_len)
 
         ctx.add_header(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
@@ -124,22 +126,22 @@ class CHashTable(Map):
         # can be copied.
         # Yeah, so which API's should we use for load and store?
         lib_code = f"""
-void* {methods['init']}() {{
+inline void* {methods['init']}() {{
     void* ptr = malloc(sizeof({hmap_t}));
     memset(ptr, 0, sizeof({hmap_t}));
     return ptr;
 }}
-bool {methods['exists']}({hmap_t} *map, {keytype_c}* key) {{
-    return {hmap_t}_contains(map, *key);
+inline bool {methods['exists']}({hmap_t} *map, {keytype_c} key) {{
+    return {hmap_t}_contains(map, key);
 }}
-void {methods['load']}({hmap_t} *map, {keytype_c}* key, {valuetype_c}* value) {{
-    const {valuetype_c}* internal_val = {hmap_t}_at(map, *key);
-    *value = *internal_val;
+inline {valuetype_c} {methods['load']}({hmap_t} *map, {keytype_c} key) {{
+    const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
+    return *internal_val;
 }}
-void {methods['store']}({hmap_t} *map, {keytype_c}* key, {valuetype_c}* value) {{
-    {hmap_t}_insert_or_assign(map, *key, *value);
+inline void {methods['store']}({hmap_t} *map, {keytype_c} key, {valuetype_c} value) {{
+    {hmap_t}_insert_or_assign(map, key, value);
 }}
-void {methods['cleanup']}(void* ptr) {{
+inline void {methods['cleanup']}(void* ptr) {{
     {hmap_t}* hptr = ptr;
     {hmap_t}_drop(hptr);
     free(hptr);
@@ -165,33 +167,32 @@ void {methods['cleanup']}(void* ptr) {{
         lib = load_shared_lib(code)
 
         # get keystruct and value types
-        KeyStruct = c_type(key_type)._type_
-        ValueStruct = c_type(value_type)._type_
+        KeyStruct = c_type(key_type)
+        ValueStruct = c_type(value_type)
 
         init_func = getattr(lib, methods["init"])
         init_func.argtypes = []
         init_func.restype = ctypes.c_void_p
 
-        # Exists: Takes (map*, key*) -> returns bool
+        # Exists: Takes (map*, key) -> returns bool
         exists_func = getattr(lib, methods["exists"])
-        exists_func.argtypes = [ctypes.c_void_p, ctypes.POINTER(KeyStruct)]
+        exists_func.argtypes = [ctypes.c_void_p, KeyStruct]
         exists_func.restype = ctypes.c_bool
 
-        # Load: Takes (map*, key*, out_val*) -> returns void
+        # Load: Takes (map*, key) -> returns value
         load_func = getattr(lib, methods["load"])
         load_func.argtypes = [
             ctypes.c_void_p,
-            ctypes.POINTER(KeyStruct),
-            ctypes.POINTER(ValueStruct),
+            KeyStruct,
         ]
-        load_func.restype = None
+        load_func.restype = ValueStruct
 
-        # Store: Takes (map*, key*, val*) -> returns void
+        # Store: Takes (map*, key, val) -> returns void
         store_func = getattr(lib, methods["store"])
         store_func.argtypes = [
             ctypes.c_void_p,
-            ctypes.POINTER(KeyStruct),
-            ctypes.POINTER(ValueStruct),
+            KeyStruct,
+            ValueStruct,
         ]
         store_func.restype = None
 
@@ -233,32 +234,29 @@ void {methods['cleanup']}(void* ptr) {{
 
     def exists(self, idx: tuple) -> bool:
         assert _is_integer_tuple(idx, self.key_len)
-        KeyStruct = c_type(self.ftype.key_type)._type_
+        KeyStruct = c_type(self.ftype.key_type)
         c_key = KeyStruct(*idx)
         func = getattr(self.lib.library, self.lib.methods["exists"])
-        func.restype = ctypes.c_bool
-        return func(self.map, ctypes.byref(c_key))
+        return func(self.map, c_key)
 
     def load(self, idx):
         assert _is_integer_tuple(idx, self.key_len)
-        KeyStruct = c_type(self.ftype.key_type)._type_
-        ValueStruct = c_type(self.ftype.value_type)._type_
+        KeyStruct = c_type(self.ftype.key_type)
         c_key = KeyStruct(*idx)
-        c_value = ValueStruct()
-        getattr(self.lib.library, self.lib.methods["load"])(
-            self.map, ctypes.byref(c_key), ctypes.byref(c_value)
+        c_value = getattr(self.lib.library, self.lib.methods["load"])(
+            self.map, c_key
         )
-        return tuple(getattr(c_value, f) for f, _ in c_value._fields_)
+        return tuple(getattr(c_value, f) for f in self.ftype.value_type.struct_fieldnames)
 
     def store(self, idx, val):
         assert _is_integer_tuple(idx, self.key_len)
         assert _is_integer_tuple(val, self.value_len)
-        KeyStruct = c_type(self.ftype.key_type)._type_
-        ValueStruct = c_type(self.ftype.value_type)._type_
+        KeyStruct = c_type(self.ftype.key_type)
+        ValueStruct = c_type(self.ftype.value_type)
         c_key = KeyStruct(*idx)
         c_value = ValueStruct(*val)
         getattr(self.lib.library, self.lib.methods["store"])(
-            self.map, ctypes.byref(c_key), ctypes.byref(c_value)
+            self.map, c_key, c_value
         )
 
     def __str__(self):
@@ -292,7 +290,7 @@ class CHashTableFType(CMapFType, CStackFType):
         return f"chashtable_t({self.key_len}, {self.value_len})"
 
     def __repr__(self):
-        return f"cHashTableFType({self.key_len}, {self.value_len})"
+        return f"CHashTableFType({self.key_len}, {self.value_len})"
 
     @property
     def key_type(self):
@@ -326,7 +324,6 @@ class CHashTableFType(CMapFType, CStackFType):
         return ctypes.POINTER(CHashMapStruct)
 
     def c_existsmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
-        # TODO: call in the methods from the c library.
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
         return f"{ctx.feed}{methods['exists']}({map.obj.map}, {ctx(idx)})"
@@ -345,21 +342,11 @@ class CHashTableFType(CMapFType, CStackFType):
     def c_loadmap(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
         """
         Get an expression where we can get the value corresponding to a key.
-
-        TODO: Do we want to use pointers to tuples (standard across everything
-        but requires lifecycle management)
-        Or do we want to just use tuple values?
-
-        This load is incomplete without this design decision.
         """
         assert isinstance(map.obj, CMapFields)
         methods: CHashMethods = ctx.datastructures[self]
 
-        valuetype_c = ctx.ctype_name(c_type(self.value_type)._type_)
-        value = ctx.freshen("value")
-        ctx.exec(f"{ctx.feed}{valuetype_c} {value};")
-        ctx.exec(f"{ctx.feed}{methods['load']}({map.obj.map}, {ctx(idx)}, &{value});")
-        return value
+        return (f"{methods['load']}({map.obj.map}, {ctx(idx)})")
 
     def c_unpack(self, ctx: "CContext", var_n: str, val: AssemblyExpression):
         """
@@ -585,7 +572,7 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
 
 
 if __name__ == "__main__":
-    table = CHashTable(2, 3, {})
+    table = CHashTable(2, 3, {(1, 2): (1, 4, 3)})
     table.store((2, 3), (3, 2, 3))
     print(table.exists((2, 3)))
     print(table.load((2, 3)))
