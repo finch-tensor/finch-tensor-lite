@@ -198,8 +198,9 @@ def compute(arg, ctx=None):
 
     args = arg if isinstance(arg, tuple) else (arg,)
     vars = tuple(Alias(gensym("A")) for _ in args)
+    ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
     bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
-    prgm = Plan(bodies + (Produces(vars),))
+    prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
     res = ctx(prgm)
     if isinstance(arg, tuple):
         return tuple(res)

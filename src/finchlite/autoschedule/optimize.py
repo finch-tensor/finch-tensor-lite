@@ -383,6 +383,7 @@ def _propagate_fields(root, fields):
 
 
 def propagate_fields(root: LogicNode) -> LogicNode:
+    print(root)
     return _propagate_fields(root, fields={})
 
 
