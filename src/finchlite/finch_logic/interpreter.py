@@ -20,23 +20,29 @@ from .nodes import (
     Subquery,
     Table,
     Value,
+    TableValue,
 )
-
-
-@dataclass(eq=True, frozen=True)
-class TableValue:
-    tns: Any
-    idxs: Iterable[Any]
-
-    def __post_init__(self):
-        if isinstance(self.tns, TableValue):
-            raise ValueError("The tensor (tns) cannot be a TableValue")
 
 
 class FinchLogicInterpreter:
     def __init__(self, *, make_tensor=np.full, verbose=False):
         self.verbose = verbose
-        self.bindings = {}
+        self.make_tensor = make_tensor  # Added make_tensor argument
+    
+    def __call__(self, node, bindings=None):
+        if bindings is None:
+            bindings = {}
+        machine = FinchLogicMachine(
+            make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
+        )
+        return machine(node)
+
+class FinchLogicMachine:
+    def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
+        self.verbose = verbose
+        if bindings is None:
+            bindings = {}
+        self.bindings = bindings
         self.make_tensor = make_tensor  # Added make_tensor argument
 
     def __call__(self, node):
@@ -126,7 +132,16 @@ class FinchLogicInterpreter:
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
-                self.bindings[lhs] = rhs
+                if lhs not in self.bindings:
+                    tns = self.make_tensor(
+                        rhs.tns.shape,
+                        fill_value(rhs.tns),
+                        dtype=element_type(rhs.tns),
+                    )
+                    self.bindings[lhs] = TableValue(tns, rhs.idxs)
+                lhs = self(lhs)
+                for crds in product(*[range(dim) for dim in rhs.tns.shape]):
+                    lhs.tns[*crds] = rhs.tns[*crds]
                 return (rhs,)
             case Plan(bodies):
                 res = ()
@@ -136,10 +151,7 @@ class FinchLogicInterpreter:
             case Produces(args):
                 return tuple(self(arg).tns for arg in args)
             case Subquery(lhs, arg):
-                res = self.bindings.get(lhs)
-                if res is None:
-                    res = self(arg)
-                    self.bindings[lhs] = res
+                (res,) = self(Query(lhs, arg))
                 return res
             case _:
                 raise ValueError(f"Unknown expression type: {type(node)}")

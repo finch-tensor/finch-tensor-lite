@@ -18,6 +18,7 @@ from .nodes import (
     Subquery,
     Table,
     Value,
+    TableValue
 )
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "Subquery",
     "Table",
     "Value",
+    "TableValue",
 ]

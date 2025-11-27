@@ -102,6 +102,9 @@ class TestEagerTensor(finchlite.EagerTensor):
     def __getitem__(self, item):
         return self.array[item]
 
+    def __setitem__(self, idx, val):
+        self.array[idx] = val
+
     def __hash__(self):
         # TODO: correct hashing for ndarrays
         return id(self.array)
