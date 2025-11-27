@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from finchlite.finch_assembly.map import MapFType, FType
+from finchlite.finch_assembly.map import FType, MapFType
 from finchlite.finch_assembly.nodes import AssemblyExpression
 
 from .. import finch_assembly as asm
@@ -610,7 +610,7 @@ class CContext(Context):
             self.headers.append(header)
             self._headerset.add(header)
 
-    def add_datastructure(self, ftype: FType, handler: 'Callable[[CContext], Any]'):
+    def add_datastructure(self, ftype: FType, handler: "Callable[[CContext], Any]"):
         """
         Code to add a datastructure declaration.
         This is the minimum required to prevent redundancy.
@@ -1090,16 +1090,35 @@ def struct_c_type(fmt: AssemblyStructFType):
     return new_struct
 
 
+def struct_c_type_wrapper(fmt: AssemblyStructFType):
+    """
+    C type decider for struct types. Serialization actually ensures that before
+    crossing the FFI boundary, all serialized structs are structs, not
+    pointers.
+
+    The reason why we have this method is that ctypes can intelligently infer
+    whether we are working with a pointer arg type (pass by reference) or a
+    non-pointer type (pass by value)
+    """
+    t = struct_c_type(fmt)
+    if fmt.is_mutable:
+        return ctypes.POINTER(t)
+    return t
+
+
 register_property(
     AssemblyStructFType,
     "c_type",
     "__attr__",
-    lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
+    struct_c_type_wrapper,
 )
 
 
-def struct_c_getattr(fmt: AssemblyStructFType, ctx: "CContext", obj: str, attr: str):
-    return f"{obj}->{attr}"
+def struct_c_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
+    if fmt.is_mutable:
+        # we are passing things in as a pointer (reference c_type_wrapper)
+        return f"{obj}->{attr}"
+    return f"{obj}.{attr}"
 
 
 register_property(
@@ -1110,10 +1129,11 @@ register_property(
 )
 
 
-def struct_c_setattr(fmt: AssemblyStructFType, ctx: "CContext", obj: str, attr, val: str):
-    # here, val has already been computed.
-    ctx.exec(f"{ctx.feed}{obj}->{attr} = {val};")
-    return
+def struct_c_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
+    if fmt.is_mutable:
+        ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+    else:
+        ctx.emit(f"{ctx.feed}{obj}.{attr} = {val};")
 
 
 register_property(
@@ -1159,7 +1179,5 @@ register_property(
     TupleFType,
     "c_type",
     "__attr__",
-    lambda fmt: ctypes.POINTER(
-        struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields))
-    ),
+    lambda fmt: struct_c_type_wrapper(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
 )
