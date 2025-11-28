@@ -932,8 +932,17 @@ def test_e2e_numba():
     finchlite.set_default_scheduler(ctx=ctx)
 
 
-def test_hashtable_c():
-    table = CHashTable(2, 3)
+@pytest.mark.parametrize(
+    ["compiler", "tabletype"],
+    [
+        (CCompiler(), CHashTable),
+        (asm.AssemblyInterpreter(), CHashTable),
+        (NumbaCompiler(), NumbaHashTable),
+        (asm.AssemblyInterpreter(), NumbaHashTable),
+    ],
+)
+def test_hashtable(compiler, tabletype):
+    table = tabletype(2, 3)
 
     table_v = asm.Variable("a", ftype(table))
     table_slt = asm.Slot("a_", ftype(table))
@@ -972,47 +981,10 @@ def test_hashtable_c():
             ),
         )
     )
-    compiled = CCompiler()(module)
-    assert compiled.setidx(table, (1, 2), (2, 3, 4)) == (2, 3, 4)
-    assert compiled.setidx(table, (1, 4), (3, 4, 1)) == (3, 4, 1)
-    assert compiled.exists(table, (1, 2))
-    assert not compiled.exists(table, (1, 3))
-    assert not compiled.exists(table, (2, 3))
+    compiled = compiler(module)
+    assert compiled.setidx(table, key_type(1, 2), val_type(2, 3, 4)) == val_type(2, 3, 4)
+    assert compiled.setidx(table, key_type(1, 4), val_type(3, 4, 1)) == val_type(3, 4, 1)
+    assert compiled.exists(table, key_type(1, 2))
 
-
-def test_hashtable_numba():
-    table = NumbaHashTable(2, 3)
-
-    table_v = asm.Variable("a", ftype(table))
-    table_slt = asm.Slot("a_", ftype(table))
-
-    key_type = table.ftype.key_type
-    val_type = table.ftype.value_type
-    key_v = asm.Variable("key", key_type)
-    val_v = asm.Variable("val", val_type)
-
-    module = asm.Module(
-        (
-            asm.Function(
-                asm.Variable("setidx", val_type),
-                (table_v, key_v, val_v),
-                asm.Block(
-                    (
-                        asm.Unpack(table_slt, table_v),
-                        asm.StoreMap(
-                            table_slt,
-                            key_v,
-                            val_v,
-                        ),
-                        asm.Return(asm.LoadMap(table_slt, key_v)),
-                    )
-                ),
-            ),
-        )
-    )
-    compiled = NumbaCompiler()(module)
-    key = key_type(1, 2)
-    val = key_type(2, 3, 4)
-    result = compiled.setidx(table, key, val)
-    assert table.exists((1, 2))
-    assert not table.exists((1, 3))
+    assert not compiled.exists(table, key_type(1, 3))
+    assert not compiled.exists(table, val_type(2, 3))

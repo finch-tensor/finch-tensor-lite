@@ -4,22 +4,17 @@ from pathlib import Path
 from typing import NamedTuple, TypedDict
 
 import numba
+import numba.typed
 
-from finchlite.codegen.c import (
-    CContext,
-    CMapFType,
-    CStackFType,
-    c_type,
-    load_shared_lib,
-)
-from finchlite.codegen.numba_backend import (
-    NumbaContext,
-    NumbaMapFType,
-    NumbaStackFType,
-)
+from finchlite.codegen.c import (CContext, CMapFType, CStackFType, c_type, construct_from_c,
+                                 load_shared_lib)
+from finchlite.codegen.numba_backend import (NumbaContext, NumbaMapFType,
+                                             NumbaStackFType,
+                                             construct_from_numba, numba_type,
+                                             serialize_to_numba)
 from finchlite.finch_assembly.map import Map
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
-from finchlite.finch_assembly.struct import TupleFType
+from finchlite.finch_assembly.struct import AssemblyStructFType, TupleFType
 
 stcpath = Path(__file__).parent / "stc"
 hashmap_h = stcpath / "stc" / "hashmap.h"
@@ -58,6 +53,13 @@ def _is_integer_tuple(tup, size):
 
 def _int_tuple_ftype(size: int):
     return TupleFType.from_tuple(tuple(int for _ in range(size)))
+
+def _tuplify(ftype: AssemblyStructFType, obj):
+    assert isinstance(ftype, AssemblyStructFType)
+    return tuple([
+        ftype.struct_getattr(obj, attr)
+        for attr in ftype.struct_fieldnames
+    ])
 
 
 class CHashMapStruct(ctypes.Structure):
@@ -237,23 +239,25 @@ class CHashTable(Map):
     def __del__(self):
         getattr(self.lib.library, self.lib.methods["cleanup"])(self.map)
 
-    def exists(self, idx: tuple) -> bool:
+    def exists(self, idx) -> bool:
+        idx = _tuplify(self.ftype.key_type, idx)
         assert _is_integer_tuple(idx, self.key_len)
         KeyStruct = c_type(self.ftype.key_type)
         c_key = KeyStruct(*idx)
-        func = getattr(self.lib.library, self.lib.methods["exists"])
-        return func(self.map, c_key)
+        c_value = getattr(self.lib.library, self.lib.methods["exists"])(self.map, c_key)
+        return bool(c_value)
 
     def load(self, idx):
+        idx = _tuplify(self.ftype.key_type, idx)
         assert _is_integer_tuple(idx, self.key_len)
         KeyStruct = c_type(self.ftype.key_type)
         c_key = KeyStruct(*idx)
         c_value = getattr(self.lib.library, self.lib.methods["load"])(self.map, c_key)
-        return tuple(
-            getattr(c_value, f) for f in self.ftype.value_type.struct_fieldnames
-        )
+        return construct_from_c(self.ftype.value_type, c_value)
 
     def store(self, idx, val):
+        idx = _tuplify(self.ftype.key_type, idx)
+        val = _tuplify(self.ftype.value_type, val)
         assert _is_integer_tuple(idx, self.key_len)
         assert _is_integer_tuple(val, self.value_len)
         KeyStruct = c_type(self.ftype.key_type)
@@ -420,9 +424,22 @@ class NumbaHashTable(Map):
         Constructor for the Hash Table, which maps integer tuples to integer tuples. Takes three arguments:
         in_len: The
         """
+        self.key_len = key_len
+        self.value_len = value_len
+
+        self._key_type = _int_tuple_ftype(key_len)
+        self._value_type = _int_tuple_ftype(value_len)
+
+        self._numba_key_type = numba.types.UniTuple(numba.types.int64, key_len)
+        self._numba_value_type = numba.types.UniTuple(numba.types.int64, value_len)
+
+
         if map is None:
             map = {}
-        self.map = {}
+        self.map = numba.typed.Dict.empty(
+            key_type=self._numba_key_type,
+            value_type=self._numba_value_type
+        )
         for key, value in map.items():
             if not _is_integer_tuple(key, key_len):
                 raise TypeError(
@@ -433,8 +450,6 @@ class NumbaHashTable(Map):
                     f"Supplied value {key} is not a tuple of {value_len} integers"
                 )
             self.map[key] = value
-        self.key_len = key_len
-        self.value_len = value_len
 
     @property
     def ftype(self):
@@ -444,14 +459,23 @@ class NumbaHashTable(Map):
         return NumbaHashTableFType(self.key_len, self.value_len)
 
     def exists(self, idx) -> bool:
+        """
+        Exists function of the numba hash table.
+        It will accept an object with TupleFType and return a bool.
+        """
+        idx = _tuplify(self.ftype.key_type, idx)
         assert _is_integer_tuple(idx, self.key_len)
         return idx in self.map
 
     def load(self, idx):
+        idx = _tuplify(self.ftype.key_type, idx)
         assert _is_integer_tuple(idx, self.key_len)
-        return self.map[idx]
+        result = self.map[idx]
+        return self.ftype.value_type(*result)
 
     def store(self, idx, val):
+        idx = _tuplify(self.ftype.key_type, idx)
+        val = _tuplify(self.ftype.value_type, val)
         assert _is_integer_tuple(idx, self.key_len)
         assert _is_integer_tuple(val, self.value_len)
         self.map[idx] = val
@@ -513,25 +537,32 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
     """
 
     def numba_jitclass_type(self) -> numba.types.Type:
-        key_t = numba.types.UniTuple(numba.types.int64, self.key_len)
-        value_t = numba.types.UniTuple(numba.types.int64, self.value_len)
-        return numba.types.ListType(numba.types.DictType(key_t, value_t))
+        return numba.types.ListType(numba.types.DictType(self._numba_key_type, self._numba_value_type))
 
     def numba_type(self):
-        return self.numba_jitclass_type()
-        # return list[dict[key_t, val_t]]
+        return list
 
     def numba_existsmap(
         self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
     ):
         assert isinstance(map.obj, NumbaMapFields)
-        return f"({ctx(idx)}) in {map.obj.map}"
+        tuple_fields = ",".join(
+            f"{ctx(idx)}.{field}"
+            for field in self.key_type.struct_fieldnames
+        )
+        return f"tuple(({tuple_fields})) in {map.obj.map}"
 
     def numba_loadmap(
         self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
     ):
         assert isinstance(map.obj, NumbaMapFields)
-        return f"{map.obj.map}[{ctx(idx)}]"
+        tuple_fields = ",".join(
+            f"{ctx(idx)}.{field}"
+            for field in self.key_type.struct_fieldnames
+        )
+        value_v = ctx.freshen("value")
+        ctx.exec(f"{ctx.feed}{value_v} = {map.obj.map}[tuple(({tuple_fields}))]")
+        return f"{ctx.full_name(numba_type(self.value_type))}(*{value_v})"
 
     def numba_storemap(
         self,
@@ -541,7 +572,15 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
         value: "AssemblyExpression",
     ):
         assert isinstance(map.obj, NumbaMapFields)
-        ctx.exec(f"{ctx.feed}{map.obj.map}[{ctx(idx)}] = {ctx(value)}")
+        idx_fields = ",".join(
+            f"{ctx(idx)}.{field}"
+            for field in self.key_type.struct_fieldnames
+        )
+        val_fields = ",".join(
+            f"{ctx(value)}.{field}"
+            for field in self.value_type.struct_fieldnames
+        )
+        ctx.exec(f"{ctx.feed}{map.obj.map}[tuple(({idx_fields}))] = tuple(({val_fields}))")
 
     def numba_unpack(
         self, ctx: "NumbaContext", var_n: str, val: "AssemblyExpression"
@@ -581,7 +620,8 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
 
 
 if __name__ == "__main__":
-    table = CHashTable(2, 3, {(1, 2): (1, 4, 3)})
+    table = NumbaHashTable(2, 3, {(1, 2): (1, 4, 3)})
+    print(numba_type(table.ftype.key_type))
     table.store((2, 3), (3, 2, 3))
     print(table.exists((2, 3)))
     print(table.load((2, 3)))
