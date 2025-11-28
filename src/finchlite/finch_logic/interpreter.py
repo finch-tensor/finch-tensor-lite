@@ -21,7 +21,7 @@ from .nodes import (
 )
 
 
-class FinchLogicInterpreter:
+class LogicInterpreter:
     def __init__(self, *, make_tensor=np.full, verbose=False):
         self.verbose = verbose
         self.make_tensor = make_tensor  # Added make_tensor argument
@@ -29,13 +29,13 @@ class FinchLogicInterpreter:
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        machine = FinchLogicMachine(
+        machine = LogicMachine(
             make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
         )
         return machine(node)
 
 
-class FinchLogicMachine:
+class LogicMachine:
     def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
         self.verbose = verbose
         if bindings is None:

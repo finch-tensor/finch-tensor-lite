@@ -64,7 +64,7 @@ from ..compile import BufferizedNDArray, NotationCompiler
 from ..finch_logic import (
     Alias,
     Field,
-    FinchLogicInterpreter,
+    LogicInterpreter,
     Literal,
     Plan,
     Produces,
@@ -96,7 +96,7 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
+        _DEFAULT_SCHEDULER = LogicInterpreter()
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())

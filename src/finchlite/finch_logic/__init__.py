@@ -1,4 +1,4 @@
-from .interpreter import FinchLogicInterpreter
+from .interpreter import LogicInterpreter
 from .nodes import (
     Aggregate,
     Alias,
@@ -33,7 +33,7 @@ __all__ = [
     "Aggregate",
     "Alias",
     "Field",
-    "FinchLogicInterpreter",
+    "LogicInterpreter",
     "Literal",
     "LogicEinsumLowerer",
     "LogicEvaluator",

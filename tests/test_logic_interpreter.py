@@ -11,7 +11,7 @@ from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    FinchLogicInterpreter,
+    LogicInterpreter,
     Literal,
     MapJoin,
     Plan,
@@ -48,7 +48,7 @@ def test_matrix_multiplication(a, b):
         )
     )
 
-    result = FinchLogicInterpreter()(p)[0]
+    result = LogicInterpreter()(p)[0]
 
     expected = np.matmul(a, b)
 
@@ -92,7 +92,7 @@ def test_materialize():
         )
     )
 
-    result = FinchLogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
+    result = LogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
 
     expected = np.array(
         [[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]]

@@ -39,7 +39,7 @@ from finchlite.finch_logic import (
     Subquery,
     Table,
 )
-from finchlite.finch_logic.interpreter import FinchLogicInterpreter
+from finchlite.finch_logic.interpreter import LogicInterpreter
 from finchlite.symbolic.gensym import _sg
 
 
@@ -810,7 +810,7 @@ def test_scheduler_e2e_matmul(a, b):
 
     plan_opt = optimize(plan)
 
-    result = FinchLogicInterpreter()(plan_opt)[0]
+    result = LogicInterpreter()(plan_opt)[0]
 
     expected = np.matmul(a, b)
 
@@ -892,7 +892,7 @@ def test_scheduler_e2e_sddmm():
 
     assert plan_opt == expected_plan
 
-    result = FinchLogicInterpreter()(plan_opt)[0]
+    result = LogicInterpreter()(plan_opt)[0]
 
     expected = s * np.matmul(a, b)
 

@@ -5,9 +5,9 @@ from ..finch_logic import (
     LogicEvaluator,
     LogicLoader,
     LogicNode,
+    LogicInterpreter
 )
-from ..symbolic import Namespace, PostWalk, Rewrite, ftype
-from .compiler import LogicCompiler
+from ..symbolic import Namespace, PostWalk, Rewrite, ftype, fisinstance
 
 
 def extract_tables(
@@ -103,6 +103,40 @@ def get_return_fields(
 ):
     ctx = LogicFieldsContext(bindings)
     return ctx(prgm)
+
+
+class LogicInterpreterKernel:
+    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+    
+    def __call__(self, *args):
+        bindings = {var: lgc.TableValue(tns, self.bindings[var].idxs) for var, tns in zip(self.bindings.keys(), args, strict=True)}
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = LogicInterpreter()
+        return ctx(self.prgm, bindings)
+        
+
+class LogicInterpreterLibrary:
+    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+    
+    def getattr(self, name):
+        if name == "main":
+            return self.interpreter
+        elif name == "prgm":
+            return self.prgm
+        else:
+            raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+class FakeLogicCompiler:
+    def __init__(self):
+        pass
+
+    def __call__(self, prgm, bindings):
+        return LogicInterpreterLibrary(prgm, bindings)
 
 
 class LogicExecutor(LogicEvaluator):
