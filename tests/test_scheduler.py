@@ -810,7 +810,7 @@ def test_scheduler_e2e_matmul(a, b):
 
     plan_opt = optimize(plan)
 
-    result = LogicInterpreter()(plan_opt)[0]
+    result = LogicInterpreter()(plan_opt)[0].tns
 
     expected = np.matmul(a, b)
 
@@ -892,7 +892,7 @@ def test_scheduler_e2e_sddmm():
 
     assert plan_opt == expected_plan
 
-    result = LogicInterpreter()(plan_opt)[0]
+    result = LogicInterpreter()(plan_opt)[0].tns
 
     expected = s * np.matmul(a, b)
 

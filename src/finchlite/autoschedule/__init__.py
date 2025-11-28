@@ -17,6 +17,7 @@ from ..finch_logic import (
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler
 from .executor import LogicExecutor
+from .normalize import LogicNormalizer
 from .optimize import (
     DefaultLogicOptimizer,
     concordize,
@@ -48,6 +49,7 @@ __all__ = [
     "Literal",
     "LogicCompiler",
     "LogicExecutor",
+    "LogicNormalizer",
     "MapJoin",
     "Plan",
     "PostOrderDFS",

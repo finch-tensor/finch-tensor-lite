@@ -116,7 +116,10 @@ class LogicInterpreterKernel(AssemblyKernel):
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = LogicInterpreter()
-        return ctx(self.prgm, bindings)
+        res = ctx(self.prgm, bindings)
+        if isinstance(res, tuple):
+            return tuple(tbl.tns for tbl in res)
+        return res.tns
 
 
 class LogicInterpreterLibrary(AssemblyLibrary):

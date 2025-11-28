@@ -55,7 +55,7 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.autoschedule import LogicExecutor
+from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_assembly as asm
@@ -99,7 +99,8 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = LogicInterpreter()
+        #_DEFAULT_SCHEDULER = LogicInterpreter()
+        _DEFAULT_SCHEDULER = LogicNormalizer(LogicExecutor())
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
