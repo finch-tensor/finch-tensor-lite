@@ -36,7 +36,10 @@ def numba_type(t):
     """
     if hasattr(t, "numba_type"):
         return t.numba_type()
-    return query_property(t, "numba_type", "__attr__")
+    try:
+        return query_property(t, "numba_type", "__attr__")
+    except AttributeError:
+        return t
 
 
 def numba_jitclass_type(t):
@@ -796,6 +799,25 @@ register_property(
     "__attr__",
     serialize_tuple_to_numba,
 )
+
+# trivial ser/deser
+for t in (
+    int, bool, float
+):
+    register_property(
+        t,
+        "construct_from_numba",
+        "__attr__",
+        lambda fmt, obj: obj,
+    )
+
+    register_property(
+        t,
+        "serialize_to_numba",
+        "__attr__",
+        lambda fmt, obj: obj,
+    )
+
 
 register_property(
     operator.add,
