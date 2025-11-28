@@ -108,7 +108,8 @@ def get_return_fields(
 class LogicExecutor(LogicEvaluator):
     def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
         if ctx is None:
-            ctx = LogicCompiler()
+            #ctx = LogicCompiler()
+            raise ValueError("LogicExecutor requires a LogicLoader")
         self.ctx: LogicLoader = ctx
         self.verbose: bool = verbose
 
