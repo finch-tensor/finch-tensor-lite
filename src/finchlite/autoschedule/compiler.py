@@ -4,6 +4,9 @@ from typing import overload
 
 import numpy as np
 
+from finchlite.finch_logic.nodes import TableValueFType
+from finchlite.symbolic.traversal import PostOrderDFS
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import (
@@ -403,12 +406,12 @@ class LogicLowerer:
 
 def record_tables(
     root: LogicNode,
+    bindings: dict[Alias, TableValueFType],
 ) -> tuple[
     LogicNode,
     dict[Alias, ntn.Variable],
     dict[Alias, ntn.Slot],
     dict[ntn.Variable, ntn.Call],
-    dict[Alias, Table],
     dict[Field, Field],
 ]:
     """
@@ -422,54 +425,34 @@ def record_tables(
     slot_vars: dict[Alias, ntn.Slot] = {}
     # store loop extent variable
     dim_size_vars: dict[ntn.Variable, ntn.Call] = {}
-    # actual tables
-    tables: dict[Alias, Table] = {}
     # field relabels mapping to actual fields
     field_relabels: dict[Field, Field] = {}
 
-    def rule_0(node):
+    for (var, tbl) in bindings.items():
+        table_vars[var] = ntn.Variable(var.name, ftype(tbl.tns))
+        slot_vars[var] = ntn.Slot(f"{var.name}_s", ftype(tbl.tns))
+        for idx, (field, field_type) in enumerate(
+            zip(tbl.fields, tbl.tns.shape_type, strict=True)
+        ):
+            assert isinstance(field, Field)
+            dim_size_var = ntn.Variable(
+                f"{field.name}_size", ExtentFType(field_type, field_type)
+            )
+            dim_size_vars[dim_size_var] = ntn.Call(
+                ntn.Literal(dimension), (table_vars[var], ntn.Literal(idx))
+            )
+    for node in PostOrderDFS(root):
         match node:
-            case Query(Alias(name) as alias, Table(Literal(val), fields) as tbl):
-                table_var = ntn.Variable(name, ftype(val))
-                table_vars[alias] = table_var
-                slot_var = ntn.Slot(f"{name}_slot", ftype(val))
-                slot_vars[alias] = slot_var
-                tables[alias] = tbl
-                for idx, (field, field_type) in enumerate(
-                    zip(fields, val.shape_type, strict=True)
-                ):
-                    assert isinstance(field, Field)
-                    dim_size_var = ntn.Variable(
-                        f"{field.name}_size", ExtentFType(field_type, field_type)
-                    )
-                    if dim_size_var not in dim_size_vars:
-                        dim_size_vars[dim_size_var] = ntn.Call(
-                            ntn.Literal(dimension), (table_var, ntn.Literal(idx))
-                        )
-                return Query(alias, None)
-
-            case Query(Alias(name) as alias, rhs):
-                suitable_rep = find_suitable_rep(rhs, table_vars)
-                table_vars[alias] = ntn.Variable(name, suitable_rep)
-                tables[alias] = Table(
-                    Literal(TensorPlaceholder(dtype=suitable_rep.element_type)),
-                    rhs.fields,
-                )
-
-                return Query(alias, Reformat(suitable_rep, rhs))
-
             case Relabel(Alias(_) as alias, idxs) as relabel:
                 field_relabels.update(
                     {
                         k: v
-                        for k, v in zip(idxs, tables[alias].idxs, strict=True)
+                        for k, v in zip(idxs, bindings[alias].idxs, strict=True)
                         if k != v
                     }
                 )
-                return relabel
 
-    processed_root = Rewrite(PostWalk(rule_0))(root)
-    return processed_root, table_vars, slot_vars, dim_size_vars, tables, field_relabels
+    return root, table_vars, slot_vars, dim_size_vars, field_relabels
 
 
 def find_suitable_rep(root, table_vars) -> TensorFType:
@@ -551,15 +534,52 @@ def merge_blocks(root: ntn.NotationNode) -> ntn.NotationNode:
     return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
 
-class LogicCompiler:
+class NotationGenerator:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict[Alias, Table]]:
-        prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
-            record_tables(prgm)
+    def __call__(self, prgm: LogicNode, bindings: dict[Alias, TableValueFType]) -> ntn.NotationNode:
+        prgm, table_vars, slot_vars, dim_size_vars, field_relabels = (
+            record_tables(prgm, bindings)
         )
         lowered_prgm = self.ll(
             prgm, table_vars, slot_vars, dim_size_vars, field_relabels
         )
-        return merge_blocks(lowered_prgm), tables
+        return merge_blocks(lowered_prgm), bindings
+
+
+class BasicFormatInference:
+    def __call__(self, node, bindings: dict[Alias, tuple[Field, ...]]):
+        bindings = dict(bindings)
+        def infer_expr(node: LogicExpression) -> TableValueFType:
+            match node:
+                case Alias(_):
+                    if node not in bindings:
+                        raise ValueError(f"undefined tensor alias {node}")
+                    return bindings[node]
+                case Reorder(arg, idxs):
+                    fmt = infer_expr(arg)
+                    etype = fmt.tns.element_type
+
+                    return TableValueFType(
+                        BufferizedNDArrayFType(
+                            NumpyBufferFType(etype),
+                            np.intp(len(idxs)),
+                            strides_t=TupleFType.from_tuple(
+                                tuple()
+                            ),
+                        ),
+                        idxs,
+                    )
+
+        def infer_stmt(node: LogicStatement):
+            match node:
+                case Plan(bodies):
+                    for body in bodies:
+                        self(body)
+                case Query(lhs, rhs):
+                    fmt = infer_expr(rhs)
+                    bindings[lhs] = fmt
+
+            match node:
+                case Alias(_) as node:
