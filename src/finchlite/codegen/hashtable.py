@@ -1,17 +1,26 @@
 import ctypes
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import dedent
 from typing import NamedTuple, TypedDict
 
 import numba
 import numba.typed
 
-from finchlite.codegen.c import (CContext, CMapFType, CStackFType, c_type, construct_from_c,
-                                 load_shared_lib)
-from finchlite.codegen.numba_backend import (NumbaContext, NumbaMapFType,
-                                             NumbaStackFType,
-                                             construct_from_numba, numba_type,
-                                             serialize_to_numba)
+from finchlite.codegen.c import (
+    CContext,
+    CMapFType,
+    CStackFType,
+    c_type,
+    construct_from_c,
+    load_shared_lib,
+)
+from finchlite.codegen.numba_backend import (
+    NumbaContext,
+    NumbaMapFType,
+    NumbaStackFType,
+    numba_type,
+)
 from finchlite.finch_assembly.map import Map
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.finch_assembly.struct import AssemblyStructFType, TupleFType
@@ -45,21 +54,16 @@ class CMapFields(NamedTuple):
 def _is_integer_tuple(tup, size):
     if not isinstance(tup, tuple) or len(tup) != size:
         return False
-    for elt in tup:
-        if not isinstance(elt, int):
-            return False
-    return True
+    return all(isinstance(elt, int) for elt in tup)
 
 
 def _int_tuple_ftype(size: int):
     return TupleFType.from_tuple(tuple(int for _ in range(size)))
 
+
 def _tuplify(ftype: AssemblyStructFType, obj):
     assert isinstance(ftype, AssemblyStructFType)
-    return tuple([
-        ftype.struct_getattr(obj, attr)
-        for attr in ftype.struct_fieldnames
-    ])
+    return tuple([ftype.struct_getattr(obj, attr) for attr in ftype.struct_fieldnames])
 
 
 class CHashMapStruct(ctypes.Structure):
@@ -113,7 +117,7 @@ class CHashTable(Map):
         ctx.add_header("#include <stdlib.h>")
 
         # these headers should just be added to the headers list.
-        # deduplication is catastrohpic here.
+        # deduplication is catastrophic here.
         ctx.headers.append(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
         ctx.headers.append("#define i_eq c_memcmp_eq")
         ctx.headers.append(f'#include "{hashmap_h}"')
@@ -132,28 +136,45 @@ class CHashTable(Map):
         # basically for the load functions, you need to provide a variable that
         # can be copied.
         # Yeah, so which API's should we use for load and store?
-        lib_code = f"""
-{inline_s}void* {methods["init"]}() {{
-    void* ptr = malloc(sizeof({hmap_t}));
-    memset(ptr, 0, sizeof({hmap_t}));
-    return ptr;
-}}
-{inline_s}bool {methods["exists"]}({hmap_t} *map, {keytype_c} key) {{
-    return {hmap_t}_contains(map, key);
-}}
-{inline_s}{valuetype_c} {methods["load"]}({hmap_t} *map, {keytype_c} key) {{
-    const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
-    return *internal_val;
-}}
-{inline_s}void {methods["store"]}({hmap_t} *map, {keytype_c} key, {valuetype_c} value) {{
-    {hmap_t}_insert_or_assign(map, key, value);
-}}
-{inline_s}void {methods["cleanup"]}(void* ptr) {{
-    {hmap_t}* hptr = ptr;
-    {hmap_t}_drop(hptr);
-    free(hptr);
-}}
-        """
+        lib_code = dedent(f"""
+            {inline_s}void*
+            {methods["init"]}() {{
+                void* ptr = malloc(sizeof({hmap_t}));
+                memset(ptr, 0, sizeof({hmap_t}));
+                return ptr;
+            }}
+
+            {inline_s}bool
+            {methods["exists"]}(
+                {hmap_t} *map, {keytype_c} key
+            ) {{
+                return {hmap_t}_contains(map, key);
+            }}
+
+            {inline_s}{valuetype_c}
+            {methods["load"]}(
+                {hmap_t} *map, {keytype_c} key
+            ) {{
+                const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
+                return *internal_val;
+            }}
+
+            {inline_s}void
+            {methods["store"]}(
+                {hmap_t} *map, {keytype_c} key, {valuetype_c} value
+            ) {{
+                {hmap_t}_insert_or_assign(map, key, value);
+            }}
+
+            {inline_s}void
+            {methods["cleanup"]}(
+                void* ptr
+            ) {{
+                {hmap_t}* hptr = ptr;
+                {hmap_t}_drop(hptr);
+                free(hptr);
+            }}
+        """)
         ctx.add_header(lib_code)
 
         return methods, hmap_t
@@ -389,8 +410,8 @@ class CHashTableFType(CMapFType, CStackFType):
         map = ctypes.c_void_p(obj.map)
         struct = CHashMapStruct(map, obj)
         # We NEED this for stupid ownership reasons.
-        obj._self_obj = ctypes.py_object(obj)  # type: ignore
-        obj._struct = struct  # type: ignore
+        obj._self_obj = ctypes.py_object(obj)
+        obj._struct = struct
         return ctypes.pointer(struct)
 
     def deserialize_from_c(self, obj: CHashTable, res):
@@ -407,9 +428,6 @@ class CHashTableFType(CMapFType, CStackFType):
         Construct a CHashTable from a C-compatible structure.
 
         c_map is a pointer to a CHashMapStruct
-
-        I am going to refrain from doing this because lifecycle management is horrible.
-        Should we move?
         """
         raise NotImplementedError
 
@@ -420,10 +438,6 @@ class NumbaHashTable(Map):
     """
 
     def __init__(self, key_len, value_len, map: "dict[tuple,tuple] | None" = None):
-        """
-        Constructor for the Hash Table, which maps integer tuples to integer tuples. Takes three arguments:
-        in_len: The
-        """
         self.key_len = key_len
         self.value_len = value_len
 
@@ -433,12 +447,10 @@ class NumbaHashTable(Map):
         self._numba_key_type = numba.types.UniTuple(numba.types.int64, key_len)
         self._numba_value_type = numba.types.UniTuple(numba.types.int64, value_len)
 
-
         if map is None:
             map = {}
         self.map = numba.typed.Dict.empty(
-            key_type=self._numba_key_type,
-            value_type=self._numba_value_type
+            key_type=self._numba_key_type, value_type=self._numba_value_type
         )
         for key, value in map.items():
             if not _is_integer_tuple(key, key_len):
@@ -537,7 +549,9 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
     """
 
     def numba_jitclass_type(self) -> numba.types.Type:
-        return numba.types.ListType(numba.types.DictType(self._numba_key_type, self._numba_value_type))
+        return numba.types.ListType(
+            numba.types.DictType(self._numba_key_type, self._numba_value_type)
+        )
 
     def numba_type(self):
         return list
@@ -547,8 +561,7 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
     ):
         assert isinstance(map.obj, NumbaMapFields)
         tuple_fields = ",".join(
-            f"{ctx(idx)}.{field}"
-            for field in self.key_type.struct_fieldnames
+            f"{ctx(idx)}.{field}" for field in self.key_type.struct_fieldnames
         )
         return f"tuple(({tuple_fields})) in {map.obj.map}"
 
@@ -557,8 +570,7 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
     ):
         assert isinstance(map.obj, NumbaMapFields)
         tuple_fields = ",".join(
-            f"{ctx(idx)}.{field}"
-            for field in self.key_type.struct_fieldnames
+            f"{ctx(idx)}.{field}" for field in self.key_type.struct_fieldnames
         )
         value_v = ctx.freshen("value")
         ctx.exec(f"{ctx.feed}{value_v} = {map.obj.map}[tuple(({tuple_fields}))]")
@@ -573,14 +585,14 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
     ):
         assert isinstance(map.obj, NumbaMapFields)
         idx_fields = ",".join(
-            f"{ctx(idx)}.{field}"
-            for field in self.key_type.struct_fieldnames
+            f"{ctx(idx)}.{field}" for field in self.key_type.struct_fieldnames
         )
         val_fields = ",".join(
-            f"{ctx(value)}.{field}"
-            for field in self.value_type.struct_fieldnames
+            f"{ctx(value)}.{field}" for field in self.value_type.struct_fieldnames
         )
-        ctx.exec(f"{ctx.feed}{map.obj.map}[tuple(({idx_fields}))] = tuple(({val_fields}))")
+        ctx.exec(
+            f"{ctx.feed}{map.obj.map}[tuple(({idx_fields}))] = tuple(({val_fields}))"
+        )
 
     def numba_unpack(
         self, ctx: "NumbaContext", var_n: str, val: "AssemblyExpression"

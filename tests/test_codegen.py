@@ -982,8 +982,12 @@ def test_hashtable(compiler, tabletype):
         )
     )
     compiled = compiler(module)
-    assert compiled.setidx(table, key_type(1, 2), val_type(2, 3, 4)) == val_type(2, 3, 4)
-    assert compiled.setidx(table, key_type(1, 4), val_type(3, 4, 1)) == val_type(3, 4, 1)
+    assert compiled.setidx(table, key_type(1, 2), val_type(2, 3, 4)) == val_type(
+        2, 3, 4
+    )
+    assert compiled.setidx(table, key_type(1, 4), val_type(3, 4, 1)) == val_type(
+        3, 4, 1
+    )
     assert compiled.exists(table, key_type(1, 2))
 
     assert not compiled.exists(table, key_type(1, 3))

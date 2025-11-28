@@ -801,9 +801,7 @@ register_property(
 )
 
 # trivial ser/deser
-for t in (
-    int, bool, float
-):
+for t in (int, bool, float):
     register_property(
         t,
         "construct_from_numba",
