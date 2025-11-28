@@ -145,12 +145,39 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             ("shape", self.shape_t),
             ("strides", self.strides_t),
         ]
+    
+    def from_fields(self, buf, shape, strides):
+        return BufferizedNDArray(
+            buf,
+            shape,
+            strides,
+        )
 
     def __init__(self, buf_t: NumpyBufferFType, ndim: np.intp, strides_t: TupleFType):
         self.buf_t = buf_t
         self._ndim = ndim
         self.shape_t = strides_t  # assuming shape is the same type as strides
         self.strides_t = strides_t
+
+    def __call__(
+        self,
+        shape: tuple[int, ...],
+    ) -> BufferizedNDArray:
+        tns = np.full(shape, self.fill_value, dtype=self.buf_t.element_type)
+        tns_2 = BufferizedNDArray(tns)
+        return BufferizedNDArray(
+            tns_2.buf,
+            shape=tuple(
+                t(s)
+                for s, t in zip(shape, self.shape_t.struct_fieldformats, strict=True)
+            ),
+            strides=tuple(
+                t(s)
+                for (s, t) in zip(
+                    tns_2.strides, self.strides_t.struct_fieldformats, strict=True
+                )
+            ),
+        )
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
@@ -241,14 +268,6 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ctx.exec(asm.Repack(obj.buf_s))
         return
 
-    def __call__(
-        self,
-        buf: NumpyBuffer,
-        shape: tuple[np.integer, ...],
-        strides: tuple[np.integer, ...],
-    ) -> BufferizedNDArray:
-        return BufferizedNDArray(buf, shape, strides)
-
 
 class BufferizedNDArrayAccessor(Tensor):
     """
@@ -327,6 +346,11 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
 
     def __hash__(self):
         return hash((self.tns, self.nind, self.pos, self.op))
+    
+    def __call__(self, shape: tuple) -> BufferizedNDArrayAccessor:
+        raise NotImplementedError(
+            "Cannot directly instantiate BufferizedNDArrayAccessor from ftype"
+        )
 
     @property
     def ndim(self) -> np.intp:

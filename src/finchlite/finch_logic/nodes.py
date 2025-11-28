@@ -31,17 +31,23 @@ class TableValueFType(FType):
         return hash((self.tns, self.idxs))
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(frozen=True)
 class TableValue(FTyped):
     tns: Any
     idxs: tuple[Field, ...]
 
+    @property
     def ftype(self):
         return TableValueFType(ftype(self.tns), self.idxs)
 
     def __post_init__(self):
         if isinstance(self.tns, TableValue):
             raise ValueError("The tensor (tns) cannot be a TableValue")
+
+    def __eq__(self, other):
+        if not isinstance(other, TableValue):
+            return False
+        return (self.tns == other.tns).all() and self.idxs == other.idxs
 
 
 @dataclass(eq=True, frozen=True)

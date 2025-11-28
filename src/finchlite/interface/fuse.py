@@ -56,6 +56,7 @@ from typing import Any
 import numpy as np
 
 from finchlite.autoschedule import LogicExecutor
+from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -66,6 +67,7 @@ from ..compile import BufferizedNDArray, NotationCompiler
 from ..finch_logic import (
     Alias,
     Field,
+    LogicInterpreter,
     Literal,
     Plan,
     Produces,
@@ -97,7 +99,7 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = LogicExecutor()
+        _DEFAULT_SCHEDULER = LogicInterpreter()
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
@@ -107,9 +109,11 @@ def set_default_scheduler(
             prgm, tables = optimizer(plan)
             mod = ntn_interp(prgm)
             args = provision_tensors(prgm, tables)
-            return (mod.func(*args),)
+            res = mod.func(*args)
+            return (TableValue(res, tuple(Field("i") for i in range(res.ndim)),),)
 
         _DEFAULT_SCHEDULER = fn_compile
+        _DEFAULT_SCHEDULER = LogicExecutor()
 
     elif mode == Mode.INTERPRET_ASSEMBLY:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
@@ -121,7 +125,8 @@ def set_default_scheduler(
             asm_prgm = notation_compiler(ntn_prgm)
             mod = asm_interp(asm_prgm)
             args = provision_tensors(asm_prgm, tables)
-            return (mod.func(*args),)
+            res = mod.func(*args)
+            return (TableValue(res, tuple(Field("i") for i in range(res.ndim)),),)
 
         _DEFAULT_SCHEDULER = fn_compile
 
@@ -139,7 +144,8 @@ def set_default_scheduler(
             # print("Assembler: \n", asm_prgm)
             mod = numba_compiler(asm_prgm)
             args = provision_tensors(asm_prgm, tables)
-            return (mod.func(*args),)
+            res = mod.func(*args)
+            return (TableValue(res, tuple(Field("i") for i in range(res.ndim)),),)
 
         _DEFAULT_SCHEDULER = fn_compile
 
@@ -204,8 +210,9 @@ def compute(arg, ctx=None):
     prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
     res = ctx(prgm)
     if isinstance(arg, tuple):
-        return tuple(res)
-    return res[0].to_numpy() if hasattr(res[0], "to_numpy") else res[0]
+        return tuple(tbl.tns for tbl in res)
+    res = res[0].tns
+    return res.to_numpy() if hasattr(res, "to_numpy") else res
 
 
 def fuse(f, *args, ctx=None):

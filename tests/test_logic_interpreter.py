@@ -50,9 +50,9 @@ def test_matrix_multiplication(a, b):
 
     result = LogicInterpreter()(p)[0]
 
-    expected = np.matmul(a, b)
+    expected = TableValue(np.matmul(a, b), (i, j))
 
-    assert_equal(result, expected)
+    assert result == expected
 
 
 def test_plan_repr():
@@ -94,9 +94,9 @@ def test_materialize():
 
     result = LogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
 
-    expected = np.array(
+    expected = TableValue(np.array(
         [[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]]
-    )
+    ), (i, j))
 
-    assert_equal(result, expected)
+    assert result == expected
     assert_equal(C, np.array([[1, 1], [1, 1]]))

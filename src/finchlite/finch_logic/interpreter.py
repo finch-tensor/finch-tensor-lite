@@ -88,7 +88,7 @@ class LogicMachine:
                         arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args
                     ]
                     result[*crds] = op(*vals)
-                return TableValue(result, idxs)
+                return TableValue(result, tuple(idxs))
             case Aggregate(Literal(op), Literal(init), arg, idxs):
                 arg = self(arg)
                 dtype = fixpoint_type(op, init, element_type(arg.tns))
@@ -106,7 +106,7 @@ class LogicMachine:
                     ]
                     result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
                 return TableValue(
-                    result, [idx for idx in arg.idxs if idx not in node.idxs]
+                    result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
                 )
             case Relabel(arg, idxs):
                 arg = self(arg)
@@ -147,7 +147,7 @@ class LogicMachine:
                     res = self(body)
                 return res
             case Produces(args):
-                return tuple(self(arg).tns for arg in args)
+                return tuple(self(arg) for arg in args)
             case Subquery(lhs, arg):
                 (res,) = self(Query(lhs, arg))
                 return res

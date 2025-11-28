@@ -721,7 +721,7 @@ def struct_construct_from_numba(fmt: AssemblyStructFType, numba_struct):
         construct_from_numba(field_type, getattr(numba_struct, name))
         for (name, field_type) in fmt.struct_fields
     ]
-    return fmt(*args)
+    return fmt.from_fields(*args)
 
 
 register_property(

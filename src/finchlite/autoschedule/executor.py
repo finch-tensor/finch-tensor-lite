@@ -1,6 +1,7 @@
 from typing import overload
 
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
 from ..finch_logic import LogicEvaluator, LogicInterpreter, LogicLoader, LogicNode
@@ -125,7 +126,7 @@ class LogicInterpreterLibrary(AssemblyLibrary):
 
     def __getattr__(self, name):
         if name == "main":
-            return self.interpreter
+            return LogicInterpreterKernel(self.prgm, self.bindings)
         if name == "prgm":
             return self.prgm
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
@@ -164,15 +165,15 @@ class LogicExecutor(LogicEvaluator):
 
         inputs = [tbl.tns for tbl in bindings.values()]
         workspaces = [
-            tbl.tns(sizes[idx] for idx in tbl.idxs) for tbl in workspace_ftypes.values()
+            tbl.tns(tuple(sizes[idx] for idx in tbl.idxs)) for var, tbl in workspace_ftypes.items() if var not in bindings
         ]
 
         res = mod.main(*inputs, *workspaces)
 
-        res_ftype = get_return_fields(
+        res_idxs = get_return_fields(
             prgm, {var: tbl.idxs for var, tbl in bindings.items()}
         )
 
         if isinstance(res, tuple):
-            return (t(tns) for t, tns in zip(res_ftype, res, strict=True))
-        return res_ftype(res)
+            return tuple(TableValue(tns, idxs) for idxs, tns in zip(res_idxs, res, strict=True))
+        return TableValue(res, res_idxs)

@@ -74,6 +74,16 @@ class LazyTensorFType(TensorFType):
     def __hash__(self):
         return hash((self._fill_value, self._element_type, self._shape_type))
 
+    def __call__(self, shape: tuple) -> LazyTensor:
+        idxs = tuple(Field(gensym("i")) for _ in shape)
+        return LazyTensor(
+            data=Table(Literal(FillTensor(shape, self._fill_value)), idxs),
+            ctx=EffectBlob(),
+            shape=shape,
+            fill_value=self._fill_value,
+            element_type=self._element_type,
+        )
+
     @property
     def fill_value(self):
         return self._fill_value
@@ -1186,22 +1196,23 @@ class WrapperTensorFType(TensorFType):
 
 
 @dataclass(frozen=True)
-class NoneTensorFType(DefaultTensorFType):
-    pass
+class FillTensorFType(DefaultTensorFType):
+    def __call__(self, shape: tuple) -> FillTensor:
+        return FillTensor(shape, self.fill_value)
 
-
-class NoneTensor(Tensor):
+class FillTensor(Tensor):
     """
     A tensor that has a specific shape but contains no actual data.
     Used primarily for broadcasting operations where a tensor of a specific
     shape is needed but the values are irrelevant.
     """
 
-    def __init__(self, shape):
+    def __init__(self, shape, fill_value):
         self._shape = shape
+        self._fill_value = fill_value
 
     def __getitem__(self, idxs):
-        return None
+        return self._fill_value
 
     @property
     def shape(self):
@@ -1209,9 +1220,9 @@ class NoneTensor(Tensor):
 
     @property
     def ftype(self):
-        return NoneTensorFType(
-            None,
-            None,
+        return FillTensorFType(
+            self._fill_value,
+            ftype(self._fill_value),
             tuple(type(dim) for dim in self.shape),
         )
 
@@ -1237,7 +1248,7 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(first_arg, tensor, NoneTensor(shape))
+    return elementwise(first_arg, tensor, FillTensor(shape, None))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
@@ -1263,6 +1274,11 @@ class ConcatTensorFType(WrapperTensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def __call__(self, shape: tuple) -> ConcatTensor:
+        tns = self._child_formats[0](shape)
+        shape2 = tuple(dim if i != self.concat_axis else self._shape_type[i](0) for i, dim in enumerate(shape))
+        tnss = (tns,) + tuple(fmt(shape2) for fmt in self._child_formats[1:])
+        return ConcatTensor(*tnss, axis=self.concat_axis)
 
 class ConcatTensor(Tensor):
     """
@@ -1384,6 +1400,10 @@ class SplitDimsTensorFType(WrapperTensorFType):
             type(dim) for dim in self.split_shape
         ]
         return tuple(shape_type_list)
+    
+    def __call__(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError("Cannot directly instantiate SplitDimsTensor from ftype")
+
 
 
 class SplitDimsTensor(Tensor):
@@ -1470,6 +1490,9 @@ class CombineDimsTensorFType(WrapperTensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    def __call__(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError("Cannot directly instantiate SplitDimsTensor from ftype")
 
 
 class CombineDimsTensor(Tensor):

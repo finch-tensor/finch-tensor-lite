@@ -17,7 +17,7 @@ class AssemblyStructFType(FType, ABC):
     def struct_fields(self) -> list[tuple[str, Any]]: ...
 
     @abstractmethod
-    def __call__(self, *args): ...
+    def from_fields(self, *args): ...
 
     @property
     def is_mutable(self) -> bool:
@@ -71,7 +71,7 @@ class NamedTupleFType(AssemblyStructFType):
     def struct_fields(self):
         return self._struct_fields
 
-    def __call__(self, *args):
+    def from_fields(self, *args):
         assert all(
             isinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
@@ -114,7 +114,7 @@ class TupleFType(AssemblyStructFType):
     def struct_fields(self):
         return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
 
-    def __call__(self, *args):
+    def from_fields(self, *args):
         assert all(
             isinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
