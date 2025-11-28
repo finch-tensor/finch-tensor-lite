@@ -1,13 +1,10 @@
 from typing import overload
 
+from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+
 from .. import finch_logic as lgc
-from ..finch_logic import (
-    LogicEvaluator,
-    LogicLoader,
-    LogicNode,
-    LogicInterpreter
-)
-from ..symbolic import Namespace, PostWalk, Rewrite, ftype, fisinstance
+from ..finch_logic import LogicEvaluator, LogicInterpreter, LogicLoader, LogicNode
+from ..symbolic import Namespace, PostWalk, Rewrite, fisinstance, ftype
 
 
 def extract_tables(
@@ -105,45 +102,49 @@ def get_return_fields(
     return ctx(prgm)
 
 
-class LogicInterpreterKernel:
+class LogicInterpreterKernel(AssemblyKernel):
     def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
         self.prgm = prgm
         self.bindings = bindings
-    
+
     def __call__(self, *args):
-        bindings = {var: lgc.TableValue(tns, self.bindings[var].idxs) for var, tns in zip(self.bindings.keys(), args, strict=True)}
+        bindings = {
+            var: lgc.TableValue(tns, self.bindings[var].idxs)
+            for var, tns in zip(self.bindings.keys(), args, strict=True)
+        }
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = LogicInterpreter()
         return ctx(self.prgm, bindings)
-        
 
-class LogicInterpreterLibrary:
+
+class LogicInterpreterLibrary(AssemblyLibrary):
     def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
         self.prgm = prgm
         self.bindings = bindings
-    
-    def getattr(self, name):
+
+    def __getattr__(self, name):
         if name == "main":
             return self.interpreter
-        elif name == "prgm":
+        if name == "prgm":
             return self.prgm
-        else:
-            raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
-class FakeLogicCompiler:
+
+class FakeLogicCompiler(LogicLoader):
     def __init__(self):
         pass
 
-    def __call__(self, prgm, bindings):
-        return LogicInterpreterLibrary(prgm, bindings)
+    def __call__(
+        self, prgm: lgc.LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]
+    ) -> tuple[LogicInterpreterLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
+        return (LogicInterpreterLibrary(prgm, bindings), bindings)
 
 
 class LogicExecutor(LogicEvaluator):
     def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
         if ctx is None:
-            #ctx = LogicCompiler()
-            raise ValueError("LogicExecutor requires a LogicLoader")
+            ctx = FakeLogicCompiler()
         self.ctx: LogicLoader = ctx
         self.verbose: bool = verbose
 

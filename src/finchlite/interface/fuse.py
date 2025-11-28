@@ -55,6 +55,8 @@ from typing import Any
 
 import numpy as np
 
+from finchlite.autoschedule import LogicExecutor
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
@@ -64,7 +66,6 @@ from ..compile import BufferizedNDArray, NotationCompiler
 from ..finch_logic import (
     Alias,
     Field,
-    LogicInterpreter,
     Literal,
     Plan,
     Produces,
@@ -96,7 +97,7 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = LogicInterpreter()
+        _DEFAULT_SCHEDULER = LogicExecutor()
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
