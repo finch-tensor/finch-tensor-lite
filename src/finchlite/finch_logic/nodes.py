@@ -16,6 +16,29 @@ from ..symbolic import (
 )
 from ..util import qual_str
 
+"""
+Notes on Finch Logic IR:
+Finch Logic IR is an intermediate representation (IR) used in the Finch Tensor
+Lite framework. It is designed to represent logical operations and transformations
+on tensors in a structured and abstract manner. The Logic IR is built around the
+concept of "tables," which are tensors with named dimensions, allowing for more
+intuitive manipulation and reasoning about tensor operations.
+
+Dimensions in Finch Logic IR are represented using "fields," which are named
+entities that index the dimensions of a tensor. This naming convention helps
+clarify the relationships between different tensors and their dimensions during
+operations such as mapping, aggregation, reordering, and relabeling.
+
+Fields may not be used to represent different dimension sizes within the same
+logic program. 
+
+Tables may be referenced using "aliases," which are symbolic names that refer to
+specific tables within the program. Evaluators for Finch logic may accept a list
+of bindings from aliases to tables, allowing the logic program to modify the
+state of tensors. Queries in Finch Logic IR can bind the result of an expression
+to an alias for later use, or update the value of an existing alias.
+"""
+
 
 @dataclass(eq=True, frozen=True)
 class TableValueFType(FType):
@@ -103,7 +126,6 @@ class LogicExpression(LogicNode):
     def fields(self) -> list[Field]:
         """Returns fields of the node."""
         ...
-
 
 class LogicStatement(LogicNode):
     """
