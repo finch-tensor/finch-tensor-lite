@@ -965,6 +965,7 @@ def test_hashtable(compiler, tabletype):
                             key_v,
                             val_v,
                         ),
+                        asm.Repack(table_slt),
                         asm.Return(asm.LoadMap(table_slt, key_v)),
                     )
                 ),

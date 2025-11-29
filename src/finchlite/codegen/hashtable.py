@@ -2,7 +2,7 @@ import ctypes
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import NamedTuple, TypedDict
+from typing import Any, NamedTuple, TypedDict
 
 import numba
 import numba.typed
@@ -243,6 +243,10 @@ class CHashTable(Map):
         self.key_len = key_len
         self.value_len = value_len
 
+        # these are blank fields we need when serializing or smth
+        self._struct: Any = None
+        self._self_obj: Any = None
+
         if map is None:
             map = {}
         self.map = getattr(self.lib.library, self.lib.methods["init"])()
@@ -399,7 +403,7 @@ class CHashTableFType(CMapFType, CStackFType):
         """
         Repack the map out of C context.
         """
-        ctx.exec(f"{ctx.feed}{lhs}->map = {obj.map}")
+        ctx.exec(f"{ctx.feed}{lhs}->map = {obj.map};")
 
     def serialize_to_c(self, obj: CHashTable):
         """
@@ -506,6 +510,8 @@ class NumbaHashTableFType(NumbaMapFType, NumbaStackFType):
         self.value_len = value_len
         self._key_type = _int_tuple_ftype(key_len)
         self._value_type = _int_tuple_ftype(value_len)
+        self._numba_key_type = numba.types.UniTuple(numba.types.int64, key_len)
+        self._numba_value_type = numba.types.UniTuple(numba.types.int64, value_len)
 
     def __eq__(self, other):
         if not isinstance(other, NumbaHashTableFType):
