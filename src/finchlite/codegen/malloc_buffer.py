@@ -1,25 +1,136 @@
 import ctypes
-from pathlib import Path
+from dataclasses import dataclass
+from textwrap import dedent
+from typing import TypedDict
 
 import numpy as np
 
-from finchlite.codegen.c import CBufferFType, CStackFType, c_type, load_shared_lib
+from finchlite.codegen.c import (
+    CBufferFType,
+    CContext,
+    CStackFType,
+    c_type,
+    construct_from_c,
+    load_shared_lib,
+    serialize_to_c,
+)
 from finchlite.codegen.numpy_buffer import CBufferFields
 from finchlite.finch_assembly import Buffer
+from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.util import qual_str
 
-backend_lib = load_shared_lib(
-    (Path(__file__).parent / "malloc_buffer_backend.c").read_text(encoding="utf-8")
-)
 
-
-class CMallocBuffer(ctypes.Structure):
+class CMallocBufferStruct(ctypes.Structure):
     _fields_ = [
         ("data", ctypes.c_void_p),
         ("length", ctypes.c_size_t),
         ("datasize", ctypes.c_size_t),
         ("resize", ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t)),
     ]
+
+
+class CMallocBufferMethods(TypedDict):
+    init: str
+    resize: str
+    free: str
+
+
+@dataclass
+class CMallocBufferLibrary:
+    library: ctypes.CDLL
+    methods: CMallocBufferMethods
+
+    def init(self, *args):
+        return getattr(self.library, self.methods["init"])(*args)
+
+    def resize(self, *args):
+        return getattr(self.library, self.methods["resize"])(*args)
+
+    def free(self, *args):
+        return getattr(self.library, self.methods["free"])(*args)
+
+
+class MallocBufferBackend:
+    _library: CMallocBufferLibrary
+
+    @classmethod
+    def gen_code(
+        cls,
+        ctx: "CContext",
+        inline: bool = False,
+    ):
+        ctx.add_header("#include <string.h>")
+        ctx.add_header("#include <stdlib.h>")
+        ctx.add_header("#include <stdio.h>")
+
+        methods: CMallocBufferMethods = {
+            "init": ctx.freshen("mallocbuffer_init"),
+            "free": ctx.freshen("mallocbuffer_free"),
+            "resize": ctx.freshen("mallocbuffer_resize"),
+        }
+
+        buffer = ctx.ctype_name(CMallocBufferStruct)
+        inline_s = "static inline " if inline else ""
+        libcode = dedent(
+            f"""
+            {inline_s}void* mallocbuffer_resize({buffer}* m, size_t length) {{
+                m->data = realloc(m->data, m->datasize * length);
+                if (length > m->length) {{
+                    memset(m->data + (m->length * m->datasize), 0,
+                        (length - m->length) * m->datasize);
+                }}
+                m->length = length;
+                return m->data;
+            }}
+            {inline_s}void mallocbuffer_free(struct MallocBuffer *m) {{
+                free(m->data);
+                m->data = 0;
+                m->length = 0;
+            }}
+            {inline_s}void mallocbuffer_init(
+                struct MallocBuffer *m,
+                size_t datasize,
+                size_t length
+            ) {{
+                m->length = length;
+                m->datasize = datasize;
+                m->data = malloc(length * datasize);
+                memset(m->data, 0, length * datasize);
+            }}
+            """
+        )
+        ctx.add_header(libcode)
+        return methods
+
+    @classmethod
+    def library(cls) -> CMallocBufferLibrary:
+        # lazy compile the library.
+        if cls._library is not None:
+            return cls._library
+        ctx = CContext()
+        methods = cls.gen_code(ctx)
+        lib = load_shared_lib(ctx.emit_global())
+
+        init_func = getattr(lib, methods["init"])
+        init_func.argtypes = [
+            ctypes.POINTER(CMallocBufferStruct),
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+        ]
+        init_func.restype = None
+
+        free_func = getattr(lib, methods["free"])
+        free_func.argtypes = [
+            ctypes.POINTER(CMallocBufferStruct),
+        ]
+        free_func.restype = None
+
+        resize_func = getattr(lib, methods["resize"])
+        resize_func.argtypes = [ctypes.POINTER(CMallocBufferStruct), ctypes.c_size_t]
+        resize_func.restype = ctypes.c_void_p
+
+        cls._library = CMallocBufferLibrary(lib, methods)
+        return cls._library
 
 
 class MallocBuffer(Buffer):
@@ -41,8 +152,9 @@ class MallocBuffer(Buffer):
         """
         self._dtype = dtype
         self._c_dtype = c_type(dtype)
-        self.buffer = ctypes.pointer(CMallocBuffer())
-        backend_lib.mallocbuffer_init(
+        self.buffer = ctypes.pointer(CMallocBufferStruct())
+
+        MallocBufferBackend.library().init(
             self.buffer,
             ctypes.c_size_t(ctypes.sizeof(self._c_dtype)),
             ctypes.c_size_t(length),
@@ -51,18 +163,20 @@ class MallocBuffer(Buffer):
             return
         if len(data) > length:
             raise IndexError
-        castarray = ctypes.cast(
-            self.buffer.contents.data, ctypes.POINTER(self._c_dtype)
-        )
+
         for idx, elt in enumerate(data):
-            castarray[idx] = self._c_dtype(elt)
+            self.castbuffer[idx] = serialize_to_c(self._dtype, elt)
 
     def __del__(self):
         """
         Frees the mallocbuffer stored inside.
         """
         if hasattr(self, "buffer"):
-            backend_lib.mallocbuffer_free(self.buffer)
+            MallocBufferBackend.library().free(self.buffer)
+
+    @property
+    def castbuffer(self):
+        return ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))
 
     @property
     def ftype(self):
@@ -75,23 +189,19 @@ class MallocBuffer(Buffer):
     def length(self):
         return np.intp(self.buffer.contents.length)
 
-    def load(self, index: int):
-        return self._dtype(
-            ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index]
-        )
+    def load(self, index):
+        value = self.castbuffer[index]
+        return construct_from_c(self.ftype.element_type, value)
 
     def store(self, index: int, value):
-        ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index] = (
-            self._dtype(value)
-        )
+        value = serialize_to_c(self.ftype.element_type, value)
+        self.castbuffer[index] = value
 
     def resize(self, new_length: int):
         self.buffer.contents.resize(self.buffer, ctypes.c_size_t(new_length))
 
     def __str__(self):
-        array = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[
-            : self.length()
-        ]
+        array = self.castbuffer[: self.length()]
         return f"malloc_buf({array})"
 
 
@@ -141,21 +251,26 @@ class MallocBufferFType(CBufferFType, CStackFType):
         return MallocBuffer(len, dtype)
 
     def c_type(self):
-        return ctypes.POINTER(CMallocBuffer)
+        return ctypes.POINTER(CMallocBufferStruct)
 
-    def c_length(self, ctx, buf):
+    def c_length(self, ctx: "CContext", buf: "Stack"):
+        assert isinstance(buf.obj, CBufferFields)
         return buf.obj.length
 
-    def c_data(self, ctx, buf):
+    def c_data(self, ctx: "CContext", buf: "Stack"):
+        assert isinstance(buf.obj, CBufferFields)
         return buf.obj.data
 
-    def c_load(self, ctx, buf, idx):
+    def c_load(self, ctx: "CContext", buf: "Stack", idx: "AssemblyExpression"):
+        assert isinstance(buf.obj, CBufferFields)
         return f"({buf.obj.data})[{ctx(idx)}]"
 
-    def c_store(self, ctx, buf, idx, value):
+    def c_store(self, ctx: "CContext", buf: "Stack", idx: "AssemblyExpression", value: "AssemblyExpression"):
+        assert isinstance(buf.obj, CBufferFields)
         ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
 
-    def c_resize(self, ctx, buf, new_len):
+    def c_resize(self, ctx: "CContext", buf: "Stack", new_len: "AssemblyExpression"):
+        assert isinstance(buf.obj, CBufferFields)
         new_len = ctx(ctx.cache("len", new_len))
         obj = buf.obj.obj
         data = buf.obj.data
@@ -167,10 +282,11 @@ class MallocBufferFType(CBufferFType, CStackFType):
         )
         return
 
-    def c_unpack(self, ctx, var_n, val):
+    def c_unpack(self, ctx: "CContext", var_n, val):
         """
         Unpack the malloc buffer into C context.
         """
+        # TODO: you need to add gen_code stuff here.
         data = ctx.freshen(var_n, "data")
         length = ctx.freshen(var_n, "length")
         t = ctx.ctype_name(c_type(self._dtype))
