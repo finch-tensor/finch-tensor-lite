@@ -405,7 +405,7 @@ class LoadMap(AssemblyExpression, AssemblyTree):
         return [self.map, self.index]
 
     def result_format(self):
-        return element_format(self.map.result_format)
+        return self.map.result_format.value_type
 
 
 @dataclass(eq=True, frozen=True)
