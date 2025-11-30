@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
@@ -14,11 +14,9 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.finch_assembly.map import FType, MapFType
-
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
+from ..finch_assembly import AssemblyStructFType, BufferFType, MapFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
@@ -612,22 +610,22 @@ class CContext(Context):
         self.fptr = fptr
         self.types = types
         self.slots = slots
-        self.datastructures: dict[FType, Any] = {}
+        self.datastructures: dict[Hashable, Any] = {}
 
     def add_header(self, header):
         if header not in self._headerset:
             self.headers.append(header)
             self._headerset.add(header)
 
-    def add_datastructure(self, ftype: FType, handler: "Callable[[CContext], Any]"):
+    def add_datastructure(self, key: Hashable, handler: "Callable[[CContext], Any]"):
         """
         Code to add a datastructure declaration.
         This is the minimum required to prevent redundancy.
         """
-        if ftype in self.datastructures:
+        if key in self.datastructures:
             return
         # at least mark something is there.
-        self.datastructures[ftype] = None
+        self.datastructures[key] = None
         handler(self)
 
     def emit_global(self):

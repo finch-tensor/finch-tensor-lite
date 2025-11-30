@@ -6,6 +6,7 @@ from .cfg_builder import (
 )
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
+from .map import MapFType
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -69,6 +70,7 @@ __all__ = [
     "Literal",
     "Load",
     "LoadMap",
+    "MapFType",
     "Module",
     "NamedTupleFType",
     "Print",

@@ -16,20 +16,24 @@ class Map(FTyped, ABC):
     ): ...
 
     @property
-    def element_type(self):
-        """
-        Return the type of elements stored in the hash table.
-        This is typically the same as the dtype used to create the map.
-        """
-        return self.ftype.element_type()
+    @abstractmethod
+    def ftype(self) -> "MapFType": ...
 
     @property
-    def length_type(self):
+    def value_type(self):
         """
-        Return the type of indices used to access elements in the hash table.
-        This is typically an integer type.
+        Return type of values stored in the hash table
+        (probably some TupleFType)
         """
-        return self.ftype.length_type()
+        return self.ftype.value_type
+
+    @property
+    def key_type(self):
+        """
+        Return type of keys stored in the hash table
+        (probably some TupleFType)
+        """
+        return self.ftype.key_type
 
     @abstractmethod
     def load(self, idx: tuple):

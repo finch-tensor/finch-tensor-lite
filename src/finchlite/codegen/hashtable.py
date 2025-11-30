@@ -390,7 +390,7 @@ class CHashTableFType(CMapFType, CStackFType):
         data = ctx.freshen(var_n, "data")
         # Add all the stupid header stuff from above.
         ctx.add_datastructure(
-            self,
+            ("CHashTableFType", self.key_len, self.value_len),
             lambda ctx: CHashTable.gen_code(
                 ctx, self.key_type, self.value_type, inline=True
             ),
@@ -444,9 +444,6 @@ class NumbaHashTable(Map):
     def __init__(self, key_len, value_len, map: "dict[tuple,tuple] | None" = None):
         self.key_len = key_len
         self.value_len = value_len
-
-        self._key_type = _int_tuple_ftype(key_len)
-        self._value_type = _int_tuple_ftype(value_len)
 
         self._numba_key_type = numba.types.UniTuple(numba.types.int64, key_len)
         self._numba_value_type = numba.types.UniTuple(numba.types.int64, value_len)
