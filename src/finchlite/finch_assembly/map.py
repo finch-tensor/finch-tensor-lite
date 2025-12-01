@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from ..symbolic import FType, FTyped
 
 
-class Map(FTyped, ABC):
+class Dict(FTyped, ABC):
     """
     Abstract base class for a map data structure.
     Hash tables should be such that their bucket size can be resized, with Tree
@@ -17,7 +17,7 @@ class Map(FTyped, ABC):
 
     @property
     @abstractmethod
-    def ftype(self) -> "MapFType": ...
+    def ftype(self) -> "DictFType": ...
 
     @property
     def value_type(self):
@@ -58,7 +58,7 @@ class Map(FTyped, ABC):
         ...
 
 
-class MapFType(FType):
+class DictFType(FType):
     """
     Abstract base class for an ftype corresponding to a map.
     """

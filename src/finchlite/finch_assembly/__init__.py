@@ -6,7 +6,7 @@ from .cfg_builder import (
 )
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
-from .map import MapFType
+from .map import Dict, DictFType
 from .nodes import (
     AssemblyNode,
     Assert,
@@ -15,7 +15,7 @@ from .nodes import (
     Break,
     BufferLoop,
     Call,
-    ExistsMap,
+    ExistsDict,
     ForLoop,
     Function,
     GetAttr,
@@ -24,7 +24,7 @@ from .nodes import (
     Length,
     Literal,
     Load,
-    LoadMap,
+    LoadDict,
     Module,
     Print,
     Repack,
@@ -34,7 +34,7 @@ from .nodes import (
     Slot,
     Stack,
     Store,
-    StoreMap,
+    StoreDict,
     TaggedVariable,
     Unpack,
     Variable,
@@ -60,7 +60,7 @@ __all__ = [
     "BufferFType",
     "BufferLoop",
     "Call",
-    "ExistsMap",
+    "ExistsDict",
     "ForLoop",
     "Function",
     "GetAttr",
@@ -69,8 +69,9 @@ __all__ = [
     "Length",
     "Literal",
     "Load",
-    "LoadMap",
-    "MapFType",
+    "LoadDict",
+    "Dict",
+    "DictFType",
     "Module",
     "NamedTupleFType",
     "Print",
@@ -81,7 +82,7 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
-    "StoreMap",
+    "StoreDict",
     "TaggedVariable",
     "TupleFType",
     "Unpack",

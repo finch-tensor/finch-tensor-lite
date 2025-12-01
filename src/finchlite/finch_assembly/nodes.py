@@ -367,7 +367,7 @@ class Store(AssemblyTree, AssemblyStatement):
 
 
 @dataclass(eq=True, frozen=True)
-class ExistsMap(AssemblyExpression, AssemblyTree):
+class ExistsDict(AssemblyExpression, AssemblyTree):
     """
     Represents checking whether an integer tuple key is in a map.
 
@@ -388,7 +388,7 @@ class ExistsMap(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class LoadMap(AssemblyExpression, AssemblyTree):
+class LoadDict(AssemblyExpression, AssemblyTree):
     """
     Represents loading a value from a map given an integer tuple key.
 
@@ -397,19 +397,19 @@ class LoadMap(AssemblyExpression, AssemblyTree):
         index: The key value
     """
 
-    map: Slot | Stack
+    dct: Slot | Stack
     index: AssemblyExpression
 
     @property
     def children(self):
-        return [self.map, self.index]
+        return [self.dct, self.index]
 
     def result_format(self):
-        return self.map.result_format.value_type
+        return self.dct.result_format.value_type
 
 
 @dataclass(eq=True, frozen=True)
-class StoreMap(AssemblyTree, AssemblyStatement):
+class StoreDict(AssemblyTree, AssemblyStatement):
     """
     Represents storing a value into a buffer given an integer tuple key.
 
@@ -769,16 +769,16 @@ class AssemblyPrinterContext(Context):
                 return None
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
-            case LoadMap(map, idx):
+            case LoadDict(map, idx):
                 return f"loadmap({self(map)}, {self(idx)})"
-            case ExistsMap(map, idx):
+            case ExistsDict(map, idx):
                 return f"existsmap({self(map)}, {self(idx)})"
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
                 return None
-            case StoreMap(map, idx, val):
+            case StoreDict(map, idx, val):
                 self.exec(f"{feed}storemap({self(map)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):

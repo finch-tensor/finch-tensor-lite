@@ -6,7 +6,7 @@ from .. import algebra
 from ..symbolic import FType, ScopedDict, ftype
 from . import nodes as asm
 from .buffer import BufferFType
-from .map import MapFType
+from .map import DictFType
 from .struct import AssemblyStructFType
 
 
@@ -82,9 +82,9 @@ class AssemblyTypeChecker:
                 f"The variable '{var_n}' is not defined in the current context."
             ) from KeyError
 
-    def check_map(self, map):
-        map_type = self.check_expr(map)
-        if isinstance(map_type, MapFType):
+    def check_dict(self, dct):
+        map_type = self.check_expr(dct)
+        if isinstance(map_type, DictFType):
             return map_type
         raise AssemblyTypeError(f"Expected map, got {map_type}.")
 
@@ -141,13 +141,13 @@ class AssemblyTypeChecker:
             case asm.Length(buffer):
                 buffer_type = self.check_buffer(buffer)
                 return buffer_type.length_type
-            case asm.ExistsMap(map, index):
-                map_type = self.check_map(map)
+            case asm.ExistsDict(dct, index):
+                map_type = self.check_dict(dct)
                 index_type = self.check_expr(index)
                 check_type_match(map_type.key_type, index_type)
                 return bool
-            case asm.LoadMap(map, index):
-                map_type = self.check_map(map)
+            case asm.LoadDict(dct, index):
+                map_type = self.check_dict(dct)
                 index_type = self.check_expr(index)
                 check_type_match(map_type.key_type, index_type)
                 return map_type.value_type
@@ -198,8 +198,8 @@ class AssemblyTypeChecker:
                 value_type = self.check_expr(value)
                 check_type_match(buffer_type.element_type, value_type)
                 return None
-            case asm.StoreMap(map, index, value):
-                map_type = self.check_map(map)
+            case asm.StoreDict(map, index, value):
+                map_type = self.check_dict(map)
                 index_type = self.check_expr(index)
                 value_type = self.check_expr(value)
                 check_type_match(map_type.key_type, index_type)

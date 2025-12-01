@@ -8,7 +8,7 @@ import numpy as np
 
 import numba
 
-from finchlite.finch_assembly.map import MapFType  # type: ignore[import-untyped]
+from finchlite.finch_assembly.map import DictFType  # type: ignore[import-untyped]
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
@@ -265,28 +265,28 @@ register_property(
 )
 
 
-class NumbaMapFType(MapFType, NumbaArgumentFType, ABC):
+class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
     """
     Abstract base class for the ftype of datastructures. The ftype defines how
     the data in a Map is organized and accessed.
     """
 
     @abstractmethod
-    def numba_existsmap(self, ctx: "NumbaContext", map, idx):
+    def numba_existsdict(self, ctx: "NumbaContext", map, idx):
         """
         Return numba code which checks whether a given key exists in a map.
         """
         ...
 
     @abstractmethod
-    def numba_loadmap(self, ctx, buffer, idx):
+    def numba_loaddict(self, ctx, buffer, idx):
         """
         Return numba code which gets a value corresponding to a certain key.
         """
         ...
 
     @abstractmethod
-    def numba_storemap(self, ctx, buffer, idx, value):
+    def numba_storedict(self, ctx, buffer, idx, value):
         """
         Return C code which stores a certain value given a certain integer tuple key.
         """
@@ -588,15 +588,15 @@ class NumbaContext(Context):
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 return buf.result_format.numba_length(self, buf)
-            case asm.LoadMap(map, idx):
-                map = self.resolve(map)
-                return map.result_format.numba_loadmap(self, map, idx)
-            case asm.ExistsMap(map, idx):
-                map = self.resolve(map)
-                return map.result_format.numba_existsmap(self, map, idx)
-            case asm.StoreMap(map, idx, val):
-                map = self.resolve(map)
-                return map.result_format.numba_storemap(self, map, idx, val)
+            case asm.LoadDict(dct, idx):
+                dct = self.resolve(dct)
+                return dct.result_format.numba_loaddict(self, dct, idx)
+            case asm.ExistsDict(dct, idx):
+                dct = self.resolve(dct)
+                return dct.result_format.numba_existsdict(self, dct, idx)
+            case asm.StoreDict(dct, idx, val):
+                dct = self.resolve(dct)
+                return dct.result_format.numba_storedict(self, dct, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:

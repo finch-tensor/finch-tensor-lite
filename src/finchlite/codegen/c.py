@@ -16,7 +16,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFType, BufferFType, MapFType, TupleFType
+from ..finch_assembly import AssemblyStructFType, BufferFType, DictFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
@@ -817,15 +817,15 @@ class CContext(Context):
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 return buf.result_format.c_length(self, buf)
-            case asm.LoadMap(map, idx):
+            case asm.LoadDict(map, idx):
                 map = self.resolve(map)
-                return map.result_format.c_loadmap(self, map, idx)
-            case asm.ExistsMap(map, idx):
+                return map.result_format.c_loaddict(self, map, idx)
+            case asm.ExistsDict(map, idx):
                 map = self.resolve(map)
-                return map.result_format.c_existsmap(self, map, idx)
-            case asm.StoreMap(map, idx, val):
+                return map.result_format.c_existsdict(self, map, idx)
+            case asm.StoreDict(map, idx, val):
                 map = self.resolve(map)
-                return map.result_format.c_storemap(self, map, idx, val)
+                return map.result_format.c_storedict(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -970,28 +970,28 @@ class CArgumentFType(ABC):
         """
 
 
-class CMapFType(MapFType, CArgumentFType, ABC):
+class CDictFType(DictFType, CArgumentFType, ABC):
     """
-    Abstract base class for the ftype of datastructures. The ftype defines how
+    Abstract base class for the ftype of dictionaries. The ftype defines how
     the data in a Map is organized and accessed.
     """
 
     @abstractmethod
-    def c_existsmap(self, ctx, map, idx):
+    def c_existsdict(self, ctx, map, idx):
         """
         Return C code which checks whether a given key exists in a map.
         """
         ...
 
     @abstractmethod
-    def c_loadmap(self, ctx, map, idx):
+    def c_loaddict(self, ctx, map, idx):
         """
         Return C code which gets a value corresponding to a certain key.
         """
         ...
 
     @abstractmethod
-    def c_storemap(self, ctx, buffer, idx, value):
+    def c_storedict(self, ctx, buffer, idx, value):
         """
         Return C code which stores a certain value given a certain integer tuple key.
         """

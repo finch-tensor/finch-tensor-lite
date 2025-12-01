@@ -716,13 +716,13 @@ def test_hashtable(tabletype):
                 asm.Block(
                     (
                         asm.Unpack(table_slt, table_v),
-                        asm.StoreMap(
+                        asm.StoreDict(
                             table_slt,
                             key_v,
                             val_v,
                         ),
                         asm.Repack(table_slt),
-                        asm.Return(asm.LoadMap(table_slt, key_v)),
+                        asm.Return(asm.LoadDict(table_slt, key_v)),
                     )
                 ),
             ),
@@ -732,7 +732,7 @@ def test_hashtable(tabletype):
                 asm.Block(
                     (
                         asm.Unpack(table_slt, table_v),
-                        asm.Return(asm.ExistsMap(table_slt, key_v)),
+                        asm.Return(asm.ExistsDict(table_slt, key_v)),
                     )
                 ),
             ),
@@ -768,13 +768,13 @@ def test_hashtable_fail(tabletype):
                 asm.Block(
                     (
                         asm.Unpack(table_slt, table_v),
-                        asm.StoreMap(
+                        asm.StoreDict(
                             table_slt,
                             key_v,
                             val_v,
                         ),
                         asm.Repack(table_slt),
-                        asm.Return(asm.LoadMap(table_slt, key_v)),
+                        asm.Return(asm.LoadDict(table_slt, key_v)),
                     )
                 ),
             ),
