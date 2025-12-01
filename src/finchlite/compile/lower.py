@@ -126,7 +126,7 @@ class SingletonExtent:
         ctx_2(body)
 
 
-class FinchCompileError(Exception):
+class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir
     """
     Exception raised during Finch compilation.
     This is used to indicate errors in the compilation process.
@@ -138,8 +138,26 @@ class FinchCompileError(Exception):
         self.node = node
 
 
+@dataclass
+class SimpleExtentFType:  # TODO: Remove once solved in Lookup looplet
+    start: Any
+    end: Any
+
+    def get_start(self, ext):
+        return self.start
+
+    def get_end(self, ext):
+        return self.end
+
+    @property
+    def result_format(self):
+        return self
+
+
 @dataclass(eq=True, frozen=True)
-class ExtentFType(AssemblyStructFType):
+class ExtentFType(
+    AssemblyStructFType
+):  # We're using same class for types and variables!!!
     start: Any
     end: Any
 
@@ -274,7 +292,7 @@ class NotationCompiler:
         self.ctx = ctx
 
     def __call__(self, prgm):
-        ctx_2 = NotationContext()
+        ctx_2 = NotationContext()  # TODO: rename it
 
         return self.ctx(ctx_2(prgm))
 
@@ -547,8 +565,27 @@ def instantiate(ctx, prgm):
     return Rewrite(PostWalk(instantiate_node))(prgm)
 
 
+def supply_mask_columns(prgm):
+    from ..tensor.masks import LoTriMaskFType
+
+    def supply_columns(node):
+        match node:
+            case ntn.Access(tns, mode, idxs):
+                if isinstance(tns.type, LoTriMaskFType):
+                    *_, col_idx, _ = idxs
+                    lvl_t = tns.type.body.lvl_t
+                    for _ in idxs[:-1]:
+                        lvl_t = lvl_t.lvl_t
+                    lvl_t.column = col_idx
+                    return ntn.Access(tns, mode, idxs)
+        return None
+
+    return Rewrite(PostWalk(supply_columns))(prgm)
+
+
 def lower_looplets(ctx, idx, ext, body):
     body = instantiate(ctx, body)
+    body = supply_mask_columns(body)
     ctx_2 = ctx.scope()
 
     def unfurl_node(node):
@@ -556,7 +593,7 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
+                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, proto=None)
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
@@ -624,8 +661,9 @@ class LoopletContext(Context):
     def __call__(self, ext, body):
         pass_ = self.select_pass(body)
         if pass_ is None:
+            # TODO: add logging that no pass was selected
             ctx_2 = self.ctx.scope()
-            ctx_2(body)
+            ctx_2(body)  # NotationContext
             return ctx_2.emit()
         pass_(self, self.idx, ext, body)
         return None

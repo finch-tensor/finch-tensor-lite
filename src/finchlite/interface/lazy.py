@@ -352,7 +352,7 @@ def asarray(arg: Any, format=None) -> Any:
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
 
-    return format(arg)
+    return format(val=arg)
 
 
 def defer(arr) -> LazyTensor:
@@ -538,17 +538,14 @@ def reduce(
         axis or axes along which reduction must be computed. By default, the reduction
         must be computed over the entire array. If a tuple of integers, reductions must
         be computed over multiple axes. Default: ``None``.
-
     dtype: Optional[dtype]
         data type of the returned array. If ``None``, a suitable data type will be
         calculated.
-
     keepdims: bool
         if ``True``, the reduced axes (dimensions) must be included in the result as
         singleton dimensions, and, accordingly, the result must be compatible with the
         input array (see :ref:`broadcasting`). Otherwise, if ``False``, the reduced axes
         (dimensions) must not be included in the result. Default: ``False``.
-
     init: Optional
         Initial value for the reduction. If ``None``, a suitable initial value will be
         calculated. The initial value must be compatible with the operation defined by

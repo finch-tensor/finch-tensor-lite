@@ -1,12 +1,15 @@
+import operator
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
-from finchlite.compile.lower import LoopletPass, SingletonExtentFType
+import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
+from ..compile.lower import LoopletPass, SimpleExtentFType, SingletonExtentFType
 from ..symbolic import PostWalk
 
 
@@ -87,16 +90,71 @@ class SpikePass(LoopletPass):
 
 @dataclass
 class Sequence:
-    head: Any
-    split: Any
-    tail: Any
+    head: Callable
+    split: Callable
+    tail: Callable
+
+    @property
+    def pass_request(self):
+        return SequencePass()
 
 
-@dataclass
 class SequencePass(LoopletPass):
     @property
     def priority(self):
-        return 0
+        return 1
+
+    @staticmethod
+    def _get_split_for_idx(ctx, idx, body) -> asm.Variable:
+        splits = set()
+
+        def find_split(node):
+            match node:
+                case ntn.Access(tns, _, (j, *_)):
+                    if j == idx and isinstance(tns, Sequence):
+                        splits.add(tns.split(ctx, idx))
+
+        PostWalk(find_split)(body)
+        assert len(splits) == 1, (
+            f"Only one split var can occur for {idx}, found: {splits}."
+        )
+        return ctx.ctx(splits.pop())
+
+    def __call__(self, ctx, idx, ext, body):
+        split_var = self._get_split_for_idx(ctx, idx, body)
+
+        def sequence_node(node, seq_field: str):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx and isinstance(tns, Sequence):
+                        return ntn.Access(
+                            getattr(tns, seq_field)(ctx, idx), mode, (j, *idxs)
+                        )
+            return None
+
+        # process head
+        sequence_head = partial(sequence_node, seq_field="head")
+        body_head = PostWalk(sequence_head)(body)
+        ext_2 = SimpleExtentFType(
+            ext.result_format.get_start(ext),
+            asm.Call(asm.Literal(operator.add), (split_var, asm.Literal(np.intp(1)))),
+        )
+        ctx_2 = ctx.scope()
+        ctx_2(ext_2, body_head)
+        emitted_head = ctx_2.emit()
+
+        # process tail
+        sequence_tail = partial(sequence_node, seq_field="tail")
+        body_tail = PostWalk(sequence_tail)(body)
+        ext_3 = SimpleExtentFType(
+            asm.Call(asm.Literal(operator.add), (split_var, asm.Literal(np.intp(2)))),
+            ext.result_format.get_end(ext),
+        )
+        ctx_3 = ctx.scope()
+        ctx_3(ext_3, body_tail)
+        emitted_tail = ctx_3.emit()
+
+        ctx.exec(asm.Block((*emitted_head, *emitted_tail)))
 
 
 @dataclass
@@ -111,7 +169,20 @@ class Run:
 class RunPass(LoopletPass):
     @property
     def priority(self):
-        return 0
+        return 1
+
+    def __call__(self, ctx, idx, ext, body):
+        def run_node(node):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)):
+                    if j == idx and isinstance(tns, Run):
+                        return ntn.Access(tns.body(ctx), mode, (j, *idxs))
+            return None
+
+        # TODO: Proper Run Pass
+        PostWalk(run_node)(body)
+        ctx_2 = ctx.scope()
+        ctx.exec(asm.Block(ctx_2.emit()))
 
 
 @dataclass
@@ -151,7 +222,7 @@ class LookupPass(LoopletPass):
     def __call__(self, ctx, idx, ext, body):
         idx_2 = asm.Variable(ctx.freshen(idx.name), idx.result_format)
 
-        def lookup_node(node):
+        def lookup_node(node):  # Lowers all Lookups for idx!
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
                     if j == idx and isinstance(tns, Lookup):
@@ -165,8 +236,8 @@ class LookupPass(LoopletPass):
         body_2 = PostWalk(lookup_node)(body)
         ctx_2 = ctx.scope()
         ext_2 = SingletonExtentFType.stack(idx_2)
-        ctx_2(ext_2, body_2)
-        start = ext.result_format.get_start(ext)
+        ctx_2(ext_2, body_2)  # calling LoopletContext
+        start = ext.result_format.get_start(ext)  # TODO: We should accept arbitrary ext
         stop = ext.result_format.get_end(ext)
         body_3 = asm.Block(ctx_2.emit())
         ctx.exec(asm.ForLoop(idx_2, start, stop, body_3))
@@ -206,7 +277,7 @@ class Leaf:
 class LeafPass(LoopletPass):
     @property
     def priority(self):
-        return 2
+        return 0
 
     def __call__(self, ctx, idx, ext, body):
         def leaf_node(node):
@@ -217,4 +288,4 @@ class LeafPass(LoopletPass):
             return None
 
         body_2 = PostWalk(leaf_node)(body)
-        ctx.ctx(body_2)
+        ctx.ctx(body_2)  # calling NotationContext

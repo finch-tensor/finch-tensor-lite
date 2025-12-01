@@ -403,7 +403,9 @@ class NumbaContext(Context):
         """
         Emit the headers for the C code.
         """
-        return "\n".join([*self.imports, self.emit()])
+        result = "\n".join([*self.imports, self.emit()])
+        print(result)
+        return result
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])

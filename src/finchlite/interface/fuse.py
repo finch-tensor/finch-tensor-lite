@@ -131,11 +131,11 @@ def set_default_scheduler(
 
         def fn_compile(plan):
             # TODO: proper logging
-            # print("Logic: \n", plan)
+            print("Logic: \n", plan)
             ntn_prgm, table_vars, tables = optimizer(plan)
-            # print("Notation: \n", ntn_prgm)
+            print("Notation: \n", ntn_prgm)
             asm_prgm = notation_compiler(ntn_prgm)
-            # print("Assembler: \n", asm_prgm)
+            print("Assembler: \n", asm_prgm)
             mod = numba_compiler(asm_prgm)
             args = provision_tensors(asm_prgm, table_vars, tables)
             return (mod.func(*args),)
