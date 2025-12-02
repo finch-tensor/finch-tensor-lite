@@ -16,7 +16,14 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFType, BufferFType, DictFType, TupleFType
+from ..finch_assembly import (
+    AssemblyStructFType,
+    BufferFType,
+    DictFType,
+    ImmutableStructFType,
+    MutableStructFType,
+    TupleFType,
+)
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
@@ -206,21 +213,11 @@ for t in (
     register_property(t, "numba_type", "__attr__", lambda t: t)
 
 
-def scalar_to_ctypes_copy(fmt, obj):
-    """
-    This hack is required because it turns out that scalars don't own memory or smth
-    """
-    arr = np.array([obj], dtype=obj.dtype, copy=True)
-    scalar_ctype = np.ctypeslib.as_ctypes_type(obj.dtype)
-    ptr_ctype = ctypes.POINTER(scalar_ctype)
-    return arr.ctypes.data_as(ptr_ctype).contents
-
-
 register_property(
     np.generic,
     "serialize_to_c",
     "__attr__",
-    scalar_to_ctypes_copy,
+    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
 )
 
 # pass by value -> no op
@@ -1097,57 +1094,55 @@ def struct_c_type(fmt: AssemblyStructFType):
     return new_struct
 
 
-def struct_c_type_wrapper(fmt: AssemblyStructFType):
-    """
-    C type decider for struct types. Serialization actually ensures that before
-    crossing the FFI boundary, all serialized structs are structs, not
-    pointers.
+"""
+Note: When serializing any struct to C, it will get serialized to a struct with
+no indirection.
 
-    The reason why we have this method is that ctypes can intelligently infer
-    whether we are working with a pointer arg type (pass by reference) or a
-    non-pointer type (pass by value)
-    """
-    t = struct_c_type(fmt)
-    if fmt.is_mutable:
-        return ctypes.POINTER(t)
-    return t
-
+When you pass a struct into a kernel that expects a struct pointer, ctypes can
+intelligently infer whether we are working with a pointer arg type (pass by
+reference) or a non-pointer type (in which case it will immediately apply
+indirection)
+"""
 
 register_property(
-    AssemblyStructFType,
+    MutableStructFType,
     "c_type",
     "__attr__",
-    struct_c_type_wrapper,
+    lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
+)
+
+register_property(
+    ImmutableStructFType, "c_type", "__attr__", lambda fmt: struct_c_type(fmt)
 )
 
 
-def struct_c_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
-    if fmt.is_mutable:
-        # we are passing things in as a pointer (reference c_type_wrapper)
-        return f"{obj}->{attr}"
-    return f"{obj}.{attr}"
-
-
 register_property(
-    AssemblyStructFType,
+    MutableStructFType,
     "c_getattr",
     "__attr__",
-    struct_c_getattr,
+    lambda fmt, ctx, obj, attr: f"{obj}->{attr}",
+)
+
+register_property(
+    ImmutableStructFType,
+    "c_getattr",
+    "__attr__",
+    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
 )
 
 
-def struct_c_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
-    if fmt.is_mutable:
-        ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
-    else:
-        ctx.emit(f"{ctx.feed}{obj}.{attr} = {val};")
+def struct_mutable_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
+    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
 
+
+# the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
+# but we will not include that because it's bad.
 
 register_property(
-    AssemblyStructFType,
+    MutableStructFType,
     "c_setattr",
     "__attr__",
-    struct_c_setattr,
+    struct_mutable_setattr,
 )
 
 
@@ -1193,5 +1188,5 @@ register_property(
     TupleFType,
     "c_type",
     "__attr__",
-    lambda fmt: struct_c_type_wrapper(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
+    lambda fmt: struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
 )
