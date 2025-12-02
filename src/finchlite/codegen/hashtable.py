@@ -24,7 +24,7 @@ from finchlite.finch_assembly.map import Dict
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.finch_assembly.struct import AssemblyStructFType, TupleFType
 
-stcpath = Path(__file__).parent / "stc"
+stcpath = Path(__file__).parent / "stc" / "include"
 hashmap_h = stcpath / "stc" / "hashmap.h"
 
 
