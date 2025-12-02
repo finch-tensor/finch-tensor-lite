@@ -5,7 +5,6 @@ from textwrap import dedent
 from typing import Any, NamedTuple, TypedDict
 
 import numba
-import numba.typed
 
 from finchlite.codegen.c import (
     CContext,
