@@ -689,14 +689,19 @@ def test_simple_struct():
 
 
 @pytest.mark.parametrize(
-    ["tabletype"],
+    ["constructor"],
     [
-        (CHashTable,),
-        (NumbaHashTable,),
+        (
+            lambda: CHashTable(
+                asm.TupleFType.from_tuple((int, int)),
+                asm.TupleFType.from_tuple((int, int, int)),
+            ),
+        ),
+        (lambda: NumbaHashTable(2, 3),),
     ],
 )
-def test_hashtable(tabletype):
-    table = tabletype(2, 3)
+def test_hashtable(constructor):
+    table = constructor()
 
     table_v = asm.Variable("a", ftype(table))
     table_slt = asm.Slot("a_", ftype(table))
@@ -742,14 +747,19 @@ def test_hashtable(tabletype):
 
 
 @pytest.mark.parametrize(
-    ["tabletype"],
+    ["constructor"],
     [
-        (CHashTable,),
-        (NumbaHashTable,),
+        (
+            lambda: CHashTable(
+                asm.TupleFType.from_tuple((int, int)),
+                asm.TupleFType.from_tuple((int, int, int)),
+            ),
+        ),
+        (lambda: NumbaHashTable(2, 3),),
     ],
 )
-def test_hashtable_fail(tabletype):
-    table = tabletype(2, 3)
+def test_hashtable_fail(constructor):
+    table = constructor()
 
     table_v = asm.Variable("a", ftype(table))
     table_slt = asm.Slot("a_", ftype(table))
