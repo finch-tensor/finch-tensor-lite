@@ -13,7 +13,7 @@ from finchlite.codegen.c import (
     c_type,
     construct_from_c,
     load_shared_lib,
-    serialize_to_c
+    serialize_to_c,
 )
 from finchlite.codegen.numba_backend import (
     NumbaContext,
