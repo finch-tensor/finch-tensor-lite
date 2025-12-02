@@ -1000,3 +1000,66 @@ def test_hashtable(compiler, constructor):
 
     assert not compiled.exists(table, key_type(1, 3))
     assert not compiled.exists(table, val_type(2, 3))
+
+
+@pytest.mark.parametrize(
+    ["compiler"],
+    [
+        (CCompiler(),),
+        (asm.AssemblyInterpreter(),),
+    ],
+)
+def test_multiple_c_hashtable(compiler):
+    """
+    This test exists because in the case of C, we might need to dump multiple
+    hash table definitions into the context.
+    """
+
+    def _tupletype(arity):
+        return asm.TupleFType.from_tuple(tuple(int for _ in range(arity)))
+
+    def func(table: CHashTable, num: int):
+        key_type = table.ftype.key_type
+        val_type = table.ftype.value_type
+        key_v = asm.Variable("key", key_type)
+        val_v = asm.Variable("val", val_type)
+        table_v = asm.Variable("a", ftype(table))
+        table_slt = asm.Slot("a_", ftype(table))
+        return asm.Function(
+            asm.Variable(f"setidx_{num}", val_type),
+            (table_v, key_v, val_v),
+            asm.Block(
+                (
+                    asm.Unpack(table_slt, table_v),
+                    asm.StoreDict(
+                        table_slt,
+                        key_v,
+                        val_v,
+                    ),
+                    asm.Repack(table_slt),
+                    asm.Return(asm.LoadDict(table_slt, key_v)),
+                )
+            ),
+        )
+
+    table1 = CHashTable(_tupletype(2), _tupletype(3))
+    table2 = CHashTable(_tupletype(1), _tupletype(4))
+
+    mod = compiler(
+        asm.Module(
+            (
+                func(table1, 1),
+                func(table2, 2),
+            )
+        )
+    )
+
+    # what's important here is that you can call setidx_1 on table1 and
+    # setidx_2 on table2.
+    assert mod.setidx_1(
+        table1, table1.key_type(1, 2), table1.value_type(2, 3, 4)
+    ) == table1.value_type(2, 3, 4)
+
+    assert mod.setidx_2(
+        table2, table2.key_type(1), table2.value_type(2, 3, 4, 5)
+    ) == table2.value_type(2, 3, 4, 5)
