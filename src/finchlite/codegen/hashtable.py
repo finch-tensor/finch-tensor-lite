@@ -13,6 +13,7 @@ from finchlite.codegen.c import (
     c_type,
     construct_from_c,
     load_shared_lib,
+    serialize_to_c
 )
 from finchlite.codegen.numba_backend import (
     NumbaContext,
@@ -93,25 +94,20 @@ class CHashTable(Dict):
     CHashTable class that basically connects up to an STC library.
     """
 
-    libraries: dict[tuple[int, int], CHashTableLibrary] = {}
+    libraries: dict[tuple[AssemblyStructFType, AssemblyStructFType], CHashTableLibrary] = {}
 
     @classmethod
     def gen_code(
         cls,
         ctx: "CContext",
-        key_type: "TupleFType",
-        value_type: "TupleFType",
+        key_type: "AssemblyStructFType",
+        value_type: "AssemblyStructFType",
         inline: bool = False,
     ) -> tuple[CHashMethods, str]:
-        assert isinstance(key_type, TupleFType)
-        assert isinstance(value_type, TupleFType)
-
-        key_len = len(key_type.struct_fields)
-        value_len = len(value_type.struct_fields)
         # dereference both key and value types; as given, they are both pointers.
         keytype_c = ctx.ctype_name(c_type(key_type))
         valuetype_c = ctx.ctype_name(c_type(value_type))
-        hmap_t = ctx.freshen("hmap", key_len, value_len)
+        hmap_t = ctx.freshen("hmap")
 
         ctx.add_header("#include <stdlib.h>")
 
@@ -122,14 +118,14 @@ class CHashTable(Dict):
         ctx.headers.append(f'#include "{hashmap_h}"')
 
         methods: CHashMethods = {
-            "init": ctx.freshen("finch_hmap_init", key_len, value_len),
-            "exists": ctx.freshen("finch_hmap_exists", key_len, value_len),
-            "load": ctx.freshen("finch_hmap_load", key_len, value_len),
-            "store": ctx.freshen("finch_hmap_store", key_len, value_len),
-            "cleanup": ctx.freshen("finch_hmap_cleanup", key_len, value_len),
+            "init": ctx.freshen("finch_hmap_init"),
+            "exists": ctx.freshen("finch_hmap_exists"),
+            "load": ctx.freshen("finch_hmap_load"),
+            "store": ctx.freshen("finch_hmap_store"),
+            "cleanup": ctx.freshen("finch_hmap_cleanup"),
         }
         # register these methods in the datastructures.
-        ctx.datastructures[CHashTableFType(key_len, value_len)] = methods
+        ctx.datastructures[CHashTableFType(key_type, value_type)] = methods
         inline_s = "static inline " if inline else ""
 
         # basically for the load functions, you need to provide a variable that
@@ -179,15 +175,12 @@ class CHashTable(Dict):
         return methods, hmap_t
 
     @classmethod
-    def compile(cls, key_len: int, value_len: int) -> CHashTableLibrary:
+    def compile(cls, key_type: AssemblyStructFType, value_type: AssemblyStructFType) -> CHashTableLibrary:
         """
         compile a library to use for the c hash table.
         """
-        if (key_len, value_len) in cls.libraries:
-            return cls.libraries[(key_len, value_len)]
-        key_type = _int_tuple_ftype(key_len)
-        value_type = _int_tuple_ftype(value_len)
-
+        if (key_type, value_type) in cls.libraries:
+            return cls.libraries[(key_type, value_type)]
         ctx = CContext()
         methods, hmap_t = cls.gen_code(ctx, key_type, value_type)
         code = ctx.emit_global()
@@ -228,66 +221,47 @@ class CHashTable(Dict):
         cleanup_func.argtypes = [ctypes.c_void_p]
         cleanup_func.restype = None
 
-        cls.libraries[(key_len, value_len)] = CHashTableLibrary(lib, methods, hmap_t)
-        return cls.libraries[(key_len, value_len)]
+        cls.libraries[(key_type, value_type)] = CHashTableLibrary(lib, methods, hmap_t)
+        return cls.libraries[(key_type, value_type)]
 
     def __init__(
-        self, key_len: int, value_len: int, map: "dict[tuple,tuple] | None" = None
+        self, key_type, value_type, map: "dict | None" = None
     ):
         """
         Constructor for the C Hash Table
         """
-        self.lib = self.__class__.compile(key_len, value_len)
-
-        self.key_len = key_len
-        self.value_len = value_len
+        self.lib = self.__class__.compile(key_type, value_type)
 
         # these are blank fields we need when serializing or smth
         self._struct: Any = None
         self._self_obj: Any = None
 
+        self._key_type = key_type
+        self._value_type = value_type
+
         if map is None:
             map = {}
         self.dct = getattr(self.lib.library, self.lib.methods["init"])()
         for key, value in map.items():
-            if not _is_integer_tuple(key, key_len):
-                raise TypeError(
-                    f"Supplied key {key} is not a tuple of {key_len} integers"
-                )
-            if not _is_integer_tuple(value, value_len):
-                raise TypeError(
-                    f"Supplied value {key} is not a tuple of {value_len} integers"
-                )
+            # if some error happens, the serialization will handle it.
             self.store(key, value)
 
     def __del__(self):
         getattr(self.lib.library, self.lib.methods["cleanup"])(self.dct)
 
     def exists(self, idx) -> bool:
-        idx = _tuplify(self.ftype.key_type, idx)
-        assert _is_integer_tuple(idx, self.key_len)
-        KeyStruct = c_type(self.ftype.key_type)
-        c_key = KeyStruct(*idx)
+        c_key = serialize_to_c(self.ftype.key_type, idx)
         c_value = getattr(self.lib.library, self.lib.methods["exists"])(self.dct, c_key)
         return bool(c_value)
 
     def load(self, idx):
-        idx = _tuplify(self.ftype.key_type, idx)
-        assert _is_integer_tuple(idx, self.key_len)
-        KeyStruct = c_type(self.ftype.key_type)
-        c_key = KeyStruct(*idx)
+        c_key = serialize_to_c(self.ftype.key_type, idx)
         c_value = getattr(self.lib.library, self.lib.methods["load"])(self.dct, c_key)
         return construct_from_c(self.ftype.value_type, c_value)
 
     def store(self, idx, val):
-        idx = _tuplify(self.ftype.key_type, idx)
-        val = _tuplify(self.ftype.value_type, val)
-        assert _is_integer_tuple(idx, self.key_len)
-        assert _is_integer_tuple(val, self.value_len)
-        KeyStruct = c_type(self.ftype.key_type)
-        ValueStruct = c_type(self.ftype.value_type)
-        c_key = KeyStruct(*idx)
-        c_value = ValueStruct(*val)
+        c_key = serialize_to_c(self.ftype.key_type, idx)
+        c_value = serialize_to_c(self.ftype.value_type, val)
         getattr(self.lib.library, self.lib.methods["store"])(self.dct, c_key, c_value)
 
     def __str__(self):
@@ -295,7 +269,7 @@ class CHashTable(Dict):
 
     @property
     def ftype(self):
-        return CHashTableFType(self.key_len, self.value_len)
+        return CHashTableFType(self._key_type, self._value_type)
 
 
 class CHashTableFType(CDictFType, CStackFType):
@@ -303,25 +277,25 @@ class CHashTableFType(CDictFType, CStackFType):
     An implementation of Hash Tables using the stc library.
     """
 
-    def __init__(self, key_len: int, value_len: int):
-        self.key_len = key_len
-        self.value_len = value_len
-        self._key_type = _int_tuple_ftype(key_len)
-        self._value_type = _int_tuple_ftype(value_len)
+    def __init__(self, key_type: AssemblyStructFType, value_type: AssemblyStructFType):
+        # these should both be immutable structs/POD types.
+        # we will enforce this once the immutable struct PR is merged.
+        self._key_type = key_type
+        self._value_type = value_type
 
     def __eq__(self, other):
         if not isinstance(other, CHashTableFType):
             return False
-        return self.key_len == other.key_len and self.value_len == other.value_len
+        return self.key_type == other.key_type and self.value_type == other.value_type
 
     def __call__(self):
-        return CHashTable(self.key_len, self.value_len, {})
+        return CHashTable(self.key_type, self.value_type, {})
 
     def __str__(self):
-        return f"chashtable_t({self.key_len}, {self.value_len})"
+        return f"chashtable_t({self.key_type}, {self.value_type})"
 
     def __repr__(self):
-        return f"CHashTableFType({self.key_len}, {self.value_len})"
+        return f"CHashTableFType({self.key_type}, {self.value_type})"
 
     @property
     def key_type(self):
@@ -344,7 +318,7 @@ class CHashTableFType(CDictFType, CStackFType):
         This method needs to be here because you are going to be using this
         type as a key in dictionaries.
         """
-        return hash(("CHashTableFType", self.key_len, self.value_len))
+        return hash(("CHashTableFType", self.key_type, self.value_type))
 
     """
     Methods for the C Backend
@@ -389,7 +363,7 @@ class CHashTableFType(CDictFType, CStackFType):
         data = ctx.freshen(var_n, "data")
         # Add all the stupid header stuff from above.
         ctx.add_datastructure(
-            ("CHashTableFType", self.key_len, self.value_len),
+            ("CHashTableFType", self.key_type, self.value_type),
             lambda ctx: CHashTable.gen_code(
                 ctx, self.key_type, self.value_type, inline=True
             ),
@@ -410,8 +384,8 @@ class CHashTableFType(CDictFType, CStackFType):
         This datatype will then immediately get turned into a struct.
         """
         assert isinstance(obj, CHashTable)
-        map = ctypes.c_void_p(obj.dct)
-        struct = CHashTableStruct(map, obj)
+        dct = ctypes.c_void_p(obj.dct)
+        struct = CHashTableStruct(dct, obj)
         # We NEED this for stupid ownership reasons.
         obj._self_obj = ctypes.py_object(obj)
         obj._struct = struct
@@ -426,7 +400,7 @@ class CHashTableFType(CDictFType, CStackFType):
 
         obj.dct = res.contents.map
 
-    def construct_from_c(self, c_map):
+    def construct_from_c(self, c_dct):
         """
         Construct a CHashTable from a C-compatible structure.
 
@@ -634,8 +608,8 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
 
 
 if __name__ == "__main__":
-    table = NumbaHashTable(2, 3, {(1, 2): (1, 4, 3)})
-    print(numba_type(table.ftype.key_type))
+    table = CHashTable(2, 3, {(1, 2): (1, 4, 3)})
+    print(c_type(table.ftype.key_type))
     table.store((2, 3), (3, 2, 3))
     print(table.exists((2, 3)))
     print(table.load((2, 3)))

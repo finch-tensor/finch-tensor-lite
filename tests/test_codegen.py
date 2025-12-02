@@ -6,9 +6,8 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-import pytest
-
 import numpy as np
+import pytest
 from numpy.testing import assert_equal
 
 import finchlite
@@ -23,11 +22,7 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import (
-    construct_from_c,
-    deserialize_from_c,
-    serialize_to_c,
-)
+from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
 from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_backend import (
@@ -933,16 +928,28 @@ def test_e2e_numba():
 
 
 @pytest.mark.parametrize(
-    ["compiler", "tabletype"],
+    ["compiler", "constructor"],
     [
-        (CCompiler(), CHashTable),
-        (asm.AssemblyInterpreter(), CHashTable),
-        (NumbaCompiler(), NumbaHashTable),
-        (asm.AssemblyInterpreter(), NumbaHashTable),
+        (
+            CCompiler(),
+            lambda: CHashTable(
+                asm.TupleFType.from_tuple((int, int)),
+                asm.TupleFType.from_tuple((int, int, int)),
+            ),
+        ),
+        (
+            asm.AssemblyInterpreter(),
+            lambda: CHashTable(
+                asm.TupleFType.from_tuple((int, int)),
+                asm.TupleFType.from_tuple((int, int, int)),
+            ),
+        ),
+        (NumbaCompiler(), lambda: NumbaHashTable(2, 3)),
+        (asm.AssemblyInterpreter(), lambda: NumbaHashTable(2, 3)),
     ],
 )
-def test_hashtable(compiler, tabletype):
-    table = tabletype(2, 3)
+def test_hashtable(compiler, constructor):
+    table = constructor()
 
     table_v = asm.Variable("a", ftype(table))
     table_slt = asm.Slot("a_", ftype(table))
