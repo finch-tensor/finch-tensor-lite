@@ -13,14 +13,13 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.finch_assembly.struct import MutableStructFType
-
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,
     ImmutableStructFType,
+    MutableStructFType,
     TupleFType,
 )
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
@@ -212,21 +211,11 @@ for t in (
     register_property(t, "numba_type", "__attr__", lambda t: t)
 
 
-def scalar_to_ctypes_copy(fmt, obj):
-    """
-    This hack is required because it turns out that scalars don't own memory or smth
-    """
-    arr = np.array([obj], dtype=obj.dtype, copy=True)
-    scalar_ctype = np.ctypeslib.as_ctypes_type(obj.dtype)
-    ptr_ctype = ctypes.POINTER(scalar_ctype)
-    return arr.ctypes.data_as(ptr_ctype).contents
-
-
 register_property(
     np.generic,
     "serialize_to_c",
     "__attr__",
-    scalar_to_ctypes_copy,
+    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
 )
 
 # pass by value -> no op
