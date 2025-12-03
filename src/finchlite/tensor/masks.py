@@ -5,7 +5,6 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor
 from ..compile import looplets as lplt
 from ..tensor import Level, LevelFType
 
@@ -137,7 +136,7 @@ class LoTriMask(Level):
         return self.lvl
 
 
-def tril(x: Tensor, /, *, k: int = 0) -> Tensor:
+def tril(x, /, *, k: int = 0):
     if k != 0:
         raise Exception(f"Only k=0 is supported, but got: {k}")
 
@@ -145,7 +144,7 @@ def tril(x: Tensor, /, *, k: int = 0) -> Tensor:
     lvl = x.lvl
     for _ in range(x.ndim - 2):
         lvl = lvl.lvl
-    low_tri_mask = LoTriMask(LoTriMaskFType(lvl.lvl.ftype), lvl.lvl)
+    low_tri_mask = LoTriMask(LoTriMaskFType(lvl.lvl.ftype), lvl.lvl)  # type: ignore[abstract]
     lvl.lvl = low_tri_mask
     lvl._format._lvl_t = low_tri_mask.ftype
 
