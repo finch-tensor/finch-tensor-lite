@@ -20,6 +20,7 @@ from finchlite.finch_logic import (
     Table,
 )
 from finchlite.galley.TensorStats import TensorStats
+from finchlite.symbolic import PostOrderDFS
 
 
 @dataclass
@@ -171,55 +172,57 @@ def get_idx_connected_components(
 
 
 def replace_and_remove_nodes(
-    expr: LogicNode,
+    expr: LogicExpression,
     node_to_replace: LogicExpression,
     new_node: LogicExpression,
     nodes_to_remove: Collection[LogicExpression],
-) -> LogicNode:
+) -> LogicExpression:
     """
     Replace and/or remove arguments of a pointwise MapJoin expression.
 
     Parameters
     ----------
-    expr : LogicNode
+    expr : LogicExpression
         The expression to transform. Typically a `MapJoin` in a pointwise
         subexpression.
-    node_to_replace : LogicNode
+    node_to_replace : LogicExpression
         The node to replace when it appears as an argument to `expr`, or as
         `expr` itself.
-    new_node : LogicNode
+    new_node : LogicExpression
         The node that replaces `node_to_replace` wherever it is found.
-    nodes_to_remove : Collection[LogicNode]
+    nodes_to_remove : Collection[LogicExpression]
         A collection of nodes that, if present as arguments to a `MapJoin`,
         should be removed from its argument list.
 
     Returns
     -------
-    LogicNode
-        A new `MapJoin` node with updated arguments if `expr` is a `MapJoin`,
+    LogicExpression
+        A `MapJoin` node with updated arguments if `expr` is a `MapJoin`,
         `new_node` if `expr == node_to_replace`, or the original `expr`
         otherwise.
     """
     if expr == node_to_replace:
         return new_node
 
-    if isinstance(expr, (Plan, Query, Aggregate)):
-        raise ValueError(
-            f"There should be no {type(expr).__name__} nodes in a pointwise expression."
-        )
+    nodes_to_remove = set(nodes_to_remove)
 
-    if isinstance(expr, MapJoin):
-        nodes_to_remove = set(nodes_to_remove)
-        new_args: list[LogicExpression] = []
+    for node in PostOrderDFS(expr):
+        if isinstance(node, (Plan, Query, Aggregate)):
+            raise ValueError(
+                f"There should be no {type(node).__name__} "
+                "nodes in a pointwise expression."
+            )
 
-        for arg in expr.args:
-            if arg in nodes_to_remove:
-                continue
-            if arg == node_to_replace:
-                arg = new_node
-            new_args.append(arg)
-
-        return MapJoin(expr.op, tuple(new_args))
+        if isinstance(node, MapJoin) and any(
+            (arg == node_to_replace) or (arg in nodes_to_remove) for arg in node.args
+        ):
+            new_args: list[LogicExpression] = [
+                arg for arg in node.args if arg not in nodes_to_remove
+            ]
+            for i, arg in enumerate(new_args):
+                if arg == node_to_replace:
+                    new_args[i] = new_node
+            object.__setattr__(node, "args", tuple(new_args))
     return expr
 
 

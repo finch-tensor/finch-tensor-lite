@@ -1408,39 +1408,95 @@ def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
 
 
 @pytest.mark.parametrize(
-    "arg_names,node_to_replace,nodes_to_remove,expected_names",
+    "expr,node_to_replace,new_node,nodes_to_remove,expected_names",
     [
-        (["a", "b", "c"], "b", [], ["a", "a", "c"]),
-        (["a", "b", "c"], "b", ["c"], ["a", "a"]),
-        (["a", "b", "c"], "c", ["c"], ["a", "b"]),
-        (["a", "b", "c"], "b", ["b"], ["a", "c"]),
-        (["a", "b", "c"], "c", [], ["a", "b", "a"]),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            set(),
+            ["a", "a", "c"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("c"), (Field("c"),))},
+            ["a", "a"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("c"), (Field("c"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("c"), (Field("c"),))},
+            ["a", "b"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("b"), (Field("b"),))},
+            ["a", "c"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("c"), (Field("c"),)),
+            Table(Literal("a"), (Field("a"),)),
+            set(),
+            ["a", "b", "a"],
+        ),
     ],
 )
 def test_replace_and_remove_nodes(
-    arg_names,
+    expr,
     node_to_replace,
+    new_node,
     nodes_to_remove,
     expected_names,
 ):
-    args = [Table(Literal(name), (Field(name),)) for name in arg_names]
-    node_to_replace_node = next(
-        tbl for tbl in args if tbl.idxs[0].name == node_to_replace
-    )
-    new_node = args[0]
-
-    nodes_to_remove_nodes = {tbl for tbl in args if tbl.idxs[0].name in nodes_to_remove}
-
-    expr_node = MapJoin(Literal("op"), tuple(args))
-
     out = replace_and_remove_nodes(
-        expr=expr_node,
-        node_to_replace=node_to_replace_node,
+        expr=expr,
+        node_to_replace=node_to_replace,
         new_node=new_node,
-        nodes_to_remove=nodes_to_remove_nodes,
+        nodes_to_remove=nodes_to_remove,
     )
-    result = [tbl.idxs[0].name for tbl in out.args]
 
+    result = [tbl.idxs[0].name for tbl in out.args]
     assert result == expected_names
 
 
@@ -1482,7 +1538,7 @@ def test_replace_and_remove_nodes(
             ["A"],
         ),
         # Nested case:
-        # root = MapJoin(mul, [A(i,j), B(i)]), reduce over i → [A]
+        # root = MapJoin(mul, [A(i,j), B(j)]), reduce over i → [A]
         (
             MapJoin(
                 Literal(op.mul),
@@ -1504,7 +1560,6 @@ def test_replace_and_remove_nodes(
                 ),
             ),
             "i",
-            # expected root is the entire max node
             [
                 MapJoin(
                     Literal(max),
@@ -1515,18 +1570,39 @@ def test_replace_and_remove_nodes(
                 )
             ],
         ),
+        # root = MapJoin(mul, [A(j), MapJoin(max, [B(i), C(j)])]), reduce over i
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("j"),)),
+                    MapJoin(
+                        Literal(max),
+                        (
+                            Table(Literal("B"), (Field("i"),)),
+                            Table(Literal("C"), (Field("j"),)),
+                        ),
+                    ),
+                ),
+            ),
+            "i",
+            [
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal("B"), (Field("i"),)),
+                        Table(Literal("C"), (Field("j"),)),
+                    ),
+                )
+            ],
+        ),
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
     roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
-    if (
-        isinstance(root, MapJoin)
-        and isinstance(root.op, Literal)
-        and root.op.val is max
-        and idx_name == "i"
-    ):
+    if expected and not isinstance(expected[0], str):
         assert roots == expected
     else:
         # All other cases:
