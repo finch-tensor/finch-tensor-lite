@@ -300,15 +300,15 @@ register_property(
 
 # deserialize_to_c should modify in place. TODO: implement
 
-for t in (int, float):
+for typ in (int, float):
     register_property(
-        t,
+        typ,
         "c_hash",
         "__attr__",
         c_hash_default,
     )
     register_property(
-        t,
+        typ,
         "c_eq",
         "__attr__",
         c_eq_default,
@@ -1045,6 +1045,7 @@ class CHashableFType(FType):
         """
         ...
 
+    @abstractmethod
     def c_eq(self, ctx: CContext) -> str:
         """
         Emit code from CContext that takes an expression and returns the NAME
