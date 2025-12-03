@@ -6,9 +6,8 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-import pytest
-
 import numpy as np
+import pytest
 from numpy.testing import assert_equal
 
 import finchlite
@@ -23,7 +22,12 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.c import (
+    CContext,
+    construct_from_c,
+    deserialize_from_c,
+    serialize_to_c,
+)
 from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_backend import (
@@ -1048,12 +1052,17 @@ def test_multiple_c_hashtable(compiler):
 
     table1 = CHashTable(_int_tupletype(2), _int_tupletype(3))
     table2 = CHashTable(_int_tupletype(1), _int_tupletype(4))
+    table3 = CHashTable(
+        asm.TupleFType.from_tuple((float, int)),
+        asm.TupleFType.from_tuple((float, float)),
+    )
 
     mod = compiler(
         asm.Module(
             (
                 func(table1, 1),
                 func(table2, 2),
+                func(table3, 3),
             )
         )
     )
@@ -1067,3 +1076,7 @@ def test_multiple_c_hashtable(compiler):
     assert mod.setidx_2(
         table2, table2.key_type(1), table2.value_type(2, 3, 4, 5)
     ) == table2.value_type(2, 3, 4, 5)
+
+    assert mod.setidx_3(
+        table3, table3.key_type(0.1, 2), table3.value_type(0.2, 0.2)
+    ) == table3.value_type(0.2, 0.2)

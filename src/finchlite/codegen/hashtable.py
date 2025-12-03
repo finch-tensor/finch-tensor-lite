@@ -10,6 +10,8 @@ from finchlite.codegen.c import (
     CContext,
     CDictFType,
     CStackFType,
+    c_eq,
+    c_hash,
     c_type,
     construct_from_c,
     load_shared_lib,
@@ -111,12 +113,16 @@ class CHashTable(Dict):
         valuetype_c = ctx.ctype_name(c_type(value_type))
         hmap_t = ctx.freshen("hmap")
 
+        hash_macro = c_hash(key_type, ctx)
+        eq_macro = c_eq(key_type, ctx)
+
         ctx.add_header("#include <stdlib.h>")
 
         # these headers should just be added to the headers list.
         # deduplication is catastrophic here.
         ctx.headers.append(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
-        ctx.headers.append("#define i_eq c_memcmp_eq")
+        ctx.headers.append(f"#define i_eq {eq_macro}")
+        ctx.headers.append(f"#define i_hash {hash_macro}")
         ctx.headers.append(f'#include "{hashmap_h}"')
 
         methods: CHashMethods = {
