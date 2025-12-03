@@ -54,6 +54,10 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         Returns:
             An instance of ElementLevel.
         """
+        # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
+        if val is not None and isinstance(val, np.ndarray):
+            from ...codegen import NumpyBuffer
+            val = NumpyBuffer(np.asarray(val).reshape(-1))
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         return ElementLevel(self, val)
@@ -80,9 +84,12 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def to_kwargs(self):
         return asdict(self)
 
-    def from_fields(self, *args) -> "ElementLevel":
-        return ElementLevel(*args)
-
+    def from_fields(self, val = None) -> "ElementLevel":
+        # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
+        if val is not None and isinstance(val, np.ndarray):
+            from ...codegen import NumpyBuffer
+            val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
+        return ElementLevel(_format=self, _val=val)
     @property
     def shape_type(self):
         return ()
