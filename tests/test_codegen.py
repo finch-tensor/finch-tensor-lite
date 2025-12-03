@@ -1106,5 +1106,7 @@ def test_multiple_c_hashtable(compiler):
     ) == table3.value_type(a=0.2, b=0.2)
 
     assert mod.setidx_4(
-        table4, table4.key_type(a=0.1, b=nestedtype(b=1, c=0.2)), table4.value_type(a=0.2, b=0.2)
+        table4,
+        table4.key_type(a=0.1, b=nestedtype(b=1, c=0.2)),
+        table4.value_type(a=0.2, b=0.2),
     ) == table4.value_type(a=0.2, b=0.2)

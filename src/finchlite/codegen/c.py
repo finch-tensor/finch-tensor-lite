@@ -1181,9 +1181,7 @@ class CStackFType(ABC):
 
 
 def serialize_struct_to_c(fmt: AssemblyStructFType, obj) -> Any:
-    args = [
-        serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields
-    ]
+    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
     return struct_c_type(fmt)(*args)
 
 

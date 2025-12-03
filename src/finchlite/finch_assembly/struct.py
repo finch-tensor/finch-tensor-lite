@@ -123,7 +123,7 @@ class NamedTupleFType(ImmutableStructFType):
 
         return all(
             fisinstance(elt, format)
-            for elt, format in zip(other, self.struct_fieldformats)
+            for elt, format in zip(other, self.struct_fieldformats, strict=False)
         )
 
     def __call__(self, *args):
@@ -183,7 +183,7 @@ class TupleFType(ImmutableStructFType):
             return False
         return all(
             fisinstance(elt, format)
-            for elt, format in zip(other, self.struct_fieldformats)
+            for elt, format in zip(other, self.struct_fieldformats, strict=False)
         )
 
     def __call__(self, **kwargs):
