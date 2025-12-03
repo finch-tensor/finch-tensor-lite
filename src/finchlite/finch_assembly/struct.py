@@ -66,7 +66,24 @@ class AssemblyStructFType(FType, ABC):
         return dict(self.struct_fields)[attr]
 
 
-class NamedTupleFType(AssemblyStructFType):
+class ImmutableStructFType(AssemblyStructFType):
+    @property
+    def is_mutable(self) -> bool:
+        return False
+
+
+class MutableStructFType(AssemblyStructFType):
+    """
+    Class for a mutable assembly struct type.
+    It is currently not used anywhere, but maybe it will be useful in the future?
+    """
+
+    @property
+    def is_mutable(self) -> bool:
+        return True
+
+
+class NamedTupleFType(ImmutableStructFType):
     def __init__(self, struct_name, struct_fields):
         self._struct_name = struct_name
         self._struct_fields = struct_fields
@@ -106,7 +123,7 @@ class NamedTupleFType(AssemblyStructFType):
         return namedtuple(self.struct_name, self.struct_fieldnames)(args)
 
 
-class TupleFType(AssemblyStructFType):
+class TupleFType(ImmutableStructFType):
     def __init__(self, struct_name, struct_formats):
         self._struct_name = struct_name
         self._struct_formats = struct_formats

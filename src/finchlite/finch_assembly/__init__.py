@@ -1,9 +1,5 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import (
-    AssemblyCFGBuilder,
-    assembly_build_cfg,
-    assembly_number_uses,
-)
+from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
@@ -36,7 +32,13 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
-from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
+from .struct import (
+    AssemblyStructFType,
+    ImmutableStructFType,
+    MutableStructFType,
+    NamedTupleFType,
+    TupleFType,
+)
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 
 __all__ = [
@@ -61,10 +63,12 @@ __all__ = [
     "GetAttr",
     "If",
     "IfElse",
+    "ImmutableStructFType",
     "Length",
     "Literal",
     "Load",
     "Module",
+    "MutableStructFType",
     "NamedTupleFType",
     "Print",
     "Repack",
