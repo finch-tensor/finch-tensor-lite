@@ -112,6 +112,7 @@ class CHashTable(Dict):
         hmap_t = ctx.freshen("hmap")
 
         ctx.add_header("#include <stdlib.h>")
+        ctx.add_header("#include <stdio.h>")
 
         # these headers should just be added to the headers list.
         # deduplication is catastrophic here.
@@ -152,7 +153,9 @@ class CHashTable(Dict):
             {methods["load"]}(
                 {hmap_t} *map, {keytype_c} key
             ) {{
+                printf("Loading happening\\n");
                 const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
+                printf("Loading Done\\n");
                 return *internal_val;
             }}
 
@@ -160,7 +163,9 @@ class CHashTable(Dict):
             {methods["store"]}(
                 {hmap_t} *map, {keytype_c} key, {valuetype_c} value
             ) {{
+                printf("Storing happening\\n");
                 {hmap_t}_insert_or_assign(map, key, value);
+                printf("Storing Done\\n");
             }}
 
             {inline_s}void
