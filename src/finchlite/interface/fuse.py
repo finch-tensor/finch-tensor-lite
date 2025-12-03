@@ -67,7 +67,6 @@ from ..compile import BufferizedNDArray, NotationCompiler
 from ..finch_logic import (
     Alias,
     Field,
-    LogicInterpreter,
     Literal,
     Plan,
     Produces,
@@ -99,7 +98,7 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        #_DEFAULT_SCHEDULER = LogicInterpreter()
+        # _DEFAULT_SCHEDULER = LogicInterpreter()
         _DEFAULT_SCHEDULER = LogicNormalizer(LogicExecutor())
 
     elif mode == Mode.INTERPRET_NOTATION:
@@ -111,7 +110,12 @@ def set_default_scheduler(
             mod = ntn_interp(prgm)
             args = provision_tensors(prgm, tables)
             res = mod.func(*args)
-            return (TableValue(res, tuple(Field("i") for i in range(res.ndim)),),)
+            return (
+                TableValue(
+                    res,
+                    tuple(Field("i") for i in range(res.ndim)),
+                ),
+            )
 
         _DEFAULT_SCHEDULER = fn_compile
         _DEFAULT_SCHEDULER = LogicExecutor()
@@ -127,7 +131,12 @@ def set_default_scheduler(
             mod = asm_interp(asm_prgm)
             args = provision_tensors(asm_prgm, tables)
             res = mod.func(*args)
-            return (TableValue(res, tuple(Field("i") for i in range(res.ndim)),),)
+            return (
+                TableValue(
+                    res,
+                    tuple(Field("i") for i in range(res.ndim)),
+                ),
+            )
 
         _DEFAULT_SCHEDULER = fn_compile
 
@@ -146,7 +155,12 @@ def set_default_scheduler(
             mod = numba_compiler(asm_prgm)
             args = provision_tensors(asm_prgm, tables)
             res = mod.func(*args)
-            return (TableValue(res, tuple(Field("i") for i in range(res.ndim)),),)
+            return (
+                TableValue(
+                    res,
+                    tuple(Field("i") for i in range(res.ndim)),
+                ),
+            )
 
         _DEFAULT_SCHEDULER = fn_compile
 

@@ -168,7 +168,9 @@ class LogicExecutor(LogicEvaluator):
 
         inputs = [tbl.tns for tbl in bindings.values()]
         workspaces = [
-            tbl.tns(tuple(sizes[idx] for idx in tbl.idxs)) for var, tbl in workspace_ftypes.items() if var not in bindings
+            tbl.tns(tuple(sizes[idx] for idx in tbl.idxs))
+            for var, tbl in workspace_ftypes.items()
+            if var not in bindings
         ]
 
         res = mod.main(*inputs, *workspaces)
@@ -178,5 +180,7 @@ class LogicExecutor(LogicEvaluator):
         )
 
         if isinstance(res, tuple):
-            return tuple(TableValue(tns, idxs) for idxs, tns in zip(res_idxs, res, strict=True))
+            return tuple(
+                TableValue(tns, idxs) for idxs, tns in zip(res_idxs, res, strict=True)
+            )
         return TableValue(res, res_idxs)

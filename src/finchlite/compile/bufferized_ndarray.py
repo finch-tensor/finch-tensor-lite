@@ -145,7 +145,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             ("shape", self.shape_t),
             ("strides", self.strides_t),
         ]
-    
+
     def from_fields(self, buf, shape, strides):
         return BufferizedNDArray(
             buf,
@@ -346,7 +346,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
 
     def __hash__(self):
         return hash((self.tns, self.nind, self.pos, self.op))
-    
+
     def __call__(self, shape: tuple) -> BufferizedNDArrayAccessor:
         raise NotImplementedError(
             "Cannot directly instantiate BufferizedNDArrayAccessor from ftype"
