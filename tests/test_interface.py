@@ -133,7 +133,7 @@ class TestEagerTensor(finchlite.EagerTensor):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -141,7 +141,7 @@ class TestEagerTensor(finchlite.EagerTensor):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -241,7 +241,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -327,7 +327,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -393,7 +393,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -401,7 +401,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -409,7 +409,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -468,7 +468,7 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -566,7 +566,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -574,7 +574,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_matmul(a, b, a_wrap, b_wrap):
@@ -627,7 +627,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_matrix_transpose(a, a_wrap):
@@ -684,7 +684,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -692,7 +692,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_tensordot(a, b, axes, a_wrap, b_wrap):
@@ -769,7 +769,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -777,7 +777,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
@@ -948,7 +948,7 @@ def test_scalar_coerce(x, func):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_broadcast_to(x, shape, x_wrap):
@@ -988,7 +988,7 @@ def test_broadcast_to(x, shape, x_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
@@ -1050,7 +1050,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
@@ -1117,7 +1117,7 @@ def test_concat_invalid(shapes, rng):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_moveaxis(shape, source, destination, wrapper, rng):
@@ -1174,7 +1174,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
@@ -1229,7 +1229,7 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
@@ -1292,7 +1292,7 @@ def test_split_dims_errors(array_shape, axis, split_shape):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_combine_dims(array_shape, axes, expected_shape, wrapper):
@@ -1357,7 +1357,7 @@ def test_combine_dims_errors(array_shape, axes):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_flatten(array_shape, expected_shape, wrapper):

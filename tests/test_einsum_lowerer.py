@@ -10,7 +10,7 @@ from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.finch_einsum import EinsumInterpreter
 from finchlite.finch_logic import Alias, LogicExpression, Plan, Produces, Query
 from finchlite.interface.fuse import compute
-from finchlite.interface.lazy import defer
+from finchlite.interface.lazy import lazy
 from finchlite.symbolic import gensym
 
 
@@ -51,8 +51,8 @@ def lower_and_execute(ir: LogicExpression):
 
 def test_simple_addition(rng):
     """Test lowering of simple addition A + B"""
-    A = defer(rng.random((3, 3)))
-    B = defer(rng.random((3, 3)))
+    A = lazy(rng.random((3, 3)))
+    B = lazy(rng.random((3, 3)))
 
     C = finchlite.add(A, B)
 
@@ -66,7 +66,7 @@ def test_simple_addition(rng):
 
 def test_scalar_multiplication(rng):
     """Test lowering of scalar multiplication 2 * A"""
-    A = defer(rng.random((4, 4)))
+    A = lazy(rng.random((4, 4)))
 
     B = finchlite.multiply(2, A)
 
@@ -78,9 +78,9 @@ def test_scalar_multiplication(rng):
 
 def test_element_wise_operations(rng):
     """Test lowering of element-wise operations"""
-    A = defer(rng.random((3, 3)))
-    B = defer(rng.random((3, 3)))
-    C = defer(rng.random((3, 3)))
+    A = lazy(rng.random((3, 3)))
+    B = lazy(rng.random((3, 3)))
+    C = lazy(rng.random((3, 3)))
 
     D = finchlite.add(finchlite.multiply(A, B), C)
 
@@ -92,7 +92,7 @@ def test_element_wise_operations(rng):
 
 def test_sum_reduction(rng):
     """Test sum reduction using +="""
-    A = defer(rng.random((3, 4)))
+    A = lazy(rng.random((3, 4)))
 
     B = finchlite.sum(A, axis=1)
 
@@ -104,7 +104,7 @@ def test_sum_reduction(rng):
 
 def test_maximum_reduction(rng):
     """Test maximum reduction using max="""
-    A = defer(rng.random((3, 4)))
+    A = lazy(rng.random((3, 4)))
 
     B = finchlite.max(A, axis=1)
 
@@ -115,8 +115,8 @@ def test_maximum_reduction(rng):
 
 def test_batch_matrix_multiplication(rng):
     """Test batch matrix multiplication using +="""
-    A = defer(rng.random((2, 3, 4)))
-    B = defer(rng.random((2, 4, 5)))
+    A = lazy(rng.random((2, 3, 4)))
+    B = lazy(rng.random((2, 4, 5)))
 
     C = finchlite.matmul(A, B)
 
@@ -127,7 +127,7 @@ def test_batch_matrix_multiplication(rng):
 
 def test_minimum_reduction(rng):
     """Test minimum reduction using min="""
-    A = defer(rng.random((3, 4)))
+    A = lazy(rng.random((3, 4)))
 
     B = finchlite.min(A, axis=1)
 
