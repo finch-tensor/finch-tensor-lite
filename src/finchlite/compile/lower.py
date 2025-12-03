@@ -126,7 +126,7 @@ class SingletonExtent:
         ctx_2(body)
 
 
-class FinchCompileError(Exception):
+class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir
     """
     Exception raised during Finch compilation.
     This is used to indicate errors in the compilation process.
@@ -138,8 +138,26 @@ class FinchCompileError(Exception):
         self.node = node
 
 
+@dataclass
+class SimpleExtentFType:  # TODO: Remove once solved in Lookup looplet
+    start: Any
+    end: Any
+
+    def get_start(self, ext):
+        return self.start
+
+    def get_end(self, ext):
+        return self.end
+
+    @property
+    def result_format(self):
+        return self
+
+
 @dataclass(eq=True, frozen=True)
-class ExtentFType(AssemblyStructFType):
+class ExtentFType(
+    AssemblyStructFType
+):  # We're using same class for types and variables!!!
     start: Any
     end: Any
 
@@ -178,12 +196,12 @@ class ExtentFType(AssemblyStructFType):
     def get_end(self, ext):
         return asm.GetAttr(ext, asm.Literal("end"))
 
-    def lower_loop(self, ctx, idx, ext, body):
+    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
         """
         Lower a loop with the given index and body.
         This is used to compile the loop into assembly.
         """
-        lower_looplets(ctx, idx, ext, body)
+        lower_looplets(ctx, idx, visited_idxs, ext, body)
         return
 
     def default_loop(self, ctx, idx, ext, body):
@@ -236,8 +254,8 @@ class SingletonExtentFType:
     def get_end(self, ext):
         return asm.GetAttr(ext, "idx")
 
-    def lower_loop(self, ctx, idx, ext, body):
-        lower_looplets(ctx, idx, ext, body)
+    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
+        lower_looplets(ctx, idx, visited_idxs, ext, body)
         return
 
     def default_loop(self, ctx, idx, ext, body):
@@ -274,7 +292,7 @@ class NotationCompiler:
         self.ctx = ctx
 
     def __call__(self, prgm):
-        ctx_2 = NotationContext()
+        ctx_2 = NotationContext()  # TODO: rename it
 
         return self.ctx(ctx_2(prgm))
 
@@ -372,7 +390,7 @@ class NotationContext(Context):
         assert self.access_modes[tns_var] == ntn.Read()
         del self.access_modes[tns_var]
 
-    def __call__(self, prgm):
+    def __call__(self, prgm, visited_idxs=()):
         """
         Lower Finch Notation to Finch Assembly. First we check for early
         simplifications, then we call the normal lowering for the outermost
@@ -450,7 +468,7 @@ class NotationContext(Context):
                 return None
             case ntn.Loop(idx, ext, body):
                 # first instantiate tensors
-                ext.result_format.lower_loop(self, idx, self(ext), body)
+                ext.result_format.lower_loop(self, idx, visited_idxs, self(ext), body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 self._thaw_tensor(tns.name, op)
@@ -547,7 +565,7 @@ def instantiate(ctx, prgm):
     return Rewrite(PostWalk(instantiate_node))(prgm)
 
 
-def lower_looplets(ctx, idx, ext, body):
+def lower_looplets(ctx, idx, visited_idxs, ext, body):
     body = instantiate(ctx, body)
     ctx_2 = ctx.scope()
 
@@ -556,12 +574,12 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
+                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, proto=None)
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
-    ctx_3 = LoopletContext(ctx, idx)
+    ctx_3 = LoopletContext(ctx, idx, visited_idxs)
     ctx_3(ext, body)
 
 
@@ -588,9 +606,10 @@ class DefaultPass(LoopletPass):
 
 
 class LoopletContext(Context):
-    def __init__(self, ctx, idx):
+    def __init__(self, ctx, idx, visited_idxs):
         self.ctx = ctx  # NotationContext
         self.idx = idx
+        self.visited_idxs = visited_idxs
 
     def freshen(self, *tags):
         return self.ctx.freshen(*tags)
@@ -606,7 +625,7 @@ class LoopletContext(Context):
 
     def scope(self):
         blk = self.ctx.scope()
-        return LoopletContext(blk, self.idx)
+        return LoopletContext(blk, self.idx, self.visited_idxs)
 
     def emit(self):
         return self.ctx.emit()
@@ -624,8 +643,9 @@ class LoopletContext(Context):
     def __call__(self, ext, body):
         pass_ = self.select_pass(body)
         if pass_ is None:
+            # TODO: add logging that no pass was selected
             ctx_2 = self.ctx.scope()
-            ctx_2(body)
+            ctx_2(body)  # NotationContext
             return ctx_2.emit()
-        pass_(self, self.idx, ext, body)
+        pass_(self, self.idx, self.visited_idxs, ext, body)
         return None

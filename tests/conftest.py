@@ -45,6 +45,13 @@ def interpreter_scheduler():
 
 
 @pytest.fixture
+def numba_compiler():
+    ctx = get_default_scheduler()
+    yield set_default_scheduler(mode=Mode.COMPILE_NUMBA)
+    set_default_scheduler(ctx=ctx)
+
+
+@pytest.fixture
 def tp_0():
     return (Field("A1"), Field("A3"))
 

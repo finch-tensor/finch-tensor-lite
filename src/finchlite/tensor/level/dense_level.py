@@ -1,5 +1,5 @@
 import operator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -145,7 +145,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def unfurl(self, ctx, tns, ext, mode, proto):
         def child_accessor(ctx, idx):
             pos_2 = asm.Variable(
-                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.position_type
+                ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(
                 asm.Assign(
@@ -158,7 +158,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                                 asm.Literal(operator.mul),
                                 [
                                     asm.GetAttr(tns.obj.lvl, asm.Literal("stride")),
-                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
+                                    asm.Variable(idx.name, idx.type),
                                 ],
                             ),
                         ],
@@ -193,7 +193,7 @@ class DenseLevel(Level):
     A class representing dense level.
     """
 
-    _format: DenseLevelFType
+    _format: DenseLevelFType = field(repr=False)
     lvl: Level
     dimension: np.intp
     pos: asm.AssemblyNode | None = None
