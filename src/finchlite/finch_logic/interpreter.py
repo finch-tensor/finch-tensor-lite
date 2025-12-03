@@ -49,8 +49,8 @@ class FinchLogicInterpreter:
                 return val
             case Value(_):
                 raise ValueError(
-                    "The interpreter cannot evaluate a deferred node, a compiler might "
-                    "generate code for it"
+                    "The interpreter cannot evaluate a lazy node. Instead, you can "
+                    "use a compiler to generate code for it"
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")

@@ -936,8 +936,8 @@ def test_e2e_numba(fmt_fn, dtype):
     aa = fmt(val=a)
     bb = fmt(val=b)
 
-    wa = finchlite.defer(aa)
-    wb = finchlite.defer(bb)
+    wa = finchlite.lazy(aa)
+    wb = finchlite.lazy(bb)
 
     plan = finchlite.matmul(wa, wb)
     result = finchlite.compute(plan)
