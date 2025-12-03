@@ -38,7 +38,7 @@ jobs:
           poetry install --extras test
       - name: Run tests
         run: |
-          poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
+          poetry run pytest -s --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
       - uses: codecov/codecov-action@v5
 
 on:
