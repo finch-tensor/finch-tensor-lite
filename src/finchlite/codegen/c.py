@@ -25,7 +25,6 @@ from ..finch_assembly import (
     TupleFType,
 )
 from ..symbolic import Context, FType, Namespace, ScopedDict, fisinstance, ftype
-from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
 
@@ -118,7 +117,7 @@ def c_hash(fmt, ctx: "CContext"):
 
 def c_hash_default(fmt, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
-    return f"c_default_hash"
+    return "c_default_hash"
 
 
 def c_eq(fmt, ctx: "CContext"):
@@ -137,7 +136,7 @@ def c_eq(fmt, ctx: "CContext"):
 
 def c_eq_default(fmt, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
-    return f"c_default_eq"
+    return "c_default_eq"
 
 
 def serialize_to_c(fmt, obj):
@@ -682,9 +681,7 @@ class CContext(Context):
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
-        self.headers = headers + [
-            '#pragma GCC diagnostic error "-Wimplicit-function-declaration"'
-        ]
+        self.headers = headers
         self._headerset = set(headers)
         if fptr is None:
             fptr = {}
@@ -1028,7 +1025,6 @@ class CContext(Context):
 
 
 class CHashableFType(FType):
-
     @abstractmethod
     def c_hash(self, ctx: CContext) -> str:
         """
@@ -1064,7 +1060,6 @@ class CHashableFType(FType):
         This is important to note for immutable structs because you need to do
         something like &var_n->property if you want to do recursive hashing.
         """
-        ...
 
 
 class CArgumentFType(ABC):
@@ -1339,7 +1334,7 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     var_n = ctx.freshen("var")
     args = ",".join(
         f"{macro}(&({var_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames)
+        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
     )
     ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
     return name
@@ -1372,7 +1367,7 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     var2_n = ctx.freshen("var")
     args = " && ".join(
         f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames)
+        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
     )
     ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
     return name

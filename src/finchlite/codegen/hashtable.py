@@ -467,7 +467,9 @@ class NumbaHashTable(Dict):
         idx = _tuplify(self.ftype.key_type, idx)
         assert _is_integer_tuple(idx, self.key_len)
         result = self.dct[idx]
-        return self.ftype.value_type(*result)
+        return self.ftype.value_type(
+            **{str(n): fieldvalue for n, fieldvalue in enumerate(result)}
+        )
 
     def store(self, idx, val):
         idx = _tuplify(self.ftype.key_type, idx)
@@ -615,12 +617,3 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
         Construct a numba map from a Numba-compatible object.
         """
         return NumbaHashTable(self.key_len, self.value_len, numba_map[0])
-
-
-if __name__ == "__main__":
-    table = CHashTable(2, 3, {(1, 2): (1, 4, 3)})
-    print(c_type(table.ftype.key_type))
-    table.store((2, 3), (3, 2, 3))
-    print(table.exists((2, 3)))
-    print(table.load((2, 3)))
-    print(table.exists((2, 1)))

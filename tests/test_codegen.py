@@ -6,8 +6,9 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-import numpy as np
 import pytest
+
+import numpy as np
 from numpy.testing import assert_equal
 
 import finchlite
@@ -23,7 +24,6 @@ from finchlite.codegen import (
     SafeBuffer,
 )
 from finchlite.codegen.c import (
-    CContext,
     construct_from_c,
     deserialize_from_c,
     serialize_to_c,
@@ -1010,16 +1010,19 @@ def test_hashtable(compiler, constructor):
         )
     )
     compiled = compiler(module)
-    assert compiled.setidx(table, key_type(1, 2), val_type(2, 3, 4)) == val_type(
-        2, 3, 4
-    )
-    assert compiled.setidx(table, key_type(1, 4), val_type(3, 4, 1)) == val_type(
-        3, 4, 1
-    )
-    assert compiled.exists(table, key_type(1, 2))
+    assert compiled.setidx(
+        table, key_type(a=1, b=2), val_type(a=2, b=3, c=4)
+    ) == val_type(a=2, b=3, c=4)
 
-    assert not compiled.exists(table, key_type(1, 3))
-    assert not compiled.exists(table, val_type(2, 3))
+    assert compiled.setidx(
+        table, key_type(a=1, b=4), val_type(a=3, b=4, c=1)
+    ) == val_type(a=3, b=4, c=1)
+
+    assert compiled.exists(table, key_type(a=1, b=2))
+
+    assert not compiled.exists(table, key_type(a=1, b=3))
+
+    assert not compiled.exists(table, val_type(a=2, b=3))
 
 
 @pytest.mark.parametrize(
@@ -1085,13 +1088,13 @@ def test_multiple_c_hashtable(compiler):
     # what's important here is that you can call setidx_1 on table1 and
     # setidx_2 on table2.
     assert mod.setidx_1(
-        table1, table1.key_type(1, 2), table1.value_type(2, 3, 4)
-    ) == table1.value_type(2, 3, 4)
+        table1, table1.key_type(a=1, b=2), table1.value_type(a=2, b=3, c=4)
+    ) == table1.value_type(a=2, b=3, c=4)
 
     assert mod.setidx_2(
-        table2, table2.key_type(1), table2.value_type(2, 3, 4, 5)
-    ) == table2.value_type(2, 3, 4, 5)
+        table2, table2.key_type(a=1), table2.value_type(a=2, b=3, c=4, d=5)
+    ) == table2.value_type(a=2, b=3, c=4, d=5)
 
     assert mod.setidx_3(
-        table3, table3.key_type(0.1, 2), table3.value_type(0.2, 0.2)
-    ) == table3.value_type(0.2, 0.2)
+        table3, table3.key_type(a=0.1, b=2), table3.value_type(a=0.2, b=0.2)
+    ) == table3.value_type(a=0.2, b=0.2)
