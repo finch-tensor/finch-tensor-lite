@@ -940,3 +940,96 @@ def test_e2e_numba(fmt_fn, dtype):
     assert_equal(result, a @ b)
 
     finchlite.set_default_scheduler(ctx=ctx)
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        CCompiler(),
+        NumbaCompiler(),
+    ],
+)
+def test_print(compiler, capfd, file_regression):
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+    x = (np.int64(1), np.int64(4))
+
+    p_var = asm.Variable("p", ftype(p))
+    x_var = asm.Variable("x", ftype(x))
+    res_var = asm.Variable("res", np.float64)
+
+    i16_var = asm.Variable("i16_var", np.int16)
+    i32_var = asm.Variable("i32_var", np.int32)
+    i64_var = asm.Variable("i64_var", np.int64)
+    # f16_var = asm.Variable("f16_var", np.float16)
+    # f32_var = asm.Variable("f32_var", np.float32)
+    f64_var = asm.Variable("f64_var", np.float64)
+    # bool_var = asm.Variable("bool_var", np.bool_)
+    # str_var = asm.Variable("str_var", np.str_)
+
+    prgm = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("simple_struct", np.float64),
+                    (p_var, x_var),
+                    asm.Block(
+                        (
+                            asm.Assign(i16_var, asm.Literal(np.int16(32767))),
+                            asm.Assign(i32_var, asm.Literal(np.int32(65536))),
+                            asm.Assign(i64_var, asm.Literal(np.int64(65536))),
+                            # asm.Assign(f16_var, asm.Literal(np.float16(1.0))),
+                            # asm.Assign(f32_var, asm.Literal(np.float32(2.0))),
+                            asm.Assign(f64_var, asm.Literal(np.float64(3.0))),
+                            # asm.Assign(bool_var, asm.Literal(np.bool_(1))),
+                            # asm.Assign(str_var, asm.Literal(np.str_("Test String"))),
+                            asm.Print((i16_var, i32_var, i64_var)),
+                            asm.Print((f64_var,)),
+                            # asm.Print((bool_var,)),
+                            # asm.Print((str_var,)),
+                            asm.Print((p_var,)),
+                            asm.Print((x_var,)),
+                            asm.Print((p_var, x_var)),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.mul),
+                                    (
+                                        asm.GetAttr(p_var, asm.Literal("x")),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                    ),
+                                ),
+                            ),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.add),
+                                    (
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            asm.Print((res_var,)),
+                            asm.Print((p_var, x_var, res_var)),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = prgm.simple_struct(p, x)
+    assert result == np.float64(9.0)
+
+    capture = capfd.readouterr().out
+    file_regression.check(capture, extension=".txt")
