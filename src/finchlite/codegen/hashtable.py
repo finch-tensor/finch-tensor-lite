@@ -94,6 +94,29 @@ class CHashTable(Dict):
     CHashTable class that basically connects up to an STC library.
     """
 
+    macros = [
+        "T",
+        "i_key",
+        "i_keyclass",
+        "i_keypro",
+        "i_val",
+        "i_valclass",
+        "i_valpro",
+        "i_hash",
+        "i_eq",
+        "i_keydrop",
+        "i_keyclone",
+        "i_keyraw",
+        "i_cmpclass",
+        "i_keyfrom",
+        "i_keytoraw",
+        "i_valdrop",
+        "i_valclone",
+        "i_valraw",
+        "i_valfrom",
+        "i_valtoraw",
+    ]
+
     libraries: dict[
         tuple[AssemblyStructFType, AssemblyStructFType], CHashTableLibrary
     ] = {}
@@ -116,6 +139,8 @@ class CHashTable(Dict):
 
         # these headers should just be added to the headers list.
         # deduplication is catastrophic here.
+        for macro in cls.macros:
+            ctx.headers.append(f"#undef {macro}")
         ctx.headers.append(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
         ctx.headers.append("#define i_eq c_memcmp_eq")
         ctx.headers.append(f'#include "{hashmap_h}"')
@@ -134,7 +159,8 @@ class CHashTable(Dict):
         # basically for the load functions, you need to provide a variable that
         # can be copied.
         # Yeah, so which API's should we use for load and store?
-        lib_code = dedent(f"""
+        lib_code = dedent(
+            f"""
             {inline_s}void*
             {methods["init"]}() {{
                 void* ptr = malloc(sizeof({hmap_t}));
@@ -153,9 +179,7 @@ class CHashTable(Dict):
             {methods["load"]}(
                 {hmap_t} *map, {keytype_c} key
             ) {{
-                printf("Loading happening\\n");
                 const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
-                printf("Loading Done\\n");
                 return *internal_val;
             }}
 
@@ -163,9 +187,7 @@ class CHashTable(Dict):
             {methods["store"]}(
                 {hmap_t} *map, {keytype_c} key, {valuetype_c} value
             ) {{
-                printf("Storing happening\\n");
                 {hmap_t}_insert_or_assign(map, key, value);
-                printf("Storing Done\\n");
             }}
 
             {inline_s}void
@@ -176,7 +198,8 @@ class CHashTable(Dict):
                 {hmap_t}_drop(hptr);
                 free(hptr);
             }}
-        """)
+        """
+        )
         ctx.add_header(lib_code)
 
         return methods, hmap_t
