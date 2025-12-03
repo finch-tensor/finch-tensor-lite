@@ -138,6 +138,7 @@ from .tensor import (
     dense,
     element,
     fiber_tensor,
+    tril,
 )
 
 __all__ = [
@@ -272,6 +273,7 @@ __all__ = [
     "tan",
     "tanh",
     "tensordot",
+    "tril",
     "truediv",
     "trunc",
     "var",

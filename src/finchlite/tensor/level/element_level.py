@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -161,7 +161,7 @@ class ElementLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    _format: ElementLevelFType
+    _format: ElementLevelFType = field(repr=False)
     _val: Any | None = None
 
     def __post_init__(self):
