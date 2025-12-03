@@ -25,6 +25,7 @@ from ..finch_assembly import (
     TupleFType,
 )
 from ..symbolic import Context, FType, Namespace, ScopedDict, fisinstance, ftype
+from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
 
@@ -403,6 +404,7 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
+                    # return_t = c_type(return_t)
                     arg_ts = [arg.result_format for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern

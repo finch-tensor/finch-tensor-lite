@@ -1,4 +1,8 @@
+import math
+import operator
+
 from . import algebra
+from .algebra import is_associative, is_commutative, is_idempotent
 
 
 def and_test(a, b):
@@ -147,3 +151,73 @@ algebra.register_property(
     "return_type",
     lambda op, x: x,
 )
+
+
+def repeat_operator(x):
+    """
+    If there exists an operator g such that
+    f(x, x, ..., x)  (n times)  is equal to g(x, n),
+    then return g.
+    """
+    if not callable(x):
+        raise TypeError("Can't check repeat operator of non-callable objects!")
+
+    if is_idempotent(x):
+        return None
+
+    if x is operator.add:
+        return operator.mul
+
+    if x is operator.mul:
+        return math.exp
+
+    return None
+
+
+for fn in [
+    operator.and_,
+    operator.or_,
+    min,
+    max,
+]:
+    algebra.register_property(
+        fn,
+        "__call__",
+        "repeat_operator",
+        lambda op: None,
+    )
+
+algebra.register_property(
+    operator.add,
+    "__call__",
+    "repeat_operator",
+    lambda op: operator.mul,
+)
+
+algebra.register_property(
+    operator.mul,
+    "__call__",
+    "repeat_operator",
+    lambda op: math.exp,
+)
+
+
+def cansplitpush(x, y):
+    """
+    Return True if a reduction with operator `x` can be 'split-pushed' through
+    a pointwise operator `y`.
+
+    We allow split-push when:
+      - x has a known repeat operator (repeat_operator(x) is not None),
+      - x and y are the same operator,
+      - and x is both commutative and associative.
+    """
+    if not callable(x) or not callable(y):
+        raise TypeError("Can't check splitpush of non-callable operators!")
+
+    return (
+        repeat_operator(x) is not None
+        and x == y
+        and is_commutative(x)
+        and is_associative(x)
+    )
