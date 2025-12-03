@@ -94,7 +94,9 @@ class CHashTable(Dict):
     CHashTable class that basically connects up to an STC library.
     """
 
-    libraries: dict[tuple[AssemblyStructFType, AssemblyStructFType], CHashTableLibrary] = {}
+    libraries: dict[
+        tuple[AssemblyStructFType, AssemblyStructFType], CHashTableLibrary
+    ] = {}
 
     @classmethod
     def gen_code(
@@ -175,7 +177,9 @@ class CHashTable(Dict):
         return methods, hmap_t
 
     @classmethod
-    def compile(cls, key_type: AssemblyStructFType, value_type: AssemblyStructFType) -> CHashTableLibrary:
+    def compile(
+        cls, key_type: AssemblyStructFType, value_type: AssemblyStructFType
+    ) -> CHashTableLibrary:
         """
         compile a library to use for the c hash table.
         """
@@ -224,9 +228,7 @@ class CHashTable(Dict):
         cls.libraries[(key_type, value_type)] = CHashTableLibrary(lib, methods, hmap_t)
         return cls.libraries[(key_type, value_type)]
 
-    def __init__(
-        self, key_type, value_type, map: "dict | None" = None
-    ):
+    def __init__(self, key_type, value_type, map: "dict | None" = None):
         """
         Constructor for the C Hash Table
         """
