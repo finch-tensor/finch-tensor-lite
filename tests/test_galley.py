@@ -14,9 +14,11 @@ from finchlite.finch_logic import (
 )
 from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
+    find_lowest_roots,
     get_idx_connected_components,
     get_reducible_idxs,
     insert_statistics,
+    replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
 
@@ -1311,23 +1313,35 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     ],
 )
 def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
-    aq = AnnotatedQuery(
-        ST=object,
-        output_name=None,
-        reduce_idxs=list(reduce_idxs),
-        point_expr=None,
-        idx_lowest_root=OrderedDict(),
-        idx_op=OrderedDict(),
-        idx_init=OrderedDict(),
-        parent_idxs=OrderedDict((k, list(v)) for k, v in parent_idxs.items()),
-        original_idx=OrderedDict(),
-        connected_components=[],
-        connected_idxs=OrderedDict(),
-        output_order=None,
-        output_format=None,
+    names = set(reduce_idxs)
+    names.update(parent_idxs.keys())
+    for i in parent_idxs.values():
+        names.update(i)
+
+    fields: dict[str, Field] = {x: Field(x) for x in names}
+    reduce_fields: list[Field] = [fields[name] for name in reduce_idxs]
+    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(
+        (fields[key], [fields[p] for p in parents])
+        for key, parents in parent_idxs.items()
     )
 
-    assert get_reducible_idxs(aq) == expected
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = object
+    aq.output_name = None
+    aq.reduce_idxs = reduce_fields
+    aq.point_expr = None
+    aq.idx_lowest_root = OrderedDict()
+    aq.idx_op = OrderedDict()
+    aq.idx_init = OrderedDict()
+    aq.parent_idxs = parent_fields
+    aq.original_idx = OrderedDict()
+    aq.connected_components = []
+    aq.connected_idxs = OrderedDict()
+    aq.output_order = None
+    aq.output_format = None
+
+    result = [field.name for field in get_reducible_idxs(aq)]
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -1372,5 +1386,230 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     ],
 )
 def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
-    out = get_idx_connected_components(parent_idxs, connected_idxs)
-    assert out == expected
+    names: set[str] = set(parent_idxs.keys()) | set(connected_idxs.keys())
+    for i in parent_idxs.values():
+        names.update(i)
+    for j in connected_idxs.values():
+        names.update(j)
+
+    name = {x: Field(x) for x in names}
+
+    parent_field_idxs: dict[Field, list[Field]] = {
+        name[k]: [name[p] for p in v] for k, v in parent_idxs.items()
+    }
+    connected_field_idxs: dict[Field, list[Field]] = {
+        name[k]: [name[n] for n in v] for k, v in connected_idxs.items()
+    }
+
+    components = get_idx_connected_components(parent_field_idxs, connected_field_idxs)
+    result = [[field.name for field in comp] for comp in components]
+
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "expr,node_to_replace,new_node,nodes_to_remove,expected_names",
+    [
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            set(),
+            ["a", "a", "c"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("c"), (Field("c"),))},
+            ["a", "a"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("c"), (Field("c"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("c"), (Field("c"),))},
+            ["a", "b"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("b"), (Field("b"),))},
+            ["a", "c"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("c"), (Field("c"),)),
+            Table(Literal("a"), (Field("a"),)),
+            set(),
+            ["a", "b", "a"],
+        ),
+    ],
+)
+def test_replace_and_remove_nodes(
+    expr,
+    node_to_replace,
+    new_node,
+    nodes_to_remove,
+    expected_names,
+):
+    out = replace_and_remove_nodes(
+        expr=expr,
+        node_to_replace=node_to_replace,
+        new_node=new_node,
+        nodes_to_remove=nodes_to_remove,
+    )
+
+    result = [tbl.idxs[0].name for tbl in out.args]
+    assert result == expected_names
+
+
+@pytest.mark.parametrize(
+    "root, idx_name, expected",
+    [
+        # Distributive case:
+        # root = MapJoin(mul, [A(i), B(j)]), reduce over j → [B]
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("i"),)),
+                    Table(Literal("B"), (Field("j"),)),
+                ),
+            ),
+            "j",
+            ["B"],
+        ),
+        # Split-push case:
+        # root = MapJoin(add, [A(i), B(i), C(j)]), reduce over i → [C, A, B]
+        (
+            MapJoin(
+                Literal(op.add),
+                (
+                    Table(Literal("A"), (Field("i"),)),
+                    Table(Literal("B"), (Field("i"),)),
+                    Table(Literal("C"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            ["C", "A", "B"],
+        ),
+        # Leaf case:
+        # root = Table(A(i)), reduce over i → [A]
+        (
+            Table(Literal("A"), (Field("i"),)),
+            "i",
+            ["A"],
+        ),
+        # Nested case:
+        # root = MapJoin(mul, [A(i,j), B(j)]), reduce over i → [A]
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("i"), Field("j"))),
+                    Table(Literal("B"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            ["A"],
+        ),
+        # Special case: max(C(i), D(j)), reduce over i → [max(C,D)]
+        (
+            MapJoin(
+                Literal(max),
+                (
+                    Table(Literal("C"), (Field("i"),)),
+                    Table(Literal("D"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            [
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal("C"), (Field("i"),)),
+                        Table(Literal("D"), (Field("j"),)),
+                    ),
+                )
+            ],
+        ),
+        # root = MapJoin(mul, [A(j), MapJoin(max, [B(i), C(j)])]), reduce over i
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("j"),)),
+                    MapJoin(
+                        Literal(max),
+                        (
+                            Table(Literal("B"), (Field("i"),)),
+                            Table(Literal("C"), (Field("j"),)),
+                        ),
+                    ),
+                ),
+            ),
+            "i",
+            [
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal("B"), (Field("i"),)),
+                        Table(Literal("C"), (Field("j"),)),
+                    ),
+                )
+            ],
+        ),
+    ],
+)
+def test_find_lowest_roots(root, idx_name, expected):
+    roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
+
+    # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
+    if expected and not isinstance(expected[0], str):
+        assert roots == expected
+    else:
+        # All other cases:
+        result: list[str] = []
+        for node in roots:
+            assert isinstance(node, Table)
+            assert isinstance(node.tns, Literal)
+            result.append(node.tns.val)
+
+        assert result == expected

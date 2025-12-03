@@ -51,6 +51,22 @@ class TensorFType(FType, ABC):
         """
         ...
 
+    # TODO: Remove and properly infer result rep
+    def add_levels(self, idxs: list[int]):
+        raise Exception("TODO: to remove")
+
+    # TODO: Remove and properly infer result rep
+    def remove_levels(self, idxs: list[int]):
+        raise Exception("TODO: to remove")
+
+    # TODO: Remove and properly infer result rep
+    def to_kwargs(self) -> dict[str, Any]:
+        raise Exception("TODO: to remove")
+
+    # TODO: Remove and properly infer result rep
+    def from_kwargs(self, **kwargs):
+        raise Exception("TODO: to remove")
+
 
 class Tensor(FTyped, ABC):
     """

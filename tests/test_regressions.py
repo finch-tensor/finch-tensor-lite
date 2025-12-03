@@ -106,5 +106,5 @@ def test_tree_regression(file_regression):
             ),
         )
     )
-    program, tables = LogicCompiler()(plan)
+    program, table_vars, tables = LogicCompiler()(plan)
     file_regression.check(str(program), extension=".txt")

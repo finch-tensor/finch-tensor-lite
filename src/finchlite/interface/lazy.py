@@ -394,27 +394,28 @@ class LazyTensor(OverrideTensor):
 
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, format="bufferized") -> Any:
+def asarray(arg: Any, format=None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
 
     Args:
         arg: The object to be converted.
+        format: The format for the result array.
 
     Returns:
         The array type result of the given object.
     """
-    if format != "bufferized":
-        raise Exception(f"Only bufferized format is now supported, got: {format}")
+    if format is None:
+        if hasattr(arg, "asarray"):
+            return arg.asarray()
+        return query_property(arg, "asarray", "__attr__")
 
-    if hasattr(arg, "asarray"):
-        return arg.asarray()
-
-    return query_property(arg, "asarray", "__attr__")
+    return format(arg)
 
 
 def defer(arr) -> LazyTensor:
