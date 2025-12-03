@@ -611,6 +611,11 @@ register_property(
 register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 register_property(type(None), "c_type", "__attr__", lambda x: None)
 
+# ints and floats should be serialized and constructed trivially.
+register_property(int, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(float, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(int, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+register_property(float, "construct_from_c", "__attr__", lambda fmt, x: x.value)
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
@@ -1176,7 +1181,9 @@ class CStackFType(ABC):
 
 
 def serialize_struct_to_c(fmt: AssemblyStructFType, obj) -> Any:
-    args = [getattr(obj, name) for name in fmt.struct_fieldnames]
+    args = [
+        serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields
+    ]
     return struct_c_type(fmt)(*args)
 
 

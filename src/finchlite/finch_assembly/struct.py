@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Any
 
 from ..algebra import register_property
-from ..symbolic import FType, ftype
+from ..symbolic import FType, fisinstance, ftype
 
 
 class AssemblyStructFType(FType, ABC):
@@ -115,9 +115,20 @@ class NamedTupleFType(ImmutableStructFType):
     def to_kwargs(self) -> dict:
         raise NotImplementedError
 
+    def fisinstance(self, other):
+        if not isinstance(other, tuple) or not hasattr(other, "_fields"):
+            return False
+        if tuple(other._fields) != tuple(self.struct_fieldnames):
+            return False
+
+        return all(
+            fisinstance(elt, format)
+            for elt, format in zip(other, self.struct_fieldformats)
+        )
+
     def __call__(self, *args):
         assert all(
-            isinstance(a, f)
+            fisinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
         )
         return namedtuple(self.struct_name, self.struct_fieldnames)(args)
@@ -164,9 +175,21 @@ class TupleFType(ImmutableStructFType):
     def to_kwargs(self) -> dict:
         raise NotImplementedError
 
+    def fisinstance(self, other):
+        """
+        Overridden fisinstance that matches what we have below.
+        """
+        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldformats):
+            return False
+        return all(
+            fisinstance(elt, format)
+            for elt, format in zip(other, self.struct_fieldformats)
+        )
+
     def __call__(self, **kwargs):
+        # same as above. This check is useless.
         assert all(
-            isinstance(a, f)
+            fisinstance(a, f)
             for a, f in zip(kwargs.values(), self.struct_fieldformats, strict=False)
         )
         return tuple(kwargs.values())
