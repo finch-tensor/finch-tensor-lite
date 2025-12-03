@@ -1067,13 +1067,13 @@ def test_multiple_c_hashtable(compiler):
 
     # what's important here is that you can call setidx_1 on table1 and
     # setidx_2 on table2.
-    assert mod.setidx_1(
-        table1, table1.key_type(1, 2.0), table1.value_type(2, 3, 4)
-    ) == table1.value_type(2, 3, 4)
-
     assert mod.setidx_2(
         table2, table2.key_type(1), table2.value_type(2, 3, 4, 5)
     ) == table2.value_type(2, 3, 4, 5)
+
+    assert mod.setidx_1(
+        table1, table1.key_type(1, 2.0), table1.value_type(2, 3, 4)
+    ) == table1.value_type(2, 3, 4)
 
     assert mod.setidx_3(
         table3, table3.key_type(1, 2.0), table3.value_type(1.434, 1.4)
