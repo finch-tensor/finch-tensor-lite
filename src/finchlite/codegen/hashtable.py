@@ -94,29 +94,6 @@ class CHashTable(Dict):
     CHashTable class that basically connects up to an STC library.
     """
 
-    macros = [
-        "T",
-        "i_key",
-        "i_keyclass",
-        "i_keypro",
-        "i_val",
-        "i_valclass",
-        "i_valpro",
-        "i_hash",
-        "i_eq",
-        "i_keydrop",
-        "i_keyclone",
-        "i_keyraw",
-        "i_cmpclass",
-        "i_keyfrom",
-        "i_keytoraw",
-        "i_valdrop",
-        "i_valclone",
-        "i_valraw",
-        "i_valfrom",
-        "i_valtoraw",
-    ]
-
     libraries: dict[
         tuple[AssemblyStructFType, AssemblyStructFType], CHashTableLibrary
     ] = {}
@@ -135,12 +112,9 @@ class CHashTable(Dict):
         hmap_t = ctx.freshen("hmap")
 
         ctx.add_header("#include <stdlib.h>")
-        ctx.add_header("#include <stdio.h>")
 
         # these headers should just be added to the headers list.
         # deduplication is catastrophic here.
-        for macro in cls.macros:
-            ctx.headers.append(f"#undef {macro}")
         ctx.headers.append(f"#define T {hmap_t}, {keytype_c}, {valuetype_c}")
         ctx.headers.append("#define i_eq c_memcmp_eq")
         ctx.headers.append(f'#include "{hashmap_h}"')
