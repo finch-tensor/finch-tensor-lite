@@ -118,9 +118,9 @@ def test_logic_compiler():
     )
 
     bufferized_ndarray_ftype = BufferizedNDArrayFType(
-        buf_t=NumpyBufferFType(np.dtype(int)),
+        buffer_type=NumpyBufferFType(np.dtype(int)),
         ndim=np.intp(2),
-        strides_t=TupleFType.from_tuple((np.intp, np.intp)),
+        dimension_type=TupleFType.from_tuple((np.intp, np.intp)),
     )
 
     expected_program = Module(
@@ -314,13 +314,13 @@ def test_logic_compiler():
         )
     )
 
-    program, tables = LogicCompiler()(plan)
+    program, table_vars, tables = LogicCompiler()(plan)
 
     assert program == expected_program
 
     mod = NotationInterpreter()(program)
 
-    args = provision_tensors(program, tables)
+    args = provision_tensors(program, table_vars, tables)
     result = mod.func(*args)
 
     expected = np.matmul(args[0].to_numpy(), args[1].to_numpy(), dtype=float)

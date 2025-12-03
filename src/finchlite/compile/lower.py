@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pprint import pprint
 from typing import Any
 
@@ -15,14 +15,14 @@ from ..util import qual_str
 
 class FinchTensorFType(TensorFType, ABC):
     @abstractmethod
-    def lower_unwrap(tns):
+    def lower_unwrap(self, ctx, obj):
         """
         Unwrap a tensor view to get the underlying tensor.
         This is used to get the original tensor from a tensor view.
         """
 
     @abstractmethod
-    def lower_increment(tns, val):
+    def lower_increment(self, ctx, obj, val):
         """
         Increment a tensor view with an operation and value.
         This updates the tensor at the specified index with the operation and value.
@@ -47,7 +47,10 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(self, ctx, tns, ext, mode, proto): ...
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        """
+        Unfurl a tensor.
+        """
 
 
 @dataclass(eq=True, frozen=True)
@@ -157,6 +160,14 @@ class ExtentFType(AssemblyStructFType):
     @property
     def struct_fields(self):
         return [("start", np.intp), ("end", np.intp)]
+
+    def from_kwargs(self, **kwargs) -> "ExtentFType":
+        start = kwargs.get("start", self.start)
+        end = kwargs.get("end", self.end)
+        return ExtentFType(start, end)  # type: ignore[abstract]
+
+    def to_kwargs(self):
+        return asdict(self)
 
     def __call__(self, *args):
         raise TypeError(f"{self.struct_name} is not callable")
@@ -281,6 +292,7 @@ class NotationContext(Context):
         epilogue=None,
         bindings=None,
         slots=None,
+        access_modes=None,
         types=None,
         func_state=None,
     ):
@@ -289,10 +301,13 @@ class NotationContext(Context):
             bindings = ScopedDict()
         if slots is None:
             slots = ScopedDict()
+        if access_modes is None:
+            access_modes = ScopedDict()
         if types is None:
             types = ScopedDict()
         self.bindings = bindings
         self.slots = slots
+        self.access_modes = access_modes
         self.types = types
         self.func_state = func_state
 
@@ -304,6 +319,7 @@ class NotationContext(Context):
         blk = super().block()
         blk.bindings = self.bindings
         blk.slots = self.slots
+        blk.access_modes = self.access_modes
         blk.types = self.types
         blk.func_state = self.func_state
         return blk
@@ -315,6 +331,7 @@ class NotationContext(Context):
         blk = self.block()
         blk.bindings = self.bindings.scope()
         blk.slots = self.slots.scope()
+        blk.access_modes = self.access_modes.scope()
         blk.types = self.types.scope()
         return blk
 
@@ -339,6 +356,21 @@ class NotationContext(Context):
                 return node
             case _:
                 raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+
+    def _freeze_tensor(self, tns_var: str, op: ntn.Literal | None) -> None:
+        if op is None:
+            assert tns_var not in self.access_modes
+        else:
+            assert self.access_modes[tns_var] == ntn.Update(op)
+        self.access_modes[tns_var] = ntn.Read()
+
+    def _thaw_tensor(self, tns_var: str, op: ntn.Literal) -> None:
+        assert self.access_modes[tns_var] == ntn.Read()
+        self.access_modes[tns_var] = ntn.Update(op)
+
+    def _rm_tensor_from_accesses(self, tns_var: str) -> None:
+        assert self.access_modes[tns_var] == ntn.Read()
+        del self.access_modes[tns_var]
 
     def __call__(self, prgm):
         """
@@ -387,6 +419,7 @@ class NotationContext(Context):
                 var = asm.Variable(var_n, var_t)
                 self.exec(asm.Assign(var, val_code))
                 self.types[var_n] = var_t
+                self._freeze_tensor(var_n, op=None)
                 self.slots[var_n] = var_t.asm_unpack(
                     self, var_n, asm.Variable(var_n, var_t)
                 )
@@ -397,6 +430,7 @@ class NotationContext(Context):
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
+                self._rm_tensor_from_accesses(var_n)
                 var_t.asm_repack(self, var_n, obj)
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, _)):
@@ -419,16 +453,19 @@ class NotationContext(Context):
                 ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
             case ntn.Declare(tns, init, op, shape):
+                self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
                 return tns.result_format.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
+                self._freeze_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 op_e = self(op)
                 return tns.result_format.lower_freeze(self, tns, op_e)
             case ntn.Thaw(tns, op):
+                self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 op_e = self(op)
                 return tns.result_format.lower_thaw(self, tns, op_e)
