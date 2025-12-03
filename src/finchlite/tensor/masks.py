@@ -106,7 +106,7 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
 @dataclass
 class LoTriMask(Level):
     """
-    Lower triangular mask column level for storing column idx.
+    Lower triangular mask level.
     """
 
     _format: LoTriMaskFType = field(repr=False)
@@ -141,12 +141,12 @@ def tril(x: Tensor, /, *, k: int = 0) -> Tensor:
     if k != 0:
         raise Exception(f"Only k=0 is supported, but got: {k}")
 
-    # insert column level in appropriate place
+    # insert mask level in appropriate place
     lvl = x.lvl
     for _ in range(x.ndim - 2):
         lvl = lvl.lvl
-    low_tri_mask_column = LoTriMask(LoTriMaskFType(lvl.lvl.ftype), lvl.lvl)
-    lvl.lvl = low_tri_mask_column
-    lvl._format._lvl_t = low_tri_mask_column.ftype
+    low_tri_mask = LoTriMask(LoTriMaskFType(lvl.lvl.ftype), lvl.lvl)
+    lvl.lvl = low_tri_mask
+    lvl._format._lvl_t = low_tri_mask.ftype
 
     return x

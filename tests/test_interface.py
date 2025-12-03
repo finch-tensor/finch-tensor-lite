@@ -1394,7 +1394,7 @@ def test_flatten(array_shape, expected_shape, wrapper):
     "wrapper",
     [
         lambda x: x,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_tril(arr, wrapper):
