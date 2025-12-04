@@ -4,8 +4,9 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import Any
 
-import numba
 import numpy as np
+
+import numba
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property

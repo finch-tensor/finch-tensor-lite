@@ -1,8 +1,8 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
 from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
-from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .dct import Dict, DictFType
+from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyExpression,
     AssemblyNode,
