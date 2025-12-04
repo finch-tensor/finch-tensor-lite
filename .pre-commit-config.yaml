@@ -6,21 +6,21 @@ repos:
         exclude: |
           (?x)(
               ^tests/reference/|
-              ^src/finchlilite/codegen/stc/
+              ^src/finchlite/codegen/stc/
           )
 
       - id: trailing-whitespace
         exclude: |
           (?x)(
               ^tests/reference/|
-              ^src/finchlilite/codegen/stc/
+              ^src/finchlite/codegen/stc/
           )
 
       - id: mixed-line-ending
         exclude: |
           (?x)(
               ^tests/reference/|
-              ^src/finchlilite/codegen/stc/
+              ^src/finchlite/codegen/stc/
           )
 
       - id: name-tests-test
@@ -29,7 +29,7 @@ repos:
           (?x)(
               ^tests/reference/|
               ^tests/scripts/|
-              ^src/finchlilite/codegen/stc/
+              ^src/finchlite/codegen/stc/
           )
 
       - id: no-commit-to-branch
