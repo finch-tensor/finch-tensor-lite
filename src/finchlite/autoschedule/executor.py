@@ -1,4 +1,4 @@
-from typing import overload
+from typing import Any, overload
 
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.nodes import TableValue
@@ -71,9 +71,9 @@ class LogicFieldsContext:
             case lgc.Aggregate(_, _, arg, idxs):
                 arg_idxs = self(arg)
                 return tuple(idx for idx in arg_idxs if idx not in idxs)
-            case lgc.Relabel(arg, idxs):
+            case lgc.Relabel(_, idxs):
                 return idxs
-            case lgc.Reorder(arg, idxs):
+            case lgc.Reorder(_, idxs):
                 return idxs
             case lgc.Subquery(lhs, arg):
                 res = self.bindings.get(lhs)
@@ -145,6 +145,39 @@ class FakeLogicCompiler(LogicLoader):
         return (LogicInterpreterLibrary(prgm, bindings), bindings)
 
 
+class ProvisionTensorsContext:
+    def __init__(
+        self,
+        bindings: dict[lgc.Alias, lgc.TableValue],
+        types: dict[lgc.Alias, lgc.TableValueFType],
+    ):
+        self.bindings: dict[lgc.Alias, lgc.TableValue] = bindings.copy()
+        self.shapes: dict[lgc.Alias, tuple[Any, ...]] = {
+            var: tbl.tns.shape for var, tbl in bindings.items()
+        }
+        self.fields: dict[lgc.Alias, tuple[lgc.Field, ...]] = {
+            var: tbl.idxs for var, tbl in types.items()
+        }
+        self.types: dict[lgc.Alias, lgc.TableValueFType] = types
+
+    def __call__(self, node: lgc.LogicStatement) -> dict[lgc.Alias, lgc.TableValue]:
+        match node:
+            case lgc.Plan(bodies):
+                for body in bodies:
+                    self(body)
+            case lgc.Query(lhs, rhs):
+                if lhs not in self.bindings:
+                    shape = rhs.shape(self.shapes, self.fields)
+                    tns = self.types[lhs].tns(shape)
+                    self.bindings[lhs] = lgc.TableValue(tns, self.types[lhs].idxs)
+                    self.shapes[lhs] = shape
+            case lgc.Produces(_):
+                pass
+            case _:
+                raise ValueError(f"Unknown LogicStatement: {type(node)}")
+        return self.bindings
+
+
 class LogicExecutor(LogicEvaluator):
     def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
         if ctx is None:
@@ -160,22 +193,12 @@ class LogicExecutor(LogicEvaluator):
         prgm, bindings = extract_tables(prgm, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 
-        sizes = {
-            idx: dim
-            for tbl in bindings.values()
-            for (idx, dim) in zip(tbl.idxs, tbl.tns.shape, strict=True)
-        }
+        mod, binding_ftypes = self.ctx(prgm, binding_ftypes)
 
-        mod, workspace_ftypes = self.ctx(prgm, binding_ftypes)
+        bindings = ProvisionTensorsContext(bindings, binding_ftypes)(prgm)
+        args = [tbl.tns for tbl in bindings.values()]
 
-        inputs = [tbl.tns for tbl in bindings.values()]
-        workspaces = [
-            tbl.tns(tuple(sizes[idx] for idx in tbl.idxs))
-            for var, tbl in workspace_ftypes.items()
-            if var not in bindings
-        ]
-
-        res = mod.main(*inputs, *workspaces)
+        res = mod.main(*args)
 
         res_idxs = get_return_fields(
             prgm, {var: tbl.idxs for var, tbl in bindings.items()}

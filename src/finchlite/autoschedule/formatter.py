@@ -16,7 +16,7 @@ class LogicFormatterContext:
     def __init__(self, bindings: dict[lgc.Alias, lgc.TableValueFType] | None = None):
         if bindings is None:
             bindings = {}
-        self.bindings: dict[lgc.Alias, lgc.TableValueFType] = bindings
+        self.bindings: dict[lgc.Alias, lgc.TableValueFType] = bindings.copy()
         self.fields = {idx: val.idxs for idx, val in bindings.items()}
         self.shape_types = {idx: val.tns.shape_type for idx, val in bindings.items()}
         self.element_types = {
@@ -72,7 +72,7 @@ class LogicFormatterContext:
                         ),
                     )
                     self.bindings[lhs] = TableValueFType(tns, fields)
-            case lgc.Produces(exprs):
+            case lgc.Produces(_):
                 pass
             case _:
                 raise ValueError(f"Unsupported logic statement for formatting: {node}")
