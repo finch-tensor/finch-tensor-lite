@@ -952,24 +952,27 @@ def test_e2e_numba(fmt_fn, dtype):
     [
         (
             CCompiler(),
-            lambda: CHashTable(
-                asm.TupleFType.from_tuple((int, int)),
-                asm.TupleFType.from_tuple((int, int, int)),
-            ),
+            CHashTable,
         ),
         (
             asm.AssemblyInterpreter(),
-            lambda: CHashTable(
-                asm.TupleFType.from_tuple((int, int)),
-                asm.TupleFType.from_tuple((int, int, int)),
-            ),
+            CHashTable,
         ),
-        (NumbaCompiler(), lambda: NumbaHashTable(2, 3)),
-        (asm.AssemblyInterpreter(), lambda: NumbaHashTable(2, 3)),
+        (
+            NumbaCompiler(),
+            NumbaHashTable,
+        ),
+        (
+            asm.AssemblyInterpreter(),
+            NumbaHashTable,
+        ),
     ],
 )
 def test_hashtable(compiler, constructor):
-    table = constructor()
+    table = constructor(
+        asm.TupleFType.from_tuple((int, int)),
+        asm.TupleFType.from_tuple((int, int, int)),
+    )
 
     table_v = asm.Variable("a", ftype(table))
     table_slt = asm.Slot("a_", ftype(table))
@@ -1026,13 +1029,15 @@ def test_hashtable(compiler, constructor):
 
 
 @pytest.mark.parametrize(
-    ["compiler"],
+    ["compiler", "tabletype"],
     [
-        (CCompiler(),),
-        (asm.AssemblyInterpreter(),),
+        (CCompiler(), CHashTable),
+        (asm.AssemblyInterpreter(), CHashTable),
+        (NumbaCompiler(), NumbaHashTable),
+        (asm.AssemblyInterpreter(), NumbaHashTable),
     ],
 )
-def test_multiple_c_hashtable(compiler):
+def test_multiple_hashtable(compiler, tabletype):
     """
     This test exists because in the case of C, we might need to dump multiple
     hash table definitions into the context.
@@ -1044,7 +1049,7 @@ def test_multiple_c_hashtable(compiler):
     def _int_tupletype(arity):
         return asm.TupleFType.from_tuple(tuple(int for _ in range(arity)))
 
-    def func(table: CHashTable, num: int):
+    def func(table, num: int):
         key_type = table.ftype.key_type
         val_type = table.ftype.value_type
         key_v = asm.Variable("key", key_type)
@@ -1068,13 +1073,13 @@ def test_multiple_c_hashtable(compiler):
             ),
         )
 
-    table1 = CHashTable(_int_tupletype(2), _int_tupletype(3))
-    table2 = CHashTable(_int_tupletype(1), _int_tupletype(4))
-    table3 = CHashTable(
+    table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
+    table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
+    table3 = tabletype(
         asm.TupleFType.from_tuple((float, int)),
         asm.TupleFType.from_tuple((float, float)),
     )
-    table4 = CHashTable(
+    table4 = tabletype(
         asm.TupleFType.from_tuple((float, asm.TupleFType.from_tuple((int, float)))),
         asm.TupleFType.from_tuple((float, float)),
     )

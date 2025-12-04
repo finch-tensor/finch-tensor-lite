@@ -8,11 +8,15 @@ import numpy as np
 
 import numba
 
-from finchlite.finch_assembly.map import DictFType  # type: ignore[import-untyped]
+from finchlite.finch_assembly.map import DictFType
+from finchlite.finch_assembly.struct import (
+    ImmutableStructFType,
+    MutableStructFType,
+)  # type: ignore[import-untyped]
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
+from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 
 logger = logging.getLogger(__name__)
@@ -62,6 +66,26 @@ register_property(
     "numba_type",
     "__attr__",
     lambda t: numba.from_dtype(t),
+)
+
+
+def immutable_struct_jitclass_type(fmt: ImmutableStructFType):
+    return numba.types.Tuple(
+        tuple([numba_jitclass_type(t) for t in fmt.struct_fieldformats])
+    )
+
+
+register_property(
+    ImmutableStructFType,
+    "numba_jitclass_type",
+    "__attr__",
+    immutable_struct_jitclass_type,
+)
+register_property(
+    ImmutableStructFType,
+    "numba_type",
+    "__attr__",
+    lambda t: tuple,
 )
 
 
@@ -136,6 +160,13 @@ register_property(
 )
 
 register_property(
+    float,
+    "numba_jitclass_type",
+    "__attr__",
+    lambda t: numba.float64,
+)
+
+register_property(
     AssemblyStructFType,
     "numba_jitclass_type",
     "__attr__",
@@ -198,6 +229,36 @@ register_property(
 )
 
 
+def serialize_immutable_to_numba(fmt: ImmutableStructFType, obj):
+    return tuple(
+        serialize_to_numba(childfmt, fmt.struct_getattr(obj, attr))
+        for attr, childfmt in fmt.struct_fields
+    )
+
+
+register_property(
+    ImmutableStructFType, "serialize_to_numba", "__attr__", serialize_immutable_to_numba
+)
+
+
+def immutable_construct_from_numba(fmt: AssemblyStructFType, numba_tuple):
+    kwargs = {
+        name: construct_from_numba(field_type, field_value)
+        for field_value, (name, field_type) in zip(
+            numba_tuple, fmt.struct_fields, strict=False
+        )
+    }
+    return fmt(**kwargs)
+
+
+register_property(
+    ImmutableStructFType,
+    "construct_from_numba",
+    "__attr__",
+    immutable_construct_from_numba,
+)
+
+
 def deserialize_from_numba(fmt, obj, numba_obj):
     """
     Deserialize a Numba-compatible object back to the original ftype.
@@ -213,7 +274,10 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     if hasattr(fmt, "deserialize_from_numba"):
         fmt.deserialize_from_numba(obj, numba_obj)
     else:
-        query_property(fmt, "deserialize_from_numba", "__attr__", obj, numba_obj)
+        try:
+            query_property(fmt, "deserialize_from_numba", "__attr__", obj, numba_obj)
+        except AttributeError:
+            return
 
 
 register_property(
@@ -517,6 +581,7 @@ class NumbaContext(Context):
                     )
                 return None
             case asm.GetAttr(obj, attr):
+                # print("GetAttr:", obj, obj.result_format, attr, attr.val)
                 obj_code = self(obj)
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError(f"trying to get missing attr: {attr}")
@@ -751,13 +816,26 @@ register_property(
 )
 
 
+def immutable_struct_numba_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
+    index = list(fmt.struct_fieldnames).index(attr)
+    return f"{obj}[{index}]"
+
+
+register_property(
+    ImmutableStructFType,
+    "numba_getattr",
+    "__attr__",
+    immutable_struct_numba_getattr,
+)
+
+
 def struct_numba_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
     ctx.emit(f"{ctx.feed}{obj}.{attr} = {val}")
     return
 
 
 register_property(
-    AssemblyStructFType,
+    MutableStructFType,
     "numba_setattr",
     "__attr__",
     struct_numba_setattr,
@@ -783,15 +861,8 @@ register_property(
 def serialize_tuple_to_numba(fmt, obj):
     if not isinstance(fmt, AssemblyStructFType):
         fmt = ftype(fmt)
-    return numba_type(fmt)(*obj)
+    return numba_type(fmt)(obj)
 
-
-register_property(
-    TupleFType,
-    "serialize_to_numba",
-    "__attr__",
-    serialize_tuple_to_numba,
-)
 
 register_property(
     tuple,

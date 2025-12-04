@@ -21,11 +21,13 @@ from finchlite.codegen.numba_backend import (
     NumbaContext,
     NumbaDictFType,
     NumbaStackFType,
-    numba_type,
+    construct_from_numba,
+    numba_jitclass_type,
+    serialize_to_numba,
 )
 from finchlite.finch_assembly.map import Dict
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
-from finchlite.finch_assembly.struct import AssemblyStructFType, TupleFType
+from finchlite.finch_assembly.struct import ImmutableStructFType, TupleFType
 
 stcpath = Path(__file__).parent / "stc" / "include"
 hashmap_h = stcpath / "stc" / "hashmap.h"
@@ -44,28 +46,12 @@ class NumbaDictFields(NamedTuple):
 
 class CDictFields(NamedTuple):
     """
-    TODO: for the C backend, we will pulling in a completely different library
-    to do the actual hash function implementation. Should we even try to
-    convert back?
+    A tuple that stores the variable names for accessing the hash table
+    (manipulated directly in C) and the python object.
     """
 
     map: str
     obj: str
-
-
-def _is_integer_tuple(tup, size):
-    if not isinstance(tup, tuple) or len(tup) != size:
-        return False
-    return all(isinstance(elt, int) for elt in tup)
-
-
-def _int_tuple_ftype(size: int):
-    return TupleFType.from_tuple(tuple(int for _ in range(size)))
-
-
-def _tuplify(ftype: AssemblyStructFType, obj):
-    assert isinstance(ftype, AssemblyStructFType)
-    return tuple([ftype.struct_getattr(obj, attr) for attr in ftype.struct_fieldnames])
 
 
 class CHashTableStruct(ctypes.Structure):
@@ -97,15 +83,15 @@ class CHashTable(Dict):
     """
 
     libraries: dict[
-        tuple[AssemblyStructFType, AssemblyStructFType], CHashTableLibrary
+        tuple[ImmutableStructFType, ImmutableStructFType], CHashTableLibrary
     ] = {}
 
     @classmethod
     def gen_code(
         cls,
         ctx: "CContext",
-        key_type: "AssemblyStructFType",
-        value_type: "AssemblyStructFType",
+        key_type: "ImmutableStructFType",
+        value_type: "ImmutableStructFType",
         inline: bool = False,
     ) -> tuple[CHashMethods, str]:
         # dereference both key and value types; as given, they are both pointers.
@@ -186,10 +172,10 @@ class CHashTable(Dict):
 
     @classmethod
     def compile(
-        cls, key_type: AssemblyStructFType, value_type: AssemblyStructFType
+        cls, key_type: ImmutableStructFType, value_type: ImmutableStructFType
     ) -> CHashTableLibrary:
         """
-        compile a library to use for the c hash table.
+        Compile a library to use for the c hash table.
         """
         if (key_type, value_type) in cls.libraries:
             return cls.libraries[(key_type, value_type)]
@@ -287,7 +273,9 @@ class CHashTableFType(CDictFType, CStackFType):
     An implementation of Hash Tables using the stc library.
     """
 
-    def __init__(self, key_type: AssemblyStructFType, value_type: AssemblyStructFType):
+    def __init__(
+        self, key_type: ImmutableStructFType, value_type: ImmutableStructFType
+    ):
         # these should both be immutable structs/POD types.
         # we will enforce this once the immutable struct PR is merged.
         self._key_type = key_type
@@ -311,7 +299,6 @@ class CHashTableFType(CDictFType, CStackFType):
     def key_type(self):
         """
         Returns the type of elements used as the keys of the hash table.
-        (some integer tuple)
         """
         return self._key_type
 
@@ -319,7 +306,6 @@ class CHashTableFType(CDictFType, CStackFType):
     def value_type(self):
         """
         Returns the type of elements used as the value of the hash table.
-        (some integer tuple)
         """
         return self._value_type
 
@@ -421,15 +407,20 @@ class CHashTableFType(CDictFType, CStackFType):
 
 class NumbaHashTable(Dict):
     """
-    A Hash Table that maps Z^{in_len} to Z^{out_len}
+    A Hash Table implementation that integrates cleanly with the numba backend.
     """
 
-    def __init__(self, key_len, value_len, dct: "dict[tuple,tuple] | None" = None):
-        self.key_len = key_len
-        self.value_len = value_len
+    def __init__(
+        self,
+        key_type: ImmutableStructFType,
+        value_type: ImmutableStructFType,
+        dct: "dict[tuple,tuple] | None" = None,
+    ):
+        self._key_type = key_type
+        self._value_type = value_type
 
-        self._numba_key_type = numba.types.UniTuple(numba.types.int64, key_len)
-        self._numba_value_type = numba.types.UniTuple(numba.types.int64, value_len)
+        self._numba_key_type = numba_jitclass_type(key_type)
+        self._numba_value_type = numba_jitclass_type(value_type)
 
         if dct is None:
             dct = {}
@@ -437,14 +428,6 @@ class NumbaHashTable(Dict):
             key_type=self._numba_key_type, value_type=self._numba_value_type
         )
         for key, value in dct.items():
-            if not _is_integer_tuple(key, key_len):
-                raise TypeError(
-                    f"Supplied key {key} is not a tuple of {key_len} integers"
-                )
-            if not _is_integer_tuple(value, value_len):
-                raise TypeError(
-                    f"Supplied value {key} is not a tuple of {value_len} integers"
-                )
             self.dct[key] = value
 
     @property
@@ -452,30 +435,24 @@ class NumbaHashTable(Dict):
         """
         Returns the finch type of this hash table.
         """
-        return NumbaHashTableFType(self.key_len, self.value_len)
+        return NumbaHashTableFType(self._key_type, self._value_type)
 
     def exists(self, idx) -> bool:
         """
         Exists function of the numba hash table.
         It will accept an object with TupleFType and return a bool.
         """
-        idx = _tuplify(self.ftype.key_type, idx)
-        assert _is_integer_tuple(idx, self.key_len)
+        idx = serialize_to_numba(self.key_type, idx)
         return idx in self.dct
 
     def load(self, idx):
-        idx = _tuplify(self.ftype.key_type, idx)
-        assert _is_integer_tuple(idx, self.key_len)
+        idx = serialize_to_numba(self.key_type, idx)
         result = self.dct[idx]
-        return self.ftype.value_type(
-            **{str(n): fieldvalue for n, fieldvalue in enumerate(result)}
-        )
+        return construct_from_numba(self.value_type, result)
 
     def store(self, idx, val):
-        idx = _tuplify(self.ftype.key_type, idx)
-        val = _tuplify(self.ftype.value_type, val)
-        assert _is_integer_tuple(idx, self.key_len)
-        assert _is_integer_tuple(val, self.value_len)
+        idx = serialize_to_numba(self.key_type, idx)
+        val = serialize_to_numba(self.value_type, val)
         self.dct[idx] = val
 
     def __str__(self):
@@ -487,27 +464,25 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
     An implementation of Hash Tables using the stc library.
     """
 
-    def __init__(self, key_len: int, value_len: int):
-        self.key_len = key_len
-        self.value_len = value_len
-        self._key_type = _int_tuple_ftype(key_len)
-        self._value_type = _int_tuple_ftype(value_len)
-        self._numba_key_type = numba.types.UniTuple(numba.types.int64, key_len)
-        self._numba_value_type = numba.types.UniTuple(numba.types.int64, value_len)
+    def __init__(
+        self, key_type: ImmutableStructFType, value_type: ImmutableStructFType
+    ):
+        self._key_type = key_type
+        self._value_type = value_type
 
     def __eq__(self, other):
         if not isinstance(other, NumbaHashTableFType):
             return False
-        return self.key_len == other.key_len and self.value_len == other.value_len
+        return self.key_type == other.key_type and self.value_type == other.value_type
 
     def __call__(self):
-        return NumbaHashTable(self.key_len, self.value_len, {})
+        return NumbaHashTable(self._key_type, self._value_type, {})
 
     def __str__(self):
-        return f"numba_hashtable_t({self.key_len}, {self.value_len})"
+        return f"numba_hashtable_t({self.key_type}, {self.value_type})"
 
     def __repr__(self):
-        return f"HashTableFType({self.key_len}, {self.value_len})"
+        return f"NumbaHashTableFType({self.key_type}, {self.value_type})"
 
     @property
     def key_type(self):
@@ -530,15 +505,17 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
         This method needs to be here because you are going to be using this
         type as a key in dictionaries.
         """
-        return hash(("NumbaHashTableFType", self.key_len, self.value_len))
+        return hash(("NumbaHashTableFType", self.key_type, self.value_type))
 
     """
     Methods for the Numba Backend
     """
 
     def numba_jitclass_type(self) -> numba.types.Type:
+        numba_key_type = numba_jitclass_type(self.key_type)
+        numba_value_type = numba_jitclass_type(self.value_type)
         return numba.types.ListType(
-            numba.types.DictType(self._numba_key_type, self._numba_value_type)
+            numba.types.DictType(numba_key_type, numba_value_type)
         )
 
     def numba_type(self):
@@ -548,21 +525,13 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
         self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
     ):
         assert isinstance(map.obj, NumbaDictFields)
-        tuple_fields = ",".join(
-            f"{ctx(idx)}.{field}" for field in self.key_type.struct_fieldnames
-        )
-        return f"tuple(({tuple_fields})) in {map.obj.map}"
+        return f"{ctx(idx)} in {map.obj.map}"
 
     def numba_loaddict(
         self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
     ):
         assert isinstance(map.obj, NumbaDictFields)
-        tuple_fields = ",".join(
-            f"{ctx(idx)}.{field}" for field in self.key_type.struct_fieldnames
-        )
-        value_v = ctx.freshen("value")
-        ctx.exec(f"{ctx.feed}{value_v} = {map.obj.map}[tuple(({tuple_fields}))]")
-        return f"{ctx.full_name(numba_type(self.value_type))}(*{value_v})"
+        return f"{map.obj.map}[{ctx(idx)}]"
 
     def numba_storedict(
         self,
@@ -572,15 +541,7 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
         value: "AssemblyExpression",
     ):
         assert isinstance(map.obj, NumbaDictFields)
-        idx_fields = ",".join(
-            f"{ctx(idx)}.{field}" for field in self.key_type.struct_fieldnames
-        )
-        val_fields = ",".join(
-            f"{ctx(value)}.{field}" for field in self.value_type.struct_fieldnames
-        )
-        ctx.exec(
-            f"{ctx.feed}{map.obj.map}[tuple(({idx_fields}))] = tuple(({val_fields}))"
-        )
+        ctx.exec(f"{ctx.feed}{map.obj.map}[{ctx(idx)}] = {ctx(value)}")
 
     def numba_unpack(
         self, ctx: "NumbaContext", var_n: str, val: "AssemblyExpression"
