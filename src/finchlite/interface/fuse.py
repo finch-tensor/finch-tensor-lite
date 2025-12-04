@@ -56,6 +56,8 @@ from typing import Any
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.finch_logic.nodes import TableValue
 
+import numpy as np
+
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
@@ -189,7 +191,7 @@ def provision_tensors(
             case Table(Literal(val), idxs):
                 if isinstance(val, TensorPlaceholder):
                     shape = tuple(dims_dict[field] for field in idxs)
-                    tensor = table_var.type_(shape)
+                    tensor = table_var.type_(shape, val=np.zeros(dtype=val.dtype, shape=shape))
                 else:
                     for idx, field in enumerate(table.idxs):
                         dims_dict[field] = val.shape[idx]
