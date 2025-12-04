@@ -219,4 +219,3 @@ register_property(
     c_eq_struct,
 )
 ```
-
