@@ -15,12 +15,14 @@ from .algebra import (
 )
 from .operator import (
     InitWrite,
+    cansplitpush,
     conjugate,
     first_arg,
     identity,
     overwrite,
     promote_max,
     promote_min,
+    repeat_operator,
 )
 from .tensor import (
     Tensor,
@@ -37,6 +39,7 @@ __all__ = [
     "Tensor",
     "TensorFType",
     "TensorPlaceholder",
+    "cansplitpush",
     "conjugate",
     "element_type",
     "fill_value",
@@ -56,6 +59,7 @@ __all__ = [
     "promote_type",
     "query_property",
     "register_property",
+    "repeat_operator",
     "return_type",
     "shape_type",
 ]

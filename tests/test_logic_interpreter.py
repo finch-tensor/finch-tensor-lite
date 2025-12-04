@@ -94,9 +94,10 @@ def test_materialize():
 
     result = LogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
 
-    expected = TableValue(np.array(
-        [[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]]
-    ), (i, j))
+    expected = TableValue(
+        np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]]),
+        (i, j),
+    )
 
     assert result == expected
     assert_equal(C, np.array([[1, 1], [1, 1]]))

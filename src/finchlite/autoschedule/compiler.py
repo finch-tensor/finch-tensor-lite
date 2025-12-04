@@ -14,8 +14,7 @@ from ..algebra import (
     return_type,
 )
 from ..codegen import NumpyBufferFType
-from ..compile import BufferizedNDArrayFType, ExtentFType, dimension
-from ..finch_assembly import TupleFType
+from ..compile import ExtentFType, dimension
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -214,11 +213,7 @@ class LogicLowerer:
                 return ntn.Assign(
                     ntn.Variable(
                         name,
-                        BufferizedNDArrayFType(
-                            NumpyBufferFType(val.dtype),
-                            val.ndim,
-                            TupleFType.from_tuple(val.shape_type),
-                        ),
+                        val.from_kwargs(val.to_kwargs()),
                     ),
                     compile_logic_constant(tns),
                 )
@@ -498,13 +493,19 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                 )
             )
 
-            return BufferizedNDArrayFType(
-                buf_t=NumpyBufferFType(dtype),
+            # TODO: properly infer result rep from args
+            result_rep, fields = args_suitable_reps_fields[0]
+            levels_to_add = [
+                idx for idx, f in enumerate(result_fields) if f not in fields
+            ]
+            result_rep = result_rep.add_levels(levels_to_add)
+            kwargs = result_rep.to_kwargs()
+            kwargs.update(
+                element_type=NumpyBufferFType(dtype),
                 ndim=np.intp(len(result_fields)),
-                strides_t=TupleFType.from_tuple(
-                    tuple(field_type_map[f] for f in result_fields)
-                ),
+                dimension_type=tuple(field_type_map[f] for f in result_fields),
             )
+            return result_rep.from_kwargs(**kwargs)
         case Aggregate(Literal(op), init, arg, idxs):
             init_suitable_rep = find_suitable_rep(init, table_vars)
             arg_suitable_rep = find_suitable_rep(arg, table_vars)
@@ -513,16 +514,24 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
                     op, init_suitable_rep.element_type, arg_suitable_rep.element_type
                 )
             )
-            strides_t = tuple(
-                st
-                for f, st in zip(arg.fields(), arg_suitable_rep.shape_type, strict=True)
-                if f not in idxs
-            )
-            return BufferizedNDArrayFType(
-                buf_t=buf_t,
+            # TODO: properly infer result rep from args
+            levels_to_remove = []
+            strides_t = []
+            for idx, (f, st) in enumerate(
+                zip(arg.fields(), arg_suitable_rep.shape_type, strict=True)
+            ):
+                if f not in idxs:
+                    strides_t.append(st)
+                else:
+                    levels_to_remove.append(idx)
+            arg_suitable_rep = arg_suitable_rep.remove_levels(levels_to_remove)
+            kwargs = arg_suitable_rep.to_kwargs()
+            kwargs.update(
+                buffer_type=buf_t,
                 ndim=np.intp(len(strides_t)),
-                strides_t=TupleFType.from_tuple(strides_t),
+                dimension_type=tuple(strides_t),
             )
+            return arg_suitable_rep.from_kwargs(**kwargs)
         case LogicTree() as tree:
             for child in tree.children:
                 suitable_rep = find_suitable_rep(child, table_vars)
@@ -555,11 +564,13 @@ class LogicCompiler:
     def __init__(self):
         self.ll = LogicLowerer()
 
-    def __call__(self, prgm: LogicNode) -> tuple[ntn.NotationNode, dict[Alias, Table]]:
+    def __call__(
+        self, prgm: LogicNode
+    ) -> tuple[ntn.NotationNode, dict[Alias, ntn.Variable], dict[Alias, Table]]:
         prgm, table_vars, slot_vars, dim_size_vars, tables, field_relabels = (
             record_tables(prgm)
         )
         lowered_prgm = self.ll(
             prgm, table_vars, slot_vars, dim_size_vars, field_relabels
         )
-        return merge_blocks(lowered_prgm), tables
+        return merge_blocks(lowered_prgm), table_vars, tables

@@ -394,27 +394,28 @@ class LazyTensor(OverrideTensor):
 
 
 register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, format="bufferized") -> Any:
+def asarray(arg: Any, format=None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
 
     Args:
         arg: The object to be converted.
+        format: The format for the result array.
 
     Returns:
         The array type result of the given object.
     """
-    if format != "bufferized":
-        raise Exception(f"Only bufferized format is now supported, got: {format}")
+    if format is None:
+        if hasattr(arg, "asarray"):
+            return arg.asarray()
+        return query_property(arg, "asarray", "__attr__")
 
-    if hasattr(arg, "asarray"):
-        return arg.asarray()
-
-    return query_property(arg, "asarray", "__attr__")
+    return format(arg)
 
 
 def defer(arr) -> LazyTensor:
@@ -1200,6 +1201,7 @@ class FillTensorFType(DefaultTensorFType):
     def __call__(self, shape: tuple) -> FillTensor:
         return FillTensor(shape, self.fill_value)
 
+
 class FillTensor(Tensor):
     """
     A tensor that has a specific shape but contains no actual data.
@@ -1276,9 +1278,13 @@ class ConcatTensorFType(WrapperTensorFType):
 
     def __call__(self, shape: tuple) -> ConcatTensor:
         tns = self._child_formats[0](shape)
-        shape2 = tuple(dim if i != self.concat_axis else self._shape_type[i](0) for i, dim in enumerate(shape))
+        shape2 = tuple(
+            dim if i != self.concat_axis else self._shape_type[i](0)
+            for i, dim in enumerate(shape)
+        )
         tnss = (tns,) + tuple(fmt(shape2) for fmt in self._child_formats[1:])
         return ConcatTensor(*tnss, axis=self.concat_axis)
+
 
 class ConcatTensor(Tensor):
     """
@@ -1400,10 +1406,11 @@ class SplitDimsTensorFType(WrapperTensorFType):
             type(dim) for dim in self.split_shape
         ]
         return tuple(shape_type_list)
-    
-    def __call__(self, shape: tuple) -> SplitDimsTensor:
-        raise NotImplementedError("Cannot directly instantiate SplitDimsTensor from ftype")
 
+    def __call__(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError(
+            "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
 
 
 class SplitDimsTensor(Tensor):
@@ -1492,7 +1499,9 @@ class CombineDimsTensorFType(WrapperTensorFType):
         return self._shape_type
 
     def __call__(self, shape: tuple) -> SplitDimsTensor:
-        raise NotImplementedError("Cannot directly instantiate SplitDimsTensor from ftype")
+        raise NotImplementedError(
+            "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
 
 
 class CombineDimsTensor(Tensor):
