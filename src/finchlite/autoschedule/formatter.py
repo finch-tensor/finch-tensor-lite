@@ -1,26 +1,27 @@
-from typing import overload
+import numpy as np
 
 from finchlite.codegen.numpy_buffer import NumpyBufferFType
 from finchlite.compile.bufferized_ndarray import BufferizedNDArrayFType
-from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_assembly.struct import TupleFType
-from finchlite.finch_logic.nodes import TableValue, TableValueFType
+from finchlite.finch_logic.nodes import TableValueFType
 from finchlite.symbolic import gensym
 
 from .. import finch_logic as lgc
-from ..finch_logic import LogicEvaluator, LogicInterpreter, LogicLoader, LogicNode
-from ..symbolic import Namespace, PostWalk, Rewrite, fisinstance, ftype
+from ..finch_logic import LogicLoader
 from .executor import FakeLogicCompiler
-import numpy as np
+
 
 class LogicFormatterContext:
     def __init__(self, bindings: dict[lgc.Alias, lgc.TableValueFType] | None = None):
         if bindings is None:
             bindings = {}
         self.bindings: dict[lgc.Alias, lgc.TableValueFType] = bindings
-        self.fields = {idx:val.idxs for idx, val in bindings.items()}
+        self.fields = {idx: val.idxs for idx, val in bindings.items()}
         self.shape_types = {idx: val.tns.shape_type for idx, val in bindings.items()}
-        self.element_types = {idx: val.tns.element_type for idx, val in bindings.items()}
+        self.element_types = {
+            idx: val.tns.element_type for idx, val in bindings.items()
+        }
         self.fill_values = {idx: val.tns.fill_value for idx, val in bindings.items()}
 
     def __call__(
@@ -62,11 +63,13 @@ class LogicFormatterContext:
                     self.element_types[lhs] = element_type
                     self.fill_values[lhs] = fill_value
 
-                    #TODO: This constructor is awful
+                    # TODO: This constructor is awful
                     tns = BufferizedNDArrayFType(
-                        buffer_type = NumpyBufferFType(element_type),
+                        buffer_type=NumpyBufferFType(element_type),
                         ndim=np.intp(len(fields)),
-                        dimension_type=TupleFType(struct_name=gensym("ugh"), struct_formats=shape_type),
+                        dimension_type=TupleFType(
+                            struct_name=gensym("ugh"), struct_formats=shape_type
+                        ),
                     )
                     self.bindings[lhs] = TableValueFType(tns, fields)
             case lgc.Produces(exprs):
@@ -74,6 +77,7 @@ class LogicFormatterContext:
             case _:
                 raise ValueError(f"Unsupported logic statement for formatting: {node}")
         return self.bindings
+
 
 class LogicFormatter(LogicLoader):
     def __init__(self, loader: LogicLoader | None = None):
