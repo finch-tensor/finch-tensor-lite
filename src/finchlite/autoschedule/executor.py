@@ -140,7 +140,7 @@ class FakeLogicCompiler(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicNode, bindings: dict[lgc.Alias, lgc.TableValueFType]
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
     ) -> tuple[LogicInterpreterLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
         return (LogicInterpreterLibrary(prgm, bindings), bindings)
 
@@ -155,6 +155,8 @@ class LogicExecutor(LogicEvaluator):
     def __call__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValue] | None = None):
         if bindings is None:
             bindings = {}
+        if isinstance(prgm, lgc.LogicExpression):
+            prgm = lgc.Produces((prgm,))
         prgm, bindings = extract_tables(prgm, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 

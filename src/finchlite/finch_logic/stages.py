@@ -23,7 +23,7 @@ class LogicEvaluator(Stage):
 class LogicLoader(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
     ) -> tuple[AssemblyLibrary, dict[lgc.Alias, TableValueFType]]:
         """
         Generate Finch Library from the given logic and input types, with a
@@ -35,7 +35,7 @@ class LogicLoader(ABC):
 class LogicNotationLowerer(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
     ) -> tuple[ntn.Module, dict[lgc.Alias, TableValueFType]]:
         """
         Generate Finch Notation from the given logic and input types.  Also
@@ -46,7 +46,7 @@ class LogicNotationLowerer(ABC):
 class LogicEinsumLowerer(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
     ) -> tuple[ein.EinsumNode, dict[lgc.Alias, TableValueFType]]:
         """
         Generate Finch Einsum from the given logic and input types,
@@ -57,8 +57,8 @@ class LogicEinsumLowerer(ABC):
 class LogicTransform(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[lgc.LogicNode, dict[lgc.Alias, TableValueFType]]:
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
+    ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TableValueFType]]:
         """
         Transform the given logic term into another logic term.
         """
@@ -71,7 +71,7 @@ class OptLogicLoader(LogicLoader):
 
     def __call__(
         self,
-        term: lgc.LogicNode,
+        term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, lgc.TableValueFType],
     ) -> tuple[AssemblyLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
         for opt in self.opts:

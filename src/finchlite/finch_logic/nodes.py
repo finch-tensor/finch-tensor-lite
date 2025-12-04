@@ -7,6 +7,7 @@ from typing import Any, Self, TypeVar
 
 from finchlite.algebra.algebra import fixpoint_type, return_type
 
+from ..algebra import promote_max, promote_type
 from ..symbolic import (
     Context,
     FType,
@@ -18,6 +19,23 @@ from ..symbolic import (
     literal_repr,
 )
 from ..util import qual_str
+
+
+def merge_dim_type(d1, d2):
+    if d1 and d2:
+        return promote_type(d1, d2)
+    return d1 or d2
+
+
+def merge_dim(d1, d2):
+    d3 = d1 or 1
+    d4 = d2 or 1
+    if d3 != d4:
+        raise ValueError(f"Dimension mismatch: {d1} vs {d2}")
+    if d1 and d2:
+        return promote_max(d1, d2)
+    return d1 or d2
+
 
 """
 Notes on Finch Logic IR:
@@ -145,6 +163,22 @@ class LogicExpression(LogicNode):
         are expanded, None is used.  When dimensions are contracted, the value
         is combined with None."""
         ...
+
+    def shape_type(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[Any, ...]:
+        """Returns the shape type of the node."""
+        return self.mapdims(merge_dim_type, dim_bindings, field_bindings)
+
+    def shape(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[Any, ...]:
+        """Returns the shape of the node."""
+        return self.mapdims(merge_dim, dim_bindings, field_bindings)
 
     @abstractmethod
     def element_type(
