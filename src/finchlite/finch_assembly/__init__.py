@@ -1,8 +1,10 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
 from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
+from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
+    AssemblyExpression,
     AssemblyNode,
     Assert,
     Assign,
@@ -10,6 +12,7 @@ from .nodes import (
     Break,
     BufferLoop,
     Call,
+    ExistsDict,
     ForLoop,
     Function,
     GetAttr,
@@ -18,6 +21,7 @@ from .nodes import (
     Length,
     Literal,
     Load,
+    LoadDict,
     Module,
     Print,
     Repack,
@@ -27,6 +31,7 @@ from .nodes import (
     Slot,
     Stack,
     Store,
+    StoreDict,
     TaggedVariable,
     Unpack,
     Variable,
@@ -44,6 +49,7 @@ from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check
 __all__ = [
     "AssemblyCFGBuilder",
     "AssemblyCopyPropagation",
+    "AssemblyExpression",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
@@ -58,6 +64,9 @@ __all__ = [
     "BufferFType",
     "BufferLoop",
     "Call",
+    "Dict",
+    "DictFType",
+    "ExistsDict",
     "ForLoop",
     "Function",
     "GetAttr",
@@ -67,6 +76,7 @@ __all__ = [
     "Length",
     "Literal",
     "Load",
+    "LoadDict",
     "Module",
     "MutableStructFType",
     "NamedTupleFType",
@@ -78,6 +88,7 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
+    "StoreDict",
     "TaggedVariable",
     "TupleFType",
     "Unpack",
