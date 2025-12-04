@@ -4,19 +4,17 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import Any
 
-import numpy as np
-
 import numba
-
-from finchlite.finch_assembly.map import DictFType
-from finchlite.finch_assembly.struct import (
-    ImmutableStructFType,
-    MutableStructFType,
-)  # type: ignore[import-untyped]
+import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType
+from ..finch_assembly.dct import DictFType
+from ..finch_assembly.struct import (  # type: ignore[import-untyped]
+    ImmutableStructFType,
+    MutableStructFType,
+)
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 
 logger = logging.getLogger(__name__)

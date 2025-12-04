@@ -33,12 +33,13 @@ hashmap_h = stcpath / "stc" / "hashmap.h"
 
 class NumbaDictFields(NamedTuple):
     """
-    This is a field that extracts out the map from the obj variable. Its
-    purpose is so that we can extract out map from obj in unpack, do
-    computations on the map variable, and re-insert that into obj in repack.
+    This is a field that extracts out the dictionary from the obj variable. Its
+    purpose is so that we can extract out dictionary from obj in unpack, do
+    computations on the dictionary variable, and re-insert that into obj in
+    repack.
     """
 
-    map: str
+    dct: str
     obj: str
 
 
@@ -48,13 +49,13 @@ class CDictFields(NamedTuple):
     (manipulated directly in C) and the python object.
     """
 
-    map: str
+    dct: str
     obj: str
 
 
 class CHashTableStruct(ctypes.Structure):
     _fields_ = [
-        ("map", ctypes.c_void_p),
+        ("dct", ctypes.c_void_p),
         ("obj", ctypes.py_object),
     ]
 
@@ -134,24 +135,24 @@ class CHashTable(Dict):
 
             {inline_s}bool
             {methods["exists"]}(
-                {hmap_t} *map, {keytype_c} key
+                {hmap_t} *dct, {keytype_c} key
             ) {{
-                return {hmap_t}_contains(map, key);
+                return {hmap_t}_contains(dct, key);
             }}
 
             {inline_s}{valuetype_c}
             {methods["load"]}(
-                {hmap_t} *map, {keytype_c} key
+                {hmap_t} *dct, {keytype_c} key
             ) {{
-                const {valuetype_c}* internal_val = {hmap_t}_at(map, key);
+                const {valuetype_c}* internal_val = {hmap_t}_at(dct, key);
                 return *internal_val;
             }}
 
             {inline_s}void
             {methods["store"]}(
-                {hmap_t} *map, {keytype_c} key, {valuetype_c} value
+                {hmap_t} *dct, {keytype_c} key, {valuetype_c} value
             ) {{
-                {hmap_t}_insert_or_assign(map, key, value);
+                {hmap_t}_insert_or_assign(dct, key, value);
             }}
 
             {inline_s}void
@@ -220,7 +221,7 @@ class CHashTable(Dict):
         cls.libraries[(key_type, value_type)] = CHashTableLibrary(lib, methods, hmap_t)
         return cls.libraries[(key_type, value_type)]
 
-    def __init__(self, key_type, value_type, map: "dict | None" = None):
+    def __init__(self, key_type, value_type, dct: "dict | None" = None):
         """
         Constructor for the C Hash Table
         """
@@ -233,10 +234,10 @@ class CHashTable(Dict):
         self._key_type = key_type
         self._value_type = value_type
 
-        if map is None:
-            map = {}
+        if dct is None:
+            dct = {}
         self.dct = getattr(self.lib.library, self.lib.methods["init"])()
-        for key, value in map.items():
+        for key, value in dct.items():
             # if some error happens, the serialization will handle it.
             self.store(key, value)
 
@@ -322,32 +323,32 @@ class CHashTableFType(CDictFType, CStackFType):
     def c_type(self):
         return ctypes.POINTER(CHashTableStruct)
 
-    def c_existsdict(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
-        assert isinstance(map.obj, CDictFields)
+    def c_existsdict(self, ctx: "CContext", dct: "Stack", idx: "AssemblyExpression"):
+        assert isinstance(dct.obj, CDictFields)
         methods: CHashMethods = ctx.datastructures[self]
-        return f"{ctx.feed}{methods['exists']}({map.obj.map}, {ctx(idx)})"
+        return f"{ctx.feed}{methods['exists']}({dct.obj.dct}, {ctx(idx)})"
 
     def c_storedict(
         self,
         ctx: "CContext",
-        map: "Stack",
+        dct: "Stack",
         idx: "AssemblyExpression",
         value: "AssemblyExpression",
     ):
-        assert isinstance(map.obj, CDictFields)
+        assert isinstance(dct.obj, CDictFields)
         methods: CHashMethods = ctx.datastructures[self]
         ctx.exec(
-            f"{ctx.feed}{methods['store']}({map.obj.map}, {ctx(idx)}, {ctx(value)});"
+            f"{ctx.feed}{methods['store']}({dct.obj.dct}, {ctx(idx)}, {ctx(value)});"
         )
 
-    def c_loaddict(self, ctx: "CContext", map: "Stack", idx: "AssemblyExpression"):
+    def c_loaddict(self, ctx: "CContext", dct: "Stack", idx: "AssemblyExpression"):
         """
         Get an expression where we can get the value corresponding to a key.
         """
-        assert isinstance(map.obj, CDictFields)
+        assert isinstance(dct.obj, CDictFields)
         methods: CHashMethods = ctx.datastructures[self]
 
-        return f"{methods['load']}({map.obj.map}, {ctx(idx)})"
+        return f"{methods['load']}({dct.obj.dct}, {ctx(idx)})"
 
     def c_unpack(self, ctx: "CContext", var_n: str, val: AssemblyExpression):
         """
@@ -363,14 +364,14 @@ class CHashTableFType(CDictFType, CStackFType):
             ),
         )
 
-        ctx.exec(f"{ctx.feed}void* {data} = {ctx(val)}->map;")
+        ctx.exec(f"{ctx.feed}void* {data} = {ctx(val)}->dct;")
         return CDictFields(data, var_n)
 
     def c_repack(self, ctx: "CContext", lhs: str, obj: "CDictFields"):
         """
         Repack the map out of C context.
         """
-        ctx.exec(f"{ctx.feed}{lhs}->map = {obj.map};")
+        ctx.exec(f"{ctx.feed}{lhs}->dct = {obj.dct};")
 
     def serialize_to_c(self, obj: CHashTable):
         """
@@ -387,18 +388,18 @@ class CHashTableFType(CDictFType, CStackFType):
 
     def deserialize_from_c(self, obj: CHashTable, res):
         """
-        Update our hash table based on how the C call modified the CHashMapStruct.
+        Update our hash table based on how the C call modified the CHashTableStruct.
         """
         assert isinstance(res, ctypes.POINTER(CHashTableStruct))
         assert isinstance(res.contents.obj, CHashTable)
 
-        obj.dct = res.contents.map
+        obj.dct = res.contents.dct
 
     def construct_from_c(self, c_dct):
         """
         Construct a CHashTable from a C-compatible structure.
 
-        c_map is a pointer to a CHashMapStruct
+        c_map is a pointer to a CHashTableStruct
         """
         raise NotImplementedError
 
@@ -520,59 +521,57 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
         return list
 
     def numba_existsdict(
-        self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
+        self, ctx: "NumbaContext", dct: "Stack", idx: "AssemblyExpression"
     ):
-        assert isinstance(map.obj, NumbaDictFields)
-        return f"{ctx(idx)} in {map.obj.map}"
+        assert isinstance(dct.obj, NumbaDictFields)
+        return f"{ctx(idx)} in {dct.obj.dct}"
 
     def numba_loaddict(
-        self, ctx: "NumbaContext", map: "Stack", idx: "AssemblyExpression"
+        self, ctx: "NumbaContext", dct: "Stack", idx: "AssemblyExpression"
     ):
-        assert isinstance(map.obj, NumbaDictFields)
-        return f"{map.obj.map}[{ctx(idx)}]"
+        assert isinstance(dct.obj, NumbaDictFields)
+        return f"{dct.obj.dct}[{ctx(idx)}]"
 
     def numba_storedict(
         self,
         ctx: "NumbaContext",
-        map: "Stack",
+        dct: "Stack",
         idx: "AssemblyExpression",
         value: "AssemblyExpression",
     ):
-        assert isinstance(map.obj, NumbaDictFields)
-        ctx.exec(f"{ctx.feed}{map.obj.map}[{ctx(idx)}] = {ctx(value)}")
+        assert isinstance(dct.obj, NumbaDictFields)
+        ctx.exec(f"{ctx.feed}{dct.obj.dct}[{ctx(idx)}] = {ctx(value)}")
 
     def numba_unpack(
         self, ctx: "NumbaContext", var_n: str, val: "AssemblyExpression"
     ) -> NumbaDictFields:
         """
-        Unpack the map into numba context.
+        Unpack the dictionary into numba context.
         """
         # the val field will always be asm.Variable(var_n, var_t)
-        map = ctx.freshen(var_n, "map")
-        ctx.exec(f"{ctx.feed}{map} = {ctx(val)}[0]")
+        dct = ctx.freshen(var_n, "dct")
+        ctx.exec(f"{ctx.feed}{dct} = {ctx(val)}[0]")
 
-        return NumbaDictFields(map, var_n)
+        return NumbaDictFields(dct, var_n)
 
     def numba_repack(self, ctx: "NumbaContext", lhs: str, obj: "NumbaDictFields"):
         """
-        Repack the map from Numba context.
+        Repack the dictionary from Numba context.
         """
         # obj is the fields corresponding to the self.slots[lhs]
-        ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.map}")
+        ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.dct}")
 
     def serialize_to_numba(self, obj: "NumbaHashTable"):
         """
-        Serialize the hashmap to a Numba-compatible object.
-
-        We will supply the input and output length
+        Serialize the hash table to a Numba-compatible object.
         """
         return numba.typed.List([obj.dct])
 
-    def deserialize_from_numba(self, obj: "NumbaHashTable", numba_map: "list[dict]"):
-        obj.dct = numba_map[0]
+    def deserialize_from_numba(self, obj: "NumbaHashTable", numba_dct: "list[dict]"):
+        obj.dct = numba_dct[0]
 
-    def construct_from_numba(self, numba_map):
+    def construct_from_numba(self, numba_dct):
         """
-        Construct a numba map from a Numba-compatible object.
+        Construct a numba dictionary from a Numba-compatible object.
         """
-        return NumbaHashTable(self.key_len, self.value_len, numba_map[0])
+        return NumbaHashTable(self.key_type, self.value_type, numba_dct[0])

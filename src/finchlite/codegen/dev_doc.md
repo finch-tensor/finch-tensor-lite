@@ -82,7 +82,7 @@ Here's how it works for numba:
 1. The NumpyBuffer (denoted `pybuf`) gets turned into a one-element list of the
    form `nnp = list([ndarray])`. `nnp` gets passed into the kernel.
 2. (In kernel) The CNumpyBuffer gets unpacked into variables "buffer1" and
-   "obj1" (actual names of these variables will depend on what the context has).
+   "nnp" (actual names of these variables will depend on what the context has).
    These variable _names_ get stored in the CContext's slots as a tuple
    `("buffer1", "nnp")`. The following code gets emitted in the process:
    ```python

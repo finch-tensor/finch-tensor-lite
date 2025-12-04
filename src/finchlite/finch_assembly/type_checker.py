@@ -6,7 +6,7 @@ from .. import algebra
 from ..symbolic import FType, ScopedDict, ftype
 from . import nodes as asm
 from .buffer import BufferFType
-from .map import DictFType
+from .dct import DictFType
 from .struct import AssemblyStructFType
 
 
