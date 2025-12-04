@@ -30,6 +30,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 extend-exclude = [
     "tests/reference",
+    "src/finchlite/codegen/stc",
 ]
 line-length = 88
 

@@ -6,7 +6,8 @@ from typing import Any, NamedTuple, TypedDict
 
 import numba
 
-from finchlite.codegen.c import (
+from ..finch_assembly import AssemblyExpression, Dict, ImmutableStructFType, Stack
+from .c import (
     CContext,
     CDictFType,
     CStackFType,
@@ -17,7 +18,7 @@ from finchlite.codegen.c import (
     load_shared_lib,
     serialize_to_c,
 )
-from finchlite.codegen.numba_backend import (
+from .numba_backend import (
     NumbaContext,
     NumbaDictFType,
     NumbaStackFType,
@@ -25,9 +26,6 @@ from finchlite.codegen.numba_backend import (
     numba_jitclass_type,
     serialize_to_numba,
 )
-from finchlite.finch_assembly.map import Dict
-from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
-from finchlite.finch_assembly.struct import ImmutableStructFType
 
 stcpath = Path(__file__).parent / "stc" / "include"
 hashmap_h = stcpath / "stc" / "hashmap.h"

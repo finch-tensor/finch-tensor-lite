@@ -4,6 +4,7 @@ from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .map import Dict, DictFType
 from .nodes import (
+    AssemblyExpression,
     AssemblyNode,
     Assert,
     Assign,
@@ -48,6 +49,7 @@ from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check
 __all__ = [
     "AssemblyCFGBuilder",
     "AssemblyCopyPropagation",
+    "AssemblyExpression",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyNode",
