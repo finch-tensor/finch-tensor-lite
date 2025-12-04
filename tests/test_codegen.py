@@ -916,7 +916,6 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(np_type, constructed, serialized) is None
 
 
-@pytest.mark.skip("HELP")
 @pytest.mark.parametrize(
     "fmt_fn",
     [
@@ -938,8 +937,8 @@ def test_e2e_numba(fmt_fn, dtype):
     aa = fmt(a.shape, val=a)
     bb = fmt(b.shape, val=b)
 
-    wa = finchlite.defer(aa)
-    wb = finchlite.defer(bb)
+    wa = finchlite.lazy(aa)
+    wb = finchlite.lazy(bb)
 
     plan = finchlite.matmul(wa, wb)
     result = finchlite.compute(plan)
