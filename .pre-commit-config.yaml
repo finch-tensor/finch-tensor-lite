@@ -1,31 +1,48 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-    - id: end-of-file-fixer
-      exclude: ^tests/reference/
-    - id: trailing-whitespace
-      exclude: ^tests/reference/
-    - id: mixed-line-ending
-      exclude: ^tests/reference/
-    - id: name-tests-test
-      args: ["--pytest-test-first"]
-      exclude: |
+      - id: end-of-file-fixer
+        exclude: |
           (?x)(
               ^tests/reference/|
-              ^tests/scripts/
+              ^src/finchlilite/codegen/stc/
           )
-    - id: no-commit-to-branch
 
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.14.7
-  hooks:
-    - id: ruff-check
-      args: [--fix, --config=pyproject.toml]
-      types_or: [ python, pyi, jupyter ]
-    - id: ruff-format
-      args: [--config=pyproject.toml]
-      types_or: [ python, pyi, jupyter ]
+      - id: trailing-whitespace
+        exclude: |
+          (?x)(
+              ^tests/reference/|
+              ^src/finchlilite/codegen/stc/
+          )
+
+      - id: mixed-line-ending
+        exclude: |
+          (?x)(
+              ^tests/reference/|
+              ^src/finchlilite/codegen/stc/
+          )
+
+      - id: name-tests-test
+        args: ["--pytest-test-first"]
+        exclude: |
+          (?x)(
+              ^tests/reference/|
+              ^tests/scripts/|
+              ^src/finchlilite/codegen/stc/
+          )
+
+      - id: no-commit-to-branch
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.7
+    hooks:
+      - id: ruff-check
+        args: [--fix, --config=pyproject.toml]
+        types_or: [python, pyi, jupyter]
+      - id: ruff-format
+        args: [--config=pyproject.toml]
+        types_or: [python, pyi, jupyter]
 
 ci:
-    autofix_prs: false
+  autofix_prs: false
