@@ -106,7 +106,7 @@ from .fuse import (
     get_default_scheduler,
     set_default_scheduler,
 )
-from .lazy import LazyTensor, asarray, defer
+from .lazy import LazyTensor, asarray, lazy
 from .scalar import Scalar, ScalarFType
 
 __all__ = [
@@ -143,7 +143,6 @@ __all__ = [
     "copysign",
     "cos",
     "cosh",
-    "defer",
     "divide",
     "einop",
     "einsum",
@@ -165,6 +164,7 @@ __all__ = [
     "isfinite",
     "isinf",
     "isnan",
+    "lazy",
     "less",
     "less_equal",
     "log",
