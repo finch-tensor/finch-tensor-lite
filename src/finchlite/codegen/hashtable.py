@@ -27,7 +27,7 @@ from finchlite.codegen.numba_backend import (
 )
 from finchlite.finch_assembly.map import Dict
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
-from finchlite.finch_assembly.struct import ImmutableStructFType, TupleFType
+from finchlite.finch_assembly.struct import ImmutableStructFType
 
 stcpath = Path(__file__).parent / "stc" / "include"
 hashmap_h = stcpath / "stc" / "hashmap.h"
