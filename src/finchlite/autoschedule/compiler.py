@@ -233,7 +233,7 @@ class LogicLowerer:
             ):
                 loop_idxs = with_subsequence(intersect(idxs_1, idxs_2), idxs_2)
                 arg_shape_type = find_suitable_rep(arg, table_vars).shape_type
-                field_types = dict(zip(arg.fields, arg_shape_type, strict=True))
+                field_types = dict(zip(arg.fields(), arg_shape_type, strict=True))
                 rhs, rhs_idxs, req_slots = compile_pointwise_logic(
                     Relabel(arg, idxs_1),
                     list(loop_idxs),
@@ -279,7 +279,7 @@ class LogicLowerer:
             ):
                 assert isinstance(tns, TensorFType)
                 arg_shape_type = find_suitable_rep(arg, table_vars).shape_type
-                field_types = dict(zip(arg.fields, arg_shape_type, strict=True))
+                field_types = dict(zip(arg.fields(), arg_shape_type, strict=True))
                 rhs, rhs_idxs, req_slots = compile_pointwise_logic(
                     arg, list(idxs_2), slot_vars, field_relabels, field_types
                 )
@@ -453,7 +453,7 @@ def record_tables(
                 table_vars[alias] = ntn.Variable(name, suitable_rep)
                 tables[alias] = Table(
                     Literal(TensorPlaceholder(dtype=suitable_rep.element_type)),
-                    rhs.fields,
+                    rhs.fields(),
                 )
 
                 return Query(alias, Reformat(suitable_rep, rhs))
@@ -476,7 +476,7 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
     match root:
         case MapJoin(Literal(op), args):
             args_suitable_reps_fields = [
-                (find_suitable_rep(arg, table_vars), arg.fields) for arg in args
+                (find_suitable_rep(arg, table_vars), arg.fields()) for arg in args
             ]
             field_type_map: dict[Field, type] = {}
             for rep, fields in args_suitable_reps_fields:
@@ -515,7 +515,7 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
             )
             strides_t = tuple(
                 st
-                for f, st in zip(arg.fields, arg_suitable_rep.shape_type, strict=True)
+                for f, st in zip(arg.fields(), arg_suitable_rep.shape_type, strict=True)
                 if f not in idxs
             )
             return BufferizedNDArrayFType(

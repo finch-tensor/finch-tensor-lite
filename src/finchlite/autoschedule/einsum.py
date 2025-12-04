@@ -31,7 +31,7 @@ class EinsumLowerer:
                 lgc.Alias(name),
                 lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
             ):
-                einidxs = tuple(ein.Index(field.name) for field in node.rhs.fields)
+                einidxs = tuple(ein.Index(field.name) for field in node.rhs.fields())
                 my_bodies = []
                 if init != init_value(operation, type(init)):
                     my_bodies.append(
@@ -56,7 +56,7 @@ class EinsumLowerer:
                 return ein.Einsum(
                     op=ein.Literal(overwrite),
                     tns=ein.Alias(name),
-                    idxs=tuple(ein.Index(field.name) for field in node.rhs.fields),
+                    idxs=tuple(ein.Index(field.name) for field in node.rhs.fields()),
                     arg=einarg,
                 )
 
