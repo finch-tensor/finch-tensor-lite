@@ -916,11 +916,10 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(np_type, constructed, serialized) is None
 
 
-@pytest.mark.skip("HELP")
 @pytest.mark.parametrize(
     "fmt_fn",
     [
-        lambda x: ftype(BufferizedNDArray(np.zeros((2,2), x))),
+        lambda x: ftype(BufferizedNDArray(np.zeros((2, 2), x))),
         lambda dtype: fiber_tensor(
             dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
         ),

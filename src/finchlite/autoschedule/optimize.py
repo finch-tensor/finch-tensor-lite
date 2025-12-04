@@ -634,7 +634,9 @@ def _set_loop_order(node, perms):
             assert isinstance(arg, LogicExpression)
             idxs_2 = _heuristic_loop_order(arg)
             rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-            perms[lhs] = Reorder(Relabel(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
+            perms[lhs] = Reorder(
+                Relabel(lhs, tuple(rhs_2.fields())), tuple(rhs.fields())
+            )
             return Query(lhs, rhs_2)
         case Query(lhs, Reorder(Relabel(Alias(_) as tns, _), _)) as q:
             tns = perms.get(tns, tns)

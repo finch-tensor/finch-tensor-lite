@@ -257,8 +257,8 @@ def find_lowest_roots(
             raise TypeError(
                 f"Expected MapJoin.op to be a Literal, got {type(root.op).__name__}"
             )
-        args_with = [arg for arg in root.args if idx in arg.fields]
-        args_without = [arg for arg in root.args if idx not in arg.fields]
+        args_with = [arg for arg in root.args if idx in arg.fields()]
+        args_without = [arg for arg in root.args if idx not in arg.fields()]
 
         if len(args_with) == 1 and is_distributive(root.op.val, op.val):
             return find_lowest_roots(op, idx, args_with[0])
