@@ -1084,6 +1084,7 @@ def test_multiple_hashtable(compiler, tabletype):
         asm.TupleFType.from_tuple((float, float)),
     )
     nestedtype = asm.TupleFType.from_tuple((int, float))
+    table5 = tabletype(int, int)
 
     mod = compiler(
         asm.Module(
@@ -1092,6 +1093,7 @@ def test_multiple_hashtable(compiler, tabletype):
                 func(table2, 2),
                 func(table3, 3),
                 func(table4, 4),
+                func(table5, 5),
             )
         )
     )
@@ -1115,3 +1117,5 @@ def test_multiple_hashtable(compiler, tabletype):
         table4.key_type(a=0.1, b=nestedtype(b=1, c=0.2)),
         table4.value_type(a=0.2, b=0.2),
     ) == table4.value_type(a=0.2, b=0.2)
+
+    assert mod.setidx_5(table5, 3, 2) == 2

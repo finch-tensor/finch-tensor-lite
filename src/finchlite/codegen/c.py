@@ -170,7 +170,10 @@ def deserialize_from_c(fmt, obj, c_obj):
     if hasattr(fmt, "deserialize_from_c"):
         fmt.deserialize_from_c(obj, c_obj)
     else:
-        query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
+        try:
+            query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
+        except AttributeError:
+            return
 
 
 def construct_from_c(fmt, c_obj):
