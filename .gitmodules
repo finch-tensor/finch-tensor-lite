@@ -1,3 +1,0 @@
-[submodule "src/finchlite/codegen/stc"]
-	path = src/finchlite/codegen/stc
-	url = https://github.com/stclib/stc

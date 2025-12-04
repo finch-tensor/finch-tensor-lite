@@ -19,8 +19,6 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -38,7 +36,7 @@ jobs:
           poetry install --extras test
       - name: Run tests
         run: |
-          poetry run pytest -s --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
+          poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
       - uses: codecov/codecov-action@v5
 
 on:
