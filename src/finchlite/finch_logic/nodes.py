@@ -32,7 +32,7 @@ clarify the relationships between different tensors and their dimensions during
 operations such as mapping, aggregation, reordering, and relabeling.
 
 Fields may not be used to represent different dimension sizes within the same
-logic program. 
+logic program.
 
 Tables may be referenced using "aliases," which are symbolic names that refer to
 specific tables within the program. Evaluators for Finch logic may accept a list
@@ -123,23 +123,25 @@ class LogicExpression(LogicNode):
     tensor with named dimensions.
     """
 
-    @property
     @abstractmethod
-    def fields(self, bindings:dict[Alias, tuple[Field, ...]] | None=None) -> tuple[Field]:
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         ...
 
-    @property
     @abstractmethod
-    def element_type(self, bindings:dict[Alias, Any] | None=None) -> Any: #In the future should be FType
+    def element_type(
+        self, bindings: dict[Alias, Any] | None = None
+    ) -> Any:  # In the future should be FType
         """Returns element type of the node."""
         ...
 
-    @property
     @abstractmethod
-    def fill_value(self, bindings:dict[Alias, Any] | None=None) -> Any:
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns fill value of the node."""
         ...
+
 
 class LogicStatement(LogicNode):
     """
@@ -232,19 +234,23 @@ class Alias(LogicExpression, NamedTerm):
     def symbol(self) -> str:
         return self.name
 
-    def fields(self, bindings:dict[Alias, tuple[Field, ...]] | None=None) -> tuple[Field]:
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         if bindings is None or self not in bindings:
             raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
         return bindings[self]
-    
-    def element_type(self, bindings:dict[Alias, Any] | None=None) -> Any:
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
         if bindings is None or self not in bindings:
-            raise NotImplementedError("Cannot resolve element_type of Alias {self.name}")
+            raise NotImplementedError(
+                "Cannot resolve element_type of Alias {self.name}"
+            )
         return bindings[self]
 
-    def fill_value(self, bindings:dict[Alias, Any] | None=None) -> Any:
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns fill value of the node."""
         if bindings is None or self not in bindings:
             raise NotImplementedError("Cannot resolve fill_value of Alias {self.name}")
@@ -270,27 +276,27 @@ class Table(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
-    def fields(self, bindings: dict[Alias, tuple[Field, ...]] | None=None) -> tuple[Field]:
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
-    
-    def element_type(self, bindings: dict[Alias, Any] | None=None) -> Any:
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
         if isinstance(self.tns, Literal):
             return ftype(self.tns.val.element_type)
-        elif isinstance(self.tns, Value):
+        if isinstance(self.tns, Value):
             return self.tns.type_.element_type
-        else:
-            raise ValueError(f"Unknown tensor type: {type(self.tns)}")
+        raise ValueError(f"Unknown tensor type: {type(self.tns)}")
 
-    def fill_value(self, bindings: dict[Alias, Any] | None=None) -> Any:
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns fill value of the node."""
         if isinstance(self.tns, Literal):
             return self.tns.val.fill_value
-        elif isinstance(self.tns, Value):
+        if isinstance(self.tns, Value):
             return self.tns.type_.fill_value
-        else:
-            raise ValueError(f"Unknown tensor type: {type(self.tns)}")
+        raise ValueError(f"Unknown tensor type: {type(self.tns)}")
 
     @classmethod
     def from_children(cls, tns, *idxs):
@@ -318,15 +324,19 @@ class MapJoin(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
-    def fields(self, bindings: dict[Alias, tuple[Field, ...]] | None=None) -> tuple[Field]:
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         args_fields = [x.fields(bindings) for x in self.args]
         return tuple(dict.fromkeys([f for fs in args_fields for f in fs]))
-    
-    def element_type(self, bindings: dict[Alias, Any] | None=None) -> Any:
-        return return_type(self.op.val, [arg.element_type(bindings) for arg in self.args])
-    
-    def fill_value(self, bindings: dict[Alias, Any] | None=None) -> Any:
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        return return_type(
+            self.op.val, [arg.element_type(bindings) for arg in self.args]
+        )
+
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.op.val(*[arg.fill_value(bindings) for arg in self.args])
 
     @classmethod
@@ -347,8 +357,8 @@ class Aggregate(LogicTree, LogicExpression):
         idxs: The dimensions to reduce.
     """
 
-    op: Literal | Value
-    init: Literal | Value
+    op: Literal
+    init: Literal
     arg: LogicExpression
     idxs: tuple[Field, ...]
 
@@ -357,16 +367,18 @@ class Aggregate(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
-    @property
-    def fields(self) -> tuple[Field, ...]:
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return tuple(field for field in self.arg.fields() if field not in self.idxs)
-    
-    def element_type(self, bindings: dict[Alias, Any] | None=None) -> Any:
+        return tuple(
+            field for field in self.arg.fields(bindings) if field not in self.idxs
+        )
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return fixpoint_type(self.op, self.init, self.arg.element_type(bindings))
-    
-    def fill_value(self, bindings: dict[Alias, Any] | None=None) -> Any:
+
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.init.val
 
     @classmethod
@@ -394,14 +406,16 @@ class Reorder(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    def fields(self, bindings: dict[Alias, tuple[Field, ...]] | None=None) -> tuple[Field, ...]:
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
-    
-    def element_type(self, bindings: dict[Alias, Any] | None=None) -> Any:
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.arg.element_type(bindings)
-    
-    def fill_value(self, bindings: dict[Alias, Any] | None=None) -> Any:
+
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.arg.fill_value(bindings)
 
     @classmethod
@@ -420,18 +434,27 @@ class Relabel(LogicTree, LogicExpression):
         idxs: The new labels for dimensions.
     """
 
-    arg: LogicNode
+    arg: LogicExpression
     idxs: tuple[Field, ...]
+
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.idxs
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        """Returns element type of the node."""
+        return self.arg.element_type(bindings)
+
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        """Returns fill value of the node."""
+        return self.arg.fill_value(bindings)
 
     @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
-
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        return [*self.idxs]
 
     @classmethod
     def from_children(cls, arg, *idxs):
@@ -451,16 +474,24 @@ class Reformat(LogicTree, LogicExpression):
     tns: LogicNode
     arg: LogicExpression
 
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.arg.fields(bindings)
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        """Returns element type of the node."""
+        return self.arg.element_type(bindings)
+
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        """Returns fill value of the node."""
+        return self.arg.fill_value(bindings)
+
     @property
     def children(self):
         """Returns the children of the node."""
         return [self.tns, self.arg]
-
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return self.arg.fields()
 
 
 @dataclass(eq=True, frozen=True)
@@ -477,16 +508,24 @@ class Subquery(LogicTree, LogicExpression):
     lhs: Alias
     arg: LogicExpression
 
+    def fields(
+        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+    ) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.arg.fields(bindings)
+
+    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        """Returns element type of the node."""
+        return self.arg.element_type(bindings)
+
+    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
+        """Returns fill value of the node."""
+        return self.arg.fill_value(bindings)
+
     @property
     def children(self):
         """Returns the children of the node."""
         return [self.lhs, self.arg]
-
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return self.arg.fields()
 
 
 @dataclass(eq=True, frozen=True)

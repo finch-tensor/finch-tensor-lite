@@ -108,7 +108,7 @@ def test_propagate_fields():
 @pytest.mark.parametrize(
     "node,pass_fn",
     [
-        (Reformat(Literal(""), Reorder(Literal(""), ())), isolate_reformats),
+        (Reformat(Literal(""), Reorder(Table(Literal(""), ()), ())), isolate_reformats),
         (Table(Literal(""), ()), isolate_tables),
     ],
 )

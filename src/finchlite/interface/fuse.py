@@ -53,8 +53,6 @@ Performance:
 from enum import Enum
 from typing import Any
 
-import numpy as np
-
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.finch_logic.nodes import TableValue
 

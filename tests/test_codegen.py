@@ -920,7 +920,7 @@ def test_np_numba_serialization(value, np_type):
 @pytest.mark.parametrize(
     "fmt_fn",
     [
-        lambda x: ftype(BufferizedNDArray(np.zeros((2,2), x))),
+        lambda x: ftype(BufferizedNDArray(np.zeros((2, 2), x))),
         lambda dtype: fiber_tensor(
             dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
         ),
