@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from typing import Any, Self
+from typing import Any, Self, TypeVar
 
 from finchlite.algebra.algebra import fixpoint_type, return_type
 
@@ -115,6 +116,9 @@ class LogicTree(LogicNode, TermTree, ABC):
         ...
 
 
+T = TypeVar("T")
+
+
 class LogicExpression(LogicNode):
     """
     Logic AST expression base class.
@@ -128,6 +132,18 @@ class LogicExpression(LogicNode):
         self, bindings: dict[Alias, tuple[Field, ...]] | None = None
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
+        ...
+
+    @abstractmethod
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        """Compute per-dimension values, combining using `op`. When dimensions
+        are expanded, None is used.  When dimensions are contracted, the value
+        is combined with None."""
         ...
 
     @abstractmethod
@@ -242,6 +258,16 @@ class Alias(LogicExpression, NamedTerm):
             raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
         return bindings[self]
 
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        if dim_bindings is None or self not in dim_bindings:
+            raise NotImplementedError("Cannot resolve dims of Alias {self.name}")
+        return dim_bindings[self]
+
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
         if bindings is None or self not in bindings:
@@ -281,6 +307,14 @@ class Table(LogicTree, LogicExpression):
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
+
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        raise NotImplementedError("Cannot resolve dims of Tables")
 
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
@@ -331,6 +365,23 @@ class MapJoin(LogicTree, LogicExpression):
         args_fields = [x.fields(bindings) for x in self.args]
         return tuple(dict.fromkeys([f for fs in args_fields for f in fs]))
 
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        arg_dims: dict[Field, T | None] = {}
+        for arg in self.args:
+            dims = arg.mapdims(op, dim_bindings, field_bindings)
+            fields = arg.fields(field_bindings)
+            for idx, dim in zip(fields, dims, strict=True):
+                if idx in arg_dims:
+                    arg_dims[idx] = op(arg_dims[idx], dim)
+                else:
+                    arg_dims[idx] = dim
+        return tuple(arg_dims[f] for f in self.fields(field_bindings))
+
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return return_type(
             self.op.val, [arg.element_type(bindings) for arg in self.args]
@@ -375,6 +426,18 @@ class Aggregate(LogicTree, LogicExpression):
             field for field in self.arg.fields(bindings) if field not in self.idxs
         )
 
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        idxs = self.arg.fields(field_bindings)
+        dims = self.arg.mapdims(op, dim_bindings, field_bindings)
+        return tuple(
+            val for idx, val in zip(idxs, dims, strict=True) if idx not in self.idxs
+        )
+
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return fixpoint_type(self.op, self.init, self.arg.element_type(bindings))
 
@@ -412,6 +475,21 @@ class Reorder(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.idxs
 
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        idxs = self.arg.fields(field_bindings)
+        dims = self.arg.mapdims(op, dim_bindings, field_bindings)
+        idx_dims = dict(zip(idxs, dims, strict=True))
+        for idx in self.idxs:
+            if idx not in idxs:
+                # when squeezing a dimension, we combine with None
+                op(idx_dims[idx], None)
+        return tuple(idx_dims.get(f) for f in self.idxs)
+
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.arg.element_type(bindings)
 
@@ -442,6 +520,14 @@ class Relabel(LogicTree, LogicExpression):
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
+
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        return self.arg.mapdims(op, dim_bindings, field_bindings)
 
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
@@ -480,6 +566,14 @@ class Reformat(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.arg.fields(bindings)
 
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        return self.arg.mapdims(op, dim_bindings, field_bindings)
+
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
         return self.arg.element_type(bindings)
@@ -513,6 +607,14 @@ class Subquery(LogicTree, LogicExpression):
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.arg.fields(bindings)
+
+    def mapdims(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> tuple[T | None, ...]:
+        return self.arg.mapdims(op, dim_bindings, field_bindings)
 
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns element type of the node."""
