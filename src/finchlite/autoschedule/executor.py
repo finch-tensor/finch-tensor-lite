@@ -125,6 +125,11 @@ class ProvisionTensorsContext:
                     self(body)
             case lgc.Query(lhs, rhs):
                 if lhs not in self.bindings:
+                    if lhs not in self.types:
+                        raise ValueError(
+                            f"Type information missing for {lhs}, did you run"
+                            f" tensor formatter?"
+                        )
                     shape = rhs.shape(self.shapes, self.fields)
                     tns = self.types[lhs].tns(shape)
                     self.bindings[lhs] = lgc.TableValue(tns, self.types[lhs].idxs)

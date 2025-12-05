@@ -1,11 +1,9 @@
-from typing import Any, overload
-
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
-from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
-from ..finch_logic import LogicEvaluator, LogicInterpreter, LogicLoader, LogicNode
-from ..symbolic import Namespace, PostWalk, Rewrite, fisinstance, ftype
+from ..finch_logic import LogicInterpreter, LogicLoader
+from ..symbolic import fisinstance
+
 
 class LogicInterpreterKernel(AssemblyKernel):
     def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
