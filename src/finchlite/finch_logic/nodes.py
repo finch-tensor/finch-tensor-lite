@@ -418,7 +418,7 @@ class MapJoin(LogicTree, LogicExpression):
 
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return return_type(
-            self.op.val, [arg.element_type(bindings) for arg in self.args]
+            self.op.val, *[arg.element_type(bindings) for arg in self.args]
         )
 
     def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
@@ -473,7 +473,7 @@ class Aggregate(LogicTree, LogicExpression):
         )
 
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return fixpoint_type(self.op, self.init, self.arg.element_type(bindings))
+        return fixpoint_type(self.op.val, self.init.val, self.arg.element_type(bindings))
 
     def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.init.val
@@ -518,8 +518,8 @@ class Reorder(LogicTree, LogicExpression):
         idxs = self.arg.fields(field_bindings)
         dims = self.arg.mapdims(op, dim_bindings, field_bindings)
         idx_dims = dict(zip(idxs, dims, strict=True))
-        for idx in self.idxs:
-            if idx not in idxs:
+        for idx in idxs:
+            if idx not in self.idxs:
                 # when squeezing a dimension, we combine with None
                 op(idx_dims[idx], None)
         return tuple(idx_dims.get(f) for f in self.idxs)
