@@ -40,6 +40,7 @@ from .optimize import (
     push_fields,
     set_loop_order,
 )
+from .stages import LogicNotationLowerer
 
 __all__ = [
     "Aggregate",
@@ -50,6 +51,7 @@ __all__ = [
     "LogicCompiler",
     "LogicExecutor",
     "LogicNormalizer",
+    "LogicNotationLowerer",
     "MapJoin",
     "Plan",
     "PostOrderDFS",

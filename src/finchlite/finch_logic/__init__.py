@@ -25,7 +25,6 @@ from .stages import (
     LogicEinsumLowerer,
     LogicEvaluator,
     LogicLoader,
-    LogicNotationLowerer,
     LogicTransform,
 )
 
@@ -40,7 +39,6 @@ __all__ = [
     "LogicInterpreter",
     "LogicLoader",
     "LogicNode",
-    "LogicNotationLowerer",
     "LogicStatement",
     "LogicTransform",
     "LogicTree",

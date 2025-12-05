@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import operator
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Iterable
 
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
@@ -20,18 +19,7 @@ from ..finch_logic import (
     TableValueFType,
 )
 from ..symbolic import Context
-
-
-class LogicNotationLowerer(ABC):
-    @abstractmethod
-    def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> ntn.Module:
-        """
-        Generate Finch Notation from the given logic and input types.  Also
-        return a dictionary including additional tables needed to run the kernel.
-        """
-
+from .stages import LogicNotationLowerer
 
 class PointwiseContext:
     def __init__(self, ctx: NotationContext):
@@ -44,7 +32,6 @@ class PointwiseContext:
     ) -> ntn.NotationExpression:
         match ex:
             case lgc.MapJoin(lgc.Literal(op), args):
-                args = []
                 return ntn.Call(
                     ntn.Literal(op),
                     tuple(
@@ -65,7 +52,15 @@ class PointwiseContext:
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
-
+def merge_shapes(
+    a: ntn.Variable | None,
+    b: ntn.Variable | None
+) -> ntn.Variable | None:
+    if a and b:
+        if a.name < b.name:
+            return a
+        return b
+    return a or b
 class NotationContext(Context):
     """
     Compiles Finch Logic to Finch Notation. Holds the state of the
@@ -79,11 +74,12 @@ class NotationContext(Context):
         shapes: dict[lgc.Alias, ntn.Variable],
         fields: dict[lgc.Alias, tuple[lgc.Field, ...]] | None = None,
         shape_types: dict[lgc.Alias, tuple[Any, ...]] | None = None,
-        epilogue: tuple[ntn.NotationStatement] | None = None,
+        epilogue: Iterable[ntn.NotationStatement] | None = None,
     ):
         self.bindings = bindings
         self.slots = slots
         self.shapes = shapes
+        self.equiv: dict[ntn.Variable, ntn.Variable] = {}
         if fields is None:
             fields = {var: val.idxs for var, val in bindings.items()}
         self.fields = fields
@@ -94,6 +90,9 @@ class NotationContext(Context):
             epilogue = ()
         self.epilogue = epilogue
 
+
+
+
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
         Lower Finch Notation to Finch Assembly. First we check for early
@@ -101,7 +100,7 @@ class NotationContext(Context):
         node.
         """
         match prgm:
-            case lgc.Block(bodies):
+            case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(
                 lhs, lgc.Reorder(lgc.Relabel(Alias(_) as arg, idxs_1), idxs_2)
@@ -111,7 +110,7 @@ class NotationContext(Context):
             case lgc.Query(
                 lhs, lgc.Aggregate(op, init, lgc.Reorder(arg, idxs_1), idxs_2)
             ):
-                arg_shapes = arg.mapdims(self.shapes, self.fields)
+                arg_shapes:tuple[ntn.Variable | None] = arg.mapdims(merge_shapes, self.shapes, self.fields)
                 shapes = {idx: arg_shapes.get(idx) or ntn.Literal(1) for idx in idxs_1}
                 shape_type = arg.shape_type(self.shape_types, self.fields)
                 fields = arg.fields(self.fields)
@@ -185,6 +184,8 @@ class NotationContext(Context):
                         ),
                     )
                 )
+            case _:
+                raise Exception(f"Unrecognized logic: {prgm}")
 
 
 class NotationGenerator(LogicNotationLowerer):
