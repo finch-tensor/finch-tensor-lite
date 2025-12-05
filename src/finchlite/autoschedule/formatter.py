@@ -9,7 +9,7 @@ from finchlite.symbolic import gensym
 
 from .. import finch_logic as lgc
 from ..finch_logic import LogicLoader
-from .executor import FakeLogicCompiler
+from .fakecompiler import FakeLogicCompiler
 
 
 class LogicFormatterContext:

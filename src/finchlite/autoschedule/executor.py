@@ -1,17 +1,17 @@
 from typing import Any, overload
 
-from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
-from ..finch_logic import LogicEvaluator, LogicInterpreter, LogicLoader, LogicNode
-from ..symbolic import Namespace, PostWalk, Rewrite, fisinstance, ftype
+from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode
+from ..symbolic import Namespace, PostWalk, Rewrite, ftype
+from .formatter import LogicFormatter
 
 
 def extract_tables(
-    root: LogicNode,
+    root: lgc.LogicStatement,
     bindings: dict[lgc.Alias, lgc.TableValue],
-) -> tuple[lgc.LogicNode, dict[lgc.Alias, lgc.TableValue]]:
+) -> tuple[lgc.LogicStatement, dict[lgc.Alias, lgc.TableValue]]:
     """
     Extracts tables from logic plan, replacing them with aliases.
     """
@@ -103,48 +103,6 @@ def get_return_fields(
     return ctx(prgm)
 
 
-class LogicInterpreterKernel(AssemblyKernel):
-    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
-        self.prgm = prgm
-        self.bindings = bindings
-
-    def __call__(self, *args):
-        bindings = {
-            var: lgc.TableValue(tns, self.bindings[var].idxs)
-            for var, tns in zip(self.bindings.keys(), args, strict=True)
-        }
-        for key in bindings:
-            assert fisinstance(bindings[key], self.bindings[key])
-        ctx = LogicInterpreter()
-        res = ctx(self.prgm, bindings)
-        if isinstance(res, tuple):
-            return tuple(tbl.tns for tbl in res)
-        return res.tns
-
-
-class LogicInterpreterLibrary(AssemblyLibrary):
-    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
-        self.prgm = prgm
-        self.bindings = bindings
-
-    def __getattr__(self, name):
-        if name == "main":
-            return LogicInterpreterKernel(self.prgm, self.bindings)
-        if name == "prgm":
-            return self.prgm
-        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
-
-
-class FakeLogicCompiler(LogicLoader):
-    def __init__(self):
-        pass
-
-    def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
-    ) -> tuple[LogicInterpreterLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
-        return (LogicInterpreterLibrary(prgm, bindings), bindings)
-
-
 class ProvisionTensorsContext:
     def __init__(
         self,
@@ -181,31 +139,38 @@ class ProvisionTensorsContext:
 class LogicExecutor(LogicEvaluator):
     def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
         if ctx is None:
-            ctx = FakeLogicCompiler()
+            ctx = LogicFormatter()
         self.ctx: LogicLoader = ctx
         self.verbose: bool = verbose
 
-    def __call__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValue] | None = None):
+    def __call__(
+        self, prgm: LogicNode, bindings: dict[lgc.Alias, lgc.TableValue] | None = None
+    ):
         if bindings is None:
             bindings = {}
+
         if isinstance(prgm, lgc.LogicExpression):
-            prgm = lgc.Produces((prgm,))
-        prgm, bindings = extract_tables(prgm, bindings)
+            stmt: lgc.LogicStatement = lgc.Produces((prgm,))
+        elif isinstance(prgm, lgc.LogicStatement):
+            stmt = prgm
+        else:
+            raise ValueError(f"Invalid prgm type: {type(prgm)}")
+        stmt, bindings = extract_tables(stmt, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 
-        mod, binding_ftypes = self.ctx(prgm, binding_ftypes)
+        mod, binding_ftypes = self.ctx(stmt, binding_ftypes)
 
-        bindings = ProvisionTensorsContext(bindings, binding_ftypes)(prgm)
+        bindings = ProvisionTensorsContext(bindings, binding_ftypes)(stmt)
         args = [tbl.tns for tbl in bindings.values()]
 
         res = mod.main(*args)
 
         res_idxs = get_return_fields(
-            prgm, {var: tbl.idxs for var, tbl in bindings.items()}
+            stmt, {var: tbl.idxs for var, tbl in bindings.items()}
         )
 
-        if isinstance(res, tuple):
-            return tuple(
-                TableValue(tns, idxs) for idxs, tns in zip(res_idxs, res, strict=True)
-            )
-        return TableValue(res, res_idxs)
+        if isinstance(prgm, lgc.LogicExpression):
+            return TableValue(res[0], res_idxs)
+        return tuple(
+            TableValue(tns, idxs) for idxs, tns in zip(res_idxs, res, strict=True)
+        )
