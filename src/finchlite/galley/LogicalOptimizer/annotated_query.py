@@ -27,7 +27,9 @@ from finchlite.galley.TensorStats import TensorStats
 from finchlite.symbolic import (
     Chain,
     PostWalk,
+    PreOrderDFS,
     Rewrite,
+    gensym,
     intree,
     isdescendant,
 )
@@ -449,3 +451,97 @@ def find_lowest_roots(
     raise ValueError(
         f"There shouldn't be nodes of type {type(root).__name__} during root pushdown."
     )
+
+
+def get_reduce_query(
+    reduce_idx: Field, aq: AnnotatedQuery
+) -> tuple[Query, LogicExpression, set[LogicExpression], list[Field]]:
+    original_idx = aq.original_idx[reduce_idx]
+    reduce_op = aq.idx_op[reduce_idx]
+    root_node = aq.idx_lowest_root[reduce_idx]
+    query_expr = None
+    idxs_to_be_reduced: set[Field] = set()
+    nodes_to_remove = set()
+    node_to_replace = -1
+    reducible_idxs = get_reducible_idxs(aq)
+    stats_cache = aq.cache_point
+    if isinstance(root_node, MapJoin) and is_distributive(root_node.op.val, reduce_op):
+        # If you're already reducing one index, then it may
+        # make sense to reduce others as well.
+        # E.g. when you reduce one vertex of a triangle, you should
+        # do the other two as well.
+        args_with_reduce_idx = [
+            arg for arg in root_node.args if original_idx in stats_cache[arg].index_set
+        ]
+        kernel_idxs = set().union(
+            *(stats_cache[arg].index_set for arg in args_with_reduce_idx)
+        )
+        relevant_args = [
+            arg
+            for arg in root_node.args
+            if stats_cache[arg].index_set.issubset(kernel_idxs)
+        ]
+        if len(relevant_args) == len(root_node.args):
+            node_to_replace = root_node
+            for node in PreOrderDFS(root_node):
+                if node != node_to_replace:
+                    nodes_to_remove.add(node)
+        else:
+            node_to_replace = relevant_args[0]
+            for arg in relevant_args[1:]:
+                for node in PreOrderDFS(arg):
+                    nodes_to_remove.add(node)
+        query_expr = MapJoin(root_node.op, tuple(relevant_args))
+        stats_cache[query_expr] = aq.ST.mapjoin(
+            root_node.op.val, [stats_cache[arg] for arg in relevant_args]
+        )
+        relevant_args_set = set(relevant_args)
+        for idx in reducible_idxs:
+            if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
+                continue
+
+            args_with_idx = [
+                arg
+                for arg in root_node.args
+                if aq.original_idx[idx].name in stats_cache[arg].index_set
+            ]
+
+            if idx in aq.connected_idxs[reduce_idx] and relevant_args_set.issuperset(
+                args_with_idx
+            ):
+                idxs_to_be_reduced.add(idx)
+    else:
+        query_expr = root_node
+        node_to_replace = root_node
+        reducible_idxs = get_reducible_idxs(aq)
+        for idx in reducible_idxs:
+            if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
+                continue
+            if (
+                idx in aq.connected_idxs[reduce_idx]
+                or aq.idx_lowest_root[idx] == node_to_replace
+            ):
+                idxs_to_be_reduced.add(idx)
+    final_idxs_to_be_reduced: list[Field] = []
+    for idx in idxs_to_be_reduced:
+        orig = aq.original_idx[idx]
+        if orig not in final_idxs_to_be_reduced:
+            final_idxs_to_be_reduced.append(orig)
+    reduced_idxs = list(idxs_to_be_reduced)
+
+    query_expr = Aggregate(
+        Literal(aq.idx_op[aq.original_idx[reduce_idx]]),
+        Literal(aq.idx_init[aq.original_idx[reduce_idx]]),
+        query_expr,
+        tuple(final_idxs_to_be_reduced),
+    )
+
+    stats_cache[query_expr] = aq.ST.aggregate(
+        query_expr.op.val,
+        query_expr.init.val,
+        [i.name for i in final_idxs_to_be_reduced],
+        stats_cache[query_expr.arg],
+    )
+    query = Query(Alias(gensym("A")), query_expr)
+
+    return query, node_to_replace, nodes_to_remove, reduced_idxs
