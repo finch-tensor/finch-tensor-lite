@@ -13,7 +13,7 @@ from numpy.testing import assert_equal
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite import ftype
+from finchlite import dense, element, fiber_tensor, ftype
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
@@ -30,6 +30,7 @@ from finchlite.codegen.numba_backend import (
     deserialize_from_numba,
     serialize_to_numba,
 )
+from finchlite.compile import BufferizedNDArray
 
 
 def test_add_function():
@@ -260,7 +261,7 @@ def test_malloc_resize(new_size):
         )
     )
     mod = CCompiler()(prgm)
-    assert mod.length(ab).value == new_size
+    assert mod.length(ab) == new_size
     assert ab.length() == new_size
     for i in range(new_size):
         assert ab.load(i) == 0 if i >= len(a) else a[i]
@@ -909,15 +910,29 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(np_type, constructed, serialized) is None
 
 
-def test_e2e_numba():
+@pytest.mark.parametrize(
+    "fmt_fn",
+    [
+        lambda x: BufferizedNDArray,
+        lambda dtype: fiber_tensor(
+            dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
+        ),
+    ],
+)
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_numba(fmt_fn, dtype):
     ctx = finchlite.get_default_scheduler()  # TODO: as fixture
     finchlite.set_default_scheduler(mode=finchlite.Mode.COMPILE_NUMBA)
 
-    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=np.float64)
-    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=np.float64)
+    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
+    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
-    wa = finchlite.defer(a)
-    wb = finchlite.defer(b)
+    fmt = fmt_fn(dtype)
+    aa = fmt(val=a)
+    bb = fmt(val=b)
+
+    wa = finchlite.defer(aa)
+    wb = finchlite.defer(bb)
 
     plan = finchlite.matmul(wa, wb)
     result = finchlite.compute(plan)

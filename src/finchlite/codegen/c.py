@@ -15,7 +15,13 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
+from ..finch_assembly import (
+    AssemblyStructFType,
+    BufferFType,
+    ImmutableStructFType,
+    MutableStructFType,
+    TupleFType,
+)
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
@@ -140,7 +146,7 @@ def construct_from_c(fmt, c_obj):
         return fmt.construct_from_c(c_obj)
     try:
         return query_property(fmt, "construct_from_c", "__attr__", c_obj)
-    except NotImplementedError:
+    except AttributeError:
         return fmt(c_obj)
 
 
@@ -204,12 +210,14 @@ for t in (
     register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
     register_property(t, "numba_type", "__attr__", lambda t: t)
 
+
 register_property(
     np.generic,
     "serialize_to_c",
     "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(obj),
+    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
 )
+
 # pass by value -> no op
 register_property(
     np.generic,
@@ -254,11 +262,9 @@ class CKernel:
             self.argtypes, args, serial_args, strict=False
         ):
             deserialize_from_c(type_, arg, serial_arg)
-        if hasattr(self.ret_type, "construct_from_c"):
-            return construct_from_c(res.ftype, res)
         if self.ret_type is type(None):
             return None
-        return self.ret_type(res)
+        return construct_from_c(self.ret_type, res)
 
 
 class CModule:
@@ -315,7 +321,7 @@ class CCompiler:
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    return_t = c_type(return_t)
+                    # return_t = c_type(return_t)
                     arg_ts = [arg.result_format for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
@@ -1035,36 +1041,55 @@ def struct_c_type(fmt: AssemblyStructFType):
     return new_struct
 
 
+"""
+Note: When serializing any struct to C, it will get serialized to a struct with
+no indirection.
+
+When you pass a struct into a kernel that expects a struct pointer, ctypes can
+intelligently infer whether we are working with a pointer arg type (pass by
+reference) or a non-pointer type (in which case it will immediately apply
+indirection)
+"""
+
 register_property(
-    AssemblyStructFType,
+    MutableStructFType,
     "c_type",
     "__attr__",
     lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
 )
 
-
-def struct_c_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
-    return f"{obj}->{attr}"
-
-
 register_property(
-    AssemblyStructFType,
-    "c_getattr",
-    "__attr__",
-    struct_c_getattr,
+    ImmutableStructFType, "c_type", "__attr__", lambda fmt: struct_c_type(fmt)
 )
 
 
-def struct_c_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
-    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
-    return
-
+register_property(
+    MutableStructFType,
+    "c_getattr",
+    "__attr__",
+    lambda fmt, ctx, obj, attr: f"{obj}->{attr}",
+)
 
 register_property(
-    AssemblyStructFType,
+    ImmutableStructFType,
+    "c_getattr",
+    "__attr__",
+    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
+)
+
+
+def struct_mutable_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
+    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+
+
+# the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
+# but we will not include that because it's bad.
+
+register_property(
+    MutableStructFType,
     "c_setattr",
     "__attr__",
-    struct_c_setattr,
+    struct_mutable_setattr,
 )
 
 
@@ -1092,18 +1117,23 @@ register_property(
     "__attr__",
     serialize_tuple_to_c,
 )
+
+
+def tuple_construct_from_c(fmt: TupleFType, c_struct):
+    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
+    return tuple(args)
+
+
 register_property(
     TupleFType,
     "construct_from_c",
     "__attr__",
-    lambda fmt, obj, c_tuple: tuple(c_tuple),
+    tuple_construct_from_c,
 )
 
 register_property(
     TupleFType,
     "c_type",
     "__attr__",
-    lambda fmt: ctypes.POINTER(
-        struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields))
-    ),
+    lambda fmt: struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
 )
