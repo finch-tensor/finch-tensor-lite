@@ -2,6 +2,7 @@ from .annotated_query import (
     AnnotatedQuery,
     find_lowest_roots,
     get_idx_connected_components,
+    get_reduce_query,
     get_reducible_idxs,
     replace_and_remove_nodes,
 )
@@ -11,6 +12,7 @@ __all__ = [
     "AnnotatedQuery",
     "find_lowest_roots",
     "get_idx_connected_components",
+    "get_reduce_query",
     "get_reducible_idxs",
     "insert_statistics",
     "replace_and_remove_nodes",

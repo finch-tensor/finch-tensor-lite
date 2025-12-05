@@ -63,6 +63,16 @@ class DCStats(TensorStats):
         self.dcs = set(dcs)
         return self
 
+    @staticmethod
+    def copy_stats(stat: TensorStats) -> TensorStats:
+        """
+        Deep copy of a DCStats object: copies the TensorDef and the DC set.
+        """
+        if not isinstance(stat, DCStats):
+            raise TypeError("copy_stats expected a DCStats instance")
+
+        return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
+
     def _structure_to_dcs(self, arr: Any) -> set[DC]:
         """
         Dispatch DC extraction based on tensor dimensionality.

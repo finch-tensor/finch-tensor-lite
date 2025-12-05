@@ -1339,6 +1339,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.connected_idxs = OrderedDict()
     aq.output_order = None
     aq.output_format = None
+    aq.bindings = OrderedDict()
 
     result = [field.name for field in get_reducible_idxs(aq)]
     assert result == expected

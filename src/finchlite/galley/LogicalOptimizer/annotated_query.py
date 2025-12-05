@@ -555,3 +555,83 @@ def get_reduce_query(
     query = Query(Alias(gensym("A")), query_expr)
 
     return query, node_to_replace, nodes_to_remove, reduced_idxs
+
+
+def reduce_idx(
+    reduce_idx: Field, aq: AnnotatedQuery, do_condense: bool = False
+) -> Query:
+    query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
+        reduce_idx, aq
+    )
+    query_copy = query
+
+    alias_expr = Alias(query_copy.lhs.name)
+    stats_cache = aq.cache_point
+    insert_statistics(
+        aq.ST, query_copy.rhs, aq.bindings, replace=False, cache=stats_cache
+    )
+
+    rhs_stats = stats_cache[query_copy.rhs]
+    stats_cache[alias_expr] = aq.ST.copy_stats(rhs_stats)
+
+    new_point_expr: LogicExpression = replace_and_remove_nodes(
+        expr=cast(LogicExpression, aq.point_expr),
+        node_to_replace=node_to_replace,
+        new_node=alias_expr,
+        nodes_to_remove=nodes_to_remove,
+    )
+    new_reduce_idxs = [x for x in aq.reduce_idxs if x not in reduced_idxs]
+    new_idx_lowest_root: OrderedDict[Field, LogicExpression] = OrderedDict()
+    new_idx_op: OrderedDict[Field, Any] = OrderedDict()
+    new_idx_init: OrderedDict[Field, Any] = OrderedDict()
+    new_parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict()
+    new_connected_idxs: OrderedDict[Field, set[Field]] = OrderedDict()
+    for idx in aq.idx_lowest_root:
+        if idx in reduced_idxs:
+            continue
+        root = aq.idx_lowest_root[idx]
+        if root == node_to_replace or root in nodes_to_remove:
+            root = alias_expr
+
+        new_idx_lowest_root[idx] = root
+        new_idx_op[idx] = aq.idx_op[idx]
+        new_idx_init[idx] = aq.idx_init[idx]
+        new_idx_op[aq.original_idx[idx]] = aq.idx_op[idx]
+        new_idx_init[aq.original_idx[idx]] = aq.idx_init[idx]
+        new_parent_idxs[idx] = [
+            x for x in aq.parent_idxs.get(idx, []) if x not in reduced_idxs
+        ]
+        new_connected_idxs[idx] = {
+            x for x in aq.connected_idxs.get(idx, set()) if x not in reduced_idxs
+        }
+
+    for idx in new_idx_lowest_root:
+        for idx2 in new_idx_lowest_root:
+            if new_idx_lowest_root[idx] is new_idx_lowest_root[idx2]:
+                new_connected_idxs[idx].add(idx2)
+                new_connected_idxs[idx2].add(idx)
+
+    new_components = get_idx_connected_components(new_parent_idxs, new_connected_idxs)
+
+    # Here, we update the statistics for all nodes above the affected nodes
+    rel_child_nodes: set[LogicExpression] = set(nodes_to_remove)
+    rel_child_nodes.add(node_to_replace)
+
+    # for n in PostOrderDFS(new_point_expr):
+    #     if n == node_to_replace:
+    #         insert_statistics(aq.ST, n, aq.bindings, replace=True, cache=stats_cache)
+    #     elif intree(n, new_point_expr) and any(
+    #         c in rel_child_nodes for c in n.children
+    #     ):
+    #         insert_statistics(aq.ST, n, aq.bindings, replace=True, cache=stats_cache)
+    #         rel_child_nodes.add(n)
+
+    aq.reduce_idxs = new_reduce_idxs
+    aq.point_expr = new_point_expr
+    aq.idx_lowest_root = new_idx_lowest_root
+    aq.idx_op = new_idx_op
+    aq.idx_init = new_idx_init
+    aq.parent_idxs = new_parent_idxs
+    aq.connected_idxs = new_connected_idxs
+    aq.connected_components = new_components
+    return query_copy

@@ -12,6 +12,15 @@ class DenseStats(TensorStats):
         ds.tensordef = d.copy()
         return ds
 
+    @staticmethod
+    def copy_stats(stat: TensorStats) -> TensorStats:
+        """
+        Deep copy of a DenseStats object.
+        """
+        if not isinstance(stat, DenseStats):
+            raise TypeError("copy_stats expected a DenseStats instance")
+        return DenseStats.from_def(stat.tensordef.copy())
+
     def estimate_non_fill_values(self) -> float:
         total = 1.0
         for size in self.dim_sizes.values():
