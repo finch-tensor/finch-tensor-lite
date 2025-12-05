@@ -48,10 +48,16 @@ class AnnotatedQuery:
     original_idx: OrderedDict[Field, Field]
     connected_components: list[list[Field]]
     connected_idxs: OrderedDict[Field, set[Field]]
+    bindings: OrderedDict[Alias, TensorStats]
     output_order: list[Field] | None = None
     output_format: list[Any] | None = None
 
-    def __init__(self, ST: type[TensorStats], q: Query):
+    def __init__(
+        self,
+        ST: type[TensorStats],
+        q: Query,
+        bindings: OrderedDict[Alias, TensorStats] | None = None,
+    ):
         if not isinstance(q, Query):
             raise ValueError(
                 "Annotated Queries can only be built from queries of the form: "
@@ -59,7 +65,9 @@ class AnnotatedQuery:
                 "Query(name, agg_map_expr)"
             )
         self.ST = ST
-        bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+        if bindings is None:
+            bindings = OrderedDict()
+        self.bindings = bindings
         cache: dict[object, TensorStats] = {}
         insert_statistics(ST, q, bindings=bindings, replace=False, cache=cache)
         self.cache = cache
@@ -97,11 +105,9 @@ class AnnotatedQuery:
                     return node
 
         point_expr = Rewrite(PostWalk(Chain([aggregate_annotation_rule])))(expr)
-
-        bindings_point: OrderedDict[Alias, TensorStats] = OrderedDict()
         cache_point: dict[object, TensorStats] = {}
         insert_statistics(
-            ST, point_expr, bindings=bindings_point, replace=False, cache=cache_point
+            ST, point_expr, bindings=bindings, replace=False, cache=cache_point
         )
         self.cache_point = cache_point
 
