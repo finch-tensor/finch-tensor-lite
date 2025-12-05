@@ -307,11 +307,11 @@ class AssemblyGenerator(NotationLowerer):
         pass
 
     def __call__(self, term: ntn.Module) -> asm.Module:
-        ctx = NotationContext()
+        ctx = AssemblyContext()
         return ctx(term)
 
 
-class NotationContext(Context):
+class AssemblyContext(Context):
     """
     Compiles Finch Notation to Finch Assembly. Holds the state of the
     compilation process.
@@ -621,7 +621,7 @@ class DefaultPass(LoopletPass):
 
 class LoopletContext(Context):
     def __init__(self, ctx, idx):
-        self.ctx = ctx  # NotationContext
+        self.ctx = ctx  # AssemblyContext
         self.idx = idx
 
     def freshen(self, *tags):

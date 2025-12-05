@@ -1,12 +1,8 @@
 import numpy as np
 
 from finchlite.algebra.tensor import NDArrayFType
-from finchlite.codegen.numpy_buffer import NumpyBufferFType
-from finchlite.compile.bufferized_ndarray import BufferizedNDArrayFType
 from finchlite.finch_assembly import AssemblyLibrary
-from finchlite.finch_assembly.struct import TupleFType
 from finchlite.finch_logic.nodes import TableValueFType
-from finchlite.symbolic import gensym
 
 from .. import finch_logic as lgc
 from ..finch_logic import LogicLoader
@@ -68,14 +64,15 @@ class LogicFormatterContext:
                         dim if dim is not None else np.intp for dim in shape_type
                     )
 
-                    # TODO: This constructor is awful, also bufferized ndarray seems broken
-                    #tns = BufferizedNDArrayFType(
-                    #    buffer_type=NumpyBufferFType(element_type),
-                    #    ndim=np.intp(len(fields)),
-                    #    dimension_type=TupleFType(
-                    #        struct_name=gensym("ugh"), struct_formats=shape_type
-                    #    ),
-                    #)
+                    # TODO: This constructor is awful
+                    # TODO: bufferized ndarray seems broken
+                    # tns = BufferizedNDArrayFType(
+                    #     buffer_type=NumpyBufferFType(element_type),
+                    #     ndim=np.intp(len(fields)),
+                    #     dimension_type=TupleFType(
+                    #         struct_name=gensym("ugh"), struct_formats=shape_type
+                    #     ),
+                    # )
                     tns = NDArrayFType(element_type, np.intp(len(shape_type)))
                     self.bindings[lhs] = TableValueFType(tns, fields)
             case lgc.Produces(_):

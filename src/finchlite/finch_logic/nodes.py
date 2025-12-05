@@ -473,7 +473,9 @@ class Aggregate(LogicTree, LogicExpression):
         )
 
     def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return fixpoint_type(self.op.val, self.init.val, self.arg.element_type(bindings))
+        return fixpoint_type(
+            self.op.val, self.init.val, self.arg.element_type(bindings)
+        )
 
     def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         return self.init.val

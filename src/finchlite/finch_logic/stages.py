@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
 from .. import finch_einsum as ein
-from .. import finch_notation as ntn
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
@@ -29,17 +28,6 @@ class LogicLoader(ABC):
         Generate Finch Library from the given logic and input types, with a
         single method called main which implements the logic. Also return a
         dictionary including additional tables needed to run the kernel.
-        """
-
-
-class LogicNotationLowerer(ABC):
-    @abstractmethod
-    def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[ntn.Module, dict[lgc.Alias, TableValueFType]]:
-        """
-        Generate Finch Notation from the given logic and input types.  Also
-        return a dictionary including additional tables needed to run the kernel.
         """
 
 

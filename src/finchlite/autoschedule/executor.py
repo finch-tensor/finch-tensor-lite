@@ -131,7 +131,9 @@ class ProvisionTensorsContext:
                             f" tensor formatter?"
                         )
                     shape = rhs.shape(self.shapes, self.fields)
-                    tns = self.types[lhs].tns(tuple(dim if dim is not None else 1 for dim in shape))
+                    tns = self.types[lhs].tns(
+                        tuple(dim if dim is not None else 1 for dim in shape)
+                    )
                     self.bindings[lhs] = lgc.TableValue(tns, self.types[lhs].idxs)
                     self.shapes[lhs] = shape
             case lgc.Produces(_):
