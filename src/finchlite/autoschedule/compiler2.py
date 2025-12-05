@@ -9,7 +9,7 @@ from finchlite.symbolic import gensym
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
 from ..algebra import overwrite
-from ..compile import ExtentFType
+from ..compile import ExtentFType, NotationCompiler
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     Field,
@@ -229,11 +229,14 @@ class NotationGenerator(LogicNotationLowerer):
             )
         )
 
-
 class LogicCompiler2(LogicLoader):
-    def __init__(self, ctx_lower: LogicNotationLowerer, ctx_load: NotationLoader):
-        self.ctx_lower = ctx_lower
-        self.ctx_load = ctx_load
+    def __init__(self, ctx_lower: LogicNotationLowerer|None, ctx_load: NotationLoader|None):
+        if ctx_lower is None:
+            ctx_lower = NotationGenerator()
+        if ctx_load is None:
+            ctx_load = NotationCompiler()
+        self.ctx_lower: LogicNotationLowerer = ctx_lower
+        self.ctx_load: NotationLoader = ctx_load
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
