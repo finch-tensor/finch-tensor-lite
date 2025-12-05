@@ -109,7 +109,7 @@ class NotationContext:
                 # Build a dict mapping fields to their shapes
                 fields = arg.fields(self.fields)
                 arg_dims = arg.mapdims(merge_shapes, self.shapes, self.fields)
-                shapes_map = {idx: dim for idx, dim in zip(fields, arg_dims)}
+                shapes_map = dict(zip(fields, arg_dims, strict=True))
                 shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
                 shape_type = arg.shape_type(self.shape_types, self.fields)
                 loops = {
