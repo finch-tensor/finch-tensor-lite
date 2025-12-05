@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-import operator
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
+from ..algebra import overwrite
 from ..compile import ExtentFType
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
-    Alias,
     Field,
     Literal,
     LogicLoader,
     TableValueFType,
 )
-from ..symbolic import Context
 from .stages import LogicNotationLowerer
-from ..algebra import overwrite
+
 
 class PointwiseContext:
     def __init__(self, ctx: NotationContext):
@@ -52,10 +51,8 @@ class PointwiseContext:
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
-def merge_shapes(
-    a: ntn.Variable | None,
-    b: ntn.Variable | None
-) -> ntn.Variable | None:
+
+def merge_shapes(a: ntn.Variable | None, b: ntn.Variable | None) -> ntn.Variable | None:
     if a and b:
         if a.name < b.name:
             return a
@@ -63,7 +60,7 @@ def merge_shapes(
     return a or b
 
 
-class NotationContext():
+class NotationContext:
     """
     Compiles Finch Logic to Finch Notation. Holds the state of the
     compilation process.
@@ -91,9 +88,6 @@ class NotationContext():
         if epilogue is None:
             epilogue = ()
         self.epilogue = epilogue
-
-
-
 
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
@@ -142,17 +136,19 @@ class NotationContext():
                     )
 
                 return ntn.Block(
-                    (ntn.Declare(
-                        self.slots[lhs],
-                        ntn.Literal(init.val),
-                        ntn.Literal(op.val),
-                        (),
-                    ),
-                    body,
-                    ntn.Freeze(
-                        self.slots[lhs],
-                        ntn.Literal(op.val),
-                    ))
+                    (
+                        ntn.Declare(
+                            self.slots[lhs],
+                            ntn.Literal(init.val),
+                            ntn.Literal(op.val),
+                            (),
+                        ),
+                        body,
+                        ntn.Freeze(
+                            self.slots[lhs],
+                            ntn.Literal(op.val),
+                        ),
+                    )
                 )
             case lgc.Query(lhs, lgc.Reorder(arg, idxs)):
                 return self(
@@ -170,13 +166,15 @@ class NotationContext():
                 for arg in args:
                     assert isinstance(arg, lgc.Alias)
                 return ntn.Block(
-                    (*self.epilogue,
-                    ntn.Return(
-                        ntn.Call(
-                            ntn.Literal(tuple),
-                            tuple(self.bindings[arg].tns for arg in args),
-                        )
-                    ))
+                    (
+                        *self.epilogue,
+                        ntn.Return(
+                            ntn.Call(
+                                ntn.Literal(tuple),
+                                tuple(self.bindings[arg].tns for arg in args),
+                            )
+                        ),
+                    )
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {prgm}")
@@ -204,7 +202,9 @@ class NotationGenerator(LogicNotationLowerer):
             for i, t in enumerate(bindings[arg].tns.shape_type):
                 dim = ntn.Variable(gensym(f"{arg.name}_dim_{i}"), t)
                 shape.append(dim)
-                preamble.append(ntn.Assign(dim, ntn.Size(slots[arg], ntn.Literal(i))))
+                preamble.append(
+                    ntn.Assign(dim, ntn.Dimension(slots[arg], ntn.Literal(i)))
+                )
             shapes[arg] = tuple(shape)
             epilogue.append(
                 ntn.Repack(
@@ -220,14 +220,13 @@ class NotationGenerator(LogicNotationLowerer):
         )
         body = ctx(term)
         return ntn.Module(
-            (ntn.Function(
-                ntn.Variable("main"),
-                tuple(args.values()),
-                ntn.Block(
-                    (*preamble,
-                    body)
+            (
+                ntn.Function(
+                    ntn.Variable("main"),
+                    tuple(args.values()),
+                    ntn.Block((*preamble, body)),
                 ),
-            ),)
+            )
         )
 
 

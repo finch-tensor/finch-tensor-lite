@@ -420,6 +420,11 @@ class NotationInterpreter(NotationLoader):
                         return access(tns_e, idxs_e, op=op_e)
                     case _:
                         raise NotImplementedError(f"Unrecognized access mode: {mode}")
+            case ntn.Dimension(tns, r):
+                assert isinstance(tns, ntn.Slot)
+                tns_e = self(tns)
+                r_e = self(r)
+                return tns_e.shape[r_e]
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)

@@ -252,6 +252,12 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def shape_type(self) -> tuple:
         return tuple(np.intp for _ in range(self.ndim))
 
+    def lower_dim(self, ctx, obj, r):
+        return asm.GetAttr(
+            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.Literal(f"element_{r}"),
+        )
+
     def lower_declare(self, ctx, tns, init, op, shape):
         i_var = asm.Variable("i", self.buf_t.length_type)
         body = asm.Store(

@@ -23,6 +23,12 @@ from .stages import NotationLowerer
 
 class FinchTensorFType(TensorFType, ABC):
     @abstractmethod
+    def lower_dim(self, ctx, obj, i):
+        """
+        Get the dimension of the tensor at mode i.
+        """
+
+    @abstractmethod
     def lower_unwrap(self, ctx, obj):
         """
         Unwrap a tensor view to get the underlying tensor.
@@ -484,6 +490,9 @@ class AssemblyContext(Context):
                 # first instantiate tensors
                 ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
+            case ntn.Dimension(tns, ntn.Literal(r)):
+                tns = self.resolve(tns)
+                return tns.result_format.lower_dim(self, tns.obj, r)
             case ntn.Declare(tns, init, op, shape):
                 self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
