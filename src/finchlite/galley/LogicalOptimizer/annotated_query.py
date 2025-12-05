@@ -26,7 +26,6 @@ from finchlite.finch_logic import (
 from finchlite.galley.TensorStats import TensorStats
 from finchlite.symbolic import (
     Chain,
-    PostOrderDFS,
     PostWalk,
     Rewrite,
     intree,
@@ -365,29 +364,32 @@ def replace_and_remove_nodes(
         `new_node` if `expr == node_to_replace`, or the original `expr`
         otherwise.
     """
-    if expr == node_to_replace:
-        return new_node
+    nodes_to_remove_set = set(nodes_to_remove)
 
-    nodes_to_remove = set(nodes_to_remove)
-
-    for node in PostOrderDFS(expr):
+    def replace_remove_rule(node: LogicExpression) -> LogicExpression | None:
         if isinstance(node, (Plan, Query, Aggregate)):
             raise ValueError(
                 f"There should be no {type(node).__name__} "
                 "nodes in a pointwise expression."
             )
 
+        if node == node_to_replace and node not in nodes_to_remove_set:
+            return new_node
+
         if isinstance(node, MapJoin) and any(
             (arg == node_to_replace) or (arg in nodes_to_remove) for arg in node.args
         ):
-            new_args: list[LogicExpression] = [
-                arg for arg in node.args if arg not in nodes_to_remove
-            ]
+            new_args = [arg for arg in node.args if arg not in nodes_to_remove_set]
+
             for i, arg in enumerate(new_args):
                 if arg == node_to_replace:
                     new_args[i] = new_node
+
             object.__setattr__(node, "args", tuple(new_args))
-    return expr
+            return node
+        return None
+
+    return Rewrite(PostWalk(Chain([replace_remove_rule])))(expr)
 
 
 def find_lowest_roots(
