@@ -15,11 +15,11 @@ from ..finch_logic import (
     Field,
     Literal,
     LogicLoader,
-    Relabel,
     TableValueFType,
 )
 from ..symbolic import Context
 from .stages import LogicNotationLowerer
+from ..algebra import overwrite
 
 class PointwiseContext:
     def __init__(self, ctx: NotationContext):
@@ -47,7 +47,7 @@ class PointwiseContext:
                         tuple(loops.values()),
                     )
                 )
-            case Relabel(arg, idxs):
+            case lgc.Relabel(arg, idxs):
                 return self(arg, dict(zip(idxs, loops.values(), strict=True)))
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
@@ -61,7 +61,9 @@ def merge_shapes(
             return a
         return b
     return a or b
-class NotationContext(Context):
+
+
+class NotationContext():
     """
     Compiles Finch Logic to Finch Notation. Holds the state of the
     compilation process.
@@ -71,7 +73,7 @@ class NotationContext(Context):
         self,
         bindings: dict[lgc.Alias, lgc.TableValueFType],
         slots: dict[lgc.Alias, ntn.Slot],
-        shapes: dict[lgc.Alias, ntn.Variable],
+        shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
         fields: dict[lgc.Alias, tuple[lgc.Field, ...]] | None = None,
         shape_types: dict[lgc.Alias, tuple[Any, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
@@ -103,37 +105,35 @@ class NotationContext(Context):
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(
-                lhs, lgc.Reorder(lgc.Relabel(Alias(_) as arg, idxs_1), idxs_2)
+                lhs, lgc.Reorder(lgc.Relabel(lgc.Alias(_) as arg, idxs_1), idxs_2)
             ):
                 # TODO (mtsokol): mostly the same as `agg`, used for explicit transpose
                 raise NotImplementedError
             case lgc.Query(
                 lhs, lgc.Aggregate(op, init, lgc.Reorder(arg, idxs_1), idxs_2)
             ):
-                arg_shapes:tuple[ntn.Variable | None] = arg.mapdims(merge_shapes, self.shapes, self.fields)
-                shapes = {idx: arg_shapes.get(idx) or ntn.Literal(1) for idx in idxs_1}
-                shape_type = arg.shape_type(self.shape_types, self.fields)
+                # Build a dict mapping fields to their shapes
                 fields = arg.fields(self.fields)
+                arg_dims = arg.mapdims(merge_shapes, self.shapes, self.fields)
+                shapes_map = {idx: dim for idx, dim in zip(fields, arg_dims)}
+                shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
+                shape_type = arg.shape_type(self.shape_types, self.fields)
                 loops = {
                     idx: ntn.Variable(gensym(idx.name), t)
-                    for idx, t in zip(shape_type, fields, strict=True)
+                    for idx, t in zip(fields, shape_type, strict=True)
                 }
                 ctx = PointwiseContext(self)
                 rhs = ctx(arg, loops)
-                lhs = ntn.Unwrap(
-                    ntn.Access(
-                        self.ctx.slots[lhs],
-                        ntn.Update(ntn.Literal(op)),
-                        tuple(loops[idx] for idx in idxs_1 if idx not in idxs_2),
-                    )
+                lhs_access = ntn.Access(
+                    self.slots[lhs],
+                    ntn.Update(ntn.Literal(op)),
+                    tuple(loops[idx] for idx in idxs_1 if idx not in idxs_2),
                 )
-                body: ntn.Increment | ntn.Loop = ntn.Increment(lhs, rhs)
-                for idx, t in reversed(zip(idxs_1, shape_type, strict=True)):
-                    ext = (
-                        ExtentFType.stack(
-                            ntn.Literal(t(0)),
-                            shapes[idx],
-                        ),
+                body: ntn.Increment | ntn.Loop = ntn.Increment(lhs_access, rhs)
+                for idx, t in reversed(list(zip(idxs_1, shape_type, strict=True))):
+                    ext = ExtentFType.stack(
+                        ntn.Literal(t(0)),
+                        shapes[idx],
                     )
                     body = ntn.Loop(
                         loops[idx],
@@ -142,23 +142,24 @@ class NotationContext(Context):
                     )
 
                 return ntn.Block(
-                    ntn.Declare(
-                        self.ctx.slots[lhs],
+                    (ntn.Declare(
+                        self.slots[lhs],
                         ntn.Literal(init.val),
                         ntn.Literal(op.val),
+                        (),
                     ),
                     body,
                     ntn.Freeze(
-                        self.ctx.slots[lhs],
+                        self.slots[lhs],
                         ntn.Literal(op.val),
-                    ),
+                    ))
                 )
             case lgc.Query(lhs, lgc.Reorder(arg, idxs)):
                 return self(
                     lgc.Query(
                         lhs,
                         lgc.Aggregate(
-                            Literal(operator.overwrite),
+                            Literal(overwrite),
                             Literal(self.bindings[lhs].tns.fill_value),
                             lgc.Reorder(arg, idxs),
                             (),
@@ -169,20 +170,13 @@ class NotationContext(Context):
                 for arg in args:
                     assert isinstance(arg, lgc.Alias)
                 return ntn.Block(
-                    (
-                        *self.epilogue,
-                        ntn.Return(
-                            ntn.Call(
-                                ntn.Literal(tuple),
-                                tuple(
-                                    ntn.Variable(
-                                        self.freshen(a.name), self.bindings[a].tns
-                                    )
-                                    for a in args
-                                ),
-                            )
-                        ),
-                    )
+                    (*self.epilogue,
+                    ntn.Return(
+                        ntn.Call(
+                            ntn.Literal(tuple),
+                            tuple(self.bindings[arg].tns for arg in args),
+                        )
+                    ))
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {prgm}")
@@ -192,11 +186,11 @@ class NotationGenerator(LogicNotationLowerer):
     def __call__(
         self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
     ) -> ntn.Module:
-        preamble = []
-        epilogue = []
-        args = {}
-        slots = {}
-        shapes = {}
+        preamble: list[ntn.NotationStatement] = []
+        epilogue: list[ntn.NotationStatement] = []
+        args: dict[lgc.Alias, ntn.Variable] = {}
+        slots: dict[lgc.Alias, ntn.Slot] = {}
+        shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]] = {}
         for arg in bindings:
             args[arg] = ntn.Variable(gensym(f"{arg.name}"), bindings[arg].tns)
             slots[arg] = ntn.Slot(gensym(f"_{arg.name}"), bindings[arg].tns)
@@ -206,12 +200,12 @@ class NotationGenerator(LogicNotationLowerer):
                     args[arg],
                 )
             )
-            shape = []
+            shape: list[ntn.Variable] = []
             for i, t in enumerate(bindings[arg].tns.shape_type):
                 dim = ntn.Variable(gensym(f"{arg.name}_dim_{i}"), t)
                 shape.append(dim)
-                preamble.append(ntn.Assign(dim, ntn.Length(slots[arg], ntn.Literal(i))))
-            shapes[arg] = shape
+                preamble.append(ntn.Assign(dim, ntn.Size(slots[arg], ntn.Literal(i))))
+            shapes[arg] = tuple(shape)
             epilogue.append(
                 ntn.Repack(
                     slots[arg],
@@ -226,16 +220,14 @@ class NotationGenerator(LogicNotationLowerer):
         )
         body = ctx(term)
         return ntn.Module(
-            ntn.Function(
+            (ntn.Function(
                 ntn.Variable("main"),
                 tuple(args.values()),
                 ntn.Block(
-                    (
-                        *preamble,
-                        body,
-                    )
+                    (*preamble,
+                    body)
                 ),
-            )
+            ),)
         )
 
 

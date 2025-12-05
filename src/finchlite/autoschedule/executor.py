@@ -157,7 +157,11 @@ class LogicExecutor(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, lgc.LogicExpression):
-            stmt: lgc.LogicStatement = lgc.Produces((prgm,))
+            var = lgc.Alias("result")
+            stmt: lgc.LogicStatement = lgc.Plan((
+                lgc.Query(var, prgm),
+                lgc.Produces((var,))
+            ))
         elif isinstance(prgm, lgc.LogicStatement):
             stmt = prgm
         else:
