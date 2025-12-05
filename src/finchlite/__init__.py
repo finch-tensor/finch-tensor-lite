@@ -4,10 +4,10 @@ from .codegen import (
     NumpyBufferFType,
 )
 from .compile import (
+    AssemblyContext,
     BufferizedNDArray,
     Extent,
     ExtentFType,
-    NotationContext,
     dimension,
 )
 from .galley import (
@@ -142,6 +142,7 @@ from .tensor import (
 
 __all__ = [
     "DC",
+    "AssemblyContext",
     "BufferizedNDArray",
     "DCStats",
     "DenseLevelFType",
@@ -154,7 +155,6 @@ __all__ = [
     "FiberTensorFType",
     "LazyTensor",
     "Mode",
-    "NotationContext",
     "NumpyBuffer",
     "NumpyBufferFType",
     "Reflector",

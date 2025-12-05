@@ -17,7 +17,7 @@ class AssemblyStructFType(FType, ABC):
     def struct_fields(self) -> list[tuple[str, Any]]: ...
 
     @abstractmethod
-    def __call__(self, *args): ...
+    def from_fields(self, *args): ...
 
     @property
     def is_mutable(self) -> bool:
@@ -115,6 +115,13 @@ class NamedTupleFType(ImmutableStructFType):
     def to_kwargs(self) -> dict:
         raise NotImplementedError
 
+    def from_fields(self, *args):
+        assert all(
+            isinstance(a, f)
+            for a, f in zip(args, self.struct_fieldformats, strict=False)
+        )
+        return namedtuple(self.struct_name, self.struct_fieldnames)(args)
+
     def __call__(self, *args):
         assert all(
             isinstance(a, f)
@@ -170,6 +177,13 @@ class TupleFType(ImmutableStructFType):
             for a, f in zip(kwargs.values(), self.struct_fieldformats, strict=False)
         )
         return tuple(kwargs.values())
+
+    def from_fields(self, *args):
+        assert all(
+            isinstance(a, f)
+            for a, f in zip(args, self.struct_fieldformats, strict=False)
+        )
+        return tuple(args)
 
     @staticmethod
     @lru_cache

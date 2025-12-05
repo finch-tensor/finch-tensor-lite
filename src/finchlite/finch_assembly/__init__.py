@@ -32,6 +32,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import (
     AssemblyStructFType,
     ImmutableStructFType,
@@ -46,8 +47,12 @@ __all__ = [
     "AssemblyCopyPropagation",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
+    "AssemblyKernel",
+    "AssemblyLibrary",
+    "AssemblyLoader",
     "AssemblyNode",
     "AssemblyStructFType",
+    "AssemblyTransform",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
     "Assert",

@@ -10,7 +10,6 @@ from finchlite.finch_assembly.struct import TupleFType
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, register_property
-from ..codegen.numpy_buffer import NumpyBuffer
 from ..compile.lower import FinchTensorFType
 from ..symbolic import FTyped
 
@@ -239,15 +238,10 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         if self.position_type is None:
             self.position_type = self.lvl_t.position_type
 
-    def __call__(self, *, lvl=None, shape=None, val=None):
+    def __call__(self, shape, val=None):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        if lvl is not None:
-            return FiberTensor(lvl, self.lvl_t.position_type(1))
-        if shape is None:
-            shape = val.shape
-            val = NumpyBuffer(val.reshape(-1))
         return FiberTensor(
             self.lvl_t(shape=shape, val=val), self.lvl_t.position_type(1)
         )
@@ -350,6 +344,9 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         """
         ctx.exec(asm.Repack(obj.buf_s))
         return
+
+    def from_fields(self, *args) -> "FiberTensor":
+        return FiberTensor(*args)
 
 
 def fiber_tensor(lvl: LevelFType, position_type: type | None = None):

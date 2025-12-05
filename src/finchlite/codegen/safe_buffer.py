@@ -1,8 +1,8 @@
 import ctypes
 
 import finchlite.finch_assembly as asm
-from finchlite.codegen.c import CBufferFType, CStackFType
-from finchlite.codegen.numba_backend import NumbaBufferFType, NumbaStackFType
+from finchlite.codegen.c_codegen import CBufferFType, CStackFType
+from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaStackFType
 from finchlite.finch_assembly import Buffer
 
 
