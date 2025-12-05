@@ -18,8 +18,8 @@ Key Functions:
 Examples:
 ---------
 1. Basic Usage:
-    >>> C = defer(A)
-    >>> D = defer(B)
+    >>> C = lazy(A)
+    >>> D = lazy(B)
     >>> E = (C + D) / 2
     >>> compute(E)
 
@@ -72,7 +72,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import Reflector, gensym
-from .lazy import defer
+from .lazy import lazy
 
 _DEFAULT_SCHEDULER = None
 
@@ -227,7 +227,7 @@ def fuse(f, *args, ctx=None):
     if ctx is None:
         ctx = get_default_scheduler()
 
-    args = [defer(arg) for arg in args]
+    args = [lazy(arg) for arg in args]
     if len(args) == 1:
         return f(args[0])
     return compute(f(*args), ctx=ctx)
