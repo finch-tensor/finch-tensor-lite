@@ -8,7 +8,8 @@ struct CMallocBufferStruct {
 #include <stdlib.h>
 #include <stdio.h>
 
-static inline double* mallocbuffer_resize(double* data, size_t len_old, size_t len_new) {
+static inline double*
+mallocbuffer_resize (double* data, size_t len_old, size_t len_new) {
     data = realloc(data, sizeof(double) * len_new);
     if (data == 0) {
         printf("Malloc Failed!\n");
@@ -20,12 +21,14 @@ static inline double* mallocbuffer_resize(double* data, size_t len_old, size_t l
     return data;
 }
 // methods below are not used by the kernel.
-static inline void mallocbuffer_free(struct CMallocBufferStruct *m) {
+static inline void
+mallocbuffer_free(struct CMallocBufferStruct *m) {
     free(m->data);
     m->data = 0;
     m->length = 0;
 }
-static inline void mallocbuffer_init(
+static inline void
+mallocbuffer_init(
     struct CMallocBufferStruct *m,
     size_t datasize,
     size_t length

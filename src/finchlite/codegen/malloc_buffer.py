@@ -147,11 +147,7 @@ class MallocBufferBackend:
 
 class MallocBuffer(Buffer):
     """
-    A buffer that uses Malloc buffers to store data.
-
-    To check out the corresponding C code, you should reference
-    ./malloc_buffer_backend.c in the same directory as the malloc_buffer.py
-    file
+    A buffer that uses buffers managed by malloc to store data.
     """
 
     def __init__(self, length: int, dtype, data=None):
@@ -159,7 +155,7 @@ class MallocBuffer(Buffer):
         Constructor for the MallocBuffer class.
 
         length (int): the length of the malloc array.
-        dtype (type[ctypes._CData]): the ctype that the buffer will be based on.
+        dtype (FType): the type that the buffer will be based on.
         data (optional): a list of data to initialize the buffer with.
         """
         self._dtype = dtype
