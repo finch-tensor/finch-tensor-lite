@@ -157,8 +157,8 @@ def test_codegen(compiler, buffer):
     ],
 )
 def test_dot_product_malloc(compiler, buffer):
-    a = [1, 2, 3]
-    b = [4, 5, 6]
+    a = [1.0, 2.0, 3.0]
+    b = [4.0, 5.0, 6.0]
 
     a_buf = buffer(len(a), np.float64, a)
     b_buf = buffer(len(b), np.float64, b)
@@ -235,7 +235,7 @@ def test_dot_product_malloc(compiler, buffer):
     [(1,), (5,), (10,)],
 )
 def test_malloc_resize(new_size):
-    a = [1, 4, 3, 4]
+    a = [1.0, 4.0, 3.0, 4.0]
 
     ab = MallocBuffer(len(a), np.float64, a)
 
