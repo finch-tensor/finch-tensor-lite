@@ -516,18 +516,18 @@ def get_reduce_query(
                     reduce_idx
                 ] and relevant_args_set.issuperset(args_with_idx):
                     idxs_to_be_reduced.add(idx)
-        else:
-            query_expr = root_node
-            node_to_replace = root_node
-            reducible_idxs = get_reducible_idxs(aq)
-            for idx in reducible_idxs:
-                if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
-                    continue
-                if (
-                    idx in aq.connected_idxs[reduce_idx]
-                    or aq.idx_lowest_root[idx] == node_to_replace
-                ):
-                    idxs_to_be_reduced.add(idx)
+    else:
+        query_expr = root_node
+        node_to_replace = root_node
+        reducible_idxs = get_reducible_idxs(aq)
+        for idx in reducible_idxs:
+            if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
+                continue
+            if (
+                idx in aq.connected_idxs[reduce_idx]
+                or aq.idx_lowest_root[idx] == node_to_replace
+            ):
+                idxs_to_be_reduced.add(idx)
     final_idxs_to_be_reduced: list[Field] = []
     for idx in idxs_to_be_reduced:
         orig = aq.original_idx[idx]
@@ -613,18 +613,13 @@ def reduce_idx(
 
     new_components = get_idx_connected_components(new_parent_idxs, new_connected_idxs)
 
-    # Here, we update the statistics for all nodes above the affected nodes
-    rel_child_nodes: set[LogicExpression] = set(nodes_to_remove)
-    rel_child_nodes.add(node_to_replace)
-
-    # for n in PostOrderDFS(new_point_expr):
-    #     if n == node_to_replace:
-    #         insert_statistics(aq.ST, n, aq.bindings, replace=True, cache=stats_cache)
-    #     elif intree(n, new_point_expr) and any(
-    #         c in rel_child_nodes for c in n.children
-    #     ):
-    #         insert_statistics(aq.ST, n, aq.bindings, replace=True, cache=stats_cache)
-    #         rel_child_nodes.add(n)
+    insert_statistics(
+        aq.ST,
+        new_point_expr,
+        aq.bindings,
+        replace=True,
+        cache=stats_cache,
+    )
 
     aq.reduce_idxs = new_reduce_idxs
     aq.point_expr = new_point_expr

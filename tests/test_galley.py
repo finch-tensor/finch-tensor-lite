@@ -1614,3 +1614,51 @@ def test_find_lowest_roots(root, idx_name, expected):
             result.append(node.tns.val)
 
         assert result == expected
+
+
+# @pytest.mark.parametrize(
+#     "expr, idx_name, expected_rhs",
+#     [
+#         (
+#             Aggregate(
+#                 Literal(op.add),
+#                 Literal(0),
+#                 Field("i"),
+#                 MapJoin(
+#                     Literal(op.mul),
+#                     (
+#                         Table(Literal("A"), (Field("i"),)),
+#                         Table(Literal("B"), (Field("j"),)),
+#                     ),
+#                 ),
+#             ),
+#             "i",
+#             Table(Literal("A"), (Field("i"),)),
+#         ),
+#     ],
+# )
+# def test_get_reduce_query(expr, idx_name, expected_rhs):
+
+#     reduce_field = Field(idx_name)
+#     aq = object.__new__(AnnotatedQuery)
+#     aq.ST = object
+#     aq.output_name = None
+#     aq.reduce_idxs = [reduce_field]
+#     aq.point_expr = expr
+#     aq.idx_lowest_root = OrderedDict()
+#     aq.idx_op = OrderedDict()
+#     aq.idx_init = OrderedDict()
+#     aq.parent_idxs = OrderedDict()
+#     aq.original_idx = OrderedDict()
+#     aq.connected_components = []
+#     aq.connected_idxs = OrderedDict()
+#     aq.output_order = None
+#     aq.output_format = None
+#     aq.bindings = OrderedDict()
+#     aq.cache_point = {}
+#     query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
+#         reduce_field,
+#         aq,
+#     )
+
+#     assert query.rhs == expected_rhs
