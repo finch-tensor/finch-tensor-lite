@@ -76,7 +76,8 @@ class MallocBufferBackend:
         inline_s = "static inline " if inline else ""
         libcode = dedent(
             f"""
-            {inline_s}{elt_type}* {methods["resize"]}({elt_type}* data, size_t len_old, size_t len_new) {{
+            {inline_s}{elt_type}*
+            {methods["resize"]} ({elt_type}* data, size_t len_old, size_t len_new) {{
                 data = realloc(data, sizeof({elt_type}) * len_new);
                 if (data == 0) {{
                     printf("Malloc Failed!\\n");
@@ -88,12 +89,14 @@ class MallocBufferBackend:
                 return data;
             }}
             // methods below are not used by the kernel.
-            {inline_s}void {methods["free"]}({buffer_type} *m) {{
+            {inline_s}void
+            {methods["free"]}({buffer_type} *m) {{
                 free(m->data);
                 m->data = 0;
                 m->length = 0;
             }}
-            {inline_s}void {methods["init"]}(
+            {inline_s}void
+            {methods["init"]}(
                 {buffer_type} *m,
                 size_t datasize,
                 size_t length
