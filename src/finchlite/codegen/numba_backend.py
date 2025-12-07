@@ -9,7 +9,7 @@ import numpy as np
 import numba  # type: ignore[import-untyped]
 
 from .. import finch_assembly as asm
-from ..algebra import query_property, register_property
+from ..algebra import InitWrite, query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 
@@ -784,4 +784,17 @@ register_property(
     "numba_literal",
     "__attr__",
     lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+)
+
+
+def numba_lower_initwrite(initwrite, ctx, x, y):
+    ctx.exec(f"{ctx.feed}assert {initwrite.value} == {ctx(x)}")
+    return ctx(y)
+
+
+register_property(
+    InitWrite,
+    "numba_literal",
+    "__attr__",
+    lambda initwrite, ctx, x, y: numba_lower_initwrite(initwrite, ctx, x, y),
 )

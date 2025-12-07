@@ -93,6 +93,9 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
     def __call__(self, *args, **kwargs):
         return LoTriMask(self, self.body(*args, **kwargs))
 
+    def __str__(self):
+        return f"LoTriMaskFType({self.body})"
+
     @property
     def struct_name(self):
         return "LoTriMaskFType"

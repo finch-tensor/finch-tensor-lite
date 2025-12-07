@@ -211,7 +211,8 @@ class DenseLevel(Level):
 
     @property
     def ftype(self) -> DenseLevelFType:
-        return self._format
+        format = self._format
+        return type(format)(self.lvl.ftype, format.position_type, format.op)
 
     @property
     def val(self) -> Any:

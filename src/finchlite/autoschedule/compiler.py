@@ -498,7 +498,8 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
             levels_to_add = [
                 idx for idx, f in enumerate(result_fields) if f not in fields
             ]
-            result_rep = result_rep.add_levels(levels_to_add)
+            if len(levels_to_add) > 0:
+                result_rep = result_rep.add_levels(levels_to_add)
             kwargs = result_rep.to_kwargs()
             kwargs.update(
                 element_type=NumpyBufferFType(dtype),
