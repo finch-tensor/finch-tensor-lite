@@ -1,20 +1,15 @@
 import numpy as np
 
-from finchlite.algebra.tensor import NDArrayFType
 from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic.nodes import TableValueFType
 
 from .. import finch_logic as lgc
-from ..finch_logic import LogicLoader
-from .fakecompiler import FakeLogicCompiler
-from ..codegen import (
-    NumpyBufferFType
-)
+from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
-
 from ..finch_assembly import TupleFType
+from ..finch_logic import LogicLoader
 from ..symbolic import gensym
-
+from .fakecompiler import FakeLogicCompiler
 
 
 class LogicFormatterContext:

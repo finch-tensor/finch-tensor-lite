@@ -4,7 +4,8 @@ import numpy as np
 
 import finchlite
 
-from .util import finch_assert_equal, finch_assert_allclose
+from .util import finch_assert_allclose
+
 
 @pytest.fixture
 def rng():
@@ -237,6 +238,7 @@ def test_operator_precedence_with_parentheses(rng):
     finch_assert_allclose(result_with_parens, expected_with_parens)
     finch_assert_allclose(result_without_parens, expected_without_parens)
 
+
 def test_operator_precedence_unary_operators(rng):
     """Test unary operator precedence"""
     A = rng.random((3, 3)) - 0.5  # Some negative values
@@ -327,6 +329,7 @@ def test_single_comparison_vs_chained(rng):
 
     finch_assert_allclose(result_single, expected_single)
     finch_assert_allclose(result_chained, expected_chained)
+
 
 def test_alphanumeric_tensor_names(rng):
     """Test that tensor names with numbers work correctly"""

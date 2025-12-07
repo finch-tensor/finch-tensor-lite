@@ -6,8 +6,6 @@ import pytest
 import numpy as np
 from numpy import array  # noqa: F401
 
-from .util import finch_assert_equal, finch_assert_allclose
-
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -22,6 +20,8 @@ from finchlite.finch_logic import (
     Table,
     TableValue,
 )
+
+from .util import finch_assert_equal
 
 
 @pytest.mark.parametrize(

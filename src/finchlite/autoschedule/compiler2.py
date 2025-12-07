@@ -229,8 +229,11 @@ class NotationGenerator(LogicNotationLowerer):
             )
         )
 
+
 class LogicCompiler2(LogicLoader):
-    def __init__(self, ctx_lower: LogicNotationLowerer|None, ctx_load: NotationLoader|None):
+    def __init__(
+        self, ctx_lower: LogicNotationLowerer | None, ctx_load: NotationLoader | None
+    ):
         if ctx_lower is None:
             ctx_lower = NotationGenerator()
         if ctx_load is None:

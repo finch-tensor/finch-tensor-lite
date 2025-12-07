@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 import numpy as np
-from .util import finch_assert_equal
 
 import finchlite
 import finchlite.finch_assembly as asm
@@ -35,6 +34,8 @@ from finchlite.codegen.numba_codegen import (
     serialize_to_numba,
 )
 from finchlite.compile import BufferizedNDArray
+
+from .util import finch_assert_equal
 
 
 def test_add_function():

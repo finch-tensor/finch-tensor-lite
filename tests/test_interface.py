@@ -5,9 +5,9 @@ import pytest
 
 import numpy as np
 
-from .util import finch_assert_equal, finch_assert_allclose
-
 import finchlite
+
+from .util import finch_assert_allclose, finch_assert_equal
 
 
 # Utility function to generate random complex numpy tensors

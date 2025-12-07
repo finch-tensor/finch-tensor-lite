@@ -11,7 +11,7 @@ from finchlite.compile import ExtentFType, NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
 
-from .util import finch_assert_equal, finch_assert_allclose
+from .util import finch_assert_equal
 
 
 @pytest.mark.parametrize(

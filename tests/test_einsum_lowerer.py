@@ -13,7 +13,7 @@ from finchlite.interface.fuse import compute
 from finchlite.interface.lazy import LazyTensor, lazy
 from finchlite.symbolic import gensym
 
-from .util import finch_assert_equal, finch_assert_allclose
+from .util import finch_assert_allclose
 
 
 @pytest.fixture
