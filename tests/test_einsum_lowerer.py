@@ -13,6 +13,8 @@ from finchlite.interface.fuse import compute
 from finchlite.interface.lazy import LazyTensor, lazy
 from finchlite.symbolic import gensym
 
+from .util import finch_assert_equal, finch_assert_allclose
+
 
 @pytest.fixture
 def rng():
@@ -62,7 +64,7 @@ def test_simple_addition(rng):
 
     # Compare with expected
     expected = compute(A + B)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_scalar_multiplication(rng):
@@ -74,7 +76,7 @@ def test_scalar_multiplication(rng):
     result = lower_and_execute(B)
 
     expected = compute(B)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_element_wise_operations(rng):
@@ -88,7 +90,7 @@ def test_element_wise_operations(rng):
     result = lower_and_execute(D)
 
     expected = compute(D)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_sum_reduction(rng):
@@ -100,7 +102,7 @@ def test_sum_reduction(rng):
     result = lower_and_execute(B)
 
     expected = compute(B)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_maximum_reduction(rng):
@@ -111,7 +113,7 @@ def test_maximum_reduction(rng):
 
     result = lower_and_execute(B)
     expected = compute(B)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_batch_matrix_multiplication(rng):
@@ -123,7 +125,7 @@ def test_batch_matrix_multiplication(rng):
 
     result = lower_and_execute(C)
     expected = compute(C)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_minimum_reduction(rng):
@@ -134,4 +136,4 @@ def test_minimum_reduction(rng):
 
     result = lower_and_execute(B)
     expected = compute(B)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)

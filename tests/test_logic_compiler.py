@@ -50,6 +50,8 @@ from finchlite.finch_notation import (
 from finchlite.finch_notation.nodes import Repack
 from finchlite.interface.fuse import provision_tensors
 
+from .util import finch_assert_equal, finch_assert_allclose
+
 
 def test_logic_compiler():
     plan = Plan(
@@ -325,4 +327,4 @@ def test_logic_compiler():
 
     expected = np.matmul(args[0].to_numpy(), args[1].to_numpy(), dtype=float)
 
-    np.testing.assert_equal(result.to_numpy(), expected)
+    finch_assert_equal(result.to_numpy(), expected)

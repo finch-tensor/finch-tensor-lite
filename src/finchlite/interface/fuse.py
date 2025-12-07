@@ -231,8 +231,7 @@ def compute(arg, ctx=None):
     res = ctx(prgm)
     if isinstance(arg, tuple):
         return tuple(tbl.tns for tbl in res)
-    res = res[0].tns
-    return res.to_numpy() if hasattr(res, "to_numpy") else res
+    return res[0].tns
 
 
 def fuse(f, *args, ctx=None):

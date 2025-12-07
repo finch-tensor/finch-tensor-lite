@@ -42,6 +42,8 @@ from finchlite.finch_logic import (
 from finchlite.finch_logic.interpreter import LogicInterpreter
 from finchlite.symbolic.gensym import _sg
 
+from .util import finch_assert_equal, finch_assert_allclose
+
 
 def test_propagate_map_queries():
     plan = Plan(
@@ -814,7 +816,7 @@ def test_scheduler_e2e_matmul(a, b):
 
     expected = np.matmul(a, b)
 
-    np.testing.assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 def test_scheduler_e2e_sddmm():
@@ -896,4 +898,4 @@ def test_scheduler_e2e_sddmm():
 
     expected = s * np.matmul(a, b)
 
-    np.testing.assert_equal(result, expected)
+    np.testing.finch_assert_equal(result, expected)

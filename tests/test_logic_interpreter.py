@@ -5,7 +5,8 @@ import pytest
 
 import numpy as np
 from numpy import array  # noqa: F401
-from numpy.testing import assert_equal
+
+from .util import finch_assert_equal, finch_assert_allclose
 
 from finchlite.finch_logic import (
     Aggregate,
@@ -100,4 +101,4 @@ def test_materialize():
     )
 
     assert result == expected
-    assert_equal(C, np.array([[1, 1], [1, 1]]))
+    finch_assert_equal(C, np.array([[1, 1], [1, 1]]))

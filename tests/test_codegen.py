@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import numpy as np
-from numpy.testing import assert_equal
+from .util import finch_assert_equal
 
 import finchlite
 import finchlite.finch_assembly as asm
@@ -91,7 +91,7 @@ def test_buffer_function():
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -152,7 +152,7 @@ def test_codegen(compiler, buffer):
     f(buf)
     result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -944,6 +944,6 @@ def test_e2e_numba(fmt_fn, dtype):
     plan = finchlite.matmul(wa, wb)
     result = finchlite.compute(plan)
 
-    assert_equal(result, a @ b)
+    finch_assert_equal(result, a @ b)
 
     finchlite.set_default_scheduler(ctx=ctx)

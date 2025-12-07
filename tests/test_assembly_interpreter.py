@@ -26,6 +26,9 @@ from finchlite.finch_assembly import (  # noqa: F401
 from finchlite.symbolic import ftype
 
 
+from .util import finch_assert_equal, finch_assert_allclose
+
+
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -99,7 +102,7 @@ def test_dot_product(a, b):
 
     result = mod.dot_product(ab, bb)
     expected = np.dot(a, b)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_if_statement():

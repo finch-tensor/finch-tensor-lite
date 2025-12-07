@@ -7,6 +7,14 @@ from finchlite.finch_logic.nodes import TableValueFType
 from .. import finch_logic as lgc
 from ..finch_logic import LogicLoader
 from .fakecompiler import FakeLogicCompiler
+from ..codegen import (
+    NumpyBufferFType
+)
+from ..compile import BufferizedNDArrayFType
+
+from ..finch_assembly import TupleFType
+from ..symbolic import gensym
+
 
 
 class LogicFormatterContext:
@@ -66,14 +74,14 @@ class LogicFormatterContext:
 
                     # TODO: This constructor is awful
                     # TODO: bufferized ndarray seems broken
-                    # tns = BufferizedNDArrayFType(
-                    #     buffer_type=NumpyBufferFType(element_type),
-                    #     ndim=np.intp(len(fields)),
-                    #     dimension_type=TupleFType(
-                    #         struct_name=gensym("ugh"), struct_formats=shape_type
-                    #     ),
-                    # )
-                    tns = NDArrayFType(element_type, np.intp(len(shape_type)))
+                    tns = BufferizedNDArrayFType(
+                        buffer_type=NumpyBufferFType(element_type),
+                        ndim=np.intp(len(fields)),
+                        dimension_type=TupleFType(
+                            struct_name=gensym("ugh"), struct_formats=shape_type
+                        ),
+                    )
+                    # tns = NDArrayFType(element_type, np.intp(len(shape_type)))
                     self.bindings[lhs] = TableValueFType(tns, fields)
             case lgc.Produces(_):
                 pass

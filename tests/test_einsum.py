@@ -4,6 +4,7 @@ import numpy as np
 
 import finchlite
 
+from .util import finch_assert_equal, finch_assert_allclose
 
 @pytest.fixture
 def rng():
@@ -18,7 +19,7 @@ def test_basic_addition_with_transpose(rng):
     C = finchlite.einop("C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
     C_ref = A + B.T
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_matrix_multiplication(rng):
@@ -29,7 +30,7 @@ def test_matrix_multiplication(rng):
     C = finchlite.einop("C[i,j] += A[i,k] * B[k,j]", A=A, B=B)
     C_ref = A @ B
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_element_wise_multiplication(rng):
@@ -40,7 +41,7 @@ def test_element_wise_multiplication(rng):
     C = finchlite.einop("C[i,j] = A[i,j] * B[i,j]", A=A, B=B)
     C_ref = A * B
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_sum_reduction(rng):
@@ -50,7 +51,7 @@ def test_sum_reduction(rng):
     C = finchlite.einop("C[i] += A[i,j]", A=A)
     C_ref = np.sum(A, axis=1)
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_maximum_reduction(rng):
@@ -60,7 +61,7 @@ def test_maximum_reduction(rng):
     C = finchlite.einop("C[i] max= A[i,j]", A=A)
     C_ref = np.max(A, axis=1)
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_outer_product(rng):
@@ -71,7 +72,7 @@ def test_outer_product(rng):
     C = finchlite.einop("C[i,j] = A[i] * B[j]", A=A, B=B)
     C_ref = np.outer(A, B)
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_batch_matrix_multiplication(rng):
@@ -82,7 +83,7 @@ def test_batch_matrix_multiplication(rng):
     C = finchlite.einop("C[b,i,j] += A[b,i,k] * B[b,k,j]", A=A, B=B)
     C_ref = np.matmul(A, B)
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_minimum_reduction(rng):
@@ -92,7 +93,7 @@ def test_minimum_reduction(rng):
     C = finchlite.einop("C[i] min= A[i,j]", A=A)
     C_ref = np.min(A, axis=1)
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 @pytest.mark.parametrize("axis", [(0, 2, 1), (3, 0, 1), (1, 0, 3, 2), (1, 0, 3, 2)])
@@ -117,7 +118,7 @@ def test_swizzle_in(rng, axis, idxs):
     C = finchlite.einop(f"C[{xp_jdxs}] += A[{xp_idxs}]", A=A)
     C_ref = np.einsum(f"{np_idxs}->{np_jdxs}", A)
 
-    assert np.allclose(C, C_ref)
+    finch_assert_allclose(C, C_ref)
 
 
 def test_operator_precedence_arithmetic(rng):
@@ -130,7 +131,7 @@ def test_operator_precedence_arithmetic(rng):
     result = finchlite.einop("D[i,j] = A[i,j] + B[i,j] * C[i,j]", A=A, B=B, C=C)
     expected = A + (B * C)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_power_and_multiplication(rng):
@@ -141,7 +142,7 @@ def test_operator_precedence_power_and_multiplication(rng):
     result = finchlite.einop("B[i,j] = A[i,j] * A[i,j] ** 2", A=A)
     expected = A * (A**2)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_addition_and_multiplication(rng):
@@ -154,7 +155,7 @@ def test_operator_precedence_addition_and_multiplication(rng):
     result = finchlite.einop("D[i,j] = A[i,j] + B[i,j] * C[i,j] ** 2", A=A, B=B, C=C)
     expected = A + (B * (C**2))
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_logical_and_or(rng):
@@ -167,7 +168,7 @@ def test_operator_precedence_logical_and_or(rng):
     result = finchlite.einop("D[i,j] = A[i,j] or B[i,j] and C[i,j]", A=A, B=B, C=C)
     expected = np.logical_or(A, np.logical_and(B, C)).astype(float)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_bitwise_operations(rng):
@@ -187,7 +188,7 @@ def test_operator_precedence_bitwise_operations(rng):
     )
     expected = A | (B ^ (C & D))
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_shift_operations(rng):
@@ -200,7 +201,7 @@ def test_operator_precedence_shift_operations(rng):
     result = finchlite.einop("B[i,j] = A[i,j] << 1 + 1", A=A)
     expected = A << (1 + 1)  # A << 2
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_comparison_with_arithmetic(rng):
@@ -213,7 +214,7 @@ def test_operator_precedence_comparison_with_arithmetic(rng):
     result = finchlite.einop("D[i,j] = A[i,j] + B[i,j] == C[i,j]", A=A, B=B, C=C)
     expected = ((A + B) == C).astype(float)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_operator_precedence_with_parentheses(rng):
@@ -233,13 +234,8 @@ def test_operator_precedence_with_parentheses(rng):
     expected_with_parens = (A + B) * C
     expected_without_parens = A + (B * C)
 
-    assert np.allclose(result_with_parens, expected_with_parens)
-    assert np.allclose(result_without_parens, expected_without_parens)
-
-    # Verify they're different (unless by coincidence)
-    if not np.allclose(expected_with_parens, expected_without_parens):
-        assert not np.allclose(result_with_parens, result_without_parens)
-
+    finch_assert_allclose(result_with_parens, expected_with_parens)
+    finch_assert_allclose(result_without_parens, expected_without_parens)
 
 def test_operator_precedence_unary_operators(rng):
     """Test unary operator precedence"""
@@ -249,7 +245,7 @@ def test_operator_precedence_unary_operators(rng):
     result = finchlite.einop("B[i,j] = -A[i,j] ** 2", A=A)
     expected = -(A**2)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_numeric_literals(rng):
@@ -260,13 +256,13 @@ def test_numeric_literals(rng):
     result = finchlite.einop("B[i,j] = A[i,j] + 1", A=A)
     expected = A + 1
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
     # Test complex expression with literals
     result2 = finchlite.einop("C[i,j] = A[i,j] * 2 + 3", A=A)
     expected2 = A * 2 + 3
 
-    assert np.allclose(result2, expected2)
+    finch_assert_allclose(result2, expected2)
 
 
 def test_comparison_chaining(rng):
@@ -282,7 +278,7 @@ def test_comparison_chaining(rng):
     result = finchlite.einop("D[i,j] = A[i,j] < B[i,j] < C[i,j]", A=A, B=B, C=C)
     expected = np.logical_and(A < B, B < C).astype(float)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_comparison_chaining_three_way(rng):
@@ -295,7 +291,7 @@ def test_comparison_chaining_three_way(rng):
     result = finchlite.einop("D[i,j] = A[i,j] <= B[i,j] < C[i,j]", A=A, B=B, C=C)
     expected = np.logical_and(A <= B, B < C).astype(float)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_comparison_chaining_four_way(rng):
@@ -311,7 +307,7 @@ def test_comparison_chaining_four_way(rng):
     )
     expected = np.logical_and(np.logical_and(A < B, B < C), C < D).astype(float)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_single_comparison_vs_chained(rng):
@@ -329,12 +325,8 @@ def test_single_comparison_vs_chained(rng):
     result_chained = finchlite.einop("E[i,j] = A[i,j] < B[i,j] < C[i,j]", A=A, B=B, C=C)
     expected_chained = np.logical_and(A < B, B < C).astype(float)
 
-    assert np.allclose(result_single, expected_single)
-    assert np.allclose(result_chained, expected_chained)
-
-    # Verify they're different
-    assert not np.allclose(result_single, result_chained)
-
+    finch_assert_allclose(result_single, expected_single)
+    finch_assert_allclose(result_chained, expected_chained)
 
 def test_alphanumeric_tensor_names(rng):
     """Test that tensor names with numbers work correctly"""
@@ -351,7 +343,7 @@ def test_alphanumeric_tensor_names(rng):
     )
     expected = A1 + (B2 * C3_test)
 
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
     # Test comparison chaining with alphanumeric names
     X1 = np.array([[1, 2]])
@@ -363,7 +355,7 @@ def test_alphanumeric_tensor_names(rng):
     )
     expected2 = np.logical_and(X1 < Y2, Y2 < Z3).astype(float)
 
-    assert np.allclose(result2, expected2)
+    finch_assert_allclose(result2, expected2)
 
 
 def test_bool_literals(rng):
@@ -373,12 +365,12 @@ def test_bool_literals(rng):
     # Test True literal
     result_true = finchlite.einop("B[i,j] = A[i,j] and True", A=A)
     expected_true = np.logical_and(A, True).astype(float)
-    assert np.allclose(result_true, expected_true)
+    finch_assert_allclose(result_true, expected_true)
 
     # Test False literal
     result_false = finchlite.einop("C[i,j] = A[i,j] or False", A=A)
     expected_false = np.logical_or(A, False).astype(float)
-    assert np.allclose(result_false, expected_false)
+    finch_assert_allclose(result_false, expected_false)
 
     # Test boolean operations with literals
     A_bool = rng.random((2, 2)) > 0.5
@@ -386,7 +378,7 @@ def test_bool_literals(rng):
         "D[i,j] = A_bool[i,j] and True and False", A_bool=A_bool
     )
     expected_and = np.logical_and(np.logical_and(A_bool, True), False)
-    assert np.allclose(result_and, expected_and)
+    finch_assert_allclose(result_and, expected_and)
 
 
 def test_int_literals(rng):
@@ -396,22 +388,22 @@ def test_int_literals(rng):
     # Test positive integer
     result_pos = finchlite.einop("B[i,j] = A[i,j] + 42", A=A)
     expected_pos = A + 42
-    assert np.allclose(result_pos, expected_pos)
+    finch_assert_allclose(result_pos, expected_pos)
 
     # Test negative integer
     result_neg = finchlite.einop("C[i,j] = A[i,j] * -5", A=A)
     expected_neg = A * (-5)
-    assert np.allclose(result_neg, expected_neg)
+    finch_assert_allclose(result_neg, expected_neg)
 
     # Test zero
     result_zero = finchlite.einop("D[i,j] = A[i,j] + 0", A=A)
     expected_zero = A + 0
-    assert np.allclose(result_zero, expected_zero)
+    finch_assert_allclose(result_zero, expected_zero)
 
     # Test large integer
     result_large = finchlite.einop("E[i,j] = A[i,j] + 123456789", A=A)
     expected_large = A + 123456789
-    assert np.allclose(result_large, expected_large)
+    finch_assert_allclose(result_large, expected_large)
 
 
 def test_float_literals(rng):
@@ -421,22 +413,22 @@ def test_float_literals(rng):
     # Test positive float
     result_pos = finchlite.einop("B[i,j] = A[i,j] + 3.14159", A=A)
     expected_pos = A + 3.14159
-    assert np.allclose(result_pos, expected_pos)
+    finch_assert_allclose(result_pos, expected_pos)
 
     # Test negative float
     result_neg = finchlite.einop("C[i,j] = A[i,j] * -2.71828", A=A)
     expected_neg = A * (-2.71828)
-    assert np.allclose(result_neg, expected_neg)
+    finch_assert_allclose(result_neg, expected_neg)
 
     # Test scientific notation
     result_sci = finchlite.einop("D[i,j] = A[i,j] + 1.5e-3", A=A)
     expected_sci = A + 1.5e-3
-    assert np.allclose(result_sci, expected_sci)
+    finch_assert_allclose(result_sci, expected_sci)
 
     # Test very small float
     result_small = finchlite.einop("E[i,j] = A[i,j] + 0.000001", A=A)
     expected_small = A + 0.000001
-    assert np.allclose(result_small, expected_small)
+    finch_assert_allclose(result_small, expected_small)
 
 
 def test_complex_literals(rng):
@@ -446,17 +438,17 @@ def test_complex_literals(rng):
     # Test complex with real and imaginary parts
     result_complex = finchlite.einop("B[i,j] = A[i,j] + (3+4j)", A=A)
     expected_complex = A + (3 + 4j)
-    assert np.allclose(result_complex, expected_complex)
+    finch_assert_allclose(result_complex, expected_complex)
 
     # Test pure imaginary
     result_imag = finchlite.einop("C[i,j] = A[i,j] * 2j", A=A)
     expected_imag = A * 2j
-    assert np.allclose(result_imag, expected_imag)
+    finch_assert_allclose(result_imag, expected_imag)
 
     # Test complex with negative parts
     result_neg = finchlite.einop("D[i,j] = A[i,j] + (-1-2j)", A=A)
     expected_neg = A + (-1 - 2j)
-    assert np.allclose(result_neg, expected_neg)
+    finch_assert_allclose(result_neg, expected_neg)
 
 
 def test_mixed_literal_types(rng):
@@ -466,17 +458,17 @@ def test_mixed_literal_types(rng):
     # Test int + float
     result_int_float = finchlite.einop("B[i,j] = A[i,j] + 5 + 3.14", A=A)
     expected_int_float = A + 5 + 3.14
-    assert np.allclose(result_int_float, expected_int_float)
+    finch_assert_allclose(result_int_float, expected_int_float)
 
     # Test operator precedence with literals
     result_precedence = finchlite.einop("C[i,j] = A[i,j] + 2 * 3", A=A)
     expected_precedence = A + (2 * 3)  # Should be A + 6, not (A + 2) * 3
-    assert np.allclose(result_precedence, expected_precedence)
+    finch_assert_allclose(result_precedence, expected_precedence)
 
     # Test power with literals
     result_power = finchlite.einop("D[i,j] = A[i,j] + 2 ** 3", A=A)
     expected_power = A + (2**3)  # Should be A + 8
-    assert np.allclose(result_power, expected_power)
+    finch_assert_allclose(result_power, expected_power)
 
 
 def test_literal_edge_cases(rng):
@@ -486,17 +478,17 @@ def test_literal_edge_cases(rng):
     # Test multiple literals in sequence
     result_multi = finchlite.einop("B[i,j] = A[i,j] + 1 + 2 + 3", A=A)
     expected_multi = A + 1 + 2 + 3  # Should be A + 6
-    assert np.allclose(result_multi, expected_multi)
+    finch_assert_allclose(result_multi, expected_multi)
 
     # Test literals in comparisons
     result_comp = finchlite.einop("C[i,j] = A[i,j] > 0.5", A=A)
     expected_comp = (A > 0.5).astype(float)
-    assert np.allclose(result_comp, expected_comp)
+    finch_assert_allclose(result_comp, expected_comp)
 
     # Test literals with parentheses
     result_parens = finchlite.einop("D[i,j] = A[i,j] * (2 + 3)", A=A)
     expected_parens = A * (2 + 3)  # Should be A * 5
-    assert np.allclose(result_parens, expected_parens)
+    finch_assert_allclose(result_parens, expected_parens)
 
 
 # =============================================================================
@@ -515,8 +507,8 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("ii", A)
         expected = np.einsum("ii", A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.trace(A))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.trace(A))
 
     def test_element_wise_multiplication(self, rng):
         """Test element-wise multiplication"""
@@ -526,8 +518,8 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("ij,ij", A, B)
         expected = np.einsum("ij,ij", A, B)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.sum(A * B))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.sum(A * B))
 
     def test_matrix_multiplication(self, rng):
         """Test matrix multiplication"""
@@ -537,8 +529,8 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("ij,jk", A, B)
         expected = np.einsum("ij,jk", A, B)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, A @ B)
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, A @ B)
 
     def test_transpose(self, rng):
         """Test transpose via einsum"""
@@ -547,8 +539,8 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("ji", A)
         expected = np.einsum("ji", A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, A.T)
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, A.T)
 
     def test_vector_inner_product(self, rng):
         """Test vector inner product"""
@@ -558,8 +550,8 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("i,i", a, b)
         expected = np.einsum("i,i", a, b)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.inner(a, b))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.inner(a, b))
 
     def test_vector_outer_product(self, rng):
         """Test vector outer product"""
@@ -569,8 +561,8 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("i,j", a, b)
         expected = np.einsum("i,j", a, b)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.outer(a, b))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.outer(a, b))
 
     def test_tensor_contraction(self, rng):
         """Test tensor contraction"""
@@ -580,7 +572,7 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("ijk,jil", A, B)
         expected = np.einsum("ijk,jil", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
     def test_bilinear_transformation(self, rng):
         """Test bilinear transformation"""
@@ -591,7 +583,7 @@ class TestEinsumImplicitMode:
         result = finchlite.einsum("ij,jkl,lm", A, B, C)
         expected = np.einsum("ij,jkl,lm", A, B, C)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
 
 class TestEinsumExplicitMode:
@@ -605,8 +597,8 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ii->i", A)
         expected = np.einsum("ii->i", A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.diag(A))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.diag(A))
 
     def test_sum_over_axis(self, rng):
         """Test sum over specific axis"""
@@ -616,15 +608,15 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ij->i", A)
         expected = np.einsum("ij->i", A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.sum(A, axis=1))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.sum(A, axis=1))
 
         # Sum over axis 0
         result2 = finchlite.einsum("ij->j", A)
         expected2 = np.einsum("ij->j", A)
 
-        assert np.allclose(result2, expected2)
-        assert np.allclose(result2, np.sum(A, axis=0))
+        finch_assert_allclose(result2, expected2)
+        finch_assert_allclose(result2, np.sum(A, axis=0))
 
     def test_total_sum(self, rng):
         """Test total sum"""
@@ -633,8 +625,8 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ij->", A)
         expected = np.einsum("ij->", A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.sum(A))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.sum(A))
 
     def test_transpose_explicit(self, rng):
         """Test transpose with explicit output"""
@@ -643,8 +635,8 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ij->ji", A)
         expected = np.einsum("ij->ji", A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, A.T)
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, A.T)
 
     def test_matrix_vector_explicit(self, rng):
         """Test matrix-vector multiplication with explicit output"""
@@ -654,8 +646,8 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ij,j->i", A, b)
         expected = np.einsum("ij,j->i", A, b)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, A @ b)
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, A @ b)
 
     def test_custom_contraction(self, rng):
         """Test custom tensor contraction with explicit output"""
@@ -665,7 +657,7 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ijk,kl->ijl", A, B)
         expected = np.einsum("ijk,kl->ijl", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
     def test_reorder_axes(self, rng):
         """Test reordering axes with explicit output"""
@@ -674,7 +666,7 @@ class TestEinsumExplicitMode:
         result = finchlite.einsum("ijkl->ljik", A)
         expected = np.einsum("ijkl->ljik", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
 
 class TestEinsumVariableOrdering:
@@ -688,13 +680,13 @@ class TestEinsumVariableOrdering:
         # Standard order
         result1 = finchlite.einsum("ij,jk", A, B)
         expected1 = np.einsum("ij,jk", A, B)
-        assert np.allclose(result1, expected1)
+        finch_assert_allclose(result1, expected1)
 
         # Different variable names but same meaning
         result2 = finchlite.einsum("ab,bc", A, B)
         expected2 = np.einsum("ab,bc", A, B)
-        assert np.allclose(result2, expected2)
-        assert np.allclose(result1, result2)
+        finch_assert_allclose(result2, expected2)
+        finch_assert_allclose(result1, result2)
 
     def test_non_alphabetical_ordering(self, rng):
         """Test non-alphabetical variable ordering"""
@@ -705,7 +697,7 @@ class TestEinsumVariableOrdering:
         result = finchlite.einsum("ij,jl", A, B)
         expected = np.einsum("ij,jl", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         # This should be different from alphabetical ij,jk due to l < k
 
     def test_variable_ordering_explicit_override(self, rng):
@@ -717,9 +709,9 @@ class TestEinsumVariableOrdering:
         result = finchlite.einsum("ij,jk->ki", A, B)
         expected = np.einsum("ij,jk->ki", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         # This should be transpose of standard matrix multiplication
-        assert np.allclose(result, (A @ B).T)
+        finch_assert_allclose(result, (A @ B).T)
 
     @pytest.mark.skip(reason="Repeated indices not yet supported")
     def test_repeated_indices(self, rng):
@@ -730,7 +722,7 @@ class TestEinsumVariableOrdering:
         result = finchlite.einsum("iji", A)
         expected = np.einsum("iji", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
     def test_mixed_variable_types(self, rng):
         """Test mixing different variable names"""
@@ -741,7 +733,7 @@ class TestEinsumVariableOrdering:
         result = finchlite.einsum("az,zb", A, B)
         expected = np.einsum("az,zb", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
 
 class TestEinsumSpecialSyntax:
@@ -760,8 +752,8 @@ class TestEinsumSpecialSyntax:
 
         expected = np.einsum(A, [0, 1], B, [1, 2])
 
-        assert np.allclose(result1, result2)
-        assert np.allclose(result2, expected)
+        finch_assert_allclose(result1, result2)
+        finch_assert_allclose(result2, expected)
 
     def test_alternative_syntax_with_output(self, rng):
         """Test alternative syntax with explicit output specification"""
@@ -772,8 +764,8 @@ class TestEinsumSpecialSyntax:
         result = finchlite.einsum(A, [0, 1], B, [1, 2], [0, 2])
         expected = np.einsum(A, [0, 1], B, [1, 2], [0, 2])
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, A @ B)
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, A @ B)
 
     def test_alternative_syntax_transpose(self, rng):
         """Test alternative syntax for transpose"""
@@ -783,15 +775,15 @@ class TestEinsumSpecialSyntax:
         result1 = finchlite.einsum(A, [1, 0])
         expected1 = np.einsum(A, [1, 0])
 
-        assert np.allclose(result1, expected1)
-        assert np.allclose(result1, A.T)
+        finch_assert_allclose(result1, expected1)
+        finch_assert_allclose(result1, A.T)
 
         # Explicit transpose
         result2 = finchlite.einsum(A, [0, 1], [1, 0])
         expected2 = np.einsum(A, [0, 1], [1, 0])
 
-        assert np.allclose(result2, expected2)
-        assert np.allclose(result2, A.T)
+        finch_assert_allclose(result2, expected2)
+        finch_assert_allclose(result2, A.T)
 
     @pytest.mark.skip(reason="Repeated indices not yet supported")
     def test_alternative_syntax_trace(self, rng):
@@ -802,8 +794,8 @@ class TestEinsumSpecialSyntax:
         result = finchlite.einsum(A, [0, 0])
         expected = np.einsum(A, [0, 0])
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.trace(A))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.trace(A))
 
     @pytest.mark.skip(reason="Repeated indices not yet supported")
     def test_alternative_syntax_diagonal(self, rng):
@@ -813,8 +805,8 @@ class TestEinsumSpecialSyntax:
         result = finchlite.einsum(A, [0, 0], [0])
         expected = np.einsum(A, [0, 0], [0])
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.diag(A))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.diag(A))
 
     def test_alternative_syntax_sum(self, rng):
         """Test alternative syntax for sum operations"""
@@ -824,15 +816,15 @@ class TestEinsumSpecialSyntax:
         result1 = finchlite.einsum(A, [0, 1], [0])
         expected1 = np.einsum(A, [0, 1], [0])
 
-        assert np.allclose(result1, expected1)
-        assert np.allclose(result1, np.sum(A, axis=1))
+        finch_assert_allclose(result1, expected1)
+        finch_assert_allclose(result1, np.sum(A, axis=1))
 
         # Total sum
         result2 = finchlite.einsum(A, [0, 1], [])
         expected2 = np.einsum(A, [0, 1], [])
 
-        assert np.allclose(result2, expected2)
-        assert np.allclose(result2, np.sum(A))
+        finch_assert_allclose(result2, expected2)
+        finch_assert_allclose(result2, np.sum(A))
 
     def test_alternative_syntax_outer_product(self, rng):
         """Test alternative syntax for outer product"""
@@ -842,8 +834,8 @@ class TestEinsumSpecialSyntax:
         result = finchlite.einsum(a, [0], b, [1])
         expected = np.einsum(a, [0], b, [1])
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, np.outer(a, b))
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, np.outer(a, b))
 
     def test_alternative_syntax_complex_contraction(self, rng):
         """Test alternative syntax for complex tensor contraction"""
@@ -854,7 +846,7 @@ class TestEinsumSpecialSyntax:
         result = finchlite.einsum(A, [0, 1, 2], B, [2, 3, 4], C, [4, 0], [1, 3])
         expected = np.einsum(A, [0, 1, 2], B, [2, 3, 4], C, [4, 0], [1, 3])
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
 
 class TestEinsumEdgeCases:
@@ -867,13 +859,13 @@ class TestEinsumEdgeCases:
         # Identity operation
         result1 = finchlite.einsum("ijk", A)
         expected1 = np.einsum("ijk", A)
-        assert np.allclose(result1, expected1)
-        assert np.allclose(result1, A)
+        finch_assert_allclose(result1, expected1)
+        finch_assert_allclose(result1, A)
 
         # Permute dimensions
         result2 = finchlite.einsum("ikj", A)
         expected2 = np.einsum("ikj", A)
-        assert np.allclose(result2, expected2)
+        finch_assert_allclose(result2, expected2)
 
     def test_scalar_operations(self, rng):
         """Test operations involving scalars"""
@@ -884,8 +876,8 @@ class TestEinsumEdgeCases:
         result = finchlite.einsum(",ij", scalar, A)
         expected = np.einsum(",ij", scalar, A)
 
-        assert np.allclose(result, expected)
-        assert np.allclose(result, scalar * A)
+        finch_assert_allclose(result, expected)
+        finch_assert_allclose(result, scalar * A)
 
     def test_empty_dimensions(self, rng):
         """Test with empty dimensions"""
@@ -895,7 +887,7 @@ class TestEinsumEdgeCases:
         result = finchlite.einsum("ij,jk", A, B)
         expected = np.einsum("ij,jk", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == (0, 4)
 
     def test_1d_tensors(self, rng):
@@ -907,7 +899,7 @@ class TestEinsumEdgeCases:
         result = finchlite.einsum("i,i", a, b)
         expected = np.einsum("i,i", a, b)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert np.isscalar(result) or result.shape == ()
 
     def test_high_dimensional(self, rng):
@@ -918,7 +910,7 @@ class TestEinsumEdgeCases:
         result = finchlite.einsum("abcde,abcde", A, B)
         expected = np.einsum("abcde,abcde", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
 
 class TestEinsumEllipses:
@@ -932,7 +924,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...", A)
         expected = np.einsum("...", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_with_named_indices(self, rng):
@@ -943,7 +935,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...i->...", A)
         expected = np.einsum("...i->...", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_transpose(self, rng):
@@ -954,7 +946,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ij->...ji", A)
         expected = np.einsum("...ij->...ji", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_matrix_multiply(self, rng):
@@ -966,7 +958,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ij,...jk->...ik", A, B)
         expected = np.einsum("...ij,...jk->...ik", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_different_batch_dims(self, rng):
@@ -978,7 +970,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ij,...jk->...ik", A, B)
         expected = np.einsum("...ij,...jk->...ik", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     @pytest.mark.skip(reason="Repeated indices not yet supported")
@@ -990,7 +982,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ii->...", A)
         expected = np.einsum("...ii->...", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     @pytest.mark.skip(reason="Repeated indices not yet supported")
@@ -1002,7 +994,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ii->...i", A)
         expected = np.einsum("...ii->...i", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_element_wise(self, rng):
@@ -1014,7 +1006,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...,...->...", A, B)
         expected = np.einsum("...,...->...", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_sum_product(self, rng):
@@ -1026,7 +1018,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...,...", A, B)
         expected = np.einsum("...,...", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
     def test_ellipses_outer_product(self, rng):
         """Test outer product with ellipses"""
@@ -1037,7 +1029,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...i,...j->...ij", A, B)
         expected = np.einsum("...i,...j->...ij", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_multiple_contractions(self, rng):
@@ -1050,7 +1042,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ij,...jk,...kl->...il", A, B, C)
         expected = np.einsum("...ij,...jk,...kl->...il", A, B, C)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_broadcasting_edge_cases(self, rng):
@@ -1062,7 +1054,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...ij,...jk->...ik", A, B)
         expected = np.einsum("...ij,...jk->...ik", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_with_scalars(self, rng):
@@ -1074,7 +1066,7 @@ class TestEinsumEllipses:
         result = finchlite.einsum("...,...->...", A, scalar)
         expected = np.einsum("...,...->...", A, scalar)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         assert result.shape == expected.shape
 
     def test_ellipses_reduction_patterns(self, rng):
@@ -1084,17 +1076,17 @@ class TestEinsumEllipses:
         # Sum over last dimension
         result1 = finchlite.einsum("...i->...", A)
         expected1 = np.einsum("...i->...", A)
-        assert np.allclose(result1, expected1)
+        finch_assert_allclose(result1, expected1)
 
         # Sum over last two dimensions
         result2 = finchlite.einsum("...ij->...", A)
         expected2 = np.einsum("...ij->...", A)
-        assert np.allclose(result2, expected2)
+        finch_assert_allclose(result2, expected2)
 
         # Sum over specific dimensions while keeping others
         result3 = finchlite.einsum("...ijk->...ik", A)
         expected3 = np.einsum("...ijk->...ik", A)
-        assert np.allclose(result3, expected3)
+        finch_assert_allclose(result3, expected3)
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.complex64, np.complex128])
@@ -1109,7 +1101,7 @@ class TestEinsumDataTypes:
         result = finchlite.einsum("ij,jk", A, B)
         expected = np.einsum("ij,jk", A, B)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
         # Check dtype preservation (may depend on implementation)
 
     def test_complex_operations(self, rng, dtype):
@@ -1122,4 +1114,4 @@ class TestEinsumDataTypes:
         result = finchlite.einsum("ij", A)
         expected = np.einsum("ij", A)
 
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
