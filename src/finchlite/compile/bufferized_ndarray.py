@@ -417,6 +417,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def element_type(self):
         return self.tns.element_type
 
+    def lower_dim(self, ctx, obj, r):
+        return self.tns.lower_dim(ctx, obj.tns, r)
+
     def lower_declare(self, ctx, tns, init, op, shape):
         raise NotImplementedError(
             "BufferizedNDArrayAccessorFType does not support lower_declare."

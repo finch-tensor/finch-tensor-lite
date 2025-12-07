@@ -127,6 +127,9 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def get_fields_class(self, tns, buf_s, nind, pos, op):
         return DenseLevelFields(tns, buf_s, nind, pos, op)
 
+    def lower_dim(self, ctx, obj, r):
+        raise NotImplementedError("DenseLevelFType does not support lower_dim.")
+
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.lower_declare(ctx, tns, init, op, shape)
 

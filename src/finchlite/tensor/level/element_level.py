@@ -135,6 +135,9 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def lower_thaw(self, ctx, tns, op):
         return tns
 
+    def lower_dim(self, ctx, obj, r):
+        raise NotImplementedError("DenseLevelFType does not support lower_dim.")
+
     def unfurl(self, ctx, tns, ext, mode, proto):
         raise NotImplementedError("ElementLevelFType does not support unfurl.")
 

@@ -330,6 +330,9 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.lower_declare(ctx, tns.obj.buf_s, init, op, shape)
 
+    def lower_dim(self, ctx, obj, r):
+        raise NotImplementedError("DenseLevelFType does not support lower_dim.")
+
     def asm_unpack(self, ctx, var_n, val):
         """
         Unpack the into asm context.

@@ -898,4 +898,4 @@ def test_scheduler_e2e_sddmm():
 
     expected = s * np.matmul(a, b)
 
-    np.testing.finch_assert_equal(result, expected)
+    finch_assert_equal(result, expected)
