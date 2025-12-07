@@ -50,7 +50,7 @@ from finchlite.finch_notation import (
 from finchlite.finch_notation.nodes import Repack
 from finchlite.interface.fuse import provision_tensors
 
-from .util import finch_assert_equal
+from .conftest import finch_assert_equal
 
 
 def test_logic_compiler():

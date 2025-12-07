@@ -7,7 +7,7 @@ import numpy as np
 
 import finchlite
 
-from .util import finch_assert_allclose, finch_assert_equal
+from .conftest import finch_assert_allclose, finch_assert_equal
 
 
 # Utility function to generate random complex numpy tensors

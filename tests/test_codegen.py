@@ -35,7 +35,7 @@ from finchlite.codegen.numba_codegen import (
 )
 from finchlite.compile import BufferizedNDArray
 
-from .util import finch_assert_equal
+from .conftest import finch_assert_equal
 
 
 def test_add_function():

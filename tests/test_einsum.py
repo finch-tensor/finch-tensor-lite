@@ -4,7 +4,7 @@ import numpy as np
 
 import finchlite
 
-from .util import finch_assert_allclose
+from .conftest import finch_assert_allclose
 
 
 @pytest.fixture

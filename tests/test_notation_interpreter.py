@@ -31,7 +31,7 @@ from finchlite.finch_notation import (  # noqa: F401
     Variable,
 )
 
-from .util import finch_assert_equal
+from .conftest import finch_assert_equal
 
 
 @pytest.mark.parametrize(

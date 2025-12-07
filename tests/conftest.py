@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from numpy.random import default_rng
+from numpy.testing import assert_allclose, assert_equal
 
 from finchlite import Mode, get_default_scheduler, set_default_scheduler
 from finchlite.finch_logic import Field
@@ -62,3 +63,19 @@ def tp_2():
 @pytest.fixture
 def tp_3():
     return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))
+
+
+def finch_assert_equal(result, expected, **kwargs):
+    if hasattr(result, "to_numpy"):
+        result = result.to_numpy()
+    if hasattr(expected, "to_numpy"):
+        expected = expected.to_numpy()
+    assert_equal(result, expected, **kwargs)
+
+
+def finch_assert_allclose(result, expected, **kwargs):
+    if hasattr(result, "to_numpy"):
+        result = result.to_numpy()
+    if hasattr(expected, "to_numpy"):
+        expected = expected.to_numpy()
+    assert_allclose(result, expected, **kwargs)

@@ -25,7 +25,7 @@ from finchlite.finch_assembly import (  # noqa: F401
 )
 from finchlite.symbolic import ftype
 
-from .util import finch_assert_allclose
+from .conftest import finch_assert_allclose
 
 
 @pytest.mark.parametrize(

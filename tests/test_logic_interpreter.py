@@ -21,7 +21,7 @@ from finchlite.finch_logic import (
     TableValue,
 )
 
-from .util import finch_assert_equal
+from .conftest import finch_assert_equal
 
 
 @pytest.mark.parametrize(

@@ -42,7 +42,7 @@ from finchlite.finch_logic import (
 from finchlite.finch_logic.interpreter import LogicInterpreter
 from finchlite.symbolic.gensym import _sg
 
-from .util import finch_assert_equal
+from .conftest import finch_assert_equal
 
 
 def test_propagate_map_queries():
