@@ -40,7 +40,7 @@ from .logic_to_stats import insert_statistics
 @dataclass
 class AnnotatedQuery:
     ST: type[TensorStats]
-    output_name: Alias | None
+    output_name: Alias
     reduce_idxs: list[Field]
     point_expr: LogicNode
     idx_lowest_root: OrderedDict[Field, LogicExpression]
@@ -630,3 +630,18 @@ def reduce_idx(
     aq.connected_idxs = new_connected_idxs
     aq.connected_components = new_components
     return query_copy
+
+
+def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
+    expr = aq.point_expr
+    insert_statistics(
+        aq.ST, expr, bindings=aq.bindings, replace=True, cache=aq.cache_point
+    )
+    if isinstance(expr, Alias):
+        return None
+    query = Query(aq.output_name, cast(LogicExpression, expr))
+    remaining_cache: dict[object, TensorStats] = {}
+    insert_statistics(
+        aq.ST, query, bindings=aq.bindings, replace=True, cache=remaining_cache
+    )
+    return query

@@ -4,9 +4,11 @@ from .annotated_query import (
     get_idx_connected_components,
     get_reduce_query,
     get_reducible_idxs,
+    get_remaining_query,
     reduce_idx,
     replace_and_remove_nodes,
 )
+from .greedy_optimizer import greedy_query
 from .logic_to_stats import insert_statistics
 
 __all__ = [
@@ -15,6 +17,8 @@ __all__ = [
     "get_idx_connected_components",
     "get_reduce_query",
     "get_reducible_idxs",
+    "get_remaining_query",
+    "greedy_query",
     "insert_statistics",
     "reduce_idx",
     "replace_and_remove_nodes",
