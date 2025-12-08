@@ -140,6 +140,7 @@ class LoTriMask(Level):
 
 
 def tril(x, /, *, k: int = 0):
+    # TODO: make a copy of x
     if k != 0:
         raise Exception(f"Only k=0 is supported, but got: {k}")
 
