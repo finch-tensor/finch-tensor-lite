@@ -55,8 +55,11 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.autoschedule import LogicExecutor, LogicNormalizer
+from finchlite.autoschedule import LogicExecutor, LogicCanonicalizer
+from finchlite.autoschedule.compiler2 import LogicCompiler2
+from finchlite.autoschedule.formatter import LogicFormatter
 from finchlite.finch_logic.nodes import TableValue
+from finchlite.finch_notation.interpreter import NotationInterpreter
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -75,6 +78,7 @@ from ..finch_logic import (
 )
 from ..symbolic import Reflector, gensym
 from .lazy import lazy
+from finchlite.autoschedule.optimize import LogicNormalizer
 
 _DEFAULT_SCHEDULER = None
 
@@ -99,7 +103,7 @@ def set_default_scheduler(
 
     elif mode == Mode.INTERPRET_LOGIC:
         # _DEFAULT_SCHEDULER = LogicInterpreter()
-        _DEFAULT_SCHEDULER = LogicNormalizer(LogicExecutor())
+        _DEFAULT_SCHEDULER = LogicCanonicalizer(LogicExecutor(LogicFormatter(LogicNormalizer(LogicCompiler2(ctx_load=NotationInterpreter())))))
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())

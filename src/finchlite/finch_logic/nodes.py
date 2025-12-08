@@ -696,7 +696,7 @@ class Produces(LogicTree, LogicStatement):
         args: The arguments to return.
     """
 
-    args: tuple[Alias, ...]
+    args: tuple[LogicExpression, ...]
 
     @property
     def children(self):
