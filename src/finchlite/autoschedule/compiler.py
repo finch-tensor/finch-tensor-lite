@@ -1,4 +1,3 @@
-import operator
 from functools import reduce
 from typing import overload
 
@@ -244,8 +243,7 @@ class LogicLowerer:
                 Reformat(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
             ):
                 assert isinstance(tns, TensorFType)
-                # TODO (mtsokol): fetch fill value the right way
-                fv = 0 if op in (operator.add, operator.sub) else 1
+                fv = tns.fill_value
                 return self(
                     Query(
                         lhs,
@@ -498,7 +496,8 @@ def find_suitable_rep(root, table_vars) -> TensorFType:
             levels_to_add = [
                 idx for idx, f in enumerate(result_fields) if f not in fields
             ]
-            result_rep = result_rep.add_levels(levels_to_add)
+            if len(levels_to_add) > 0:
+                result_rep = result_rep.add_levels(levels_to_add)
             kwargs = result_rep.to_kwargs()
             kwargs.update(
                 element_type=NumpyBufferFType(dtype),
