@@ -1,4 +1,4 @@
-from .interpreter import FinchLogicInterpreter
+from .interpreter import LogicInterpreter
 from .nodes import (
     Aggregate,
     Alias,
@@ -17,18 +17,30 @@ from .nodes import (
     Reorder,
     Subquery,
     Table,
+    TableValue,
+    TableValueFType,
     Value,
+)
+from .stages import (
+    LogicEinsumLowerer,
+    LogicEvaluator,
+    LogicLoader,
+    LogicTransform,
 )
 
 __all__ = [
     "Aggregate",
     "Alias",
     "Field",
-    "FinchLogicInterpreter",
     "Literal",
+    "LogicEinsumLowerer",
+    "LogicEvaluator",
     "LogicExpression",
+    "LogicInterpreter",
+    "LogicLoader",
     "LogicNode",
     "LogicStatement",
+    "LogicTransform",
     "LogicTree",
     "MapJoin",
     "Plan",
@@ -39,5 +51,7 @@ __all__ = [
     "Reorder",
     "Subquery",
     "Table",
+    "TableValue",
+    "TableValueFType",
     "Value",
 ]

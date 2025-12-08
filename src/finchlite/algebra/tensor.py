@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -35,8 +37,18 @@ class TensorFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __init__(self, *args):
-        """TensorFType instance initializer."""
+    def __call__(
+        self, shape: tuple
+    ) -> Tensor | np.ndarray:  # TODO in the future should return Tensor
+        """
+        Create a tensor instance with the given shape.
+
+        Args:
+            shape: The shape of the tensor to create.
+
+        Returns:
+            A tensor instance with the specified shape.
+        """
         ...
 
     # TODO: Remove and properly infer result rep
@@ -172,6 +184,18 @@ class NDArrayFType(TensorFType):
 
     def __repr__(self) -> str:
         return f"NDArrayFType(dtype={repr(self._dtype)}, ndim={self._ndim})"
+
+    def __call__(self, shape: tuple) -> np.ndarray:
+        """
+        Create a NumPy array with the given shape and the dtype of this ftype.
+
+        Args:
+            shape: The shape of the array to create.
+
+        Returns:
+            A NumPy array with the specified shape and dtype.
+        """
+        return np.full(shape, self.fill_value, dtype=self._dtype)
 
     @property
     def ndim(self) -> np.intp:

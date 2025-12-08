@@ -5,21 +5,23 @@ import pytest
 
 import numpy as np
 from numpy import array  # noqa: F401
-from numpy.testing import assert_equal
 
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    FinchLogicInterpreter,
     Literal,
+    LogicInterpreter,
     MapJoin,
     Plan,
     Produces,
     Query,
     Reorder,
     Table,
+    TableValue,
 )
+
+from .conftest import finch_assert_equal
 
 
 @pytest.mark.parametrize(
@@ -47,11 +49,11 @@ def test_matrix_multiplication(a, b):
         )
     )
 
-    result = FinchLogicInterpreter()(p)[0]
+    result = LogicInterpreter()(p)[0]
 
-    expected = np.matmul(a, b)
+    expected = TableValue(np.matmul(a, b), (i, j))
 
-    assert_equal(result, expected)
+    assert result == expected
 
 
 def test_plan_repr():
@@ -72,3 +74,31 @@ def test_plan_repr():
         )
     )
     assert p == eval(repr(p))
+
+
+def test_materialize():
+    i = Field("i")
+    j = Field("j")
+
+    C = np.array([[0, 0], [0, 0]])
+
+    p = Plan(
+        (
+            Query(Alias("A"), Table(Literal(np.array([[1, 2], [3, 4]])), (i, j))),
+            Query(Alias("B"), Table(Literal(np.array([[1, 1], [1, 1]])), (i, j))),
+            Query(Alias("C"), MapJoin(Literal(add), (Alias("A"), Alias("B")))),
+            Query(Alias("D"), MapJoin(Literal(mul), (Alias("C"), Alias("A")))),
+            Query(Alias("C"), Alias("B")),
+            Produces((Alias("D"), Alias("C"))),
+        )
+    )
+
+    result = LogicInterpreter()(p, bindings={Alias("C"): TableValue(C, (i, j))})[0]
+
+    expected = TableValue(
+        np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]]),
+        (i, j),
+    )
+
+    assert result == expected
+    finch_assert_equal(C, np.array([[1, 1], [1, 1]]))

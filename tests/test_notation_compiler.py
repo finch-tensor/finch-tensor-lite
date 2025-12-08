@@ -11,6 +11,8 @@ from finchlite.compile import ExtentFType, NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
 
+from .conftest import finch_assert_equal
+
 
 @pytest.mark.parametrize(
     "a, b",
@@ -135,7 +137,7 @@ def test_matrix_multiplication(a, b):
 
     result = ntn_mod.matmul(c_buf, a_buf, b_buf).to_numpy()
     expected = np.matmul(a, b)
-    np.testing.assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
     # ASSEMBLY
     asm_program = NotationCompiler(Reflector())(prgm)
@@ -147,7 +149,7 @@ def test_matrix_multiplication(a, b):
 
     expected = np.matmul(a, b)
     actual = asm_mod.matmul(c_buf, a_buf, b_buf).to_numpy()
-    np.testing.assert_equal(actual, expected)
+    finch_assert_equal(actual, expected)
 
 
 def test_matrix_multiplication_regression(file_regression):

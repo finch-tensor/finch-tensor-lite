@@ -103,5 +103,12 @@ pytest-regression is used to ensure that compiler outputs remain consistent acro
 - It's cross-platform by default and more readable than string-based `os.path` operations.
 - Example: Use `Path("dir") / "file.txt"` instead of `os.path.join("dir", "file.txt")`.
 
+### Compiler Passes
+- In general, each compiler pass should be implemented as a separate callable class, inheriting from some subclass of `finchlite.symbolic.Stage`.
+- Each pass should have a clear, single, documented responsibility.
+- Try to separate passes that do different things into different classes, rather than building an
+all-in-one monolithic pass.
+- Files which involve more than one IR should not import the AST nodes of one IR into the file directly. For clarity, nodes of both IRs should be referred to with qualified names, e.g. `lgc.Plan` and `ntn.Loop`.
+
 ---
 **If you find an error or unclear section, please fix it or open an issue.**
