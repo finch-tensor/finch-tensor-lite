@@ -34,6 +34,9 @@ class ScalarFType(TensorFType):
     def shape_type(self):
         return ()
 
+    def lower_unwrap(self, ctx, obj):
+        return obj
+
 
 class Scalar(EagerTensor):
     def __init__(self, val: Any, fill_value: Any = None):
@@ -52,6 +55,9 @@ class Scalar(EagerTensor):
 
     def __getitem__(self, idx):
         return self.val
+
+    def __str__(self):
+        return str(self.val)
 
 
 register_property(object, "asarray", "__attr__", lambda x: Scalar(x))

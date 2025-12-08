@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..compile import looplets as lplt
+from ..interface import Scalar
 from ..tensor import Level, LevelFType
 
 
@@ -64,12 +63,13 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
         def child_accessor(ctx, idx):
             return self.body.unfurl(ctx, tns, ext, mode, proto)
 
+        scalar = Scalar(self.fill_value, self.fill_value)
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
             split=lambda ctx, idx, visited_idx: ctx.ctx(visited_idx[-1]),
             tail=lambda ctx, idx: lplt.Run(
                 lambda ctx: lplt.Leaf(
-                    lambda ctx: ntn.Stack(asm.Literal(np.intp(0)), np.intp)
+                    lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
                 )
             ),
         )

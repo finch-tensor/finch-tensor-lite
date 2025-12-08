@@ -1,4 +1,3 @@
-import operator
 from functools import reduce
 from typing import overload
 
@@ -244,8 +243,7 @@ class LogicLowerer:
                 Reformat(tns, Reorder(MapJoin(Literal(op), args), _) as reorder),
             ):
                 assert isinstance(tns, TensorFType)
-                # TODO (mtsokol): fetch fill value the right way
-                fv = 0 if op in (operator.add, operator.sub) else 1
+                fv = tns.fill_value
                 return self(
                     Query(
                         lhs,

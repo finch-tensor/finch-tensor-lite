@@ -10,6 +10,7 @@ from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
 from ..finch_assembly import AssemblyStructFType
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from ..symbolic.simplification import run_simplify
 from ..util import qual_str
 
 
@@ -294,7 +295,8 @@ class NotationCompiler:
     def __call__(self, prgm):
         ctx_2 = NotationContext()  # TODO: rename it
 
-        return self.ctx(ctx_2(prgm))
+        prgm = self.ctx(ctx_2(prgm))
+        return run_simplify(ctx_2, prgm)
 
 
 class NotationContext(Context):

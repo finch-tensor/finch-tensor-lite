@@ -151,7 +151,7 @@ class SequencePass(LoopletPass):
         body_tail = PostWalk(sequence_tail)(body)
         ext_3 = SimpleExtentFType(
             asm.Call(
-                asm.Literal(operator.add), (split_var.get(), asm.Literal(np.intp(2)))
+                asm.Literal(operator.add), (split_var.get(), asm.Literal(np.intp(1)))
             ),
             ext.result_format.get_end(ext),
         )
@@ -184,9 +184,9 @@ class RunPass(LoopletPass):
                         return ntn.Access(tns.body(ctx), mode, (j, *idxs))
             return None
 
-        # TODO: Proper Run Pass
-        PostWalk(run_node)(body)
+        body_2 = PostWalk(run_node)(body)
         ctx_2 = ctx.scope()
+        ctx_2(ext, body_2)
         ctx.exec(asm.Block(ctx_2.emit()))
 
 
