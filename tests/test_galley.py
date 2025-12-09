@@ -2170,8 +2170,7 @@ A_mat = np.ones((5, 5))
             ),
         ),
         (
-            # Case 5: respect aggregate position
-            # outer: sum_{j,k} max( sum_i A[i,j], A[j,k] )
+            # Case 5:  sum_{j,k} max( sum_i A[i,j], A[j,k] )
             # inner Aggregate(+ over i) is already inside the MapJoin.
             Query(
                 Alias("out"),

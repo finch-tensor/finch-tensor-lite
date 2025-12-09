@@ -505,6 +505,7 @@ def get_reduce_query(
     node_to_replace: LogicExpression = root_node
     reducible_idxs = get_reducible_idxs(aq)
     stats_cache = aq.cache_point
+
     if isinstance(root_node, MapJoin):
         if not isinstance(root_node.op, Literal):
             raise TypeError("MapJoin.op must be Literal(...).")
