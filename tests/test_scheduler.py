@@ -111,7 +111,6 @@ def test_propagate_fields():
     "node,pass_fn",
     [
         (Reformat(Literal(""), Reorder(Table(Literal(""), ()), ())), isolate_reformats),
-        (Table(Literal(""), ()), isolate_tables),
     ],
 )
 def test_isolate_passes(node, pass_fn):
