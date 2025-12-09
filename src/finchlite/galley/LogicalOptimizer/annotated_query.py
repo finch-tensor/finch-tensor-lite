@@ -60,6 +60,20 @@ class AnnotatedQuery:
         q: Query,
         bindings: OrderedDict[Alias, TensorStats] | None = None,
     ):
+        """
+        Build an `AnnotatedQuery` from a logical `Query`, extracting reduction
+        structure and precomputing tensor statistics.
+
+        Parameters
+        ----------
+        ST : type[TensorStats]
+            Concrete `TensorStats` implementation used to hold statistics.
+        q : Query
+            Logical query of the form `Query(name, rhs)` whose `rhs` may contain
+            `Aggregate` nodes.
+        bindings : OrderedDict[Alias, TensorStats], optional
+            Existing alias→stats environment to seed the analysis.
+        """
         if not isinstance(q, Query):
             raise ValueError(
                 "Annotated Queries can only be built from queries of the form: "
@@ -456,6 +470,31 @@ def find_lowest_roots(
 def get_reduce_query(
     reduce_idx: Field, aq: AnnotatedQuery
 ) -> tuple[Query, LogicExpression, set[LogicExpression], list[Field]]:
+    """
+    Extract the maximal kernel that depends on `reduce_idx` into a standalone
+    reduction query, and return the information needed to splice the result
+    back into the main expression.
+
+    Parameters
+    ----------
+    reduce_idx : Field
+        The index being reduced.
+    aq : AnnotatedQuery
+        The annotated query class
+
+    Returns
+    -------
+    query : Query
+        A new Query whose RHS is an Aggregate over the kernel that depends on
+        `reduce_idx`.
+    node_to_replace : LogicExpression
+        The subexpression in `aq.point_expr` that will be replaced with the
+        alias produced by `query`.
+    nodes_to_remove : set[LogicExpression]
+        Child nodes that become redundant after replacing `node_to_replace`.
+    reduced_idxs : list[Field]
+        The list of indices actually reduced in `query`.
+    """
     original_idx = aq.original_idx[reduce_idx]
     reduce_op = aq.idx_op[reduce_idx]
     root_node: LogicExpression = aq.idx_lowest_root[reduce_idx]
@@ -477,7 +516,7 @@ def get_reduce_query(
             args_with_reduce_idx = [
                 arg
                 for arg in root_node.args
-                if original_idx in stats_cache[arg].index_set
+                if original_idx.name in stats_cache[arg].index_set
             ]
             kernel_idxs = set().union(
                 *(stats_cache[arg].index_set for arg in args_with_reduce_idx)
@@ -560,18 +599,43 @@ def get_reduce_query(
 def reduce_idx(
     reduce_idx: Field, aq: AnnotatedQuery, do_condense: bool = False
 ) -> Query:
+    """
+    Perform a single reduction rewrite over `reduce_idx`, restructuring `aq`
+    so that the portion of the expression dependent on `reduce_idx` becomes
+    a standalone subquery.
+
+    Steps:
+      1. Use `get_reduce_query` to extract the maximal subexpression that
+         depends on `reduce_idx` and package it into a new `Query`.
+      2. Create a fresh `Alias` for this subquery and register its statistics.
+      3. Replace the extracted kernel in `aq.point_expr` with that alias and
+         remove any nodes that are no longer reachable.
+      4. Update all index-related metadata in `aq`—roots, ops, inits, parent
+         structure, connectivity, components, and the remaining reduction set.
+
+    Parameters
+    ----------
+    reduce_idx : Field
+        The index being reduced.
+    aq : AnnotatedQuery
+        The annotated query to rewrite in place.
+    do_condense : bool.
+
+    Returns
+    -------
+    Query
+        The newly created `Query` whose RHS computes the reduced kernel; its
+        alias is used in the updated `aq.point_expr`.
+    """
     query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
         reduce_idx, aq
     )
-    query_copy = query
 
-    alias_expr = Alias(query_copy.lhs.name)
+    alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
-    insert_statistics(
-        aq.ST, query_copy.rhs, aq.bindings, replace=False, cache=stats_cache
-    )
+    insert_statistics(aq.ST, query.rhs, aq.bindings, replace=False, cache=stats_cache)
 
-    rhs_stats = stats_cache[query_copy.rhs]
+    rhs_stats = stats_cache[query.rhs]
     stats_cache[alias_expr] = aq.ST.copy_stats(rhs_stats)
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
@@ -629,10 +693,18 @@ def reduce_idx(
     aq.parent_idxs = new_parent_idxs
     aq.connected_idxs = new_connected_idxs
     aq.connected_components = new_components
-    return query_copy
+    return query
 
 
 def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
+    """
+    Build a final `Query` from the remaining pointwise expression in `aq`.
+
+    Returns
+    -------
+    Query | None
+        The constructed final `Query`, or `None` if no expression remains.
+    """
     expr = aq.point_expr
     insert_statistics(
         aq.ST, expr, bindings=aq.bindings, replace=True, cache=aq.cache_point

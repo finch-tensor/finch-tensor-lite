@@ -7,6 +7,7 @@ import numpy as np
 
 from finchlite.finch_logic import (
     Aggregate,
+    Alias,
     Field,
     Literal,
     MapJoin,
@@ -16,8 +17,10 @@ from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
     find_lowest_roots,
     get_idx_connected_components,
+    get_reduce_query,
     get_reducible_idxs,
     insert_statistics,
+    reduce_idx,
     replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
@@ -1614,3 +1617,330 @@ def test_find_lowest_roots(root, idx_name, expected):
             result.append(node.tns.val)
 
         assert result == expected
+
+
+A = np.ones((2,))
+B = np.ones((3,))
+C = np.ones((2, 4))
+D = np.ones((4,))
+
+
+@pytest.mark.parametrize(
+    ("expr", "reduce_field", "expected"),
+    [
+        (
+            # Case 1: expr = sum_i A[i] * B[j]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(B), (Field("j"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            Field("i"),
+            # expected: sum_i A[i]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (Table(Literal(A), (Field("i"),)),),
+                ),
+                (Field("i"),),
+            ),
+        ),
+        (
+            # Case 2: expr = sum_i A[i] * A[i]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(A), (Field("i"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            Field("i"),
+            # expected: sum_i (A[i] * A[i])
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(A), (Field("i"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+        ),
+        (
+            # Case 3: expr = sum_i A[i] * C[i,k] * B[j]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                        Table(Literal(B), (Field("j"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            Field("i"),
+            # expected: sum_i (A[i] * C[i,k])
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+        ),
+        (
+            # Case 4: expr = sum_i A[i] * C[i,k] * D[k] * B[j]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                        Table(Literal(D), (Field("k"),)),
+                        Table(Literal(B), (Field("j"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            Field("i"),
+            # expected: sum_i (A[i] * C[i,k] * D[k])
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                        Table(Literal(D), (Field("k"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+        ),
+    ],
+)
+def test_get_reduce_query(expr, reduce_field, expected):
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = DenseStats
+    aq.output_name = None
+    aq.reduce_idxs = [reduce_field]
+    aq.point_expr = expr
+    aq.idx_lowest_root = OrderedDict({reduce_field: expr.arg})
+    aq.idx_op = OrderedDict({reduce_field: op.add})
+    aq.idx_init = OrderedDict({reduce_field: 0})
+    aq.parent_idxs = OrderedDict()
+    aq.original_idx = OrderedDict({reduce_field: reduce_field})
+    aq.connected_components = []
+    aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
+    aq.output_order = None
+    aq.output_format = None
+    aq.bindings = OrderedDict()
+    aq.cache_point = {}
+
+    insert_statistics(
+        aq.ST, aq.point_expr, aq.bindings, replace=False, cache=aq.cache_point
+    )
+
+    for stat in aq.cache_point.values():
+        dims = stat.dim_sizes
+        for i in list(dims.keys()):
+            if isinstance(i, str):
+                dims[Field(i)] = dims[i]
+
+    query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
+        reduce_field,
+        aq,
+    )
+
+    assert query.rhs == expected
+
+
+@pytest.mark.parametrize(
+    ("expr", "reduce_field", "expected_query", "expected_point_expr"),
+    [
+        (
+            # Case 1: expr = A[i] * B[j], reduce over i
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+            Field("i"),
+            # expected query: sum_i A[i]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (Table(Literal(A), (Field("i"),)),),
+                ),
+                (Field("i"),),
+            ),
+            # expected point expr: alias(i) * B[j]
+            lambda alias_expr: MapJoin(
+                Literal(op.mul),
+                (
+                    alias_expr,
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+        ),
+        (
+            # Case 2: expr = A[i] * A[i], reduce over i
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(A), (Field("i"),)),
+                ),
+            ),
+            Field("i"),
+            # expected query: sum_i (A[i] * A[i])
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(A), (Field("i"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            # expected point expr: alias
+            lambda alias_expr: alias_expr,
+        ),
+        (
+            # Case 3: expr = A[i] * C[i,k] * B[j], reduce over i
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(C), (Field("i"), Field("k"))),
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+            Field("i"),
+            # expected query: sum_i (A[i] * C[i,k])
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            # expected point expr: alias(k) * B[j]
+            lambda alias_expr: MapJoin(
+                Literal(op.mul),
+                (
+                    alias_expr,
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+        ),
+        (
+            # Case 4: expr = A[i] * C[i,k] * D[k] * B[j], reduce over i
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(C), (Field("i"), Field("k"))),
+                    Table(Literal(D), (Field("k"),)),
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+            Field("i"),
+            # expected query: sum_i (A[i] * C[i,k] * D[k])
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                        Table(Literal(D), (Field("k"),)),
+                    ),
+                ),
+                (Field("i"),),
+            ),
+            # expected point expr: alias(k) * B[j]
+            lambda alias_expr: MapJoin(
+                Literal(op.mul),
+                (
+                    alias_expr,
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+        ),
+    ],
+)
+def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = DenseStats
+    aq.output_name = None
+    aq.reduce_idxs = [reduce_field]
+    aq.point_expr = expr
+    aq.idx_lowest_root = OrderedDict({reduce_field: expr})
+    aq.idx_op = OrderedDict({reduce_field: op.add})
+    aq.idx_init = OrderedDict({reduce_field: 0})
+    aq.parent_idxs = OrderedDict()
+    aq.original_idx = OrderedDict({reduce_field: reduce_field})
+    aq.connected_components = []
+    aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
+    aq.output_order = None
+    aq.output_format = None
+    aq.bindings = OrderedDict()
+    aq.cache_point = {}
+
+    insert_statistics(
+        aq.ST, aq.point_expr, aq.bindings, replace=False, cache=aq.cache_point
+    )
+
+    for stat in aq.cache_point.values():
+        dims = stat.dim_sizes
+        for k in list(dims.keys()):
+            if isinstance(k, str):
+                dims[Field(k)] = dims[k]
+
+    query = reduce_idx(reduce_field, aq)
+    assert query.rhs == expected_query
+
+    alias_expr = Alias(query.lhs.name)
+    assert aq.point_expr == expected_point_expr(alias_expr)
