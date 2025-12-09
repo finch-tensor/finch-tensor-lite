@@ -101,6 +101,31 @@ def isolate_aggregates(root: LogicNode) -> LogicNode:
 
     return Rewrite(PostWalk(rule_0))(root)
 
+def isolate_tables(root: LogicNode) -> LogicNode:
+    def rule_0(stmt):
+        stack = []
+
+        def rule_1(ex):
+            match ex:
+                case Table(_) as tbl:
+                    var = Alias(gensym("A"))
+                    stack.append(Query(var, tbl))
+                    return var
+                case _:
+                    return None
+
+        match stmt:
+            case Query(lhs, rhs):
+                rhs = Rewrite(PostWalk(rule_1))(rhs)
+                return Plan((*stack, Query(lhs, rhs)))
+            case Produces(args):
+                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
+                return Plan((*stack, Produces(args)))
+            case _:
+                return None
+
+    return Rewrite(PostWalk(rule_0))(root)
+
 
 def isolate_reformats(root: LogicNode) -> LogicNode:
     def rule_0(node):
@@ -111,15 +136,6 @@ def isolate_reformats(root: LogicNode) -> LogicNode:
 
     return Rewrite(PostWalk(rule_0))(root)
 
-
-def isolate_tables(root: LogicNode) -> LogicNode:
-    def rule_0(node):
-        match node:
-            case Table() as tbl:
-                name = Alias(gensym("A"))
-                return Subquery(name, tbl)
-
-    return Rewrite(PostWalk(rule_0))(root)
 
 
 def pretty_labels(root: LogicNode) -> LogicNode:
