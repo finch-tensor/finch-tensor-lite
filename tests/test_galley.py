@@ -2045,3 +2045,166 @@ def test_get_remaining_query(expr, output_name, expected):
 
     query = get_remaining_query(aq)
     assert query == expected
+
+
+A_mat = np.ones((5, 5))
+
+
+@pytest.mark.parametrize(
+    ("query", "reduce_field", "expected"),
+    [
+        (
+            # Case 1: sum_{i,j,k} A[i,j] * A[j,k], reduce over i
+            Query(
+                Alias("out"),
+                Aggregate(
+                    Literal(op.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(op.mul),
+                        (
+                            Table(Literal(A_mat), (Field("i"), Field("j"))),
+                            Table(Literal(A_mat), (Field("j"), Field("k"))),
+                        ),
+                    ),
+                    (Field("i"), Field("j"), Field("k")),
+                ),
+            ),
+            Field("i"),
+            # expected: sum_i A[i,j]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                Table(Literal(A_mat), (Field("i"), Field("j"))),
+                (Field("i"),),
+            ),
+        ),
+        (
+            # Case 2: same chain, reduce over j
+            Query(
+                Alias("out"),
+                Aggregate(
+                    Literal(op.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(op.mul),
+                        (
+                            Table(Literal(A_mat), (Field("i"), Field("j"))),
+                            Table(Literal(A_mat), (Field("j"), Field("k"))),
+                        ),
+                    ),
+                    (Field("i"), Field("j"), Field("k")),
+                ),
+            ),
+            Field("j"),
+            # expected: unchanged full aggregate over i,j,k
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A_mat), (Field("i"), Field("j"))),
+                        Table(Literal(A_mat), (Field("j"), Field("k"))),
+                    ),
+                ),
+                (Field("i"), Field("j"), Field("k")),
+            ),
+        ),
+        (
+            # Case 3: same chain, reduce over k
+            Query(
+                Alias("out"),
+                Aggregate(
+                    Literal(op.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(op.mul),
+                        (
+                            Table(Literal(A_mat), (Field("i"), Field("j"))),
+                            Table(Literal(A_mat), (Field("j"), Field("k"))),
+                        ),
+                    ),
+                    (Field("i"), Field("j"), Field("k")),
+                ),
+            ),
+            Field("k"),
+            # expected: sum_k A[j,k]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                Table(Literal(A_mat), (Field("j"), Field("k"))),
+                (Field("k"),),
+            ),
+        ),
+        (
+            # Case 4: chain_expr = sum_{i,j,k} max(A[i,j], A[j,k])
+            Query(
+                Alias("out"),
+                Aggregate(
+                    Literal(op.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(max),
+                        (
+                            Table(Literal(A_mat), (Field("i"), Field("j"))),
+                            Table(Literal(A_mat), (Field("j"), Field("k"))),
+                        ),
+                    ),
+                    (Field("i"), Field("j"), Field("k")),
+                ),
+            ),
+            Field("i"),
+            # expected: unchanged
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal(A_mat), (Field("i"), Field("j"))),
+                        Table(Literal(A_mat), (Field("j"), Field("k"))),
+                    ),
+                ),
+                (Field("i"), Field("j"), Field("k")),
+            ),
+        ),
+        (
+            # Case 5: respect aggregate position
+            # outer: sum_{j,k} max( sum_i A[i,j], A[j,k] )
+            # inner Aggregate(+ over i) is already inside the MapJoin.
+            Query(
+                Alias("out"),
+                Aggregate(
+                    Literal(op.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(max),
+                        (
+                            Aggregate(
+                                Literal(op.add),
+                                Literal(0),
+                                Table(Literal(A_mat), (Field("i"), Field("j"))),
+                                (Field("i"),),
+                            ),
+                            Table(Literal(A_mat), (Field("j"), Field("k"))),
+                        ),
+                    ),
+                    (Field("j"), Field("k")),
+                ),
+            ),
+            Field("i"),
+            # expected: inner sum over i of A[i,j]
+            Aggregate(
+                Literal(op.add),
+                Literal(0),
+                Table(Literal(A_mat), (Field("i"), Field("j"))),
+                (Field("i"),),
+            ),
+        ),
+    ],
+)
+def test_annotated_queries(query, reduce_field, expected):
+    aq = AnnotatedQuery(DenseStats, query, bindings=OrderedDict())
+    query = reduce_idx(reduce_field, aq)
+    assert query.rhs == expected

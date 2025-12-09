@@ -77,8 +77,7 @@ class AnnotatedQuery:
         if not isinstance(q, Query):
             raise ValueError(
                 "Annotated Queries can only be built from queries of the form: "
-                "Query(name, Materialize(formats, index_order, agg_map_expr)) or "
-                "Query(name, agg_map_expr)"
+                "Query(lhs, rhs)"
             )
         self.ST = ST
         if bindings is None:
@@ -136,7 +135,9 @@ class AnnotatedQuery:
             agg_op = idx_op[idx]
             stats_point = cache_point[point_expr]
             idx_dim_size = stats_point.dim_sizes[idx.name]
-            lowest_roots = find_lowest_roots(agg_op, idx, idx_starting_root[idx])
+            lowest_roots = find_lowest_roots(
+                Literal(agg_op), idx, idx_starting_root[idx]
+            )
             original_idx[idx] = idx
             if len(lowest_roots) == 1:
                 idx_lowest_root[idx] = cast(LogicExpression, lowest_roots[0])
@@ -555,6 +556,18 @@ def get_reduce_query(
                     reduce_idx
                 ] and relevant_args_set.issuperset(args_with_idx):
                     idxs_to_be_reduced.add(idx)
+        else:
+            query_expr = root_node
+            node_to_replace = root_node
+            reducible_idxs = get_reducible_idxs(aq)
+            for idx in reducible_idxs:
+                if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
+                    continue
+                if (
+                    idx in aq.connected_idxs[reduce_idx]
+                    or aq.idx_lowest_root[idx] == node_to_replace
+                ):
+                    idxs_to_be_reduced.add(idx)
     else:
         query_expr = root_node
         node_to_replace = root_node
@@ -573,6 +586,7 @@ def get_reduce_query(
         if orig not in final_idxs_to_be_reduced:
             final_idxs_to_be_reduced.append(orig)
     reduced_idxs = list(idxs_to_be_reduced)
+    final_idxs_to_be_reduced.sort(key=lambda f: f.name)
 
     agg_op = aq.idx_op[aq.original_idx[reduce_idx]]
     agg_init = aq.idx_init[aq.original_idx[reduce_idx]]
