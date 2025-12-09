@@ -1,4 +1,4 @@
-from .dataflow import BasicBlock, ControlFlowGraph
+from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
 from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
 from .ftype import FType, FTyped, fisinstance, ftype
 from .gensym import gensym
@@ -10,18 +10,18 @@ from .rewriters import (
     Rewrite,
 )
 from .term import (
-    PostOrderDFS,
-    PreOrderDFS,
     Term,
     TermTree,
     literal_repr,
 )
+from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 __all__ = [
     "BasicBlock",
     "Chain",
     "Context",
     "ControlFlowGraph",
+    "DataFlowAnalysis",
     "FType",
     "FTyped",
     "Fixpoint",
@@ -39,5 +39,7 @@ __all__ = [
     "fisinstance",
     "ftype",
     "gensym",
+    "intree",
+    "isdescendant",
     "literal_repr",
 ]

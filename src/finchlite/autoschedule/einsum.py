@@ -16,7 +16,7 @@ class EinsumLowerer:
         node: lgc.LogicNode,
         bindings: dict[str, Any],
         definitions: dict[str, ein.Einsum],
-    ) -> ein.EinsumNode | None:
+    ) -> ein.EinsumStatement | None:
         match node:
             case lgc.Plan(bodies):
                 ein_bodies = [
@@ -29,9 +29,9 @@ class EinsumLowerer:
                 return None
             case lgc.Query(
                 lgc.Alias(name),
-                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
+                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _) as agg,
             ):
-                einidxs = tuple(ein.Index(field.name) for field in node.rhs.fields)
+                einidxs = tuple(ein.Index(field.name) for field in agg.fields)
                 my_bodies = []
                 if init != init_value(operation, type(init)):
                     my_bodies.append(
@@ -52,11 +52,12 @@ class EinsumLowerer:
                 )
                 return ein.Plan(tuple(my_bodies))
             case lgc.Query(lgc.Alias(name), rhs):
+                assert isinstance(rhs, lgc.LogicExpression)
                 einarg = self.compile_operand(rhs)
                 return ein.Einsum(
                     op=ein.Literal(overwrite),
                     tns=ein.Alias(name),
-                    idxs=tuple(ein.Index(field.name) for field in node.rhs.fields),
+                    idxs=tuple(ein.Index(field.name) for field in rhs.fields),
                     arg=einarg,
                 )
 
@@ -75,7 +76,7 @@ class EinsumLowerer:
     def compile_operand(
         self,
         ex: lgc.LogicNode,
-    ) -> ein.EinsumExpr:
+    ) -> ein.EinsumExpression:
         match ex:
             case lgc.Reformat(_, rhs):
                 return self.compile_operand(rhs)

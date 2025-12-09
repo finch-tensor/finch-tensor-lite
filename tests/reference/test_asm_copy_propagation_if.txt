@@ -1,0 +1,30 @@
+ENTRY_0: #succs=[if_else_2]
+
+EXIT_1: #succs=[]
+
+if_else_2: #succs=[if_else_4, if_else_5]
+    a_0: int64 = 5
+
+if_else_3: #succs=[EXIT_1]
+
+if_else_4: #succs=[if_else_6]
+    assert(eq(a_1, 5))
+    a_2: int64 = add(a_3, 10)
+
+if_else_5: #succs=[if_else_6]
+    assert(not_(eq(a_1, 5)))
+
+if_else_6: #succs=[if_else_7, if_else_8]
+
+if_else_7: #succs=[if_else_9]
+    assert(lt(a_4, 15))
+    a_5: int64 = sub(a_6, 3)
+
+if_else_8: #succs=[if_else_9]
+    assert(not_(lt(a_4, 15)))
+    a_7: int64 = mul(a_8, 2)
+
+if_else_9: #succs=[if_else_3]
+    return a_9
+
+if_else_10: #succs=[if_else_3]

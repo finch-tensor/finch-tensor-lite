@@ -554,7 +554,7 @@ class NumbaContext(Context):
                     ctx_2(body)
                 self.exec(ctx_2.emit())
                 return None
-            case asm.ForLoop(var, start, end, body):
+            case asm.ForLoop(asm.Variable(_, _) as var, start, end, body):
                 var_2 = self(var)
                 start = self(start)
                 end = self(end)
@@ -720,11 +720,11 @@ register_property(
 
 
 def struct_construct_from_numba(fmt: AssemblyStructFType, numba_struct):
-    args = [
-        construct_from_numba(field_type, getattr(numba_struct, name))
+    kwargs = {
+        name: construct_from_numba(field_type, getattr(numba_struct, name))
         for (name, field_type) in fmt.struct_fields
-    ]
-    return fmt(*args)
+    }
+    return fmt(**kwargs)
 
 
 register_property(
