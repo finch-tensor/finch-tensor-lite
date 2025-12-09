@@ -714,6 +714,6 @@ def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
     query = Query(aq.output_name, cast(LogicExpression, expr))
     remaining_cache: dict[object, TensorStats] = {}
     insert_statistics(
-        aq.ST, query, bindings=aq.bindings, replace=True, cache=remaining_cache
+        aq.ST, query.rhs, bindings=aq.bindings, replace=True, cache=remaining_cache
     )
     return query

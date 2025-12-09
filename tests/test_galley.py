@@ -11,6 +11,7 @@ from finchlite.finch_logic import (
     Field,
     Literal,
     MapJoin,
+    Query,
     Table,
 )
 from finchlite.galley.LogicalOptimizer import (
@@ -19,11 +20,12 @@ from finchlite.galley.LogicalOptimizer import (
     get_idx_connected_components,
     get_reduce_query,
     get_reducible_idxs,
+    get_remaining_query,
     insert_statistics,
     reduce_idx,
     replace_and_remove_nodes,
 )
-from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
+from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef, TensorStats
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
@@ -1944,3 +1946,102 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
 
     alias_expr = Alias(query.lhs.name)
     assert aq.point_expr == expected_point_expr(alias_expr)
+
+
+@pytest.mark.parametrize(
+    ("expr", "output_name", "expected"),
+    [
+        (
+            # Case 1: remaining expression is a simple MapJoin
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(A), (Field("i"),)),
+                ),
+            ),
+            Alias("out"),
+            # Expect: Query(out, <same MapJoin>)
+            Query(
+                Alias("out"),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(A), (Field("i"),)),
+                    ),
+                ),
+            ),
+        ),
+        (
+            # Case 2: three-tensor expression A[i] * C[i,k] * B[j]
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(C), (Field("i"), Field("k"))),
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+            Alias("out"),
+            # Expect: Query(out, A[i] * C[i,k] * B[j])
+            Query(
+                Alias("out"),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                        Table(Literal(B), (Field("j"),)),
+                    ),
+                ),
+            ),
+        ),
+        (
+            # Case 3: remaining expression is A[i] * C[i,k] * D[k] * B[j]
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal(A), (Field("i"),)),
+                    Table(Literal(C), (Field("i"), Field("k"))),
+                    Table(Literal(D), (Field("k"),)),
+                    Table(Literal(B), (Field("j"),)),
+                ),
+            ),
+            Alias("out"),
+            # We expect: Query(out, <same MapJoin>)
+            Query(
+                Alias("out"),
+                MapJoin(
+                    Literal(op.mul),
+                    (
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(C), (Field("i"), Field("k"))),
+                        Table(Literal(D), (Field("k"),)),
+                        Table(Literal(B), (Field("j"),)),
+                    ),
+                ),
+            ),
+        ),
+    ],
+)
+def test_get_remaining_query(expr, output_name, expected):
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = DenseStats
+    aq.output_name = output_name
+    aq.point_expr = expr
+    aq.bindings = OrderedDict()
+    aq.cache_point = {}
+
+    if isinstance(expr, Alias):
+        seed_cache: dict[object, TensorStats] = {}
+        insert_statistics(
+            DenseStats,
+            Query(expr, Table(Literal(A), (Field("i"),))),
+            bindings=aq.bindings,
+            replace=False,
+            cache=seed_cache,
+        )
+
+    query = get_remaining_query(aq)
+    assert query == expected
