@@ -21,17 +21,6 @@ numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {}
 
-numba_simple_types = [
-    np.int8, 
-    np.int16, 
-    np.int32, 
-    np.int64, 
-    np.float16, 
-    np.float32, 
-    np.float64, 
-    np.bool_, 
-    np.str_,
-]
 
 def numba_type(t):
     """
@@ -642,16 +631,7 @@ class NumbaContext(Context):
                 return None
             case asm.Print(args):
                 for arg in args:
-                    match arg:
-                        case asm.Variable(name, t):
-                            if t in numba_simple_types:
-                                self.exec(f'{feed}print({name})')
-                            else:
-                                self.exec(
-                                    f'{feed}print("{self.full_name(numba_type(t))}")'
-                                )
-                        case _:
-                            self.exec(f'{feed}print("UnknownType")')
+                    self.exec(f"{feed}print({self(arg)})")
                 return None
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")

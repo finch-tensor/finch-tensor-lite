@@ -1,12 +1,13 @@
 32767
 65536
 65536
+2.0
 3.0
-Numba_Point
-Numba_tuple
-Numba_Point
-Numba_tuple
+<numba.experimental.jitclass.boxing.Numba_Point object at 0x7d5b9d304c10>
+<numba.experimental.jitclass.boxing.Numba_tuple object at 0x7d5b9d304c10>
+<numba.experimental.jitclass.boxing.Numba_Point object at 0x7d5b9d304c10>
+<numba.experimental.jitclass.boxing.Numba_tuple object at 0x7d5b9d304c10>
 9.0
-Numba_Point
-Numba_tuple
+<numba.experimental.jitclass.boxing.Numba_Point object at 0x7d5b9d304c10>
+<numba.experimental.jitclass.boxing.Numba_tuple object at 0x7d5b9d304c10>
 9.0
