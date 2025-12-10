@@ -506,6 +506,8 @@ def get_reduce_query(
     reducible_idxs = get_reducible_idxs(aq)
     stats_cache = aq.cache_point
 
+    use_root = False
+
     if isinstance(root_node, MapJoin):
         if not isinstance(root_node.op, Literal):
             raise TypeError("MapJoin.op must be Literal(...).")
@@ -558,18 +560,11 @@ def get_reduce_query(
                 ] and relevant_args_set.issuperset(args_with_idx):
                     idxs_to_be_reduced.add(idx)
         else:
-            query_expr = root_node
-            node_to_replace = root_node
-            reducible_idxs = get_reducible_idxs(aq)
-            for idx in reducible_idxs:
-                if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
-                    continue
-                if (
-                    idx in aq.connected_idxs[reduce_idx]
-                    or aq.idx_lowest_root[idx] == node_to_replace
-                ):
-                    idxs_to_be_reduced.add(idx)
+            use_root = True
     else:
+        use_root = True
+
+    if use_root:
         query_expr = root_node
         node_to_replace = root_node
         reducible_idxs = get_reducible_idxs(aq)
@@ -581,6 +576,7 @@ def get_reduce_query(
                 or aq.idx_lowest_root[idx] == node_to_replace
             ):
                 idxs_to_be_reduced.add(idx)
+
     final_idxs_to_be_reduced: list[Field] = []
     for idx in idxs_to_be_reduced:
         orig = aq.original_idx[idx]
