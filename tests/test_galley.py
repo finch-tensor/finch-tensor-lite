@@ -5,6 +5,7 @@ import pytest
 
 import numpy as np
 
+import finchlite
 from finchlite.finch_logic import (
     Aggregate,
     Field,
@@ -16,11 +17,13 @@ from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
     find_lowest_roots,
     get_idx_connected_components,
+    get_lazy_tensor_stats,
     get_reducible_idxs,
     insert_statistics,
     replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
+from finchlite.interface import lazy
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
@@ -1613,3 +1616,55 @@ def test_find_lowest_roots(root, idx_name, expected):
             result.append(node.tns.val)
 
         assert result == expected
+
+
+@pytest.mark.parametrize(
+    "expr_func, expected_dim_sizes, expected_index_set, expected_fill_value, "
+    "expected_non_fill",
+    [
+        # Base MapJoin: C = A + B
+        (
+            lambda A, B: A + B,
+            {"i": 2, "j": 3},
+            {"i", "j"},
+            0.0,
+            6.0,
+        ),
+        # Aggregate: D = C.sum(axis=0)
+        (
+            lambda A, B: finchlite.sum(A + B, axis=0),
+            {"j": 3},
+            {"j"},
+            0.0,
+            3.0,
+        ),
+        # Combination : F = ((A + B) * 3).sum(axis=1)
+        (
+            lambda A, B: finchlite.sum((A + B) * 3, axis=1),
+            {"i": 2},
+            {"i"},
+            0.0,
+            2.0,
+        ),
+    ],
+)
+def test_lazy_tensor_stats_parametrized(
+    expr_func,
+    expected_dim_sizes,
+    expected_index_set,
+    expected_fill_value,
+    expected_non_fill,
+):
+    arr1 = np.zeros((2, 3))
+    arr2 = np.ones((2, 3))
+    A = lazy(arr1)
+    B = lazy(arr2)
+
+    expr = expr_func(A, B)
+    stats = get_lazy_tensor_stats(expr, DenseStats)
+
+    assert isinstance(stats, DenseStats)
+    assert stats.dim_sizes == expected_dim_sizes
+    assert stats.index_set == expected_index_set
+    assert stats.fill_value == expected_fill_value
+    assert stats.estimate_non_fill_values() == expected_non_fill

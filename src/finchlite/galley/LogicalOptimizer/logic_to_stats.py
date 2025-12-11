@@ -15,6 +15,7 @@ from finchlite.finch_logic import (
     Value,
 )
 from finchlite.galley.TensorStats import TensorStats
+from finchlite.interface import LazyTensor
 
 
 def insert_statistics(
@@ -35,7 +36,6 @@ def insert_statistics(
         args = [insert_statistics(ST, a, bindings, replace, cache) for a in node.args]
         if not args:
             raise ValueError("MapJoin expects at least one argument with stats.")
-
         st = ST.mapjoin(op, *args)
         cache[node] = st
         return st
@@ -57,6 +57,8 @@ def insert_statistics(
 
     if isinstance(node, Alias):
         st = bindings.get(node)
+        if st is None:
+            raise ValueError(f"No TensorStats bound to alias {node}")
         cache[node] = st
         return st
 
@@ -83,3 +85,16 @@ def insert_statistics(
         return st
 
     raise TypeError(f"Unsupported node type: {type(node).__name__}")
+
+
+def get_lazy_tensor_stats(
+    lazy_tensor: LazyTensor, StatsImpl: TensorStats
+) -> TensorStats:
+    root_node = lazy_tensor.data
+    cache: dict[object, TensorStats] = {}
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+
+    replace = False
+    return insert_statistics(
+        ST=StatsImpl, node=root_node, bindings=bindings, replace=replace, cache=cache
+    )

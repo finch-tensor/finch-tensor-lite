@@ -5,12 +5,13 @@ from .annotated_query import (
     get_reducible_idxs,
     replace_and_remove_nodes,
 )
-from .logic_to_stats import insert_statistics
+from .logic_to_stats import get_lazy_tensor_stats, insert_statistics
 
 __all__ = [
     "AnnotatedQuery",
     "find_lowest_roots",
     "get_idx_connected_components",
+    "get_lazy_tensor_stats",
     "get_reducible_idxs",
     "insert_statistics",
     "replace_and_remove_nodes",
