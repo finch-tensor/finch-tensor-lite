@@ -34,6 +34,7 @@ from finchlite.symbolic import (
     isdescendant,
 )
 
+from .constants import ALLOC_FACTOR, COMPUTE_FACTOR
 from .logic_to_stats import insert_statistics
 
 
@@ -408,11 +409,10 @@ def replace_and_remove_nodes(
                 if arg == node_to_replace:
                     new_args[i] = new_node
 
-            object.__setattr__(node, "args", tuple(new_args))
-            return node
+            return MapJoin(node.op, tuple(new_args))
         return None
 
-    return Rewrite(PostWalk(Chain([replace_remove_rule])))(expr)
+    return Rewrite(PostWalk(replace_remove_rule))(expr)
 
 
 def find_lowest_roots(
@@ -541,9 +541,6 @@ def get_reduce_query(
                     for node in PreOrderDFS(arg):
                         nodes_to_remove.add(cast(LogicExpression, node))
             query_expr = MapJoin(root_node.op, tuple(relevant_args))
-            stats_cache[query_expr] = aq.ST.mapjoin(
-                root_node.op.val, *[stats_cache[arg] for arg in relevant_args]
-            )
             relevant_args_set = set(relevant_args)
             for idx in reducible_idxs:
                 if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
@@ -595,16 +592,22 @@ def get_reduce_query(
         tuple(final_idxs_to_be_reduced),
     )
 
-    stats_cache[query_expr] = aq.ST.aggregate(
-        agg_op,
-        agg_init,
-        [i.name for i in final_idxs_to_be_reduced],
-        stats_cache[query_expr.arg],
-    )
-
     query = Query(Alias(gensym("A")), query_expr)
 
     return query, node_to_replace, nodes_to_remove, reduced_idxs
+
+
+def get_cost_of_reduce(reduce_idx: Field, aq: AnnotatedQuery):
+    query, _, _, reduced_idxs = get_reduce_query(reduce_idx, aq)
+    query_expr = query.rhs
+    cache: dict[object, TensorStats] = {}
+    insert_statistics(aq.ST, query_expr, aq.bindings, replace=False, cache=cache)
+
+    mat_stats = cache[query_expr]
+    comp_stats = cache[query_expr.arg]
+    bytes_stored = mat_stats.estimate_non_fill_values()
+    ops_performed = comp_stats.estimate_non_fill_values()
+    return ops_performed * COMPUTE_FACTOR + bytes_stored * ALLOC_FACTOR
 
 
 def reduce_idx(
@@ -641,7 +644,6 @@ def reduce_idx(
     query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
         reduce_idx, aq
     )
-
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
@@ -661,11 +663,10 @@ def reduce_idx(
     for idx in aq.idx_lowest_root:
         if idx in reduced_idxs:
             continue
-        root = aq.idx_lowest_root[idx]
-        if root == node_to_replace or root in nodes_to_remove:
-            root = alias_expr
 
-        new_idx_lowest_root[idx] = root
+        new_idx_lowest_root[idx] = replace_and_remove_nodes(
+            aq.idx_lowest_root[idx], node_to_replace, alias_expr, nodes_to_remove
+        )
         new_idx_op[idx] = aq.idx_op[idx]
         new_idx_init[idx] = aq.idx_init[idx]
         new_idx_op[aq.original_idx[idx]] = aq.idx_op[idx]
@@ -692,15 +693,14 @@ def reduce_idx(
         replace=True,
         cache=stats_cache,
     )
-
     aq.reduce_idxs = new_reduce_idxs
     aq.point_expr = new_point_expr
     aq.idx_lowest_root = new_idx_lowest_root
     aq.idx_op = new_idx_op
     aq.idx_init = new_idx_init
     aq.parent_idxs = new_parent_idxs
-    aq.connected_idxs = new_connected_idxs
     aq.connected_components = new_components
+    aq.connected_idxs = new_connected_idxs
     return query
 
 

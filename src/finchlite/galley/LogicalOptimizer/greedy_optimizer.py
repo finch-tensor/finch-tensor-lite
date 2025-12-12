@@ -1,30 +1,56 @@
-from finchlite.finch_logic import Query
+from collections import OrderedDict
+
+from finchlite.finch_logic import Plan, Produces, Query
+from finchlite.galley.TensorStats import TensorStats
 
 from .annotated_query import (
     AnnotatedQuery,
+    get_cost_of_reduce,
     get_reducible_idxs,
     get_remaining_query,
     reduce_idx,
 )
+from .logic_to_stats import insert_statistics
 
 
-def greedy_query(input_aq: AnnotatedQuery) -> list[Query]:
-    aq = input_aq
+def greedy_query_optimizer(aq: AnnotatedQuery) -> list[Query]:
     queries: list[Query] = []
     reducible_idxs = get_reducible_idxs(aq)
     while reducible_idxs:
-        next_idx = reducible_idxs[0]
-        query = reduce_idx(next_idx, aq)
+        cheapest_idx = reducible_idxs[0]
+        cost = float("inf")
+        for idx in reducible_idxs:
+            idx_cost = get_cost_of_reduce(idx, aq)
+            if idx_cost < cost:
+                cheapest_idx = idx
+                cost = idx_cost
+
+        query = reduce_idx(cheapest_idx, aq)
         queries.append(query)
         reducible_idxs = get_reducible_idxs(aq)
 
     remaining_q = get_remaining_query(aq)
     if remaining_q is not None:
         queries.append(remaining_q)
-
-    if queries:
-        last_query = queries[-1]
-        if last_query.lhs != aq.output_name:
-            queries[-1] = Query(aq.output_name, last_query.rhs)
-
+    else:
+        queries[-1] = Query(aq.output_name, queries[-1].rhs)
     return queries
+
+
+def greedy_optimizer(ST: type[TensorStats], plan: Plan):
+    bindings = OrderedDict()
+    stats_cache = OrderedDict()
+    new_bodies = []
+    for body in plan.bodies:
+        match body:
+            case Query():
+                aq = AnnotatedQuery(ST, body)
+                optimized_queries = greedy_query_optimizer(aq)
+                for sub_query in optimized_queries:
+                    bindings[sub_query.lhs] = insert_statistics(
+                        ST, sub_query.rhs, bindings, False, stats_cache
+                    )
+                new_bodies.extend(optimized_queries)
+            case Produces():
+                new_bodies.append(body)
+    return Plan(tuple(new_bodies))

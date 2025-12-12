@@ -8,7 +8,7 @@ from .annotated_query import (
     reduce_idx,
     replace_and_remove_nodes,
 )
-from .greedy_optimizer import greedy_query
+from .greedy_optimizer import greedy_optimizer
 from .logic_to_stats import insert_statistics
 
 __all__ = [
@@ -18,7 +18,7 @@ __all__ = [
     "get_reduce_query",
     "get_reducible_idxs",
     "get_remaining_query",
-    "greedy_query",
+    "greedy_optimizer",
     "insert_statistics",
     "reduce_idx",
     "replace_and_remove_nodes",
