@@ -12,6 +12,7 @@ from finchlite.finch_logic import (
     Field,
     Literal,
     MapJoin,
+    Plan,
     Query,
     Table,
 )
@@ -22,6 +23,7 @@ from finchlite.galley.LogicalOptimizer import (
     get_reduce_query,
     get_reducible_idxs,
     get_remaining_query,
+    greedy_optimizer,
     insert_statistics,
     reduce_idx,
     replace_and_remove_nodes,
@@ -963,3 +965,30 @@ def test_annotated_queries(query, reduce_field, expected):
     aq = AnnotatedQuery(DenseStats, query, bindings=OrderedDict())
     query = reduce_idx(reduce_field, aq)
     assert query.rhs == expected
+
+
+def test_greedy_optimizer():
+    A = fl.asarray(np.ones((100, 100)))
+    B = fl.asarray(np.ones((100, 10)))
+    C = fl.asarray(np.ones((10, 1)))
+    test_plan = Plan(
+        (
+            Query(
+                Alias("A"),
+                Aggregate(
+                    Literal(op.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(op.mul),
+                        (
+                            Table(Literal(A), (Field("i"), Field("j"))),
+                            Table(Literal(B), (Field("j"), Field("k"))),
+                            Table(Literal(C), (Field("k"), Field("l"))),
+                        ),
+                    ),
+                    (Field("i"), Field("j"), Field("k")),
+                ),
+            ),
+        )
+    )
+    print(greedy_optimizer(DenseStats, test_plan))

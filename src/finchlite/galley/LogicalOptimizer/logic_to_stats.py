@@ -23,7 +23,7 @@ def insert_statistics(
     node: LogicNode,
     bindings: OrderedDict[Alias, TensorStats],
     replace: bool,
-    cache: dict[object, TensorStats],
+    cache: OrderedDict[LogicNode, TensorStats],
 ) -> TensorStats:
     if node in cache:
         return cache[node]
