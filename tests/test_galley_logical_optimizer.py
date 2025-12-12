@@ -5,6 +5,7 @@ import pytest
 
 import numpy as np
 
+import finchlite as fl
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -27,12 +28,11 @@ from finchlite.galley.LogicalOptimizer import (
 )
 from finchlite.galley.TensorStats import DenseStats
 
-A_mat = np.ones((5, 5))
-
-A = np.ones((2,))
-B = np.ones((3,))
-C_mat = np.ones((2, 4))
-D = np.ones((4,))
+A = fl.asarray(np.ones((2,)))
+A_mat = fl.asarray(np.ones((5, 5)))
+B = fl.asarray(np.ones((3,)))
+C_mat = fl.asarray(np.ones((2, 4)))
+D = fl.asarray(np.ones((4,)))
 
 
 # ─────────────────────────────── Annotated_Query tests ─────────────────────────────

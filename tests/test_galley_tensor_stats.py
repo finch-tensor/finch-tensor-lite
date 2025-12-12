@@ -5,6 +5,7 @@ import pytest
 
 import numpy as np
 
+import finchlite as fl
 from finchlite.finch_logic import (
     Aggregate,
     Field,
@@ -261,7 +262,18 @@ def test_mapjoin_mul_and_add():
     ta2 = Table(Literal(2 * np.ones((2, 3))), (Field("i"), Field("j")))
 
     cache = {}
-
+    insert_statistics(
+        ST=DenseStats, node=ta, bindings=OrderedDict(), replace=False, cache=cache
+    )
+    insert_statistics(
+        ST=DenseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
+    )
+    insert_statistics(
+        ST=DenseStats, node=ta2, bindings=OrderedDict(), replace=False, cache=cache
+    )
+    cache[ta].fill_value = 1
+    cache[tb].fill_value = 1
+    cache[ta2].fill_value = 2
     node_mul = MapJoin(Literal(op.mul), (ta, tb))
     dsm = insert_statistics(
         ST=DenseStats, node=node_mul, bindings=OrderedDict(), replace=False, cache=cache
@@ -316,9 +328,37 @@ def test_aggregate_and_issimilar():
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
-        (np.array([], dtype=int), ["i"], set()),
-        (np.array([1, 1, 1, 1]), ["i"], {DC(frozenset(), frozenset(["i"]), 4.0)}),
-        (np.array([0, 1, 0, 0, 1]), ["i"], {DC(frozenset(), frozenset(["i"]), 2.0)}),
+        (fl.asarray(np.array(0)), [], {DC(frozenset(), frozenset(), 1.0)}),
+    ],
+)
+def test_dc_stats_scalar(tensor, fields, expected_dcs):
+    node = Table(
+        Literal(fl.asarray(tensor)),
+        tuple(Field(f) for f in fields),
+    )
+    stats = insert_statistics(
+        ST=DCStats,
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.dcs == expected_dcs
+
+
+@pytest.mark.parametrize(
+    "tensor, fields, expected_dcs",
+    [
+        (
+            fl.asarray(np.array([1, 1, 1, 1])),
+            ["i"],
+            {DC(frozenset(), frozenset(["i"]), 4.0)},
+        ),
+        (
+            fl.asarray(np.array([0, 1, 0, 0, 1])),
+            ["i"],
+            {DC(frozenset(), frozenset(["i"]), 2.0)},
+        ),
     ],
 )
 def test_dc_stats_vector(tensor, fields, expected_dcs):
@@ -339,9 +379,8 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
-        (np.zeros((0, 0), dtype=int), ["i", "j"], set()),
         (
-            np.ones((3, 3), dtype=int),
+            fl.asarray(np.ones((3, 3), dtype=int)),
             ["i", "j"],
             {
                 DC(frozenset(), frozenset(["i", "j"]), 9.0),
@@ -352,13 +391,15 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
             },
         ),
         (
-            np.array(
-                [
-                    [1, 0, 1],
-                    [0, 0, 0],
-                    [1, 1, 0],
-                ],
-                dtype=int,
+            fl.asarray(
+                np.array(
+                    [
+                        [1, 0, 1],
+                        [0, 0, 0],
+                        [1, 1, 0],
+                    ],
+                    dtype=int,
+                )
             ),
             ["i", "j"],
             {
@@ -389,9 +430,8 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
-        (np.zeros((0, 0, 0), dtype=int), ["i", "j", "k"], set()),
         (
-            np.ones((2, 2, 2), dtype=int),
+            fl.asarray(np.ones((2, 2, 2), dtype=int)),
             ["i", "j", "k"],
             {
                 DC(frozenset(), frozenset(["i", "j", "k"]), 8.0),
@@ -404,12 +444,14 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
             },
         ),
         (
-            np.array(
-                [
-                    [[1, 0], [0, 0]],
-                    [[0, 1], [1, 0]],
-                ],
-                dtype=int,
+            fl.asarray(
+                np.array(
+                    [
+                        [[1, 0], [0, 0]],
+                        [[0, 1], [1, 0]],
+                    ],
+                    dtype=int,
+                )
             ),
             ["i", "j", "k"],
             {
@@ -442,9 +484,8 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
 @pytest.mark.parametrize(
     "tensor, fields, expected_dcs",
     [
-        (np.zeros((0, 0, 0, 0), dtype=int), ["i", "j", "k", "l"], set()),
         (
-            np.ones((2, 2, 2, 2), dtype=int),
+            fl.asarray(np.ones((2, 2, 2, 2), dtype=int)),
             ["i", "j", "k", "l"],
             {
                 DC(frozenset(), frozenset(["i", "j", "k", "l"]), 16.0),
@@ -459,18 +500,20 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
             },
         ),
         (
-            np.array(
-                [
+            fl.asarray(
+                np.array(
                     [
-                        [[1, 0], [0, 0]],
-                        [[0, 0], [0, 1]],
+                        [
+                            [[1, 0], [0, 0]],
+                            [[0, 0], [0, 1]],
+                        ],
+                        [
+                            [[0, 0], [1, 0]],
+                            [[0, 0], [0, 0]],
+                        ],
                     ],
-                    [
-                        [[0, 0], [1, 0]],
-                        [[0, 0], [0, 0]],
-                    ],
-                ],
-                dtype=int,
+                    dtype=int,
+                )
             ),
             ["i", "j", "k", "l"],
             {
@@ -517,7 +560,9 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
     ],
 )
 def test_single_tensor_card(dims, dcs, expected_nnz):
-    node = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
+    node = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
+    )
     stat = insert_statistics(
         ST=DCStats,
         node=node,
@@ -547,7 +592,8 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
 )
 def test_1_join_dc_card(dims, dcs, expected_nnz):
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
+        (Field("i"), Field("j"), Field("k")),
     )
     stat = insert_statistics(
         ST=DCStats,
@@ -578,7 +624,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
 )
 def test_2_join_dc_card(dims, dcs, expected_nnz):
     node = Table(
-        Literal(np.zeros((1, 1, 1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k"), Field("l")),
     )
     stat = insert_statistics(
@@ -616,7 +662,8 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
 )
 def test_triangle_dc_card(dims, dcs, expected_nnz):
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
+        (Field("i"), Field("j"), Field("k")),
     )
     stat = insert_statistics(
         ST=DCStats,
@@ -653,7 +700,8 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
 )
 def test_triangle_small_dc_card(dims, dcs, expected_nnz):
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
+        (Field("i"), Field("j"), Field("k")),
     )
     stat = insert_statistics(
         ST=DCStats,
@@ -710,7 +758,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
 def test_merge_dc_join(dims, dcs_list, expected_dcs):
     stats_objs = []
     for dcs in dcs_list:
-        node = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
+        node = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
         s = insert_statistics(
             ST=DCStats,
             node=node,
@@ -802,7 +850,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
     for idx_set, dcs in inputs:
         fields = tuple(Field(ax) for ax in sorted(idx_set))
         shape = (1,) * max(1, len(fields))
-        node = Table(Literal(np.zeros(shape, dtype=int)), fields)
+        node = Table(Literal(fl.asarray(np.zeros(shape, dtype=int))), fields)
 
         insert_statistics(
             ST=DCStats,
@@ -838,14 +886,14 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
 def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     cache = {}
 
-    node1 = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
+    node1 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i"}), dims1, 0)
     s1.dcs = set(dcs1)
 
-    node2 = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
+    node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -875,14 +923,18 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
 def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     cache = {}
 
-    node1 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
+    node1 = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
+    )
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 0)
     s1.dcs = set(dcs1)
 
-    node2 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
+    node2 = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
+    )
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -912,14 +964,14 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
 def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     cache = {}
 
-    node1 = Table(Literal(np.zeros((1,), dtype=int)), (Field("i"),))
+    node1 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i"}), dims1, 0)
     s1.dcs = set(dcs1)
 
-    node2 = Table(Literal(np.zeros((1,), dtype=int)), (Field("j"),))
+    node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -950,7 +1002,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     cache = {}
 
     node1 = Table(
-        Literal(np.zeros((1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))),
         (Field("i"), Field("j")),
     )
     s1 = insert_statistics(
@@ -960,7 +1012,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     s1.dcs = set(dcs1)
 
     node2 = Table(
-        Literal(np.zeros((1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))),
         (Field("j"), Field("k")),
     )
     s2 = insert_statistics(
@@ -999,14 +1051,18 @@ def test_large_disjoint_disjunction_dc_card(
 ):
     cache = {}
 
-    node1 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
+    node1 = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
+    )
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 1)
     s1.dcs = set(dcs1)
 
-    node2 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("j"), Field("k")))
+    node2 = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
+    )
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -1014,7 +1070,8 @@ def test_large_disjoint_disjunction_dc_card(
     s2.dcs = set(dcs2)
 
     node3 = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
+        (Field("i"), Field("j"), Field("k")),
     )
     s3 = insert_statistics(
         ST=DCStats, node=node3, bindings=OrderedDict(), replace=False, cache=cache
@@ -1052,14 +1109,18 @@ def test_mixture_disjoint_disjunction_dc_card(
 ):
     cache = {}
 
-    node1 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("i"), Field("j")))
+    node1 = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
+    )
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
     s1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 1)
     s1.dcs = set(dcs1)
 
-    node2 = Table(Literal(np.zeros((1, 1), dtype=int)), (Field("j"), Field("k")))
+    node2 = Table(
+        Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
+    )
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -1067,7 +1128,8 @@ def test_mixture_disjoint_disjunction_dc_card(
     s2.dcs = set(dcs2)
 
     node3 = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)), (Field("i"), Field("j"), Field("k"))
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
+        (Field("i"), Field("j"), Field("k")),
     )
     s3 = insert_statistics(
         ST=DCStats, node=node3, bindings=OrderedDict(), replace=False, cache=cache
@@ -1113,7 +1175,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
     cache = {}
 
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
     stat = insert_statistics(
@@ -1159,7 +1221,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
     cache = {}
 
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
     st = insert_statistics(
@@ -1205,7 +1267,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
     cache = {}
 
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
     st = insert_statistics(
@@ -1268,7 +1330,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     cache = {}
 
     node = Table(
-        Literal(np.zeros((1, 1, 1), dtype=int)),
+        Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
     st = insert_statistics(

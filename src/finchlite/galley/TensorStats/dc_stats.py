@@ -10,9 +10,6 @@ import numpy as np
 import finchlite.finch_notation as ntn
 from finchlite.algebra import is_annihilator
 from finchlite.compile import dimension
-from finchlite.finch_notation import (
-    Literal,
-)
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
@@ -88,10 +85,9 @@ class DCStats(TensorStats):
         Raises:
             NotImplementedError: If dimensionality is not in {1, 2, 3, 4}.
         """
-        if arr is None or getattr(arr, "size", 0) == 0:
-            return set()
-
-        ndim = getattr(arr, "ndim", None)
+        ndim = len(getattr(arr, "shape", None))
+        if ndim == 0:
+            return {DC(frozenset(), frozenset(), 1.0)}
         if ndim == 1:
             return self._vector_structure_to_dcs(arr)
         if ndim == 2:
@@ -110,8 +106,8 @@ class DCStats(TensorStats):
         Returns:
             set[DC]: The degree constraint (DC) records derived from the 1-D tensor.
         """
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         d = ntn.Variable("d", np.int64)
         i = ntn.Variable("i", np.int64)
@@ -135,11 +131,19 @@ class DCStats(TensorStats):
                                 ntn.Assign(
                                     d,
                                     ntn.Call(
-                                        Literal(operator.add),
+                                        ntn.Literal(operator.add),
                                         (
                                             d,
-                                            ntn.Unwrap(
-                                                ntn.Access(A_, ntn.Read(), (i,))
+                                            ntn.Call(
+                                                ntn.Literal(operator.ne),
+                                                (
+                                                    ntn.Unwrap(
+                                                        ntn.Access(A_, ntn.Read(), (i,))
+                                                    ),
+                                                    ntn.Literal(
+                                                        self.tensordef.fill_value
+                                                    ),
+                                                ),
                                             ),
                                         ),
                                     ),
@@ -168,8 +172,8 @@ class DCStats(TensorStats):
             set[DC]: The degree constraint (DC) records derived from the 2-D tensor.
         """
 
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         i = ntn.Variable("i", np.int64)
         j = ntn.Variable("j", np.int64)
@@ -215,8 +219,18 @@ class DCStats(TensorStats):
                                             ntn.Literal(operator.add),
                                             (
                                                 dij,
-                                                ntn.Unwrap(
-                                                    ntn.Access(A_, ntn.Read(), (j, i))
+                                                ntn.Call(
+                                                    ntn.Literal(operator.ne),
+                                                    (
+                                                        ntn.Unwrap(
+                                                            ntn.Access(
+                                                                A_, ntn.Read(), (j, i)
+                                                            )
+                                                        ),
+                                                        ntn.Literal(
+                                                            self.tensordef.fill_value
+                                                        ),
+                                                    ),
                                                 ),
                                             ),
                                         ),
@@ -259,10 +273,20 @@ class DCStats(TensorStats):
                                                     ntn.Literal(operator.add),
                                                     (
                                                         xi,
-                                                        ntn.Unwrap(
-                                                            ntn.Access(
-                                                                A_, ntn.Read(), (j, i)
-                                                            )
+                                                        ntn.Call(
+                                                            ntn.Literal(operator.ne),
+                                                            (
+                                                                ntn.Unwrap(
+                                                                    ntn.Access(
+                                                                        A_,
+                                                                        ntn.Read(),
+                                                                        (j, i),
+                                                                    )
+                                                                ),
+                                                                ntn.Literal(
+                                                                    self.tensordef.fill_value
+                                                                ),
+                                                            ),
                                                         ),
                                                     ),
                                                 ),
@@ -305,10 +329,20 @@ class DCStats(TensorStats):
                                                     ntn.Literal(operator.add),
                                                     (
                                                         yj,
-                                                        ntn.Unwrap(
-                                                            ntn.Access(
-                                                                A_, ntn.Read(), (j, i)
-                                                            )
+                                                        ntn.Call(
+                                                            ntn.Literal(operator.ne),
+                                                            (
+                                                                ntn.Unwrap(
+                                                                    ntn.Access(
+                                                                        A_,
+                                                                        ntn.Read(),
+                                                                        (j, i),
+                                                                    )
+                                                                ),
+                                                                ntn.Literal(
+                                                                    self.tensordef.fill_value
+                                                                ),
+                                                            ),
                                                         ),
                                                     ),
                                                 ),
@@ -368,8 +402,8 @@ class DCStats(TensorStats):
         Returns:
             set[DC]: The degree constraint (DC) records derived from the 3-D tensor.
         """
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         i = ntn.Variable("i", np.int64)
         j = ntn.Variable("j", np.int64)
@@ -655,8 +689,8 @@ class DCStats(TensorStats):
         Returns:
             set[DC]: The degree constraint (DC) records derived from the 4-D tensor.
         """
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         i = ntn.Variable("i", np.int64)
         j = ntn.Variable("j", np.int64)
