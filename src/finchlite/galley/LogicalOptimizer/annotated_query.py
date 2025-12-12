@@ -84,7 +84,7 @@ class AnnotatedQuery:
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
-        cache: dict[object, TensorStats] = {}
+        cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
         insert_statistics(ST, q, bindings=bindings, replace=False, cache=cache)
         self.cache = cache
         output_name = q.lhs
@@ -121,7 +121,7 @@ class AnnotatedQuery:
                     return node
 
         point_expr = Rewrite(PostWalk(Chain([aggregate_annotation_rule])))(expr)
-        cache_point: dict[object, TensorStats] = {}
+        cache_point: OrderedDict[LogicNode, TensorStats] = OrderedDict()
         insert_statistics(
             ST, point_expr, bindings=bindings, replace=False, cache=cache_point
         )
@@ -599,8 +599,13 @@ def get_reduce_query(
 
 def get_cost_of_reduce(reduce_idx: Field, aq: AnnotatedQuery):
     query, _, _, reduced_idxs = get_reduce_query(reduce_idx, aq)
-    query_expr = query.rhs
-    cache: dict[object, TensorStats] = {}
+    query_expr: LogicExpression = query.rhs
+    if not isinstance(query_expr, Aggregate):
+        raise ValueError(
+            "The query returned by get_reduce_query should always have an \
+                Aggregate on the rhs!"
+        )
+    cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
     insert_statistics(aq.ST, query_expr, aq.bindings, replace=False, cache=cache)
 
     mat_stats = cache[query_expr]
@@ -720,7 +725,7 @@ def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
     if isinstance(expr, Alias):
         return None
     query = Query(aq.output_name, cast(LogicExpression, expr))
-    remaining_cache: dict[object, TensorStats] = {}
+    remaining_cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
     insert_statistics(
         aq.ST, query.rhs, bindings=aq.bindings, replace=True, cache=remaining_cache
     )

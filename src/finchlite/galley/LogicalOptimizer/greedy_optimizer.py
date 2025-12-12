@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from finchlite.finch_logic import Plan, Produces, Query
+from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
 from finchlite.galley.TensorStats import TensorStats
 
 from .annotated_query import (
@@ -38,9 +38,9 @@ def greedy_query_optimizer(aq: AnnotatedQuery) -> list[Query]:
 
 
 def greedy_optimizer(ST: type[TensorStats], plan: Plan):
-    bindings = OrderedDict()
-    stats_cache = OrderedDict()
-    new_bodies = []
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+    stats_cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
+    new_bodies: list[Query | Produces] = []
     for body in plan.bodies:
         match body:
             case Query():
