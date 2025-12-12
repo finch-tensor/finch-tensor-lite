@@ -644,10 +644,7 @@ def reduce_idx(
 
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
-    insert_statistics(aq.ST, query.rhs, aq.bindings, replace=False, cache=stats_cache)
-
-    rhs_stats = stats_cache[query.rhs]
-    stats_cache[alias_expr] = aq.ST.copy_stats(rhs_stats)
+    insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),
