@@ -2,6 +2,8 @@ import operator
 
 import numpy as np
 
+from finchlite.finch_einsum.stages import EinsumEvaluator
+
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
 
@@ -67,23 +69,33 @@ reduction_ops = {
 }
 
 
-class EinsumInterpreter:
-    def __init__(self, xp=None, bindings=None, loops=None):
+
+class EinsumInterpreter(EinsumEvaluator):
+    def __init__(self, *, make_tensor=np.full, verbose=False):
+        self.verbose = verbose
+        self.make_tensor = make_tensor  # Added make_tensor argument
+
+    def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        if xp is None:
-            xp = np
-        self.bindings = bindings
-        self.xp = xp
-        self.loops = loops
+        machine = EinsumMachine(
+            make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
+        )
+        return machine(node)
 
+
+class PointwiseEinsumMachine:
+    def __init__(self, ctx, loops):
+        self.ctx = ctx
+        self.loops = loops
+    
     def __call__(self, node):
-        xp = self.xp
+        xp = self.ctx.xp
         match node:
             case ein.Literal(val):
                 return val
             case ein.Alias(name):
-                return self.bindings[name]
+                return self.ctx.bindings[name]
             case ein.Call(func, args):
                 func = self(func)
                 if len(args) == 1:
@@ -102,6 +114,24 @@ class EinsumInterpreter:
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
+            case _:
+                raise ValueError(f"Unknown einsum type: {type(node)}")
+
+
+class EinsumMachine:
+    def __init__(self, xp=None, bindings=None, loops=None):
+        if bindings is None:
+            bindings = {}
+        if xp is None:
+            xp = np
+        self.bindings = bindings
+        self.xp = xp
+        self.loops = loops
+
+    def __call__(self, node):
+        xp = self.xp
+        match node:
+
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
@@ -126,7 +156,10 @@ class EinsumInterpreter:
                     val = arg
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
-                self.bindings[tns] = xp.permute_dims(val, axis)
+                if tns in self.bindings:
+                    tns[:] = xp.permute_dims(val, axis)
+                else:
+                    self.bindings[tns] = xp.permute_dims(val, axis)
                 return (tns,)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")

@@ -2,6 +2,8 @@ from itertools import product
 
 import numpy as np
 
+from finchlite.finch_logic.stages import LogicEvaluator
+
 from ..algebra import element_type, fill_value, fixpoint_type, return_type
 from .nodes import (
     Aggregate,
@@ -21,7 +23,7 @@ from .nodes import (
 )
 
 
-class LogicInterpreter:
+class LogicInterpreter(LogicEvaluator):
     def __init__(self, *, make_tensor=np.full, verbose=False):
         self.verbose = verbose
         self.make_tensor = make_tensor  # Added make_tensor argument

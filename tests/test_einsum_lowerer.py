@@ -48,8 +48,8 @@ def lower_and_execute(tns: LazyTensor):
             bindings[k] = v.val
 
     # Interpret and execute
-    interpreter = EinsumInterpreter(bindings=bindings)
-    return interpreter(einsum_plan)[0]
+    interpreter = EinsumInterpreter()
+    return interpreter(einsum_plan, bindings)[0]
 
 
 def test_simple_addition(rng):
