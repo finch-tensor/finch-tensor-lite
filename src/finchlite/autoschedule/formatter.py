@@ -7,9 +7,8 @@ from .. import finch_logic as lgc
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import TupleFType
-from ..finch_logic import LogicLoader
+from ..finch_logic import LogicLoader, MockLogicLoader
 from ..symbolic import gensym
-from .fakecompiler import FakeLogicCompiler
 
 
 class LogicFormatterContext:
@@ -89,7 +88,7 @@ class LogicFormatter(LogicLoader):
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__()
         if loader is None:
-            loader = FakeLogicCompiler()
+            loader = MockLogicLoader()
         self.loader = loader
 
     def __call__(

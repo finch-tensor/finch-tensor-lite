@@ -9,7 +9,6 @@ from finchlite.autoschedule import (
     flatten_plans,
     isolate_aggregates,
     isolate_reformats,
-    isolate_tables,
     lift_fields,
     materialize_squeeze_expand_productions,
     normalize_names,

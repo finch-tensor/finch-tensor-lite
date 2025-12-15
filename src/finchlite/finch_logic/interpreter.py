@@ -2,9 +2,12 @@ from itertools import product
 
 import numpy as np
 
+from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.stages import LogicEvaluator
 
+from . import nodes as lgc
 from ..algebra import element_type, fill_value, fixpoint_type, return_type
+from ..symbolic import fisinstance
 from .nodes import (
     Aggregate,
     Alias,
@@ -21,6 +24,7 @@ from .nodes import (
     TableValue,
     Value,
 )
+from .stages import LogicLoader
 
 
 class LogicInterpreter(LogicEvaluator):
@@ -155,3 +159,45 @@ class LogicMachine:
                 return res
             case _:
                 raise ValueError(f"Unknown expression type: {type(node)}")
+
+
+class MockLogicKernel(AssemblyKernel):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __call__(self, *args):
+        bindings = {
+            var: lgc.TableValue(tns, self.bindings[var].idxs)
+            for var, tns in zip(self.bindings.keys(), args, strict=True)
+        }
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = LogicInterpreter()
+        res = ctx(self.prgm, bindings)
+        if isinstance(res, tuple):
+            return tuple(tbl.tns for tbl in res)
+        return res.tns
+
+
+class MockLogicLibrary(AssemblyLibrary):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __getattr__(self, name):
+        if name == "main":
+            return MockLogicKernel(self.prgm, self.bindings)
+        if name == "prgm":
+            return self.prgm
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+
+class MockLogicLoader(LogicLoader):
+    def __init__(self):
+        pass
+
+    def __call__(
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
+    ) -> tuple[MockLogicLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
+        return (MockLogicLibrary(prgm, bindings), bindings)

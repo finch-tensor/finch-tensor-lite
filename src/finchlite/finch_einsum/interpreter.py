@@ -69,7 +69,6 @@ reduction_ops = {
 }
 
 
-
 class EinsumInterpreter(EinsumEvaluator):
     def __init__(self, xp=np, verbose=False):
         self.xp = xp
@@ -83,20 +82,21 @@ class EinsumInterpreter(EinsumEvaluator):
         )
         return machine(node)
 
+
 class PointwiseEinsumMachine:
     def __init__(self, xp, bindings, loops, verbose):
         self.xp = xp
         self.bindings = bindings
         self.loops = loops
         self.verbose = verbose
-    
+
     def __call__(self, node):
         xp = self.xp
         match node:
             case ein.Literal(val):
                 return val
             case ein.Alias(name):
-                if not name in self.bindings:
+                if name not in self.bindings:
                     raise ValueError(f"Unbound variable: {name}")
                 return self.bindings[name]
             case ein.Call(func, args):
@@ -126,7 +126,7 @@ class EinsumMachine:
         self.xp = xp
         self.bindings = bindings
         self.verbose = verbose
-    
+
     def __call__(self, node):
         xp = self.xp
         match node:
@@ -137,14 +137,16 @@ class EinsumMachine:
                 return res
             case ein.Produces(args):
                 for arg in args:
-                    if not arg in self.bindings:
+                    if arg not in self.bindings:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = arg.get_idxs()
                 assert set(idxs).issubset(loops)
                 loops = sorted(loops, key=lambda x: x.name)
-                ctx = PointwiseEinsumMachine(self.xp, self.bindings, loops, self.verbose)
+                ctx = PointwiseEinsumMachine(
+                    self.xp, self.bindings, loops, self.verbose
+                )
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
                 if op != overwrite:

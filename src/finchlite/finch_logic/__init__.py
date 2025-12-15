@@ -1,4 +1,9 @@
-from .interpreter import LogicInterpreter
+from .interpreter import (
+    LogicInterpreter,
+    MockLogicKernel,
+    MockLogicLibrary,
+    MockLogicLoader,
+)
 from .nodes import (
     Aggregate,
     Alias,
@@ -43,6 +48,9 @@ __all__ = [
     "LogicTransform",
     "LogicTree",
     "MapJoin",
+    "MockLogicKernel",
+    "MockLogicLibrary",
+    "MockLogicLoader",
     "Plan",
     "Produces",
     "Query",

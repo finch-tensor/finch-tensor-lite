@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from ..algebra import TensorFType
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
-from ..algebra import TensorFType
 from . import nodes as ein
 
 
@@ -13,7 +13,7 @@ class EinsumEvaluator(Stage):
         self,
         term: ein.EinsumNode,
         bindings: dict[ein.Alias, Any] | None = None,
-    ) -> Any | tuple[Any, ...]: #TODO eventually Any->Tensor
+    ) -> Any | tuple[Any, ...]:  # TODO eventually Any->Tensor
         """
         Evaluate the given logic.
         """

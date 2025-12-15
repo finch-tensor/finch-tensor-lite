@@ -101,6 +101,7 @@ def isolate_aggregates(root: LogicNode) -> LogicNode:
 
     return Rewrite(PostWalk(rule_0))(root)
 
+
 def isolate_tables(root: LogicNode) -> LogicNode:
     def rule_0(stmt):
         stack = []
@@ -135,7 +136,6 @@ def isolate_reformats(root: LogicNode) -> LogicNode:
                 return Subquery(name, ref)
 
     return Rewrite(PostWalk(rule_0))(root)
-
 
 
 def pretty_labels(root: LogicNode) -> LogicNode:
