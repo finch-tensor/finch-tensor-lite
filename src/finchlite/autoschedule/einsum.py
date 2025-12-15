@@ -96,3 +96,8 @@ class EinsumLowerer:
                 return ein.Literal(val=value)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
+
+#class EinsumCompiler:
+#    def __call__(self, prgm: lgc.LogicNode, bindings: dict[str, Any]) -> Any:
+#        interpreter = ein.EinsumInterpreter(bindings=bindings)
+#        return interpreter(prgm)

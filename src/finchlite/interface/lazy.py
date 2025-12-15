@@ -1896,13 +1896,13 @@ def einop(prgm, **kwargs):
     stmt = ein.parse_einop(prgm)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
-    ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
-    return ctx(prgm)[0]
+    ctx = ein.EinsumInterpreter(xp)
+    return ctx(prgm, dict(**kwargs))[0]
 
 
 def einsum(prgm, *args, **kwargs):
     stmt, bindings = ein.parse_einsum(prgm, *args)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
-    ctx = ein.EinsumInterpreter(xp, bindings)
-    return ctx(prgm)[0]
+    ctx = ein.EinsumInterpreter(xp)
+    return ctx(prgm, bindings)[0]
