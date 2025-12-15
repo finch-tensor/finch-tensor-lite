@@ -163,15 +163,17 @@ class NotationContext:
                     )
                 )
             case lgc.Produces(args):
+                vars: list[lgc.Alias] = []
                 for arg in args:
                     assert isinstance(arg, lgc.Alias)
+                    vars.append(arg)
                 return ntn.Block(
                     (
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
                                 ntn.Literal(tuple),
-                                tuple(self.bindings[arg].tns for arg in args),
+                                tuple(self.bindings[var].tns for var in vars),
                             )
                         ),
                     )
@@ -232,7 +234,7 @@ class NotationGenerator(LogicNotationLowerer):
 
 class LogicCompiler2(LogicLoader):
     def __init__(
-        self, ctx_lower: LogicNotationLowerer | None, ctx_load: NotationLoader | None
+        self, ctx_lower: LogicNotationLowerer | None=None, ctx_load: NotationLoader | None=None
     ):
         if ctx_lower is None:
             ctx_lower = NotationGenerator()
