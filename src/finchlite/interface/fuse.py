@@ -58,19 +58,19 @@ import numpy as np
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
 from finchlite.finch_logic.nodes import TableValue
-from finchlite.finch_notation.interpreter import NotationInterpreter
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
+from ..autoschedule.optimize2 import LogicNormalizer2
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
 from ..finch_logic import (
-    MockLogicLoader,
     Alias,
     Field,
     Literal,
+    MockLogicLoader,
     Plan,
     Produces,
     Query,
@@ -78,7 +78,6 @@ from ..finch_logic import (
 )
 from ..symbolic import Reflector, gensym
 from .lazy import lazy
-from ..autoschedule.optimize2 import LogicNormalizer2
 
 _DEFAULT_SCHEDULER = None
 
@@ -103,13 +102,7 @@ def set_default_scheduler(
 
     elif mode == Mode.INTERPRET_LOGIC:
         _DEFAULT_SCHEDULER = LogicNormalizer(
-            LogicExecutor(
-                LogicNormalizer2(
-                    LogicFormatter(
-                        MockLogicLoader()
-                    )
-                )
-            )
+            LogicExecutor(LogicNormalizer2(LogicFormatter(MockLogicLoader())))
         )
 
     elif mode == Mode.INTERPRET_NOTATION:

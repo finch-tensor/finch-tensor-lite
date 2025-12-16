@@ -1,35 +1,12 @@
-import re
-from collections.abc import Iterable
-from dataclasses import dataclass
-from functools import reduce
-from itertools import chain as join_chains
-from typing import overload
-
-from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
-
-from ..finch_logic import (
-    LogicExpression,
-    LogicNode,
-    LogicStatement,
-    LogicTree,
-    LogicLoader,
-    MockLogicLoader
-)
 from .. import finch_logic as lgc
+from ..finch_logic import LogicLoader, LogicNode, MockLogicLoader
 from ..symbolic import (
-    Chain,
-    Fixpoint,
-    Namespace,
-    PostOrderDFS,
     PostWalk,
-    PreWalk,
     Rewrite,
     gensym,
 )
-from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 
-
-"""
+r"""
 def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = propagate_map_queries_backward(prgm)
@@ -701,6 +678,7 @@ def materialize_squeeze_expand_productions(root):
     return Rewrite(PostWalk(rule_1))(root)
 """
 
+
 def isolate_aggregates(root: LogicNode) -> LogicNode:
     def transform(stmt):
         stack = []
@@ -725,6 +703,7 @@ def isolate_aggregates(root: LogicNode) -> LogicNode:
                 return None
 
     return Rewrite(PostWalk(transform))(root)
+
 
 class LogicNormalizer2(LogicLoader):
     def __init__(self, ctx=None):

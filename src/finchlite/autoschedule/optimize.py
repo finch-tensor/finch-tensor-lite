@@ -39,7 +39,6 @@ from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
-
     prgm = propagate_map_queries_backward(prgm)
 
     prgm = isolate_aggregates(prgm)

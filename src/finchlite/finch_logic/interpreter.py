@@ -5,9 +5,9 @@ import numpy as np
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.stages import LogicEvaluator
 
-from . import nodes as lgc
 from ..algebra import element_type, fill_value, fixpoint_type, return_type
 from ..symbolic import fisinstance
+from . import nodes as lgc
 from .nodes import (
     Aggregate,
     Alias,
@@ -168,7 +168,10 @@ class MockLogicKernel(AssemblyKernel):
 
     def __call__(self, *args):
         if len(args) != len(self.bindings):
-            raise ValueError(f"Wrong number of arguments passed to kernel, have {len(args)}, expected {len(self.bindings)}")
+            raise ValueError(
+                f"Wrong number of arguments passed to kernel, "
+                f"have {len(args)}, expected {len(self.bindings)}"
+            )
         bindings = {
             var: lgc.TableValue(tns, self.bindings[var].idxs)
             for var, tns in zip(self.bindings.keys(), args, strict=True)
