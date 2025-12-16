@@ -32,8 +32,8 @@ class LogicFormatterContext:
                     self(body)
             case lgc.Query(lhs, rhs):
                 fields = rhs.fields(self.fields)
-                element_type = rhs.element_type(self.element_types)
                 shape_type = rhs.shape_type(self.shape_types, self.fields)
+                element_type = rhs.element_type(self.element_types)
                 fill_value = rhs.fill_value(self.fill_values)
                 if lhs in self.bindings:
                     if self.bindings[lhs].tns.shape_type != shape_type:

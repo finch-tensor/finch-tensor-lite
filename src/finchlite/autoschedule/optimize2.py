@@ -15,6 +15,7 @@ from ..finch_logic import (
     LogicLoader,
     MockLogicLoader
 )
+from .. import finch_logic as lgc
 from ..symbolic import (
     Chain,
     Fixpoint,
@@ -63,30 +64,6 @@ def optimize(prgm: LogicNode) -> LogicNode:
     return normalize_names(prgm)
 
 
-def isolate_aggregates(root: LogicNode) -> LogicNode:
-    def rule_0(stmt):
-        stack = []
-
-        def rule_1(ex):
-            match ex:
-                case Aggregate(_, _, _, _) as agg:
-                    var = Alias(gensym("A"))
-                    stack.append(Query(var, agg))
-                    return var
-                case _:
-                    return None
-
-        match stmt:
-            case Query(lhs, rhs):
-                rhs = Rewrite(PostWalk(rule_1))(rhs)
-                return Plan((*stack, Query(lhs, rhs)))
-            case Produces(args):
-                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
-                return Plan((*stack, Produces(args)))
-            case _:
-                return None
-
-    return Rewrite(PostWalk(rule_0))(root)
 
 
 def isolate_tables(root: LogicNode) -> LogicNode:
@@ -724,6 +701,30 @@ def materialize_squeeze_expand_productions(root):
     return Rewrite(PostWalk(rule_1))(root)
 """
 
+def isolate_aggregates(root: LogicNode) -> LogicNode:
+    def transform(stmt):
+        stack = []
+
+        def rule_1(ex):
+            match ex:
+                case lgc.Aggregate(_, _, _, _) as agg:
+                    var = lgc.Alias(gensym("A"))
+                    stack.append(lgc.Query(var, agg))
+                    return var
+                case _:
+                    return None
+
+        match stmt:
+            case lgc.Query(lhs, rhs):
+                rhs = Rewrite(PostWalk(rule_1))(rhs)
+                return lgc.Plan((*stack, lgc.Query(lhs, rhs)))
+            case lgc.Produces(args):
+                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
+                return lgc.Plan((*stack, lgc.Produces(args)))
+            case _:
+                return None
+
+    return Rewrite(PostWalk(transform))(root)
 
 class LogicNormalizer2(LogicLoader):
     def __init__(self, ctx=None):
@@ -732,4 +733,5 @@ class LogicNormalizer2(LogicLoader):
         self.ctx = ctx
 
     def __call__(self, prgm: LogicNode, bindings):
+        prgm = isolate_aggregates(prgm)
         return self.ctx(prgm, bindings)

@@ -167,6 +167,8 @@ class MockLogicKernel(AssemblyKernel):
         self.bindings = bindings
 
     def __call__(self, *args):
+        if len(args) != len(self.bindings):
+            raise ValueError(f"Wrong number of arguments passed to kernel, have {len(args)}, expected {len(self.bindings)}")
         bindings = {
             var: lgc.TableValue(tns, self.bindings[var].idxs)
             for var, tns in zip(self.bindings.keys(), args, strict=True)

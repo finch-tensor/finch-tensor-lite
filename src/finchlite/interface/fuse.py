@@ -102,7 +102,15 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(MockLogicLoader()))))
+        _DEFAULT_SCHEDULER = LogicNormalizer(
+            LogicExecutor(
+                LogicNormalizer2(
+                    LogicFormatter(
+                        MockLogicLoader()
+                    )
+                )
+            )
+        )
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
