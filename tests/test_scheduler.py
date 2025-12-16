@@ -8,7 +8,6 @@ from finchlite.autoschedule import (
     concordize,
     flatten_plans,
     isolate_aggregates,
-    isolate_reformats,
     lift_fields,
     materialize_squeeze_expand_productions,
     normalize_names,
@@ -103,26 +102,6 @@ def test_propagate_fields():
     )
 
     result = propagate_fields(plan)
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    "node,pass_fn",
-    [
-        (Reformat(Literal(""), Reorder(Table(Literal(""), ()), ())), isolate_reformats),
-    ],
-)
-def test_isolate_passes(node, pass_fn):
-    plan = Plan((node, node, node))
-    expected = Plan(
-        (
-            Subquery(Alias(f"#A#{_sg.counter}"), node),
-            Subquery(Alias(f"#A#{_sg.counter + 1}"), node),
-            Subquery(Alias(f"#A#{_sg.counter + 2}"), node),
-        )
-    )
-
-    result = pass_fn(plan)
     assert result == expected
 
 

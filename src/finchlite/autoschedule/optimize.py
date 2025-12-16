@@ -23,7 +23,6 @@ from ..finch_logic import (
     Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
 )
 from ..symbolic import (
@@ -40,14 +39,11 @@ from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 
 
 def optimize(prgm: LogicNode) -> LogicNode:
-    prgm = lift_subqueries(prgm)
 
     prgm = propagate_map_queries_backward(prgm)
 
-    prgm = isolate_reformats(prgm)
     prgm = isolate_aggregates(prgm)
     prgm = isolate_tables(prgm)
-    prgm = lift_subqueries(prgm)
 
     prgm = pretty_labels(prgm)
 
@@ -128,16 +124,6 @@ def isolate_tables(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(rule_0))(root)
 
 
-def isolate_reformats(root: LogicNode) -> LogicNode:
-    def rule_0(node):
-        match node:
-            case Reformat() as ref:
-                name = Alias(gensym("A"))
-                return Subquery(name, ref)
-
-    return Rewrite(PostWalk(rule_0))(root)
-
-
 def pretty_labels(root: LogicNode) -> LogicNode:
     fields: dict[Field, Field] = {}
     aliases: dict[Alias, Alias] = {}
@@ -153,50 +139,6 @@ def pretty_labels(root: LogicNode) -> LogicNode:
                 return aliases.setdefault(a, Alias(f"A{len(aliases)}"))
 
     return Rewrite(PostWalk(Chain([rule_0, rule_1])))(root)
-
-
-@overload
-def _lift_subqueries_expr(
-    node: LogicExpression, bindings: dict[Alias, LogicExpression]
-) -> LogicExpression: ...
-@overload
-def _lift_subqueries_expr(
-    node: LogicNode, bindings: dict[Alias, LogicExpression]
-) -> LogicNode: ...
-def _lift_subqueries_expr(node, bindings):
-    match node:
-        case Subquery(lhs, arg):
-            if lhs not in bindings:
-                arg_2 = _lift_subqueries_expr(arg, bindings)
-                bindings[lhs] = arg_2
-            return lhs
-        case LogicTree() as tree:
-            return tree.make_term(
-                tree.head(),
-                *(_lift_subqueries_expr(x, bindings) for x in tree.children),
-            )
-        case _:
-            return node
-
-
-@overload
-def lift_subqueries(node: LogicStatement) -> LogicStatement: ...
-@overload
-def lift_subqueries(node: LogicNode) -> LogicNode: ...
-def lift_subqueries(node):
-    match node:
-        case Plan(bodies):
-            return Plan(tuple(map(lift_subqueries, bodies)))
-        case Query(lhs, rhs):
-            bindings: dict[Alias, LogicExpression] = {}
-            rhs_2 = _lift_subqueries_expr(rhs, bindings)
-            return Plan(
-                (*[Query(lhs, rhs) for lhs, rhs in bindings.items()], Query(lhs, rhs_2))
-            )
-        case Produces() as p:
-            return p
-        case _:
-            raise Exception(f"Invalid node: {node} in lift_subqueries")
 
 
 def _collect_productions(root: LogicNode) -> list[LogicNode]:
