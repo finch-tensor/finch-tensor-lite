@@ -78,6 +78,7 @@ from ..finch_logic import (
 )
 from ..symbolic import Reflector, gensym
 from .lazy import lazy
+from ..autoschedule.optimize2 import LogicNormalizer2
 
 _DEFAULT_SCHEDULER = None
 
@@ -101,7 +102,7 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER = ctx
 
     elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = LogicNormalizer(LogicExecutor(LogicFormatter(MockLogicLoader())))
+        _DEFAULT_SCHEDULER = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(MockLogicLoader()))))
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
