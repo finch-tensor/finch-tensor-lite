@@ -204,5 +204,7 @@ class MockLogicLoader(LogicLoader):
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
-    ) -> tuple[MockLogicLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
-        return (MockLogicLibrary(prgm, bindings), bindings)
+    ) -> tuple[
+        MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+    ]:
+        return (MockLogicLibrary(prgm, bindings), prgm, bindings)

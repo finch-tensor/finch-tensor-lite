@@ -23,7 +23,7 @@ class LogicLoader(ABC):
     @abstractmethod
     def __call__(
         self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, TableValueFType]]:
+    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TableValueFType]]:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called main which implements the logic. Also return a
@@ -61,7 +61,9 @@ class OptLogicLoader(LogicLoader):
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, lgc.TableValueFType],
-    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
+    ) -> tuple[
+        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+    ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
         return self.ctx(term, bindings)

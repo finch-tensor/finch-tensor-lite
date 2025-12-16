@@ -247,7 +247,9 @@ class LogicCompiler2(LogicLoader):
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
-    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
+    ) -> tuple[
+        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+    ]:
         mod = self.ctx_lower(prgm, bindings)
         lib = self.ctx_load(mod)
-        return lib, bindings
+        return lib, prgm, bindings

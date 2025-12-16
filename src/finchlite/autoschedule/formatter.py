@@ -95,7 +95,9 @@ class LogicFormatter(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, lgc.TableValueFType] | None = None,
-    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, lgc.TableValueFType]]:
+    ) -> tuple[
+        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+    ]:
         bindings = LogicFormatterContext(bindings)(prgm)
-        lib, bindings = self.loader(prgm, bindings)
-        return lib, bindings
+        lib, prgm, bindings = self.loader(prgm, bindings)
+        return lib, prgm, bindings

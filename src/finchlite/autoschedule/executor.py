@@ -168,7 +168,7 @@ class LogicExecutor(LogicEvaluator):
         stmt, bindings = extract_tables(stmt, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 
-        mod, binding_ftypes = self.ctx(stmt, binding_ftypes)
+        mod, stmt, binding_ftypes = self.ctx(stmt, binding_ftypes)
 
         bindings = ProvisionTensorsContext(bindings, binding_ftypes)(stmt)
         args = [tbl.tns for tbl in bindings.values()]
