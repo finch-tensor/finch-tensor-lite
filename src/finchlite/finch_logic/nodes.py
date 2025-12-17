@@ -225,6 +225,64 @@ class LogicStatement(LogicNode):
     values to Aliases. Logic statements evaluate to a tuple of table values.
     """
 
+    @abstractmethod
+    def infer_fields(
+        self, bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[Field, ...]]:
+        """Infers fields for all aliases defined in the statement. The fields
+        will be stored in the dictionary passed to the method."""
+        ...
+
+    @abstractmethod
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        ...
+
+    @abstractmethod
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        ...
+
+    def infer_shape_type(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[Any, ...]]:
+        """Infers shape_type for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_dimmap(merge_dim_type, dim_bindings, field_bindings)
+
+    def infer_shape(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[Any, ...]]:
+        """Infers shapes for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_dimmap(merge_dim, dim_bindings, field_bindings)
+
+    def infer_element_type(self, bindings: dict[Alias, Any]) -> dict[Alias, Any]:  # In the future should be FType
+        """Infers element types for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
+
+    def infer_fill_value(self, bindings: dict[Alias, Any]) -> dict[Alias, Any]:
+        """Infers fill_values for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
+
 
 @dataclass(eq=True, frozen=True)
 class Literal(LogicNode):
@@ -694,6 +752,54 @@ class Query(LogicTree, LogicStatement):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
 
+    def infer_fields(
+        self, bindings: dict[Alias, tuple[Field, ...]]
+    ) -> dict[Alias, tuple[Field, ...]]:
+        """Infers fields for all aliases defined in the statement. The fields
+        will be stored in the dictionary passed to the method."""
+        if self.lhs in bindings:
+            if self.rhs.fields(bindings) != bindings[self.lhs]:
+                raise ValueError(
+                    f"Cannot rebind alias {self.lhs} to a different fields"
+                )
+        else:
+            bindings[self.lhs] = self.rhs.fields(bindings)
+        return bindings
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        if self.lhs in dim_bindings:
+            if self.rhs.dimmap(op, dim_bindings, field_bindings) != dim_bindings[self.lhs]:
+                raise ValueError(
+                    f"Cannot rebind alias {self.lhs} to a different dims"
+                )
+        else:
+            dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings, field_bindings)
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return dim_bindings
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        if self.lhs in bindings:
+            if self.rhs.valmap(f, g, bindings) != bindings[self.lhs]:
+                raise ValueError(
+                    f"Cannot rebind alias {self.lhs} to a different values"
+                )
+        else:
+            bindings[self.lhs] = self.rhs.valmap(f, g, bindings)
+        return bindings
+
 
 @dataclass(eq=True, frozen=True)
 class Produces(LogicTree, LogicStatement):
@@ -716,6 +822,33 @@ class Produces(LogicTree, LogicStatement):
     def from_children(cls, *args):
         return cls(args)
 
+    def infer_fields(
+        self, bindings: dict[Alias, tuple[Field, ...]]
+    ) -> dict[Alias, tuple[Field, ...]]:
+        """Infers fields for all aliases defined in the statement. The fields
+        will be stored in the dictionary passed to the method."""
+        return bindings
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return dim_bindings
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return bindings
+
 
 @dataclass(eq=True, frozen=True)
 class Plan(LogicTree, LogicStatement):
@@ -728,6 +861,41 @@ class Plan(LogicTree, LogicStatement):
     """
 
     bodies: tuple[LogicStatement, ...] = ()
+
+
+    def infer_fields(
+        self, bindings: dict[Alias, tuple[Field, ...]]
+    ) -> dict[Alias, tuple[Field, ...]]:
+        """Infers fields for all aliases defined in the statement. The fields
+        will be stored in the dictionary passed to the method."""
+        for body in self.bodies:
+            body.infer_fields(bindings)
+        return bindings
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        field_bindings: dict[Alias, tuple[Field, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        for body in self.bodies:
+            body.infer_dimmap(op, dim_bindings, field_bindings)
+            body.infer_fields(field_bindings)
+        return dim_bindings
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        for body in self.bodies:
+            body.infer_valmap(f, g, bindings)
+        return bindings
 
     @property
     def children(self):
