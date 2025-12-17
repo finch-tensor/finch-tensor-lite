@@ -46,7 +46,7 @@ def reduce_element_type(op, z, t):
 
 
 def merge_fill_value(op, *args):
-    return return_type(op, *args)
+    return op(*args)
 
 
 def reduce_fill_value(op, z, t):
@@ -208,13 +208,11 @@ class LogicExpression(LogicNode):
         """Returns the shape of the node."""
         return self.dimmap(merge_dim, dim_bindings, field_bindings)
 
-    def element_type(
-        self, bindings: dict[Alias, Any] | None = None
-    ) -> Any:  # In the future should be FType
+    def element_type(self, bindings: dict[Alias, Any]) -> Any:  # In the future should be FType
         """Returns element type of the node."""
         return self.valmap(merge_element_type, reduce_element_type, bindings)
 
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
+    def fill_value(self, bindings: dict[Alias, Any]) -> Any:
         """Returns fill value of the node."""
         return self.valmap(merge_fill_value, reduce_fill_value, bindings)
 
@@ -430,13 +428,8 @@ class MapJoin(LogicTree, LogicExpression):
                     arg_dims[idx] = dim
         return tuple(arg_dims[f] for f in self.fields(field_bindings))
 
-    def valmap(
-        self,
-        f: Callable,
-        g: Callable,
-        bindings: dict[Alias, T],
-    ) -> T:
-        f(self.op.val, *[arg.valmap(f, g, bindings) for arg in self.args])
+    def valmap( self, f: Callable, g: Callable, bindings: dict[Alias, T],) -> T:
+        return f(self.op.val, *[arg.valmap(f, g, bindings) for arg in self.args])
 
     @classmethod
     def from_children(cls, op, *args):
