@@ -1,12 +1,23 @@
+from functools import reduce
+
+from ..algebra import overwrite
+
+from finchlite.symbolic.traversal import PostOrderDFS
+
 from .. import finch_logic as lgc
-from ..finch_logic import LogicLoader, LogicNode, MockLogicLoader
+from ..finch_logic import LogicLoader, MockLogicLoader, LogicStatement
 from ..symbolic import (
+    Chain,
+    Fixpoint,
+    Namespace,
+    PostOrderDFS,
     PostWalk,
     Rewrite,
     gensym,
 )
+from ._utils import intersect, is_subsequence, with_subsequence
 
-r"""
+"""
 def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = propagate_map_queries_backward(prgm)
@@ -45,7 +56,7 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
 def isolate_tables(root: LogicNode) -> LogicNode:
     def rule_0(stmt):
-        stack = []
+        stack = [
 
         def rule_1(ex):
             match ex:
@@ -415,29 +426,6 @@ def lift_fields(root):
     return Rewrite(PostWalk(Chain([rule_0, rule_1, rule_2])))(root)
 
 
-def flatten_plans(root):
-    def rule_0(ex):
-        match ex:
-            case Plan(bodies):
-                new_bodies = [
-                    tuple(body.bodies) if isinstance(body, Plan) else (body,)
-                    for body in bodies
-                ]
-                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies))
-                return Plan(flatten_bodies)
-
-    def rule_1(ex):
-        match ex:
-            case Plan(bodies):
-                body_iter = iter(bodies)
-                new_bodies = []
-                while (body := next(body_iter, None)) is not None:
-                    new_bodies.append(body)
-                    if isinstance(body, Produces):
-                        break
-                return Plan(tuple(new_bodies))
-
-    return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
 
 
 def _propagate_transpose_queries(root, bindings: dict[LogicNode, LogicNode]):
@@ -562,57 +550,6 @@ def set_loop_order(node: LogicNode) -> LogicNode:
     return _set_loop_order(node, {})
 
 
-def concordize(root: LogicNode) -> LogicNode:
-    needed_swizzles: dict[Alias, dict[tuple[Field, ...], Alias]] = {}
-    namespace = Namespace()
-    # update namespace
-    unique_leaves: set[Alias | Field] = set()
-    for node in PostOrderDFS(root):
-        match node:
-            case Alias(_) | Field(_):
-                unique_leaves.add(node)
-    for leaf in unique_leaves:
-        namespace.freshen(leaf.name)
-
-    def rule_0(ex):
-        match ex:
-            case Reorder(Relabel(Alias(_) as alias, idxs_1), idxs_2):
-                if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
-                    idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
-                    perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
-                    return Reorder(
-                        Relabel(
-                            needed_swizzles.setdefault(alias, {}).setdefault(
-                                perm, Alias(namespace.freshen(alias.name))
-                            ),
-                            idxs_subseq,
-                        ),
-                        idxs_2,
-                    )
-                return None
-
-    def rule_1(ex):
-        match ex:
-            case Query(lhs, rhs) as q if lhs in needed_swizzles:
-                idxs = tuple(rhs.fields())
-                swizzle_queries = tuple(
-                    Query(
-                        alias, Reorder(Relabel(lhs, idxs), tuple(idxs[p] for p in perm))
-                    )
-                    for perm, alias in needed_swizzles[lhs].items()
-                )
-
-                return Plan((q, *swizzle_queries))
-
-    root = flatten_plans(root)
-    match root:
-        case Plan((*bodies, Produces(_) as prod)):
-            root = Plan(tuple(bodies))
-            root = Rewrite(PostWalk(rule_0))(root)
-            root = Rewrite(PostWalk(rule_1))(root)
-            return flatten_plans(Plan((root, prod)))
-        case _:
-            raise Exception(f"Invalid root: {root}")
 
 
 def normalize_names(root: LogicNode) -> LogicNode:
@@ -676,10 +613,72 @@ def materialize_squeeze_expand_productions(root):
                 return Plan(tuple(preamble + [Produces(new_bodies)]))
 
     return Rewrite(PostWalk(rule_1))(root)
+
+def concordize(root: LogicNode) -> LogicNode:
+    needed_swizzles: dict[lgc.Alias, dict[tuple[lgc.Field, ...], lgc.Alias]] = {}
+    namespace = Namespace()
+    # update namespace
+    unique_leaves: set[lgc.Alias | lgc.Field] = set()
+    for node in PostOrderDFS(root):
+        match node:
+            case lgc.Alias(_) | lgc.Field(_):
+                unique_leaves.add(node)
+    for leaf in unique_leaves:
+        namespace.freshen(leaf.name)
+
+    def rule_0(ex):
+        match ex:
+            case lgc.Query(lhs, lgc.Aggregate(_, _, lgc.Reorder(arg, idxs_1), idxs_2)):
+                def rule_2(ex):
+                    match ex:
+                        case lgc.Alias(_) as var:
+                            rule_2(Relabel(var, fields[var]))
+
+                
+                if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
+                    idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
+                    perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
+                    return lgc.Reorder(
+                        lgc.Relabel(
+                            needed_swizzles.setdefault(alias, {}).setdefault(
+                                perm, lgc.Alias(namespace.freshen(alias.name))
+                            ),
+                            idxs_subseq,
+                        ),
+                        idxs_2,
+                    )
+                return None
+
+    def rule_1(ex):
+        match ex:
+            case lgc.Query(lhs, rhs) as q if lhs in needed_swizzles:
+                idxs = tuple(rhs.fields())
+                swizzle_queries = tuple(
+                    lgc.Query(
+                        alias,
+                        lgc.Reorder(
+                            lgc.Relabel(lhs, idxs), tuple(idxs[p] for p in perm)
+                        ),
+                    )
+                    for perm, alias in needed_swizzles[lhs].items()
+                )
+
+                return lgc.Plan((q, *swizzle_queries))
+
+    root = flatten_plans(root)
+    match root:
+        case lgc.Plan((*bodies, lgc.Produces(_) as prod)):
+            root = lgc.Plan(tuple(bodies))
+            root = Rewrite(PostWalk(rule_0))(root)
+            root = Rewrite(PostWalk(rule_1))(root)
+            return flatten_plans(lgc.Plan((root, prod)))
+        case _:
+            raise Exception(f"Invalid root: {root}")
+
 """
 
 
-def isolate_aggregates(root: LogicNode) -> LogicNode:
+def isolate_aggregates(root: LogicStatement) -> LogicStatement:
     def transform(stmt):
         stack = []
 
@@ -705,12 +704,75 @@ def isolate_aggregates(root: LogicNode) -> LogicNode:
     return Rewrite(PostWalk(transform))(root)
 
 
+def standardize_query_roots(
+    root: LogicStatement, bindings
+) -> LogicStatement:
+    fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
+    fill_values = root.infer_fill_value({var:val.tns.fill_value for var, val in bindings.items()})
+
+    def rule(ex):
+        match ex:
+            case lgc.Query(
+                lhs,
+                lgc.Aggregate(op, init, lgc.Reorder(arg, idxs_1), idxs_2) as rhs,
+            ):
+                return ex
+            case lgc.Query(lhs, lgc.Aggregate(op, init, arg, idxs_2) as rhs):
+                idxs_1 = arg.fields(fields)
+                return lgc.Query(
+                    lhs, lgc.Aggregate(op, init, lgc.Reorder(arg, idxs_1), idxs_2)
+                )
+            case lgc.Query(lhs, lgc.Reorder()):
+                return ex
+            case lgc.Query(lhs, rhs):
+                return lgc.Query(
+                    lhs,
+                    lgc.Aggregate(
+                        lgc.Literal(overwrite),
+                        lgc.Literal(rhs.fill_value(fill_values)),
+                        lgc.Reorder(rhs, rhs.fields(fields)),
+                        (),
+                    ),
+                )
+            case lgc.Query(lhs, rhs):
+                return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields(fields)))
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def flatten_plans(root):
+    def rule_0(ex):
+        match ex:
+            case lgc.Plan(bodies):
+                new_bodies = [
+                    tuple(body.bodies) if isinstance(body, lgc.Plan) else (body,)
+                    for body in bodies
+                ]
+                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies))
+                return lgc.Plan(flatten_bodies)
+
+    def rule_1(ex):
+        match ex:
+            case lgc.Plan(bodies):
+                body_iter = iter(bodies)
+                new_bodies = []
+                while (body := next(body_iter, None)) is not None:
+                    new_bodies.append(body)
+                    if isinstance(body, lgc.Produces):
+                        break
+                return lgc.Plan(tuple(new_bodies))
+
+    return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+
+
+
 class LogicNormalizer2(LogicLoader):
     def __init__(self, ctx=None):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx = ctx
 
-    def __call__(self, prgm: LogicNode, bindings):
+    def __call__(self, prgm: LogicStatement, bindings):
         prgm = isolate_aggregates(prgm)
+        prgm = standardize_query_roots(prgm, bindings)
         return self.ctx(prgm, bindings)
