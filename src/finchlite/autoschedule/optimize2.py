@@ -19,6 +19,7 @@ from ..symbolic import (
 from ..finch_logic import (
     Aggregate,
     Alias,
+    TableValueFType,
     Field,
     Literal,
     LogicExpression,
@@ -698,7 +699,6 @@ def standardize_query_roots(
     return Rewrite(PostWalk(rule))(root)
 
 
-"""
 def concordize(root: LogicStatement, bindings:dict[Alias, TableValueFType]) -> LogicStatement:
     fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
 
@@ -746,7 +746,6 @@ def concordize(root: LogicStatement, bindings:dict[Alias, TableValueFType]) -> L
             return flatten_plans(Plan((root, prod)))
         case _:
             raise Exception(f"Invalid root: {root}")
-"""
 
 
 def push_fields(root:LogicStatement, bindings):
@@ -820,7 +819,7 @@ def flatten_plans(root):
                     tuple(body.bodies) if isinstance(body, Plan) else (body,)
                     for body in bodies
                 ]
-                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies))
+                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies, ()))
                 return Plan(flatten_bodies)
 
     def rule_1(ex):
@@ -848,4 +847,5 @@ class LogicNormalizer2(LogicLoader):
         prgm = isolate_aggregates(prgm)
         prgm = standardize_query_roots(prgm, bindings)
         prgm = push_fields(prgm, bindings)
+        prgm = concordize(prgm, bindings)
         return self.ctx(prgm, bindings)
