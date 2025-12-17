@@ -37,6 +37,22 @@ def merge_dim(d1, d2):
     return d1 or d2
 
 
+def merge_element_type(op, *args):
+    return return_type(op, *args)
+
+
+def reduce_element_type(op, z, t):
+    return fixpoint_type(op, z, t)
+
+
+def merge_fill_value(op, *args):
+    return return_type(op, *args)
+
+
+def reduce_fill_value(op, z, t):
+    return z
+
+
 """
 Notes on Finch Logic IR:
 Finch Logic IR is an intermediate representation (IR) used in the Finch Tensor
@@ -153,7 +169,7 @@ class LogicExpression(LogicNode):
         ...
 
     @abstractmethod
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
@@ -164,13 +180,25 @@ class LogicExpression(LogicNode):
         is combined with None."""
         ...
 
+    @abstractmethod
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        """Compute per-tensor values. `f(op, args)` is used to combine values in
+        mapjoin, and `g(op, init, arg)` is used to combine values in
+        aggregation."""
+        ...
+
     def shape_type(
         self,
         dim_bindings: dict[Alias, tuple[Any, ...]],
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[Any, ...]:
         """Returns the shape type of the node."""
-        return self.mapdims(merge_dim_type, dim_bindings, field_bindings)
+        return self.dimmap(merge_dim_type, dim_bindings, field_bindings)
 
     def shape(
         self,
@@ -178,19 +206,17 @@ class LogicExpression(LogicNode):
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[Any, ...]:
         """Returns the shape of the node."""
-        return self.mapdims(merge_dim, dim_bindings, field_bindings)
+        return self.dimmap(merge_dim, dim_bindings, field_bindings)
 
-    @abstractmethod
     def element_type(
         self, bindings: dict[Alias, Any] | None = None
     ) -> Any:  # In the future should be FType
         """Returns element type of the node."""
-        ...
+        return self.valmap(merge_element_type, reduce_element_type, bindings)
 
-    @abstractmethod
     def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
         """Returns fill value of the node."""
-        ...
+        return self.valmap(merge_fill_value, reduce_fill_value, bindings)
 
 
 class LogicStatement(LogicNode):
@@ -292,7 +318,7 @@ class Alias(LogicExpression, NamedTerm):
             raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
         return bindings[self]
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
@@ -302,18 +328,14 @@ class Alias(LogicExpression, NamedTerm):
             raise NotImplementedError("Cannot resolve dims of Alias {self.name}")
         return dim_bindings[self]
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns element type of the node."""
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
         if bindings is None or self not in bindings:
-            raise NotImplementedError(
-                "Cannot resolve element_type of Alias {self.name}"
-            )
-        return bindings[self]
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns fill value of the node."""
-        if bindings is None or self not in bindings:
-            raise NotImplementedError("Cannot resolve fill_value of Alias {self.name}")
+            raise NotImplementedError("Cannot resolve value of Alias {self.name}")
         return bindings[self]
 
 
@@ -342,7 +364,7 @@ class Table(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.idxs
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
@@ -350,21 +372,13 @@ class Table(LogicTree, LogicExpression):
     ) -> tuple[T | None, ...]:
         raise NotImplementedError("Cannot resolve dims of Tables")
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns element type of the node."""
-        if isinstance(self.tns, Literal):
-            return ftype(self.tns.val.element_type)
-        if isinstance(self.tns, Value):
-            return self.tns.type_.element_type
-        raise ValueError(f"Unknown tensor type: {type(self.tns)}")
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns fill value of the node."""
-        if isinstance(self.tns, Literal):
-            return self.tns.val.fill_value
-        if isinstance(self.tns, Value):
-            return self.tns.type_.fill_value
-        raise ValueError(f"Unknown tensor type: {type(self.tns)}")
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
     def from_children(cls, tns, *idxs):
@@ -399,7 +413,7 @@ class MapJoin(LogicTree, LogicExpression):
         args_fields = [x.fields(bindings) for x in self.args]
         return tuple(dict.fromkeys([f for fs in args_fields for f in fs]))
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
@@ -407,7 +421,7 @@ class MapJoin(LogicTree, LogicExpression):
     ) -> tuple[T | None, ...]:
         arg_dims: dict[Field, T | None] = {}
         for arg in self.args:
-            dims = arg.mapdims(op, dim_bindings, field_bindings)
+            dims = arg.dimmap(op, dim_bindings, field_bindings)
             fields = arg.fields(field_bindings)
             for idx, dim in zip(fields, dims, strict=True):
                 if idx in arg_dims:
@@ -416,13 +430,13 @@ class MapJoin(LogicTree, LogicExpression):
                     arg_dims[idx] = dim
         return tuple(arg_dims[f] for f in self.fields(field_bindings))
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return return_type(
-            self.op.val, *[arg.element_type(bindings) for arg in self.args]
-        )
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return self.op.val(*[arg.fill_value(bindings) for arg in self.args])
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        f(self.op.val, *[arg.valmap(f, g, bindings) for arg in self.args])
 
     @classmethod
     def from_children(cls, op, *args):
@@ -460,25 +474,25 @@ class Aggregate(LogicTree, LogicExpression):
             field for field in self.arg.fields(bindings) if field not in self.idxs
         )
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[T | None, ...]:
         idxs = self.arg.fields(field_bindings)
-        dims = self.arg.mapdims(op, dim_bindings, field_bindings)
+        dims = self.arg.dimmap(op, dim_bindings, field_bindings)
         return tuple(
             val for idx, val in zip(idxs, dims, strict=True) if idx not in self.idxs
         )
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return fixpoint_type(
-            self.op.val, self.init.val, self.arg.element_type(bindings)
-        )
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return self.init.val
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return g(self.op.val, self.init.val, self.arg.valmap(f, g, bindings))
 
     @classmethod
     def from_children(cls, op, init, arg, *idxs):
@@ -511,14 +525,14 @@ class Reorder(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.idxs
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[T | None, ...]:
         idxs = self.arg.fields(field_bindings)
-        dims = self.arg.mapdims(op, dim_bindings, field_bindings)
+        dims = self.arg.dimmap(op, dim_bindings, field_bindings)
         idx_dims = dict(zip(idxs, dims, strict=True))
         for idx in idxs:
             if idx not in self.idxs:
@@ -526,11 +540,13 @@ class Reorder(LogicTree, LogicExpression):
                 op(idx_dims[idx], None)
         return tuple(idx_dims.get(f) for f in self.idxs)
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return self.arg.element_type(bindings)
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        return self.arg.fill_value(bindings)
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.arg.valmap(f, g, bindings)
 
     @classmethod
     def from_children(cls, arg, *idxs):
@@ -557,21 +573,21 @@ class Relabel(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.idxs
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[T | None, ...]:
-        return self.arg.mapdims(op, dim_bindings, field_bindings)
+        return self.arg.dimmap(op, dim_bindings, field_bindings)
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns element type of the node."""
-        return self.arg.element_type(bindings)
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns fill value of the node."""
-        return self.arg.fill_value(bindings)
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.arg.valmap(f, g, bindings)
 
     @property
     def children(self):
@@ -602,21 +618,21 @@ class Reformat(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.arg.fields(bindings)
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[T | None, ...]:
-        return self.arg.mapdims(op, dim_bindings, field_bindings)
+        return self.arg.dimmap(op, dim_bindings, field_bindings)
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns element type of the node."""
-        return self.arg.element_type(bindings)
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns fill value of the node."""
-        return self.arg.fill_value(bindings)
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.arg.valmap(f, g, bindings)
 
     @property
     def children(self):
@@ -644,21 +660,21 @@ class Subquery(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.arg.fields(bindings)
 
-    def mapdims(
+    def dimmap(
         self,
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[T | None, ...]:
-        return self.arg.mapdims(op, dim_bindings, field_bindings)
+        return self.arg.dimmap(op, dim_bindings, field_bindings)
 
-    def element_type(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns element type of the node."""
-        return self.arg.element_type(bindings)
-
-    def fill_value(self, bindings: dict[Alias, Any] | None = None) -> Any:
-        """Returns fill value of the node."""
-        return self.arg.fill_value(bindings)
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.arg.valmap(f, g, bindings)
 
     @property
     def children(self):
