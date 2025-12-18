@@ -208,7 +208,9 @@ class LogicExpression(LogicNode):
         """Returns the shape of the node."""
         return self.dimmap(merge_dim, dim_bindings, field_bindings)
 
-    def element_type(self, bindings: dict[Alias, Any]) -> Any:  # In the future should be FType
+    def element_type(
+        self, bindings: dict[Alias, Any]
+    ) -> Any:  # In the future should be FType
         """Returns element type of the node."""
         return self.valmap(merge_element_type, reduce_element_type, bindings)
 
@@ -227,7 +229,8 @@ class LogicStatement(LogicNode):
 
     @abstractmethod
     def infer_fields(
-        self, bindings: dict[Alias, tuple[Field, ...]],
+        self,
+        bindings: dict[Alias, tuple[Field, ...]],
     ) -> dict[Alias, tuple[Field, ...]]:
         """Infers fields for all aliases defined in the statement. The fields
         will be stored in the dictionary passed to the method."""
@@ -273,7 +276,9 @@ class LogicStatement(LogicNode):
         will be stored in the dictionary passed to the method."""
         return self.infer_dimmap(merge_dim, dim_bindings, field_bindings)
 
-    def infer_element_type(self, bindings: dict[Alias, Any]) -> dict[Alias, Any]:  # In the future should be FType
+    def infer_element_type(
+        self, bindings: dict[Alias, Any]
+    ) -> dict[Alias, Any]:  # In the future should be FType
         """Infers element types for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
@@ -486,7 +491,12 @@ class MapJoin(LogicTree, LogicExpression):
                     arg_dims[idx] = dim
         return tuple(arg_dims[f] for f in self.fields(field_bindings))
 
-    def valmap( self, f: Callable, g: Callable, bindings: dict[Alias, T],) -> T:
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
         return f(self.op.val, *[arg.valmap(f, g, bindings) for arg in self.args])
 
     @classmethod
@@ -773,10 +783,11 @@ class Query(LogicTree, LogicStatement):
         field_bindings: dict[Alias, tuple[Field, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
         if self.lhs in dim_bindings:
-            if self.rhs.dimmap(op, dim_bindings, field_bindings) != dim_bindings[self.lhs]:
-                raise ValueError(
-                    f"Cannot rebind alias {self.lhs} to a different dims"
-                )
+            if (
+                self.rhs.dimmap(op, dim_bindings, field_bindings)
+                != dim_bindings[self.lhs]
+            ):
+                raise ValueError(f"Cannot rebind alias {self.lhs} to a different dims")
         else:
             dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings, field_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results
@@ -861,7 +872,6 @@ class Plan(LogicTree, LogicStatement):
     """
 
     bodies: tuple[LogicStatement, ...] = ()
-
 
     def infer_fields(
         self, bindings: dict[Alias, tuple[Field, ...]]

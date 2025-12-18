@@ -19,11 +19,11 @@ from .operator import (
     conjugate,
     first_arg,
     identity,
+    make_tuple,
     overwrite,
     promote_max,
     promote_min,
     repeat_operator,
-    make_tuple,
 )
 from .tensor import (
     Tensor,
@@ -54,6 +54,7 @@ __all__ = [
     "is_distributive",
     "is_idempotent",
     "is_identity",
+    "make_tuple",
     "overwrite",
     "promote_max",
     "promote_min",
@@ -62,6 +63,5 @@ __all__ = [
     "register_property",
     "repeat_operator",
     "return_type",
-    "make_tuple",
     "shape_type",
 ]

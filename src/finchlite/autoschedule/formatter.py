@@ -1,4 +1,3 @@
-from typing import Any
 import numpy as np
 
 from finchlite.finch_assembly import AssemblyLibrary
@@ -28,18 +27,23 @@ class LogicFormatter(LogicLoader):
     ]:
         bindings = bindings.copy()
         fields = prgm.infer_fields({var: val.idxs for var, val in bindings.items()})
-        shape_types = prgm.infer_shape_type({var: val.tns.shape_type for var, val in bindings.items()}, fields)
-        element_types = prgm.infer_element_type({var: val.tns.element_type for var, val in bindings.items()})
+        shape_types = prgm.infer_shape_type(
+            {var: val.tns.shape_type for var, val in bindings.items()}, fields
+        )
+        element_types = prgm.infer_element_type(
+            {var: val.tns.element_type for var, val in bindings.items()}
+        )
 
         def formatter(node: lgc.LogicStatement):
             match node:
                 case lgc.Plan(bodies):
                     for body in bodies:
                         formatter(body)
-                case lgc.Query(lhs, rhs):
-                    if not lhs in bindings:
+                case lgc.Query(lhs, _):
+                    if lhs not in bindings:
                         shape_type = tuple(
-                            dim if dim is not None else np.intp for dim in shape_types[lhs]
+                            dim if dim is not None else np.intp
+                            for dim in shape_types[lhs]
                         )
 
                         # TODO: This constructor is awful
@@ -51,15 +55,16 @@ class LogicFormatter(LogicLoader):
                                 struct_name=gensym("ugh"), struct_formats=shape_type
                             ),
                         )
-                        #tns = NDArrayFType(element_type, np.intp(len(shape_type)))
+                        # tns = NDArrayFType(element_type, np.intp(len(shape_type)))
                         bindings[lhs] = TableValueFType(tns, fields[lhs])
                 case lgc.Produces(_):
                     pass
                 case _:
-                    raise ValueError(f"Unsupported logic statement for formatting: {node}")
+                    raise ValueError(
+                        f"Unsupported logic statement for formatting: {node}"
+                    )
 
         formatter(prgm)
-
 
         lib, prgm, bindings = self.loader(prgm, bindings)
         return lib, prgm, bindings

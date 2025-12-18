@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import numpy as np
+import operator
 from collections.abc import Iterable
 from typing import Any
-import operator
+
+import numpy as np
 
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
@@ -11,14 +12,14 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..finch_notation import NotationInterpreter
-from ..algebra import overwrite, make_tuple
+from ..algebra import make_tuple, overwrite
 from ..compile import Extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     LogicLoader,
     TableValueFType,
 )
+from ..finch_notation import NotationInterpreter
 from .stages import LogicNotationLowerer
 
 
@@ -49,7 +50,15 @@ class PointwiseContext:
                     )
                 )
             case lgc.Relabel(arg, idxs):
-                return self(arg, {idx_1: loops[idx_2] for idx_1, idx_2 in zip(arg.fields(self.ctx.fields), idxs)})
+                return self(
+                    arg,
+                    {
+                        idx_1: loops[idx_2]
+                        for idx_1, idx_2 in zip(
+                            arg.fields(self.ctx.fields), idxs, strict=True
+                        )
+                    },
+                )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -102,19 +111,27 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(
-                lhs, lgc.Reorder(lgc.Alias(_) as arg, idxs)
-            ):
-                return self(lgc.Query(lhs, lgc.Reorder(lgc.Relabel(arg, arg.fields(self.fields)), idxs)))
+            case lgc.Query(lhs, lgc.Reorder(lgc.Alias(_) as arg, idxs)):
+                return self(
+                    lgc.Query(
+                        lhs,
+                        lgc.Reorder(lgc.Relabel(arg, arg.fields(self.fields)), idxs),
+                    )
+                )
             case lgc.Query(
                 lhs, lgc.Reorder(lgc.Relabel(lgc.Alias(_), idxs_1) as arg, idxs_2)
             ):
                 arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
                 shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
-                shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1 + idxs_2}
+                shapes = {
+                    idx: shapes_map.get(idx) or ntn.Literal(1)
+                    for idx in idxs_1 + idxs_2
+                }
                 arg_types = arg.shape_type(self.shape_types, self.fields)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
-                shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1 + idxs_2}
+                shape_type = {
+                    idx: shape_type_map.get(idx) or np.intp for idx in idxs_1 + idxs_2
+                }
                 loop_idxs = []
                 remap_idxs = {}
                 out_idxs = iter(idxs_2)
@@ -125,7 +142,9 @@ class NotationContext:
                     if idx == out_idx:
                         out_idx = next(out_idxs, None)
                         new_idxs.append(idx)
-                    while (out_idx in loop_idxs or out_idx not in idxs_1) and out_idx != None:
+                    while (
+                        out_idx in loop_idxs or out_idx not in idxs_1
+                    ) and out_idx is not None:
                         if out_idx in loop_idxs:
                             new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
                             remap_idxs[new_idx] = out_idx
@@ -135,7 +154,9 @@ class NotationContext:
                             loop_idxs.append(out_idx)
                             new_idxs.append(out_idx)
                         out_idx = next(out_idxs, None)
-                while (out_idx in loop_idxs or out_idx not in idxs_1) and out_idx != None:
+                while (
+                    out_idx in loop_idxs or out_idx not in idxs_1
+                ) and out_idx is not None:
                     if out_idx in loop_idxs:
                         new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
                         remap_idxs[new_idx] = out_idx
@@ -146,7 +167,10 @@ class NotationContext:
                         new_idxs.append(out_idx)
                     out_idx = next(out_idxs, None)
                 loops = {
-                    idx: ntn.Variable(gensym(idx.name), shape_type.get(idx) or shape_type[remap_idxs[idx]])
+                    idx: ntn.Variable(
+                        gensym(idx.name),
+                        shape_type.get(idx) or shape_type[remap_idxs[idx]],
+                    )
                     for idx in loop_idxs
                 }
                 ctx = PointwiseContext(self)
@@ -159,13 +183,16 @@ class NotationContext:
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(loop_idxs):
                     t = loops[idx].type_
-                    ext = ntn.Call(ntn.Literal(Extent),
-                        (ntn.Literal(t(0)),
-                        shapes.get(idx) or shapes[remap_idxs[idx]]),
+                    ext = ntn.Call(
+                        ntn.Literal(Extent),
+                        (ntn.Literal(t(0)), shapes.get(idx) or shapes[remap_idxs[idx]]),
                     )
                     if idx in remap_idxs:
                         body = ntn.If(
-                            ntn.Call(ntn.Literal(operator.eq), (loops[idx], loops[remap_idxs[idx]])),
+                            ntn.Call(
+                                ntn.Literal(operator.eq),
+                                (loops[idx], loops[remap_idxs[idx]]),
+                            ),
                             body,
                         )
                     body = ntn.Loop(
@@ -173,8 +200,7 @@ class NotationContext:
                         ext,
                         body,
                     )
-                
-                
+
                 return ntn.Block(
                     (
                         ntn.Declare(
@@ -191,7 +217,13 @@ class NotationContext:
                     )
                 )
             case lgc.Query(
-                lhs, lgc.Aggregate(lgc.Literal(op), lgc.Literal(init), lgc.Reorder(arg, idxs_1) as arg_2, idxs_2)
+                lhs,
+                lgc.Aggregate(
+                    lgc.Literal(op),
+                    lgc.Literal(init),
+                    lgc.Reorder(arg, idxs_1) as arg_2,
+                    idxs_2,
+                ),
             ):
                 # Build a dict mapping fields to their shapes
                 arg_dims = arg_2.dimmap(merge_shapes, self.shapes, self.fields)
@@ -214,9 +246,9 @@ class NotationContext:
                 body = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(idxs_1):
                     t = loops[idx].type_
-                    ext = ntn.Call(ntn.Literal(Extent),
-                        (ntn.Literal(t(0)),
-                        shapes[idx]),
+                    ext = ntn.Call(
+                        ntn.Literal(Extent),
+                        (ntn.Literal(t(0)), shapes[idx]),
                     )
                     body = ntn.Loop(
                         loops[idx],

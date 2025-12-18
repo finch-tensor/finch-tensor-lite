@@ -4,7 +4,6 @@ import numpy as np
 
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.stages import LogicEvaluator
-from finchlite.symbolic import ftype
 
 from ..algebra import element_type, fill_value, fixpoint_type, return_type
 from ..symbolic import fisinstance

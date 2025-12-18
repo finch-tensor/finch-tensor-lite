@@ -1,41 +1,34 @@
 from functools import reduce
 
 from ..algebra import overwrite
-
-from finchlite.symbolic.traversal import PostOrderDFS
-
-from .. import finch_logic as lgc
-from ..finch_logic import LogicLoader, MockLogicLoader, LogicStatement
+from ..finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    LogicLoader,
+    LogicStatement,
+    MapJoin,
+    MockLogicLoader,
+    Plan,
+    Produces,
+    Query,
+    Relabel,
+    Reorder,
+    Table,
+    TableValueFType,
+)
 from ..symbolic import (
     Chain,
     Fixpoint,
     Namespace,
-    PostOrderDFS,
-    PreWalk,
     PostWalk,
+    PreWalk,
     Rewrite,
     gensym,
 )
-from ..finch_logic import (
-    Aggregate,
-    Alias,
-    TableValueFType,
-    Field,
-    Literal,
-    LogicExpression,
-    LogicNode,
-    LogicStatement,
-    LogicTree,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Reformat,
-    Relabel,
-    Reorder,
-    Table,
-)
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
+
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
     def transform(stmt):
@@ -63,11 +56,11 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(transform))(root)
 
 
-def standardize_query_roots(
-    root: LogicStatement, bindings
-) -> LogicStatement:
-    fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
-    fill_values = root.infer_fill_value({var:val.tns.fill_value for var, val in bindings.items()})
+def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
+    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
+    fill_values = root.infer_fill_value(
+        {var: val.tns.fill_value for var, val in bindings.items()}
+    )
 
     def rule(ex):
         match ex:
@@ -78,9 +71,7 @@ def standardize_query_roots(
                 return ex
             case Query(lhs, Aggregate(op, init, arg, idxs_2) as rhs):
                 idxs_1 = arg.fields(fields)
-                return Query(
-                    lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)
-                )
+                return Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2))
             case Query(lhs, Reorder(Relabel(Alias(), idxs_1), idxs_2)):
                 return ex
             case Query(lhs, Reorder(Alias(), idxs_2)):
@@ -105,8 +96,10 @@ def standardize_query_roots(
     return Rewrite(PostWalk(rule))(root)
 
 
-def concordize(root: LogicStatement, bindings:dict[Alias, TableValueFType]) -> LogicStatement:
-    fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
+def concordize(
+    root: LogicStatement, bindings: dict[Alias, TableValueFType]
+) -> LogicStatement:
+    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
 
     needed_swizzles: dict[Alias, dict[tuple[Field, ...], Alias]] = {}
     namespace = Namespace(root)
@@ -114,7 +107,7 @@ def concordize(root: LogicStatement, bindings:dict[Alias, TableValueFType]) -> L
     def rule_0(ex):
         match ex:
             case Reorder(Alias(_) as var, idxs_2):
-                rule_0(Reorder(Relabel(var, fields[var]), idxs_2))
+                return rule_0(Reorder(Relabel(var, fields[var]), idxs_2))
             case Reorder(Relabel(Alias(_) as var, idxs_1), idxs_2):
                 if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
                     idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
@@ -154,8 +147,8 @@ def concordize(root: LogicStatement, bindings:dict[Alias, TableValueFType]) -> L
             raise Exception(f"Invalid root: {root}")
 
 
-def push_fields(root:LogicStatement, bindings):
-    fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
+def push_fields(root: LogicStatement, bindings):
+    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
 
     def rule_1(ex):
         match ex:
@@ -171,7 +164,9 @@ def push_fields(root:LogicStatement, bindings):
             case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
                 diff_idxs = setdiff(arg.fields(fields), agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
-                relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields(fields))
+                relabeled_idxs = tuple(
+                    reidx_dict.get(idx, idx) for idx in arg.fields(fields)
+                )
                 return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
             case Relabel(Relabel(arg, _), idxs):
                 return Relabel(arg, idxs)
@@ -183,16 +178,15 @@ def push_fields(root:LogicStatement, bindings):
             case Relabel(Table(arg, _), idxs):
                 return Table(arg, idxs)
 
-    root = Rewrite(
-        PreWalk(Fixpoint(rule_1))
-    )(root) # ignore[type-arg]
-
+    root = Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]
 
     def rule_2(ex):
         match ex:
             case Reorder(Reorder(arg, _), idxs):
                 return Reorder(arg, idxs)
-            case Reorder(MapJoin(op, args), idxs) if not all(isinstance(arg, Reorder) for arg in args):
+            case Reorder(MapJoin(op, args), idxs) if not all(
+                isinstance(arg, Reorder) for arg in args
+            ):
                 return Reorder(
                     MapJoin(
                         op,
@@ -216,6 +210,7 @@ def push_fields(root:LogicStatement, bindings):
                 )
 
     return Rewrite(PreWalk(Fixpoint(rule_2)))(root)
+
 
 def flatten_plans(root):
     def rule_0(ex):
@@ -242,31 +237,33 @@ def flatten_plans(root):
     return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
 
 
-def drop_reorders(root:LogicStatement) -> LogicStatement:
+def drop_reorders(root: LogicStatement) -> LogicStatement:
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
+
                 def rule(ex):
                     match ex:
                         case Reorder(arg_2, idxs_3):
                             assert is_subsequence(idxs_3, idxs_1)
                             return arg_2
+
                 arg_3 = Rewrite(PostWalk(rule))(arg)
-                return Query(
-                    lhs, Aggregate(op, init, Reorder(arg_3, idxs_1), idxs_2)
-                )
+                return Query(lhs, Aggregate(op, init, Reorder(arg_3, idxs_1), idxs_2))
 
     return Rewrite(PostWalk(rule_2))(root)
 
 
-def drop_with_aggregation(root:LogicStatement, bindings) -> LogicStatement:
-    fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
+def drop_with_aggregation(root: LogicStatement, bindings) -> LogicStatement:
+    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
+
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
-                idxs_3 = tuple([idx for idx in arg.fields(fields) if not idx in idxs_1])
+                idxs_3 = tuple([idx for idx in arg.fields(fields) if idx not in idxs_1])
                 return Query(
-                    lhs, Aggregate(op, init, Reorder(arg, idxs_1 + idxs_3), idxs_2 + idxs_3)
+                    lhs,
+                    Aggregate(op, init, Reorder(arg, idxs_1 + idxs_3), idxs_2 + idxs_3),
                 )
 
     return Rewrite(PostWalk(rule_2))(root)

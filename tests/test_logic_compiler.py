@@ -3,21 +3,11 @@ import operator
 import numpy as np
 
 import finchlite.finch_logic as logic
-from finchlite.finch_logic import TableValue
-from finchlite.autoschedule import (
-    LogicCompiler,
-    NotationGenerator
-)
-from finchlite.codegen.numpy_buffer import NumpyBufferFType
-from finchlite.compile import dimension
+from finchlite import ftype
+from finchlite.autoschedule import NotationGenerator
 from finchlite.compile.bufferized_ndarray import (
     BufferizedNDArray,
-    BufferizedNDArrayFType,
 )
-from finchlite.interface import INTERPRET_NOTATION
-from finchlite import ftype
-from finchlite.compile.lower import ExtentFType
-from finchlite.finch_assembly.struct import TupleFType
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -28,31 +18,9 @@ from finchlite.finch_logic import (
     Query,
     Relabel,
     Reorder,
-    Table,
+    TableValue,
 )
-from finchlite.finch_notation import (
-    Access,
-    Assign,
-    Block,
-    Call,
-    Declare,
-    Freeze,
-    Function,
-    Increment,
-    Literal,
-    Loop,
-    Module,
-    NotationInterpreter,
-    Read,
-    Return,
-    Slot,
-    Unpack,
-    Unwrap,
-    Update,
-    Variable,
-)
-from finchlite.finch_notation.nodes import Repack
-from finchlite.interface.fuse import provision_tensors
+from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal
 
@@ -85,15 +53,10 @@ def test_logic_compiler(file_regression):
                 ),
             ),
             Plan(
-                bodies=(
-                    Produces(
-                        args=(Alias(name=":A2"),)
-                    ),
-                ),
-            )
+                bodies=(Produces(args=(Alias(name=":A2"),)),),
+            ),
         ),
     )
-    
 
     bindings = {
         Alias(name=":A0"): TableValue(
@@ -110,14 +73,20 @@ def test_logic_compiler(file_regression):
         ),
     }
 
-    program = NotationGenerator()(plan, {var:ftype(val) for var, val in bindings.items()})
+    program = NotationGenerator()(
+        plan, {var: ftype(val) for var, val in bindings.items()}
+    )
 
-    file_regression.check(str(program), extension=".txt", basename="test_logic_compiler_program")
+    file_regression.check(
+        str(program), extension=".txt", basename="test_logic_compiler_program"
+    )
 
     result = INTERPRET_NOTATION(plan, bindings)
 
-    expected = np.matmul(bindings[Alias(name=":A0")].tns.to_numpy(), bindings[Alias(name=":A1")].tns.to_numpy(), dtype=float)
+    expected = np.matmul(
+        bindings[Alias(name=":A0")].tns.to_numpy(),
+        bindings[Alias(name=":A1")].tns.to_numpy(),
+        dtype=float,
+    )
 
     finch_assert_equal(result[0].tns.to_numpy(), expected)
-
-

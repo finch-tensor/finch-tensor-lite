@@ -50,23 +50,19 @@ Performance:
   or `with_scheduler`.
 """
 
-from enum import Enum
 from typing import Any
 
 import numpy as np
 
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
-from finchlite.finch_logic.nodes import TableValue
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
-from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
-from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
-from ..autoschedule.optimize2 import LogicNormalizer2
 from ..autoschedule.compiler2 import LogicCompiler2
+from ..autoschedule.optimize2 import LogicNormalizer2
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
 from ..finch_assembly import AssemblyInterpreter
@@ -74,45 +70,53 @@ from ..finch_logic import (
     Alias,
     Field,
     Literal,
-    MockLogicLoader,
     LogicInterpreter,
+    MockLogicLoader,
     Plan,
     Produces,
     Query,
     Table,
 )
-from ..symbolic import Reflector, gensym
+from ..symbolic import gensym
 from .lazy import lazy
 
 _DEFAULT_SCHEDULER = None
 
 
 INTERPRET_LOGIC = LogicInterpreter()
-OPTIMIZE_LOGIC = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
-        MockLogicLoader()
-    ))))
-INTERPRET_NOTATION = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
-        LogicCompiler2(NotationInterpreter())
-    ))))
-INTERPRET_ASSEMBLY = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
-        LogicCompiler2(NotationCompiler(
-            AssemblyInterpreter()
-        ))
-    ))))
-COMPILE_NUMBA = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
-        LogicCompiler2(NotationCompiler(
-            NumbaCompiler()
-        ))
-    ))))
+OPTIMIZE_LOGIC = LogicNormalizer(
+    LogicExecutor(LogicNormalizer2(LogicFormatter(MockLogicLoader())))
+)
+INTERPRET_NOTATION = LogicNormalizer(
+    LogicExecutor(
+        LogicNormalizer2(LogicFormatter(LogicCompiler2(NotationInterpreter())))
+    )
+)
+INTERPRET_ASSEMBLY = LogicNormalizer(
+    LogicExecutor(
+        LogicNormalizer2(
+            LogicFormatter(LogicCompiler2(NotationCompiler(AssemblyInterpreter())))
+        )
+    )
+)
+COMPILE_NUMBA = LogicNormalizer(
+    LogicExecutor(
+        LogicNormalizer2(
+            LogicFormatter(LogicCompiler2(NotationCompiler(NumbaCompiler())))
+        )
+    )
+)
+
 
 def set_default_scheduler(
     *,
-    ctx:LogicEvaluator=INTERPRET_NOTATION,
+    ctx: LogicEvaluator = INTERPRET_NOTATION,
 ):
     global _DEFAULT_SCHEDULER
 
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
+
 
 set_default_scheduler()
 

@@ -420,7 +420,9 @@ class NotationInterpreter(NotationLoader):
                             op_e = self(op)
                             return access(tns_e, idxs_e, op=op_e)
                         case _:
-                            raise NotImplementedError(f"Unrecognized access mode: {mode}")
+                            raise NotImplementedError(
+                                f"Unrecognized access mode: {mode}"
+                            )
                 except Exception as e:
                     print(f"Error during tensor access {prgm}")
                     raise e
@@ -479,6 +481,7 @@ class NotationInterpreter(NotationLoader):
                 ctx_2(body)
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
+
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):

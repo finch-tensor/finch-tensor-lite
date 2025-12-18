@@ -3,7 +3,7 @@ from collections import namedtuple
 from functools import lru_cache
 from typing import Any
 
-from ..algebra import register_property, make_tuple
+from ..algebra import make_tuple, register_property
 from ..symbolic import FType, ftype
 
 
@@ -128,7 +128,7 @@ class NamedTupleFType(ImmutableStructFType):
             for a, f in zip(args, self.struct_fieldformats, strict=False)
         )
         return namedtuple(self.struct_name, self.struct_fieldnames)(args)
-    
+
 
 class TupleFType(ImmutableStructFType):
     def __init__(self, struct_name, struct_formats):
@@ -208,11 +208,10 @@ def tupleformat(x):
 
 register_property(tuple, "ftype", "__attr__", tupleformat)
 
+
 def tuple_return_type(fmt, *args):
-    return TupleFType(
-        "tuple",
-        args
-    )
+    return TupleFType("tuple", args)
+
 
 register_property(
     make_tuple,

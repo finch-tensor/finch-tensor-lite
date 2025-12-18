@@ -99,13 +99,13 @@ from .eager import (
     vecdot,
 )
 from .fuse import (
+    COMPILE_NUMBA,
+    INTERPRET_ASSEMBLY,
+    INTERPRET_LOGIC,
+    INTERPRET_NOTATION,
+    OPTIMIZE_LOGIC,
     compute,
     fuse,
-    INTERPRET_LOGIC,
-    OPTIMIZE_LOGIC,
-    INTERPRET_NOTATION,
-    INTERPRET_ASSEMBLY,
-    COMPILE_NUMBA,
     fused,
     get_default_scheduler,
     set_default_scheduler,
@@ -114,13 +114,13 @@ from .lazy import LazyTensor, asarray, lazy
 from .scalar import Scalar, ScalarFType
 
 __all__ = [
+    "COMPILE_NUMBA",
+    "INTERPRET_ASSEMBLY",
+    "INTERPRET_LOGIC",
+    "INTERPRET_NOTATION",
+    "OPTIMIZE_LOGIC",
     "EagerTensor",
     "LazyTensor",
-    "INTERPRET_LOGIC",
-    "OPTIMIZE_LOGIC",
-    "INTERPRET_NOTATION",
-    "INTERPRET_ASSEMBLY",
-    "COMPILE_NUMBA",
     "Scalar",
     "ScalarFType",
     "abs",
