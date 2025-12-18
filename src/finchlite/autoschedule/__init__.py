@@ -16,6 +16,7 @@ from ..finch_logic import (
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler
+from .compiler2 import NotationGenerator
 from .executor import LogicExecutor
 from .normalize import LogicNormalizer
 from .optimize import (
@@ -60,6 +61,7 @@ __all__ = [
     "Reformat",
     "Relabel",
     "Reorder",
+    "NotationGenerator",
     "Subquery",
     "Table",
     "Value",
