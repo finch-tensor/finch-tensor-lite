@@ -470,7 +470,6 @@ class NotationInterpreter(NotationLoader):
                 ctx_2(body)
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
-
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
                     if len(args_e) != len(args):
@@ -492,7 +491,7 @@ class NotationInterpreter(NotationLoader):
                         if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
-                                f"for function '{func_n}'."
+                                f"for function '{func_n}'. have type {ftype(ret_e)}"
                             )
                         return ret_e
                     raise ValueError(
@@ -522,7 +521,7 @@ class NotationInterpreter(NotationLoader):
                 return NotationInterpreterLibrary(self, kernels)
             case ntn.Stack(val):
                 raise NotImplementedError(
-                    "NotationInterpreter does not support symbolic, no target language"
+                    "NotationInterpreter does not support stacks."
                 )
             case _:
                 raise NotImplementedError(

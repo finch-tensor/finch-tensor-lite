@@ -23,6 +23,7 @@ from .operator import (
     promote_max,
     promote_min,
     repeat_operator,
+    make_tuple,
 )
 from .tensor import (
     Tensor,
@@ -61,5 +62,6 @@ __all__ = [
     "register_property",
     "repeat_operator",
     "return_type",
+    "make_tuple",
     "shape_type",
 ]

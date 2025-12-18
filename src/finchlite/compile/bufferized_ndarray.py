@@ -345,6 +345,18 @@ class BufferizedNDArrayAccessor(Tensor):
         return self.tns.shape[self.nind :]
 
     def access(self, indices, op):
+        if len(indices) + self.nind > self.tns.ndim:
+            raise IndexError(
+                f"Too many indices for tensor access: "
+                f"got {len(indices)} indices for tensor with "
+                f"{self.tns.ndim - self.nind} dimensions."
+            )
+        for i, idx in enumerate(indices):
+            if not (0 <= idx < self.tns.shape[self.nind + i]):
+                raise IndexError(
+                    f"Index {idx} out of bounds for axis {self.nind + i} "
+                    f"with size {self.tns.shape[self.nind + i]}"
+                )
         pos = self.pos + np.dot(
             indices, self.tns.strides[self.nind : self.nind + len(indices)]
         )

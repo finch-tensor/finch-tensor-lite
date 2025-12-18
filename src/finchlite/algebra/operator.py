@@ -221,3 +221,6 @@ def cansplitpush(x, y):
         and is_commutative(x)
         and is_associative(x)
     )
+
+def make_tuple(*args):
+    return tuple(args)

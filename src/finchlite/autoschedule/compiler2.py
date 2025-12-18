@@ -7,12 +7,13 @@ import operator
 
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
+from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
 from ..finch_notation import NotationInterpreter
-from ..algebra import overwrite
-from ..compile import ExtentFType
+from ..algebra import overwrite, make_tuple
+from ..compile import Extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     LogicLoader,
@@ -70,6 +71,7 @@ class NotationContext:
     def __init__(
         self,
         bindings: dict[lgc.Alias, lgc.TableValueFType],
+        args: dict[lgc.Alias, ntn.Variable],
         slots: dict[lgc.Alias, ntn.Slot],
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
         fields: dict[lgc.Alias, tuple[lgc.Field, ...]] | None = None,
@@ -77,6 +79,7 @@ class NotationContext:
         epilogue: Iterable[ntn.NotationStatement] | None = None,
     ):
         self.bindings = bindings
+        self.args = args
         self.slots = slots
         self.shapes = shapes
         self.equiv: dict[ntn.Variable, ntn.Variable] = {}
@@ -142,9 +145,9 @@ class NotationContext:
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(loop_idxs):
                     t = loops[idx].type_
-                    ext = ExtentFType.stack(
-                        ntn.Literal(t(0)),
-                        shapes.get(idx) or shapes[remap_idxs[idx]],
+                    ext = ntn.Call(ntn.Literal(Extent),
+                        (ntn.Literal(t(0)),
+                        shapes.get(idx) or shapes[remap_idxs[idx]]),
                     )
                     if idx in remap_idxs:
                         body = ntn.If(
@@ -174,7 +177,7 @@ class NotationContext:
                     )
                 )
             case lgc.Query(
-                lhs, lgc.Aggregate(op, init, lgc.Reorder(arg, idxs_1), idxs_2)
+                lhs, lgc.Aggregate(lgc.Literal(op), lgc.Literal(init), lgc.Reorder(arg, idxs_1), idxs_2)
             ):
                 # Build a dict mapping fields to their shapes
                 arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
@@ -197,9 +200,9 @@ class NotationContext:
                 body = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(idxs_1):
                     t = loops[idx].type_
-                    ext = ExtentFType.stack(
-                        ntn.Literal(t(0)),
-                        shapes[idx],
+                    ext = ntn.Call(ntn.Literal(Extent),
+                        (ntn.Literal(t(0)),
+                        shapes[idx]),
                     )
                     body = ntn.Loop(
                         loops[idx],
@@ -211,14 +214,14 @@ class NotationContext:
                     (
                         ntn.Declare(
                             self.slots[lhs],
-                            ntn.Literal(init.val),
-                            ntn.Literal(op.val),
+                            ntn.Literal(init),
+                            ntn.Literal(op),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(op.val),
+                            ntn.Literal(op),
                         ),
                     )
                 )
@@ -232,8 +235,8 @@ class NotationContext:
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
-                                ntn.Literal(tuple),
-                                tuple(self.bindings[var].tns for var in vars),
+                                ntn.Literal(make_tuple),
+                                tuple(self.args[var] for var in vars),
                             )
                         ),
                     )
@@ -276,15 +279,21 @@ class NotationGenerator(LogicNotationLowerer):
             )
         ctx = NotationContext(
             bindings,
+            args,
             slots,
             shapes,
             epilogue=epilogue,
         )
         body = ctx(term)
+        ret_t = None
+        for node in PostOrderDFS(body):
+            match node:
+                case ntn.Return(expr):
+                    ret_t = expr.result_format
         return ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("main"),
+                    ntn.Variable("main", ret_t),
                     tuple(args.values()),
                     ntn.Block((*preamble, body)),
                 ),
