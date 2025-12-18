@@ -61,7 +61,7 @@ from finchlite.finch_notation.interpreter import NotationInterpreter
 
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
-from ..autoschedule.compiler2 import LogicCompiler2
+from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.optimize2 import LogicNormalizer2
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
@@ -89,20 +89,20 @@ OPTIMIZE_LOGIC = LogicNormalizer(
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
-        LogicNormalizer2(LogicFormatter(LogicCompiler2(NotationInterpreter())))
+        LogicNormalizer2(LogicFormatter(LogicCompiler(NotationInterpreter())))
     )
 )
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
         LogicNormalizer2(
-            LogicFormatter(LogicCompiler2(NotationCompiler(AssemblyInterpreter())))
+            LogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
         )
     )
 )
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         LogicNormalizer2(
-            LogicFormatter(LogicCompiler2(NotationCompiler(NumbaCompiler())))
+            LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
         )
     )
 )

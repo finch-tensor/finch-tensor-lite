@@ -15,8 +15,7 @@ from ..finch_logic import (
     Value,
 )
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
-from .compiler import LogicCompiler
-from .compiler2 import NotationGenerator
+from .compiler import LogicCompiler, NotationGenerator
 from .executor import LogicExecutor
 from .normalize import LogicNormalizer
 from .optimize import (
