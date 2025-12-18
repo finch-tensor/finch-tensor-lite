@@ -10,8 +10,9 @@ from finchlite.symbolic import gensym
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
+from ..finch_notation import NotationInterpreter
 from ..algebra import overwrite
-from ..compile import ExtentFType, NotationCompiler
+from ..compile import ExtentFType
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     LogicLoader,
@@ -43,11 +44,11 @@ class PointwiseContext:
                     ntn.Access(
                         self.ctx.slots[var],
                         ntn.Read(),
-                        tuple(loops.values()),
+                        tuple(loops[idx] for idx in var.fields(self.ctx.fields)),
                     )
                 )
             case lgc.Relabel(arg, idxs):
-                return self(arg, dict(zip(idxs, loops.values(), strict=True)))
+                return self(arg, {idx_1: loops[idx_2] for idx_1, idx_2 in zip(arg.fields(self.ctx.fields), idxs)})
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
 
@@ -99,6 +100,10 @@ class NotationContext:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(
+                lhs, lgc.Reorder(lgc.Alias(_) as arg, idxs)
+            ):
+                return self(lgc.Query(lhs, lgc.Reorder(lgc.Relabel(arg, arg.fields(self.fields)), idxs)))
+            case lgc.Query(
                 lhs, lgc.Reorder(lgc.Relabel(lgc.Alias(_), idxs_1) as arg, idxs_2)
             ):
                 arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
@@ -124,7 +129,7 @@ class NotationContext:
                         new_idxs.append(new_idx)
                         out_idx = next(out_idxs, None)
                 loops = {
-                    idx: ntn.Variable(gensym(idx.name), shape_type.get(idx, shape_type[remap_idxs[idx]]))
+                    idx: ntn.Variable(gensym(idx.name), shape_type.get(idx) or shape_type[remap_idxs[idx]])
                     for idx in loop_idxs
                 }
                 ctx = PointwiseContext(self)
@@ -139,7 +144,7 @@ class NotationContext:
                     t = loops[idx].type_
                     ext = ExtentFType.stack(
                         ntn.Literal(t(0)),
-                        shapes.get(idx, shapes[remap_idxs[idx]]),
+                        shapes.get(idx) or shapes[remap_idxs[idx]],
                     )
                     if idx in remap_idxs:
                         body = ntn.If(
@@ -190,7 +195,8 @@ class NotationContext:
                     tuple(loops[idx] for idx in idxs_1 if idx not in idxs_2),
                 )
                 body = ntn.Increment(lhs_access, rhs)
-                for idx, t in reversed(list(zip(idxs_1, shape_type, strict=True))):
+                for idx in reversed(idxs_1):
+                    t = loops[idx].type_
                     ext = ExtentFType.stack(
                         ntn.Literal(t(0)),
                         shapes[idx],
@@ -295,7 +301,7 @@ class LogicCompiler2(LogicLoader):
         if ctx_lower is None:
             ctx_lower = NotationGenerator()
         if ctx_load is None:
-            ctx_load = NotationCompiler()
+            ctx_load = NotationInterpreter()
         self.ctx_lower: LogicNotationLowerer = ctx_lower
         self.ctx_load: NotationLoader = ctx_load
 

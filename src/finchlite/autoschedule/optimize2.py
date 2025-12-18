@@ -81,8 +81,14 @@ def standardize_query_roots(
                 return Query(
                     lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)
                 )
-            case Query(lhs, Reorder()):
+            case Query(lhs, Reorder(Relabel(Alias(), idxs_1), idxs_2)):
                 return ex
+            case Query(lhs, Reorder(Alias(), idxs_2)):
+                return ex
+            case Query(lhs, Alias() as arg):
+                return Query(lhs, Reorder(arg, arg.fields(fields)))
+            case Query(lhs, Relabel(Alias(), idxs) as arg):
+                return Query(lhs, Reorder(arg, idxs))
             case Query(lhs, rhs):
                 return Query(
                     lhs,
@@ -236,6 +242,21 @@ def flatten_plans(root):
     return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
 
 
+def drop_reorders(root:LogicStatement) -> LogicStatement:
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
+                def rule(ex):
+                    match ex:
+                        case Reorder(arg_2, idxs_3):
+                            assert is_subsequence(idxs_3, idxs_1)
+                            return arg_2
+                arg_3 = Rewrite(PostWalk(rule))(arg)
+                return Query(
+                    lhs, Aggregate(op, init, Reorder(arg_3, idxs_1), idxs_2)
+                )
+
+    return Rewrite(PostWalk(rule_2))(root)
 
 class LogicNormalizer2(LogicLoader):
     def __init__(self, ctx=None):
@@ -248,4 +269,9 @@ class LogicNormalizer2(LogicLoader):
         prgm = standardize_query_roots(prgm, bindings)
         prgm = push_fields(prgm, bindings)
         prgm = concordize(prgm, bindings)
+        print("hewwo")
+        print(prgm)
+        prgm = drop_reorders(prgm)
+        print("hi")
+        print(prgm)
         return self.ctx(prgm, bindings)

@@ -371,7 +371,7 @@ class Alias(LogicExpression, NamedTerm):
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         if bindings is None or self not in bindings:
-            raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
+            raise NotImplementedError(f"Cannot resolve fields of Alias {self.name}")
         return bindings[self]
 
     def dimmap(
@@ -381,7 +381,7 @@ class Alias(LogicExpression, NamedTerm):
         field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> tuple[T | None, ...]:
         if dim_bindings is None or self not in dim_bindings:
-            raise NotImplementedError("Cannot resolve dims of Alias {self.name}")
+            raise NotImplementedError(f"Cannot resolve dims of Alias {self.name}")
         return dim_bindings[self]
 
     def valmap(
@@ -391,7 +391,7 @@ class Alias(LogicExpression, NamedTerm):
         bindings: dict[Alias, T],
     ) -> T:
         if bindings is None or self not in bindings:
-            raise NotImplementedError("Cannot resolve value of Alias {self.name}")
+            raise NotImplementedError(f"Cannot resolve value of Alias {self.name}")
         return bindings[self]
 
 
