@@ -75,12 +75,6 @@ class LogicFieldsContext:
                 return idxs
             case lgc.Reorder(_, idxs):
                 return idxs
-            case lgc.Subquery(lhs, arg):
-                res = self.bindings.get(lhs)
-                if res is None:
-                    res = self(arg)
-                    self.bindings[lhs] = res
-                return res
             case lgc.Query(lhs, rhs):
                 rhs = self(rhs)
                 self.bindings[lhs] = rhs

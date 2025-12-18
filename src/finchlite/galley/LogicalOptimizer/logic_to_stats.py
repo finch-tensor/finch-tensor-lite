@@ -9,7 +9,6 @@ from finchlite.finch_logic import (
     Literal,
     LogicNode,
     MapJoin,
-    Reformat,
     Reorder,
     Table,
     Value,
@@ -60,7 +59,7 @@ def insert_statistics(
         cache[node] = st
         return st
 
-    if isinstance(node, (Reformat, Reorder)):
+    if isinstance(node, Reorder):
         child = insert_statistics(ST, node.arg, bindings, replace, cache)
         cache[node] = child
         return child

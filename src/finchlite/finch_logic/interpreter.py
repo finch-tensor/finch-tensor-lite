@@ -19,7 +19,6 @@ from .nodes import (
     Query,
     Relabel,
     Reorder,
-    Subquery,
     Table,
     TableValue,
     Value,
@@ -152,9 +151,6 @@ class LogicMachine:
                 return res
             case Produces(args):
                 return tuple(self(arg) for arg in args)
-            case Subquery(lhs, arg):
-                (res,) = self(Query(lhs, arg))
-                return res
             case _:
                 raise ValueError(f"Unknown expression type: {type(node)}")
 

@@ -661,89 +661,6 @@ class Relabel(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Reformat(LogicTree, LogicExpression):
-    """
-    Represents a logical AST statement that reformats `arg` into the tensor `tns`.
-
-    Attributes:
-        tns: The target tensor.
-        arg: The argument to reformat.
-    """
-
-    tns: LogicNode
-    arg: LogicExpression
-
-    def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
-    ) -> tuple[Field, ...]:
-        """Returns fields of the node."""
-        return self.arg.fields(bindings)
-
-    def dimmap(
-        self,
-        op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
-    ) -> tuple[T | None, ...]:
-        return self.arg.dimmap(op, dim_bindings, field_bindings)
-
-    def valmap(
-        self,
-        f: Callable,
-        g: Callable,
-        bindings: dict[Alias, T],
-    ) -> T:
-        return self.arg.valmap(f, g, bindings)
-
-    @property
-    def children(self):
-        """Returns the children of the node."""
-        return [self.tns, self.arg]
-
-
-@dataclass(eq=True, frozen=True)
-class Subquery(LogicTree, LogicExpression):
-    """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to
-    `lhs`, and returns `rhs`.
-
-    Attributes:
-        lhs: The left-hand side of the binding.
-        arg: The argument to evaluate.
-    """
-
-    lhs: Alias
-    arg: LogicExpression
-
-    def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
-    ) -> tuple[Field, ...]:
-        """Returns fields of the node."""
-        return self.arg.fields(bindings)
-
-    def dimmap(
-        self,
-        op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-        field_bindings: dict[Alias, tuple[Field, ...]] | None = None,
-    ) -> tuple[T | None, ...]:
-        return self.arg.dimmap(op, dim_bindings, field_bindings)
-
-    def valmap(
-        self,
-        f: Callable,
-        g: Callable,
-        bindings: dict[Alias, T],
-    ) -> T:
-        return self.arg.valmap(f, g, bindings)
-
-    @property
-    def children(self):
-        """Returns the children of the node."""
-        return [self.lhs, self.arg]
-
-
-@dataclass(eq=True, frozen=True)
 class Query(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
@@ -982,9 +899,6 @@ class LogicPrinterContext(Context):
                 args = tuple(self(arg) for arg in args)
                 self.exec(f"{feed}return {args}\n")
                 return None
-            case Subquery(lhs, arg):
-                self.exec(f"{feed}{self(lhs)} = {self(arg)}")
-                return self(lhs)
             case str(label):
                 return label
             case _:

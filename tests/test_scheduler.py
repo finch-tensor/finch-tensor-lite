@@ -12,10 +12,8 @@ from finchlite.autoschedule import (
     materialize_squeeze_expand_productions,
     normalize_names,
     optimize,
-    pretty_labels,
     propagate_copy_queries,
     propagate_fields,
-    propagate_into_reformats,
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
@@ -31,10 +29,8 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
 )
 from finchlite.finch_logic.interpreter import LogicInterpreter
@@ -160,30 +156,6 @@ def test_isolate_aggregates():
     assert result == expected
 
 
-def test_pretty_labels():
-    plan = Plan(
-        (
-            Field("AA"),
-            Alias("BB"),
-            Alias("CC"),
-            Subquery(Alias("BB"), Field("AA")),
-            Subquery(Alias("CC"), Field("AA")),
-        )
-    )
-    expected = Plan(
-        (
-            Field("i0"),
-            Alias("A0"),
-            Alias("A1"),
-            Subquery(Alias("A0"), Field("i0")),
-            Subquery(Alias("A1"), Field("i0")),
-        )
-    )
-
-    result = pretty_labels(plan)
-    assert result == expected
-
-
 def test_push_fields():
     plan = Plan(
         (
@@ -282,49 +254,49 @@ def test_propagate_copy_queries():
     assert result == expected
 
 
-def test_propagate_into_reformats():
-    plan = Plan(
-        (
-            Query(Alias("A1"), Alias("A0")),
-            Query(
-                Alias("D0"),
-                Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
-            ),
-            Query(
-                Alias("B0"),
-                Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
-            ),
-            Literal(1),
-            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
-            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
-            Literal(2),
-        )
-    )
-
-    expected = Plan(
-        (
-            Query(Alias("A1"), Alias("A0")),
-            Query(
-                Alias("E0"),
-                Reformat(
-                    Literal(4),
-                    Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
-                ),
-            ),
-            Query(
-                Alias("C0"),
-                Reformat(
-                    Literal(3),
-                    Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
-                ),
-            ),
-            Literal(1),
-            Literal(2),
-        )
-    )
-
-    result = propagate_into_reformats(plan)
-    assert result == expected
+# def test_propagate_into_reformats():
+#    plan = Plan(
+#        (
+#            Query(Alias("A1"), Alias("A0")),
+#            Query(
+#                Alias("D0"),
+#                Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
+#            ),
+#            Query(
+#                Alias("B0"),
+#                Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
+#            ),
+#            Literal(1),
+#            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
+#            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
+#            Literal(2),
+#        )
+#    )
+#
+#    expected = Plan(
+#        (
+#            Query(Alias("A1"), Alias("A0")),
+#            Query(
+#                Alias("E0"),
+#                Reformat(
+#                    Literal(4),
+#                    Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
+#                ),
+#            ),
+#            Query(
+#                Alias("C0"),
+#                Reformat(
+#                    Literal(3),
+#                    Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
+#                ),
+#            ),
+#            Literal(1),
+#            Literal(2),
+#        )
+#    )
+#
+#    result = propagate_into_reformats(plan)
+#    assert result == expected
 
 
 def test_propagate_transpose_queries():
@@ -385,14 +357,11 @@ def test_lift_fields():
             ),
             Query(
                 Alias("A0"),
-                Reformat(
-                    Literal(0),
-                    MapJoin(
-                        Literal("*"),
-                        (
-                            Table(Literal(2), (Field("i1"), Field("i2"))),
-                            Table(Literal(4), (Field("i1"), Field("i2"))),
-                        ),
+                MapJoin(
+                    Literal("*"),
+                    (
+                        Table(Literal(2), (Field("i1"), Field("i2"))),
+                        Table(Literal(4), (Field("i1"), Field("i2"))),
                     ),
                 ),
             ),
@@ -425,18 +394,15 @@ def test_lift_fields():
             ),
             Query(
                 Alias("A0"),
-                Reformat(
-                    Literal(0),
-                    Reorder(
-                        MapJoin(
-                            Literal("*"),
-                            (
-                                Table(Literal(2), (Field("i1"), Field("i2"))),
-                                Table(Literal(4), (Field("i1"), Field("i2"))),
-                            ),
+                Reorder(
+                    MapJoin(
+                        Literal("*"),
+                        (
+                            Table(Literal(2), (Field("i1"), Field("i2"))),
+                            Table(Literal(4), (Field("i1"), Field("i2"))),
                         ),
-                        (Field("i1"), Field("i2")),
                     ),
+                    (Field("i1"), Field("i2")),
                 ),
             ),
         )
