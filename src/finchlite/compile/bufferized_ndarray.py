@@ -357,9 +357,9 @@ class BufferizedNDArrayAccessor(Tensor):
                     f"Index {idx} out of bounds for axis {self.nind + i} "
                     f"with size {self.tns.shape[self.nind + i]}"
                 )
-        pos = self.pos + np.dot(
-            indices, self.tns.strides[self.nind : self.nind + len(indices)]
-        )
+        pos = self.pos
+        for i, idx in enumerate(indices):
+            pos += idx * self.tns.strides[self.nind + i]
         return BufferizedNDArrayAccessor(self.tns, self.nind + len(indices), pos, op)
 
     def unwrap(self):

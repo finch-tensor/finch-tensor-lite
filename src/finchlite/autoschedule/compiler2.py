@@ -111,13 +111,13 @@ class NotationContext:
             ):
                 arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
                 shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
-                shapes = {idx: shapes_map.get(idx) or ntn.Literal(0) for idx in idxs_1 + idxs_2}
+                shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1 + idxs_2}
                 arg_types = arg.shape_type(self.shape_types, self.fields)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
                 shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1 + idxs_2}
-                out_idxs = iter(idxs_2)
                 loop_idxs = []
                 remap_idxs = {}
+                out_idxs = iter(idxs_2)
                 out_idx = next(out_idxs, None)
                 new_idxs = []
                 for idx in idxs_1:
@@ -126,11 +126,25 @@ class NotationContext:
                         out_idx = next(out_idxs, None)
                         new_idxs.append(idx)
                     while (out_idx in loop_idxs or out_idx not in idxs_1) and out_idx != None:
+                        if out_idx in loop_idxs:
+                            new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
+                            remap_idxs[new_idx] = out_idx
+                            loop_idxs.append(new_idx)
+                            new_idxs.append(new_idx)
+                        else:
+                            loop_idxs.append(out_idx)
+                            new_idxs.append(out_idx)
+                        out_idx = next(out_idxs, None)
+                while (out_idx in loop_idxs or out_idx not in idxs_1) and out_idx != None:
+                    if out_idx in loop_idxs:
                         new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
                         remap_idxs[new_idx] = out_idx
                         loop_idxs.append(new_idx)
                         new_idxs.append(new_idx)
-                        out_idx = next(out_idxs, None)
+                    else:
+                        loop_idxs.append(out_idx)
+                        new_idxs.append(out_idx)
+                    out_idx = next(out_idxs, None)
                 loops = {
                     idx: ntn.Variable(gensym(idx.name), shape_type.get(idx) or shape_type[remap_idxs[idx]])
                     for idx in loop_idxs
@@ -177,13 +191,13 @@ class NotationContext:
                     )
                 )
             case lgc.Query(
-                lhs, lgc.Aggregate(lgc.Literal(op), lgc.Literal(init), lgc.Reorder(arg, idxs_1), idxs_2)
+                lhs, lgc.Aggregate(lgc.Literal(op), lgc.Literal(init), lgc.Reorder(arg, idxs_1) as arg_2, idxs_2)
             ):
                 # Build a dict mapping fields to their shapes
-                arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
+                arg_dims = arg_2.dimmap(merge_shapes, self.shapes, self.fields)
                 shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
-                shapes = {idx: shapes_map.get(idx) or ntn.Literal(0) for idx in idxs_1}
-                arg_types = arg.shape_type(self.shape_types, self.fields)
+                shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
+                arg_types = arg_2.shape_type(self.shape_types, self.fields)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
                 shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1}
                 loops = {

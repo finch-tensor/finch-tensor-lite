@@ -258,6 +258,20 @@ def drop_reorders(root:LogicStatement) -> LogicStatement:
 
     return Rewrite(PostWalk(rule_2))(root)
 
+
+def drop_with_aggregation(root:LogicStatement, bindings) -> LogicStatement:
+    fields = root.infer_fields({var:val.idxs for var, val in bindings.items()})
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
+                idxs_3 = tuple([idx for idx in arg.fields(fields) if not idx in idxs_1])
+                return Query(
+                    lhs, Aggregate(op, init, Reorder(arg, idxs_1 + idxs_3), idxs_2 + idxs_3)
+                )
+
+    return Rewrite(PostWalk(rule_2))(root)
+
+
 class LogicNormalizer2(LogicLoader):
     def __init__(self, ctx=None):
         if ctx is None:
@@ -268,6 +282,8 @@ class LogicNormalizer2(LogicLoader):
         prgm = isolate_aggregates(prgm)
         prgm = standardize_query_roots(prgm, bindings)
         prgm = push_fields(prgm, bindings)
+        prgm = drop_reorders(prgm)
+        prgm = drop_with_aggregation(prgm, bindings)
         prgm = concordize(prgm, bindings)
         prgm = drop_reorders(prgm)
         return self.ctx(prgm, bindings)

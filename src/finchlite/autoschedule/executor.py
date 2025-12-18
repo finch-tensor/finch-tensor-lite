@@ -130,7 +130,9 @@ class ProvisionTensorsContext:
                             f"Type information missing for {lhs}, did you run"
                             f" tensor formatter?"
                         )
+                    print(lhs)
                     shape = rhs.shape(self.shapes, self.fields)
+                    print(shape)
                     tns = self.types[lhs].tns(
                         tuple(dim if dim is not None else 1 for dim in shape)
                     )

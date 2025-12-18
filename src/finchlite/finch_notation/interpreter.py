@@ -412,14 +412,19 @@ class NotationInterpreter(NotationLoader):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
-                match mode:
-                    case ntn.Read():
-                        return access(tns_e, idxs_e)
-                    case ntn.Update(op):
-                        op_e = self(op)
-                        return access(tns_e, idxs_e, op=op_e)
-                    case _:
-                        raise NotImplementedError(f"Unrecognized access mode: {mode}")
+                try:
+                    match mode:
+                        case ntn.Read():
+                            return access(tns_e, idxs_e)
+                        case ntn.Update(op):
+                            op_e = self(op)
+                            return access(tns_e, idxs_e, op=op_e)
+                        case _:
+                            raise NotImplementedError(f"Unrecognized access mode: {mode}")
+                except Exception as e:
+                    print(f"Error during tensor access {prgm}")
+                    raise e
+
             case ntn.Dimension(tns, r):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
@@ -428,7 +433,11 @@ class NotationInterpreter(NotationLoader):
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)
-                increment(tns_e, val_e)
+                try:
+                    increment(tns_e, val_e)
+                except Exception as e:
+                    print(f"Error during tensor increment {prgm}")
+                    raise e
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
