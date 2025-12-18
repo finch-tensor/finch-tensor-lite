@@ -64,6 +64,7 @@ from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
 from ..autoschedule.optimize2 import LogicNormalizer2
+from ..autoschedule.compiler2 import LogicCompiler2
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
 from ..finch_logic import (
@@ -102,7 +103,7 @@ def set_default_scheduler(
 
     elif mode == Mode.INTERPRET_LOGIC:
         _DEFAULT_SCHEDULER = LogicNormalizer(
-            LogicExecutor(LogicNormalizer2(LogicFormatter(MockLogicLoader())))
+            LogicExecutor(LogicNormalizer2(LogicFormatter(LogicCompiler2())))
         )
 
     elif mode == Mode.INTERPRET_NOTATION:

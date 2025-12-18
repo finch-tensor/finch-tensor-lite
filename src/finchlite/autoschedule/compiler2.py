@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import numpy as np
 from collections.abc import Iterable
 from typing import Any
+import operator
 
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
@@ -12,8 +14,6 @@ from ..algebra import overwrite
 from ..compile import ExtentFType, NotationCompiler
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
-    Field,
-    Literal,
     LogicLoader,
     TableValueFType,
 )
@@ -27,7 +27,7 @@ class PointwiseContext:
     def __call__(
         self,
         ex: lgc.LogicExpression,
-        loops: dict[Field, ntn.Variable],
+        loops: dict[lgc.Field, ntn.Variable],
     ) -> ntn.NotationExpression:
         match ex:
             case lgc.MapJoin(lgc.Literal(op), args):
@@ -99,22 +99,88 @@ class NotationContext:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(
-                lhs, lgc.Reorder(lgc.Relabel(lgc.Alias(_) as arg, idxs_1), idxs_2)
+                lhs, lgc.Reorder(lgc.Relabel(lgc.Alias(_), idxs_1) as arg, idxs_2)
             ):
-                # TODO (mtsokol): mostly the same as `agg`, used for explicit transpose
-                raise NotImplementedError
+                arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
+                shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
+                shapes = {idx: shapes_map.get(idx) or ntn.Literal(0) for idx in idxs_1 + idxs_2}
+                arg_types = arg.shape_type(self.shape_types, self.fields)
+                shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
+                shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1 + idxs_2}
+                out_idxs = iter(idxs_2)
+                loop_idxs = []
+                remap_idxs = {}
+                out_idx = next(out_idxs, None)
+                new_idxs = []
+                for idx in idxs_1:
+                    loop_idxs.append(idx)
+                    if idx == out_idx:
+                        out_idx = next(out_idxs, None)
+                        new_idxs.append(idx)
+                    while (out_idx in loop_idxs or out_idx not in idxs_1) and out_idx != None:
+                        new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
+                        remap_idxs[new_idx] = out_idx
+                        loop_idxs.append(new_idx)
+                        new_idxs.append(new_idx)
+                        out_idx = next(out_idxs, None)
+                loops = {
+                    idx: ntn.Variable(gensym(idx.name), shape_type.get(idx, shape_type[remap_idxs[idx]]))
+                    for idx in loop_idxs
+                }
+                ctx = PointwiseContext(self)
+                rhs = ctx(arg, loops)
+                lhs_access = ntn.Access(
+                    self.slots[lhs],
+                    ntn.Update(ntn.Literal(overwrite)),
+                    tuple(loops[idx] for idx in new_idxs),
+                )
+                body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
+                for idx in reversed(loop_idxs):
+                    t = loops[idx].type_
+                    ext = ExtentFType.stack(
+                        ntn.Literal(t(0)),
+                        shapes.get(idx, shapes[remap_idxs[idx]]),
+                    )
+                    if idx in remap_idxs:
+                        body = ntn.If(
+                            ntn.Call(ntn.Literal(operator.eq), (loops[idx], loops[remap_idxs[idx]])),
+                            body,
+                        )
+                    body = ntn.Loop(
+                        loops[idx],
+                        ext,
+                        body,
+                    )
+                
+                
+                return ntn.Block(
+                    (
+                        ntn.Declare(
+                            self.slots[lhs],
+                            ntn.Literal(self.bindings[lhs].tns.fill_value),
+                            ntn.Literal(overwrite),
+                            (),
+                        ),
+                        body,
+                        ntn.Freeze(
+                            self.slots[lhs],
+                            ntn.Literal(overwrite),
+                        ),
+                    )
+                )
             case lgc.Query(
                 lhs, lgc.Aggregate(op, init, lgc.Reorder(arg, idxs_1), idxs_2)
             ):
                 # Build a dict mapping fields to their shapes
-                fields = arg.fields(self.fields)
                 arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
-                shapes_map = dict(zip(fields, arg_dims, strict=True))
-                shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
-                shape_type = arg.shape_type(self.shape_types, self.fields)
+                shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
+                shapes = {idx: shapes_map.get(idx) or ntn.Literal(0) for idx in idxs_1}
+                arg_types = arg.shape_type(self.shape_types, self.fields)
+                shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
+                shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1}
                 loops = {
-                    idx: ntn.Variable(gensym(idx.name), t)
-                    for idx, t in zip(fields, shape_type, strict=True)
+                    idx: ntn.Variable(gensym(idx.name), shape_type[idx])
+                    for idx in idxs_1
                 }
                 ctx = PointwiseContext(self)
                 rhs = ctx(arg, loops)
@@ -123,7 +189,7 @@ class NotationContext:
                     ntn.Update(ntn.Literal(op)),
                     tuple(loops[idx] for idx in idxs_1 if idx not in idxs_2),
                 )
-                body: ntn.Increment | ntn.Loop = ntn.Increment(lhs_access, rhs)
+                body = ntn.Increment(lhs_access, rhs)
                 for idx, t in reversed(list(zip(idxs_1, shape_type, strict=True))):
                     ext = ExtentFType.stack(
                         ntn.Literal(t(0)),
@@ -147,18 +213,6 @@ class NotationContext:
                         ntn.Freeze(
                             self.slots[lhs],
                             ntn.Literal(op.val),
-                        ),
-                    )
-                )
-            case lgc.Query(lhs, lgc.Reorder(arg, idxs)):
-                return self(
-                    lgc.Query(
-                        lhs,
-                        lgc.Aggregate(
-                            Literal(overwrite),
-                            Literal(self.bindings[lhs].tns.fill_value),
-                            lgc.Reorder(arg, idxs),
-                            (),
                         ),
                     )
                 )
