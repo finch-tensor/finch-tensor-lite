@@ -56,7 +56,7 @@ from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
 from ..autoschedule.compiler import LogicCompiler
-from ..autoschedule.optimize2 import LogicNormalizer2
+from ..autoschedule.standardize import LogicStandardizer
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
 from ..finch_assembly import AssemblyInterpreter
@@ -76,23 +76,23 @@ _DEFAULT_SCHEDULER = None
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
-    LogicExecutor(LogicNormalizer2(LogicFormatter(MockLogicLoader())))
+    LogicExecutor(LogicStandardizer(LogicFormatter(MockLogicLoader())))
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
-        LogicNormalizer2(LogicFormatter(LogicCompiler(NotationInterpreter())))
+        LogicStandardizer(LogicFormatter(LogicCompiler(NotationInterpreter())))
     )
 )
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
-        LogicNormalizer2(
+        LogicStandardizer(
             LogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
         )
     )
 )
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
-        LogicNormalizer2(
+        LogicStandardizer(
             LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
         )
     )

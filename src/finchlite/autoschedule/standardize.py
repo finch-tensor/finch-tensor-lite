@@ -269,7 +269,7 @@ def drop_with_aggregation(root: LogicStatement, bindings) -> LogicStatement:
     return Rewrite(PostWalk(rule_2))(root)
 
 
-class LogicNormalizer2(LogicLoader):
+class LogicStandardizer(LogicLoader):
     def __init__(self, ctx=None):
         if ctx is None:
             ctx = MockLogicLoader()
