@@ -58,6 +58,8 @@ import numpy as np
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
 from finchlite.finch_logic.nodes import TableValue
+from finchlite.finch_logic.stages import LogicEvaluator
+from finchlite.finch_notation.interpreter import NotationInterpreter
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
@@ -67,11 +69,13 @@ from ..autoschedule.optimize2 import LogicNormalizer2
 from ..autoschedule.compiler2 import LogicCompiler2
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
+from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import (
     Alias,
     Field,
     Literal,
     MockLogicLoader,
+    LogicInterpreter,
     Plan,
     Produces,
     Query,
@@ -83,98 +87,32 @@ from .lazy import lazy
 _DEFAULT_SCHEDULER = None
 
 
-class Mode(Enum):
-    INTERPRET_LOGIC = 0
-    INTERPRET_NOTATION = 1
-    INTERPRET_ASSEMBLY = 2
-    COMPILE_NUMBA = 3
-    COMPILE_C = 4
-
+INTERPRET_LOGIC = LogicInterpreter()
+OPTIMIZE_LOGIC = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
+        MockLogicLoader()
+    ))))
+INTERPRET_NOTATION = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
+        LogicCompiler2(NotationInterpreter())
+    ))))
+INTERPRET_ASSEMBLY = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
+        LogicCompiler2(NotationCompiler(
+            AssemblyInterpreter()
+        ))
+    ))))
+COMPILE_NUMBA = LogicNormalizer(LogicExecutor(LogicNormalizer2(LogicFormatter(
+        LogicCompiler2(NotationCompiler(
+            NumbaCompiler()
+        ))
+    ))))
 
 def set_default_scheduler(
     *,
-    ctx=None,
-    mode=Mode.INTERPRET_LOGIC,  # TODO: change to NOTATION
+    ctx:LogicEvaluator=INTERPRET_NOTATION,
 ):
     global _DEFAULT_SCHEDULER
 
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
-
-    elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = LogicNormalizer(
-            LogicExecutor(LogicNormalizer2(LogicFormatter(LogicCompiler2())))
-        )
-
-    elif mode == Mode.INTERPRET_NOTATION:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        ntn_interp = ntn.NotationInterpreter()
-
-        def fn_compile(plan):
-            prgm, table_vars, tables = optimizer(plan)
-            mod = ntn_interp(prgm)
-            args = provision_tensors(prgm, table_vars, tables)
-            res = mod.func(*args)
-            return (
-                TableValue(
-                    res,
-                    tuple(Field("i") for i in range(res.ndim)),
-                ),
-            )
-
-        _DEFAULT_SCHEDULER = fn_compile
-        _DEFAULT_SCHEDULER = LogicExecutor()
-
-    elif mode == Mode.INTERPRET_ASSEMBLY:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        notation_compiler = NotationCompiler(Reflector())
-        asm_interp = asm.AssemblyInterpreter()
-
-        def fn_compile(plan):
-            ntn_prgm, table_vars, tables = optimizer(plan)
-            asm_prgm = notation_compiler(ntn_prgm)
-            mod = asm_interp(asm_prgm)
-            args = provision_tensors(asm_prgm, table_vars, tables)
-            res = mod.func(*args)
-            return (
-                TableValue(
-                    res,
-                    tuple(Field("i") for i in range(res.ndim)),
-                ),
-            )
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.COMPILE_NUMBA:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        notation_compiler = NotationCompiler(Reflector())
-        numba_compiler = NumbaCompiler()
-
-        def fn_compile(plan):
-            # TODO: proper logging
-            # print("Logic: \n", plan)
-            ntn_prgm, table_vars, tables = optimizer(plan)
-            # print("Notation: \n", ntn_prgm)
-            asm_prgm = notation_compiler(ntn_prgm)
-            # print("Assembler: \n", asm_prgm)
-            mod = numba_compiler(asm_prgm)
-            args = provision_tensors(asm_prgm, table_vars, tables)
-            res = mod.func(*args)
-            return (
-                TableValue(
-                    res,
-                    tuple(Field("i") for i in range(res.ndim)),
-                ),
-            )
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.COMPILE_C:
-        raise NotImplementedError
-
-    else:
-        raise Exception(f"Invalid scheduler mode: {mode}")
-
 
 set_default_scheduler()
 

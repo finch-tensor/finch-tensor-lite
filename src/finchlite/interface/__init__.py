@@ -99,9 +99,13 @@ from .eager import (
     vecdot,
 )
 from .fuse import (
-    Mode,
     compute,
     fuse,
+    INTERPRET_LOGIC,
+    OPTIMIZE_LOGIC,
+    INTERPRET_NOTATION,
+    INTERPRET_ASSEMBLY,
+    COMPILE_NUMBA,
     fused,
     get_default_scheduler,
     set_default_scheduler,
@@ -112,7 +116,11 @@ from .scalar import Scalar, ScalarFType
 __all__ = [
     "EagerTensor",
     "LazyTensor",
-    "Mode",
+    "INTERPRET_LOGIC",
+    "OPTIMIZE_LOGIC",
+    "INTERPRET_NOTATION",
+    "INTERPRET_ASSEMBLY",
+    "COMPILE_NUMBA",
     "Scalar",
     "ScalarFType",
     "abs",

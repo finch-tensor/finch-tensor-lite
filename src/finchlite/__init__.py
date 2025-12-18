@@ -19,7 +19,6 @@ from .galley import (
 from .interface import (
     EagerTensor,
     LazyTensor,
-    Mode,
     Scalar,
     abs,
     acos,
@@ -154,7 +153,6 @@ __all__ = [
     "FTyped",
     "FiberTensorFType",
     "LazyTensor",
-    "Mode",
     "NumpyBuffer",
     "NumpyBufferFType",
     "Reflector",
