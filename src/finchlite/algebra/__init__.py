@@ -28,7 +28,6 @@ from .operator import (
 from .tensor import (
     Tensor,
     TensorFType,
-    TensorPlaceholder,
     element_type,
     fill_value,
     shape_type,
@@ -39,7 +38,6 @@ __all__ = [
     "StableNumber",
     "Tensor",
     "TensorFType",
-    "TensorPlaceholder",
     "cansplitpush",
     "conjugate",
     "element_type",

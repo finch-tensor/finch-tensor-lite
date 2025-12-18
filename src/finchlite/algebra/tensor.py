@@ -217,12 +217,3 @@ class NDArrayFType(TensorFType):
 register_property(
     np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, np.intp(x.ndim))
 )
-
-
-class TensorPlaceholder:
-    def __init__(self, dtype):
-        self._dtype = dtype
-
-    @property
-    def dtype(self):
-        return self._dtype

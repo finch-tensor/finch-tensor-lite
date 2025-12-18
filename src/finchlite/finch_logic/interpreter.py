@@ -50,10 +50,8 @@ class LogicMachine:
         self.make_tensor = make_tensor  # Added make_tensor argument
 
     def __call__(self, node):
-        # Example implementation for evaluating an expression
         if self.verbose:
             print(f"Evaluating: {node}")
-        # Placeholder for actual logic
         match node:
             case Literal(val):
                 return val

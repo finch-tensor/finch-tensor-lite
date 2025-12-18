@@ -50,17 +50,11 @@ Performance:
   or `with_scheduler`.
 """
 
-from typing import Any
-
-import numpy as np
-
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
-from .. import finch_notation as ntn
-from ..algebra import Tensor, TensorPlaceholder
 from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.optimize2 import LogicNormalizer2
 from ..codegen import NumbaCompiler
@@ -68,14 +62,11 @@ from ..compile import NotationCompiler
 from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import (
     Alias,
-    Field,
-    Literal,
     LogicInterpreter,
     MockLogicLoader,
     Plan,
     Produces,
     Query,
-    Table,
 )
 from ..symbolic import gensym
 from .lazy import lazy
@@ -124,33 +115,6 @@ set_default_scheduler()
 def get_default_scheduler():
     global _DEFAULT_SCHEDULER
     return _DEFAULT_SCHEDULER
-
-
-def provision_tensors(
-    prgm: Any, table_vars: dict[Alias, ntn.Variable], tables: dict[Alias, Table]
-) -> list[Tensor]:
-    args: list[Tensor] = []
-    dims_dict: dict[Field, int] = {}
-    for arg in prgm.funcs[0].args:
-        table = tables[Alias(arg.name)]
-        table_var = table_vars[Alias(arg.name)]
-        match table:
-            case Table(Literal(val), idxs):
-                if isinstance(val, TensorPlaceholder):
-                    shape = tuple(dims_dict[field] for field in idxs)
-                    tensor = table_var.type_(
-                        shape, val=np.zeros(dtype=val.dtype, shape=shape)
-                    )
-                else:
-                    for idx, field in enumerate(table.idxs):
-                        dims_dict[field] = val.shape[idx]
-                    tensor = val
-            case _:
-                raise Exception(f"Invalid table for tensor processing: {table}")
-
-        args.append(tensor)
-
-    return args
 
 
 def compute(arg, ctx=None):
