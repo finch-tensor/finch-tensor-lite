@@ -72,6 +72,21 @@ class DCStats(TensorStats):
 
         return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
 
+
+    def _relabel_dc(DC, field_mapping):
+        return DC(
+            frozenset(field_mapping.get(idx, idx) for idx in DC.from_indices),
+            frozenset(field_mapping.get(idx, idx) for idx in DC.to_indices),
+            DC.value,
+        )
+    
+    @staticmethod
+    def relabel_fields(stats, field_mapping):
+        stats = DCStats.copy_stats(stats)
+        stats.tensordef = stats.tensordef.relabel_fields(field_mapping)
+        stats.dcs = {DCStats._relabel_dc(dc, field_mapping) for dc in stats.dcs}
+        return stats
+
     def _structure_to_dcs(self, arr: Tensor, fields: Iterable[str]) -> set[DC]:
         """
         Dispatch DC extraction based on tensor dimensionality.

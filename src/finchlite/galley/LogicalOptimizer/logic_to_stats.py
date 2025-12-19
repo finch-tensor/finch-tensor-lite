@@ -13,6 +13,7 @@ from finchlite.finch_logic import (
     Reformat,
     Reorder,
     Table,
+    Relabel,
     Value,
 )
 from finchlite.galley.TensorStats import TensorStats
@@ -23,7 +24,7 @@ def insert_statistics(
     node: LogicNode,
     bindings: OrderedDict[Alias, TensorStats],
     replace: bool,
-    cache: dict[object, TensorStats],
+    cache: OrderedDict[LogicNode, TensorStats],
 ) -> TensorStats:
     if node in cache:
         return cache[node]
@@ -72,6 +73,14 @@ def insert_statistics(
         child = insert_statistics(ST, node.arg, bindings, replace, cache)
         cache[node] = child
         return child
+    
+
+    if isinstance(node, (Relabel)):
+        child_stats = insert_statistics(ST, node.arg, bindings, replace, cache)
+        field_mapping = {node.arg.fields[i] : node.idxs[i] for i in range(len(node.idxs))}
+        child_copy = ST.relabel_fields(child_stats, node.field_mapping)
+        cache[node] = child_copy
+        return child_copy
 
     if isinstance(node, Table):
         if not isinstance(node.tns, Literal):

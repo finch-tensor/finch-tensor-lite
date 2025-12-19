@@ -58,6 +58,16 @@ class TensorStats(ABC):
         """
         ...
 
+    @staticmethod
+    @abstractmethod
+    def relabel_fields(
+        stats: "TensorStats", field_mapping: Mapping[str, str]
+    ) -> "TensorStats":
+        """
+        Returns a new TensorStats object with the fields relabeled according to field_mapping
+        """
+        ...
+
     @property
     def dim_sizes(self) -> Mapping[str, float]:
         return self.tensordef.dim_sizes

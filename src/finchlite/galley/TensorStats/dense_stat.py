@@ -21,6 +21,12 @@ class DenseStats(TensorStats):
             raise TypeError("copy_stats expected a DenseStats instance")
         return DenseStats.from_def(stat.tensordef.copy())
 
+    @staticmethod
+    def relabel_fields(stats, field_mapping):
+        stats = DenseStats.copy_stats(stats)
+        stats.tensordef = stats.tensordef.relabel_fields(field_mapping)
+        return stats
+
     def estimate_non_fill_values(self) -> float:
         total = 1.0
         for size in self.dim_sizes.values():
