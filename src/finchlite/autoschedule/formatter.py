@@ -1,3 +1,4 @@
+from finchlite.algebra.tensor import TensorFType
 import numpy as np
 
 from finchlite.finch_assembly import AssemblyLibrary
@@ -21,16 +22,17 @@ class LogicFormatter(LogicLoader):
     def __call__(
         self,
         prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, lgc.TableValueFType],
+        bindings: dict[lgc.Alias, TensorFType],
     ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
     ]:
         bindings = bindings.copy()
+        print(prgm)
         shape_types = prgm.infer_shape_type(
-            {var: val.tns.shape_type for var, val in bindings.items()}
+            {var: val.shape_type for var, val in bindings.items()}
         )
         element_types = prgm.infer_element_type(
-            {var: val.tns.element_type for var, val in bindings.items()}
+            {var: val.element_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement):
@@ -49,13 +51,13 @@ class LogicFormatter(LogicLoader):
                         # TODO: bufferized ndarray seems broken
                         tns = BufferizedNDArrayFType(
                             buffer_type=NumpyBufferFType(element_types[lhs]),
-                            ndim=np.intp(len(fields[lhs])),
+                            ndim=np.intp(len(shape_type)),
                             dimension_type=TupleFType(
                                 struct_name=gensym("ugh"), struct_formats=shape_type
                             ),
                         )
                         # tns = NDArrayFType(element_type, np.intp(len(shape_type)))
-                        bindings[lhs] = TableValueFType(tns, fields[lhs])
+                        bindings[lhs] = tns
                 case lgc.Produces(_):
                     pass
                 case _:

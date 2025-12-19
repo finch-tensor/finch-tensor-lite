@@ -1,5 +1,6 @@
 from itertools import product
 
+from finchlite.algebra.tensor import TensorFType
 import numpy as np
 
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -61,11 +62,11 @@ class LogicMachine:
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
-            case Alias(_):
-                alias = self.bindings.get(node, None)
-                if alias is None:
+            case Table(Alias() as var, idxs):
+                val = self.bindings.get(var, None)
+                if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
-                return alias
+                return TableValue(val, idxs)
             case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
             case MapJoin(Literal(op), args):
@@ -156,7 +157,7 @@ class LogicMachine:
 
 
 class MockLogicKernel(AssemblyKernel):
-    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
         self.prgm = prgm
         self.bindings = bindings
 
@@ -180,7 +181,7 @@ class MockLogicKernel(AssemblyKernel):
 
 
 class MockLogicLibrary(AssemblyLibrary):
-    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
         self.prgm = prgm
         self.bindings = bindings
 
@@ -197,8 +198,8 @@ class MockLogicLoader(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[
-        MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+        MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
     ]:
         return (MockLogicLibrary(prgm, bindings), prgm, bindings)

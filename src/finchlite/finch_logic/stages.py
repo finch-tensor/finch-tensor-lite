@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 
+from finchlite.algebra.tensor import Tensor, TensorFType
+
 from .. import finch_einsum as ein
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
-from .nodes import TableValueFType
 
 
 class LogicEvaluator(Stage):
@@ -12,8 +13,8 @@ class LogicEvaluator(Stage):
     def __call__(
         self,
         term: lgc.LogicNode,
-        bindings: dict[lgc.Alias, lgc.TableValue] | None = None,
-    ) -> lgc.TableValue | tuple[lgc.TableValue, ...]:
+        bindings: dict[lgc.Alias, Tensor] | None = None,
+    ) -> Tensor | tuple[Tensor, ...]:
         """
         Evaluate the given logic.
         """
@@ -22,8 +23,8 @@ class LogicEvaluator(Stage):
 class LogicLoader(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TableValueFType]]:
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called main which implements the logic. Also return a
@@ -34,8 +35,8 @@ class LogicLoader(ABC):
 class LogicEinsumLowerer(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[ein.EinsumNode, dict[lgc.Alias, TableValueFType]]:
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ) -> tuple[ein.EinsumNode, dict[lgc.Alias, TensorFType]]:
         """
         Generate Finch Einsum from the given logic and input types,
         types for all aliases.
@@ -45,8 +46,8 @@ class LogicEinsumLowerer(ABC):
 class LogicTransform(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
-    ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TableValueFType]]:
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         """
         Transform the given logic term into another logic term.
         """
@@ -60,9 +61,9 @@ class OptLogicLoader(LogicLoader):
     def __call__(
         self,
         term: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, lgc.TableValueFType],
+        bindings: dict[lgc.Alias, TensorFType],
     ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
     ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})

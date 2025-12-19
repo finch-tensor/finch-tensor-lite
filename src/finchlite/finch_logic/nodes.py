@@ -163,7 +163,7 @@ class LogicExpression(LogicNode):
 
     @abstractmethod
     def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+        self
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
         ...
@@ -220,8 +220,8 @@ class LogicStatement(LogicNode):
     """
     Logic AST statement base class.
 
-    A Logic statement may modify the state of the machine by assigning table
-    values to Aliases. Logic statements evaluate to a tuple of table values.
+    A Logic statement may modify the state of the machine by assigning tensors to Aliases.
+    Logic statements evaluate to a tuple of tensors.
     """
 
     @abstractmethod
@@ -314,6 +314,9 @@ class Value(LogicNode):
     yet to be evaluated.
 
     Attributes:
+
+    name: str
+
         ex: The expression to be evaluated.
         type_: The type of the expression.
     """
@@ -391,7 +394,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Literal | Value
+    tns: Literal | Value | Alias
     idxs: tuple[Field, ...]
 
     @property
@@ -410,7 +413,7 @@ class Table(LogicTree, LogicExpression):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
-        raise NotImplementedError("Cannot resolve dims of Tables")
+        return self.tns.dimmap(op, dim_bindings)
 
     def valmap(
         self,
@@ -418,7 +421,7 @@ class Table(LogicTree, LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        raise NotImplementedError("Cannot resolve value of Tables")
+        return self.tns.valmap(f, g, bindings)
 
     @classmethod
     def from_children(cls, tns, *idxs):
@@ -447,10 +450,10 @@ class MapJoin(LogicTree, LogicExpression):
         return [self.op, *self.args]
 
     def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
+        self
     ) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        args_fields = [x.fields(bindings) for x in self.args]
+        args_fields = [x.fields() for x in self.args]
         return tuple(dict.fromkeys([f for fs in args_fields for f in fs]))
 
     def dimmap(
@@ -505,12 +508,10 @@ class Aggregate(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
-    def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
-    ) -> tuple[Field, ...]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return tuple(
-            field for field in self.arg.fields(bindings) if field not in self.idxs
+            field for field in self.arg.fields() if field not in self.idxs
         )
 
     def dimmap(
@@ -557,9 +558,7 @@ class Reorder(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
-    ) -> tuple[Field, ...]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
 
@@ -604,9 +603,7 @@ class Relabel(LogicTree, LogicExpression):
     arg: LogicExpression
     idxs: tuple[Field, ...]
 
-    def fields(
-        self, bindings: dict[Alias, tuple[Field, ...]] | None = None
-    ) -> tuple[Field, ...]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
 

@@ -4,6 +4,7 @@ import operator
 from collections.abc import Iterable
 from typing import Any
 
+from finchlite.algebra.tensor import TensorFType
 import numpy as np
 
 from finchlite.finch_notation.stages import NotationLoader
@@ -41,12 +42,12 @@ class PointwiseContext:
                         for arg in args
                     ),
                 )
-            case lgc.Alias(_) as var:
+            case lgc.Table(lgc.Alias(_) as var, idxs):
                 return ntn.Unwrap(
                     ntn.Access(
                         self.ctx.slots[var],
                         ntn.Read(),
-                        tuple(loops[idx] for idx in var.fields(self.ctx.fields)),
+                        tuple(loops[idx] for idx in idxs),
                     )
                 )
             case lgc.Relabel(arg, idxs):
@@ -55,7 +56,7 @@ class PointwiseContext:
                     {
                         idx_1: loops[idx_2]
                         for idx_1, idx_2 in zip(
-                            arg.fields(self.ctx.fields), idxs, strict=True
+                            arg.fields(), idxs, strict=True
                         )
                     },
                 )
@@ -79,11 +80,10 @@ class NotationContext:
 
     def __init__(
         self,
-        bindings: dict[lgc.Alias, lgc.TableValueFType],
+        bindings: dict[lgc.Alias, TensorFType],
         args: dict[lgc.Alias, ntn.Variable],
         slots: dict[lgc.Alias, ntn.Slot],
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
-        fields: dict[lgc.Alias, tuple[lgc.Field, ...]] | None = None,
         shape_types: dict[lgc.Alias, tuple[Any, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
     ):
@@ -92,11 +92,8 @@ class NotationContext:
         self.slots = slots
         self.shapes = shapes
         self.equiv: dict[ntn.Variable, ntn.Variable] = {}
-        if fields is None:
-            fields = {var: val.idxs for var, val in bindings.items()}
-        self.fields = fields
         if shape_types is None:
-            shape_types = {var: val.tns.shape_type for var, val in bindings.items()}
+            shape_types = {var: val.shape_type for var, val in bindings.items()}
         self.shape_types = shape_types
         if epilogue is None:
             epilogue = ()
@@ -111,23 +108,16 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(lhs, lgc.Reorder(lgc.Alias(_) as arg, idxs)):
-                return self(
-                    lgc.Query(
-                        lhs,
-                        lgc.Reorder(lgc.Relabel(arg, arg.fields(self.fields)), idxs),
-                    )
-                )
             case lgc.Query(
-                lhs, lgc.Reorder(lgc.Relabel(lgc.Alias(_), idxs_1) as arg, idxs_2)
+                lhs, lgc.Reorder(lgc.Table(lgc.Alias(_), idxs_1) as arg, idxs_2)
             ):
-                arg_dims = arg.dimmap(merge_shapes, self.shapes, self.fields)
+                arg_dims = arg.dimmap(merge_shapes, self.shapes)
                 shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
                 shapes = {
                     idx: shapes_map.get(idx) or ntn.Literal(1)
                     for idx in idxs_1 + idxs_2
                 }
-                arg_types = arg.shape_type(self.shape_types, self.fields)
+                arg_types = arg.shape_type(self.shape_types)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
                 shape_type = {
                     idx: shape_type_map.get(idx) or np.intp for idx in idxs_1 + idxs_2
@@ -205,7 +195,7 @@ class NotationContext:
                     (
                         ntn.Declare(
                             self.slots[lhs],
-                            ntn.Literal(self.bindings[lhs].tns.fill_value),
+                            ntn.Literal(self.bindings[lhs].fill_value),
                             ntn.Literal(overwrite),
                             (),
                         ),
@@ -226,10 +216,10 @@ class NotationContext:
                 ),
             ):
                 # Build a dict mapping fields to their shapes
-                arg_dims = arg_2.dimmap(merge_shapes, self.shapes, self.fields)
+                arg_dims = arg_2.dimmap(merge_shapes, self.shapes)
                 shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
                 shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
-                arg_types = arg_2.shape_type(self.shape_types, self.fields)
+                arg_types = arg_2.shape_type(self.shape_types)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
                 shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1}
                 loops = {
@@ -293,7 +283,7 @@ class NotationContext:
 
 class NotationGenerator(LogicNotationLowerer):
     def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TableValueFType]
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> ntn.Module:
         preamble: list[ntn.NotationStatement] = []
         epilogue: list[ntn.NotationStatement] = []
@@ -301,8 +291,8 @@ class NotationGenerator(LogicNotationLowerer):
         slots: dict[lgc.Alias, ntn.Slot] = {}
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]] = {}
         for arg in bindings:
-            args[arg] = ntn.Variable(gensym(f"{arg.name}"), bindings[arg].tns)
-            slots[arg] = ntn.Slot(gensym(f"_{arg.name}"), bindings[arg].tns)
+            args[arg] = ntn.Variable(gensym(f"{arg.name}"), bindings[arg])
+            slots[arg] = ntn.Slot(gensym(f"_{arg.name}"), bindings[arg])
             preamble.append(
                 ntn.Unpack(
                     slots[arg],
@@ -310,7 +300,7 @@ class NotationGenerator(LogicNotationLowerer):
                 )
             )
             shape: list[ntn.Variable] = []
-            for i, t in enumerate(bindings[arg].tns.shape_type):
+            for i, t in enumerate(bindings[arg].shape_type):
                 dim = ntn.Variable(gensym(f"{arg.name}_dim_{i}"), t)
                 shape.append(dim)
                 preamble.append(
@@ -361,9 +351,9 @@ class LogicCompiler(LogicLoader):
         self.ctx_load: NotationLoader = ctx_load
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
     ]:
         mod = self.ctx_lower(prgm, bindings)
         lib = self.ctx_load(mod)

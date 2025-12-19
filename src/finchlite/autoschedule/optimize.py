@@ -44,12 +44,10 @@ def optimize(prgm: LogicNode) -> LogicNode:
 
     prgm = pretty_labels(prgm)
 
-    prgm = propagate_fields(prgm)
     prgm = propagate_copy_queries(prgm)
     prgm = propagate_transpose_queries(prgm)
     prgm = propagate_map_queries(prgm)
 
-    prgm = propagate_fields(prgm)
     prgm = push_fields(prgm)
     prgm = lift_fields(prgm)
     prgm = push_fields(prgm)
@@ -317,44 +315,6 @@ def propagate_copy_queries(root):
 #
 #    return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
-
-@overload
-def _propagate_fields(
-    root: LogicStatement, fields: dict[LogicNode, Iterable[Field]]
-) -> LogicStatement: ...
-@overload
-def _propagate_fields(
-    root: LogicExpression, fields: dict[LogicNode, Iterable[Field]]
-) -> LogicExpression: ...
-@overload
-def _propagate_fields(
-    root: LogicTree, fields: dict[LogicNode, Iterable[Field]]
-) -> LogicTree: ...
-@overload
-def _propagate_fields(
-    root: LogicNode, fields: dict[LogicNode, Iterable[Field]]
-) -> LogicNode: ...
-def _propagate_fields(root, fields):
-    match root:
-        case Plan(bodies):
-            return Plan(tuple(_propagate_fields(b, fields) for b in bodies))
-        case Query(lhs, rhs):
-            rhs_2 = _propagate_fields(rhs, fields)
-            assert isinstance(rhs_2, LogicExpression)
-            fields[lhs] = rhs_2.fields()
-            return Query(lhs, rhs_2)
-        case Alias(_) as a:
-            return Relabel(a, tuple(fields[a]))
-        case LogicTree() as tree:
-            return tree.make_term(
-                tree.head(), *(_propagate_fields(c, fields) for c in tree.children)
-            )
-        case node:
-            return node
-
-
-def propagate_fields(root: LogicNode) -> LogicNode:
-    return _propagate_fields(root, fields={})
 
 
 def push_fields(root):

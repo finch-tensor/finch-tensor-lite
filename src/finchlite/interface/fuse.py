@@ -62,11 +62,13 @@ from ..compile import NotationCompiler
 from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import (
     Alias,
+    Field,
     LogicInterpreter,
     MockLogicLoader,
     Plan,
     Produces,
     Query,
+    Table,
 )
 from ..symbolic import gensym
 from .lazy import lazy
@@ -137,12 +139,12 @@ def compute(arg, ctx=None):
     args = arg if isinstance(arg, tuple) else (arg,)
     vars = tuple(Alias(gensym("A")) for _ in args)
     ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
-    bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
+    bodies = tuple(map(lambda arg, var: Query(var, Table(arg.data, tuple(Field(gensym("i")) for _ in range(len(arg.shape))))), args, vars))
     prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
     res = ctx(prgm)
     if isinstance(arg, tuple):
-        return tuple(tbl.tns for tbl in res)
-    return res[0].tns
+        return tuple(tns for tns in res)
+    return res[0]
 
 
 def fuse(f, *args, ctx=None):

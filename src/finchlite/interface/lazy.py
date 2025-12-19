@@ -412,6 +412,7 @@ def asarray(arg: Any, format=None) -> Any:
     """
     if format is None:
         if hasattr(arg, "asarray"):
+            raise ValueError("SHOULD NOT BE HERE")
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
 
@@ -463,7 +464,7 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
     return LazyTensor(
-        Reorder(Relabel(arg.data, idxs), tuple(idxs[i] for i in axis)),
+        Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis)),
         arg.ctx,
         tuple(arg.shape[i] for i in axis),
         arg.fill_value,
@@ -527,7 +528,7 @@ def expand_dims(
         Field(gensym("i")) if n in axis else idxs_1[n - offset[n]]
         for n in range(x.ndim + len(axis))
     )
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    data_2 = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
@@ -575,7 +576,7 @@ def squeeze(
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    data_2 = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
     return LazyTensor(data_2, x.ctx, shape_2, x.fill_value, x.element_type)
 
@@ -641,7 +642,7 @@ def reduce(
     data: LogicExpression = Aggregate(
         Literal(op),
         Literal(init),
-        Relabel(x.data, fields),
+        Table(x.data, fields),
         tuple(fields[i] for i in axis),
     )
     if keepdims:
@@ -733,7 +734,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                 if arg.shape[i - ndim + arg.ndim] != 1:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
-        bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
+        bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
     data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
