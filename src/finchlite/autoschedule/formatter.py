@@ -26,9 +26,8 @@ class LogicFormatter(LogicLoader):
         AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
     ]:
         bindings = bindings.copy()
-        fields = prgm.infer_fields({var: val.idxs for var, val in bindings.items()})
         shape_types = prgm.infer_shape_type(
-            {var: val.tns.shape_type for var, val in bindings.items()}, fields
+            {var: val.tns.shape_type for var, val in bindings.items()}
         )
         element_types = prgm.infer_element_type(
             {var: val.tns.element_type for var, val in bindings.items()}
