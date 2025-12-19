@@ -10,7 +10,6 @@ from finchlite.finch_logic import (
     LogicNode,
     MapJoin,
     Query,
-    Reformat,
     Reorder,
     Table,
     Value,
