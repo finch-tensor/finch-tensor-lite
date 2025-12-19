@@ -49,15 +49,15 @@ class TensorDef:
             fill_value=fv,
         )
 
-    def reindex_def(self, new_axis: Iterable[str]) -> "TensorDef":
+    def relabel_fields(self,  field_mapping: Mapping[str, str]) -> "TensorDef":
         """
         Return
             :TensorDef with a new reindexed index_set and dim sizes
         """
-        new_axis = list(new_axis)
-        new_dim_sizes = OrderedDict((axis, self.dim_sizes[axis]) for axis in new_axis)
+        new_dim_sizes = OrderedDict((field_mapping[axis], self.dim_sizes[axis]) for axis in self.index_set)
+        new_index_set = set(new_dim_sizes.keys())
         return TensorDef(
-            index_set=new_axis,
+            index_set=new_index_set,
             dim_sizes=new_dim_sizes,
             fill_value=self.fill_value,
         )

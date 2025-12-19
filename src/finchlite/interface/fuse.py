@@ -59,6 +59,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, TensorPlaceholder
 from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
+from ..galley.LogicalOptimizer.greedy_optimizer import GalleyLogicOptimizer
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
 from ..finch_logic import (
@@ -80,9 +81,10 @@ _DEFAULT_SCHEDULER = None
 class Mode(Enum):
     INTERPRET_LOGIC = 0
     INTERPRET_NOTATION = 1
-    INTERPRET_ASSEMBLY = 2
-    COMPILE_NUMBA = 3
-    COMPILE_C = 4
+    GALLEY_INTERPRET_NOTATION = 2
+    INTERPRET_ASSEMBLY = 3
+    COMPILE_NUMBA = 4
+    COMPILE_C = 5
 
 
 def set_default_scheduler(
@@ -97,6 +99,18 @@ def set_default_scheduler(
 
     elif mode == Mode.INTERPRET_LOGIC:
         _DEFAULT_SCHEDULER = FinchLogicInterpreter()
+
+    elif mode == Mode.GALLEY_INTERPRET_NOTATION:
+        optimizer = GalleyLogicOptimizer(LogicCompiler())
+        ntn_interp = ntn.NotationInterpreter()
+
+        def fn_compile(plan):
+            prgm, table_vars, tables = optimizer(plan)
+            mod = ntn_interp(prgm)
+            args = provision_tensors(prgm, table_vars, tables)
+            return (mod.func(*args),)
+
+        _DEFAULT_SCHEDULER = fn_compile
 
     elif mode == Mode.INTERPRET_NOTATION:
         optimizer = DefaultLogicOptimizer(LogicCompiler())
