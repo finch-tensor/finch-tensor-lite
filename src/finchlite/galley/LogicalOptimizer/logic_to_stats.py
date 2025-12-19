@@ -9,6 +9,8 @@ from finchlite.finch_logic import (
     Literal,
     LogicNode,
     MapJoin,
+    Query,
+    Reformat,
     Reorder,
     Table,
     Value,
@@ -25,6 +27,13 @@ def insert_statistics(
 ) -> TensorStats:
     if node in cache:
         return cache[node]
+
+    if isinstance(node, Query):
+        stats = insert_statistics(ST, node.rhs, bindings, replace, cache)
+        if isinstance(node.lhs, Alias):
+            bindings[node.lhs] = stats
+        cache[node] = stats
+        return stats
 
     if isinstance(node, MapJoin):
         if not isinstance(node.op, Literal):
