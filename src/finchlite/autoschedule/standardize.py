@@ -25,6 +25,7 @@ from ..symbolic import (
     PostWalk,
     PreWalk,
     Rewrite,
+    PostOrderDFS,
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
@@ -55,6 +56,17 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
 
     return Rewrite(PostWalk(transform))(root)
 
+def split_increments(root: LogicStatement) -> LogicStatement:
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, rhs):
+                if lhs in PostOrderDFS(rhs):
+                    var = Alias(gensym("A"))
+                    new_query = Query(var, rhs)
+                    new_root = Query(lhs, var)
+                    return Plan((new_query, new_root))
+
+    return Rewrite(PostWalk(rule_2))(root)
 
 def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
@@ -270,6 +282,12 @@ def drop_with_aggregation(root: LogicStatement, bindings) -> LogicStatement:
 
 
 class LogicStandardizer(LogicLoader):
+    """
+    The LogicStandardizer applies a series of transformations to standardize
+    logic statements into a canonical form. Any Logic is accepted as input, and the output logic should be a plan with only two forms of queries:
+    1. Queries that perform a Reorder of a single argument
+    2. Queries that perform an Aggregate over a Reorder of a series of map-joins.
+    """
     def __init__(self, ctx=None):
         if ctx is None:
             ctx = MockLogicLoader()
@@ -277,6 +295,7 @@ class LogicStandardizer(LogicLoader):
 
     def __call__(self, prgm: LogicStatement, bindings):
         prgm = isolate_aggregates(prgm)
+        prgm = split_increments(prgm)
         prgm = standardize_query_roots(prgm, bindings)
         prgm = push_fields(prgm, bindings)
         prgm = drop_reorders(prgm)
