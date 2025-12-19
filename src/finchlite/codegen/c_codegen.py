@@ -25,6 +25,7 @@ from ..finch_assembly import (
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
+from .stages import CCode, CLowerer
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +234,7 @@ register_property(
 # deserialize_to_c should modify in place. TODO: implement
 
 
-class CKernel:
+class CKernel(asm.AssemblyKernel):
     """
     A class to represent a C kernel.
     """
@@ -267,7 +268,7 @@ class CKernel:
         return construct_from_c(self.ret_type, res)
 
 
-class CModule:
+class CLibrary(asm.AssemblyLibrary):
     """
     A class to represent a C module.
     """
@@ -285,12 +286,14 @@ class CModule:
         )
 
 
-class CCompiler:
+class CCompiler(asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
 
-    def __init__(self, ctx=None, cc=None, cflags=None, shared_cflags=None):
+    def __init__(
+        self, ctx: CLowerer | None = None, cc=None, cflags=None, shared_cflags=None
+    ):
         if cc is None:
             cc = config.get("cc")
         if cflags is None:
@@ -300,12 +303,10 @@ class CCompiler:
         self.cc = cc
         self.cflags = cflags
         self.shared_cflags = shared_cflags
-        self.ctx = CGenerator() if ctx is None else ctx
+        self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
-    def __call__(self, prgm):
-        ctx = CContext()
-        ctx(prgm)
-        c_code = ctx.emit_global()
+    def __call__(self, prgm: asm.Module) -> CLibrary:
+        c_code = self.ctx(prgm).code
         logger.info(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
@@ -329,7 +330,7 @@ class CCompiler:
                     raise NotImplementedError(
                         f"Unrecognized function type: {type(func)}"
                     )
-        return CModule(lib, kernels)
+        return CLibrary(lib, kernels)
 
 
 def c_function_name(op: Any, ctx, *args: Any) -> str:
@@ -565,11 +566,11 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CGenerator:
+class CGenerator(CLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = CContext()
         ctx(prgm)
-        return ctx.emit_global()
+        return CCode(ctx.emit_global())
 
 
 class CContext(Context):

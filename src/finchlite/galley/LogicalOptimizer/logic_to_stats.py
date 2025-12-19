@@ -9,8 +9,8 @@ from finchlite.finch_logic import (
     Literal,
     LogicNode,
     MapJoin,
-    Reformat,
-    Subquery,
+    Query,
+    Reorder,
     Table,
     Value,
 )
@@ -41,6 +41,13 @@ def insert_statistics(
             st = ST.mapjoin(op, *args)
             cache[node] = st
             return st
+        case Query():
+            stats = insert_statistics(ST, node.rhs, bindings, replace, cache)
+            if isinstance(node.lhs, Alias):
+                bindings[node.lhs] = stats
+            cache[node] = stats
+            return stats
+
 
         case Aggregate():
             if not isinstance(node.op, Literal):
@@ -64,9 +71,9 @@ def insert_statistics(
             cache[node] = st
             return st
 
-        case Reformat():
+        case Reorder():
             child = insert_statistics(ST, node.arg, bindings, replace, cache)
-            cache[node] = child.reorder()
+            cache[node] = child
             return child
 
         # We need implementation for reformat and relabel
@@ -85,12 +92,6 @@ def insert_statistics(
         case Value() | Literal():
             val = node.val if isinstance(node, Literal) else node.ex
             st = ST(val)
-            cache[node] = st
-            return st
-
-        case Subquery():
-            st = insert_statistics(ST, node.arg, bindings, replace, cache)
-            bindings[node.lhs] = st
             cache[node] = st
             return st
 
