@@ -262,7 +262,7 @@ class Produces(EinsumTree, EinsumStatement):
         args: The arguments to return.
     """
 
-    args: tuple[EinsumNode, ...]
+    args: tuple[Alias, ...]
 
     @property
     def children(self):

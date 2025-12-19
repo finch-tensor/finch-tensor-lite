@@ -1,4 +1,9 @@
-from .interpreter import FinchLogicInterpreter
+from .interpreter import (
+    LogicInterpreter,
+    MockLogicKernel,
+    MockLogicLibrary,
+    MockLogicLoader,
+)
 from .nodes import (
     Aggregate,
     Alias,
@@ -12,32 +17,45 @@ from .nodes import (
     Plan,
     Produces,
     Query,
-    Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
+    TableValue,
+    TableValueFType,
     Value,
+)
+from .stages import (
+    LogicEinsumLowerer,
+    LogicEvaluator,
+    LogicLoader,
+    LogicTransform,
 )
 
 __all__ = [
     "Aggregate",
     "Alias",
     "Field",
-    "FinchLogicInterpreter",
     "Literal",
+    "LogicEinsumLowerer",
+    "LogicEvaluator",
     "LogicExpression",
+    "LogicInterpreter",
+    "LogicLoader",
     "LogicNode",
     "LogicStatement",
+    "LogicTransform",
     "LogicTree",
     "MapJoin",
+    "MockLogicKernel",
+    "MockLogicLibrary",
+    "MockLogicLoader",
     "Plan",
     "Produces",
     "Query",
-    "Reformat",
     "Relabel",
     "Reorder",
-    "Subquery",
     "Table",
+    "TableValue",
+    "TableValueFType",
     "Value",
 ]

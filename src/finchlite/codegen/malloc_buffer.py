@@ -6,7 +6,7 @@ from typing import TypedDict
 
 import numpy as np
 
-from finchlite.codegen.c import (
+from finchlite.codegen.c_codegen import (
     CBufferFType,
     CContext,
     CStackFType,
