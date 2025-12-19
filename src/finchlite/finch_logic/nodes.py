@@ -258,6 +258,8 @@ class Aggregate(LogicTree, LogicExpression):
 @dataclass(eq=True, frozen=True)
 class Reorder(LogicTree, LogicExpression):
     """
+    A = Table(Literal(np.zeros(2,3)),(Field("i"),Field("j")))
+    B = Reorder(A,(Field("i")))
     Represents a logical AST statement that reorders the dimensions of `arg` to be
     `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not
     exist in `arg` may be added.

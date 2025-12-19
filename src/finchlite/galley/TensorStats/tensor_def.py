@@ -12,7 +12,7 @@ from finchlite.algebra import fill_value, is_idempotent, is_identity
 class TensorDef:
     def __init__(
         self,
-        index_set: Iterable[str],
+        index_set: Iterable[str],  # List or order or indices - Tuple - Order matters
         dim_sizes: Mapping[str, float],
         fill_value: Any,
     ):
@@ -32,6 +32,7 @@ class TensorDef:
         )
 
     @classmethod
+    # indices ->()
     def from_tensor(cls, tensor: Any, indices: Iterable[str]) -> "TensorDef":
         """
         Storing axis, sizes, and fill_value of the tensor
@@ -166,7 +167,9 @@ class TensorDef:
             TensorDef: A new TensorDef representing the merged tensor.
         """
         new_fill_value = op(*(s.fill_value for s in args))
-        new_index_set = set().union(*(s.index_set for s in args))
+        new_index_set = set().union(
+            *(s.index_set for s in args)
+        )  # TableNode -> Mapjoin -> .fields
         new_dim_sizes: dict = {}
         for index in new_index_set:
             for s in args:

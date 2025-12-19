@@ -50,6 +50,19 @@ class TensorStats(ABC):
         """
         ...
 
+    @staticmethod
+    @abstractmethod
+    def relabel(stats: "TensorStats", relabel_indices: Iterable[str]) -> "TensorStats":
+        """ """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def reorder(stats: "TensorStats", reorder_indices: Iterable[str]
+                ) -> "TensorStats":
+        """ """
+        ...
+
     @property
     def dim_sizes(self) -> Mapping[str, float]:
         return self.tensordef.dim_sizes
