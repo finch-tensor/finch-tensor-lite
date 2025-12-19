@@ -1592,11 +1592,12 @@ class DCStats(TensorStats):
     def reorder(stats: "TensorStats", reorder_indices: Iterable[str]) -> "DCStats":
         new_axes = set(reorder_indices)
         for old_idx in stats.index_set:
-            if old_idx not in new_axes:
-                if stats.get_dim_size(old_idx) != 1:
-                    raise ValueError(
-                        f"Trying to drop dimension '{old_idx}' of size {stats.get_dim_size(old_idx)}. Only size 1 dimensions can be dropped."
-                    )
+            if old_idx not in new_axes and stats.get_dim_size(old_idx) != 1:
+                raise ValueError(
+                    f"Trying to drop dimension '{old_idx}' of size"
+                    f" {stats.get_dim_size(old_idx)}."
+                    " Only size 1 dimensions can be dropped."
+                )
 
         new_dims = {}
         for idx in reorder_indices:

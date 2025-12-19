@@ -128,9 +128,7 @@ class LogicMachine:
                 result = self.make_tensor(
                     dims, fill_value(arg.tns), dtype=element_type(arg.tns)
                 )
-                for crds in product(
-                    *[range(dim) for dim in dims]
-                ):  # (0,1,2)*(0,1) = (0,0),(0,1),(1,0),(1,1),(2,0),(2,1) Let us take the crds as (2,1) for example
+                for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(
                         zip(idxs, crds, strict=True)
                     )  # node_crds = ((j,2), (i,1))

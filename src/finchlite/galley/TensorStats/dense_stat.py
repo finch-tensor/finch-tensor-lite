@@ -70,7 +70,6 @@ class DenseStats(TensorStats):
             and a.fill_value == b.fill_value
         )
 
-    # Defining relabel method which just relabels the indices of the tensorstats object and the stats remain same
     @staticmethod
     def relabel(stats: "TensorStats", relabel_indices: Iterable[str]) -> "DenseStats":
         new_axes = set(relabel_indices)
@@ -79,16 +78,16 @@ class DenseStats(TensorStats):
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)
 
-    # Defining reorder method which reorder the indices and returns stats for the new tensor
     @staticmethod
     def reorder(stats: "TensorStats", reorder_indices: Iterable[str]) -> "DenseStats":
         new_axes = set(reorder_indices)
         for old_idx in stats.index_set:
-            if old_idx not in new_axes:
-                if stats.get_dim_size(old_idx) != 1:
-                    raise ValueError(
-                        f"Trying to drop dimension '{old_idx}' of size {stats.get_dim_size(old_idx)}. Only size 1 dimensions can be dropped."
-                    )
+            if old_idx not in new_axes and stats.get_dim_size(old_idx) != 1:
+                raise ValueError(
+                    f"Trying to drop dimension '{old_idx}' of size"
+                    f" {stats.get_dim_size(old_idx)}."
+                    " Only size 1 dimensions can be dropped."
+                )
 
         new_dims = {}
         for idx in reorder_indices:

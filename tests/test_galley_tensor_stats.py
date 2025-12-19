@@ -21,6 +21,7 @@ from finchlite.galley.LogicalOptimizer import (
     get_lazy_tensor_stats,
     get_reducible_idxs,
     insert_statistics,
+    replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
 from finchlite.interface import lazy

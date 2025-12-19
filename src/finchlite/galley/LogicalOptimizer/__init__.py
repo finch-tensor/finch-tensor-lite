@@ -8,9 +8,8 @@ from .annotated_query import (
     reduce_idx,
     replace_and_remove_nodes,
 )
-from .logic_to_stats import get_lazy_tensor_stats, insert_statistics
 from .greedy_optimizer import greedy_query
-from .logic_to_stats import insert_statistics
+from .logic_to_stats import get_lazy_tensor_stats, insert_statistics
 
 __all__ = [
     "AnnotatedQuery",

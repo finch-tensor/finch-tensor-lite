@@ -66,8 +66,7 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def reorder(stats: "TensorStats", reorder_indices: Iterable[str]
-                ) -> "TensorStats":
+    def reorder(stats: "TensorStats", reorder_indices: Iterable[str]) -> "TensorStats":
         """ """
         ...
 

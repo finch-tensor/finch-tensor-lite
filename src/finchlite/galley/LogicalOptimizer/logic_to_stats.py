@@ -48,7 +48,6 @@ def insert_statistics(
             cache[node] = stats
             return stats
 
-
         case Aggregate():
             if not isinstance(node.op, Literal):
                 raise TypeError("Aggregate.op must be Literal(...).")
