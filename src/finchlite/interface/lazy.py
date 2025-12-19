@@ -102,10 +102,17 @@ effect_stamp = 0
 
 class EffectBlob:
     """
-    The EffectBlob class represents a collection of prior queries in a lazy evaluation context, which can be extracted into a linear trace of LogicStatements (in the order they were issued). Note that the global `effect_stamp` counter is required to maintain the relative ordering of effect blobs in the face of in-place mutations to tensors.
-    Each effect blob contains a logic statement and references to other effect blobs. The datastructure is designed to
-    be immutable, mergeable in O(1) time, and support linear time extraction. To achieve linear time, we use a hash table to avoid re-extracting already seen blobs.
+    The EffectBlob class represents a collection of prior queries in a lazy
+    evaluation context, which can be extracted into a linear trace of
+    LogicStatements (in the order they were issued). Note that the global
+    `effect_stamp` counter is required to maintain the relative ordering of
+    effect blobs in the face of in-place mutations to tensors.  Each effect blob
+    contains a logic statement and references to other effect blobs. The
+    datastructure is designed to be immutable, mergeable in O(1) time, and
+    support linear time extraction. To achieve linear time, we use a hash table
+    to avoid re-extracting already seen blobs.
     """
+
     stamp: int
     stmt: LogicStatement
     blobs: tuple[EffectBlob, ...]
