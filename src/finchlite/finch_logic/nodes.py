@@ -413,7 +413,12 @@ class Table(LogicTree, LogicExpression):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
-        return self.tns.dimmap(op, dim_bindings)
+        if isinstance(self.tns, Alias):
+            if self.tns not in dim_bindings:
+                raise NotImplementedError(f"Cannot resolve dims of Alias {self.tns.name}")
+            return dim_bindings[self.tns]
+        else:
+            raise NotImplementedError("Cannot resolve dims of Tables")
 
     def valmap(
         self,
@@ -421,7 +426,12 @@ class Table(LogicTree, LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return self.tns.valmap(f, g, bindings)
+        if isinstance(self.tns, Alias):
+            if self.tns not in bindings:
+                raise NotImplementedError(f"Cannot resolve value of Alias {self.tns.name}")
+            return bindings[self.tns]
+        else:
+            raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
     def from_children(cls, tns, *idxs):

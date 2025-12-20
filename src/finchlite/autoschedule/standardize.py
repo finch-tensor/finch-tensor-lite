@@ -228,7 +228,6 @@ def flatten_plans(root):
 
 
 def drop_reorders(root: LogicStatement) -> LogicStatement:
-    print(root)
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):

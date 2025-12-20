@@ -76,9 +76,12 @@ class LazyTensorFType(TensorFType):
 
     def __call__(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
+        ctx = EffectBlob()
+        expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
+        data, ctx = ctx.eval(expr)
         return LazyTensor(
-            data=Table(Literal(FillTensor(shape, self._fill_value)), idxs),
-            ctx=EffectBlob(),
+            data=data,
+            ctx=ctx,
             shape=shape,
             fill_value=self._fill_value,
             element_type=self._element_type,
@@ -148,7 +151,7 @@ class EffectBlob:
 class LazyTensor(OverrideTensor):
     def __init__(
         self,
-        data: LogicExpression,
+        data: Alias,
         ctx: EffectBlob,
         shape: tuple,
         fill_value: Any,
@@ -412,7 +415,6 @@ def asarray(arg: Any, format=None) -> Any:
     """
     if format is None:
         if hasattr(arg, "asarray"):
-            raise ValueError("SHOULD NOT BE HERE")
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
 
@@ -463,15 +465,17 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     arg = lazy(arg)
     axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
+    expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
+    data, ctx = arg.ctx.eval(expr)
     return LazyTensor(
-        Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis)),
-        arg.ctx,
+        data,
+        ctx,
         tuple(arg.shape[i] for i in axis),
         arg.fill_value,
         arg.element_type,
     )
 
-
+# NEED TO CHANGE THIS AND SQUEEZE TO ONLY PUT ALIASES IN DATA
 def expand_dims(
     x,
     /,
@@ -528,11 +532,12 @@ def expand_dims(
         Field(gensym("i")) if n in axis else idxs_1[n - offset[n]]
         for n in range(x.ndim + len(axis))
     )
-    data_2 = Reorder(Table(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
-    return LazyTensor(data_2, x.ctx, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def squeeze(
@@ -576,10 +581,10 @@ def squeeze(
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
-    data_2 = Reorder(Table(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
-    return LazyTensor(data_2, x.ctx, shape_2, x.fill_value, x.element_type)
-
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 def reduce(
     op: Callable,
@@ -653,8 +658,8 @@ def reduce(
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
-    data, ctx = x.ctx.eval(data)
-    return LazyTensor(data, ctx, shape, init, dtype)
+    expr, ctx = x.ctx.eval(data)
+    return LazyTensor(expr, ctx, shape, init, dtype)
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -735,11 +740,11 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
+    expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
     ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
-    data, ctx = ctx.eval(data)
+    data, ctx = ctx.eval(expr)
     return LazyTensor(data, ctx, shape, new_fill_value, new_element_type)
 
 

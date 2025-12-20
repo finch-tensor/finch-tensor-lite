@@ -87,7 +87,7 @@ class LogicExecutor(LogicEvaluator):
     ):
         if bindings is None:
             bindings = {}
-
+        
         if isinstance(prgm, lgc.LogicExpression):
             var = lgc.Alias("result")
             stmt: lgc.LogicStatement = lgc.Plan(

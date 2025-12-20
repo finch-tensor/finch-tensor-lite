@@ -27,7 +27,6 @@ class LogicFormatter(LogicLoader):
         AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
     ]:
         bindings = bindings.copy()
-        print(prgm)
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
