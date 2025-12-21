@@ -1,3 +1,5 @@
+from typing import Any
+
 from ..finch_logic import (
     Alias,
     Field,
@@ -13,7 +15,11 @@ class LogicNormalizer(LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
     def __call__(
-        self, prgm: LogicNode, bindings: dict[Alias, TableValue] | None = None
+        self,
+        prgm: LogicNode,
+        bindings: dict[Alias, TableValue] | None = None,
+        *,
+        debug_ctx: dict[str, Any] | None = None,
     ) -> TableValue | tuple[TableValue, ...]:
         if bindings is None:
             bindings = {}
@@ -51,7 +57,7 @@ class LogicNormalizer(LogicEvaluator):
         bindings = {
             Rewrite(rule_0)(var): reidx(tbl, renames) for var, tbl in bindings.items()
         }
-        res = self.ctx(root, bindings)
+        res = self.ctx(root, bindings, debug_ctx=debug_ctx)
 
         if isinstance(res, tuple):
             return tuple(reidx(tbl, unrenames) for tbl in res)

@@ -1,4 +1,5 @@
 from functools import reduce
+from typing import Any
 
 from ..algebra import overwrite
 from ..finch_logic import (
@@ -298,7 +299,16 @@ class LogicStandardizer(LogicLoader):
             ctx = MockLogicLoader()
         self.ctx = ctx
 
-    def __call__(self, prgm: LogicStatement, bindings):
+    def __call__(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TableValueFType],
+        *,
+        debug_ctx: dict[str, Any] | None = None,
+    ):
+        if debug_ctx is not None:
+            debug_ctx["pre_logic_standardizer"] = prgm
+
         prgm = isolate_aggregates(prgm)
         prgm = split_increments(prgm)
         prgm = standardize_query_roots(prgm, bindings)
@@ -307,4 +317,8 @@ class LogicStandardizer(LogicLoader):
         prgm = drop_with_aggregation(prgm, bindings)
         prgm = concordize(prgm, bindings)
         prgm = drop_reorders(prgm)
+
+        if debug_ctx is not None:
+            debug_ctx["post_logic_standardizer"] = prgm
+
         return self.ctx(prgm, bindings)

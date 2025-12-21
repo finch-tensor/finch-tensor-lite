@@ -10,6 +10,5 @@ class LogicNotationLowerer(ABC):
         self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
     ) -> ntn.Module:
         """
-        Generate Finch Notation from the given logic and input types.  Also
-        return a dictionary including additional tables needed to run the kernel.
+        Generate Finch Notation from the given logic and input types.
         """

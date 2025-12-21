@@ -1,17 +1,20 @@
-import numpy as np
+from typing import Any
 
-from finchlite.finch_assembly import AssemblyLibrary
-from finchlite.finch_logic.nodes import TableValueFType
+import numpy as np
 
 from .. import finch_logic as lgc
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
-from ..finch_assembly import TupleFType
-from ..finch_logic import LogicLoader, MockLogicLoader
+from ..finch_assembly import AssemblyLibrary, TupleFType
+from ..finch_logic import LogicLoader, MockLogicLoader, TableValueFType
 from ..symbolic import gensym
 
 
 class LogicFormatter(LogicLoader):
+    """
+    Docstring for LogicFormatter
+    """
+
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__()
         if loader is None:
@@ -22,6 +25,8 @@ class LogicFormatter(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, lgc.TableValueFType],
+        *,
+        debug_ctx: dict[str, Any] | None = None,
     ) -> tuple[
         AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
     ]:
