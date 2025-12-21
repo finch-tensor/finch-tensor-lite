@@ -1,9 +1,7 @@
 from typing import Any, overload
 
-from finchlite.finch_logic.nodes import TableValue
-
 from .. import finch_logic as lgc
-from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode
+from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode, TableValue
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
 from .formatter import LogicFormatter
 
@@ -145,7 +143,11 @@ class LogicExecutor(LogicEvaluator):
         self.verbose: bool = verbose
 
     def __call__(
-        self, prgm: LogicNode, bindings: dict[lgc.Alias, lgc.TableValue] | None = None
+        self,
+        prgm: LogicNode,
+        bindings: dict[lgc.Alias, lgc.TableValue] | None = None,
+        *,
+        debug_ctx: dict[str, Any] | None = None,
     ):
         if bindings is None:
             bindings = {}
@@ -159,10 +161,16 @@ class LogicExecutor(LogicEvaluator):
             stmt = prgm
         else:
             raise ValueError(f"Invalid prgm type: {type(prgm)}")
-        stmt, bindings = extract_tables(stmt, bindings)
-        binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 
-        mod, stmt, binding_ftypes = self.ctx(stmt, binding_ftypes)
+        if debug_ctx is not None:
+            debug_ctx["pre_logic_executor"] = stmt
+
+        stmt, bindings = extract_tables(stmt, bindings)
+        binding_ftypes: dict[lgc.Alias, lgc.TableValueFType] = {
+            var: ftype(val) for var, val in bindings.items()
+        }
+
+        mod, stmt, binding_ftypes = self.ctx(stmt, binding_ftypes, debug_ctx=debug_ctx)
 
         bindings = ProvisionTensorsContext(bindings, binding_ftypes)(stmt)
         args = [tbl.tns for tbl in bindings.values()]

@@ -4,8 +4,7 @@ from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
 
-from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
-
+from ..algebra import is_annihilator, is_distributive, is_identity
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -61,9 +60,6 @@ def optimize(prgm: LogicNode) -> LogicNode:
     prgm = concordize(prgm)
 
     prgm = materialize_squeeze_expand_productions(prgm)
-    prgm = propagate_copy_queries(prgm)
-
-    # prgm = propagate_into_reformats(prgm)
     prgm = propagate_copy_queries(prgm)
 
     return normalize_names(prgm)
@@ -276,46 +272,6 @@ def propagate_copy_queries(root):
                 return Plan()
 
     return Rewrite(PostWalk(Chain([lambda node: copies.get(node), rule_0])))(root)
-
-
-# def propagate_into_reformats(root: LogicNode) -> LogicNode:
-#    @dataclass
-#    class Entry:
-#        node: Query
-#        node_pos: int
-#        matched: Query | None = None
-#        matched_pos: int | None = None
-#
-#    def rule_0(ex: LogicNode) -> LogicNode | None:
-#        match ex:
-#            case Plan(bodies):
-#                queries: list[Entry] = []
-#                for idx, node in enumerate(bodies):
-#                    match node:
-#                        case Query(_, Reformat(_, arg)) as que_ref:
-#                            for q in queries[::-1]:
-#                                if q.node.lhs == arg:
-#                                    q.matched = que_ref
-#                                    q.matched_pos = idx
-#                                    break
-#                        case Query(_, _) as q:
-#                            queries.append(Entry(q, idx))
-#
-#                for q in queries[::-1]:
-#                    if q.matched is not None and q.matched_pos is not None:
-#                        new_bodies = list(bodies)
-#                        new_bodies.pop(q.matched_pos)
-#                        if q.node.lhs not in PostOrderDFS(
-#                            Plan(tuple(new_bodies[q.node_pos + 1 :]))
-#                        ) and isinstance(q.node.rhs, MapJoin | Aggregate | Reorder):
-#                            assert isinstance(q.matched.rhs, Reformat)
-#                            new_bodies[q.node_pos] = Query(
-#                                q.matched.lhs, Reformat(q.matched.rhs.tns, q.node.rhs)
-#                            )
-#                            return Plan(tuple(new_bodies))
-#        return None
-#
-#    return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
 
 
 @overload
