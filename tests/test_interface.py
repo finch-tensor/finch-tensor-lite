@@ -100,7 +100,7 @@ class TestEagerTensor(finchlite.EagerTensor):
     __test__ = False
 
     def __init__(self, array):
-        self.array = np.array(array)
+        self.array = finchlite.asarray(array)
 
     def __repr__(self):
         return f"TestEagerTensor({self.array})"

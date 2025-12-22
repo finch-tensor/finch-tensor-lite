@@ -1,5 +1,7 @@
 from functools import reduce
 
+from finchlite.algebra.tensor import TensorFType
+
 from ..algebra import overwrite
 from ..finch_logic import (
     Aggregate,
@@ -16,7 +18,6 @@ from ..finch_logic import (
     Relabel,
     Reorder,
     Table,
-    TableValueFType,
 )
 from ..symbolic import (
     Chain,
@@ -40,7 +41,7 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
                 case Aggregate(_, _, _, _) as agg:
                     var = Alias(gensym("A"))
                     stack.append(Query(var, agg))
-                    return var
+                    return Table(var, agg.fields())
                 case _:
                     return None
 
@@ -72,9 +73,8 @@ def split_increments(root: LogicStatement) -> LogicStatement:
 
 
 def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
-    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
     fill_values = root.infer_fill_value(
-        {var: val.tns.fill_value for var, val in bindings.items()}
+        {var: val.fill_value for var, val in bindings.items()}
     )
 
     def rule(ex):
@@ -85,15 +85,11 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
             ):
                 return ex
             case Query(lhs, Aggregate(op, init, arg, idxs_2) as rhs):
-                idxs_1 = arg.fields(fields)
+                idxs_1 = arg.fields()
                 return Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2))
-            case Query(lhs, Reorder(Relabel(Alias(), idxs_1), idxs_2)):
+            case Query(lhs, Reorder(Table(Alias(), idxs_1), idxs_2)):
                 return ex
-            case Query(lhs, Reorder(Alias(), idxs_2)):
-                return ex
-            case Query(lhs, Alias() as arg):
-                return Query(lhs, Reorder(arg, arg.fields(fields)))
-            case Query(lhs, Relabel(Alias(), idxs) as arg):
+            case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
             case Query(lhs, rhs):
                 return Query(
@@ -101,34 +97,28 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                     Aggregate(
                         Literal(overwrite),
                         Literal(rhs.fill_value(fill_values)),
-                        Reorder(rhs, rhs.fields(fields)),
+                        Reorder(rhs, rhs.fields()),
                         (),
                     ),
                 )
-            case Query(lhs, rhs):
-                return Query(lhs, Reorder(rhs, rhs.fields(fields)))
 
     return Rewrite(PostWalk(rule))(root)
 
 
 def concordize(
-    root: LogicStatement, bindings: dict[Alias, TableValueFType]
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> LogicStatement:
-    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
-
-    needed_swizzles: dict[Alias, dict[tuple[Field, ...], Alias]] = {}
+    needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
 
     def rule_0(ex):
         match ex:
-            case Reorder(Alias(_) as var, idxs_2):
-                return rule_0(Reorder(Relabel(var, fields[var]), idxs_2))
-            case Reorder(Relabel(Alias(_) as var, idxs_1), idxs_2):
+            case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
                 if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
                     idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
                     perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
                     return Reorder(
-                        Relabel(
+                        Table(
                             needed_swizzles.setdefault(var, {}).setdefault(
                                 perm, Alias(namespace.freshen(var.name))
                             ),
@@ -140,11 +130,12 @@ def concordize(
 
     def rule_1(ex):
         match ex:
-            case Query(lhs, rhs) as q if lhs in needed_swizzles:
-                idxs = tuple(rhs.fields())
+            case Query(lhs, _) as q if lhs in needed_swizzles:
+                ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
+                idxs = tuple([Field(f"idx_{i}") for i in range(ndims)])
                 swizzle_queries = tuple(
                     Query(
-                        alias, Reorder(Relabel(lhs, idxs), tuple(idxs[p] for p in perm))
+                        alias, Reorder(Table(lhs, idxs), tuple(idxs[p] for p in perm))
                     )
                     for perm, alias in needed_swizzles[lhs].items()
                 )
@@ -163,30 +154,26 @@ def concordize(
 
 
 def push_fields(root: LogicStatement, bindings):
-    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
-
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
-                reidx = dict(zip(mj.fields(fields), idxs, strict=True))
+                reidx = dict(zip(mj.fields(), idxs, strict=True))
                 return MapJoin(
                     op,
                     tuple(
-                        Relabel(arg, tuple(reidx[f] for f in arg.fields(fields)))
+                        Relabel(arg, tuple(reidx[f] for f in arg.fields()))
                         for arg in args
                     ),
                 )
             case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
-                diff_idxs = setdiff(arg.fields(fields), agg_idxs)
+                diff_idxs = setdiff(arg.fields(), agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
-                relabeled_idxs = tuple(
-                    reidx_dict.get(idx, idx) for idx in arg.fields(fields)
-                )
+                relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields())
                 return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
             case Relabel(Relabel(arg, _), idxs):
                 return Relabel(arg, idxs)
             case Relabel(Reorder(arg, idxs_1), idxs_2):
-                idxs_3 = arg.fields(fields)
+                idxs_3 = arg.fields()
                 reidx_dict = dict(zip(idxs_1, idxs_2, strict=True))
                 idxs_4 = tuple(reidx_dict.get(idx, idx) for idx in idxs_3)
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
@@ -270,12 +257,10 @@ def drop_reorders(root: LogicStatement) -> LogicStatement:
 
 
 def drop_with_aggregation(root: LogicStatement, bindings) -> LogicStatement:
-    fields = root.infer_fields({var: val.idxs for var, val in bindings.items()})
-
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
-                idxs_3 = tuple([idx for idx in arg.fields(fields) if idx not in idxs_1])
+                idxs_3 = tuple([idx for idx in arg.fields() if idx not in idxs_1])
                 return Query(
                     lhs,
                     Aggregate(op, init, Reorder(arg, idxs_1 + idxs_3), idxs_2 + idxs_3),

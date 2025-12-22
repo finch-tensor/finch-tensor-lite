@@ -28,7 +28,6 @@ from .optimize import (
     optimize,
     pretty_labels,
     propagate_copy_queries,
-    propagate_fields,
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,

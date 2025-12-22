@@ -1,9 +1,10 @@
+from finchlite.algebra.tensor import Tensor
+
 from ..finch_logic import (
     Alias,
     Field,
     LogicEvaluator,
     LogicNode,
-    TableValue,
 )
 from ..symbolic import Namespace, PostWalk, Rewrite
 
@@ -13,8 +14,8 @@ class LogicNormalizer(LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
     def __call__(
-        self, prgm: LogicNode, bindings: dict[Alias, TableValue] | None = None
-    ) -> TableValue | tuple[TableValue, ...]:
+        self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None
+    ) -> Tensor | tuple[Tensor, ...]:
         if bindings is None:
             bindings = {}
         spc = Namespace(prgm)
@@ -43,16 +44,9 @@ class LogicNormalizer(LogicEvaluator):
 
         root = Rewrite(PostWalk(rule_0))(prgm)
 
-        def reidx(tbl: TableValue, names):
-            return TableValue(
-                tbl.tns, tuple(Field(names[idx.name]) for idx in tbl.idxs)
-            )
-
-        bindings = {
-            Rewrite(rule_0)(var): reidx(tbl, renames) for var, tbl in bindings.items()
-        }
+        bindings = {Rewrite(rule_0)(var): tns for var, tns in bindings.items()}
         res = self.ctx(root, bindings)
 
         if isinstance(res, tuple):
-            return tuple(reidx(tbl, unrenames) for tbl in res)
-        return reidx(res, unrenames)
+            return tuple(tns for tns in res)
+        return res
