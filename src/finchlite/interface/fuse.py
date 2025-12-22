@@ -63,12 +63,12 @@ from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import (
     Alias,
     Field,
+    Table,
     LogicInterpreter,
     MockLogicLoader,
     Plan,
     Produces,
     Query,
-    Table,
 )
 from ..symbolic import gensym
 from .lazy import lazy

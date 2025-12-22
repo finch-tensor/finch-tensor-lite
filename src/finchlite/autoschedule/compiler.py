@@ -4,6 +4,10 @@ import operator
 from collections.abc import Iterable
 from typing import Any
 
+import operator
+from collections.abc import Iterable
+from typing import Any
+
 from finchlite.algebra.tensor import TensorFType
 import numpy as np
 

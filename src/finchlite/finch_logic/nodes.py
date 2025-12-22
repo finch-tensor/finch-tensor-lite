@@ -314,9 +314,6 @@ class Value(LogicNode):
     yet to be evaluated.
 
     Attributes:
-
-    name: str
-
         ex: The expression to be evaluated.
         type_: The type of the expression.
     """
