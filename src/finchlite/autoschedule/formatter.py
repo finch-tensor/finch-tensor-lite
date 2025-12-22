@@ -1,8 +1,7 @@
-from finchlite.algebra.tensor import TensorFType
 import numpy as np
 
+from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyLibrary
-from finchlite.finch_logic.nodes import TableValueFType
 
 from .. import finch_logic as lgc
 from ..codegen import NumpyBufferFType
@@ -23,9 +22,7 @@ class LogicFormatter(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-    ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
-    ]:
+    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         bindings = bindings.copy()
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}

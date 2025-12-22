@@ -76,6 +76,7 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     fill_values = root.infer_fill_value(
         {var: val.fill_value for var, val in bindings.items()}
     )
+
     def rule(ex):
         match ex:
             case Query(
@@ -107,7 +108,6 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
 def concordize(
     root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> LogicStatement:
-
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
 
@@ -130,7 +130,7 @@ def concordize(
 
     def rule_1(ex):
         match ex:
-            case Query(lhs, rhs) as q if lhs in needed_swizzles:
+            case Query(lhs, _) as q if lhs in needed_swizzles:
                 ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
                 idxs = tuple([Field(f"idx_{i}") for i in range(ndims)])
                 swizzle_queries = tuple(
@@ -154,7 +154,6 @@ def concordize(
 
 
 def push_fields(root: LogicStatement, bindings):
-
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
@@ -169,9 +168,7 @@ def push_fields(root: LogicStatement, bindings):
             case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
                 diff_idxs = setdiff(arg.fields(), agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
-                relabeled_idxs = tuple(
-                    reidx_dict.get(idx, idx) for idx in arg.fields()
-                )
+                relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields())
                 return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
             case Relabel(Relabel(arg, _), idxs):
                 return Relabel(arg, idxs)
@@ -260,7 +257,6 @@ def drop_reorders(root: LogicStatement) -> LogicStatement:
 
 
 def drop_with_aggregation(root: LogicStatement, bindings) -> LogicStatement:
-
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):

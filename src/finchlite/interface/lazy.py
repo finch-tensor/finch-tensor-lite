@@ -44,7 +44,6 @@ from ..finch_logic import (
     MapJoin,
     Plan,
     Query,
-    Relabel,
     Reorder,
     Table,
 )
@@ -487,6 +486,7 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
         arg.element_type,
     )
 
+
 # TODO: NEED TO CHANGE THIS AND SQUEEZE TO ONLY PUT ALIASES IN DATA
 def expand_dims(
     x,
@@ -597,6 +597,7 @@ def squeeze(
     shape_2 = tuple(x.shape[n] for n in newaxis)
     data_2, ctx = x.ctx.eval(expr)
     return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
+
 
 def reduce(
     op: Callable,

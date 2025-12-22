@@ -1,4 +1,4 @@
-from typing import Any, overload
+from typing import Any
 
 from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_logic.nodes import TableValue
@@ -87,7 +87,7 @@ class LogicExecutor(LogicEvaluator):
     ):
         if bindings is None:
             bindings = {}
-        
+
         if isinstance(prgm, lgc.LogicExpression):
             var = lgc.Alias("result")
             stmt: lgc.LogicStatement = lgc.Plan(
@@ -103,11 +103,10 @@ class LogicExecutor(LogicEvaluator):
         mod, stmt, binding_ftypes = self.ctx(stmt, binding_ftypes)
 
         bindings = ProvisionTensorsContext(bindings, binding_ftypes)(stmt)
-        args = [tns for tns in bindings.values()]
+        args = list(bindings.values())
 
         res = mod.main(*args)
 
         if isinstance(prgm, lgc.LogicExpression):
             return TableValue(res[0], prgm.fields())
         return tuple(res)
-

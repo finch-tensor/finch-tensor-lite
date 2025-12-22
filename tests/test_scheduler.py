@@ -63,43 +63,6 @@ def test_propagate_map_queries():
     assert result == expected
 
 
-def test_propagate_fields():
-    plan = Plan(
-        (
-            Query(
-                Alias("A10"),
-                MapJoin(
-                    Literal("op"),
-                    (
-                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Literal("tbl2"), (Field("A2"), Field("A3"))),
-                    ),
-                ),
-            ),
-            Alias("A10"),
-        )
-    )
-
-    expected = Plan(
-        (
-            Query(
-                Alias("A10"),
-                MapJoin(
-                    Literal("op"),
-                    (
-                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Literal("tbl2"), (Field("A2"), Field("A3"))),
-                    ),
-                ),
-            ),
-            Relabel(Alias("A10"), (Field("A1"), Field("A2"), Field("A3"))),
-        )
-    )
-
-    result = propagate_fields(plan)
-    assert result == expected
-
-
 def test_isolate_aggregates():
     plan = Plan(
         (

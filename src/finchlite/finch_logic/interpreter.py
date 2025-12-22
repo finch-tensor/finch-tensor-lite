@@ -1,9 +1,9 @@
 from itertools import product
 
-import finchlite
-from finchlite.algebra.tensor import TensorFType
 import numpy as np
 
+import finchlite
+from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.stages import LogicEvaluator
 
@@ -33,6 +33,7 @@ def make_tensor(shape, fill_value, *, dtype=None):
         dtype = type(fill_value)
     return finchlite.asarray(np.full(shape, fill_value, dtype=dtype))
 
+
 class LogicInterpreter(LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor, verbose=False):
         self.verbose = verbose
@@ -45,6 +46,7 @@ class LogicInterpreter(LogicEvaluator):
             make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
         )
         return machine(node)
+
 
 class LogicMachine:
     def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
@@ -131,7 +133,10 @@ class LogicMachine:
                 arg = self(arg)
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx not in idxs and dim != 1:
-                        raise ValueError(f"Trying to drop a dimension that is not 1 : idx {idx} indices {idxs} shape {arg.tns.shape}")
+                        raise ValueError(
+                            f"Trying to drop a dimension that is not 1 : idx "
+                            f"{idx} indices {idxs} shape {arg.tns.shape}"
+                        )
                 arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
                 result = self.make_tensor(
@@ -209,7 +214,5 @@ class MockLogicLoader(LogicLoader):
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[
-        MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
-    ]:
+    ) -> tuple[MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         return (MockLogicLibrary(prgm, bindings), prgm, bindings)

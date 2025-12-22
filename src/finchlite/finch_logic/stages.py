@@ -62,9 +62,7 @@ class OptLogicLoader(LogicLoader):
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-    ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
-    ]:
+    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
         return self.ctx(term, bindings)

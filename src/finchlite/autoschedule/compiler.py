@@ -4,13 +4,9 @@ import operator
 from collections.abc import Iterable
 from typing import Any
 
-import operator
-from collections.abc import Iterable
-from typing import Any
-
-from finchlite.algebra.tensor import TensorFType
 import numpy as np
 
+from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
@@ -22,7 +18,6 @@ from ..compile import Extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     LogicLoader,
-    TableValueFType,
 )
 from ..finch_notation import NotationInterpreter
 from .stages import LogicNotationLowerer
@@ -59,9 +54,7 @@ class PointwiseContext:
                     arg,
                     {
                         idx_1: loops[idx_2]
-                        for idx_1, idx_2 in zip(
-                            arg.fields(), idxs, strict=True
-                        )
+                        for idx_1, idx_2 in zip(arg.fields(), idxs, strict=True)
                     },
                 )
             case _:
@@ -356,9 +349,7 @@ class LogicCompiler(LogicLoader):
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]
-    ]:
+    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         mod = self.ctx_lower(prgm, bindings)
         lib = self.ctx_load(mod)
         return lib, prgm, bindings

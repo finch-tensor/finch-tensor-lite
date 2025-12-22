@@ -5,7 +5,6 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import register_property
 from ..symbolic import FType, FTyped, ftype
 
 
@@ -106,7 +105,7 @@ class Tensor(FTyped, ABC):
         should be an actual tuple, rather than a tuple type, so that it can hold
         e.g. dtypes, formats, or types, and so that we can easily index it."""
         return self.ftype.shape_type
-    
+
     @property
     @abstractmethod
     def shape(self) -> tuple:

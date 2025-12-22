@@ -162,9 +162,7 @@ class LogicExpression(LogicNode):
     """
 
     @abstractmethod
-    def fields(
-        self
-    ) -> tuple[Field, ...]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         ...
 
@@ -220,7 +218,9 @@ class LogicStatement(LogicNode):
     """
     Logic AST statement base class.
 
-    A Logic statement may modify the state of the machine by assigning tensors to Aliases.
+    A Logic statement may modify the state of the machine by assigning tensors
+    to Aliases.
+
     Logic statements evaluate to a tuple of tensors.
     """
 
@@ -358,7 +358,9 @@ class Alias(LogicExpression, NamedTerm):
 
     def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        raise NotImplementedError(f"Aliases do not have fields because they are tensors not tables!")
+        raise NotImplementedError(
+            "Aliases do not have fields because they are tensors not tables!"
+        )
 
     def dimmap(
         self,
@@ -399,23 +401,20 @@ class Table(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
-    def fields(
-        self
-    ) -> tuple[Field, ...]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         return self.idxs
 
     def dimmap(
-        self,
-        op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]]
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
         if isinstance(self.tns, Alias):
             if self.tns not in dim_bindings:
-                raise NotImplementedError(f"Cannot resolve dims of Alias {self.tns.name}")
+                raise NotImplementedError(
+                    f"Cannot resolve dims of Alias {self.tns.name}"
+                )
             return dim_bindings[self.tns]
-        else:
-            raise NotImplementedError("Cannot resolve dims of Tables")
+        raise NotImplementedError("Cannot resolve dims of Tables")
 
     def valmap(
         self,
@@ -425,10 +424,11 @@ class Table(LogicTree, LogicExpression):
     ) -> T:
         if isinstance(self.tns, Alias):
             if self.tns not in bindings:
-                raise NotImplementedError(f"Cannot resolve value of Alias {self.tns.name}")
+                raise NotImplementedError(
+                    f"Cannot resolve value of Alias {self.tns.name}"
+                )
             return bindings[self.tns]
-        else:
-            raise NotImplementedError("Cannot resolve value of Tables")
+        raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
     def from_children(cls, tns, *idxs):
@@ -456,9 +456,7 @@ class MapJoin(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
-    def fields(
-        self
-    ) -> tuple[Field, ...]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         args_fields = [x.fields() for x in self.args]
         return tuple(dict.fromkeys([f for fs in args_fields for f in fs]))
@@ -517,9 +515,7 @@ class Aggregate(LogicTree, LogicExpression):
 
     def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        return tuple(
-            field for field in self.arg.fields() if field not in self.idxs
-        )
+        return tuple(field for field in self.arg.fields() if field not in self.idxs)
 
     def dimmap(
         self,
@@ -570,9 +566,7 @@ class Reorder(LogicTree, LogicExpression):
         return self.idxs
 
     def dimmap(
-        self,
-        op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]]
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
         idxs = self.arg.fields()
         dims = self.arg.dimmap(op, dim_bindings)
@@ -615,9 +609,7 @@ class Relabel(LogicTree, LogicExpression):
         return self.idxs
 
     def dimmap(
-        self,
-        op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]]
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
         return self.arg.dimmap(op, dim_bindings)
 
@@ -664,10 +656,7 @@ class Query(LogicTree, LogicStatement):
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
         if self.lhs in dim_bindings:
-            if (
-                self.rhs.dimmap(op, dim_bindings)
-                != dim_bindings[self.lhs]
-            ):
+            if self.rhs.dimmap(op, dim_bindings) != dim_bindings[self.lhs]:
                 raise ValueError(f"Cannot rebind alias {self.lhs} to a different dims")
         else:
             dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
@@ -745,7 +734,6 @@ class Plan(LogicTree, LogicStatement):
     """
 
     bodies: tuple[LogicStatement, ...] = ()
-
 
     def infer_dimmap(
         self,

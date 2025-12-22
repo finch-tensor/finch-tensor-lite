@@ -1,10 +1,10 @@
 from finchlite.algebra.tensor import Tensor
+
 from ..finch_logic import (
     Alias,
     Field,
     LogicEvaluator,
     LogicNode,
-    TableValue,
 )
 from ..symbolic import Namespace, PostWalk, Rewrite
 
@@ -44,10 +44,7 @@ class LogicNormalizer(LogicEvaluator):
 
         root = Rewrite(PostWalk(rule_0))(prgm)
 
-
-        bindings = {
-            Rewrite(rule_0)(var): tns for var, tns in bindings.items()
-        }
+        bindings = {Rewrite(rule_0)(var): tns for var, tns in bindings.items()}
         res = self.ctx(root, bindings)
 
         if isinstance(res, tuple):

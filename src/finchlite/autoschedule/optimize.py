@@ -1,5 +1,4 @@
 import re
-from collections.abc import Iterable
 from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
@@ -14,7 +13,6 @@ from ..finch_logic import (
     LogicExpression,
     LogicNode,
     LogicStatement,
-    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -314,7 +312,6 @@ def propagate_copy_queries(root):
 #        return None
 #
 #    return Rewrite(PostWalk(Fixpoint(rule_0)))(root)
-
 
 
 def push_fields(root):
