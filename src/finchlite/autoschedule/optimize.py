@@ -657,7 +657,7 @@ def materialize_squeeze_expand_productions(root):
                 preamble.append(Query(new_tns, Reorder(Relabel(tns, idxs_1), new_idxs)))
                 if new_idxs == idxs_2:
                     return new_tns
-                return Reorder(Relabel(new_tns, new_idxs), idxs_2)
+                return Reorder(Table(new_tns, new_idxs), idxs_2)
             case Reorder(Relabel(arg, idxs_1), idxs_2) if idxs_1 == idxs_2:
                 return arg
             case node:

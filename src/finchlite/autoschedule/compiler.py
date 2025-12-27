@@ -260,9 +260,9 @@ class NotationContext:
                 )
             case lgc.Produces(args):
                 vars: list[lgc.Alias] = []
-                for arg in args:
-                    assert isinstance(arg, lgc.Alias)
-                    vars.append(arg)
+                for var in args:
+                    assert isinstance(var, lgc.Alias)
+                    vars.append(var)
                 return ntn.Block(
                     (
                         *self.epilogue,

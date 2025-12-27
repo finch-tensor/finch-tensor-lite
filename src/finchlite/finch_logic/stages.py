@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 from finchlite.algebra.tensor import Tensor, TensorFType
@@ -14,7 +16,7 @@ class LogicEvaluator(Stage):
         self,
         term: lgc.LogicNode,
         bindings: dict[lgc.Alias, Tensor] | None = None,
-    ) -> Tensor | tuple[Tensor, ...]:
+    ) -> lgc.TableValue | tuple[Tensor, ...]:
         """
         Evaluate the given logic.
         """
