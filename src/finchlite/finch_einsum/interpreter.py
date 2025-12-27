@@ -2,7 +2,10 @@ import operator
 
 import numpy as np
 
-from finchlite.finch_einsum.stages import EinsumEvaluator
+from finchlite.algebra.tensor import TensorFType
+from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
+from finchlite.finch_einsum.stages import EinsumEvaluator, EinsumLoader
+from finchlite.symbolic.ftype import fisinstance
 
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
@@ -164,3 +167,47 @@ class EinsumMachine:
                 return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
+
+
+class MockEinsumKernel(AssemblyKernel):
+    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __call__(self, *args):
+        if len(args) != len(self.bindings):
+            raise ValueError(
+                f"Wrong number of arguments passed to kernel, "
+                f"have {len(args)}, expected {len(self.bindings)}"
+            )
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = EinsumInterpreter()
+        res = ctx(self.prgm, bindings)
+        if isinstance(res, tuple):
+            return tuple(tbl.tns for tbl in res)
+        return res.tns
+
+
+class MockEinsumLibrary(AssemblyLibrary):
+    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __getattr__(self, name):
+        if name == "main":
+            return MockEinsumKernel(self.prgm, self.bindings)
+        if name == "prgm":
+            return self.prgm
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+
+class MockEinsumLoader(EinsumLoader):
+    def __init__(self):
+        pass
+
+    def __call__(
+        self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
+    ) -> tuple[MockEinsumLibrary, ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
+        return (MockEinsumLibrary(prgm, bindings), prgm, bindings)

@@ -182,10 +182,7 @@ class MockLogicKernel(AssemblyKernel):
                 f"Wrong number of arguments passed to kernel, "
                 f"have {len(args)}, expected {len(self.bindings)}"
             )
-        bindings = {
-            var: lgc.TableValue(tns, self.bindings[var].idxs)
-            for var, tns in zip(self.bindings.keys(), args, strict=True)
-        }
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = LogicInterpreter()

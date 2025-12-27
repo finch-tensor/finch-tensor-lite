@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 
 from finchlite.algebra.tensor import Tensor, TensorFType
 
-from .. import finch_einsum as ein
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
@@ -31,17 +30,6 @@ class LogicLoader(ABC):
         Generate Finch Library from the given logic and input types, with a
         single method called main which implements the logic. Also return a
         dictionary including additional tables needed to run the kernel.
-        """
-
-
-class LogicEinsumLowerer(ABC):
-    @abstractmethod
-    def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[ein.EinsumNode, dict[lgc.Alias, TensorFType]]:
-        """
-        Generate Finch Einsum from the given logic and input types,
-        types for all aliases.
         """
 
 
