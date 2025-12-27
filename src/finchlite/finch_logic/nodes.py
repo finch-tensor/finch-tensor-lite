@@ -341,7 +341,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicExpression, NamedTerm):
+class Alias(LogicNode, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
