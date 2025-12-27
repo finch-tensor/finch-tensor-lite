@@ -105,9 +105,7 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     return Rewrite(PostWalk(rule))(root)
 
 
-def concordize(
-    root: LogicStatement, bindings: dict[Alias, TensorFType]
-) -> LogicStatement:
+def concordize(root: LogicStatement) -> LogicStatement:
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
 
@@ -153,7 +151,7 @@ def concordize(
             raise Exception(f"Invalid root: {root}")
 
 
-def push_fields(root: LogicStatement, bindings):
+def push_fields(root: LogicStatement):
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
@@ -256,7 +254,7 @@ def drop_reorders(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(rule_2))(root)
 
 
-def drop_with_aggregation(root: LogicStatement, bindings) -> LogicStatement:
+def drop_with_aggregation(root: LogicStatement) -> LogicStatement:
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
@@ -278,18 +276,18 @@ class LogicStandardizer(LogicLoader):
     2. Queries that perform an Aggregate over a Reorder of a series of map-joins.
     """
 
-    def __init__(self, ctx=None):
+    def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = MockLogicLoader()
-        self.ctx = ctx
+        self.ctx: LogicLoader = ctx
 
-    def __call__(self, prgm: LogicStatement, bindings):
+    def __call__(self, prgm: LogicStatement, bindings: dict[Alias, TensorFType]):
         prgm = isolate_aggregates(prgm)
         prgm = split_increments(prgm)
         prgm = standardize_query_roots(prgm, bindings)
-        prgm = push_fields(prgm, bindings)
+        prgm = push_fields(prgm)
         prgm = drop_reorders(prgm)
-        prgm = drop_with_aggregation(prgm, bindings)
-        prgm = concordize(prgm, bindings)
+        prgm = drop_with_aggregation(prgm)
+        prgm = concordize(prgm)
         prgm = drop_reorders(prgm)
         return self.ctx(prgm, bindings)

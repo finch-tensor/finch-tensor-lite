@@ -168,7 +168,7 @@ class LazyTensor(OverrideTensor):
         fill_value: Any,
         element_type: Any,
     ):
-        self.data: LogicExpression = data
+        self.data: Alias = data
         self.ctx = ctx
         self._shape = shape
         self._fill_value = fill_value

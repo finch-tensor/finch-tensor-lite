@@ -5,6 +5,7 @@ from ..finch_logic import (
     Field,
     LogicEvaluator,
     LogicNode,
+    TableValue,
 )
 from ..symbolic import Namespace, PostWalk, Rewrite
 
@@ -15,7 +16,7 @@ class LogicNormalizer(LogicEvaluator):
 
     def __call__(
         self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None
-    ) -> Tensor | tuple[Tensor, ...]:
+    ) -> TableValue | tuple[Tensor, ...]:
         if bindings is None:
             bindings = {}
         spc = Namespace(prgm)
@@ -45,8 +46,4 @@ class LogicNormalizer(LogicEvaluator):
         root = Rewrite(PostWalk(rule_0))(prgm)
 
         bindings = {Rewrite(rule_0)(var): tns for var, tns in bindings.items()}
-        res = self.ctx(root, bindings)
-
-        if isinstance(res, tuple):
-            return tuple(tns for tns in res)
-        return res
+        return self.ctx(root, bindings)

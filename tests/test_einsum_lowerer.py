@@ -8,10 +8,9 @@ import finchlite
 from finchlite.autoschedule import optimize
 from finchlite.autoschedule.einsum import EinsumLowerer
 from finchlite.finch_einsum import EinsumInterpreter
-from finchlite.finch_logic import Alias, Plan, Produces, Query
+from finchlite.finch_logic import Plan, Produces
 from finchlite.interface.fuse import compute
 from finchlite.interface.lazy import LazyTensor, lazy
-from finchlite.symbolic import gensym
 
 from .conftest import finch_assert_allclose
 
@@ -31,10 +30,8 @@ def lower_and_execute(tns: LazyTensor):
     Returns:
         The result of executing the einsum plan
     """
-    ir = tns.data
     # Optimize into a plan
-    var = Alias(gensym("result"))
-    plan = Plan(tns.ctx.trace() + (Query(var, ir), Produces((var,))))
+    plan = Plan(tns.ctx.trace() + (Produces((tns.data,)),))
     optimized_plan = cast(Plan, optimize(plan))
 
     # Lower to einsum IR

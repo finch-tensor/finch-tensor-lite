@@ -649,7 +649,7 @@ def reduce_idx(
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),
         node_to_replace=node_to_replace,
-        new_node=alias_expr,
+        new_node=Table(alias_expr, tuple(reduced_idxs)),
         nodes_to_remove=nodes_to_remove,
     )
     new_reduce_idxs = [x for x in aq.reduce_idxs if x not in reduced_idxs]
@@ -663,7 +663,7 @@ def reduce_idx(
             continue
         root = aq.idx_lowest_root[idx]
         if root == node_to_replace or root in nodes_to_remove:
-            root = alias_expr
+            root = Table(alias_expr, tuple(reduced_idxs))
 
         new_idx_lowest_root[idx] = root
         new_idx_op[idx] = aq.idx_op[idx]
