@@ -23,7 +23,7 @@ class EinsumLoader(ABC):
     @abstractmethod
     def __call__(
         self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
-    ) -> tuple[AssemblyLibrary, dict[ein.Alias, TensorFType]]:
+    ) -> tuple[AssemblyLibrary, ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called main which implements the logic. Also return a
@@ -50,7 +50,7 @@ class OptEinsumLoader(EinsumLoader):
         self,
         term: ein.EinsumStatement,
         bindings: dict[ein.Alias, TensorFType],
-    ) -> tuple[AssemblyLibrary, dict[ein.Alias, TensorFType]]:
+    ) -> tuple[AssemblyLibrary, ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
         return self.ctx(term, bindings)

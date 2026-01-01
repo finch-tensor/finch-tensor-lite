@@ -1,7 +1,8 @@
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
 from finchlite.algebra import init_value, overwrite
-from finchlite.algebra.tensor import Tensor
+from finchlite.algebra.tensor import TensorFType
+from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
 from finchlite.finch_logic import LogicStatement
 from finchlite.finch_logic.stages import LogicLoader
@@ -48,20 +49,19 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 arg=einarg,
             )
         case lgc.Produces(args):
-            return ein.Produces(tuple(ein.Alias(ret_arg.name for ret_arg in args)))
+            return ein.Produces(tuple(ein.Alias(ret_arg.name) for ret_arg in args))
         case _:
             raise Exception(f"Unrecognized logic: {node}")
 
 
 def generate_einsum_expr(
-    self,
     ex: lgc.LogicExpression,
 ) -> ein.EinsumExpression:
     match ex:
         case lgc.Reorder(arg, idxs):
-            return self.compile_operand(arg)
+            return generate_einsum_expr(arg)
         case lgc.MapJoin(lgc.Literal(operation), lgcargs):
-            args = tuple([self.compile_operand(arg) for arg in lgcargs])
+            args = tuple([generate_einsum_expr(arg) for arg in lgcargs])
             return ein.Call(ein.Literal(operation), args)
         case lgc.Table(lgc.Alias(name), idxs):
             return ein.Access(
@@ -76,10 +76,10 @@ def generate_einsum_expr(
 
 class EinsumGenerator(LogicEinsumLowerer):
     def __call__(
-        self, prgm: LogicStatement, bindings: dict[lgc.Alias, Tensor]
-    ) -> tuple[ein.EinsumStatement, dict[ein.Alias, Tensor]]:
-        bindings = {ein.Alias(var.name): val for var, val in bindings.items()}
-        return generate_einsum_stmt(prgm), bindings
+        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
+        bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
+        return generate_einsum_stmt(prgm), bindings_2
 
 
 class LogicGeneratorContext:
@@ -97,20 +97,25 @@ class LogicGeneratorContext:
                 )
             case ein.Einsum(
                 ein.Literal(op),
-                idxs,
                 ein.Alias(name),
+                idxs,
                 rhs,
             ):
-                rhs_2 = (self.generate_logic_expr(rhs),)
+                rhs_2 = self.generate_logic_expr(rhs)
                 t = rhs_2.element_type(self.element_types)
                 init = init_value(op, t)
                 self.element_types[lgc.Alias(name)] = t
+                idxs_2 = []
+                for idx in idxs:
+                    assert isinstance(idx, ein.Index)
+                    idxs_2.append(lgc.Field(idx.name))
                 return lgc.Query(
                     lgc.Alias(name),
                     lgc.Aggregate(
                         lgc.Literal(op),
                         lgc.Literal(init),
-                        tuple(lgc.Field(idx.name) for idx in idxs),
+                        rhs_2,
+                        tuple(idxs_2),
                     ),
                 )
             case _:
@@ -128,20 +133,22 @@ class LogicGeneratorContext:
                     lgcargs,
                 )
             case ein.Access(ein.Alias(name), idxs):
+                idxs_2 = []
+                for idx in idxs:
+                    assert isinstance(idx, ein.Index)
+                    idxs_2.append(lgc.Field(idx.name))
                 return lgc.Table(
                     lgc.Alias(name),
-                    tuple(lgc.Field(idx.name) for idx in idxs),
+                    tuple(idxs_2),
                 )
-            case ein.Literal(value):
-                return lgc.Literal(value)
             case _:
                 raise Exception(f"Unrecognized logic: {node}")
 
 
 class EinsumLogicLowerer(Stage):
     def __call__(
-        self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, Tensor]
-    ) -> lgc.LogicStatement:
+        self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
+    ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         element_types = {var: val.element_type for var, val in bindings.items()}
         ctx = LogicGeneratorContext(element_types)
         prgm_2 = ctx.generate_logic_stmt(prgm)
@@ -167,8 +174,8 @@ class LogicEinsumLoader(LogicLoader):
         self.ctx_lift: EinsumLogicLowerer = ctx_lift
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, Tensor]
-    ) -> ein.Plan:
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings)
         mod, ein_prgm, ein_bindings = self.ctx_load(ein_prgm, ein_bindings)
         lgc_prgm, lgc_bindings = self.ctx_lift(ein_prgm, ein_bindings)

@@ -25,7 +25,6 @@ from .nodes import (
     Value,
 )
 from .stages import (
-    LogicEinsumLowerer,
     LogicEvaluator,
     LogicLoader,
     LogicTransform,
@@ -36,7 +35,6 @@ __all__ = [
     "Alias",
     "Field",
     "Literal",
-    "LogicEinsumLowerer",
     "LogicEvaluator",
     "LogicExpression",
     "LogicInterpreter",

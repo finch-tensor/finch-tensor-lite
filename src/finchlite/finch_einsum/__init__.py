@@ -10,7 +10,6 @@ from .nodes import (
     Call,
     Einsum,
     EinsumExpression,
-    EinsumLoader,
     EinsumNode,
     EinsumStatement,
     Index,
@@ -19,6 +18,10 @@ from .nodes import (
     Produces,
 )
 from .parser import parse_einop, parse_einsum
+from .stages import (
+    EinsumEvaluator,
+    EinsumLoader,
+)
 
 __all__ = [
     "Access",
@@ -26,6 +29,7 @@ __all__ = [
     "Call",
     "Einsum",
     "EinsumCompiler",
+    "EinsumEvaluator",
     "EinsumExpression",
     "EinsumInterpreter",
     "EinsumLoader",
