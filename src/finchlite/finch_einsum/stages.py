@@ -28,7 +28,7 @@ class EinsumLoader(ABC):
     ) -> tuple[
         AssemblyLibrary,
         dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index, ...]],
+        dict[ein.Alias, tuple[ein.Index | None, ...]],
     ]:
         """
         Generate Finch Library from the given logic and input types, with a
@@ -59,7 +59,7 @@ class OptEinsumLoader(EinsumLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index, ...]],
+        dict[ein.Alias, tuple[ein.Index | None, ...]],
     ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
@@ -69,9 +69,9 @@ class OptEinsumLoader(EinsumLoader):
 def compute_shape_vars(
     prgm: ein.EinsumStatement,
     bindings: dict[ein.Alias, TensorFType],
-) -> dict[ein.Alias, tuple[ein.Index, ...]]:
+) -> dict[ein.Alias, tuple[ein.Index | None, ...]]:
     groups: dict[ein.Index, set[ein.Index]] = {}
-    dim_bindings: dict[ein.Alias, tuple[ein.Index, ...]] = {}
+    dim_bindings: dict[ein.Alias, tuple[ein.Index | None, ...]] = {}
     for var, tns in bindings.items():
         idxs = [ein.Index(f"{var.name}_i_{i}") for i in range(tns.ndim)]
         for idx in idxs:
@@ -79,20 +79,29 @@ def compute_shape_vars(
         dim_bindings[var] = tuple(idxs)
 
     def merge_dim_groups(dim1, dim2):
+        if dim1 is None:
+            groups[dim2].add(None)
+            return dim2
+        if dim2 is None:
+            groups[dim1].add(None)
+            return dim1
         if groups[dim1] is groups[dim2]:
             return dim1
         if len(groups[dim1]) < len(groups[dim2]):
             dim1, dim2 = dim2, dim1
         groups[dim1].update(groups[dim2])
         for idx in groups[dim2]:
-            groups[idx] = dim1
+            groups[idx] = groups[dim1]
         return dim1
 
     for stmt in PostOrderDFS(prgm):
         match stmt:
             case ein.Einsum(_, lhs, lhs_idxs, arg):
                 assert all(isinstance(idx, ein.Index) for idx in lhs_idxs)
-                idx_bindings = dict(zip(lhs_idxs, dim_bindings[lhs], strict=True))
+                if lhs in dim_bindings:
+                    idx_bindings = dict(zip(lhs_idxs, dim_bindings[lhs], strict=True))
+                else:
+                    idx_bindings = {}
                 for node in PostOrderDFS(arg):
                     match node:
                         case ein.Access(var, idxs_2):
@@ -106,16 +115,21 @@ def compute_shape_vars(
                                     idx_bindings[idx_2] = dim
                         case _:
                             pass
+                dim_bindings[lhs] = tuple(idx_bindings.get(idx) for idx in lhs_idxs)
             case _:
                 pass
 
-    group_names: dict[set[ein.Index], ein.Index] = {}
+    group_names: dict[int, ein.Index | None] = {}
 
     for group in groups.values():
-        if group not in group_names:
-            group_names[group] = ein.Index(f"i_{len(group_names)}")
+        if None in group:
+            group_names[id(group)] = None
+        elif id(group) not in group_names:
+            group_names[id(group)] = ein.Index(f"i_{len(group_names)}")
 
     return {
-        var: tuple(group_names[groups[idx]] for idx in idxs)
+        var: tuple(
+            group_names[id(groups[idx])] if idx is not None else None for idx in idxs
+        )
         for var, idxs in dim_bindings.items()
     }

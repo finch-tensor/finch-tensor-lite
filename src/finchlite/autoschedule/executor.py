@@ -25,8 +25,6 @@ def extract_tensors(
             case lgc.Table(lgc.Literal(tns), idxs):
                 if id(tns) in ids:
                     var = ids[id(tns)]
-                    if bindings[var].idxs == idxs:
-                        return var
                     return lgc.Table(var, idxs)
                 var = lgc.Alias(spc.freshen("A"))
                 ids[id(tns)] = var

@@ -84,6 +84,7 @@ class EinsumInterpreter(EinsumEvaluator):
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
+        bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(
             xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
         )
@@ -101,13 +102,12 @@ class PointwiseEinsumMachine:
         xp = self.xp
         match node:
             case ein.Literal(val):
-                return val
+                return self.xp.full([1 for _ in self.loops], val)
             case ein.Alias(name):
-                if name not in self.bindings:
+                if node not in self.bindings:
                     raise ValueError(f"Unbound variable: {name}")
-                return self.bindings[name]
-            case ein.Call(func, args):
-                func = self(func)
+                return self.bindings[node]
+            case ein.Call(ein.Literal(func), args):
                 if len(args) == 1:
                     func = getattr(xp, unary_ops[func])
                 else:
@@ -148,9 +148,8 @@ class EinsumMachine:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
-                loops = arg.get_idxs()
-                assert set(idxs).issubset(loops)
-                loops = sorted(loops, key=lambda x: x.name)
+                loops = set(arg.get_idxs()).union(set(idxs))
+                loops = sorted(list(loops), key=lambda x: x.name)
                 ctx = PointwiseEinsumMachine(
                     self.xp, self.bindings, loops, self.verbose
                 )
@@ -160,12 +159,16 @@ class EinsumMachine:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
                 else:
-                    assert set(idxs) == set(loops)
                     val = arg
+                    for i in sorted(axis, reverse=True):
+                        val = xp.take(val, -1, axis=i)
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
                 if tns in self.bindings:
-                    self.bindings[tns][:] = xp.permute_dims(val, axis)
+                    if self.bindings[tns].ndim == 0:
+                        self.bindings[tns][()] = val
+                    else:
+                        self.bindings[tns][:] = xp.permute_dims(val, axis)
                 else:
                     self.bindings[tns] = xp.permute_dims(val, axis)
                 return (self.bindings[tns],)
@@ -188,10 +191,7 @@ class MockEinsumKernel(AssemblyKernel):
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = EinsumInterpreter()
-        res = ctx(self.prgm, bindings)
-        if isinstance(res, tuple):
-            return tuple(tbl.tns for tbl in res)
-        return res.tns
+        return ctx(self.prgm, bindings)
 
 
 class MockEinsumLibrary(AssemblyLibrary):
@@ -216,7 +216,7 @@ class MockEinsumLoader(EinsumLoader):
     ) -> tuple[
         MockEinsumLibrary,
         dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index, ...]],
+        dict[ein.Alias, tuple[ein.Index | None, ...]],
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockEinsumLibrary(prgm, bindings), bindings, shape_vars

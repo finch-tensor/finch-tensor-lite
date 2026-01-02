@@ -659,7 +659,7 @@ class Query(LogicTree, LogicStatement):
             for dim1, dim2 in zip(
                 self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
             ):
-                merge_dim(dim1, dim2)
+                op(dim1, dim2)
         else:
             dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results

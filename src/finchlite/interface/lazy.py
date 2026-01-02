@@ -454,6 +454,38 @@ def lazy(arr) -> LazyTensor:
     ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
     return LazyTensor(tns, ctx, shape, fill_value(arr), element_type(arr))
 
+def full(
+    shape: int | tuple[int, ...],
+    fill_value: bool | int | float | complex, *,
+    dtype: Any | None = None
+):
+    """
+    Returns a new array having a specified shape and filled with fill_value.
+
+    Parameters:
+    - shape (Union[int, Tuple[int, ...]]): output array shape.
+    - fill_value (Union[bool, int, float, complex]): fill value.
+    - dtype (Optional[dtype]): output array data type. If dtype is None, the
+    output array data type must be inferred from fill_value according to the
+    following rules:
+        * If the fill value is an int, the output array data type must be the
+            default integer data type.
+        * If the fill value is a float, the output array data type must be the
+            default real-valued floating-point data type.
+        * If the fill value is a complex number, the output array data type must
+            be the default complex floating-point data type.
+        * If the fill value is a bool, the output array must have a boolean data
+            type. Default: None.
+    
+    Returns:
+
+    - out (array): an array where every element is equal to fill_value.
+    """
+    val = lazy(np.full((), fill_value, dtype=dtype))
+    if isinstance(shape, int):
+        shape = (shape,)
+    return broadcast_to(val, shape)
+
 
 def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     """
@@ -487,7 +519,6 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     )
 
 
-# TODO: NEED TO CHANGE THIS AND SQUEEZE TO ONLY PUT ALIASES IN DATA
 def expand_dims(
     x,
     /,
@@ -1916,7 +1947,8 @@ def einop(prgm, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
-    return ctx(prgm, dict(**kwargs))[0]
+    bindings = {ein.Alias(k): v for k, v in kwargs.items()}
+    return ctx(prgm, bindings)[0]
 
 
 def einsum(prgm, *args, **kwargs):
@@ -1924,4 +1956,5 @@ def einsum(prgm, *args, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
+    bindings = {ein.Alias(k): v for k, v in bindings.items()}
     return ctx(prgm, bindings)[0]
