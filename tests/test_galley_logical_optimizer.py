@@ -739,7 +739,7 @@ def rename_aliases(expr):
                 MapJoin(
                     Literal(op.mul),
                     (
-                        Table(Alias("A"), (Field("i"),)),
+                        Table(Literal(A), (Field("i"),)),
                         Table(Literal(A), (Field("j"),)),
                     ),
                 ),
@@ -769,8 +769,8 @@ def rename_aliases(expr):
                 MapJoin(
                     Literal(op.mul),
                     (
-                        Table(Alias("A"), (Field("i"),)),
-                        Table(Alias("A"), (Field("j"),)),
+                        Table(Literal(A), (Field("i"),)),
+                        Table(Literal(A), (Field("j"),)),
                         Table(Literal(A), (Field("k"),)),
                     ),
                 ),
