@@ -20,7 +20,7 @@ def rng():
 
 @pytest.fixture
 def ctx():
-    return LogicExecutor(LogicStandardizer(LogicEinsumLoader(MockEinsumLoader())))
+    return LogicExecutor(LogicStandardizer(LogicEinsumLoader(ctx_load=MockEinsumLoader())))
 
 
 def test_simple_addition(rng, ctx):

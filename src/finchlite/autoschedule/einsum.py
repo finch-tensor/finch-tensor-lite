@@ -79,7 +79,7 @@ class EinsumGenerator(LogicEinsumLowerer):
         self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
-        return generate_einsum_stmt(prgm), bindings_2
+        return (generate_einsum_stmt(prgm), bindings_2)
 
 
 class LogicGeneratorContext:
@@ -176,6 +176,7 @@ class LogicEinsumLoader(LogicLoader):
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
+        print(self.ctx_lower(prgm, bindings))
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings)
         mod, ein_prgm, ein_bindings = self.ctx_load(ein_prgm, ein_bindings)
         lgc_prgm, lgc_bindings = self.ctx_lift(ein_prgm, ein_bindings)
