@@ -16,9 +16,7 @@ from .. import finch_notation as ntn
 from ..algebra import make_tuple, overwrite
 from ..compile import Extent
 from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import (
-    LogicLoader,
-)
+from ..finch_logic import LogicLoader, compute_shape_vars
 from ..finch_notation import NotationInterpreter
 from .stages import LogicNotationLowerer
 
@@ -349,7 +347,12 @@ class LogicCompiler(LogicLoader):
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field, ...]],
+    ]:
         mod = self.ctx_lower(prgm, bindings)
         lib = self.ctx_load(mod)
-        return lib, prgm, bindings
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return lib, bindings, shape_vars

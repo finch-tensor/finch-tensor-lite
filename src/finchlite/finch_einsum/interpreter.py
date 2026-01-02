@@ -4,7 +4,11 @@ import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
-from finchlite.finch_einsum.stages import EinsumEvaluator, EinsumLoader
+from finchlite.finch_einsum.stages import (
+    EinsumEvaluator,
+    EinsumLoader,
+    compute_shape_vars,
+)
 from finchlite.symbolic.ftype import fisinstance
 
 from ..algebra import overwrite, promote_max, promote_min
@@ -209,5 +213,10 @@ class MockEinsumLoader(EinsumLoader):
 
     def __call__(
         self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
-    ) -> tuple[MockEinsumLibrary, ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
-        return (MockEinsumLibrary(prgm, bindings), prgm, bindings)
+    ) -> tuple[
+        MockEinsumLibrary,
+        dict[ein.Alias, TensorFType],
+        dict[ein.Alias, tuple[ein.Field, ...]],
+    ]:
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return MockEinsumLibrary(prgm, bindings), bindings, shape_vars

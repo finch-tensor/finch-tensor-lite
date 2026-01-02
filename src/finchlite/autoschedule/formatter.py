@@ -63,5 +63,5 @@ class LogicFormatter(LogicLoader):
 
         formatter(prgm)
 
-        lib, prgm, bindings = self.loader(prgm, bindings)
-        return lib, prgm, bindings
+        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        return lib, bindings, shape_vars

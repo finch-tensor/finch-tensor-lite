@@ -28,6 +28,7 @@ from .stages import (
     LogicEvaluator,
     LogicLoader,
     LogicTransform,
+    compute_shape_vars,
 )
 
 __all__ = [
@@ -56,4 +57,5 @@ __all__ = [
     "TableValue",
     "TableValueFType",
     "Value",
+    "compute_shape_vars",
 ]

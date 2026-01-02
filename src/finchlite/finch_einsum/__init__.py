@@ -21,6 +21,7 @@ from .parser import parse_einop, parse_einsum
 from .stages import (
     EinsumEvaluator,
     EinsumLoader,
+    compute_shape_vars,
 )
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "MockEinsumLoader",
     "Plan",
     "Produces",
+    "compute_shape_vars",
     "parse_einop",
     "parse_einsum",
 ]
