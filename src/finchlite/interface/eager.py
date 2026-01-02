@@ -227,10 +227,12 @@ class EagerTensor(OverrideTensor, ABC):
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
+
 def full(
     shape: int | tuple[int, ...],
-    fill_value: bool | int | float | complex, *,
-    dtype: Any | None = None
+    fill_value: bool | complex,
+    *,
+    dtype: Any | None = None,
 ):
     """
     Returns a new array having a specified shape and filled with fill_value.
@@ -249,12 +251,13 @@ def full(
             be the default complex floating-point data type.
         * If the fill value is a bool, the output array must have a boolean data
             type. Default: None.
-    
+
     Returns:
 
     - out (array): an array where every element is equal to fill_value.
     """
     return compute(lazy.full(shape, fill_value, dtype=dtype))
+
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
