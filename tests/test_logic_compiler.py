@@ -1,6 +1,5 @@
 import operator
 
-from finchlite.finch_logic.nodes import Table
 import numpy as np
 
 import finchlite.finch_logic as logic
@@ -17,10 +16,9 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
-    Relabel,
     Reorder,
-    TableValue,
 )
+from finchlite.finch_logic.nodes import Table
 from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal
@@ -60,12 +58,9 @@ def test_logic_compiler(file_regression):
     )
 
     bindings = {
-        Alias(name=":A0"):
-            BufferizedNDArray(np.array([[1, 2], [3, 4]])),
-        Alias(name=":A1"):
-            BufferizedNDArray(np.array([[5, 6], [7, 8]])),
-        Alias(name=":A2"): 
-            BufferizedNDArray(np.array([[5, 6], [7, 8]])),
+        Alias(name=":A0"): BufferizedNDArray(np.array([[1, 2], [3, 4]])),
+        Alias(name=":A1"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
+        Alias(name=":A2"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
     }
 
     program = NotationGenerator()(
