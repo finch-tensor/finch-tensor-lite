@@ -22,7 +22,11 @@ class LogicFormatter(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-    ) -> tuple[AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+    ]:
         bindings = bindings.copy()
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
@@ -63,5 +67,5 @@ class LogicFormatter(LogicLoader):
 
         formatter(prgm)
 
-        lib, prgm, bindings = self.loader(prgm, bindings)
-        return lib, prgm, bindings
+        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        return lib, bindings, shape_vars

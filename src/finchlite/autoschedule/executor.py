@@ -1,6 +1,4 @@
-from typing import Any
-
-from finchlite.algebra.tensor import Tensor, TensorFType
+from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
@@ -27,8 +25,6 @@ def extract_tensors(
             case lgc.Table(lgc.Literal(tns), idxs):
                 if id(tns) in ids:
                     var = ids[id(tns)]
-                    if bindings[var].idxs == idxs:
-                        return var
                     return lgc.Table(var, idxs)
                 var = lgc.Alias(spc.freshen("A"))
                 ids[id(tns)] = var
@@ -37,42 +33,6 @@ def extract_tensors(
 
     root = Rewrite(PostWalk(rule_0))(root)
     return root, bindings
-
-
-class ProvisionTensorsContext:
-    def __init__(
-        self,
-        bindings: dict[lgc.Alias, Tensor],
-        types: dict[lgc.Alias, TensorFType],
-    ):
-        self.bindings: dict[lgc.Alias, Tensor] = bindings.copy()
-        self.shapes: dict[lgc.Alias, tuple[Any, ...]] = {
-            var: tns.shape for var, tns in bindings.items()
-        }
-        self.types: dict[lgc.Alias, TensorFType] = types
-
-    def __call__(self, node: lgc.LogicStatement) -> dict[lgc.Alias, Tensor]:
-        match node:
-            case lgc.Plan(bodies):
-                for body in bodies:
-                    self(body)
-            case lgc.Query(lhs, rhs):
-                if lhs not in self.bindings:
-                    if lhs not in self.types:
-                        raise ValueError(
-                            f"Type information missing for {lhs}, did you run"
-                            f" tensor formatter?"
-                        )
-                    shape = rhs.shape(self.shapes)
-                    self.bindings[lhs] = self.types[lhs](
-                        tuple(dim if dim is not None else 1 for dim in shape)
-                    )
-                    self.shapes[lhs] = shape
-            case lgc.Produces(_):
-                pass
-            case _:
-                raise ValueError(f"Unknown LogicStatement: {type(node)}")
-        return self.bindings
 
 
 class LogicExecutor(LogicEvaluator):
@@ -100,9 +60,20 @@ class LogicExecutor(LogicEvaluator):
         stmt, bindings = extract_tensors(stmt, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
 
-        mod, stmt, binding_ftypes = self.ctx(stmt, binding_ftypes)
+        mod, binding_ftypes, binding_idxs = self.ctx(stmt, binding_ftypes)
 
-        bindings = ProvisionTensorsContext(bindings, binding_ftypes)(stmt)
+        binding_shapes = dict[lgc.Field | None, int]()
+        for var, tns in bindings.items():
+            for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
+                if idx is not None:
+                    binding_shapes[idx] = dim
+
+        bindings = bindings.copy()
+        for var, tns_ftype in binding_ftypes.items():
+            if var not in bindings:
+                shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
+                bindings[var] = tns_ftype(shape)
+
         args = list(bindings.values())
 
         res = mod.main(*args)

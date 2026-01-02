@@ -34,7 +34,8 @@ from .optimize import (
     push_fields,
     set_loop_order,
 )
-from .stages import LogicNotationLowerer
+from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .standardize import LogicStandardizer
 
 __all__ = [
     "Aggregate",
@@ -43,9 +44,11 @@ __all__ = [
     "Field",
     "Literal",
     "LogicCompiler",
+    "LogicEinsumLowerer",
     "LogicExecutor",
     "LogicNormalizer",
     "LogicNotationLowerer",
+    "LogicStandardizer",
     "MapJoin",
     "NotationGenerator",
     "Plan",

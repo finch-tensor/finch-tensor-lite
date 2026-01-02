@@ -25,7 +25,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicLoader
+from .stages import LogicLoader, compute_shape_vars
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
@@ -182,10 +182,7 @@ class MockLogicKernel(AssemblyKernel):
                 f"Wrong number of arguments passed to kernel, "
                 f"have {len(args)}, expected {len(self.bindings)}"
             )
-        bindings = {
-            var: lgc.TableValue(tns, self.bindings[var].idxs)
-            for var, tns in zip(self.bindings.keys(), args, strict=True)
-        }
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = LogicInterpreter()
@@ -214,5 +211,10 @@ class MockLogicLoader(LogicLoader):
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
-        return (MockLogicLibrary(prgm, bindings), prgm, bindings)
+    ) -> tuple[
+        MockLogicLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+    ]:
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return MockLogicLibrary(prgm, bindings), bindings, shape_vars

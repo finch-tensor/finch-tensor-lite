@@ -656,8 +656,10 @@ class Query(LogicTree, LogicStatement):
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
         if self.lhs in dim_bindings:
-            if self.rhs.dimmap(op, dim_bindings) != dim_bindings[self.lhs]:
-                raise ValueError(f"Cannot rebind alias {self.lhs} to a different dims")
+            for dim1, dim2 in zip(
+                self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
+            ):
+                op(dim1, dim2)
         else:
             dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results
