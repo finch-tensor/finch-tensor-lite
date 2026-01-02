@@ -149,7 +149,7 @@ class EinsumMachine:
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = set(arg.get_idxs()).union(set(idxs))
-                loops = sorted(list(loops), key=lambda x: x.name)
+                loops = sorted(loops, key=lambda x: x.name)
                 ctx = PointwiseEinsumMachine(
                     self.xp, self.bindings, loops, self.verbose
                 )
