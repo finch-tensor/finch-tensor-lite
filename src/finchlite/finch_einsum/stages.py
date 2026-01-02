@@ -28,7 +28,7 @@ class EinsumLoader(ABC):
     ) -> tuple[
         AssemblyLibrary,
         dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Field, ...]],
+        dict[ein.Alias, tuple[ein.Index, ...]],
     ]:
         """
         Generate Finch Library from the given logic and input types, with a
@@ -56,7 +56,11 @@ class OptEinsumLoader(EinsumLoader):
         self,
         term: ein.EinsumStatement,
         bindings: dict[ein.Alias, TensorFType],
-    ) -> tuple[AssemblyLibrary, ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[ein.Alias, TensorFType],
+        dict[ein.Alias, tuple[ein.Index, ...]],
+    ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
         return self.ctx(term, bindings)
@@ -65,14 +69,14 @@ class OptEinsumLoader(EinsumLoader):
 def compute_shape_vars(
     prgm: ein.EinsumStatement,
     bindings: dict[ein.Alias, TensorFType],
-) -> dict[ein.Alias, tuple[ein.Field, ...]]:
-    groups = {}
-    dim_bindings = {}
+) -> dict[ein.Alias, tuple[ein.Index, ...]]:
+    groups: dict[ein.Index, set[ein.Index]] = {}
+    dim_bindings: dict[ein.Alias, tuple[ein.Index, ...]] = {}
     for var, tns in bindings.items():
-        idxs = [ein.Field(f"{var.name}_i_{i}") for i in range(tns.ndim)]
+        idxs = [ein.Index(f"{var.name}_i_{i}") for i in range(tns.ndim)]
         for idx in idxs:
-            groups[idx] = set(idx)
-        dim_bindings[var] = tuple[idxs]
+            groups[idx] = {idx}
+        dim_bindings[var] = tuple(idxs)
 
     def merge_dim_groups(dim1, dim2):
         if groups[dim1] is groups[dim2]:
@@ -86,32 +90,32 @@ def compute_shape_vars(
 
     for stmt in PostOrderDFS(prgm):
         match stmt:
-            case ein.Einsum(_, lhs, arg, lhs_idxs):
+            case ein.Einsum(_, lhs, lhs_idxs, arg):
+                assert all(isinstance(idx, ein.Index) for idx in lhs_idxs)
                 idx_bindings = dict(zip(lhs_idxs, dim_bindings[lhs], strict=True))
                 for node in PostOrderDFS(arg):
                     match node:
-                        case ein.Access(var, idxs):
-                            for idx, dim in zip(idxs, dim_bindings[var], strict=True):
-                                if idx in idx_bindings:
-                                    merge_dim_groups(idx_bindings[idx], dim)
+                        case ein.Access(var, idxs_2):
+                            for idx_2, dim in zip(
+                                idxs_2, dim_bindings[var], strict=True
+                            ):
+                                assert isinstance(idx_2, ein.Index)
+                                if idx_2 in idx_bindings:
+                                    merge_dim_groups(idx_bindings[idx_2], dim)
                                 else:
-                                    idx_bindings[idx] = dim
+                                    idx_bindings[idx_2] = dim
                         case _:
                             pass
             case _:
                 pass
 
-    prgm.infer_dimmap(merge_dim_groups, dim_bindings)
+    group_names: dict[set[ein.Index], ein.Index] = {}
 
-    group_names = {}
-
-    for group in groups:
-        if None in group:
-            group_names[group] = None
-        else:
-            group_names[group] = f"i_{len(group_names)}"
+    for group in groups.values():
+        if group not in group_names:
+            group_names[group] = ein.Index(f"i_{len(group_names)}")
 
     return {
-        var: tuple(ein.Field(group_names[groups[idx]]) for idx in idxs)
+        var: tuple(group_names[groups[idx]] for idx in idxs)
         for var, idxs in dim_bindings.items()
     }

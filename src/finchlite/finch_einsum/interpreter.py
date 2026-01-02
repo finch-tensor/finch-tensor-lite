@@ -216,7 +216,7 @@ class MockEinsumLoader(EinsumLoader):
     ) -> tuple[
         MockEinsumLibrary,
         dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Field, ...]],
+        dict[ein.Alias, tuple[ein.Index, ...]],
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockEinsumLibrary(prgm, bindings), bindings, shape_vars

@@ -64,7 +64,7 @@ class LogicExecutor(LogicEvaluator):
 
         mod, binding_ftypes, binding_idxs = self.ctx(stmt, binding_ftypes)
 
-        binding_shapes = dict[lgc.Field, int]()
+        binding_shapes = dict[lgc.Field | None, int]()
         for var, tns in bindings.items():
             for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
                 if idx is not None:

@@ -350,7 +350,7 @@ class LogicCompiler(LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field, ...]],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
         mod = self.ctx_lower(prgm, bindings)
         lib = self.ctx_load(mod)

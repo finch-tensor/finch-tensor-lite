@@ -214,7 +214,7 @@ class MockLogicLoader(LogicLoader):
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field, ...]],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockLogicLibrary(prgm, bindings), bindings, shape_vars
