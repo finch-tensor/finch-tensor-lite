@@ -66,7 +66,7 @@ def tp_2():
 def tp_3():
     return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))
 
-
+#TODO Remove once we solve #280
 def reset_name_counts(prgm: str) -> str:
     counter = 0
     visited = set()
