@@ -1,11 +1,14 @@
+import re
 from pathlib import Path
 
 import pytest
 
 from numpy.random import default_rng
+from numpy.testing import assert_allclose, assert_equal
 
-from finchlite import Mode, get_default_scheduler, set_default_scheduler
+from finchlite import get_default_scheduler, set_default_scheduler
 from finchlite.finch_logic import Field
+from finchlite.interface.fuse import INTERPRET_LOGIC
 
 
 @pytest.fixture(scope="session")
@@ -40,7 +43,7 @@ def random_wrapper(rng):
 @pytest.fixture
 def interpreter_scheduler():
     ctx = get_default_scheduler()
-    yield set_default_scheduler(mode=Mode.INTERPRET_LOGIC)
+    yield set_default_scheduler(ctx=INTERPRET_LOGIC)
     set_default_scheduler(ctx=ctx)
 
 
@@ -62,3 +65,33 @@ def tp_2():
 @pytest.fixture
 def tp_3():
     return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))
+
+
+# TODO Remove once we solve #280
+def reset_name_counts(prgm: str) -> str:
+    counter = 0
+    visited = set()
+    matched = re.finditer(r"#(?P<alias>\w+)#(?P<counter>\d+)", prgm)
+    for m in matched:
+        label = m.group(0)
+        if label not in visited:
+            visited.add(label)
+            counter += 1
+            prgm = prgm.replace(label, f"#{m.group('alias')}#{counter}")
+    return prgm
+
+
+def finch_assert_equal(result, expected, **kwargs):
+    if hasattr(result, "to_numpy"):
+        result = result.to_numpy()
+    if hasattr(expected, "to_numpy"):
+        expected = expected.to_numpy()
+    assert_equal(result, expected, **kwargs)
+
+
+def finch_assert_allclose(result, expected, **kwargs):
+    if hasattr(result, "to_numpy"):
+        result = result.to_numpy()
+    if hasattr(expected, "to_numpy"):
+        expected = expected.to_numpy()
+    assert_allclose(result, expected, **kwargs)

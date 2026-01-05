@@ -1,0 +1,20 @@
+def main(#A0#1: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64, #A1#2: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64, #A2#3: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64) -> tuple(BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64):
+    #_A0#4: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64 = unpack(#A0#1)
+    #A0_dim_0#5: int64 = #_A0#4.shape[0]
+    #A0_dim_1#6: int64 = #_A0#4.shape[1]
+    #_A1#7: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64 = unpack(#A1#2)
+    #A1_dim_0#8: int64 = #_A1#7.shape[0]
+    #A1_dim_1#9: int64 = #_A1#7.shape[1]
+    #_A2#10: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64 = unpack(#A2#3)
+    #A2_dim_0#11: int64 = #_A2#10.shape[0]
+    #A2_dim_1#12: int64 = #_A2#10.shape[1]
+    declare(#_A2#10, 0, add, [])
+    loop(#i0#13, Extent(0, #A0_dim_0#5)):
+        loop(#i1#14, Extent(0, #A0_dim_1#6)):
+            loop(#i2#15, Extent(0, #A1_dim_1#9)):
+                increment(update(#_A2#10, ['#i0#13', '#i2#15'], add), mul(unwrap(read(#_A0#4, ['#i0#13', '#i1#14'])), unwrap(read(#_A1#7, ['#i1#14', '#i2#15']))))
+    freeze(#_A2#10, add)
+    repack(#_A0#4, #A0#1)
+    repack(#_A1#7, #A1#2)
+    repack(#_A2#10, #A2#3)
+    return make_tuple(#A2#3)

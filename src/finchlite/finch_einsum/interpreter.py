@@ -2,6 +2,8 @@ import operator
 
 import numpy as np
 
+from finchlite.finch_einsum.stages import EinsumEvaluator
+
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
 
@@ -67,15 +69,26 @@ reduction_ops = {
 }
 
 
-class EinsumInterpreter:
-    def __init__(self, xp=None, bindings=None, loops=None):
+class EinsumInterpreter(EinsumEvaluator):
+    def __init__(self, xp=np, verbose=False):
+        self.xp = xp
+        self.verbose = verbose
+
+    def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        if xp is None:
-            xp = np
-        self.bindings = bindings
+        machine = EinsumMachine(
+            xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
+        )
+        return machine(node)
+
+
+class PointwiseEinsumMachine:
+    def __init__(self, xp, bindings, loops, verbose):
         self.xp = xp
+        self.bindings = bindings
         self.loops = loops
+        self.verbose = verbose
 
     def __call__(self, node):
         xp = self.xp
@@ -83,6 +96,8 @@ class EinsumInterpreter:
             case ein.Literal(val):
                 return val
             case ein.Alias(name):
+                if name not in self.bindings:
+                    raise ValueError(f"Unbound variable: {name}")
                 return self.bindings[name]
             case ein.Call(func, args):
                 func = self(func)
@@ -102,22 +117,38 @@ class EinsumInterpreter:
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
+            case _:
+                raise ValueError(f"Unknown einsum type: {type(node)}")
+
+
+class EinsumMachine:
+    def __init__(self, xp, bindings, verbose):
+        self.xp = xp
+        self.bindings = bindings
+        self.verbose = verbose
+
+    def __call__(self, node):
+        xp = self.xp
+        match node:
             case ein.Plan(bodies):
                 res = None
                 for body in bodies:
                     res = self(body)
                 return res
             case ein.Produces(args):
-                return tuple(self(arg) for arg in args)
-            case ein.Einsum(op, ein.Alias(tns), idxs, arg):
-                # This is the main entry point for einsum execution
+                for arg in args:
+                    if arg not in self.bindings:
+                        raise ValueError(f"Unbound variable: {arg}")
+                return tuple(self.bindings[arg] for arg in args)
+            case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = arg.get_idxs()
                 assert set(idxs).issubset(loops)
                 loops = sorted(loops, key=lambda x: x.name)
-                ctx = EinsumInterpreter(self.xp, self.bindings, loops)
+                ctx = PointwiseEinsumMachine(
+                    self.xp, self.bindings, loops, self.verbose
+                )
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
-                op = self(op)
                 if op != overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
@@ -126,7 +157,10 @@ class EinsumInterpreter:
                     val = arg
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
-                self.bindings[tns] = xp.permute_dims(val, axis)
-                return (tns,)
+                if tns in self.bindings:
+                    self.bindings[tns][:] = xp.permute_dims(val, axis)
+                else:
+                    self.bindings[tns] = xp.permute_dims(val, axis)
+                return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")

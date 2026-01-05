@@ -8,17 +8,12 @@ from finchlite.autoschedule import (
     concordize,
     flatten_plans,
     isolate_aggregates,
-    isolate_reformats,
-    isolate_tables,
     lift_fields,
-    lift_subqueries,
     materialize_squeeze_expand_productions,
     normalize_names,
     optimize,
-    pretty_labels,
     propagate_copy_queries,
     propagate_fields,
-    propagate_into_reformats,
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
@@ -34,14 +29,14 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
 )
-from finchlite.finch_logic.interpreter import FinchLogicInterpreter
+from finchlite.finch_logic.interpreter import LogicInterpreter
 from finchlite.symbolic.gensym import _sg
+
+from .conftest import finch_assert_equal
 
 
 def test_propagate_map_queries():
@@ -66,63 +61,6 @@ def test_propagate_map_queries():
     )
 
     result = propagate_map_queries(plan)
-    assert result == expected
-
-
-def test_lift_subqueries():
-    plan = Plan(
-        (
-            Query(
-                Alias("A10"),
-                Plan(
-                    (
-                        Subquery(Alias("C10"), Literal(0)),
-                        Subquery(
-                            Alias("B10"),
-                            MapJoin(
-                                Literal("+"),
-                                (
-                                    Subquery(Alias("C10"), Literal(0)),
-                                    Literal("[1,2,3]"),
-                                ),
-                            ),
-                        ),
-                        Subquery(Alias("B10"), Literal(0)),
-                        Produces((Alias("B10"),)),
-                    )
-                ),
-            ),
-            Produces((Alias("A10"),)),
-        )
-    )
-
-    expected = Plan(
-        (
-            Plan(
-                (
-                    Query(Alias("C10"), Literal(0)),
-                    Query(
-                        Alias("B10"),
-                        MapJoin(Literal("+"), (Alias("C10"), Literal("[1,2,3]"))),
-                    ),
-                    Query(
-                        Alias("A10"),
-                        Plan(
-                            (
-                                Alias("C10"),
-                                Alias("B10"),
-                                Alias("B10"),
-                                Produces((Alias("B10"),)),
-                            )
-                        ),
-                    ),
-                ),
-            ),
-            Produces((Alias("A10"),)),
-        )
-    )
-
-    result = lift_subqueries(plan)
     assert result == expected
 
 
@@ -163,52 +101,58 @@ def test_propagate_fields():
     assert result == expected
 
 
-@pytest.mark.parametrize(
-    "node,pass_fn",
-    [
-        (
-            Aggregate(Literal(""), Literal(""), Reorder(Literal(""), ()), ()),
-            isolate_aggregates,
-        ),
-        (Reformat(Literal(""), Reorder(Literal(""), ())), isolate_reformats),
-        (Table(Literal(""), ()), isolate_tables),
-    ],
-)
-def test_isolate_passes(node, pass_fn):
-    plan = Plan((node, node, node))
-    expected = Plan(
-        (
-            Subquery(Alias(f"#A#{_sg.counter}"), node),
-            Subquery(Alias(f"#A#{_sg.counter + 1}"), node),
-            Subquery(Alias(f"#A#{_sg.counter + 2}"), node),
-        )
-    )
-
-    result = pass_fn(plan)
-    assert result == expected
-
-
-def test_pretty_labels():
+def test_isolate_aggregates():
     plan = Plan(
         (
-            Field("AA"),
-            Alias("BB"),
-            Alias("CC"),
-            Subquery(Alias("BB"), Field("AA")),
-            Subquery(Alias("CC"), Field("AA")),
-        )
-    )
-    expected = Plan(
-        (
-            Field("i0"),
-            Alias("A0"),
-            Alias("A1"),
-            Subquery(Alias("A0"), Field("i0")),
-            Subquery(Alias("A1"), Field("i0")),
+            Query(
+                Alias("A0"),
+                Aggregate(
+                    Literal("+"),
+                    Literal(0),
+                    Aggregate(
+                        Literal("*"),
+                        Literal(1),
+                        Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                        (Field("i2"),),
+                    ),
+                    (Field("i1"),),
+                ),
+            ),
         )
     )
 
-    result = pretty_labels(plan)
+    expected = Plan(
+        (
+            Plan(
+                (
+                    Query(
+                        Alias(f"#A#{_sg.counter}"),
+                        Aggregate(
+                            Literal("*"),
+                            Literal(1),
+                            Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
+                            (Field("i2"),),
+                        ),
+                    ),
+                    Query(
+                        Alias(f"#A#{_sg.counter + 1}"),
+                        Aggregate(
+                            Literal("+"),
+                            Literal(0),
+                            Alias(f"#A#{_sg.counter}"),
+                            (Field("i1"),),
+                        ),
+                    ),
+                    Query(
+                        Alias("A0"),
+                        Alias(f"#A#{_sg.counter + 1}"),
+                    ),
+                )
+            ),
+        )
+    )
+
+    result = isolate_aggregates(plan)
     assert result == expected
 
 
@@ -310,49 +254,49 @@ def test_propagate_copy_queries():
     assert result == expected
 
 
-def test_propagate_into_reformats():
-    plan = Plan(
-        (
-            Query(Alias("A1"), Alias("A0")),
-            Query(
-                Alias("D0"),
-                Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
-            ),
-            Query(
-                Alias("B0"),
-                Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
-            ),
-            Literal(1),
-            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
-            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
-            Literal(2),
-        )
-    )
-
-    expected = Plan(
-        (
-            Query(Alias("A1"), Alias("A0")),
-            Query(
-                Alias("E0"),
-                Reformat(
-                    Literal(4),
-                    Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
-                ),
-            ),
-            Query(
-                Alias("C0"),
-                Reformat(
-                    Literal(3),
-                    Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
-                ),
-            ),
-            Literal(1),
-            Literal(2),
-        )
-    )
-
-    result = propagate_into_reformats(plan)
-    assert result == expected
+# def test_propagate_into_reformats():
+#    plan = Plan(
+#        (
+#            Query(Alias("A1"), Alias("A0")),
+#            Query(
+#                Alias("D0"),
+#                Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
+#            ),
+#            Query(
+#                Alias("B0"),
+#                Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
+#            ),
+#            Literal(1),
+#            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
+#            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
+#            Literal(2),
+#        )
+#    )
+#
+#    expected = Plan(
+#        (
+#            Query(Alias("A1"), Alias("A0")),
+#            Query(
+#                Alias("E0"),
+#                Reformat(
+#                    Literal(4),
+#                    Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
+#                ),
+#            ),
+#            Query(
+#                Alias("C0"),
+#                Reformat(
+#                    Literal(3),
+#                    Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
+#                ),
+#            ),
+#            Literal(1),
+#            Literal(2),
+#        )
+#    )
+#
+#    result = propagate_into_reformats(plan)
+#    assert result == expected
 
 
 def test_propagate_transpose_queries():
@@ -413,14 +357,11 @@ def test_lift_fields():
             ),
             Query(
                 Alias("A0"),
-                Reformat(
-                    Literal(0),
-                    MapJoin(
-                        Literal("*"),
-                        (
-                            Table(Literal(2), (Field("i1"), Field("i2"))),
-                            Table(Literal(4), (Field("i1"), Field("i2"))),
-                        ),
+                MapJoin(
+                    Literal("*"),
+                    (
+                        Table(Literal(2), (Field("i1"), Field("i2"))),
+                        Table(Literal(4), (Field("i1"), Field("i2"))),
                     ),
                 ),
             ),
@@ -453,18 +394,15 @@ def test_lift_fields():
             ),
             Query(
                 Alias("A0"),
-                Reformat(
-                    Literal(0),
-                    Reorder(
-                        MapJoin(
-                            Literal("*"),
-                            (
-                                Table(Literal(2), (Field("i1"), Field("i2"))),
-                                Table(Literal(4), (Field("i1"), Field("i2"))),
-                            ),
+                Reorder(
+                    MapJoin(
+                        Literal("*"),
+                        (
+                            Table(Literal(2), (Field("i1"), Field("i2"))),
+                            Table(Literal(4), (Field("i1"), Field("i2"))),
                         ),
-                        (Field("i1"), Field("i2")),
                     ),
+                    (Field("i1"), Field("i2")),
                 ),
             ),
         )
@@ -817,11 +755,11 @@ def test_scheduler_e2e_matmul(a, b):
 
     plan_opt = optimize(plan)
 
-    result = FinchLogicInterpreter()(plan_opt)[0]
+    result = LogicInterpreter()(plan_opt)[0].tns
 
     expected = np.matmul(a, b)
 
-    np.testing.assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 def test_scheduler_e2e_sddmm():
@@ -899,8 +837,8 @@ def test_scheduler_e2e_sddmm():
 
     assert plan_opt == expected_plan
 
-    result = FinchLogicInterpreter()(plan_opt)[0]
+    result = LogicInterpreter()(plan_opt)[0].tns
 
     expected = s * np.matmul(a, b)
 
-    np.testing.assert_equal(result, expected)
+    finch_assert_equal(result, expected)

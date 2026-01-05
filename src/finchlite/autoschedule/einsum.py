@@ -31,7 +31,7 @@ class EinsumLowerer:
                 lgc.Alias(name),
                 lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _) as agg,
             ):
-                einidxs = tuple(ein.Index(field.name) for field in agg.fields)
+                einidxs = tuple(ein.Index(field.name) for field in agg.fields())
                 my_bodies = []
                 if init != init_value(operation, type(init)):
                     my_bodies.append(
@@ -57,7 +57,7 @@ class EinsumLowerer:
                 return ein.Einsum(
                     op=ein.Literal(overwrite),
                     tns=ein.Alias(name),
-                    idxs=tuple(ein.Index(field.name) for field in rhs.fields),
+                    idxs=tuple(ein.Index(field.name) for field in rhs.fields()),
                     arg=einarg,
                 )
 
@@ -78,8 +78,6 @@ class EinsumLowerer:
         ex: lgc.LogicNode,
     ) -> ein.EinsumExpression:
         match ex:
-            case lgc.Reformat(_, rhs):
-                return self.compile_operand(rhs)
             case lgc.Reorder(arg, idxs):
                 return self.compile_operand(arg)
             case lgc.MapJoin(lgc.Literal(operation), lgcargs):
@@ -96,3 +94,9 @@ class EinsumLowerer:
                 return ein.Literal(val=value)
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
+
+
+# class EinsumCompiler:
+#    def __call__(self, prgm: lgc.LogicNode, bindings: dict[str, Any]) -> Any:
+#        interpreter = ein.EinsumInterpreter(bindings=bindings)
+#        return interpreter(prgm)

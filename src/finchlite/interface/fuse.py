@@ -50,103 +50,63 @@ Performance:
   or `with_scheduler`.
 """
 
-from enum import Enum
-from typing import Any
+from finchlite.autoschedule import LogicExecutor, LogicNormalizer
+from finchlite.autoschedule.formatter import LogicFormatter
+from finchlite.finch_logic.stages import LogicEvaluator
+from finchlite.finch_notation.interpreter import NotationInterpreter
 
-import numpy as np
-
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import Tensor, TensorPlaceholder
-from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
+from ..autoschedule.compiler import LogicCompiler
+from ..autoschedule.standardize import LogicStandardizer
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
+from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import (
     Alias,
-    Field,
-    FinchLogicInterpreter,
-    Literal,
+    LogicInterpreter,
+    MockLogicLoader,
     Plan,
     Produces,
     Query,
-    Table,
 )
-from ..symbolic import Reflector, gensym
+from ..symbolic import gensym
 from .lazy import lazy
 
 _DEFAULT_SCHEDULER = None
 
 
-class Mode(Enum):
-    INTERPRET_LOGIC = 0
-    INTERPRET_NOTATION = 1
-    INTERPRET_ASSEMBLY = 2
-    COMPILE_NUMBA = 3
-    COMPILE_C = 4
+INTERPRET_LOGIC = LogicInterpreter()
+OPTIMIZE_LOGIC = LogicNormalizer(
+    LogicExecutor(LogicStandardizer(LogicFormatter(MockLogicLoader())))
+)
+INTERPRET_NOTATION = LogicNormalizer(
+    LogicExecutor(
+        LogicStandardizer(LogicFormatter(LogicCompiler(NotationInterpreter())))
+    )
+)
+INTERPRET_ASSEMBLY = LogicNormalizer(
+    LogicExecutor(
+        LogicStandardizer(
+            LogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
+        )
+    )
+)
+COMPILE_NUMBA = LogicNormalizer(
+    LogicExecutor(
+        LogicStandardizer(
+            LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
+        )
+    )
+)
 
 
 def set_default_scheduler(
     *,
-    ctx=None,
-    mode=Mode.INTERPRET_LOGIC,  # TODO: change to NOTATION
+    ctx: LogicEvaluator = INTERPRET_NOTATION,
 ):
     global _DEFAULT_SCHEDULER
 
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
-
-    elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
-
-    elif mode == Mode.INTERPRET_NOTATION:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        ntn_interp = ntn.NotationInterpreter()
-
-        def fn_compile(plan):
-            prgm, table_vars, tables = optimizer(plan)
-            mod = ntn_interp(prgm)
-            args = provision_tensors(prgm, table_vars, tables)
-            return (mod.func(*args),)
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.INTERPRET_ASSEMBLY:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        notation_compiler = NotationCompiler(Reflector())
-        asm_interp = asm.AssemblyInterpreter()
-
-        def fn_compile(plan):
-            ntn_prgm, table_vars, tables = optimizer(plan)
-            asm_prgm = notation_compiler(ntn_prgm)
-            mod = asm_interp(asm_prgm)
-            args = provision_tensors(asm_prgm, table_vars, tables)
-            return (mod.func(*args),)
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.COMPILE_NUMBA:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        notation_compiler = NotationCompiler(Reflector())
-        numba_compiler = NumbaCompiler()
-
-        def fn_compile(plan):
-            # TODO: proper logging
-            # print("Logic: \n", plan)
-            ntn_prgm, table_vars, tables = optimizer(plan)
-            # print("Notation: \n", ntn_prgm)
-            asm_prgm = notation_compiler(ntn_prgm)
-            # print("Assembler: \n", asm_prgm)
-            mod = numba_compiler(asm_prgm)
-            args = provision_tensors(asm_prgm, table_vars, tables)
-            return (mod.func(*args),)
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.COMPILE_C:
-        raise NotImplementedError
-
-    else:
-        raise Exception(f"Invalid scheduler mode: {mode}")
 
 
 set_default_scheduler()
@@ -155,31 +115,6 @@ set_default_scheduler()
 def get_default_scheduler():
     global _DEFAULT_SCHEDULER
     return _DEFAULT_SCHEDULER
-
-
-def provision_tensors(
-    prgm: Any, table_vars: dict[Alias, ntn.Variable], tables: dict[Alias, Table]
-) -> list[Tensor]:
-    args: list[Tensor] = []
-    dims_dict: dict[Field, int] = {}
-    for arg in prgm.funcs[0].args:
-        table = tables[Alias(arg.name)]
-        table_var = table_vars[Alias(arg.name)]
-        match table:
-            case Table(Literal(val), idxs):
-                if isinstance(val, TensorPlaceholder):
-                    shape = tuple(dims_dict[field] for field in idxs)
-                    tensor = table_var.type_(val=np.zeros(dtype=val.dtype, shape=shape))
-                else:
-                    for idx, field in enumerate(table.idxs):
-                        dims_dict[field] = val.shape[idx]
-                    tensor = val
-            case _:
-                raise Exception(f"Invalid table for tensor processing: {table}")
-
-        args.append(tensor)
-
-    return args
 
 
 def compute(arg, ctx=None):
@@ -201,12 +136,13 @@ def compute(arg, ctx=None):
 
     args = arg if isinstance(arg, tuple) else (arg,)
     vars = tuple(Alias(gensym("A")) for _ in args)
+    ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
     bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
-    prgm = Plan(bodies + (Produces(vars),))
+    prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
     res = ctx(prgm)
     if isinstance(arg, tuple):
-        return tuple(res)
-    return res[0].to_numpy() if hasattr(res[0], "to_numpy") else res[0]
+        return tuple(tbl.tns for tbl in res)
+    return res[0].tns
 
 
 def fuse(f, *args, ctx=None):

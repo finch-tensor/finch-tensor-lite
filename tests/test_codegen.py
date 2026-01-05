@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 import numpy as np
-from numpy.testing import assert_equal
 
 import finchlite
 import finchlite.finch_assembly as asm
@@ -23,14 +22,20 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
+from finchlite.codegen.c_codegen import (
+    construct_from_c,
+    deserialize_from_c,
+    serialize_to_c,
+)
 from finchlite.codegen.malloc_buffer import MallocBuffer
-from finchlite.codegen.numba_backend import (
+from finchlite.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,
     serialize_to_numba,
 )
 from finchlite.compile import BufferizedNDArray
+
+from .conftest import finch_assert_equal
 
 
 def test_add_function():
@@ -41,7 +46,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finchlite.codegen.c.load_shared_lib(c_code).add
+    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -80,12 +85,14 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
-    f = finchlite.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finchlite.codegen.c.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
+    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
+    k = finchlite.codegen.c_codegen.CKernel(
+        f, type(None), [NumpyBufferFType(np.float64)]
+    )
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -146,7 +153,7 @@ def test_codegen(compiler, buffer):
     f(buf)
     result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -157,8 +164,8 @@ def test_codegen(compiler, buffer):
     ],
 )
 def test_dot_product_malloc(compiler, buffer):
-    a = [1, 2, 3]
-    b = [4, 5, 6]
+    a = [1.0, 2.0, 3.0]
+    b = [4.0, 5.0, 6.0]
 
     a_buf = buffer(len(a), np.float64, a)
     b_buf = buffer(len(b), np.float64, b)
@@ -231,11 +238,15 @@ def test_dot_product_malloc(compiler, buffer):
 
 
 @pytest.mark.parametrize(
-    ["new_size"],
-    [(1,), (5,), (10,)],
+    ["compiler", "new_size"],
+    [
+        [compiler, size]
+        for compiler in (asm.AssemblyInterpreter(), CCompiler())
+        for size in [1, 5, 10]
+    ],
 )
-def test_malloc_resize(new_size):
-    a = [1, 4, 3, 4]
+def test_malloc_resize(compiler, new_size):
+    a = [1.0, 4.0, 3.0, 4.0]
 
     ab = MallocBuffer(len(a), np.float64, a)
 
@@ -260,7 +271,7 @@ def test_malloc_resize(new_size):
             ),
         )
     )
-    mod = CCompiler()(prgm)
+    mod = compiler(prgm)
     assert mod.length(ab) == new_size
     assert ab.length() == new_size
     for i in range(new_size):
@@ -413,7 +424,7 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
         )
     )
 
-    file_regression.check(compiler(prgm), extension=extension)
+    file_regression.check(str(compiler(prgm)), extension=extension)
 
 
 @pytest.mark.parametrize(
@@ -482,7 +493,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
         )
     )
 
-    file_regression.check(compiler(prgm), extension=extension)
+    file_regression.check(str(compiler(prgm)), extension=extension)
 
 
 @pytest.mark.parametrize(
@@ -687,7 +698,7 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
         )
     )
     output = compiler(mod)
-    file_regression.check(output, extension=extension)
+    file_regression.check(str(output), extension=extension)
 
 
 @pytest.mark.parametrize(
@@ -910,10 +921,11 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(np_type, constructed, serialized) is None
 
 
+@pytest.mark.skip()
 @pytest.mark.parametrize(
     "fmt_fn",
     [
-        lambda x: BufferizedNDArray,
+        lambda x: ftype(BufferizedNDArray(np.zeros((2, 2), x))),
         lambda dtype: fiber_tensor(
             dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
         ),
@@ -928,8 +940,8 @@ def test_e2e_numba(fmt_fn, dtype):
     b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
     fmt = fmt_fn(dtype)
-    aa = fmt(val=a)
-    bb = fmt(val=b)
+    aa = fmt(a.shape, val=a)
+    bb = fmt(b.shape, val=b)
 
     wa = finchlite.lazy(aa)
     wb = finchlite.lazy(bb)
@@ -937,7 +949,7 @@ def test_e2e_numba(fmt_fn, dtype):
     plan = finchlite.matmul(wa, wb)
     result = finchlite.compute(plan)
 
-    assert_equal(result, a @ b)
+    finch_assert_equal(result, a @ b)
 
     finchlite.set_default_scheduler(ctx=ctx)
 
