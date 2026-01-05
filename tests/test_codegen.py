@@ -1028,6 +1028,10 @@ def test_print(compiler, capfd, file_regression):
     result = prgm.simple_struct(p, x)
     assert result == np.float64(9.0)
 
+    ctypes.CDLL(None).fflush(None)
     capture = capfd.readouterr().out
-    # file_regression.check(capture, extension=".txt")
-    print(capture)
+    if isinstance(compiler, NumbaCompiler):
+        # Normalize runtime object addresses printed by Numba for file regression
+        capture = re.sub(r" object at 0x[0-9a-fA-F]+>", ">", capture)
+
+    file_regression.check(capture, extension=".txt")

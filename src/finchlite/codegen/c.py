@@ -953,13 +953,14 @@ class CContext(Context):
                 args_value_str = ""
                 fmt_str = ""
                 for arg in args:
-                    fmt_str = (
-                        fmt_str + f"{ctype_print_fmt[c_type(arg.type)]},"
-                        if c_type(arg.type) in ctype_print_fmt
-                        else fmt_str + "%p,"
-                    )
-                    args_value_str = args_value_str + f"{self(arg)},"
-
+                    if c_type(arg.type) in ctype_print_fmt:
+                        fmt_str = fmt_str + f"{ctype_print_fmt[c_type(arg.type)]},"
+                        args_value_str = args_value_str + f"{self(arg)},"
+                    else:
+                        fmt_str = fmt_str + "%s,"
+                        args_value_str = (
+                            args_value_str + f'"{self.ctype_name(c_type(arg.type))}",'
+                        )
                 fmt_str = fmt_str[:-1]
                 args_value_str = args_value_str[:-1]
                 self.exec(f'{feed}printf("{fmt_str}\\n", {args_value_str});')
