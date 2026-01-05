@@ -9,7 +9,11 @@ struct CMallocBufferStruct {
 #include <stdio.h>
 
 static inline double*
-mallocbuffer_resize(double* data, int64_t len_old, int64_t len_new) {
+mallocbuffer_resize(
+    double* data,
+    int64_t len_old,
+    int64_t len_new
+) {
     data = realloc(data, sizeof(double) * len_new);
     if (data == 0) {
         fprintf(stderr, "Malloc Failed!\n");

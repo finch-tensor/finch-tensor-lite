@@ -80,7 +80,11 @@ class MallocBufferBackend:
         libcode = dedent(
             f"""
             {inline_s}{elt_type}*
-            {methods.resize}({elt_type}* data, {length_type} len_old, {length_type} len_new) {{
+            {methods.resize}(
+                {elt_type}* data,
+                {length_type} len_old,
+                {length_type} len_new
+            ) {{
                 data = realloc(data, sizeof({elt_type}) * len_new);
                 if (data == 0) {{
                     fprintf(stderr, "Malloc Failed!\\n");
