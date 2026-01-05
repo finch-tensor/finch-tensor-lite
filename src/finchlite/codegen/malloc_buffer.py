@@ -7,7 +7,10 @@ from textwrap import dedent
 
 import numpy as np
 
-from finchlite.codegen.c_codegen import (
+from ..finch_assembly import Buffer, Stack
+from ..finch_assembly.nodes import AssemblyExpression
+from ..util import qual_str
+from .c_codegen import (
     CBufferFType,
     CContext,
     CStackFType,
@@ -16,10 +19,7 @@ from finchlite.codegen.c_codegen import (
     load_shared_lib,
     serialize_to_c,
 )
-from finchlite.codegen.numpy_buffer import CBufferFields
-from finchlite.finch_assembly import Buffer
-from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
-from finchlite.util import qual_str
+from .numpy_buffer import CBufferFields
 
 
 class CMallocBufferStruct(ctypes.Structure):
@@ -120,7 +120,10 @@ class MallocBufferBackend:
 
     @classmethod
     def library(cls, ftype: MallocBufferFType) -> CMallocBufferLibrary:
-        # lazy compile the library.
+        """
+        Returns compiled library to operate on a buffer outside of
+        the kernel.
+        """
         if ftype in cls._library:
             return cls._library[ftype]
         ctx = CContext()
