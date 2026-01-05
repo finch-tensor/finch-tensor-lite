@@ -4,7 +4,6 @@ import ctypes
 from collections.abc import Hashable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TypedDict
 
 import numpy as np
 

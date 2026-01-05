@@ -6,8 +6,9 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-import numpy as np
 import pytest
+
+import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
