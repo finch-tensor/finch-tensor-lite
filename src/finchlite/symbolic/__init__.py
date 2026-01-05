@@ -9,6 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
+from .stage import Stage
 from .term import (
     Term,
     TermTree,
@@ -34,8 +35,10 @@ __all__ = [
     "Reflector",
     "Rewrite",
     "ScopedDict",
+    "Stage",
     "Term",
     "TermTree",
+    "fisinstance",
     "fisinstance",
     "ftype",
     "gensym",

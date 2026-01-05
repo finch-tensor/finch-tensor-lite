@@ -42,14 +42,6 @@ class TensorDef:
             (axis, float(shape[i])) for i, axis in enumerate(indices)
         )
         fv = fill_value(tensor)
-        try:
-            arr = np.asarray(tensor)
-            if arr.size > 0:
-                first = arr.flat[0]
-                if np.all(arr == first):
-                    fv = float(first)
-        except (TypeError, ValueError):
-            pass
 
         return cls(
             index_set=indices,

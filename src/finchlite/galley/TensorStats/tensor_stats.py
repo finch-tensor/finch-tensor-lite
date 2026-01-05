@@ -11,6 +11,14 @@ class TensorStats(ABC):
     def __init__(self, tensor: Any, fields: Iterable[str]):
         self.tensordef = TensorDef.from_tensor(tensor, fields)
 
+    @staticmethod
+    @abstractmethod
+    def copy_stats(stat: "TensorStats") -> "TensorStats":
+        """
+        Return a copy of a TensorStats object.
+        """
+        ...
+
     @abstractmethod
     def estimate_non_fill_values(arg: "TensorStats") -> float:
         """
