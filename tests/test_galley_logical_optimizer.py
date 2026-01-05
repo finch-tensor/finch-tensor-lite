@@ -540,7 +540,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             lambda alias_expr: MapJoin(
                 Literal(op.mul),
                 (
-                    alias_expr,
+                    Table(alias_expr, tuple()),
                     Table(Literal(B), (Field("j"),)),
                 ),
             ),
@@ -569,7 +569,8 @@ def test_get_reduce_query(expr, reduce_field, expected):
                 (Field("i"),),
             ),
             # expected point expr: alias
-            lambda alias_expr: alias_expr,
+            lambda alias_expr: 
+                    Table(alias_expr, tuple()),
         ),
         (
             # Case 3: expr = A[i] * C[i,k] * B[j], reduce over i
@@ -599,7 +600,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             lambda alias_expr: MapJoin(
                 Literal(op.mul),
                 (
-                    alias_expr,
+                    Table(alias_expr, (Field("k"),)),
                     Table(Literal(B), (Field("j"),)),
                 ),
             ),
@@ -634,7 +635,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             lambda alias_expr: MapJoin(
                 Literal(op.mul),
                 (
-                    alias_expr,
+                    Table(alias_expr, (Field("k"),)),
                     Table(Literal(B), (Field("j"),)),
                 ),
             ),
@@ -677,6 +678,8 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
 
 
 def rename_aliases(expr):
+    if isinstance(expr, Table):
+        return Table(rename_aliases(expr.tns), tuple(rename_aliases(idx) for idx in expr.idxs))
     if isinstance(expr, Alias):
         return Alias("A")
     if isinstance(expr, MapJoin):
@@ -738,8 +741,7 @@ def rename_aliases(expr):
                 Alias("out"),
                 MapJoin(
                     Literal(op.mul),
-                    (
-                        Table(Literal(A), (Field("i"),)),
+                    (   Table(Alias("A"), tuple()),
                         Table(Literal(A), (Field("j"),)),
                     ),
                 ),
@@ -768,9 +770,8 @@ def rename_aliases(expr):
                 Alias("out"),
                 MapJoin(
                     Literal(op.mul),
-                    (
-                        Table(Literal(A), (Field("i"),)),
-                        Table(Literal(A), (Field("j"),)),
+                    (   Table(Alias("A"), tuple()),
+                        Table(Alias("B"), tuple()),
                         Table(Literal(A), (Field("k"),)),
                     ),
                 ),
@@ -803,6 +804,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         assert query is None
     else:
         query = Query(query.lhs, rename_aliases(query.rhs))
+        expected = Query(expected.lhs, rename_aliases(expected.rhs))
         assert query == expected
 
 

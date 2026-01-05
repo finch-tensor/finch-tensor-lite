@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,20 @@ def tp_2():
 @pytest.fixture
 def tp_3():
     return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))
+
+
+# TODO Remove once we solve #280
+def reset_name_counts(prgm: str) -> str:
+    counter = 0
+    visited = set()
+    matched = re.finditer(r"#(?P<alias>\w+)#(?P<counter>\d+)", prgm)
+    for m in matched:
+        label = m.group(0)
+        if label not in visited:
+            visited.add(label)
+            counter += 1
+            prgm = prgm.replace(label, f"#{m.group('alias')}#{counter}")
+    return prgm
 
 
 def finch_assert_equal(result, expected, **kwargs):
