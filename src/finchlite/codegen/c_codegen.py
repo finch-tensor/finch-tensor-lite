@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from collections.abc import Hashable
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
@@ -604,6 +605,7 @@ class CContext(Context):
         self.fptr = fptr
         self.types = types
         self.slots = slots
+        self.datastructures: dict[Hashable, Any] = {}
 
     def add_header(self, header):
         if header not in self._headerset:
