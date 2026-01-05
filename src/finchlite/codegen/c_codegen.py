@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from collections.abc import Callable, Hashable
+from collections.abc import Hashable
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
@@ -703,17 +703,6 @@ class CContext(Context):
         if header not in self._headerset:
             self.headers.append(header)
             self._headerset.add(header)
-
-    def add_datastructure(self, key: Hashable, handler: "Callable[[CContext], Any]"):
-        """
-        Code to add a datastructure declaration.
-        This is the minimum required to prevent redundancy.
-        """
-        if key in self.datastructures:
-            return
-        # at least mark something is there.
-        self.datastructures[key] = None
-        handler(self)
 
     def emit_global(self):
         """

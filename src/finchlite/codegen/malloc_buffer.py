@@ -1,39 +1,166 @@
+from __future__ import annotations
+
 import ctypes
-from pathlib import Path
+from collections.abc import Hashable
+from dataclasses import dataclass
+from textwrap import dedent
 
 import numpy as np
 
-from finchlite.codegen.c_codegen import (
+from ..finch_assembly import Buffer, Stack
+from ..finch_assembly.nodes import AssemblyExpression
+from ..util import qual_str
+from .c_codegen import (
     CBufferFType,
+    CContext,
     CStackFType,
     c_type,
+    construct_from_c,
     load_shared_lib,
+    serialize_to_c,
 )
-from finchlite.codegen.numpy_buffer import CBufferFields
-from finchlite.finch_assembly import Buffer
-from finchlite.util import qual_str
-
-backend_lib = load_shared_lib(
-    (Path(__file__).parent / "malloc_buffer_backend.c").read_text(encoding="utf-8")
-)
+from .numpy_buffer import CBufferFields
 
 
-class CMallocBuffer(ctypes.Structure):
+class CMallocBufferStruct(ctypes.Structure):
     _fields_ = [
         ("data", ctypes.c_void_p),
-        ("length", ctypes.c_size_t),
-        ("datasize", ctypes.c_size_t),
-        ("resize", ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t)),
+        ("length", c_type(np.intp)),
     ]
+
+
+@dataclass
+class CMallocBufferMethods:
+    init: str
+    resize: str
+    free: str
+
+
+@dataclass
+class CMallocBufferLibrary:
+    library: ctypes.CDLL
+    methods: CMallocBufferMethods
+
+    def init(self, *args):
+        return getattr(self.library, self.methods.init)(*args)
+
+    def resize(self, *args):
+        return getattr(self.library, self.methods.resize)(*args)
+
+    def free(self, *args):
+        return getattr(self.library, self.methods.free)(*args)
+
+
+class MallocBufferBackend:
+    _library: dict[Hashable, CMallocBufferLibrary] = {}
+
+    @classmethod
+    def gen_code(
+        cls,
+        ctx: CContext,
+        ftype: MallocBufferFType,
+        inline: bool = False,
+    ) -> CMallocBufferMethods:
+        ctx.add_header("#include <string.h>")
+        ctx.add_header("#include <stdlib.h>")
+        ctx.add_header("#include <stdio.h>")
+
+        methods = CMallocBufferMethods(
+            init=ctx.freshen("mallocbuffer_init"),
+            free=ctx.freshen("mallocbuffer_free"),
+            resize=ctx.freshen("mallocbuffer_resize"),
+        )
+        ctx.datastructures[ftype] = methods
+
+        buffer_type = ctx.ctype_name(CMallocBufferStruct)
+        elt_type = ctx.ctype_name(c_type(ftype.element_type))
+        length_type = ctx.ctype_name(c_type(ftype.length_type))
+
+        inline_s = "static inline " if inline else ""
+        libcode = dedent(
+            f"""
+            {inline_s}{elt_type}*
+            {methods.resize}(
+                {elt_type}* data,
+                {length_type} len_old,
+                {length_type} len_new
+            ) {{
+                data = realloc(data, sizeof({elt_type}) * len_new);
+                if (data == 0) {{
+                    fprintf(stderr, "Malloc Failed!\\n");
+                    exit(1);
+                }}
+                if (len_new > len_old) {{
+                    memset(&data[len_old], 0, (len_new - len_old) * sizeof({elt_type}));
+                }}
+                return data;
+            }}
+            // methods below are not used by the kernel.
+            {inline_s}void
+            {methods.free}({buffer_type} *m) {{
+                free(m->data);
+                m->data = 0;
+                m->length = 0;
+            }}
+            {inline_s}void
+            {methods.init}(
+                {buffer_type} *m,
+                {length_type} datasize,
+                {length_type} length
+            ) {{
+                m->length = length;
+                m->data = malloc(length * datasize);
+                if (m->data != 0)
+                    memset(m->data, 0, length * datasize);
+            }}
+            """
+        )
+        ctx.add_header(libcode)
+        return methods
+
+    @classmethod
+    def library(cls, ftype: MallocBufferFType) -> CMallocBufferLibrary:
+        """
+        Returns compiled library to operate on a buffer outside of
+        the kernel.
+        """
+        if ftype in cls._library:
+            return cls._library[ftype]
+        ctx = CContext()
+        methods = cls.gen_code(ctx, ftype)
+        lib = load_shared_lib(ctx.emit_global())
+
+        length_type = c_type(ftype.length_type)
+
+        resize_func = getattr(lib, methods.resize)
+        resize_func.argtypes = [
+            ctypes.POINTER(c_type(ftype.element_type)),
+            length_type,
+            length_type,
+        ]
+        resize_func.restype = ctypes.POINTER(c_type(ftype.element_type))
+
+        init_func = getattr(lib, methods.init)
+        init_func.argtypes = [
+            ctypes.POINTER(CMallocBufferStruct),
+            length_type,
+            length_type,
+        ]
+        init_func.restype = None
+
+        free_func = getattr(lib, methods.free)
+        free_func.argtypes = [
+            ctypes.POINTER(CMallocBufferStruct),
+        ]
+        free_func.restype = None
+
+        cls._library[ftype] = CMallocBufferLibrary(lib, methods)
+        return cls._library[ftype]
 
 
 class MallocBuffer(Buffer):
     """
-    A buffer that uses Malloc buffers to store data.
-
-    To check out the corresponding C code, you should reference
-    ./malloc_buffer_backend.c in the same directory as the malloc_buffer.py
-    file
+    A buffer that uses buffers managed by malloc to store data.
     """
 
     def __init__(self, length: int, dtype, data=None):
@@ -41,33 +168,36 @@ class MallocBuffer(Buffer):
         Constructor for the MallocBuffer class.
 
         length (int): the length of the malloc array.
-        dtype (type[ctypes._CData]): the ctype that the buffer will be based on.
+        dtype (FType): the type that the buffer will be based on.
         data (optional): a list of data to initialize the buffer with.
         """
         self._dtype = dtype
         self._c_dtype = c_type(dtype)
-        self.buffer = ctypes.pointer(CMallocBuffer())
-        backend_lib.mallocbuffer_init(
+        self.buffer = ctypes.pointer(CMallocBufferStruct())
+
+        MallocBufferBackend.library(self.ftype).init(
             self.buffer,
-            ctypes.c_size_t(ctypes.sizeof(self._c_dtype)),
-            ctypes.c_size_t(length),
+            serialize_to_c(self.length_type, ctypes.sizeof(self._c_dtype)),
+            serialize_to_c(self.length_type, length),
         )
         if data is None:
             return
         if len(data) > length:
             raise IndexError
-        castarray = ctypes.cast(
-            self.buffer.contents.data, ctypes.POINTER(self._c_dtype)
-        )
+
         for idx, elt in enumerate(data):
-            castarray[idx] = self._c_dtype(elt)
+            self.castbuffer[idx] = serialize_to_c(self._dtype, elt)
 
     def __del__(self):
         """
         Frees the mallocbuffer stored inside.
         """
         if hasattr(self, "buffer"):
-            backend_lib.mallocbuffer_free(self.buffer)
+            MallocBufferBackend.library(self.ftype).free(self.buffer)
+
+    @property
+    def castbuffer(self):
+        return ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))
 
     @property
     def ftype(self):
@@ -80,23 +210,26 @@ class MallocBuffer(Buffer):
     def length(self):
         return np.intp(self.buffer.contents.length)
 
-    def load(self, index: int):
-        return self._dtype(
-            ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index]
-        )
+    def load(self, index):
+        value = self.castbuffer[index]
+        return construct_from_c(self.ftype.element_type, value)
 
-    def store(self, index: int, value):
-        ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[index] = (
-            self._dtype(value)
-        )
+    def store(self, index, value):
+        value = serialize_to_c(self.ftype.element_type, value)
+        self.castbuffer[index] = value
 
-    def resize(self, new_length: int):
-        self.buffer.contents.resize(self.buffer, ctypes.c_size_t(new_length))
+    def resize(self, new_length):
+        # we effectively have to run an entire serialization cycle ourselves.
+        old_length = serialize_to_c(self.ftype.length_type, self.length())
+        new_length = serialize_to_c(self.ftype.length_type, new_length)
+        newptr = MallocBufferBackend.library(self.ftype).resize(
+            self.castbuffer, old_length, new_length
+        )
+        self.buffer.contents.data = ctypes.cast(newptr, ctypes.c_void_p)
+        self.buffer.contents.length = new_length
 
     def __str__(self):
-        array = ctypes.cast(self.buffer.contents.data, ctypes.POINTER(self._c_dtype))[
-            : self.length()
-        ]
+        array = self.castbuffer[: self.length()]
         return f"malloc_buf({array})"
 
 
@@ -138,48 +271,66 @@ class MallocBufferFType(CBufferFType, CStackFType):
         return self._dtype
 
     def __hash__(self):
-        return hash(self._dtype)
+        return hash(("MallocBufferFType", self._dtype))
 
-    def __call__(self, len: int = 0, dtype: type | None = None):
-        if dtype is None:
-            dtype = self._dtype
-        return MallocBuffer(len, dtype)
+    def __call__(self, len: int = 0):
+        return MallocBuffer(len, self._dtype)
 
     def c_type(self):
-        return ctypes.POINTER(CMallocBuffer)
+        return ctypes.POINTER(CMallocBufferStruct)
 
-    def c_length(self, ctx, buf):
+    def c_length(self, ctx: CContext, buf: Stack):
+        assert isinstance(buf.obj, CBufferFields)
         return buf.obj.length
 
-    def c_data(self, ctx, buf):
+    def c_data(self, ctx: CContext, buf: Stack):
+        assert isinstance(buf.obj, CBufferFields)
         return buf.obj.data
 
-    def c_load(self, ctx, buf, idx):
+    def c_load(self, ctx: CContext, buf: Stack, idx: AssemblyExpression):
+        assert isinstance(buf.obj, CBufferFields)
         return f"({buf.obj.data})[{ctx(idx)}]"
 
-    def c_store(self, ctx, buf, idx, value):
+    def c_store(
+        self,
+        ctx: CContext,
+        buf: Stack,
+        idx: AssemblyExpression,
+        value: AssemblyExpression,
+    ):
+        assert isinstance(buf.obj, CBufferFields)
         ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
 
-    def c_resize(self, ctx, buf, new_len):
+    def c_resize(self, ctx: CContext, buf: Stack, new_len: AssemblyExpression):
+        assert isinstance(buf.obj, CBufferFields)
+
+        if self not in ctx.datastructures:
+            raise Exception("A Mallocbuffer must be unpacked before being operated on!")
+
+        methods: CMallocBufferMethods = ctx.datastructures[self]
+
         new_len = ctx(ctx.cache("len", new_len))
-        obj = buf.obj.obj
         data = buf.obj.data
         length = buf.obj.length
-        t = ctx.ctype_name(c_type(self._dtype))
+
         ctx.exec(
-            f"{ctx.feed}{data} = ({t}*){obj}->resize({obj}, ({new_len}));\n"
+            f"{ctx.feed}{data} = {methods.resize}({data}, {length}, {new_len});\n"
             f"{ctx.feed}{length} = {new_len};"
         )
         return
 
-    def c_unpack(self, ctx, var_n, val):
+    def c_unpack(self, ctx: CContext, var_n, val):
         """
         Unpack the malloc buffer into C context.
         """
         data = ctx.freshen(var_n, "data")
         length = ctx.freshen(var_n, "length")
-        t = ctx.ctype_name(c_type(self._dtype))
+        t = ctx.ctype_name(c_type(self.element_type))
         ctx.add_header("#include <stddef.h>")
+
+        if self not in ctx.datastructures:
+            MallocBufferBackend.gen_code(ctx, self, inline=True)
+
         ctx.exec(
             f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
             f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
@@ -187,13 +338,13 @@ class MallocBufferFType(CBufferFType, CStackFType):
 
         return CBufferFields(data, length, var_n)
 
-    def c_repack(self, ctx, lhs, obj):
+    def c_repack(self, ctx, var_n: str, obj: CBufferFields):
         """
         Repack the buffer from C context.
         """
         ctx.exec(
-            f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
-            f"{ctx.feed}{lhs}->length = {obj.length};"
+            f"{ctx.feed}{var_n}->data = (void*){obj.data};\n"
+            f"{ctx.feed}{var_n}->length = {obj.length};"
         )
         return
 
