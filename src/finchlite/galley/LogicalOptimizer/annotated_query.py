@@ -645,7 +645,7 @@ def reduce_idx(
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
-    alias_idxs =  [Field(idx) for idx in aq.bindings[alias_expr].index_set]
+    alias_idxs = [Field(idx) for idx in aq.bindings[alias_expr].index_set]
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),

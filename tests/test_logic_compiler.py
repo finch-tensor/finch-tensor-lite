@@ -17,8 +17,8 @@ from finchlite.finch_logic import (
     Produces,
     Query,
     Reorder,
+    Table,
 )
-from finchlite.finch_logic.nodes import Table
 from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal, reset_name_counts
@@ -36,13 +36,13 @@ def test_logic_compiler(file_regression):
                         arg=MapJoin(
                             op=logic.Literal(val=operator.mul),
                             args=(
-                                Relabel(
-                                    arg=Alias(name="A0"),
-                                    idxs=(Field(name="i0"), Field(name="i1")),
+                                Table(
+                                    Alias(name="A0"),
+                                    (Field(name="i0"), Field(name="i1")),
                                 ),
-                                Relabel(
-                                    arg=Alias(name="A1"),
-                                    idxs=(Field(name="i1"), Field(name="i2")),
+                                Table(
+                                    Alias(name="A1"),
+                                    (Field(name="i1"), Field(name="i2")),
                                 ),
                             ),
                         ),
@@ -58,18 +58,9 @@ def test_logic_compiler(file_regression):
     )
 
     bindings = {
-        Alias(name="A0"): TableValue(
-            BufferizedNDArray(np.array([[1, 2], [3, 4]])),
-            (Field(name="i0"), Field(name="i1")),
-        ),
-        Alias(name="A1"): TableValue(
-            BufferizedNDArray(np.array([[5, 6], [7, 8]])),
-            (Field(name="i1"), Field(name="i2")),
-        ),
-        Alias(name="A2"): TableValue(
-            BufferizedNDArray(np.array([[5, 6], [7, 8]])),
-            (Field(name="i0"), Field(name="i2")),
-        ),
+        Alias(name="A0"): BufferizedNDArray(np.array([[1, 2], [3, 4]])),
+        Alias(name="A1"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
     }
 
     program = NotationGenerator()(
@@ -85,8 +76,8 @@ def test_logic_compiler(file_regression):
     result = INTERPRET_NOTATION(plan, bindings)
 
     expected = np.matmul(
-        bindings[Alias(name="A0")].tns.to_numpy(),
-        bindings[Alias(name="A1")].tns.to_numpy(),
+        bindings[Alias(name="A0")].to_numpy(),
+        bindings[Alias(name="A1")].to_numpy(),
         dtype=float,
     )
 

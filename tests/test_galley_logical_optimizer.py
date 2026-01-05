@@ -540,7 +540,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             lambda alias_expr: MapJoin(
                 Literal(op.mul),
                 (
-                    Table(alias_expr, tuple()),
+                    Table(alias_expr, ()),
                     Table(Literal(B), (Field("j"),)),
                 ),
             ),
@@ -569,8 +569,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
                 (Field("i"),),
             ),
             # expected point expr: alias
-            lambda alias_expr: 
-                    Table(alias_expr, tuple()),
+            lambda alias_expr: Table(alias_expr, ()),
         ),
         (
             # Case 3: expr = A[i] * C[i,k] * B[j], reduce over i
@@ -679,7 +678,9 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
 
 def rename_aliases(expr):
     if isinstance(expr, Table):
-        return Table(rename_aliases(expr.tns), tuple(rename_aliases(idx) for idx in expr.idxs))
+        return Table(
+            rename_aliases(expr.tns), tuple(rename_aliases(idx) for idx in expr.idxs)
+        )
     if isinstance(expr, Alias):
         return Alias("A")
     if isinstance(expr, MapJoin):
@@ -741,7 +742,8 @@ def rename_aliases(expr):
                 Alias("out"),
                 MapJoin(
                     Literal(op.mul),
-                    (   Table(Alias("A"), tuple()),
+                    (
+                        Table(Alias("A"), ()),
                         Table(Literal(A), (Field("j"),)),
                     ),
                 ),
@@ -770,8 +772,9 @@ def rename_aliases(expr):
                 Alias("out"),
                 MapJoin(
                     Literal(op.mul),
-                    (   Table(Alias("A"), tuple()),
-                        Table(Alias("B"), tuple()),
+                    (
+                        Table(Alias("A"), ()),
+                        Table(Alias("B"), ()),
                         Table(Literal(A), (Field("k"),)),
                     ),
                 ),
