@@ -1,6 +1,8 @@
 from functools import reduce
+from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
+from finchlite.finch_logic.nodes import LogicExpression, LogicNode
 
 from ..algebra import overwrite
 from ..finch_logic import (
@@ -30,6 +32,7 @@ from ..symbolic import (
     gensym,
 )
 from ._utils import intersect, is_subsequence, setdiff, with_subsequence
+from .normalize import normalize_names
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -130,7 +133,7 @@ def concordize(root: LogicStatement) -> LogicStatement:
         match ex:
             case Query(lhs, _) as q if lhs in needed_swizzles:
                 ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
-                idxs = tuple([Field(f"idx_{i}") for i in range(ndims)])
+                idxs = tuple([Field(f"i_{i}") for i in range(ndims)])
                 swizzle_queries = tuple(
                     Query(
                         alias, Reorder(Table(lhs, idxs), tuple(idxs[p] for p in perm))
@@ -151,7 +154,15 @@ def concordize(root: LogicStatement) -> LogicStatement:
             raise Exception(f"Invalid root: {root}")
 
 
-def push_fields(root: LogicStatement):
+@overload
+def push_fields(root: LogicExpression) -> LogicExpression: ...
+@overload
+def push_fields(root: LogicStatement) -> LogicStatement: ...
+@overload
+def push_fields(root: LogicNode) -> LogicNode: ...
+
+
+def push_fields(root: LogicNode) -> LogicNode:
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
@@ -290,4 +301,6 @@ class LogicStandardizer(LogicLoader):
         prgm = drop_with_aggregation(prgm)
         prgm = concordize(prgm)
         prgm = drop_reorders(prgm)
+        prgm = flatten_plans(prgm)
+        prgm, bindings = normalize_names(prgm, bindings)
         return self.ctx(prgm, bindings)

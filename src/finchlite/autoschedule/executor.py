@@ -62,13 +62,14 @@ class LogicExecutor(LogicEvaluator):
 
         mod, binding_ftypes, binding_idxs = self.ctx(stmt, binding_ftypes)
 
+        bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))
+
         binding_shapes = dict[lgc.Field | None, int]()
         for var, tns in bindings.items():
             for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
                 if idx is not None:
                     binding_shapes[idx] = dim
 
-        bindings = bindings.copy()
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
