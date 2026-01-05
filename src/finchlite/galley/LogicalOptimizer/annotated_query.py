@@ -645,11 +645,12 @@ def reduce_idx(
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
+    alias_idxs =  [Field(idx) for idx in aq.bindings[alias_expr].index_set]
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),
         node_to_replace=node_to_replace,
-        new_node=Table(alias_expr, tuple(reduced_idxs)),
+        new_node=Table(alias_expr, tuple(alias_idxs)),
         nodes_to_remove=nodes_to_remove,
     )
     new_reduce_idxs = [x for x in aq.reduce_idxs if x not in reduced_idxs]
@@ -717,7 +718,7 @@ def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
     insert_statistics(
         aq.ST, expr, bindings=aq.bindings, replace=True, cache=aq.cache_point
     )
-    if isinstance(expr, Alias):
+    if isinstance(expr, Table) and isinstance(expr.tns, Alias):
         return None
     query = Query(aq.output_name, cast(LogicExpression, expr))
     remaining_cache: dict[object, TensorStats] = {}
