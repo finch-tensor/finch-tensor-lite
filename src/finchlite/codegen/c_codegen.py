@@ -612,17 +612,6 @@ class CContext(Context):
             self.headers.append(header)
             self._headerset.add(header)
 
-    def add_datastructure(self, key: Hashable, handler: "Callable[[CContext], Any]"):
-        """
-        Code to add a datastructure declaration.
-        This is the minimum required to prevent redundancy.
-        """
-        if key in self.datastructures:
-            return
-        # at least mark something is there.
-        self.datastructures[key] = None
-        handler(self)
-
     def emit_global(self):
         """
         Emit the headers for the C code.

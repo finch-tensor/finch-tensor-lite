@@ -1,7 +1,7 @@
 #include <stdint.h>
 struct CMallocBufferStruct {
     void* data;
-    uint64_t length;
+    int64_t length;
 };
 #include <stddef.h>
 #include <string.h>
@@ -9,7 +9,7 @@ struct CMallocBufferStruct {
 #include <stdio.h>
 
 static inline double*
-mallocbuffer_resize(double* data, size_t len_old, size_t len_new) {
+mallocbuffer_resize(double* data, int64_t len_old, int64_t len_new) {
     data = realloc(data, sizeof(double) * len_new);
     if (data == 0) {
         fprintf(stderr, "Malloc Failed!\n");
@@ -30,12 +30,13 @@ mallocbuffer_free(struct CMallocBufferStruct *m) {
 static inline void
 mallocbuffer_init(
     struct CMallocBufferStruct *m,
-    size_t datasize,
-    size_t length
+    int64_t datasize,
+    int64_t length
 ) {
     m->length = length;
     m->data = malloc(length * datasize);
-    memset(m->data, 0, length * datasize);
+    if (m->data != 0)
+        memset(m->data, 0, length * datasize);
 }
 
 double dot_product(struct CMallocBufferStruct* a, struct CMallocBufferStruct* b) {

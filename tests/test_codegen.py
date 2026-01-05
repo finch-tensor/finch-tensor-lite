@@ -6,9 +6,8 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 
-import pytest
-
 import numpy as np
+import pytest
 
 import finchlite
 import finchlite.finch_assembly as asm
@@ -238,10 +237,14 @@ def test_dot_product_malloc(compiler, buffer):
 
 
 @pytest.mark.parametrize(
-    ["new_size"],
-    [(1,), (5,), (10,)],
+    ["compiler", "new_size"],
+    [
+        [compiler, size]
+        for compiler in (asm.AssemblyInterpreter(), CCompiler())
+        for size in [1, 5, 10]
+    ],
 )
-def test_malloc_resize(new_size):
+def test_malloc_resize(compiler, new_size):
     a = [1.0, 4.0, 3.0, 4.0]
 
     ab = MallocBuffer(len(a), np.float64, a)
@@ -267,7 +270,7 @@ def test_malloc_resize(new_size):
             ),
         )
     )
-    mod = CCompiler()(prgm)
+    mod = compiler(prgm)
     assert mod.length(ab) == new_size
     assert ab.length() == new_size
     for i in range(new_size):
