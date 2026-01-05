@@ -128,17 +128,13 @@ class NamedTupleFType(ImmutableStructFType):
 
     def from_fields(self, *args):
         assert all(
-            isinstance(a, f)
+            fisinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
         )
         return namedtuple(self.struct_name, self.struct_fieldnames)(args)
 
     def __call__(self, *args):
-        assert all(
-            fisinstance(a, f)
-            for a, f in zip(args, self.struct_fieldformats, strict=False)
-        )
-        return namedtuple(self.struct_name, self.struct_fieldnames)(args)
+        return self.from_fields(*args)
 
 
 class TupleFType(ImmutableStructFType):
@@ -194,16 +190,11 @@ class TupleFType(ImmutableStructFType):
         )
 
     def __call__(self, **kwargs):
-        # same as above. This check is useless.
-        assert all(
-            fisinstance(a, f)
-            for a, f in zip(kwargs.values(), self.struct_fieldformats, strict=False)
-        )
-        return tuple(kwargs.values())
+        return self.from_fields(*kwargs.values())
 
     def from_fields(self, *args):
         assert all(
-            isinstance(a, f)
+            fisinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
         )
         return tuple(args)

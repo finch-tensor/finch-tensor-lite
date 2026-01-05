@@ -242,13 +242,14 @@ register_property(
 
 
 def immutable_construct_from_numba(fmt: AssemblyStructFType, numba_tuple):
-    kwargs = {
-        name: construct_from_numba(field_type, field_value)
-        for field_value, (name, field_type) in zip(
-            numba_tuple, fmt.struct_fields, strict=False
-        )
-    }
-    return fmt(**kwargs)
+    return fmt.from_fields(
+        *[
+            construct_from_numba(field_type, field_value)
+            for field_value, (name, field_type) in zip(
+                numba_tuple, fmt.struct_fields, strict=False
+            )
+        ]
+    )
 
 
 register_property(
