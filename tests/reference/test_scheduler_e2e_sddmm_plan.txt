@@ -1,0 +1,4 @@
+RES = Aggregate(add, 0, Reorder(MapJoin(mul, MapJoin(mul, Table(A, i, k), Table(B, j, k)), Table(S, j, i)), j, i, k), k)
+RES_6 = Reorder(Table(RES, i_0, i_1), i_1, i_0)
+RES_3 = Reorder(Table(RES_6, i_1, i_0), i_1, i_0)
+return RES_3

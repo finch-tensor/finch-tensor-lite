@@ -17,6 +17,7 @@ from finchlite.autoschedule.standardize import (
     flatten_plans,
     isolate_aggregates,
     push_fields,
+    standardize,
 )
 from finchlite.finch_logic import (
     Aggregate,
@@ -69,7 +70,7 @@ def test_isolate_aggregates():
                         ),
                     ),
                     Query(
-                        Alias(f"#A#{_sg.counter + 1}"),
+                        Alias("A0"),
                         Aggregate(
                             Literal("+"),
                             Literal(0),
@@ -78,10 +79,6 @@ def test_isolate_aggregates():
                             ),
                             (Field("i1"),),
                         ),
-                    ),
-                    Query(
-                        Alias("A0"),
-                        Table(Alias(f"#A#{_sg.counter + 1}"), (Field("i3"),)),
                     ),
                 )
             ),
@@ -463,13 +460,14 @@ def test_scheduler_e2e_matmul(file_regression):
         )
     )
 
-    plan_opt, _ = optimize(
+    plan_opt, bindings = optimize(
         plan,
         {
             Alias("A"): ftype(finchlite.asarray(a)),
             Alias("B"): ftype(finchlite.asarray(b)),
         },
     )
+    plan_opt, bindings = standardize(plan_opt, bindings)
 
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_matmul_plan"
@@ -484,13 +482,10 @@ def test_scheduler_e2e_sddmm(file_regression):
 
     plan = Plan(
         (
-            Query(Alias("S"), Table(Literal(s), (i, j))),
-            Query(Alias("A"), Table(Literal(a), (i, k))),
-            Query(Alias("B"), Table(Literal(b), (k, j))),
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, k)))
+                    Literal(mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j)))
                 ),
             ),
             # matmul
@@ -504,14 +499,14 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("RES"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (i, j)))
+                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i)))
                 ),
             ),
             Produces((Alias("RES"),)),
         )
     )
 
-    plan_opt, _ = optimize(
+    plan_opt, bindings = optimize(
         plan,
         {
             Alias("S"): ftype(finchlite.asarray(s)),
@@ -519,6 +514,7 @@ def test_scheduler_e2e_sddmm(file_regression):
             Alias("B"): ftype(finchlite.asarray(b)),
         },
     )
+    plan_opt, bindings = standardize(plan_opt, bindings)
 
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"

@@ -7,6 +7,7 @@ from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_logic.nodes import LogicExpression
 from finchlite.finch_logic.stages import LogicLoader
+from finchlite.symbolic import gensym
 
 from ..finch_logic import (
     Aggregate,
@@ -37,6 +38,7 @@ from .standardize import (
     flatten_plans,
     isolate_aggregates,
     push_fields,
+    standardize,
 )
 
 
@@ -101,6 +103,7 @@ def optimize(
         prgm = push_fields(prgm)
 
         prgm = propagate_transpose_queries(prgm)
+        prgm = push_fields(prgm)
         prgm = set_loop_order(prgm)
         prgm = push_fields(prgm)
 
@@ -170,8 +173,8 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
         match ex:
             case Query(a, _) if uses[a] == 1 and a not in rets:
                 return Plan()
-            case Table(Alias() as a, idxs) if uses.get(a, 0) == 1 and a not in rets:
-                return Relabel(defs.get(a, a), idxs)
+            case Table(Alias() as a, idxs) if uses.get(a, 0) == 1 and a not in rets and a in defs:
+                return Relabel(defs[a], idxs)
 
     root = Rewrite(PreWalk(rule_1))(root)
     root = push_fields(root)
@@ -227,19 +230,23 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
 
 def propagate_copy_queries(root):
     copies = {}
-    for node in PostOrderDFS(root):
+    def rule_0(node):
         match node:
             case Query(lhs, Table(Alias(_) as rhs, _)):
                 copies[lhs] = copies.get(rhs, rhs)
-
-    def rule_0(ex):
-        match ex:
-            case Query(lhs, Table(rhs, _)) if lhs == rhs:
                 return Plan()
+            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if idxs_1 == idxs_2:
+                copies[lhs] = copies.get(rhs, rhs)
+                return Plan()
+
+    root = Rewrite(PostWalk(rule_0))(root)
+
+    def rule_1(ex):
+        match ex:
             case Alias() as a if a in copies:
                 return copies[a]
 
-    return Rewrite(PostWalk(rule_0))(root)
+    return Rewrite(PostWalk(rule_1))(root)
 
 
 def lift_fields(root):
@@ -331,29 +338,38 @@ def _set_loop_order(
     node: LogicNode, perms: dict[LogicNode, LogicExpression]
 ) -> LogicNode: ...
 def _set_loop_order(node, perms):
+    def rule_0(node):
+        match node:
+            case Table(Alias(_) as tns, idxs) if tns in perms:
+                return Relabel(perms[tns], idxs)
+        return None
+
     match node:
         case Plan(bodies):
             return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
         case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-            arg = push_fields(Rewrite(PostWalk(lambda tns: perms.get(tns, tns))))(arg)
+            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
             assert isinstance(arg, LogicExpression)
             idxs_2 = _heuristic_loop_order(arg)
             rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
             perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
             return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Table(Alias(_) as tns, _), _)) as q:
+        case Query(lhs, Reorder(Table(Alias(_) as tns, _), idxs)) as q:
             tns = perms.get(tns, tns)
-            perms[lhs] = lhs
+            perms[lhs] = Table(lhs, idxs)
             return q
         case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
-            rhs = push_fields(Rewrite(PostWalk(lambda tns: perms.get(tns, tns)))(rhs))
+            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
             assert isinstance(rhs, LogicExpression)
             idxs = _heuristic_loop_order(rhs)
             perms[lhs] = Reorder(Table(lhs, idxs), tuple(rhs.fields()))
             rhs_2 = Reorder(rhs, idxs)
             return Query(lhs, rhs_2)
-        case Produces(_) as prod:
-            return Rewrite(PostWalk(lambda tns: perms.get(tns, tns)))(prod)
+        case Produces(args):
+            renames = {a : Alias(gensym("A")) for a in args if a in perms}
+            bodies = tuple([Query(v, perms[k]) for k, v in renames.items()])
+            args_2 = tuple([renames.get(a, a) for a in args])
+            return Plan(bodies + (Produces(args_2),))
         case _:
             raise Exception(f"Invalid node: {node} in set_loop_order")
 

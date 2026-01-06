@@ -49,6 +49,11 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
                     return None
 
         match stmt:
+            case Query(lhs, Aggregate(op, init, arg, idxs)):
+                arg = Rewrite(PostWalk(rule_1))(arg)
+                return Plan((*stack, Query(lhs,
+                    Aggregate(op, init, arg, idxs)
+                )))
             case Query(lhs, rhs):
                 rhs = Rewrite(PostWalk(rule_1))(rhs)
                 return Plan((*stack, Query(lhs, rhs)))
@@ -196,7 +201,7 @@ def push_fields(root: LogicNode) -> LogicNode:
             case Reorder(Reorder(arg, _), idxs):
                 return Reorder(arg, idxs)
             case Reorder(MapJoin(op, args), idxs) if not all(
-                isinstance(arg, Reorder) for arg in args
+                isinstance(arg, Reorder) and is_subsequence(arg.fields(), idxs) for arg in args
             ):
                 return Reorder(
                     MapJoin(
@@ -278,6 +283,21 @@ def drop_with_aggregation(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(rule_2))(root)
 
 
+def standardize(
+    prgm: LogicStatement,
+    bindings: dict[Alias, TensorFType],
+) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
+    prgm = isolate_aggregates(prgm)
+    prgm = split_increments(prgm)
+    prgm = standardize_query_roots(prgm, bindings)
+    prgm = push_fields(prgm)
+    prgm = drop_reorders(prgm)
+    prgm = drop_with_aggregation(prgm)
+    prgm = concordize(prgm)
+    prgm = drop_reorders(prgm)
+    prgm = flatten_plans(prgm)
+    return normalize_names(prgm, bindings)
+
 class LogicStandardizer(LogicLoader):
     """
     The LogicStandardizer applies a series of transformations to standardize
@@ -293,14 +313,5 @@ class LogicStandardizer(LogicLoader):
         self.ctx: LogicLoader = ctx
 
     def __call__(self, prgm: LogicStatement, bindings: dict[Alias, TensorFType]):
-        prgm = isolate_aggregates(prgm)
-        prgm = split_increments(prgm)
-        prgm = standardize_query_roots(prgm, bindings)
-        prgm = push_fields(prgm)
-        prgm = drop_reorders(prgm)
-        prgm = drop_with_aggregation(prgm)
-        prgm = concordize(prgm)
-        prgm = drop_reorders(prgm)
-        prgm = flatten_plans(prgm)
-        prgm, bindings = normalize_names(prgm, bindings)
+        prgm, bindings = standardize(prgm, bindings)
         return self.ctx(prgm, bindings)

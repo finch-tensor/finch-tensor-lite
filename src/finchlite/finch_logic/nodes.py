@@ -832,8 +832,8 @@ class LogicPrinterContext(Context):
                 self.exec(ctx_2.emit())
                 return None
             case Produces(args):
-                args = ", ".join([self(arg) for arg in args])
-                self.exec(f"{feed}return {args}\n")
+                args_e = ", ".join([self(arg) for arg in args])
+                self.exec(f"{feed}return {args_e}\n")
                 return None
             case str(label):
                 return label

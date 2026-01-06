@@ -1,0 +1,2 @@
+C = Aggregate(add, 0, Reorder(MapJoin(mul, Table(A, i, k), Table(B, k, j)), i, k, j), k)
+return C
