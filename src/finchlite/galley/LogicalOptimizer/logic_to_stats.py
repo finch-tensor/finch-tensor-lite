@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from finchlite.finch_logic import (
+from ...finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -14,7 +14,7 @@ from finchlite.finch_logic import (
     Table,
     Value,
 )
-from finchlite.galley.TensorStats import TensorStats
+from ..TensorStats import TensorStats
 
 
 def insert_statistics(

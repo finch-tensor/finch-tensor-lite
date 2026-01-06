@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.algebra import fill_value, is_idempotent, is_identity
+from ...algebra import fill_value, is_idempotent, is_identity
 
 
 class TensorDef:
