@@ -52,6 +52,7 @@ Performance:
 
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
+from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -78,7 +79,9 @@ _DEFAULT_SCHEDULER = None
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
-    LogicExecutor(LogicStandardizer(LogicFormatter(MockLogicLoader())))
+    LogicExecutor(
+        DefaultLogicOptimizer(LogicStandardizer(LogicFormatter(MockLogicLoader())))
+    )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
