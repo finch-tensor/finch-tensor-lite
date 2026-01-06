@@ -1044,20 +1044,11 @@ def test_print(compiler, capfd, file_regression):
 
     # Flush CDLL buffer in order to capture stdout/stderr
     if os.name == "nt":
-        # Handle ctypes behavior on Windows used by github CI
         crt = ctypes.util.find_msvcrt()
-        libc = ctypes.CDLL(crt) if crt else ctypes.cdll.msvcrt
+        cdll = ctypes.CDLL(crt) if crt else ctypes.cdll.msvcrt
     else:
-        libc = ctypes.CDLL(None)
-
-    try:
-        fflush = libc.fflush
-        fflush.argtypes = [ctypes.c_void_p]
-        fflush.restype = ctypes.c_int
-        fflush(None)
-    except AttributeError:
-        pass
-
+        cdll = ctypes.CDLL(None)
+    cdll.fflush(None)
     capture = capfd.readouterr().out
     if isinstance(compiler, NumbaCompiler):
         # Normalize runtime object addresses printed by Numba for file regression
