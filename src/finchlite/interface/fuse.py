@@ -52,6 +52,7 @@ Performance:
 
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
+from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -62,11 +63,13 @@ from ..compile import NotationCompiler
 from ..finch_assembly import AssemblyInterpreter
 from ..finch_logic import (
     Alias,
+    Field,
     LogicInterpreter,
     MockLogicLoader,
     Plan,
     Produces,
     Query,
+    Table,
 )
 from ..symbolic import gensym
 from .lazy import lazy
@@ -76,7 +79,9 @@ _DEFAULT_SCHEDULER = None
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
-    LogicExecutor(LogicStandardizer(LogicFormatter(MockLogicLoader())))
+    LogicExecutor(
+        DefaultLogicOptimizer(LogicStandardizer(LogicFormatter(MockLogicLoader())))
+    )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
@@ -137,12 +142,23 @@ def compute(arg, ctx=None):
     args = arg if isinstance(arg, tuple) else (arg,)
     vars = tuple(Alias(gensym("A")) for _ in args)
     ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
-    bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
+    bodies = tuple(
+        map(
+            lambda arg, var: Query(
+                var,
+                Table(
+                    arg.data, tuple(Field(gensym("i")) for _ in range(len(arg.shape)))
+                ),
+            ),
+            args,
+            vars,
+        )
+    )
     prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
     res = ctx(prgm)
     if isinstance(arg, tuple):
-        return tuple(tbl.tns for tbl in res)
-    return res[0].tns
+        return tuple(tns for tns in res)
+    return res[0]
 
 
 def fuse(f, *args, ctx=None):

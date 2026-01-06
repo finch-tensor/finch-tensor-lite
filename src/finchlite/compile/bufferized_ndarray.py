@@ -44,6 +44,9 @@ class BufferizedNDArray(Tensor):
         """
         return self.val.arr.reshape(self._shape, copy=False)
 
+    def __array__(self):
+        return self.to_numpy()
+
     @property
     def ftype(self):
         """

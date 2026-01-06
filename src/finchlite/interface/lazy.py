@@ -44,7 +44,6 @@ from ..finch_logic import (
     MapJoin,
     Plan,
     Query,
-    Relabel,
     Reorder,
     Table,
 )
@@ -76,9 +75,12 @@ class LazyTensorFType(TensorFType):
 
     def __call__(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
+        ctx = EffectBlob()
+        expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
+        data, ctx = ctx.eval(expr)
         return LazyTensor(
-            data=Table(Literal(FillTensor(shape, self._fill_value)), idxs),
-            ctx=EffectBlob(),
+            data=data,
+            ctx=ctx,
             shape=shape,
             fill_value=self._fill_value,
             element_type=self._element_type,
@@ -160,13 +162,13 @@ class EffectBlob:
 class LazyTensor(OverrideTensor):
     def __init__(
         self,
-        data: LogicExpression,
+        data: Alias,
         ctx: EffectBlob,
         shape: tuple,
         fill_value: Any,
         element_type: Any,
     ):
-        self.data: LogicExpression = data
+        self.data: Alias = data
         self.ctx = ctx
         self._shape = shape
         self._fill_value = fill_value
@@ -453,6 +455,40 @@ def lazy(arr) -> LazyTensor:
     return LazyTensor(tns, ctx, shape, fill_value(arr), element_type(arr))
 
 
+def full(
+    shape: int | tuple[int, ...],
+    fill_value: bool | complex,
+    *,
+    dtype: Any | None = None,
+):
+    """
+    Returns a new array having a specified shape and filled with fill_value.
+
+    Parameters:
+    - shape (Union[int, Tuple[int, ...]]): output array shape.
+    - fill_value (Union[bool, int, float, complex]): fill value.
+    - dtype (Optional[dtype]): output array data type. If dtype is None, the
+    output array data type must be inferred from fill_value according to the
+    following rules:
+        * If the fill value is an int, the output array data type must be the
+            default integer data type.
+        * If the fill value is a float, the output array data type must be the
+            default real-valued floating-point data type.
+        * If the fill value is a complex number, the output array data type must
+            be the default complex floating-point data type.
+        * If the fill value is a bool, the output array must have a boolean data
+            type. Default: None.
+
+    Returns:
+
+    - out (array): an array where every element is equal to fill_value.
+    """
+    val = lazy(np.full((), fill_value, dtype=dtype))
+    if isinstance(shape, int):
+        shape = (shape,)
+    return broadcast_to(val, shape)
+
+
 def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
@@ -474,9 +510,11 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     arg = lazy(arg)
     axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
+    expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
+    data, ctx = arg.ctx.eval(expr)
     return LazyTensor(
-        Reorder(Relabel(arg.data, idxs), tuple(idxs[i] for i in axis)),
-        arg.ctx,
+        data,
+        ctx,
         tuple(arg.shape[i] for i in axis),
         arg.fill_value,
         arg.element_type,
@@ -539,11 +577,12 @@ def expand_dims(
         Field(gensym("i")) if n in axis else idxs_1[n - offset[n]]
         for n in range(x.ndim + len(axis))
     )
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
-    return LazyTensor(data_2, x.ctx, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def squeeze(
@@ -587,9 +626,10 @@ def squeeze(
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
-    return LazyTensor(data_2, x.ctx, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def reduce(
@@ -653,7 +693,7 @@ def reduce(
     data: LogicExpression = Aggregate(
         Literal(op),
         Literal(init),
-        Relabel(x.data, fields),
+        Table(x.data, fields),
         tuple(fields[i] for i in axis),
     )
     if keepdims:
@@ -664,8 +704,8 @@ def reduce(
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
-    data, ctx = x.ctx.eval(data)
-    return LazyTensor(data, ctx, shape, init, dtype)
+    expr, ctx = x.ctx.eval(data)
+    return LazyTensor(expr, ctx, shape, init, dtype)
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -745,12 +785,12 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                 if arg.shape[i - ndim + arg.ndim] != 1:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
-        bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
+        bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
+    expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
     ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
-    data, ctx = ctx.eval(data)
+    data, ctx = ctx.eval(expr)
     return LazyTensor(data, ctx, shape, new_fill_value, new_element_type)
 
 
@@ -1909,7 +1949,8 @@ def einop(prgm, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
-    return ctx(prgm, dict(**kwargs))[0]
+    bindings = {ein.Alias(k): v for k, v in kwargs.items()}
+    return ctx(prgm, bindings)[0]
 
 
 def einsum(prgm, *args, **kwargs):
@@ -1917,4 +1958,5 @@ def einsum(prgm, *args, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
+    bindings = {ein.Alias(k): v for k, v in bindings.items()}
     return ctx(prgm, bindings)[0]

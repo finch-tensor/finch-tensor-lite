@@ -216,7 +216,7 @@ def test_tensordef_aggregate(
 
 
 def test_from_tensor_and_getters():
-    arr = np.zeros((2, 3))
+    arr = fl.asarray(np.zeros((2, 3)))
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
         ST=DenseStats,
@@ -241,7 +241,7 @@ def test_from_tensor_and_getters():
 )
 def test_estimate_non_fill_values(shape, expected):
     axes = [f"x{i}" for i in range(len(shape))]
-    arr = np.zeros(shape)
+    arr = fl.asarray(np.zeros(shape))
     node = Table(Literal(arr), tuple(Field(a) for a in axes))
 
     stats = insert_statistics(
@@ -257,9 +257,9 @@ def test_estimate_non_fill_values(shape, expected):
 
 
 def test_mapjoin_mul_and_add():
-    ta = Table(Literal(np.ones((2, 3))), (Field("i"), Field("j")))
-    tb = Table(Literal(np.ones((3, 4))), (Field("j"), Field("k")))
-    ta2 = Table(Literal(2 * np.ones((2, 3))), (Field("i"), Field("j")))
+    ta = Table(Literal(fl.asarray(np.ones((2, 3)))), (Field("i"), Field("j")))
+    tb = Table(Literal(fl.asarray(np.ones((3, 4)))), (Field("j"), Field("k")))
+    ta2 = Table(Literal(fl.asarray(2 * np.ones((2, 3)))), (Field("i"), Field("j")))
 
     cache = {}
     insert_statistics(
@@ -298,7 +298,7 @@ def test_mapjoin_mul_and_add():
 
 def test_aggregate_and_issimilar():
     table = Table(
-        Literal(np.ones((2, 3))),
+        Literal(fl.asarray(np.ones((2, 3)))),
         (Field("i"), Field("j")),
     )
     dsa = insert_statistics(
