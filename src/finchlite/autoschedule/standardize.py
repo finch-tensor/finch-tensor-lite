@@ -51,9 +51,7 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
         match stmt:
             case Query(lhs, Aggregate(op, init, arg, idxs)):
                 arg = Rewrite(PostWalk(rule_1))(arg)
-                return Plan((*stack, Query(lhs,
-                    Aggregate(op, init, arg, idxs)
-                )))
+                return Plan((*stack, Query(lhs, Aggregate(op, init, arg, idxs))))
             case Query(lhs, rhs):
                 rhs = Rewrite(PostWalk(rule_1))(rhs)
                 return Plan((*stack, Query(lhs, rhs)))
@@ -201,7 +199,8 @@ def push_fields(root: LogicNode) -> LogicNode:
             case Reorder(Reorder(arg, _), idxs):
                 return Reorder(arg, idxs)
             case Reorder(MapJoin(op, args), idxs) if not all(
-                isinstance(arg, Reorder) and is_subsequence(arg.fields(), idxs) for arg in args
+                isinstance(arg, Reorder) and is_subsequence(arg.fields(), idxs)
+                for arg in args
             ):
                 return Reorder(
                     MapJoin(
@@ -297,6 +296,7 @@ def standardize(
     prgm = drop_reorders(prgm)
     prgm = flatten_plans(prgm)
     return normalize_names(prgm, bindings)
+
 
 class LogicStandardizer(LogicLoader):
     """

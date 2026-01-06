@@ -38,7 +38,6 @@ from .standardize import (
     flatten_plans,
     isolate_aggregates,
     push_fields,
-    standardize,
 )
 
 
@@ -173,7 +172,9 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
         match ex:
             case Query(a, _) if uses[a] == 1 and a not in rets:
                 return Plan()
-            case Table(Alias() as a, idxs) if uses.get(a, 0) == 1 and a not in rets and a in defs:
+            case Table(Alias() as a, idxs) if (
+                uses.get(a, 0) == 1 and a not in rets and a in defs
+            ):
                 return Relabel(defs[a], idxs)
 
     root = Rewrite(PreWalk(rule_1))(root)
@@ -230,12 +231,15 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
 
 def propagate_copy_queries(root):
     copies = {}
+
     def rule_0(node):
         match node:
             case Query(lhs, Table(Alias(_) as rhs, _)):
                 copies[lhs] = copies.get(rhs, rhs)
                 return Plan()
-            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if idxs_1 == idxs_2:
+            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if (
+                idxs_1 == idxs_2
+            ):
                 copies[lhs] = copies.get(rhs, rhs)
                 return Plan()
 
@@ -366,7 +370,7 @@ def _set_loop_order(node, perms):
             rhs_2 = Reorder(rhs, idxs)
             return Query(lhs, rhs_2)
         case Produces(args):
-            renames = {a : Alias(gensym("A")) for a in args if a in perms}
+            renames = {a: Alias(gensym("A")) for a in args if a in perms}
             bodies = tuple([Query(v, perms[k]) for k, v in renames.items()])
             args_2 = tuple([renames.get(a, a) for a in args])
             return Plan(bodies + (Produces(args_2),))
