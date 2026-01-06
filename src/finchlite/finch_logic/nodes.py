@@ -806,20 +806,20 @@ class LogicPrinterContext(Context):
             case Alias(name):
                 return str(name)
             case Table(tns, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 return f"Table({self(tns)}, {idxs_e})"
             case MapJoin(op, args):
-                args_e = tuple(self(arg) for arg in args)
+                args_e = ", ".join([self(arg) for arg in args])
                 return f"MapJoin({self(op)}, {args_e})"
             case Aggregate(op, init, arg, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 return f"Aggregate({self(op)}, {self(init)}, {self(arg)}, {idxs_e})"
             case Relabel(arg, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Relabel({arg}, {idxs_e})"
             case Reorder(arg, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Reorder({self(arg)}, {idxs_e})"
             case Query(lhs, rhs):
@@ -832,7 +832,7 @@ class LogicPrinterContext(Context):
                 self.exec(ctx_2.emit())
                 return None
             case Produces(args):
-                args = tuple(self(arg) for arg in args)
+                args = ", ".join([self(arg) for arg in args])
                 self.exec(f"{feed}return {args}\n")
                 return None
             case str(label):
