@@ -1,4 +1,9 @@
-from .interpreter import EinsumInterpreter
+from .interpreter import (
+    EinsumInterpreter,
+    MockEinsumKernel,
+    MockEinsumLibrary,
+    MockEinsumLoader,
+)
 from .nodes import (
     Access,
     Alias,
@@ -13,6 +18,11 @@ from .nodes import (
     Produces,
 )
 from .parser import parse_einop, parse_einsum
+from .stages import (
+    EinsumEvaluator,
+    EinsumLoader,
+    compute_shape_vars,
+)
 
 __all__ = [
     "Access",
@@ -20,16 +30,22 @@ __all__ = [
     "Call",
     "Einsum",
     "EinsumCompiler",
+    "EinsumEvaluator",
     "EinsumExpression",
     "EinsumInterpreter",
+    "EinsumLoader",
     "EinsumNode",
     "EinsumScheduler",
     "EinsumScheduler",
     "EinsumStatement",
     "Index",
     "Literal",
+    "MockEinsumKernel",
+    "MockEinsumLibrary",
+    "MockEinsumLoader",
     "Plan",
     "Produces",
+    "compute_shape_vars",
     "parse_einop",
     "parse_einsum",
 ]

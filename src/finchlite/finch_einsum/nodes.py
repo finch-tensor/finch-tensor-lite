@@ -122,7 +122,7 @@ class Access(EinsumExpression, EinsumTree):
         idxs: The indices at which to access the tensor.
     """
 
-    tns: EinsumExpression
+    tns: Alias
     idxs: tuple[EinsumExpression, ...]  # (Field('i'), Field('j'))
     # Children: None (leaf)
 
@@ -131,7 +131,7 @@ class Access(EinsumExpression, EinsumTree):
         # First child is tns, rest are indices
         if len(children) < 1:
             raise ValueError("Access expects at least 1 child")
-        tns = cast(EinsumExpression, children[0])
+        tns = cast(Alias, children[0])
         idxs = cast(tuple[EinsumExpression, ...], children[1:])
         return cls(tns, tuple(idxs))
 

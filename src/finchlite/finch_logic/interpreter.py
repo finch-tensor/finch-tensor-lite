@@ -2,6 +2,8 @@ from itertools import product
 
 import numpy as np
 
+import finchlite
+from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.stages import LogicEvaluator
 
@@ -23,11 +25,17 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicLoader
+from .stages import LogicLoader, compute_shape_vars
+
+
+def make_tensor(shape, fill_value, *, dtype=None):
+    if dtype is None:
+        dtype = type(fill_value)
+    return finchlite.asarray(np.full(shape, fill_value, dtype=dtype))
 
 
 class LogicInterpreter(LogicEvaluator):
-    def __init__(self, *, make_tensor=np.full, verbose=False):
+    def __init__(self, *, make_tensor=make_tensor, verbose=False):
         self.verbose = verbose
         self.make_tensor = make_tensor  # Added make_tensor argument
 
@@ -61,13 +69,18 @@ class LogicMachine:
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
-            case Alias(_):
-                alias = self.bindings.get(node, None)
-                if alias is None:
+            case Table(Alias() as var, idxs):
+                val = self.bindings.get(var, None)
+                if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
-                return alias
+                return TableValue(val, idxs)
             case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
+            case Alias() as var:
+                val = self.bindings.get(var, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return val
             case MapJoin(Literal(op), args):
                 args = tuple(self(a) for a in args)
                 dims = {}
@@ -120,7 +133,10 @@ class LogicMachine:
                 arg = self(arg)
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx not in idxs and dim != 1:
-                        raise ValueError("Trying to drop a dimension that is not 1")
+                        raise ValueError(
+                            f"Trying to drop a dimension that is not 1 : idx "
+                            f"{idx} indices {idxs} shape {arg.tns.shape}"
+                        )
                 arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
                 result = self.make_tensor(
@@ -139,10 +155,10 @@ class LogicMachine:
                         fill_value(rhs.tns),
                         dtype=element_type(rhs.tns),
                     )
-                    self.bindings[lhs] = TableValue(tns, rhs.idxs)
+                    self.bindings[lhs] = tns
                 lhs = self(lhs)
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
-                    lhs.tns[*crds] = rhs.tns[*crds]
+                    lhs[*crds] = rhs.tns[*crds]
                 return (rhs,)
             case Plan(bodies):
                 res = ()
@@ -156,7 +172,7 @@ class LogicMachine:
 
 
 class MockLogicKernel(AssemblyKernel):
-    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
         self.prgm = prgm
         self.bindings = bindings
 
@@ -166,10 +182,7 @@ class MockLogicKernel(AssemblyKernel):
                 f"Wrong number of arguments passed to kernel, "
                 f"have {len(args)}, expected {len(self.bindings)}"
             )
-        bindings = {
-            var: lgc.TableValue(tns, self.bindings[var].idxs)
-            for var, tns in zip(self.bindings.keys(), args, strict=True)
-        }
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = LogicInterpreter()
@@ -180,7 +193,7 @@ class MockLogicKernel(AssemblyKernel):
 
 
 class MockLogicLibrary(AssemblyLibrary):
-    def __init__(self, prgm, bindings: dict[lgc.Alias, lgc.TableValueFType]):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
         self.prgm = prgm
         self.bindings = bindings
 
@@ -197,8 +210,11 @@ class MockLogicLoader(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, lgc.TableValueFType]
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[
-        MockLogicLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+        MockLogicLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
-        return (MockLogicLibrary(prgm, bindings), prgm, bindings)
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return MockLogicLibrary(prgm, bindings), bindings, shape_vars

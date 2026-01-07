@@ -99,10 +99,7 @@ def dimension(tns, mode: int) -> Extent:
 
 
 def numba_lower_dimension(ctx, tns, mode: int) -> str:
-    return (
-        f"Numba_Extent(type({ctx(tns)}.shape.element_{mode})(0), "
-        f"{ctx(tns)}.shape.element_{mode})"
-    )
+    return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
 
 
 register_property(
