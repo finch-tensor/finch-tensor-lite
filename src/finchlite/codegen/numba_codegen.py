@@ -113,12 +113,12 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     # Build the argument list for __init__
     arg_list = ", ".join(field_names)
     # Build the body of __init__ to assign each argument to ftype_
-    body = "; ".join([f"ftype_.{name} = {name}" for name in field_names])
+    body = "; ".join([f"self.{name} = {name}" for name in field_names])
     # Compose the full class source
     class_src = dedent(
         f"""\
         class {class_name}:
-            def __init__(ftype_, {arg_list}):
+            def __init__(self, {arg_list}):
                 {body if body else "pass"}
             @staticmethod
             def numba_name():

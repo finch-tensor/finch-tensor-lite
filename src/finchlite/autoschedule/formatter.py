@@ -53,7 +53,8 @@ class LogicFormatter(LogicLoader):
                             buffer_type=NumpyBufferFType(element_types[lhs]),
                             ndim=np.intp(len(shape_type)),
                             dimension_type=TupleFType(
-                                struct_name=gensym("ugh"), struct_formats=shape_type
+                                struct_name=gensym("tuple", sep="_"),
+                                struct_formats=shape_type,
                             ),
                         )
                         # tns = NDArrayFType(element_type, np.intp(len(shape_type)))

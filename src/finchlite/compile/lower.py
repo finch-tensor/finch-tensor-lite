@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pprint import pprint
 from typing import Any
 
@@ -111,6 +111,14 @@ register_property(
 
 
 register_property(
+    Extent,
+    "__call__",
+    "return_type",
+    lambda op, x, y: ExtentFType(x, y),  # type: ignore[abstract]
+)
+
+
+register_property(
     dimension,
     "numba_literal",
     "__attr__",
@@ -174,14 +182,6 @@ class ExtentFType(AssemblyStructFType):
 
     def from_fields(self, start, stop) -> "Extent":
         return Extent(start, stop)
-
-    def from_kwargs(self, **kwargs) -> "ExtentFType":
-        start = kwargs.get("start", self.start)
-        end = kwargs.get("end", self.end)
-        return ExtentFType(start, end)  # type: ignore[abstract]
-
-    def to_kwargs(self):
-        return asdict(self)
 
     def __call__(self, *args):
         raise TypeError(f"{self.struct_name} is not callable")
@@ -472,22 +472,22 @@ class AssemblyContext(Context):
                 assert isinstance(mode, ntn.Read)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
-                return tns.result_format.lower_unwrap(self, tns.obj)
+                return tns.result_format.lower_unwrap(self, tns)
             case ntn.Increment(ntn.Access(tns, mode, _), val):
                 assert isinstance(mode, ntn.Update)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
                 val_e = self(val)
-                return tns.result_format.lower_increment(self, tns.obj, val_e)
+                return tns.result_format.lower_increment(self, tns, val_e)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                # first instantiate tensors
                 ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
             case ntn.Dimension(tns, ntn.Literal(r)):
+                assert isinstance(r, int)
                 tns = self.resolve(tns)
                 return tns.result_format.lower_dim(self, tns.obj, r)
             case ntn.Declare(tns, init, op, shape):
