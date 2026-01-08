@@ -187,10 +187,18 @@ class ExtentFType(AssemblyStructFType):
         raise TypeError(f"{self.struct_name} is not callable")
 
     def get_start(self, ext):
-        return asm.GetAttr(ext, asm.Literal("start"))
+        match ext:
+            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
+                return start
+            case _:
+                return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
-        return asm.GetAttr(ext, asm.Literal("end"))
+        match ext:
+            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
+                return end
+            case _:
+                return asm.GetAttr(ext, asm.Literal("end"))
 
     def lower_loop(self, ctx, idx, ext, body):
         """

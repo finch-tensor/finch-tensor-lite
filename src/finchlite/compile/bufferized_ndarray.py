@@ -232,7 +232,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
-            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.GetAttr(obj.buf, asm.Literal("shape")),
             asm.Literal(f"element_{r}"),
         )
 
@@ -286,7 +286,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf_t)
         ctx.exec(asm.Unpack(buf_s, buf))
 
-        return BufferizedNDArrayFields(tuple(stride), buf, buf_s)
+        return BufferizedNDArrayFields(tuple(stride), val, buf_s)
 
     def asm_repack(self, ctx, lhs, obj):
         """
