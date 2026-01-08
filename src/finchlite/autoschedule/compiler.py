@@ -96,7 +96,7 @@ class NotationContext:
 
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
-        Lower Finch Notation to Finch Assembly. First we check for early
+        Lower Finch Logic to Finch Notation. First we check for early
         simplifications, then we call the normal lowering for the outermost
         node.
         """

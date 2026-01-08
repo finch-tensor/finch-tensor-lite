@@ -79,7 +79,9 @@ def with_unique_lhs(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
                     bodies.append(Query(v, Table(k, idxs)))
-                return Plan(tuple(bodies) + (Produces(args[: -len(writes) + 1]),))
+                return Plan(
+                    tuple(bodies) + (Produces(args[: len(args) - len(writes)]),)
+                )
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)
 
@@ -106,7 +108,7 @@ def optimize(
         prgm = set_loop_order(prgm)
         prgm = push_fields(prgm)
 
-        prgm = concordize(prgm)
+        prgm = concordize(prgm, bindings)
 
         return propagate_copy_queries(prgm), bindings
 
@@ -126,12 +128,16 @@ def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
 
 
 def propagate_map_queries(root: LogicStatement) -> LogicStatement:
-    def rule_0(ex):
-        match ex:
-            case Aggregate(op, init, arg, ()):
-                return MapJoin(op, (init, arg))
+    # TODO: We're not ready for that optimization yet.
+    #       First we need to support Literals as MapJoin's
+    #       arguments (they're missing `fields`) or promote
+    #       `init` to a Table here.
+    # def rule_0(ex):
+    #     match ex:
+    #         case Aggregate(op, init, arg, ()):
+    #             return MapJoin(op, (init, arg))
+    # root = Rewrite(PostWalk(rule_0))(root)
 
-    root = Rewrite(PostWalk(rule_0))(root)
     assert isinstance(root, LogicNode)
     rets = get_productions(root)
     props = {}
@@ -149,12 +155,15 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
 
 
 def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
-    def rule_0(ex):
-        match ex:
-            case Aggregate(op, init, arg, ()):
-                return MapJoin(op, (init, arg))
-
-    root = Rewrite(PostWalk(rule_0))(root)
+    # TODO: We're not ready for that optimization yet.
+    #       First we need to support Literals as MapJoin's
+    #       arguments (they're missing `fields`) or promote
+    #       `init` to a Table here.
+    # def rule_0(ex):
+    #     match ex:
+    #         case Aggregate(op, init, arg, ()):
+    #             return MapJoin(op, (init, arg))
+    # root = Rewrite(PostWalk(rule_0))(root)
 
     uses: dict[LogicNode, int] = {}
     defs: dict[LogicNode, LogicNode] = {}
@@ -293,6 +302,9 @@ def propagate_transpose_queries(root: LogicStatement):
     return flatten_plans(push_fields(root))
 
 
+class CycleInFields(Exception): ...
+
+
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
     chains = [c for c in chains if len(c) > 0]
     parents = {chain[0]: 0 for chain in chains}
@@ -303,7 +315,7 @@ def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
     perm = []
     while len(parents) > 0:
         if len(roots) == 0:
-            raise Exception("Cycle detected in fields' orders")
+            raise CycleInFields("Cycle detected in fields' orders")
         perm.append(roots.pop())
         for chain in chains:
             if len(chain) > 0 and chain[0] == perm[-1]:
@@ -323,7 +335,15 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
             case Reorder(Table(_, idxs_1), idxs_2):
                 chains.append(list(intersect(intersect(idxs_1, idxs_2), root.fields())))
     chains.extend([f] for f in root.fields())
-    result = toposort(chains)
+
+    try:
+        result = toposort(chains)
+    except CycleInFields:
+        import warnings
+
+        warnings.warn("Cycle in fields detected.", stacklevel=1)
+        return root.fields()
+
     if reduce(max, [len(c) for c in chains], 0) < len(set(join_chains(*chains))):
         counts: dict[Field, int] = {}
         for chain in chains:

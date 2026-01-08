@@ -347,8 +347,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         )
 
     def lower_dim(self, ctx, obj, r):
-        obj = asm.GetAttr(obj, asm.Literal("lvl"))
-        return self.lvl_t.level_lower_dim(ctx, obj, r)
+        return self.lvl_t.level_lower_dim(ctx, obj.lvl, r)
 
     def asm_unpack(self, ctx, var_n, val) -> FiberTensorFields:
         """
