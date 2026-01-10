@@ -1,3 +1,4 @@
+import logging
 from typing import TypeVar, overload
 
 from finchlite.algebra.tensor import Tensor
@@ -11,6 +12,9 @@ from ..finch_logic import (
     TableValue,
 )
 from ..symbolic import Namespace, PostWalk, Rewrite
+from ..util.logging import LOG_LOGIC_PRE_OPT
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
 T = TypeVar("T")
 
@@ -69,4 +73,5 @@ class LogicNormalizer(LogicEvaluator):
         self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None
     ) -> TableValue | tuple[Tensor, ...]:
         root, bindings = normalize_names(prgm, bindings or {})
+        logger.debug(root)
         return self.ctx(root, bindings)

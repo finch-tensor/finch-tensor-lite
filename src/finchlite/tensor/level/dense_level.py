@@ -203,3 +203,6 @@ class DenseLevel(Level):
     @property
     def val(self) -> Any:
         return self.lvl.val
+
+    def __str__(self):
+        return f"DenseLevel(lvl={self.lvl}, dim={self.dimension})"

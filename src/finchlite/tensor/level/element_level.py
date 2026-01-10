@@ -178,3 +178,6 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
+
+    def __str__(self):
+        return f"ElementLevel(val={self._val})"

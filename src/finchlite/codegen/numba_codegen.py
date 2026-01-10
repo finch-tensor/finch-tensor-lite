@@ -17,9 +17,10 @@ from ..finch_assembly.struct import (  # type: ignore[import-untyped]
     MutableStructFType,
 )
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
+from ..util.logging import LOG_BACKEND_NUMBA
 from .stages import NumbaCode, NumbaLowerer
 
-logger = logging.getLogger(__name__)
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NUMBA)
 
 
 # Cache for Numba structs
@@ -443,7 +444,7 @@ class NumbaCompiler(asm.AssemblyLoader):
 
     def __call__(self, prgm: asm.Module) -> NumbaLibrary:
         numba_code = self.ctx(prgm).code
-        logger.info(f"Executing Numba code:\n{numba_code}")
+        logger.debug(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
         _globals |= numba_globals
         try:
