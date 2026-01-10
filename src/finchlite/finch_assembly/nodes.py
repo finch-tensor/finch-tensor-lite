@@ -113,7 +113,7 @@ class Variable(AssemblyExpression, NamedTerm):
         return self.type
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"name": self.name, "type": self.type})
 
     @property
     def symbol(self) -> str:

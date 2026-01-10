@@ -6,7 +6,7 @@ from typing import Any
 
 from ..algebra import element_type, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, NamedTerm, Term, TermTree, literal_repr
+from ..symbolic import Context, FType, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 
@@ -81,7 +81,7 @@ class Literal(NotationExpression):
 
     @property
     def result_format(self):
-        return type(self.val)
+        return ftype(self.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"val": self.val})
