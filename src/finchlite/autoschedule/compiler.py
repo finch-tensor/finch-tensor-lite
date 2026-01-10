@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import operator
 from collections.abc import Iterable
 from typing import Any
@@ -18,7 +19,10 @@ from ..compile import Extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, compute_shape_vars
 from ..finch_notation import NotationInterpreter
+from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
 
 class PointwiseContext:
@@ -338,12 +342,12 @@ class LogicCompiler(LogicLoader):
         ctx_load: NotationLoader | None = None,
         ctx_lower: LogicNotationLowerer | None = None,
     ):
-        if ctx_lower is None:
-            ctx_lower = NotationGenerator()
         if ctx_load is None:
             ctx_load = NotationInterpreter()
-        self.ctx_lower: LogicNotationLowerer = ctx_lower
+        if ctx_lower is None:
+            ctx_lower = NotationGenerator()
         self.ctx_load: NotationLoader = ctx_load
+        self.ctx_lower: LogicNotationLowerer = ctx_lower
 
     def __call__(
         self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
@@ -353,6 +357,7 @@ class LogicCompiler(LogicLoader):
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
         mod = self.ctx_lower(prgm, bindings)
+        logger.debug(mod)
         lib = self.ctx_load(mod)
         shape_vars = compute_shape_vars(prgm, bindings)
         return lib, bindings, shape_vars
