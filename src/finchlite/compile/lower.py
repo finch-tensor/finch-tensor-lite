@@ -1,16 +1,16 @@
+import logging
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pprint import pprint
 from typing import Any
 
 import numpy as np
 
-from finchlite.finch_assembly.interpreter import AssemblyInterpreter
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
 from ..finch_assembly import (
+    AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyStructFType,
@@ -18,7 +18,10 @@ from ..finch_assembly import (
 from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
+from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
 
 
 class FinchTensorFType(TensorFType, ABC):
@@ -111,6 +114,14 @@ register_property(
 
 
 register_property(
+    Extent,
+    "__call__",
+    "return_type",
+    lambda op, x, y: ExtentFType(x, y),  # type: ignore[abstract]
+)
+
+
+register_property(
     dimension,
     "numba_literal",
     "__attr__",
@@ -175,22 +186,22 @@ class ExtentFType(AssemblyStructFType):
     def from_fields(self, start, stop) -> "Extent":
         return Extent(start, stop)
 
-    def from_kwargs(self, **kwargs) -> "ExtentFType":
-        start = kwargs.get("start", self.start)
-        end = kwargs.get("end", self.end)
-        return ExtentFType(start, end)  # type: ignore[abstract]
-
-    def to_kwargs(self):
-        return asdict(self)
-
     def __call__(self, *args):
         raise TypeError(f"{self.struct_name} is not callable")
 
     def get_start(self, ext):
-        return asm.GetAttr(ext, asm.Literal("start"))
+        match ext:
+            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
+                return start
+            case _:
+                return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
-        return asm.GetAttr(ext, asm.Literal("end"))
+        match ext:
+            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
+                return end
+            case _:
+                return asm.GetAttr(ext, asm.Literal("end"))
 
     def lower_loop(self, ctx, idx, ext, body):
         """
@@ -293,11 +304,12 @@ class NotationCompiler(NotationLoader):
             ctx_load = AssemblyInterpreter()
         if ctx_lower is None:
             ctx_lower = AssemblyGenerator()
-        self.ctx_lower: NotationLowerer = ctx_lower
         self.ctx_load: AssemblyLoader = ctx_load
+        self.ctx_lower: NotationLowerer = ctx_lower
 
     def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
+        logger.debug(asm_code)
         return self.ctx_load(asm_code)
 
 
@@ -472,22 +484,22 @@ class AssemblyContext(Context):
                 assert isinstance(mode, ntn.Read)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
-                return tns.result_format.lower_unwrap(self, tns.obj)
+                return tns.result_format.lower_unwrap(self, tns)
             case ntn.Increment(ntn.Access(tns, mode, _), val):
                 assert isinstance(mode, ntn.Update)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
                 val_e = self(val)
-                return tns.result_format.lower_increment(self, tns.obj, val_e)
+                return tns.result_format.lower_increment(self, tns, val_e)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                # first instantiate tensors
                 ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
             case ntn.Dimension(tns, ntn.Literal(r)):
+                assert isinstance(r, int)
                 tns = self.resolve(tns)
                 return tns.result_format.lower_dim(self, tns.obj, r)
             case ntn.Declare(tns, init, op, shape):

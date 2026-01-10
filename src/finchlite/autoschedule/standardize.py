@@ -163,9 +163,7 @@ def push_fields(root: LogicExpression) -> LogicExpression: ...
 def push_fields(root: LogicStatement) -> LogicStatement: ...
 @overload
 def push_fields(root: LogicNode) -> LogicNode: ...
-
-
-def push_fields(root: LogicNode) -> LogicNode:
+def push_fields(root):
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):

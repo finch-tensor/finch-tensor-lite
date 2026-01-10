@@ -1,20 +1,17 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 import numpy as np
-
-from finchlite.finch_assembly.struct import TupleFType
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, register_property
 from ..compile.lower import FinchTensorFType
-from ..symbolic import FTyped
+from ..symbolic import FType, FTyped
 
 
-class LevelFType(FinchTensorFType, ABC):
+class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
@@ -73,9 +70,66 @@ class LevelFType(FinchTensorFType, ABC):
 
     @property
     @abstractmethod
-    def lvl_t(self):
+    def next_level(self):
         """
-        Property returning nested level
+        Get the nested level.
+        """
+        ...
+
+    @abstractmethod
+    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+        """
+        Emit code to unfurl the fiber at position `pos` in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_freeze(self, ctx, tns, op, pos):
+        """
+        Emit code to freeze `pos` previously assembled positions in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_thaw(self, ctx, tns, op, pos):
+        """
+        Emit code to thaw `pos` previously assembled positions in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_unwrap(self, ctx, obj, pos):
+        """
+        Emit code to return the unwrapped scalar at position `pos` in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_increment(self, ctx, obj, val, pos):
+        """
+        Emit code to increment position `pos` in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        """
+        Emit code to lower a declare of `pos` previously assembled positions in
+        the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_dim(self, ctx, obj, r):
+        """
+        Emit code to return the size of dimension `r` of the subtensors in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
+        """
+        Emit code unpacking the level.
         """
         ...
 
@@ -205,9 +259,22 @@ class FiberTensor(Tensor, Generic[Tp]):
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
 
-class FiberTensorFields(NamedTuple):
-    lvl: asm.Variable  # TODO: lvl is misleading - rename it
+@dataclass(eq=True, frozen=True)
+class FiberTensorFields:
+    lvl: asm.AssemblyExpression
     buf_s: asm.Slot
+    pos: asm.Variable | asm.Literal
+    op: Any = None
+    dirty_bit: bool = False
+
+    def update(self, **kwargs):
+        return FiberTensorFields(
+            kwargs.get("lvl", self.lvl),
+            kwargs.get("buf_s", self.buf_s),
+            kwargs.get("pos", self.pos),
+            kwargs.get("op", self.op),
+            kwargs.get("dirty_bit", self.dirty_bit),
+        )
 
 
 @dataclass(unsafe_hash=True)
@@ -220,7 +287,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     """
 
     lvl_t: LevelFType
-    position_type: type | None = None
+    position_type: Any = None
 
     @property
     def struct_name(self):
@@ -231,7 +298,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def struct_fields(self):
         return [
             ("lvl", self.lvl_t),
-            ("shape", TupleFType.from_tuple(self.shape_type)),
+            ("shape", asm.TupleFType.from_tuple(self.shape_type)),
         ]
 
     def __post_init__(self):
@@ -273,73 +340,42 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def buffer_type(self):
         return self.lvl_t.buffer_type
 
-    def from_kwargs(self, **kwargs) -> "FiberTensorFType":
-        pos_t = kwargs.get("position_type", self.position_type)
-        return FiberTensorFType(self.lvl_t.from_kwargs(**kwargs), pos_t)  # type: ignore[abstract]
-
-    def to_kwargs(self):
-        return {
-            "position_type": self.position_type,
-            "shape_type": self.shape_type,
-        } | self.lvl_t.to_kwargs()
-
-    # TODO: temporary approach for suitable rep and traits
-    def add_levels(self, idxs: list[int]):
-        from .level.dense_level import dense
-
-        copy = deepcopy(self)
-        lvl = copy
-        for idx in range(max(idxs) + 1):
-            if idx in idxs:
-                lvl.lvl_t = dense(lvl.lvl_t, dimension_type=np.intp)
-            lvl = lvl.lvl_t  # type: ignore[assignment]
-        return copy
-
-    # TODO: temporary approach for suitable rep and traits
-    def remove_levels(self, idxs: list[int]):
-        copy = deepcopy(self)
-        lvl = copy
-        for i in range(self.ndim):
-            if i in idxs:
-                lvl.lvl_t = lvl.lvl_t.lvl_t
-            lvl = lvl.lvl_t  # type: ignore[assignment]
-        return copy
-
     def unfurl(self, ctx, tns, ext, mode, proto):
-        op = None
-        if isinstance(mode, ntn.Update):
-            op = mode.op
         tns = ctx.resolve(tns).obj
-        obj = self.lvl_t.get_fields_class(
-            tns.lvl, tns.buf_s, 0, asm.Literal(self.position_type(0)), op
+        assert isinstance(tns, FiberTensorFields)
+        op = mode.op if isinstance(mode, ntn.Update) else None
+        tns = tns.update(op=op)
+        return self.lvl_t.level_unfurl(
+            ctx, ntn.Stack(tns, self), ext, mode, proto, tns.pos
         )
-        return self.lvl_t.unfurl(ctx, ntn.Stack(obj, self.lvl_t), ext, mode, proto)
 
     def lower_freeze(self, ctx, tns, op):
-        return self.lvl_t.lower_freeze(ctx, tns.obj.buf_s, op)
+        return self.lvl_t.level_lower_freeze(ctx, tns.obj.buf_s, op, tns.obj.pos)
 
     def lower_thaw(self, ctx, tns, op):
-        return self.lvl_t.lower_thaw(ctx, tns.obj.buf_s, op)
+        return self.lvl_t.level_lower_thaw(ctx, tns.obj.buf_s, op, tns.obj.pos)
 
-    def lower_unwrap(self, ctx, obj):
-        raise NotImplementedError
+    def lower_unwrap(self, ctx, tns):
+        return self.lvl_t.level_lower_unwrap(ctx, tns.obj, tns.obj.pos)
 
-    def lower_increment(self, ctx, obj, val):
-        raise NotImplementedError
+    def lower_increment(self, ctx, tns, val):
+        return self.lvl_t.level_lower_increment(ctx, tns.obj, val, tns.obj.pos)
 
     def lower_declare(self, ctx, tns, init, op, shape):
-        return self.lvl_t.lower_declare(ctx, tns.obj.buf_s, init, op, shape)
+        return self.lvl_t.level_lower_declare(
+            ctx, tns.obj.buf_s, init, op, shape, tns.obj.pos
+        )
 
     def lower_dim(self, ctx, obj, r):
-        raise NotImplementedError("DenseLevelFType does not support lower_dim.")
+        return self.lvl_t.level_lower_dim(ctx, obj.lvl, r)
 
-    def asm_unpack(self, ctx, var_n, val):
+    def asm_unpack(self, ctx, var_n, val) -> FiberTensorFields:
         """
         Unpack the into asm context.
         """
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
-        buf_s = self.lvl_t.asm_unpack(ctx, var_n, val_lvl)
-        return FiberTensorFields(val_lvl, buf_s)
+        buf_s = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+        return FiberTensorFields(val_lvl, buf_s, pos=asm.Literal(self.position_type(0)))
 
     def asm_repack(self, ctx, lhs, obj):
         """

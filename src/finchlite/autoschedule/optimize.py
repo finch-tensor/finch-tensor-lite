@@ -79,7 +79,9 @@ def with_unique_lhs(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
                     bodies.append(Query(v, Table(k, idxs)))
-                return Plan(tuple(bodies) + (Produces(args[: -len(writes) + 1]),))
+                return Plan(
+                    tuple(bodies) + (Produces(args[: len(args) - len(writes)]),)
+                )
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)
 

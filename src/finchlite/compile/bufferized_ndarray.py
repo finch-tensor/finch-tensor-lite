@@ -218,31 +218,6 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
     def ndim(self, val):
         self._ndim = val
 
-    def from_kwargs(self, **kwargs) -> "BufferizedNDArrayFType":
-        b_t = kwargs.get("buffer_type", self.buf_t)
-        ndim = kwargs.get("ndim", self.ndim)
-        if "shape_type" in kwargs:
-            s_t = kwargs["shape_type"]
-            d_t = s_t if isinstance(s_t, TupleFType) else TupleFType.from_tuple(s_t)
-        else:
-            d_t = self.shape_t
-        return BufferizedNDArrayFType(buffer_type=b_t, ndim=ndim, dimension_type=d_t)
-
-    def to_kwargs(self):
-        return {
-            "buffer_type": self.buf_t,
-            "ndim": self.ndim,
-            "shape_type": self.shape_t,
-        }
-
-    # TODO: temporary approach for suitable rep and traits
-    def add_levels(self, idxs: list[int]):
-        return self
-
-    # TODO: temporary approach for suitable rep and traits
-    def remove_levels(self, idxs: list[int]):
-        return self
-
     @property
     def fill_value(self) -> Any:
         return np.zeros((), dtype=self.buf_t.element_type)[()]
@@ -257,7 +232,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
-            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.GetAttr(obj.buf, asm.Literal("shape")),
             asm.Literal(f"element_{r}"),
         )
 
@@ -311,7 +286,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf_t)
         ctx.exec(asm.Unpack(buf_s, buf))
 
-        return BufferizedNDArrayFields(tuple(stride), buf, buf_s)
+        return BufferizedNDArrayFields(tuple(stride), val, buf_s)
 
     def asm_repack(self, ctx, lhs, obj):
         """
@@ -478,10 +453,11 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             )
         )
 
-    def lower_unwrap(self, ctx, obj):
-        return asm.Load(obj.tns.buf_s, obj.pos)
+    def lower_unwrap(self, ctx, tns):
+        return asm.Load(tns.obj.tns.buf_s, tns.obj.pos)
 
-    def lower_increment(self, ctx, obj, val):
+    def lower_increment(self, ctx, tns, val):
+        obj = tns.obj
         lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
         ctx.exec(
             asm.Store(
