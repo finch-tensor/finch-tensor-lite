@@ -57,7 +57,6 @@ class SparseTensor(EagerTensor):
         self._shape = shape
         self._element_type = element_type
 
-
     def __call__(self, shape: tuple) -> "SparseTensor":
         """Create an empty SparseTensor with the given shape."""
         data = np.array([], dtype=self._element_type)

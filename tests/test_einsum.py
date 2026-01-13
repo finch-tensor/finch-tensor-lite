@@ -1205,7 +1205,9 @@ class TestEinsumIndirectAccess:
         )
 
         result = finchlite.multiply(A, B).flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
+        )
 
     def test_indirect_elementwise_addition(self, rng):
         """Test indirect elementwise addition"""
@@ -1254,7 +1256,9 @@ class TestEinsumIndirectAccess:
         )
 
         result = (A + B).flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
+        )
 
     def test_indirect_multiple_reads(self, rng):
         """Test multiple indirect reads from the same tensor"""
@@ -1300,7 +1304,9 @@ class TestEinsumIndirectAccess:
         )
 
         result = finchlite.multiply(A, B).flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): sparse_B}, result)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): sparse_B}, result
+        )
 
     def test_indirect_with_constant(self, rng):
         """Test indirect access combined with constant"""
@@ -1355,7 +1361,9 @@ class TestEinsumIndirectAccess:
         )
 
         result = (A * B + 5.0).flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
+        )
 
     def test_indirect_nested_operations(self, rng):
         """Test nested operations with indirect access"""
@@ -1423,7 +1431,11 @@ class TestEinsumIndirectAccess:
         )
 
         result = ((A + B) * C).flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B, ein.Alias("C"): C}, result)
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): sparse_A, ein.Alias("B"): B, ein.Alias("C"): C},
+            result,
+        )
 
     def test_indirect_direct_access_only(self, rng):
         """Test accessing only the indirect coordinates"""
@@ -1460,7 +1472,9 @@ class TestEinsumIndirectAccess:
 
         # Result should be B's values at A's coordinates
         expected = B[A != 0]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, expected)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, expected
+        )
 
     def test_double_indirection(self, rng):
         """Test double indirection: A[B[CCoords[i]]]"""
@@ -1510,7 +1524,11 @@ class TestEinsumIndirectAccess:
         # index into B, then index into A
         c_coords = sparse_C.coords
         expected = A[B[c_coords]].flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C}, expected)
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C},
+            expected,
+        )
 
     def test_triple_indirection(self, rng):
         """Test triple indirection: A[B[C[DCoords[i]]]]"""
@@ -1563,7 +1581,16 @@ class TestEinsumIndirectAccess:
         # Expected: chain of indirections
         d_coords = sparse_D.coords
         expected = A[B[C[d_coords]]].flatten()
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): C, ein.Alias("D"): sparse_D}, expected)
+        self.run_einsum_plan(
+            prgm,
+            {
+                ein.Alias("A"): A,
+                ein.Alias("B"): B,
+                ein.Alias("C"): C,
+                ein.Alias("D"): sparse_D,
+            },
+            expected,
+        )
 
     def test_mixed_direct_indirect_indexing_2d(self, rng):
         """Test mixed indexing: A[BCoords[i], j] - one indirect, one direct"""
@@ -1603,7 +1630,9 @@ class TestEinsumIndirectAccess:
         # Expected: A rows indexed by B's coords, all columns
         b_coords = sparse_B.coords
         expected = A[b_coords.flatten(), :]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
 
     def test_mixed_direct_indirect_indexing_reversed(self, rng):
         """
@@ -1646,7 +1675,9 @@ class TestEinsumIndirectAccess:
         # Expected: all rows of A, columns indexed by B's coords
         b_coords = sparse_B.coords
         expected = A[:, b_coords.flatten()]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
 
     def test_both_indices_indirect_same_source(self, rng):
         """Test both indices indirect from same source: A[BCoords[i], BCoords[i]]"""
@@ -1693,7 +1724,9 @@ class TestEinsumIndirectAccess:
         # Expected: A[coords, coords] - pseudo-diagonal at indirect positions
         b_coords = sparse_B.coords
         expected = A[b_coords.flatten(), b_coords.flatten()]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
 
     def test_both_indices_indirect_different_sources(self, rng):
         """
@@ -1746,7 +1779,11 @@ class TestEinsumIndirectAccess:
         b_coords = sparse_B.coords.flatten()
         c_coords = sparse_C.coords.flatten()
         expected = A[b_coords, c_coords]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B, ein.Alias("C"): sparse_C}, expected)
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): sparse_B, ein.Alias("C"): sparse_C},
+            expected,
+        )
 
     def test_double_indirection_with_operation(self, rng):
         """Test double indirection combined with arithmetic operation"""
@@ -1806,7 +1843,11 @@ class TestEinsumIndirectAccess:
         c_elems = sparse_C.data
         expected = A[B[c_coords]] * c_elems
 
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C}, expected)
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C},
+            expected,
+        )
 
     def test_mixed_indexing_with_computation(self, rng):
         """Test mixed direct/indirect indexing with computation"""
@@ -1859,7 +1900,9 @@ class TestEinsumIndirectAccess:
         b_coords = sparse_B.coords.flatten()
         b_elems = sparse_B.data
         expected = A[b_coords, :] + b_elems[:, np.newaxis]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
 
     def test_indirect_3d_tensor_access(self, rng):
         """Test indirect access on 3D tensor with mixed indices"""
@@ -1899,4 +1942,6 @@ class TestEinsumIndirectAccess:
 
         b_coords = sparse_B.coords.flatten()
         expected = A[:, b_coords, :]
-        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )

@@ -113,7 +113,8 @@ class PointwiseEinsumMachine:
         xp = self.xp
         match node:
             case ein.Literal(val):
-                # If val is already an array, return it directly (e.g., from recursive access)
+                # If val is already an array, return it directly
+                # (e.g., from recursive access).
                 # Otherwise, broadcast the scalar to match the loop dimensions
                 if hasattr(val, "ndim") and val.ndim > 0:
                     return val
