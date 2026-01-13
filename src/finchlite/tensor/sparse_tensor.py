@@ -57,6 +57,13 @@ class SparseTensor(EagerTensor):
         self._shape = shape
         self._element_type = element_type
 
+
+    def __call__(self, shape: tuple) -> "SparseTensor":
+        """Create an empty SparseTensor with the given shape."""
+        data = np.array([], dtype=self._element_type)
+        coords = np.empty((0, len(shape)), dtype=np.intp)
+        return SparseTensor(data, coords, shape, self._element_type)
+
     # converts an eager tensor to a sparse tensor
     @classmethod
     def from_dense_tensor(cls, dense_tensor: np.ndarray):
