@@ -1152,8 +1152,8 @@ class TestEinsumIndirectAccess:
         self, prgm: ein.Plan, bindings: dict[str, Any], expected: np.ndarray
     ):
         """Runs an einsum plan and returns the result"""
-        interpreter = ein.EinsumInterpreter(bindings=bindings)
-        result = interpreter(prgm)[0]
+        interpreter = ein.EinsumInterpreter()
+        result = interpreter(prgm, bindings)
 
         finch_assert_allclose(result, expected)
 
@@ -1171,7 +1171,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Call(
                         op=ein.Literal(operator.mul),
@@ -1200,7 +1200,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1220,7 +1220,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Call(
                         op=ein.Literal(operator.add),
@@ -1249,7 +1249,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1271,7 +1271,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Call(
                         op=ein.Literal(operator.mul),
@@ -1295,7 +1295,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1315,7 +1315,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Call(
                         op=ein.Literal(operator.add),
@@ -1350,7 +1350,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1371,7 +1371,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("D"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Call(
                         op=ein.Literal(operator.mul),
@@ -1418,7 +1418,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("D"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1438,7 +1438,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Access(
                         tns=ein.Alias("B"),
@@ -1454,7 +1454,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1481,7 +1481,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("D"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1502,7 +1502,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("D"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1530,7 +1530,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("E"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1556,7 +1556,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("E"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1579,7 +1579,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"), ein.Index("j")),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1596,7 +1596,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1622,7 +1622,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"), ein.Index("j")),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1639,7 +1639,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1662,7 +1662,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1686,7 +1686,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1713,7 +1713,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("D"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1737,7 +1737,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("D"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1764,7 +1764,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("E"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"),),
                     arg=ein.Call(
                         op=ein.Literal(operator.mul),
@@ -1798,7 +1798,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("E"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1822,7 +1822,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("D"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"), ein.Index("j")),
                     arg=ein.Call(
                         op=ein.Literal(operator.add),
@@ -1852,7 +1852,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("D"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
@@ -1875,7 +1875,7 @@ class TestEinsumIndirectAccess:
             (
                 ein.Einsum(
                     op=ein.Literal(overwrite),
-                    tns=ein.Alias("C"),
+                    tns=ein.Alias("A"),
                     idxs=(ein.Index("i"), ein.Index("j"), ein.Index("k")),
                     arg=ein.Access(
                         tns=ein.Alias("A"),
@@ -1893,7 +1893,7 @@ class TestEinsumIndirectAccess:
                         ),
                     ),
                 ),
-                ein.Produces((ein.Alias("C"),)),
+                ein.Produces((ein.Alias("A"),)),
             )
         )
 
