@@ -35,8 +35,8 @@ class SparseTensorFType(TensorFType):
 
     def __call__(self, shape: tuple) -> "SparseTensor":
         """Create an empty SparseTensor with the given shape."""
-        data = np.array([], dtype=self._element_type)
-        coords = np.empty((0, len(shape)), dtype=np.intp)
+        data: np.typing.NDArray = np.array([], dtype=self._element_type)
+        coords: np.typing.NDArray = np.empty((0, len(shape)), dtype=np.intp)
         return SparseTensor(data, coords, shape, self._element_type)
 
 
