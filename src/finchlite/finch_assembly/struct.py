@@ -3,8 +3,8 @@ from collections import namedtuple
 from functools import lru_cache
 from typing import Any
 
-from ..algebra import register_property
-from ..symbolic import FType, ftype
+from ..algebra import make_tuple, register_property
+from ..symbolic import FType, fisinstance, ftype
 
 
 class AssemblyStructFType(FType, ABC):
@@ -17,7 +17,7 @@ class AssemblyStructFType(FType, ABC):
     def struct_fields(self) -> list[tuple[str, Any]]: ...
 
     @abstractmethod
-    def __call__(self, *args): ...
+    def from_fields(self, *args): ...
 
     @property
     def is_mutable(self) -> bool:
@@ -29,6 +29,27 @@ class AssemblyStructFType(FType, ABC):
     def struct_setattr(self, obj, attr, value) -> None:
         setattr(obj, attr, value)
         return
+
+    @abstractmethod
+    def from_kwargs(self, **kwargs) -> "AssemblyStructFType":
+        """
+        Protocol for constructing Finch tensors from keyword arguments.
+        Here are currently supported arguments. They are all optional,
+        each implementor decides which fields to select:
+        - lvl_t: LevelFType
+        - fill_value: np.number
+        - element_type: type
+        - position_type: type
+        - dimension_type: type
+        - shape_type: tuple[type, ...]
+        - buffer_factory: type
+        - buffer_type: BufferFType
+        - ndim: int
+        """
+        ...
+
+    @abstractmethod
+    def to_kwargs(self) -> dict: ...
 
     @property
     def struct_fieldnames(self) -> list[str]:
@@ -45,7 +66,24 @@ class AssemblyStructFType(FType, ABC):
         return dict(self.struct_fields)[attr]
 
 
-class NamedTupleFType(AssemblyStructFType):
+class ImmutableStructFType(AssemblyStructFType):
+    @property
+    def is_mutable(self) -> bool:
+        return False
+
+
+class MutableStructFType(AssemblyStructFType):
+    """
+    Class for a mutable assembly struct type.
+    It is currently not used anywhere, but maybe it will be useful in the future?
+    """
+
+    @property
+    def is_mutable(self) -> bool:
+        return True
+
+
+class NamedTupleFType(ImmutableStructFType):
     def __init__(self, struct_name, struct_fields):
         self._struct_name = struct_name
         self._struct_fields = struct_fields
@@ -71,15 +109,35 @@ class NamedTupleFType(AssemblyStructFType):
     def struct_fields(self):
         return self._struct_fields
 
-    def __call__(self, *args):
+    def from_kwargs(self, **kwargs) -> "TupleFType":
+        raise NotImplementedError
+
+    def to_kwargs(self) -> dict:
+        raise NotImplementedError
+
+    def fisinstance(self, other):
+        if not isinstance(other, tuple) or not hasattr(other, "_fields"):
+            return False
+        if tuple(other._fields) != tuple(self.struct_fieldnames):
+            return False
+
+        return all(
+            fisinstance(elt, format)
+            for elt, format in zip(other, self.struct_fieldformats, strict=False)
+        )
+
+    def from_fields(self, *args):
         assert all(
-            isinstance(a, f)
+            fisinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
         )
         return namedtuple(self.struct_name, self.struct_fieldnames)(args)
 
+    def __call__(self, *args):
+        return self.from_fields(*args)
 
-class TupleFType(AssemblyStructFType):
+
+class TupleFType(ImmutableStructFType):
     def __init__(self, struct_name, struct_formats):
         self._struct_name = struct_name
         self._struct_formats = struct_formats
@@ -114,9 +172,29 @@ class TupleFType(AssemblyStructFType):
     def struct_fields(self):
         return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
 
-    def __call__(self, *args):
+    def from_kwargs(self, **kwargs) -> "TupleFType":
+        raise NotImplementedError
+
+    def to_kwargs(self) -> dict:
+        raise NotImplementedError
+
+    def fisinstance(self, other):
+        """
+        Overridden fisinstance that matches what we have below.
+        """
+        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldformats):
+            return False
+        return all(
+            fisinstance(elt, format)
+            for elt, format in zip(other, self.struct_fieldformats, strict=False)
+        )
+
+    def __call__(self, **kwargs):
+        return self.from_fields(*kwargs.values())
+
+    def from_fields(self, *args):
         assert all(
-            isinstance(a, f)
+            fisinstance(a, f)
             for a, f in zip(args, self.struct_fieldformats, strict=False)
         )
         return tuple(args)
@@ -125,6 +203,9 @@ class TupleFType(AssemblyStructFType):
     @lru_cache
     def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
         return TupleFType("tuple", types)
+
+    def __str__(self):
+        return f"{self.struct_name}({', '.join(map(str, self._struct_formats))})"
 
 
 def tupleformat(x):
@@ -136,7 +217,19 @@ def tupleformat(x):
                 for fieldname in type(x)._fields
             ],
         )
-    return TupleFType.from_tuple(tuple([type(elem) for elem in x]))
+    return TupleFType.from_tuple(tuple([ftype(elem) for elem in x]))
 
 
 register_property(tuple, "ftype", "__attr__", tupleformat)
+
+
+def tuple_return_type(fmt, *args):
+    return TupleFType("tuple", args)
+
+
+register_property(
+    make_tuple,
+    "__call__",
+    "return_type",
+    tuple_return_type,
+)

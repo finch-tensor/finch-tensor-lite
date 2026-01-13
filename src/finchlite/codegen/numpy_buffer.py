@@ -5,10 +5,12 @@ import numpy as np
 
 import numba
 
+from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
+
 from ..finch_assembly import Buffer
 from ..util import qual_str
-from .c import CBufferFType, CStackFType, c_type
-from .numba_backend import NumbaBufferFType
+from .c_codegen import CBufferFType, CContext, CStackFType, c_type
+from .numba_codegen import NumbaBufferFType
 
 
 class NumbaBufferFields(NamedTuple):
@@ -76,6 +78,10 @@ class NumpyBuffer(Buffer):
         arr_str = str(self.arr).replace("\n", "")
         return f"np_buf({arr_str})"
 
+    def __repr__(self):
+        arr_repr = repr(self.arr).replace("\n", "")
+        return f"NumpyBuffer({arr_repr})"
+
 
 class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     """
@@ -123,16 +129,26 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     def c_type(self):
         return ctypes.POINTER(CNumpyBuffer)
 
-    def c_length(self, ctx, buf):
+    def c_length(self, ctx: "CContext", buf: "Stack"):
+        assert isinstance(buf.obj, CBufferFields)
         return buf.obj.length
 
-    def c_data(self, ctx, buf):
+    def c_data(self, ctx: "CContext", buf: "Stack"):
+        assert isinstance(buf.obj, CBufferFields)
         return buf.obj.data
 
-    def c_load(self, ctx, buf, idx):
+    def c_load(self, ctx: "CContext", buf: "Stack", idx: "AssemblyExpression"):
+        assert isinstance(buf.obj, CBufferFields)
         return f"({buf.obj.data})[{ctx(idx)}]"
 
-    def c_store(self, ctx, buf, idx, value):
+    def c_store(
+        self,
+        ctx: "CContext",
+        buf: "Stack",
+        idx: "AssemblyExpression",
+        value: "AssemblyExpression",
+    ):
+        assert isinstance(buf.obj, CBufferFields)
         ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf, new_len):

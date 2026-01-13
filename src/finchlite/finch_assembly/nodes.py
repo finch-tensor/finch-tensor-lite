@@ -367,6 +367,68 @@ class Store(AssemblyTree, AssemblyStatement):
 
 
 @dataclass(eq=True, frozen=True)
+class ExistsDict(AssemblyExpression, AssemblyTree):
+    """
+    Represents checking whether an integer tuple key is in a map.
+
+    Attributes:
+        map: The map to load from.
+        index: The key to check for existence.
+    """
+
+    map: Slot | Stack
+    index: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index]
+
+    def result_format(self):
+        return bool
+
+
+@dataclass(eq=True, frozen=True)
+class LoadDict(AssemblyExpression, AssemblyTree):
+    """
+    Represents loading a value from a map given an integer tuple key.
+
+    Attributes:
+        map: The map to load from.
+        index: The key value
+    """
+
+    dct: Slot | Stack
+    index: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.dct, self.index]
+
+    def result_format(self):
+        return self.dct.result_format.value_type
+
+
+@dataclass(eq=True, frozen=True)
+class StoreDict(AssemblyTree, AssemblyStatement):
+    """
+    Represents storing a value into a buffer given an integer tuple key.
+
+    Attributes:
+        map: The map to load from.
+        index1: The first integer in the pair
+        index2: The second integer in the pair
+    """
+
+    map: Slot | Stack
+    index: AssemblyExpression
+    value: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index, self.value]
+
+
+@dataclass(eq=True, frozen=True)
 class Resize(AssemblyTree, AssemblyStatement):
     """
     Represents resizing a buffer to a new size.
@@ -694,7 +756,7 @@ class AssemblyPrinterContext(Context):
                         raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
             case GetAttr(obj, attr):
-                return f"getattr({obj}, {attr})"
+                return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
             case Call(Literal(_) as lit, args):
@@ -707,10 +769,17 @@ class AssemblyPrinterContext(Context):
                 return None
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
+            case LoadDict(map, idx):
+                return f"loadmap({self(map)}, {self(idx)})"
+            case ExistsDict(map, idx):
+                return f"existsmap({self(map)}, {self(idx)})"
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
+                return None
+            case StoreDict(map, idx, val):
+                self.exec(f"{feed}storemap({self(map)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")

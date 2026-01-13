@@ -1,4 +1,4 @@
-from .fiber_tensor import FiberTensor, FiberTensorFType, Level, LevelFType, tensor
+from .fiber_tensor import FiberTensor, FiberTensorFType, Level, LevelFType, fiber_tensor
 from .level import (
     DenseLevel,
     DenseLevelFType,
@@ -22,5 +22,5 @@ __all__ = [
     "SparseTensorFType",
     "dense",
     "element",
-    "tensor",
+    "fiber_tensor",
 ]

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 from ..symbolic import ScopedDict, fisinstance
 from . import nodes as asm
+from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 
 
-class AssemblyInterpreterKernel:
+class AssemblyInterpreterKernel(AssemblyKernel):
     """
     A kernel for interpreting FinchAssembly code.
     This is a simple interpreter that executes the assembly code.
@@ -23,7 +24,7 @@ class AssemblyInterpreterKernel:
         return self.ctx(asm.Call(self.func, args_i))
 
 
-class AssemblyInterpreterModule:
+class AssemblyInterpreterLibrary(AssemblyLibrary):
     """
     A class to represent an interpreted module of FinchAssembly.
     """
@@ -59,7 +60,7 @@ def check_isinstance(obj, cls):
     return isinstance(obj, cls)
 
 
-class AssemblyInterpreter:
+class AssemblyInterpreter(AssemblyLoader):
     """
     An interpreter for FinchAssembly.
     """
@@ -135,7 +136,13 @@ class AssemblyInterpreter:
             and self.function_state.should_halt
         )
 
-    def __call__(self, prgm: asm.AssemblyNode):
+    @overload
+    def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
+
+    @overload
+    def __call__(self, prgm: asm.AssemblyNode) -> Any: ...
+
+    def __call__(self, prgm):
         """
         Run the program.
         """
@@ -212,6 +219,16 @@ class AssemblyInterpreter:
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
+            case asm.LoadDict(dct, idx):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                return map_e.load(idx_e)
+            case asm.ExistsDict(dct, idx):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                return map_e.exists(idx_e)
             case asm.Store(buf, idx, val):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -219,6 +236,12 @@ class AssemblyInterpreter:
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
+            case asm.StoreDict(dct, idx, val):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                val_e = self(val)
+                return map_e.store(idx_e, val_e)
             case asm.Resize(buf, len_):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -309,7 +332,7 @@ class AssemblyInterpreter:
                     ctx_2(body)
                     if ctx_2.function_state.should_halt:
                         ret_e = ctx_2.function_state.return_value
-                        if not check_isinstance(ret_e, ret_t):
+                        if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
                                 f"for function '{func_n}'."
@@ -342,7 +365,7 @@ class AssemblyInterpreter:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return AssemblyInterpreterModule(self, kernels)
+                return AssemblyInterpreterLibrary(self, kernels)
             case asm.Print(args):
                 args_value_str = ""
                 for arg in args:

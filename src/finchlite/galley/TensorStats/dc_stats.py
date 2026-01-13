@@ -7,13 +7,10 @@ from typing import Any, cast
 
 import numpy as np
 
-import finchlite.finch_notation as ntn
-from finchlite.algebra import is_annihilator
-from finchlite.compile import dimension
-from finchlite.finch_notation import (
-    Literal,
-)
-
+from ... import finch_notation as ntn
+from ...algebra import Tensor, is_annihilator
+from ...compile import BufferizedNDArray, dimension
+from ...interface import asarray
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
@@ -51,7 +48,7 @@ class DCStats(TensorStats):
         and compute degree constraint (DC) records from the tensor’s structure.
         """
         self.tensordef = TensorDef.from_tensor(tensor, fields)
-        self.dcs = self._structure_to_dcs(tensor)
+        self.dcs = self._structure_to_dcs(tensor, fields)
 
     @staticmethod
     def from_def(tensordef: TensorDef, dcs: set[DC]) -> "DCStats":
@@ -63,7 +60,17 @@ class DCStats(TensorStats):
         self.dcs = set(dcs)
         return self
 
-    def _structure_to_dcs(self, arr: Any) -> set[DC]:
+    @staticmethod
+    def copy_stats(stat: TensorStats) -> TensorStats:
+        """
+        Deep copy of a DCStats object: copies the TensorDef and the DC set.
+        """
+        if not isinstance(stat, DCStats):
+            raise TypeError("copy_stats expected a DCStats instance")
+
+        return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
+
+    def _structure_to_dcs(self, arr: Tensor, fields: Iterable[str]) -> set[DC]:
         """
         Dispatch DC extraction based on tensor dimensionality.
 
@@ -78,19 +85,232 @@ class DCStats(TensorStats):
         Raises:
             NotImplementedError: If dimensionality is not in {1, 2, 3, 4}.
         """
-        if arr is None or getattr(arr, "size", 0) == 0:
-            return set()
+        ndim = arr.ndim
 
-        ndim = getattr(arr, "ndim", None)
-        if ndim == 1:
-            return self._vector_structure_to_dcs(arr)
-        if ndim == 2:
-            return self._matrix_structure_to_dcs(arr)
-        if ndim == 3:
-            return self._3d_structure_to_dcs(arr)
-        if ndim == 4:
-            return self._4d_structure_to_dcs(arr)
-        raise NotImplementedError(f"DC analysis not implemented for {ndim}D tensors")
+        if ndim == 0:
+            return {DC(frozenset(), frozenset(), 1.0)}
+
+        return self._array_to_dcs(arr, fields)
+
+    # Given an arbitrary n-dimensional tensor, we produce 2n+1 degree constraints.
+    # For each field i, we compute DC({}, {i}) and DC({i}, {*fields}).
+    # Additionally, we compute the nnz for the full tensor DC({}, {*fields}).
+    def _array_to_dcs(self, arr: Any, fields: Iterable[str]) -> set[DC]:
+        fields = list(fields)
+        ndims = len(fields)
+        dim_loop_variables = [
+            ntn.Variable(f"{fields[i]}", np.int64) for i in range(ndims)
+        ]
+        dim_array_variables = [
+            ntn.Variable(f"x_{fields[i]}", BufferizedNDArray) for i in range(ndims)
+        ]
+        dim_size_variables = [
+            ntn.Variable(f"n_{fields[i]}", np.int64) for i in range(ndims)
+        ]
+        dim_array_slots = [
+            ntn.Slot(f"x_{fields[i]}_", BufferizedNDArray) for i in range(ndims)
+        ]
+        dim_proj_variables = [
+            ntn.Variable(f"proj_{fields[i]}", np.int64) for i in range(ndims)
+        ]
+        dim_dc_variables = [
+            ntn.Variable(f"dc_{fields[i]}", np.int64) for i in range(ndims)
+        ]
+
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
+        A_access = ntn.Unwrap(ntn.Access(A_, ntn.Read(), tuple(dim_loop_variables)))
+        A_nnz_variable = ntn.Variable("nnz", np.int64)
+
+        dim_size_assignments = []
+        dim_proj_variable_assigments = []
+        dim_dc_variable_assigments = []
+        dim_array_unpacks = []
+        dim_array_declares = []
+        dim_array_increments = []
+        for i in range(ndims):
+            dim_size_assignments.append(
+                ntn.Assign(
+                    dim_size_variables[i],
+                    ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(i))),
+                )
+            )
+            dim_proj_variable_assigments.append(
+                ntn.Assign(dim_proj_variables[i], ntn.Literal(0))
+            )
+            dim_dc_variable_assigments.append(
+                ntn.Assign(dim_dc_variables[i], ntn.Literal(0))
+            )
+            dim_array_unpacks.append(
+                ntn.Unpack(dim_array_slots[i], dim_array_variables[i])
+            )
+            dim_array_declares.append(
+                ntn.Declare(
+                    dim_array_slots[i],
+                    ntn.Literal(0),
+                    ntn.Literal(operator.add),
+                    (dim_size_variables[i],),
+                )
+            )
+            inc_expr = ntn.Increment(
+                ntn.Access(
+                    dim_array_slots[i],
+                    ntn.Update(ntn.Literal(operator.add)),
+                    (dim_loop_variables[i],),
+                ),
+                ntn.Call(
+                    ntn.Literal(operator.ne),
+                    (
+                        A_access,
+                        ntn.Literal(self.tensordef.fill_value),
+                    ),
+                ),
+            )
+            dim_array_increments.append(inc_expr)
+
+        array_build_loop: ntn.NotationStatement = ntn.Block(
+            (
+                *dim_array_increments,
+                ntn.Assign(
+                    A_nnz_variable,
+                    ntn.Call(
+                        ntn.Literal(operator.add),
+                        (
+                            A_nnz_variable,
+                            ntn.Call(
+                                ntn.Literal(operator.ne),
+                                (
+                                    A_access,
+                                    ntn.Literal(self.tensordef.fill_value),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        )
+        for i in range(ndims):
+            array_build_loop = ntn.Loop(
+                dim_loop_variables[i], dim_size_variables[i], array_build_loop
+            )
+
+        dim_array_freezes = []
+        dc_compute_loops = []
+        dim_array_repacks = []
+        for i in range(ndims):
+            dim_array_freezes.append(
+                ntn.Freeze(dim_array_slots[i], ntn.Literal(operator.add))
+            )
+            dc_compute_loops.append(
+                ntn.Loop(
+                    dim_loop_variables[i],
+                    dim_size_variables[i],
+                    ntn.Block(
+                        (
+                            ntn.If(
+                                ntn.Call(
+                                    ntn.Literal(operator.ne),
+                                    (
+                                        ntn.Unwrap(
+                                            ntn.Access(
+                                                dim_array_slots[i],
+                                                ntn.Read(),
+                                                (dim_loop_variables[i],),
+                                            )
+                                        ),
+                                        ntn.Literal(np.int64(0)),
+                                    ),
+                                ),
+                                ntn.Assign(
+                                    dim_proj_variables[i],
+                                    ntn.Call(
+                                        ntn.Literal(operator.add),
+                                        (
+                                            dim_proj_variables[i],
+                                            ntn.Literal(np.int64(1)),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            ntn.Assign(
+                                dim_dc_variables[i],
+                                ntn.Call(
+                                    ntn.Literal(max),
+                                    (
+                                        dim_dc_variables[i],
+                                        ntn.Unwrap(
+                                            ntn.Access(
+                                                dim_array_slots[i],
+                                                ntn.Read(),
+                                                (dim_loop_variables[i],),
+                                            )
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        )
+                    ),
+                )
+            )
+            dim_array_repacks.append(
+                ntn.Repack(dim_array_slots[i], dim_array_variables[i])
+            )
+
+        def to_tuple(*args):
+            return (*args,)
+
+        dc_args = []
+        for i in range(ndims):
+            dc_args.append(dim_proj_variables[i])
+            dc_args.append(dim_dc_variables[i])
+        return_expr = ntn.Return(
+            ntn.Call(
+                ntn.Literal(to_tuple),
+                (*dc_args, A_nnz_variable),
+            )
+        )
+
+        prgm = ntn.Module(
+            (
+                ntn.Function(
+                    ntn.Variable("array_to_dcs", tuple),
+                    (A, *dim_array_variables),
+                    ntn.Block(
+                        (
+                            *dim_size_assignments,
+                            ntn.Unpack(A_, A),
+                            ntn.Assign(A_nnz_variable, ntn.Literal(0)),
+                            *dim_proj_variable_assigments,
+                            *dim_dc_variable_assigments,
+                            *dim_array_unpacks,
+                            *dim_array_declares,
+                            array_build_loop,
+                            *dim_array_freezes,
+                            *dc_compute_loops,
+                            *dim_array_repacks,
+                            ntn.Repack(A_, A),
+                            return_expr,
+                        )
+                    ),
+                ),
+            )
+        )
+        mod = ntn.NotationInterpreter()(prgm)
+
+        dim_array_instances = [asarray(np.zeros(arr.shape[i])) for i in range(ndims)]
+        dc_proj_pairs = mod.array_to_dcs(arr, *dim_array_instances)
+        dcs = set()
+        for i in range(ndims):
+            dcs.add(DC(frozenset({}), frozenset({fields[i]}), dc_proj_pairs[2 * i]))
+            dcs.add(
+                DC(
+                    frozenset({fields[i]}),
+                    frozenset({*fields}),
+                    dc_proj_pairs[2 * i + 1],
+                )
+            )
+        dcs.add(DC(frozenset({}), frozenset({*fields}), dc_proj_pairs[-1]))
+        return dcs
 
     def _vector_structure_to_dcs(self, arr: Any) -> set[DC]:
         """
@@ -100,8 +320,8 @@ class DCStats(TensorStats):
         Returns:
             set[DC]: The degree constraint (DC) records derived from the 1-D tensor.
         """
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         d = ntn.Variable("d", np.int64)
         i = ntn.Variable("i", np.int64)
@@ -125,11 +345,19 @@ class DCStats(TensorStats):
                                 ntn.Assign(
                                     d,
                                     ntn.Call(
-                                        Literal(operator.add),
+                                        ntn.Literal(operator.add),
                                         (
                                             d,
-                                            ntn.Unwrap(
-                                                ntn.Access(A_, ntn.Read(), (i,))
+                                            ntn.Call(
+                                                ntn.Literal(operator.ne),
+                                                (
+                                                    ntn.Unwrap(
+                                                        ntn.Access(A_, ntn.Read(), (i,))
+                                                    ),
+                                                    ntn.Literal(
+                                                        self.tensordef.fill_value
+                                                    ),
+                                                ),
                                             ),
                                         ),
                                     ),
@@ -149,7 +377,7 @@ class DCStats(TensorStats):
 
         return {DC(frozenset(), frozenset([result]), float(cnt))}
 
-    def _matrix_structure_to_dcs(self, arr: Any) -> set[DC]:
+    def _matrix_structure_to_dcs(self, arr: Any, fields: Iterable[str]) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes the structural
         relationships within a two-dimensional tensor.
@@ -158,8 +386,8 @@ class DCStats(TensorStats):
             set[DC]: The degree constraint (DC) records derived from the 2-D tensor.
         """
 
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         i = ntn.Variable("i", np.int64)
         j = ntn.Variable("j", np.int64)
@@ -168,8 +396,10 @@ class DCStats(TensorStats):
 
         dij = ntn.Variable("dij", np.int64)
 
-        xi = ntn.Variable("xi", np.int64)
-        yj = ntn.Variable("yj", np.int64)
+        xi = ntn.Variable("xi", BufferizedNDArray)
+        xi_ = ntn.Slot("xi_", BufferizedNDArray)
+        yj = ntn.Variable("yj", BufferizedNDArray)
+        yj_ = ntn.Slot("yj_", BufferizedNDArray)
 
         d_i = ntn.Variable("d_i", np.int64)
         d_i_j = ntn.Variable("d_i_j", np.int64)
@@ -205,8 +435,18 @@ class DCStats(TensorStats):
                                             ntn.Literal(operator.add),
                                             (
                                                 dij,
-                                                ntn.Unwrap(
-                                                    ntn.Access(A_, ntn.Read(), (j, i))
+                                                ntn.Call(
+                                                    ntn.Literal(operator.ne),
+                                                    (
+                                                        ntn.Unwrap(
+                                                            ntn.Access(
+                                                                A_, ntn.Read(), (j, i)
+                                                            )
+                                                        ),
+                                                        ntn.Literal(
+                                                            self.tensordef.fill_value
+                                                        ),
+                                                    ),
                                                 ),
                                             ),
                                         ),
@@ -220,7 +460,7 @@ class DCStats(TensorStats):
                 ),
                 ntn.Function(
                     ntn.Variable("matrix_structure_to_dcs", tuple),
-                    (A,),
+                    (A, xi, yj),
                     ntn.Block(
                         (
                             ntn.Assign(
@@ -232,36 +472,107 @@ class DCStats(TensorStats):
                                 ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1))),
                             ),
                             ntn.Unpack(A_, A),
-                            ntn.Assign(d_i, ntn.Literal(np.int64(0))),
-                            ntn.Assign(d_i_j, ntn.Literal(np.int64(0))),
+                            ntn.Unpack(xi_, xi),
+                            ntn.Unpack(yj_, yj),
+                            ntn.Declare(
+                                xi_,
+                                ntn.Literal(np.int64(0)),
+                                ntn.Literal(operator.add),
+                                (ni,),
+                            ),
+                            ntn.Declare(
+                                yj_,
+                                ntn.Literal(np.int64(0)),
+                                ntn.Literal(operator.add),
+                                (nj,),
+                            ),
                             ntn.Loop(
                                 i,
                                 ni,
                                 ntn.Block(
                                     (
-                                        ntn.Assign(xi, ntn.Literal(np.int64(0))),
                                         ntn.Loop(
                                             j,
                                             nj,
-                                            ntn.Assign(
-                                                xi,
-                                                ntn.Call(
-                                                    ntn.Literal(operator.add),
-                                                    (
-                                                        xi,
-                                                        ntn.Unwrap(
-                                                            ntn.Access(
-                                                                A_, ntn.Read(), (j, i)
-                                                            )
+                                            ntn.Block(
+                                                (
+                                                    ntn.Increment(
+                                                        ntn.Access(
+                                                            xi_,
+                                                            ntn.Update(
+                                                                ntn.Literal(
+                                                                    operator.add
+                                                                )
+                                                            ),
+                                                            (i,),
+                                                        ),
+                                                        ntn.Call(
+                                                            ntn.Literal(operator.ne),
+                                                            (
+                                                                ntn.Unwrap(
+                                                                    ntn.Access(
+                                                                        A_,
+                                                                        ntn.Read(),
+                                                                        (j, i),
+                                                                    )
+                                                                ),
+                                                                ntn.Literal(
+                                                                    self.tensordef.fill_value
+                                                                ),
+                                                            ),
                                                         ),
                                                     ),
-                                                ),
+                                                    ntn.Increment(
+                                                        ntn.Access(
+                                                            yj_,
+                                                            ntn.Update(
+                                                                ntn.Literal(
+                                                                    operator.add
+                                                                )
+                                                            ),
+                                                            (j,),
+                                                        ),
+                                                        ntn.Call(
+                                                            ntn.Literal(operator.ne),
+                                                            (
+                                                                ntn.Unwrap(
+                                                                    ntn.Access(
+                                                                        A_,
+                                                                        ntn.Read(),
+                                                                        (j, i),
+                                                                    )
+                                                                ),
+                                                                ntn.Literal(
+                                                                    self.tensordef.fill_value
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                )
                                             ),
                                         ),
+                                    )
+                                ),
+                            ),
+                            ntn.Assign(d_i, ntn.Literal(np.int64(0))),
+                            ntn.Assign(d_i_j, ntn.Literal(np.int64(0))),
+                            ntn.Freeze(xi_, ntn.Literal(operator.add)),
+                            ntn.Loop(
+                                i,
+                                ni,
+                                ntn.Block(
+                                    (
                                         ntn.If(
                                             ntn.Call(
                                                 ntn.Literal(operator.ne),
-                                                (xi, ntn.Literal(np.int64(0))),
+                                                (
+                                                    ntn.Unwrap(
+                                                        ntn.Access(
+                                                            xi_, ntn.Read(), (i,)
+                                                        )
+                                                    ),
+                                                    ntn.Literal(np.int64(0)),
+                                                ),
                                             ),
                                             ntn.Assign(
                                                 d_i,
@@ -273,11 +584,22 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.Assign(
                                             d_i_j,
-                                            ntn.Call(ntn.Literal(max), (d_i_j, xi)),
+                                            ntn.Call(
+                                                ntn.Literal(max),
+                                                (
+                                                    d_i_j,
+                                                    ntn.Unwrap(
+                                                        ntn.Access(
+                                                            xi_, ntn.Read(), (i,)
+                                                        )
+                                                    ),
+                                                ),
+                                            ),
                                         ),
                                     )
                                 ),
                             ),
+                            ntn.Freeze(yj_, ntn.Literal(operator.add)),
                             ntn.Assign(d_j, ntn.Literal(np.int64(0))),
                             ntn.Assign(d_j_i, ntn.Literal(np.int64(0))),
                             ntn.Loop(
@@ -285,29 +607,17 @@ class DCStats(TensorStats):
                                 nj,
                                 ntn.Block(
                                     (
-                                        ntn.Assign(yj, ntn.Literal(np.int64(0))),
-                                        ntn.Loop(
-                                            i,
-                                            ni,
-                                            ntn.Assign(
-                                                yj,
-                                                ntn.Call(
-                                                    ntn.Literal(operator.add),
-                                                    (
-                                                        yj,
-                                                        ntn.Unwrap(
-                                                            ntn.Access(
-                                                                A_, ntn.Read(), (j, i)
-                                                            )
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
                                         ntn.If(
                                             ntn.Call(
                                                 ntn.Literal(operator.ne),
-                                                (yj, ntn.Literal(np.int64(0))),
+                                                (
+                                                    ntn.Unwrap(
+                                                        ntn.Access(
+                                                            yj_, ntn.Read(), (j,)
+                                                        )
+                                                    ),
+                                                    ntn.Literal(np.int64(0)),
+                                                ),
                                             ),
                                             ntn.Assign(
                                                 d_j,
@@ -319,19 +629,31 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.Assign(
                                             d_j_i,
-                                            ntn.Call(ntn.Literal(max), (d_j_i, yj)),
+                                            ntn.Call(
+                                                ntn.Literal(max),
+                                                (
+                                                    d_j_i,
+                                                    ntn.Unwrap(
+                                                        ntn.Access(
+                                                            yj_, ntn.Read(), (j,)
+                                                        )
+                                                    ),
+                                                ),
+                                            ),
                                         ),
                                     )
                                 ),
                             ),
                             ntn.Repack(A_, A),
+                            ntn.Repack(xi_, xi),
+                            ntn.Repack(yj_, yj),
                             ntn.Return(
                                 ntn.Call(
                                     ntn.Literal(lambda a, b, c, d: (a, b, c, d)),
                                     (d_i, d_i_j, d_j, d_j_i),
                                 )
                             ),
-                        )
+                        ),
                     ),
                 ),
             )
@@ -339,18 +661,20 @@ class DCStats(TensorStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         d_ij = mod.matrix_total_nnz(arr)
-        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr)
-        i_result, j_result = tuple(self.tensordef.dim_sizes)
+        xi = asarray(np.zeros(arr.shape[0]))
+        yj = asarray(np.zeros(arr.shape[1]))
+        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr, xi, yj)
+        i_field, j_field = tuple(fields)
 
         return {
-            DC(frozenset(), frozenset([i_result, j_result]), float(d_ij)),
-            DC(frozenset(), frozenset([i_result]), float(d_i_)),
-            DC(frozenset(), frozenset([j_result]), float(d_j_)),
-            DC(frozenset([i_result]), frozenset([i_result, j_result]), float(d_i_j_)),
-            DC(frozenset([j_result]), frozenset([i_result, j_result]), float(d_j_i_)),
+            DC(frozenset(), frozenset([i_field, j_field]), float(d_ij)),
+            DC(frozenset(), frozenset([i_field]), float(d_i_)),
+            DC(frozenset(), frozenset([j_field]), float(d_j_)),
+            DC(frozenset([i_field]), frozenset([i_field, j_field]), float(d_i_j_)),
+            DC(frozenset([j_field]), frozenset([i_field, j_field]), float(d_j_i_)),
         }
 
-    def _3d_structure_to_dcs(self, arr: Any) -> set[DC]:
+    def _3d_structure_to_dcs(self, arr: Any, fields: str) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes structural
         relationships within a three-dimensional tensor.
@@ -358,8 +682,8 @@ class DCStats(TensorStats):
         Returns:
             set[DC]: The degree constraint (DC) records derived from the 3-D tensor.
         """
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         i = ntn.Variable("i", np.int64)
         j = ntn.Variable("j", np.int64)
@@ -626,7 +950,7 @@ class DCStats(TensorStats):
 
         d_ijk = mod._3d_total_nnz(arr)
         d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(arr)
-        i_result, j_result, k_result = tuple(self.tensordef.dim_sizes)
+        i_result, j_result, k_result = tuple(fields)
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
             DC(frozenset(), frozenset([j_result]), float(d_j_)),
@@ -637,7 +961,7 @@ class DCStats(TensorStats):
             DC(frozenset([]), frozenset([i_result, j_result, k_result]), float(d_ijk)),
         }
 
-    def _4d_structure_to_dcs(self, arr: Any) -> set[DC]:
+    def _4d_structure_to_dcs(self, arr: Any, fields: str) -> set[DC]:
         """
         Build and execute a Finch-notation program that analyzes structural
         relationships within a four-dimensional tensor.
@@ -645,8 +969,8 @@ class DCStats(TensorStats):
         Returns:
             set[DC]: The degree constraint (DC) records derived from the 4-D tensor.
         """
-        A = ntn.Variable("A", np.ndarray)
-        A_ = ntn.Slot("A_", np.ndarray)
+        A = ntn.Variable("A", arr.ftype)
+        A_ = ntn.Slot("A_", arr.ftype)
 
         i = ntn.Variable("i", np.int64)
         j = ntn.Variable("j", np.int64)
@@ -1021,7 +1345,7 @@ class DCStats(TensorStats):
             mod._4d_structure_to_dcs(arr)
         )
 
-        i_result, j_result, k_result, w_result = tuple(self.tensordef.dim_sizes)
+        i_result, j_result, k_result, w_result = tuple(fields)
         return {
             DC(frozenset(), frozenset([i_result]), float(d_i_)),
             DC(frozenset(), frozenset([j_result]), float(d_j_)),

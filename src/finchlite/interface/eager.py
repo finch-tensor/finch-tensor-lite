@@ -2,6 +2,7 @@ import builtins
 import sys
 from abc import ABC
 from collections.abc import Callable, Sequence
+from typing import Any
 
 from ..algebra import register_property
 from . import lazy
@@ -225,6 +226,37 @@ class EagerTensor(OverrideTensor, ABC):
 
 
 register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
+
+
+def full(
+    shape: int | tuple[int, ...],
+    fill_value: bool | complex,
+    *,
+    dtype: Any | None = None,
+):
+    """
+    Returns a new array having a specified shape and filled with fill_value.
+
+    Parameters:
+    - shape (Union[int, Tuple[int, ...]]): output array shape.
+    - fill_value (Union[bool, int, float, complex]): fill value.
+    - dtype (Optional[dtype]): output array data type. If dtype is None, the
+    output array data type must be inferred from fill_value according to the
+    following rules:
+        * If the fill value is an int, the output array data type must be the
+            default integer data type.
+        * If the fill value is a float, the output array data type must be the
+            default real-valued floating-point data type.
+        * If the fill value is a complex number, the output array data type must
+            be the default complex floating-point data type.
+        * If the fill value is a bool, the output array must have a boolean data
+            type. Default: None.
+
+    Returns:
+
+    - out (array): an array where every element is equal to fill_value.
+    """
+    return compute(lazy.full(shape, fill_value, dtype=dtype))
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):

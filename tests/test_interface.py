@@ -4,9 +4,10 @@ import warnings
 import pytest
 
 import numpy as np
-from numpy.testing import assert_allclose, assert_equal
 
 import finchlite
+
+from .conftest import finch_assert_allclose, finch_assert_equal
 
 
 # Utility function to generate random complex numpy tensors
@@ -58,7 +59,7 @@ def test_matrix_multiplication(a, b):
 
     expected = np.matmul(a, b)
 
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 class TestEagerTensorFType(finchlite.TensorFType):
@@ -75,6 +76,11 @@ class TestEagerTensorFType(finchlite.TensorFType):
 
     def __hash__(self):
         return hash(self.fmt)
+
+    def __call__(self, shape: tuple):
+        return TestEagerTensor(
+            np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
+        )
 
     @property
     def fill_value(self):
@@ -94,13 +100,16 @@ class TestEagerTensor(finchlite.EagerTensor):
     __test__ = False
 
     def __init__(self, array):
-        self.array = np.array(array)
+        self.array = finchlite.asarray(array)
 
     def __repr__(self):
         return f"TestEagerTensor({self.array})"
 
     def __getitem__(self, item):
         return self.array[item]
+
+    def __setitem__(self, idx, val):
+        self.array[idx] = val
 
     def __hash__(self):
         # TODO: correct hashing for ndarrays
@@ -133,7 +142,7 @@ class TestEagerTensor(finchlite.EagerTensor):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -141,7 +150,7 @@ class TestEagerTensor(finchlite.EagerTensor):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -226,7 +235,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
 
                 result = finchlite.compute(result)
 
-            assert_equal(result, expected)
+            finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -241,7 +250,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -312,7 +321,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
 
                 result = finchlite.compute(result)
 
-            assert_equal(result, expected)
+            finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -327,7 +336,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -360,7 +369,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
 
             result = finchlite.compute(result)
 
-        assert_equal(result, expected)
+        finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -393,7 +402,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -401,7 +410,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -409,7 +418,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -449,7 +458,7 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
 
                 result = finchlite.compute(result)
 
-            assert_equal(result, expected)
+            finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -468,7 +477,7 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -510,9 +519,9 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
         if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
             expected.dtype, np.complexfloating
         ):
-            assert_allclose(result, expected, rtol=1e-15, atol=0.0)
+            finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
         else:
-            assert_equal(result, expected)
+            finch_assert_equal(result, expected)
 
 
 @pytest.mark.usefixtures(
@@ -566,7 +575,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -574,7 +583,7 @@ def test_reduction_operations(a, a_wrap, ops, np_op, axis):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_matmul(a, b, a_wrap, b_wrap):
@@ -602,13 +611,12 @@ def test_matmul(a, b, a_wrap, b_wrap):
         result_with_op = finchlite.compute(result_with_op)
         result_with_np = finchlite.compute(result_with_np)
 
-    assert isinstance(result, np.ndarray)
-    assert expected.dtype == result.dtype, (
+    assert expected.dtype == finchlite.element_type(result), (
         f"Expected dtype {expected.dtype}, got {result.dtype}"
     )
-    assert_allclose(result, expected)
-    assert_allclose(result_with_op, expected)
-    assert_allclose(result_with_np, expected)
+    finch_assert_allclose(result, expected)
+    finch_assert_allclose(result_with_op, expected)
+    finch_assert_allclose(result_with_np, expected)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -627,7 +635,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_matrix_transpose(a, a_wrap):
@@ -641,7 +649,7 @@ def test_matrix_transpose(a, a_wrap):
     result = finchlite.matrix_transpose(wa)
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -684,7 +692,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -692,7 +700,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_tensordot(a, b, axes, a_wrap, b_wrap):
@@ -714,8 +722,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     if isinstance(wa, finchlite.LazyTensor) or isinstance(wb, finchlite.LazyTensor):
         assert isinstance(result, finchlite.LazyTensor)
         result = finchlite.compute(result)
-    assert isinstance(result, np.ndarray)  # for type checker
-    assert_allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -769,7 +776,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
@@ -777,7 +784,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
@@ -799,8 +806,7 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
         assert isinstance(result, finchlite.LazyTensor)
         result = finchlite.compute(result)
 
-    assert isinstance(result, np.ndarray), "Result should be a NumPy array"
-    assert_allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -818,7 +824,7 @@ def test_squeeze_valid(x, axis, expected):
     Tests for squeeze operation
     """
     result = finchlite.squeeze(x, axis=axis)
-    np.testing.assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -852,7 +858,7 @@ def test_squeeze_invalid(x, axis):
 def test_expand_dims_valid(x, axis):
     expected = np.expand_dims(x, axis=axis)
     result = finchlite.expand_dims(x, axis=axis)
-    np.testing.assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -948,7 +954,7 @@ def test_scalar_coerce(x, func):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_broadcast_to(x, shape, x_wrap):
@@ -968,7 +974,7 @@ def test_broadcast_to(x, shape, x_wrap):
         out = finchlite.broadcast_to(wx, shape)
         if isinstance(wx, finchlite.LazyTensor):
             out = finchlite.compute(out)
-        assert_equal(out, expected, strict=True)
+        finch_assert_equal(out, expected, strict=True)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -988,7 +994,7 @@ def test_broadcast_to(x, shape, x_wrap):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
@@ -1016,7 +1022,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
         assert res.shape == exp.shape, (
             f"Shape mismatch: got {res.shape}, expected {exp.shape} at index {i}"
         )
-        assert_equal(res, exp, "Values mismatch in broadcasted arrays")
+        finch_assert_equal(res, exp)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1050,7 +1056,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
@@ -1076,7 +1082,7 @@ def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
-    assert_equal(result, expected, "Values mismatch in concatenated array", strict=True)
+    finch_assert_equal(result, expected, strict=True)
 
 
 @pytest.mark.parametrize(
@@ -1117,7 +1123,7 @@ def test_concat_invalid(shapes, rng):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_moveaxis(shape, source, destination, wrapper, rng):
@@ -1141,7 +1147,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
-    assert_equal(result, expected, "Values mismatch in moved axis array", strict=True)
+    finch_assert_equal(result, expected, strict=True)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1174,7 +1180,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
@@ -1207,7 +1213,7 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
-    assert_equal(result, expected, "Values mismatch in stacked array", strict=True)
+    finch_assert_equal(result, expected, strict=True)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1229,7 +1235,7 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
@@ -1244,7 +1250,7 @@ def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
-    assert_equal(result, expected, strict=True)
+    finch_assert_equal(result, expected, strict=True)
 
 
 @pytest.mark.parametrize(
@@ -1292,7 +1298,7 @@ def test_split_dims_errors(array_shape, axis, split_shape):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_combine_dims(array_shape, axes, expected_shape, wrapper):
@@ -1309,7 +1315,7 @@ def test_combine_dims(array_shape, axes, expected_shape, wrapper):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
-    assert_equal(result, expected, strict=True)
+    finch_assert_equal(result, expected, strict=True)
 
 
 @pytest.mark.parametrize(
@@ -1357,7 +1363,7 @@ def test_combine_dims_errors(array_shape, axes):
     [
         lambda x: x,
         TestEagerTensor,
-        finchlite.defer,
+        finchlite.lazy,
     ],
 )
 def test_flatten(array_shape, expected_shape, wrapper):
@@ -1378,4 +1384,4 @@ def test_flatten(array_shape, expected_shape, wrapper):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
-    assert_equal(result, expected, strict=True)
+    finch_assert_equal(result, expected, strict=True)

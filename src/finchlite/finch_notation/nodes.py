@@ -185,6 +185,29 @@ class AccessFType(FType):
 
 
 @dataclass(eq=True, frozen=True)
+class Dimension(NotationTree, NotationExpression):
+    """
+    Notation AST expression representing the dimension of tensor `tns` in
+    rank `r`.
+    """
+
+    tns: NotationExpression
+    r: Literal
+
+    @property
+    def result_format(self):
+        return self.tns.shape_type[self.r.val]
+
+    @classmethod
+    def from_children(cls, tns, r):
+        return cls(tns, r)
+
+    @property
+    def children(self):
+        return [self.tns, self.r]
+
+
+@dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
     Notation AST expression representing the value of tensor `tns` at the indices
@@ -630,6 +653,10 @@ class NotationPrinterContext(Context):
             case Assign(Variable(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
+            case Dimension(tns, r):
+                tns_e = self(tns)
+                r_e = self(r)
+                return f"{tns_e}.shape[{r_e}]"
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]

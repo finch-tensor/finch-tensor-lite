@@ -1,11 +1,113 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from typing import Any, Self
+from typing import Any, Self, TypeVar
 
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.algebra.algebra import fixpoint_type, return_type
+
+from ..algebra import promote_max, promote_type
+from ..symbolic import (
+    Context,
+    FType,
+    FTyped,
+    NamedTerm,
+    Term,
+    TermTree,
+    ftype,
+    literal_repr,
+)
 from ..util import qual_str
+
+
+def merge_dim_type(d1, d2):
+    if d1 and d2:
+        return promote_type(d1, d2)
+    return d1 or d2
+
+
+def merge_dim(d1, d2):
+    d3 = d1 or 1
+    d4 = d2 or 1
+    if d3 != d4:
+        raise ValueError(f"Dimension mismatch: {d1} vs {d2}")
+    if d1 and d2:
+        return promote_max(d1, d2)
+    return d1 or d2
+
+
+def merge_element_type(op, *args):
+    return return_type(op, *args)
+
+
+def reduce_element_type(op, z, t):
+    return fixpoint_type(op, z, t)
+
+
+def merge_fill_value(op, *args):
+    return op(*args)
+
+
+def reduce_fill_value(op, z, t):
+    return z
+
+
+"""
+Notes on Finch Logic IR:
+Finch Logic IR is an intermediate representation (IR) used in the Finch Tensor
+Lite framework. It is designed to represent logical operations and transformations
+on tensors in a structured and abstract manner. The Logic IR is built around the
+concept of "tables," which are tensors with named dimensions, allowing for more
+intuitive manipulation and reasoning about tensor operations.
+
+Dimensions in Finch Logic IR are represented using "fields," which are named
+entities that index the dimensions of a tensor. This naming convention helps
+clarify the relationships between different tensors and their dimensions during
+operations such as mapping, aggregation, reordering, and relabeling.
+
+Fields may not be used to represent different dimension sizes within the same
+logic program.
+
+Tables may be referenced using "aliases," which are symbolic names that refer to
+specific tables within the program. Evaluators for Finch logic may accept a list
+of bindings from aliases to tables, allowing the logic program to modify the
+state of tensors. Queries in Finch Logic IR can bind the result of an expression
+to an alias for later use, or update the value of an existing alias.
+"""
+
+
+@dataclass(eq=True, frozen=True)
+class TableValueFType(FType):
+    tns: Any
+    idxs: tuple[Field, ...]
+
+    def __eq__(self, other):
+        if not isinstance(other, TableValueFType):
+            return False
+        return self.tns == other.tns and self.idxs == other.idxs
+
+    def __hash__(self):
+        return hash((self.tns, self.idxs))
+
+
+@dataclass(frozen=True)
+class TableValue(FTyped):
+    tns: Any
+    idxs: tuple[Field, ...]
+
+    @property
+    def ftype(self):
+        return TableValueFType(ftype(self.tns), self.idxs)
+
+    def __post_init__(self):
+        if isinstance(self.tns, TableValue):
+            raise ValueError("The tensor (tns) cannot be a TableValue")
+
+    def __eq__(self, other):
+        if not isinstance(other, TableValue):
+            return False
+        return (self.tns == other.tns).all() and self.idxs == other.idxs
 
 
 @dataclass(eq=True, frozen=True)
@@ -48,6 +150,9 @@ class LogicTree(LogicNode, TermTree, ABC):
         ...
 
 
+T = TypeVar("T")
+
+
 class LogicExpression(LogicNode):
     """
     Logic AST expression base class.
@@ -56,20 +161,117 @@ class LogicExpression(LogicNode):
     tensor with named dimensions.
     """
 
-    @property
     @abstractmethod
-    def fields(self) -> list[Field]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
         ...
+
+    @abstractmethod
+    def dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> tuple[T | None, ...]:
+        """Compute per-dimension values, combining using `op`. When dimensions
+        are expanded, None is used.  When dimensions are contracted, the value
+        is combined with None."""
+        ...
+
+    @abstractmethod
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        """Compute per-tensor values. `f(op, args)` is used to combine values in
+        mapjoin, and `g(op, init, arg)` is used to combine values in
+        aggregation."""
+        ...
+
+    def shape_type(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+    ) -> tuple[Any, ...]:
+        """Returns the shape type of the node."""
+        return self.dimmap(merge_dim_type, dim_bindings)
+
+    def shape(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+    ) -> tuple[Any, ...]:
+        """Returns the shape of the node."""
+        return self.dimmap(merge_dim, dim_bindings)
+
+    def element_type(
+        self, bindings: dict[Alias, Any]
+    ) -> Any:  # In the future should be FType
+        """Returns element type of the node."""
+        return self.valmap(merge_element_type, reduce_element_type, bindings)
+
+    def fill_value(self, bindings: dict[Alias, Any]) -> Any:
+        """Returns fill value of the node."""
+        return self.valmap(merge_fill_value, reduce_fill_value, bindings)
 
 
 class LogicStatement(LogicNode):
     """
     Logic AST statement base class.
 
-    A Logic statement may modify the state of the machine by assigning table
-    values to Aliases. Logic statements evaluate to a tuple of table values.
+    A Logic statement may modify the state of the machine by assigning tensors
+    to Aliases.
+
+    Logic statements evaluate to a tuple of tensors.
     """
+
+    @abstractmethod
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        ...
+
+    @abstractmethod
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        ...
+
+    def infer_shape_type(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+    ) -> dict[Alias, tuple[Any, ...]]:
+        """Infers shape_type for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_dimmap(merge_dim_type, dim_bindings)
+
+    def infer_shape(
+        self,
+        dim_bindings: dict[Alias, tuple[Any, ...]],
+    ) -> dict[Alias, tuple[Any, ...]]:
+        """Infers shapes for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_dimmap(merge_dim, dim_bindings)
+
+    def infer_element_type(
+        self, bindings: dict[Alias, Any]
+    ) -> dict[Alias, Any]:  # In the future should be FType
+        """Infers element types for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
+
+    def infer_fill_value(self, bindings: dict[Alias, Any]) -> dict[Alias, Any]:
+        """Infers fill_values for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
 
 
 @dataclass(eq=True, frozen=True)
@@ -139,7 +341,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicExpression, NamedTerm):
+class Alias(LogicNode, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -154,10 +356,30 @@ class Alias(LogicExpression, NamedTerm):
     def symbol(self) -> str:
         return self.name
 
-    @property
-    def fields(self) -> list[Field]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        raise NotImplementedError("Cannot resolve fields of Alias {self.name}")
+        raise NotImplementedError(
+            "Aliases do not have fields because they are tensors not tables!"
+        )
+
+    def dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> tuple[T | None, ...]:
+        if dim_bindings is None or self not in dim_bindings:
+            raise NotImplementedError(f"Cannot resolve dims of Alias {self.name}")
+        return dim_bindings[self]
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        if bindings is None or self not in bindings:
+            raise NotImplementedError(f"Cannot resolve value of Alias {self.name}")
+        return bindings[self]
 
 
 @dataclass(eq=True, frozen=True)
@@ -171,7 +393,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Literal | Value
+    tns: Literal | Value | Alias
     idxs: tuple[Field, ...]
 
     @property
@@ -179,10 +401,34 @@ class Table(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.tns, *self.idxs]
 
-    @property
-    def fields(self) -> list[Field]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        return [*self.idxs]
+        return self.idxs
+
+    def dimmap(
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
+    ) -> tuple[T | None, ...]:
+        if isinstance(self.tns, Alias):
+            if self.tns not in dim_bindings:
+                raise NotImplementedError(
+                    f"Cannot resolve dims of Alias {self.tns.name}"
+                )
+            return dim_bindings[self.tns]
+        raise NotImplementedError("Cannot resolve dims of Tables")
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        if isinstance(self.tns, Alias):
+            if self.tns not in bindings:
+                raise NotImplementedError(
+                    f"Cannot resolve value of Alias {self.tns.name}"
+                )
+            return bindings[self.tns]
+        raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
     def from_children(cls, tns, *idxs):
@@ -202,7 +448,7 @@ class MapJoin(LogicTree, LogicExpression):
         args: The arguments to map the function across.
     """
 
-    op: Literal | Value
+    op: Literal
     args: tuple[LogicExpression, ...]
 
     @property
@@ -210,11 +456,34 @@ class MapJoin(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.op, *self.args]
 
-    @property
-    def fields(self) -> list[Field]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        args_fields = [x.fields for x in self.args]
-        return list(dict.fromkeys([f for fs in args_fields for f in fs]))
+        args_fields = [x.fields() for x in self.args]
+        return tuple(dict.fromkeys([f for fs in args_fields for f in fs]))
+
+    def dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> tuple[T | None, ...]:
+        arg_dims: dict[Field, T | None] = {}
+        for arg in self.args:
+            dims = arg.dimmap(op, dim_bindings)
+            fields = arg.fields()
+            for idx, dim in zip(fields, dims, strict=True):
+                if idx in arg_dims:
+                    arg_dims[idx] = op(arg_dims[idx], dim)
+                else:
+                    arg_dims[idx] = dim
+        return tuple(arg_dims[f] for f in self.fields())
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return f(self.op.val, *[arg.valmap(f, g, bindings) for arg in self.args])
 
     @classmethod
     def from_children(cls, op, *args):
@@ -234,8 +503,8 @@ class Aggregate(LogicTree, LogicExpression):
         idxs: The dimensions to reduce.
     """
 
-    op: Literal | Value
-    init: Literal | Value
+    op: Literal
+    init: Literal
     arg: LogicExpression
     idxs: tuple[Field, ...]
 
@@ -244,11 +513,28 @@ class Aggregate(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.op, self.init, self.arg, *self.idxs]
 
-    @property
-    def fields(self) -> list[Field]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return [field for field in self.arg.fields if field not in self.idxs]
+        return tuple(field for field in self.arg.fields() if field not in self.idxs)
+
+    def dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> tuple[T | None, ...]:
+        idxs = self.arg.fields()
+        dims = self.arg.dimmap(op, dim_bindings)
+        return tuple(
+            val for idx, val in zip(idxs, dims, strict=True) if idx not in self.idxs
+        )
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return g(self.op.val, self.init.val, self.arg.valmap(f, g, bindings))
 
     @classmethod
     def from_children(cls, op, init, arg, *idxs):
@@ -267,7 +553,7 @@ class Reorder(LogicTree, LogicExpression):
         idxs: The new order of dimensions.
     """
 
-    arg: LogicNode
+    arg: LogicExpression
     idxs: tuple[Field, ...]
 
     @property
@@ -275,10 +561,29 @@ class Reorder(LogicTree, LogicExpression):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    @property
-    def fields(self) -> list[Field]:
+    def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        return [*self.idxs]
+        return self.idxs
+
+    def dimmap(
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
+    ) -> tuple[T | None, ...]:
+        idxs = self.arg.fields()
+        dims = self.arg.dimmap(op, dim_bindings)
+        idx_dims = dict(zip(idxs, dims, strict=True))
+        for idx in idxs:
+            if idx not in self.idxs:
+                # when squeezing a dimension, we combine with None
+                op(idx_dims[idx], None)
+        return tuple(idx_dims.get(f) for f in self.idxs)
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.arg.valmap(f, g, bindings)
 
     @classmethod
     def from_children(cls, arg, *idxs):
@@ -296,73 +601,34 @@ class Relabel(LogicTree, LogicExpression):
         idxs: The new labels for dimensions.
     """
 
-    arg: LogicNode
+    arg: LogicExpression
     idxs: tuple[Field, ...]
+
+    def fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return self.idxs
+
+    def dimmap(
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
+    ) -> tuple[T | None, ...]:
+        return self.arg.dimmap(op, dim_bindings)
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.arg.valmap(f, g, bindings)
 
     @property
     def children(self):
         """Returns the children of the node."""
         return [self.arg, *self.idxs]
 
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        return [*self.idxs]
-
     @classmethod
     def from_children(cls, arg, *idxs):
         return cls(arg, idxs)
-
-
-@dataclass(eq=True, frozen=True)
-class Reformat(LogicTree, LogicExpression):
-    """
-    Represents a logical AST statement that reformats `arg` into the tensor `tns`.
-
-    Attributes:
-        tns: The target tensor.
-        arg: The argument to reformat.
-    """
-
-    tns: LogicNode
-    arg: LogicExpression
-
-    @property
-    def children(self):
-        """Returns the children of the node."""
-        return [self.tns, self.arg]
-
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return self.arg.fields
-
-
-@dataclass(eq=True, frozen=True)
-class Subquery(LogicTree, LogicExpression):
-    """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to
-    `lhs`, and returns `rhs`.
-
-    Attributes:
-        lhs: The left-hand side of the binding.
-        arg: The argument to evaluate.
-    """
-
-    lhs: Alias
-    arg: LogicExpression
-
-    @property
-    def children(self):
-        """Returns the children of the node."""
-        return [self.lhs, self.arg]
-
-    @property
-    def fields(self) -> list[Field]:
-        """Returns fields of the node."""
-        assert isinstance(self.arg, LogicExpression)
-        return self.arg.fields
 
 
 @dataclass(eq=True, frozen=True)
@@ -384,6 +650,39 @@ class Query(LogicTree, LogicStatement):
         """Returns the children of the node."""
         return [self.lhs, self.rhs]
 
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        if self.lhs in dim_bindings:
+            for dim1, dim2 in zip(
+                self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
+            ):
+                op(dim1, dim2)
+        else:
+            dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return dim_bindings
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        if self.lhs in bindings:
+            if self.rhs.valmap(f, g, bindings) != bindings[self.lhs]:
+                raise ValueError(
+                    f"Cannot rebind alias {self.lhs} to a different values"
+                )
+        else:
+            bindings[self.lhs] = self.rhs.valmap(f, g, bindings)
+        return bindings
+
 
 @dataclass(eq=True, frozen=True)
 class Produces(LogicTree, LogicStatement):
@@ -395,7 +694,7 @@ class Produces(LogicTree, LogicStatement):
         args: The arguments to return.
     """
 
-    args: tuple[LogicExpression, ...]
+    args: tuple[Alias, ...]
 
     @property
     def children(self):
@@ -405,6 +704,25 @@ class Produces(LogicTree, LogicStatement):
     @classmethod
     def from_children(cls, *args):
         return cls(args)
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return dim_bindings
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return bindings
 
 
 @dataclass(eq=True, frozen=True)
@@ -418,6 +736,29 @@ class Plan(LogicTree, LogicStatement):
     """
 
     bodies: tuple[LogicStatement, ...] = ()
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        for body in self.bodies:
+            body.infer_dimmap(op, dim_bindings)
+        return dim_bindings
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        for body in self.bodies:
+            body.infer_valmap(f, g, bindings)
+        return bindings
 
     @property
     def children(self):
@@ -465,20 +806,20 @@ class LogicPrinterContext(Context):
             case Alias(name):
                 return str(name)
             case Table(tns, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 return f"Table({self(tns)}, {idxs_e})"
             case MapJoin(op, args):
-                args_e = tuple(self(arg) for arg in args)
+                args_e = ", ".join([self(arg) for arg in args])
                 return f"MapJoin({self(op)}, {args_e})"
             case Aggregate(op, init, arg, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 return f"Aggregate({self(op)}, {self(init)}, {self(arg)}, {idxs_e})"
             case Relabel(arg, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Relabel({arg}, {idxs_e})"
             case Reorder(arg, idxs):
-                idxs_e = [self(idx) for idx in idxs]
+                idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Reorder({self(arg)}, {idxs_e})"
             case Query(lhs, rhs):
@@ -491,12 +832,9 @@ class LogicPrinterContext(Context):
                 self.exec(ctx_2.emit())
                 return None
             case Produces(args):
-                args = tuple(self(arg) for arg in args)
-                self.exec(f"{feed}return {args}\n")
+                args_e = ", ".join([self(arg) for arg in args])
+                self.exec(f"{feed}return {args_e}\n")
                 return None
-            case Subquery(lhs, arg):
-                self.exec(f"{feed}{self(lhs)} = {self(arg)}")
-                return self(lhs)
             case str(label):
                 return label
             case _:
