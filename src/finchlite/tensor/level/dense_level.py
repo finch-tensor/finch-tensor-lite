@@ -1,14 +1,23 @@
 import operator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...codegen import NumpyBufferFType
 from ...compile import LoopletContext
 from ...compile import looplets as lplt
-from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
+from ..fiber_tensor import FiberTensorFType, Level, LevelFType
+
+
+class DenseLevelFields(NamedTuple):
+    lvl: asm.Variable
+    buf_s: NumpyBufferFType
+    pos: asm.Variable | asm.Literal
+    op: asm.Literal
+    dirty_bit: bool
 
 
 @dataclass(unsafe_hash=True)
@@ -33,7 +42,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, *, lvl=None, dimension=None, stride=None, shape=None, val=None):
+    def __call__(self, *, lvl=None, shape=None):
         """
         Creates an instance of DenseLevel with the given ftype.
 
@@ -42,9 +51,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         Returns:
             An instance of DenseLevel.
         """
-        if lvl is not None and dimension is not None:
-            return DenseLevel(self, lvl, dimension)
-        lvl = self.lvl_t(shape=shape[1:], val=val)
+        lvl = self.lvl_t(shape=shape[1:])
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
 
     def __str__(self):
@@ -93,6 +100,9 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def next_level(self):
         return self.lvl_t
 
+    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
+        return DenseLevelFields(tns, buf_s, pos, op, dirty_bit)
+
     def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
         return self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
@@ -123,8 +133,8 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         )
 
     def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
-        assert isinstance(stack.obj, FiberTensorFields)
-        tns: FiberTensorFields = stack.obj
+        assert isinstance(stack.obj, DenseLevelFields)
+        tns: DenseLevelFields = stack.obj
         assert isinstance(stack.type, FiberTensorFType)
         ft_ftype: FiberTensorFType = stack.type
 
@@ -151,7 +161,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 )
             )
             return ntn.Stack(
-                FiberTensorFields(
+                self.lvl_t.get_fields_class(
                     asm.GetAttr(tns.lvl, asm.Literal("lvl")),
                     tns.buf_s,
                     pos_2,

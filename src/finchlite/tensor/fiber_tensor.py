@@ -77,6 +77,9 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
+    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit): ...
+
+    @abstractmethod
     def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         """
         Emit code to unfurl the fiber at position `pos` in the level.
@@ -251,18 +254,6 @@ class FiberTensor(Tensor):
 class FiberTensorFields:
     lvl: asm.AssemblyExpression
     buf_s: asm.Slot
-    pos: asm.Variable | asm.Literal
-    op: Any = None
-    dirty_bit: bool = False
-
-    def update(self, **kwargs):
-        return FiberTensorFields(
-            kwargs.get("lvl", self.lvl),
-            kwargs.get("buf_s", self.buf_s),
-            kwargs.get("pos", self.pos),
-            kwargs.get("op", self.op),
-            kwargs.get("dirty_bit", self.dirty_bit),
-        )
 
 
 @dataclass(unsafe_hash=True)
@@ -288,11 +279,11 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
             ("shape", asm.TupleFType.from_tuple(self.shape_type)),
         ]
 
-    def __call__(self, shape, val=None):
+    def __call__(self, shape):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape=shape, val=val))
+        return FiberTensor(self.lvl_t(shape=shape))
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
@@ -329,10 +320,14 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         tns = ctx.resolve(tns).obj
         assert isinstance(tns, FiberTensorFields)
         op = mode.op if isinstance(mode, ntn.Update) else None
-        tns = tns.update(op=op)
-        return self.lvl_t.level_unfurl(
-            ctx, ntn.Stack(tns, self), ext, mode, proto, tns.pos
+        obj = self.lvl_t.get_fields_class(
+            tns.lvl,
+            tns.buf_s,
+            pos=asm.Literal(self.position_type(0)),
+            op=op,
+            dirty_bit=False,
         )
+        return self.lvl_t.level_unfurl(ctx, ntn.Stack(obj, self), ext, mode, proto)
 
     def lower_freeze(self, ctx, tns, op):
         return self.lvl_t.level_lower_freeze(ctx, tns.obj.buf_s, op, tns.obj.pos)
@@ -361,7 +356,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         """
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
         buf_s = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
-        return FiberTensorFields(val_lvl, buf_s, pos=asm.Literal(self.position_type(0)))
+        return FiberTensorFields(val_lvl, buf_s)
 
     def asm_repack(self, ctx, lhs, obj):
         """

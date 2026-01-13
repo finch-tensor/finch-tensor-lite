@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -7,6 +7,14 @@ from ... import finch_assembly as asm
 from ...codegen import NumpyBufferFType
 from ...symbolic import FType, ftype
 from ..fiber_tensor import Level, LevelFType
+
+
+class ElementLevelFields(NamedTuple):
+    lvl: asm.Variable
+    buf_s: NumpyBufferFType
+    pos: asm.Variable | asm.Literal
+    op: asm.Literal
+    dirty_bit: bool
 
 
 @dataclass(unsafe_hash=True)
@@ -82,15 +90,20 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         ctx.exec(asm.Unpack(buf_s, buf))
         return buf_s
 
+    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
+        return ElementLevelFields(tns, buf_s, pos, op, dirty_bit)
+
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(tns, i_var, asm.Literal(init.val))
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns), body))
 
     def level_lower_unwrap(self, ctx, obj, pos):
+        assert isinstance(obj, ElementLevelFields)
         return asm.Load(obj.buf_s, pos)
 
     def level_lower_increment(self, ctx, obj, val, pos):
+        assert isinstance(obj, ElementLevelFields)
         lowered_pos = asm.Variable(pos.name, pos.type)
         ctx.exec(
             asm.Store(
