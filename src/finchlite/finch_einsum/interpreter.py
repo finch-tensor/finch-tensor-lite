@@ -83,9 +83,14 @@ class EinsumInterpreter(EinsumEvaluator):
         self.verbose = verbose
 
     def __call__(self, node, bindings=None):
+        from ..tensor import SparseTensor
+
         if bindings is None:
             bindings = {}
-        bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
+        bindings = {
+            k: v if isinstance(v, SparseTensor) else self.xp.asarray(v)
+            for k, v in bindings.items()
+        }
         machine = EinsumMachine(
             xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
         )
@@ -210,7 +215,6 @@ class PointwiseEinsumMachine:
             # get non-zero elements/data array of a sparse tensor
             case ein.GetAttr(obj, ein.Literal("elems"), _):
                 obj = self(obj)
-                assert isinstance(ftype(obj), SparseTensorFType)
                 assert isinstance(obj, SparseTensor)
                 return obj.data
             # get coord array of a sparse tensor
