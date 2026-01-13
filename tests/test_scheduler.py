@@ -10,7 +10,10 @@ from finchlite.autoschedule.optimize import (
     lift_fields,
     optimize,
     propagate_copy_queries,
+    propagate_map_queries,
+    propagate_single_use_queries_and_combine_aggregates,
     propagate_transpose_queries,
+    set_loop_order,
 )
 from finchlite.autoschedule.standardize import (
     concordize,
@@ -34,6 +37,124 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic.ftype import ftype
 from finchlite.symbolic.gensym import _sg
+
+
+def test_propagate_map_queries():
+    plan = Plan(
+        (
+            Query(
+                Alias("A10"),
+                Aggregate(Literal("+"), Literal(0), Literal("[1,2,3]"), ()),
+            ),
+            Query(Alias("A11"), Table(Alias("A10"), ())),
+            Produces((Alias("A11"),)),
+        )
+    )
+    expected = Plan(
+        (
+            Query(
+                Alias("A11"),
+                Relabel(MapJoin(Literal("+"), (Literal(0), Literal("[1,2,3]"))), ()),
+            ),
+            Produces((Alias("A11"),)),
+        )
+    )
+
+    result = propagate_map_queries(plan)
+    assert result == expected
+
+
+def test_propagate_single_use_queries_and_combine_aggregates():
+    plan = Plan(
+        (
+            Query(Alias("A0"), Alias("A1")),
+            Table(Alias("A0"), (Field("i0"), Field("i1"))),
+            MapJoin(
+                Literal(mul),
+                (
+                    Table(Literal(10), (Field("i2"),)),
+                    Aggregate(
+                        Literal(add),
+                        Literal(0),
+                        Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
+                        (Field("i3"),),
+                    ),
+                    Table(Literal(10), (Field("i4"),)),
+                ),
+            ),
+            Aggregate(
+                Literal(add),
+                Literal(10),
+                Aggregate(Literal(add), Literal(0), Alias("A2"), (Field("i5"),)),
+                (Field("i6"),),
+            ),
+            Aggregate(
+                Literal(add),
+                Literal(0),
+                Reorder(
+                    Aggregate(
+                        Literal(add),
+                        Literal(0),
+                        Table(
+                            Alias("A3"),
+                            (Field("i10"), Field("i7"), Field("i9"), Field("i8")),
+                        ),
+                        (Field("i7"), Field("i8")),
+                    ),
+                    (Field("i9"), Field("i10")),
+                ),
+                (Field("i9"),),
+            ),
+            Produces(()),
+        )
+    )
+
+    expected = Plan(
+        (
+            Plan(()),
+            Relabel(Alias("A1"), (Field("i0"), Field("i1"))),
+            Aggregate(
+                Literal(add),
+                Literal(0),
+                MapJoin(
+                    Literal(mul),
+                    (
+                        Table(Literal(10), (Field("i2"),)),
+                        Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
+                        Table(Literal(10), (Field("i4"),)),
+                    ),
+                ),
+                (Field("i3"),),
+            ),
+            Aggregate(
+                Literal(add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
+            ),
+            Reorder(
+                Aggregate(
+                    Literal(add),
+                    Literal(0),
+                    Reorder(
+                        Table(
+                            Alias("A3"),
+                            (Field("i10"), Field("i7"), Field("i9"), Field("i8")),
+                        ),
+                        (
+                            Field("i9"),
+                            Field("i7"),
+                            Field("i10"),
+                            Field("i8"),
+                        ),
+                    ),
+                    (Field("i7"), Field("i8"), Field("i9")),
+                ),
+                (Field("i10"),),
+            ),
+            Produces(()),
+        )
+    )
+
+    result = propagate_single_use_queries_and_combine_aggregates(plan)
+    assert result == expected
 
 
 def test_isolate_aggregates():
@@ -395,6 +516,64 @@ def test_concordize():
     )
 
     result = concordize(plan)
+    assert result == expected
+
+
+def test_set_loop_order():
+    plan = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(add),
+            Literal(0),
+            Reorder(
+                MapJoin(
+                    Literal(mul),
+                    (
+                        Reorder(
+                            Table(Alias("A"), (Field("i0"), Field("i1"))),
+                            (Field("i0"), Field("i1")),
+                        ),
+                        Reorder(
+                            Table(Alias("B"), (Field("i1"), Field("i2"))),
+                            (Field("i1"), Field("i2")),
+                        ),
+                    ),
+                ),
+                (Field("i0"), Field("i2"), Field("i1")),
+            ),
+            (Field("i1"),),
+        ),
+    )
+
+    expected = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(add),
+            Literal(0),
+            Reorder(
+                Reorder(
+                    MapJoin(
+                        Literal(mul),
+                        (
+                            Reorder(
+                                Table(Alias("A"), (Field("i0"), Field("i1"))),
+                                (Field("i0"), Field("i1")),
+                            ),
+                            Reorder(
+                                Table(Alias("B"), (Field("i1"), Field("i2"))),
+                                (Field("i1"), Field("i2")),
+                            ),
+                        ),
+                    ),
+                    (Field("i0"), Field("i2"), Field("i1")),
+                ),
+                (Field("i0"), Field("i1"), Field("i2")),
+            ),
+            (Field("i1"),),
+        ),
+    )
+
+    result = set_loop_order(plan)
     assert result == expected
 
 

@@ -89,7 +89,7 @@ def optimize(
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
     def transform(prgm, bindings):
         prgm = push_fields(prgm)
-        prgm = propagate_map_queries_backward(prgm)
+        prgm = propagate_single_use_queries_and_combine_aggregates(prgm)
 
         prgm = isolate_aggregates(prgm)
 
@@ -132,7 +132,6 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
                 return MapJoin(op, (init, arg))
 
     root = Rewrite(PostWalk(rule_0))(root)
-    assert isinstance(root, LogicNode)
     rets = get_productions(root)
     props = {}
 
@@ -148,7 +147,9 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
     return flatten_plans(root)
 
 
-def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
+def propagate_single_use_queries_and_combine_aggregates(
+    root: LogicStatement,
+) -> LogicStatement:
     def rule_0(ex):
         match ex:
             case Aggregate(op, init, arg, ()):
@@ -221,7 +222,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
             ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
                 return Reorder(
                     Aggregate(op_1, init_1, arg, idxs_1 + idxs_2),
-                    setdiff(idxs_3, idxs_1),
+                    setdiff(idxs_3, idxs_2),
                 )
 
         return None
