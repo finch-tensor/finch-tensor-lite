@@ -24,7 +24,7 @@ def test_pass_through(rng):
 
     B = finchlite.einop("B[i,j] = A[i,j]", A=A)
 
-    assert np.allclose(B, A)
+    finch_assert_allclose(B, A)
 
 
 def test_transpose(rng):
@@ -34,7 +34,7 @@ def test_transpose(rng):
     B = finchlite.einop("B[i,j] = A[j, i]", A=A)
     B_ref = A.T
 
-    assert np.allclose(B, B_ref)
+    finch_assert_allclose(B, B_ref)
 
 
 def test_basic_addition_with_transpose(rng):
@@ -1155,13 +1155,7 @@ class TestEinsumIndirectAccess:
         interpreter = ein.EinsumInterpreter(bindings=bindings)
         result = interpreter(prgm)[0]
 
-        import sys
-
-        import numpy as np
-
-        np.set_printoptions(threshold=sys.maxsize)
-
-        assert np.allclose(result, expected)
+        finch_assert_allclose(result, expected)
 
     def test_indirect_elementwise_multiplication(self, rng):
         """Test indirect elementwise multiplication but no indirect assignment"""
