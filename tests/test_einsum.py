@@ -1945,3 +1945,364 @@ class TestEinsumIndirectAccess:
         self.run_einsum_plan(
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
         )
+
+    def test_mixed_same_iterator_indirect_and_direct(self, rng):
+        """
+        Test A[BCoords[i], i] where same iterator 'i' is used both as indirect
+        coordinate lookup AND as direct index.
+
+        Semantics: For each non-zero position in B, access A at row=BCoords[i],
+        col=i where i ranges over 0..nnz-1.
+
+        This tests the diagonal-like access pattern through sparse coordinates.
+        """
+        # A is 5x5, B is sparse with exactly 5 non-zeros so nnz == ncols
+        A = rng.random((5, 5))
+        B = rng.random((5,))  # All non-zero, so nnz = 5
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[BCoords[i], i]
+        # For i in 0..4: access A[coord_i, i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A[BCoords[i], i] for i in 0..nnz-1
+        b_coords = sparse_B.coords.flatten()
+        expected = A[b_coords, np.arange(len(b_coords))]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    @pytest.mark.xfail(
+        reason="Bug: direct index 'i' uses dim_size instead of nnz from indirect access"
+    )
+    def test_mixed_same_iterator_nnz_less_than_dim(self, rng):
+        """
+        Test A[BCoords[i], i] where nnz < dimension size.
+
+        B has fewer non-zeros than A's column dimension.
+        This exposes whether the direct index 'i' correctly uses nnz
+        (from indirect) rather than dim size.
+
+        BUG: The interpreter creates arange(dim_size) for direct index 'i',
+        but should create arange(nnz) to match the indirect access size.
+        """
+        A = rng.random((10, 10))
+        # B has only 3 non-zeros out of 10
+        B = np.zeros((10,))
+        B[2] = rng.random()
+        B[5] = rng.random()
+        B[8] = rng.random()
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+        assert sparse_B.coords.shape[0] == 3  # Verify nnz = 3
+
+        # Result[i] = A[BCoords[i], i] for i in 0..2
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A[coords[0], 0], A[coords[1], 1], A[coords[2], 2]
+        b_coords = sparse_B.coords.flatten()  # [2, 5, 8]
+        expected = A[b_coords, np.arange(len(b_coords))]  # A[2,0], A[5,1], A[8,2]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    @pytest.mark.xfail(
+        reason="Bug: direct indices BEFORE first indirect access are not included in target_axes"
+    )
+    def test_mixed_same_iterator_reversed_order(self, rng):
+        """
+        Test A[i, BCoords[i]] - direct index first, then indirect.
+
+        Same semantics but reversed axis order.
+
+        BUG: The interpreter only looks for indices from start_index onward,
+        missing direct indices that share the same iterator but appear earlier.
+        """
+        A = rng.random((5, 8))
+        B = rng.random((5,))  # nnz = 5
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[i, BCoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("i"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = A[np.arange(len(b_coords)), b_coords]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_with_operation(self, rng):
+        """
+        Test A[BCoords[i], i] * BElems[i] - mixed indexing combined with
+        element access.
+        """
+        A = rng.random((6, 6))
+        B = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[BCoords[i], i] * BElems[i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Index("i"),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        b_elems = sparse_B.data
+        expected = A[b_coords, np.arange(len(b_coords))] * b_elems
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_3d_tensor(self, rng):
+        """
+        Test A[BCoords[i], i, j] - mixed indexing with additional free index.
+
+        Result should have shape (nnz, J).
+        """
+        A = rng.random((4, 4, 5))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i, j] = A[BCoords[i], i, j]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                            ein.Index("j"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        # Expected: A[BCoords[i], i, :] for each i
+        expected = A[b_coords, np.arange(len(b_coords)), :]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    @pytest.mark.xfail(
+        reason="Bug: direct indices BEFORE first indirect access are not included in target_axes"
+    )
+    def test_mixed_same_iterator_sandwich(self, rng):
+        """
+        Test A[i, BCoords[i], i] - direct index on both sides of indirect.
+
+        This tests non-contiguous direct indices sharing the same iterator
+        as an indirect access.
+
+        BUG: The first 'i' at position 0 is not included because target_axes
+        only looks from start_index (position 1) onward.
+        """
+        A = rng.random((4, 6, 4))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[i, BCoords[i], i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("i"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        nnz = len(b_coords)
+        # Expected: A[i, BCoords[i], i] = extract "diagonal" through indirect middle
+        expected = A[np.arange(nnz), b_coords, np.arange(nnz)]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_two_iterators_interleaved(self, rng):
+        """
+        Test A[BCoords[i], j, i] - two different iterators, one used both
+        directly and indirectly.
+
+        This creates a 2D result: for each (i, j), access A[BCoords[i], j, i].
+        """
+        A = rng.random((5, 3, 5))
+        B = rng.random((5,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i, j] = A[BCoords[i], j, i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("j"),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        nnz = len(b_coords)
+        # Expected shape: (nnz, 3)
+        # For each i in 0..nnz-1, j in 0..2: A[BCoords[i], j, i]
+        expected = np.zeros((nnz, 3))
+        for i in range(nnz):
+            for j in range(3):
+                expected[i, j] = A[b_coords[i], j, i]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )

@@ -169,9 +169,7 @@ class PointwiseEinsumMachine:
                 start_index = idxs.index(
                     indirect_idxs[0]
                 )  # index of first indirect access
-                iterator_idxs = indirect_idxs[
-                    0
-                ].get_idxs()  # iterator indicies of the first indirect access
+                iterator_idxs = indirect_idxs[0].get_idxs()  # iterator indicies of the first indirect access
                 assert len(iterator_idxs) == 1
 
                 # get the axes of the idxs that are associated
