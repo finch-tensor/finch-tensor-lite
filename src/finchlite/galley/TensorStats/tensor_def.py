@@ -7,16 +7,20 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra import fill_value, is_idempotent, is_identity
+from finchlite.finch_logic import (
+    MapJoin,
+    Table,
+)
 
 
 class TensorDef:
     def __init__(
         self,
-        index_set: Iterable[str],  # List or order or indices - Tuple - Order matters
+        index_set : tuple[str, ...],
         dim_sizes: Mapping[str, float],
         fill_value: Any,
     ):
-        self._index_set = set(index_set)
+        self._index_set = tuple(index_set)
         self._dim_sizes = OrderedDict(dim_sizes)
         self._fill_value = fill_value
 
@@ -26,14 +30,14 @@ class TensorDef:
             Deep copy of TensorDef fields
         """
         return TensorDef(
-            index_set=self._index_set.copy(),
+            index_set=self._index_set,
             dim_sizes=self._dim_sizes.copy(),
             fill_value=self._fill_value,
-        )
+        ) 
 
     @classmethod
     # indices ->()
-    def from_tensor(cls, tensor: Any, indices: Iterable[str]) -> "TensorDef":
+    def from_tensor(cls, tensor: Any, indices: tuple[str, ...]) -> "TensorDef":
         """
         Storing axis, sizes, and fill_value of the tensor
 
@@ -50,7 +54,7 @@ class TensorDef:
             fill_value=fv,
         )
 
-    def reindex_def(self, new_axis: Iterable[str]) -> "TensorDef":
+    def reindex_def(self, new_axis:tuple[str, ...]) -> "TensorDef":
         """
         Return
             :TensorDef with a new reindexed index_set and dim sizes
@@ -81,7 +85,7 @@ class TensorDef:
         if i == j or i not in self.index_set:
             return self
 
-        new_index_set = (self.index_set - {i}) | {j}
+        new_index_set = tuple(j if x == i else x for x in self.index_set)
         new_dim_sizes = dict(self.dim_sizes)
         new_dim_sizes[j] = new_dim_sizes.pop(i)
 
@@ -101,9 +105,9 @@ class TensorDef:
         """
         if idx in self.index_set:
             return self
+        
 
-        new_index_set = set(self.index_set)
-        new_index_set.add(idx)
+        new_index_set = self.index_set + (idx,)
         new_dim_sizes = dict(self.dim_sizes)
         new_dim_sizes[idx] = 1.0
 
@@ -121,12 +125,12 @@ class TensorDef:
         return self.dim_sizes[idx]
 
     @property
-    def index_set(self) -> set[str]:
+    def index_set(self) -> tuple[str, ...]:
         return self._index_set
 
     @index_set.setter
     def index_set(self, value: Iterable[str]):
-        self._index_set = set(value)
+        self._index_set = tuple(value)
 
     @property
     def fill_value(self) -> Any:
@@ -136,7 +140,7 @@ class TensorDef:
     def fill_value(self, value: Any):
         self._fill_value = value
 
-    def get_dim_space_size(self, idx: Iterable[str]) -> float:
+    def get_dim_space_size(self, idx:tuple[str, ...]) -> float:
         prod = 1
         for i in idx:
             prod *= int(self.dim_sizes[i])
@@ -159,23 +163,23 @@ class TensorDef:
             TensorDef: A new TensorDef representing the merged tensor.
         """
         new_fill_value = op(*(s.fill_value for s in args))
-        new_index_set = set().union(
-            *(s.index_set for s in args)
-        )  # TableNode -> Mapjoin -> .fields
+        new_index_set = MapJoin(op, [
+            Table(f"_{i}", list(a.index_set)) for i, a in enumerate(args)
+        ]).fields()
         new_dim_sizes: dict = {}
         for index in new_index_set:
             for s in args:
                 if index in s.index_set:
                     new_dim_sizes[index] = s.dim_sizes[index]
                     break
-        assert set(new_dim_sizes.keys()) == new_index_set
+        assert set(new_dim_sizes.keys()) == set(new_index_set)
         return TensorDef(new_index_set, new_dim_sizes, new_fill_value)
 
     @staticmethod
     def aggregate(
         op: Callable,
         init: Any | None,
-        reduce_indices: Iterable[str],
+        reduce_indices: tuple[str, ...],
         d: "TensorDef",
     ) -> "TensorDef":
         """
@@ -190,7 +194,7 @@ class TensorDef:
             The reduction operator.
         init : Any | None
             Explicit initial value for the reduction
-        reduce_indices : Iterable[str]
+        reduce_indices : tuple[str,...]
             Axis names to reduce/eliminate from the definition.
         d : TensorDef
             The input tensor definition.
@@ -226,5 +230,5 @@ class TensorDef:
         new_dim_sizes = OrderedDict(
             (ax, d.dim_sizes[ax]) for ax in d.dim_sizes if ax not in red_set
         )
-        new_index_set = set(new_dim_sizes)
+        new_index_set = tuple(new_dim_sizes)
         return TensorDef(new_index_set, new_dim_sizes, init)

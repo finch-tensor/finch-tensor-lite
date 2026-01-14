@@ -3,7 +3,7 @@ from typing import Any, Self
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
-
+from collections import OrderedDict
 
 class DenseStats(TensorStats):
     @classmethod
@@ -29,12 +29,12 @@ class DenseStats(TensorStats):
 
     @staticmethod
     def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
-        new_axes = set().union(*(s.index_set for s in args))
+        all_axes = [ax for s in args for ax in s.index_set]
+        new_axes = tuple(dict.fromkeys(all_axes))
 
-        new_dims = {
-            ax: next(s.get_dim_size(ax) for s in args if ax in s.index_set)
-            for ax in new_axes
-        }
+        new_dims = OrderedDict(
+        (ax, next(s.get_dim_size(ax) for s in args if ax in s.index_set)) 
+        for ax in new_axes)
 
         axes_sets = [set(s.index_set) for s in args]
 
@@ -43,7 +43,7 @@ class DenseStats(TensorStats):
         else:
             same_axes = all(axes_sets[0] == axes for axes in axes_sets)
             new_fill = op(*(s.fill_value for s in args)) if same_axes else 0.0
-
+         
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)
 
@@ -51,11 +51,11 @@ class DenseStats(TensorStats):
     def aggregate(
         op: Callable[..., Any],
         init: Any | None,
-        reduce_indices: Iterable[str],
+        reduce_indices: tuple[str,...],
         stats: "TensorStats",
     ) -> "DenseStats":
-        new_axes = set(stats.index_set) - set(reduce_indices)
-        new_dims = {m: stats.get_dim_size(m) for m in new_axes}
+        new_axes = tuple(ax for ax in stats.index_set if ax not in reduce_indices)
+        new_dims = OrderedDict((m, stats.get_dim_size(m)) for m in new_axes)
         new_fill = stats.fill_value
 
         new_def = TensorDef(new_axes, new_dims, new_fill)
@@ -71,25 +71,24 @@ class DenseStats(TensorStats):
         )
 
     @staticmethod
-    def relabel(stats: "TensorStats", relabel_indices: Iterable[str]) -> "DenseStats":
-        new_axes = set(relabel_indices)
-        new_dims = {m: stats.get_dim_size(m) for m in new_axes}
+    def relabel(stats: "TensorStats", relabel_indices: tuple[str, ...]) -> "DenseStats":
+        new_axes = tuple(relabel_indices)
+        new_dims = OrderedDict((m, stats.get_dim_size(m)) for m in new_axes)
         new_fill = stats.fill_value
         new_def = TensorDef(new_axes, new_dims, new_fill)
         return DenseStats.from_def(new_def)
 
     @staticmethod
-    def reorder(stats: "TensorStats", reorder_indices: Iterable[str]) -> "DenseStats":
-        new_axes = set(reorder_indices)
+    def reorder(stats: "TensorStats", reorder_indices: tuple[str, ...]) -> "DenseStats":
         for old_idx in stats.index_set:
-            if old_idx not in new_axes and stats.get_dim_size(old_idx) != 1:
+            if old_idx not in set(reorder_indices) and stats.get_dim_size(old_idx) != 1:
                 raise ValueError(
                     f"Trying to drop dimension '{old_idx}' of size"
                     f" {stats.get_dim_size(old_idx)}."
                     " Only size 1 dimensions can be dropped."
                 )
 
-        new_dims = {}
+        new_dims = OrderedDict()
         for idx in reorder_indices:
             if idx in stats.index_set:
                 new_dims[idx] = stats.get_dim_size(idx)
