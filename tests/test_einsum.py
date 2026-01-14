@@ -1996,19 +1996,13 @@ class TestEinsumIndirectAccess:
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
         )
 
-    @pytest.mark.xfail(
-        reason="Bug: direct index 'i' uses dim_size instead of nnz from indirect access"
-    )
     def test_mixed_same_iterator_nnz_less_than_dim(self, rng):
         """
         Test A[BCoords[i], i] where nnz < dimension size.
 
         B has fewer non-zeros than A's column dimension.
-        This exposes whether the direct index 'i' correctly uses nnz
+        This tests that the direct index 'i' correctly uses nnz
         (from indirect) rather than dim size.
-
-        BUG: The interpreter creates arange(dim_size) for direct index 'i',
-        but should create arange(nnz) to match the indirect access size.
         """
         A = rng.random((10, 10))
         # B has only 3 non-zeros out of 10
@@ -2053,17 +2047,11 @@ class TestEinsumIndirectAccess:
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
         )
 
-    @pytest.mark.xfail(
-        reason="Bug: direct indices BEFORE first indirect access are not included in target_axes"
-    )
     def test_mixed_same_iterator_reversed_order(self, rng):
         """
         Test A[i, BCoords[i]] - direct index first, then indirect.
 
         Same semantics but reversed axis order.
-
-        BUG: The interpreter only looks for indices from start_index onward,
-        missing direct indices that share the same iterator but appear earlier.
         """
         A = rng.random((5, 8))
         B = rng.random((5,))  # nnz = 5
@@ -2203,18 +2191,12 @@ class TestEinsumIndirectAccess:
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
         )
 
-    @pytest.mark.xfail(
-        reason="Bug: direct indices BEFORE first indirect access are not included in target_axes"
-    )
     def test_mixed_same_iterator_sandwich(self, rng):
         """
         Test A[i, BCoords[i], i] - direct index on both sides of indirect.
 
         This tests non-contiguous direct indices sharing the same iterator
         as an indirect access.
-
-        BUG: The first 'i' at position 0 is not included because target_axes
-        only looks from start_index (position 1) onward.
         """
         A = rng.random((4, 6, 4))
         B = rng.random((4,))

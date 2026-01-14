@@ -143,51 +143,41 @@ class PointwiseEinsumMachine:
                 )
                 return tns.flat[flat_idx]  # return a 1-d array by definition
 
-            # access a tensor with a mixture of indices and other expressions
-            case ein.Access(tns, idxs):
+            # access a tensor with an indirect access index
+            case ein.Access(tns, idxs) if any(not isinstance(idx, ein.Index) for idx in idxs):
                 assert self.loops is not None
 
                 tns = self(tns)
                 indirect_idxs = [idx for idx in idxs if not isinstance(idx, ein.Index)]
 
-                # base case: no indirect indices, just permute the dimensions
-                if len(indirect_idxs) == 0:
-                    perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                    if hasattr(tns, "ndim") and len(perm) < tns.ndim:
-                        perm += list(range(len(perm), tns.ndim))
-
-                    tns = xp.permute_dims(tns, perm)  # permute the dimensions
-                    return xp.expand_dims(
-                        tns,
-                        [
-                            i
-                            for i in range(len(self.loops))
-                            if self.loops[i] not in idxs
-                        ],
-                    )
-
-                start_index = idxs.index(
-                    indirect_idxs[0]
-                )  # index of first indirect access
-                iterator_idxs = indirect_idxs[0].get_idxs()  # iterator indicies of the first indirect access
+                # iterator indices of the first indirect access
+                iterator_idxs = indirect_idxs[0].get_idxs()
                 assert len(iterator_idxs) == 1
 
-                # get the axes of the idxs that are associated
-                # with the current iterator indicies
+                # get all indices that share the same iterator
                 target_axes = [
                     i
-                    for i, idx in enumerate(idxs[start_index:], start_index)
+                    for i, idx in enumerate(idxs)
                     if idx.get_idxs().issubset(iterator_idxs)
                 ]
 
-                # get associated access indicies w/ the first indirect access
+                # get associated access indices w/ the first indirect access
                 current_idxs = [idxs[i] for i in target_axes]
 
-                # evaluate the associated access indicies
-                evaled_idxs = [
-                    xp.arange(tns.shape[idxs.index(idx)])
+                # Find the first indirect access to get the iterator size
+                first_indirect = indirect_idxs[0]
+                indirect_result = self(first_indirect).flat
+                iterator_size = len(indirect_result)
+
+                # evaluate the associated access indices
+                evaled_idxs: list[np.ndarray] = [
+                    xp.arange(iterator_size)
                     if isinstance(idx, ein.Index)
-                    else self(idx).flat
+                    else (
+                        indirect_result
+                        if idx is first_indirect
+                        else self(idx).flat
+                    )
                     for idx in current_idxs
                 ]
 
@@ -198,23 +188,46 @@ class PointwiseEinsumMachine:
                 tns = tns[tuple(evaled_idxs)]
 
                 # restore original tensor axis order
+                # Use min of target_axes since we now include all matching axes
                 tns = xp.moveaxis(tns, source=0, destination=target_axes[0])
 
-                # we recursiveley call the interpreter with the remaining idxs
-                iterator_idx = next(iter(iterator_idxs))
-                new_idxs = (
-                    list(idxs[:start_index])
-                    + [iterator_idx]
-                    + [
-                        idx
-                        for idx in idxs[start_index + 1 :]
-                        if idx not in current_idxs
-                    ]
-                )
+                # we recursively call the interpreter with the remaining idxs
+                [iterator_idx] = iterator_idxs
+                # Build new_idxs: replace all current_idxs with iterator_idx at
+                # the position of the first target axis
+                new_idxs = []
+                iterator_placed = False
+                j = 0
+                for idx in idxs:
+                    if j < len(current_idxs) and idx == current_idxs[j]:
+                        if not iterator_placed:
+                            new_idxs.append(iterator_idx)
+                            iterator_placed = True
+                        # skip other current_idxs
+                        j += 1
+                    else:
+                        new_idxs.append(idx)
 
                 new_access = ein.Access(ein.Literal(tns), new_idxs)
                 return self(new_access)
+            # access a tensor with a mixture of indices and other expressions
+            case ein.Access(tns, idxs):
+                assert self.loops is not None
 
+                tns = self(tns)
+                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
+                    perm += list(range(len(perm), tns.ndim))
+
+                tns = xp.permute_dims(tns, perm)  # permute the dimensions
+                return xp.expand_dims(
+                    tns,
+                    [
+                        i
+                        for i in range(len(self.loops))
+                        if self.loops[i] not in idxs
+                    ],
+                )
             # get non-zero elements/data array of a sparse tensor
             case ein.GetAttr(obj, ein.Literal("elems"), _):
                 obj = self(obj)
