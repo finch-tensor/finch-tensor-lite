@@ -219,6 +219,16 @@ class AssemblyInterpreter(AssemblyLoader):
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
+            case asm.LoadDict(dct, idx):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                return map_e.load(idx_e)
+            case asm.ExistsDict(dct, idx):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                return map_e.exists(idx_e)
             case asm.Store(buf, idx, val):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -226,6 +236,12 @@ class AssemblyInterpreter(AssemblyLoader):
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
+            case asm.StoreDict(dct, idx, val):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                val_e = self(val)
+                return map_e.store(idx_e, val_e)
             case asm.Resize(buf, len_):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -316,7 +332,7 @@ class AssemblyInterpreter(AssemblyLoader):
                     ctx_2(body)
                     if ctx_2.function_state.should_halt:
                         ret_e = ctx_2.function_state.return_value
-                        if not check_isinstance(ret_e, ret_t):
+                        if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
                                 f"for function '{func_n}'."

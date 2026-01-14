@@ -7,12 +7,10 @@ from typing import Any, cast
 
 import numpy as np
 
-import finchlite as fl
-import finchlite.finch_notation as ntn
-from finchlite.algebra import is_annihilator
-from finchlite.algebra.tensor import Tensor
-from finchlite.compile import dimension
-
+from ... import finch_notation as ntn
+from ...algebra import Tensor, is_annihilator
+from ...compile import BufferizedNDArray, dimension
+from ...interface import asarray
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
@@ -104,13 +102,13 @@ class DCStats(TensorStats):
             ntn.Variable(f"{fields[i]}", np.int64) for i in range(ndims)
         ]
         dim_array_variables = [
-            ntn.Variable(f"x_{fields[i]}", fl.BufferizedNDArray) for i in range(ndims)
+            ntn.Variable(f"x_{fields[i]}", BufferizedNDArray) for i in range(ndims)
         ]
         dim_size_variables = [
             ntn.Variable(f"n_{fields[i]}", np.int64) for i in range(ndims)
         ]
         dim_array_slots = [
-            ntn.Slot(f"x_{fields[i]}_", fl.BufferizedNDArray) for i in range(ndims)
+            ntn.Slot(f"x_{fields[i]}_", BufferizedNDArray) for i in range(ndims)
         ]
         dim_proj_variables = [
             ntn.Variable(f"proj_{fields[i]}", np.int64) for i in range(ndims)
@@ -299,7 +297,7 @@ class DCStats(TensorStats):
         )
         mod = ntn.NotationInterpreter()(prgm)
 
-        dim_array_instances = [fl.asarray(np.zeros(arr.shape[i])) for i in range(ndims)]
+        dim_array_instances = [asarray(np.zeros(arr.shape[i])) for i in range(ndims)]
         dc_proj_pairs = mod.array_to_dcs(arr, *dim_array_instances)
         dcs = set()
         for i in range(ndims):
@@ -398,10 +396,10 @@ class DCStats(TensorStats):
 
         dij = ntn.Variable("dij", np.int64)
 
-        xi = ntn.Variable("xi", fl.BufferizedNDArray)
-        xi_ = ntn.Slot("xi_", fl.BufferizedNDArray)
-        yj = ntn.Variable("yj", fl.BufferizedNDArray)
-        yj_ = ntn.Slot("yj_", fl.BufferizedNDArray)
+        xi = ntn.Variable("xi", BufferizedNDArray)
+        xi_ = ntn.Slot("xi_", BufferizedNDArray)
+        yj = ntn.Variable("yj", BufferizedNDArray)
+        yj_ = ntn.Slot("yj_", BufferizedNDArray)
 
         d_i = ntn.Variable("d_i", np.int64)
         d_i_j = ntn.Variable("d_i_j", np.int64)
@@ -663,8 +661,8 @@ class DCStats(TensorStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         d_ij = mod.matrix_total_nnz(arr)
-        xi = fl.asarray(np.zeros(arr.shape[0]))
-        yj = fl.asarray(np.zeros(arr.shape[1]))
+        xi = asarray(np.zeros(arr.shape[0]))
+        yj = asarray(np.zeros(arr.shape[1]))
         d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr, xi, yj)
         i_field, j_field = tuple(fields)
 

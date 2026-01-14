@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from finchlite.finch_logic import (
+from ...finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -14,8 +14,8 @@ from finchlite.finch_logic import (
     Table,
     Value,
 )
-from finchlite.galley.TensorStats import TensorStats
 from finchlite.interface import LazyTensor
+from ..TensorStats import TensorStats
 
 
 def insert_statistics(
@@ -74,28 +74,17 @@ def insert_statistics(
             child = insert_statistics(ST, node.arg, bindings, replace, cache)
             cache[node] = child
             return child
-
-        # We need implementation for reformat and relabel
-
+        
         case Table():
-            if not isinstance(node.tns, Literal):
-                raise TypeError("Table.tns must be Literal(...).")
-
-            tensor = node.tns.val
-            idxs = [f.name for f in node.idxs]
+            if isinstance(node.tns, Literal):
+                idxs = [f.name for f in node.idxs]
+                tensor = ST(node.tns.val, idxs)
+            elif isinstance(node.tns, Alias):
+                tensor = bindings[node.tns]
 
             if (node not in cache) or replace:
-                cache[node] = ST(tensor, idxs)
+                cache[node] = tensor
             return cache[node]
-
-        case Value() | Literal():
-            val = node.val if isinstance(node, Literal) else node.ex
-            st = ST(val)
-            cache[node] = st
-            return st
-
-        case _:
-            raise TypeError(f"Unsupported node type: {type(node).__name__}")
 
 
 def get_lazy_tensor_stats(

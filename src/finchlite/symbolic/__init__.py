@@ -39,6 +39,7 @@ __all__ = [
     "Term",
     "TermTree",
     "fisinstance",
+    "fisinstance",
     "ftype",
     "gensym",
     "intree",

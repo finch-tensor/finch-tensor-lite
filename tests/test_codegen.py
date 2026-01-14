@@ -27,6 +27,7 @@ from finchlite.codegen.c_codegen import (
     deserialize_from_c,
     serialize_to_c,
 )
+from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_codegen import (
     construct_from_numba,
@@ -164,8 +165,8 @@ def test_codegen(compiler, buffer):
     ],
 )
 def test_dot_product_malloc(compiler, buffer):
-    a = [1, 2, 3]
-    b = [4, 5, 6]
+    a = [1.0, 2.0, 3.0]
+    b = [4.0, 5.0, 6.0]
 
     a_buf = buffer(len(a), np.float64, a)
     b_buf = buffer(len(b), np.float64, b)
@@ -238,11 +239,15 @@ def test_dot_product_malloc(compiler, buffer):
 
 
 @pytest.mark.parametrize(
-    ["new_size"],
-    [(1,), (5,), (10,)],
+    ["compiler", "new_size"],
+    [
+        [compiler, size]
+        for compiler in (asm.AssemblyInterpreter(), CCompiler())
+        for size in [1, 5, 10]
+    ],
 )
-def test_malloc_resize(new_size):
-    a = [1, 4, 3, 4]
+def test_malloc_resize(compiler, new_size):
+    a = [1.0, 4.0, 3.0, 4.0]
 
     ab = MallocBuffer(len(a), np.float64, a)
 
@@ -267,7 +272,7 @@ def test_malloc_resize(new_size):
             ),
         )
     )
-    mod = CCompiler()(prgm)
+    mod = compiler(prgm)
     assert mod.length(ab) == new_size
     assert ab.length() == new_size
     for i in range(new_size):
@@ -948,3 +953,190 @@ def test_e2e_numba(fmt_fn, dtype):
     finch_assert_equal(result, a @ b)
 
     finchlite.set_default_scheduler(ctx=ctx)
+
+
+@pytest.mark.parametrize(
+    ["compiler", "constructor"],
+    [
+        (
+            CCompiler(),
+            CHashTable,
+        ),
+        (
+            asm.AssemblyInterpreter(),
+            CHashTable,
+        ),
+        (
+            NumbaCompiler(),
+            NumbaHashTable,
+        ),
+        (
+            asm.AssemblyInterpreter(),
+            NumbaHashTable,
+        ),
+    ],
+)
+def test_hashtable(compiler, constructor):
+    table = constructor(
+        asm.TupleFType.from_tuple((int, int)),
+        asm.TupleFType.from_tuple((int, int, int)),
+    )
+
+    table_v = asm.Variable("a", ftype(table))
+    table_slt = asm.Slot("a_", ftype(table))
+
+    key_type = table.ftype.key_type
+    val_type = table.ftype.value_type
+    key_v = asm.Variable("key", key_type)
+    val_v = asm.Variable("val", val_type)
+
+    module = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("setidx", val_type),
+                (table_v, key_v, val_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.StoreDict(
+                            table_slt,
+                            key_v,
+                            val_v,
+                        ),
+                        asm.Repack(table_slt),
+                        asm.Return(asm.LoadDict(table_slt, key_v)),
+                    )
+                ),
+            ),
+            asm.Function(
+                asm.Variable("exists", bool),
+                (table_v, key_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.Return(asm.ExistsDict(table_slt, key_v)),
+                    )
+                ),
+            ),
+        )
+    )
+    compiled = compiler(module)
+    assert compiled.setidx(
+        table,
+        key_type.from_fields(1, 2),
+        val_type.from_fields(2, 3, 4),
+    ) == val_type.from_fields(2, 3, 4)
+
+    assert compiled.setidx(
+        table,
+        key_type.from_fields(1, 4),
+        val_type.from_fields(3, 4, 1),
+    ) == val_type.from_fields(3, 4, 1)
+
+    assert compiled.exists(table, key_type.from_fields(1, 2))
+
+    assert not compiled.exists(table, key_type.from_fields(1, 3))
+
+    assert not compiled.exists(table, val_type.from_fields(2, 3))
+
+
+@pytest.mark.parametrize(
+    ["compiler", "tabletype"],
+    [
+        (CCompiler(), CHashTable),
+        (asm.AssemblyInterpreter(), CHashTable),
+        (NumbaCompiler(), NumbaHashTable),
+        (asm.AssemblyInterpreter(), NumbaHashTable),
+    ],
+)
+def test_multiple_hashtable(compiler, tabletype):
+    """
+    This test exists because in the case of C, we might need to dump multiple
+    hash table definitions into the context.
+
+    So I am not gonna touch heterogeneous structs right now because the hasher
+    hashes the padding bytes too (even though they are worse than useless)
+    """
+
+    def _int_tupletype(arity):
+        return asm.TupleFType.from_tuple(tuple(int for _ in range(arity)))
+
+    def func(table, num: int):
+        key_type = table.ftype.key_type
+        val_type = table.ftype.value_type
+        key_v = asm.Variable("key", key_type)
+        val_v = asm.Variable("val", val_type)
+        table_v = asm.Variable("a", ftype(table))
+        table_slt = asm.Slot("a_", ftype(table))
+        return asm.Function(
+            asm.Variable(f"setidx_{num}", val_type),
+            (table_v, key_v, val_v),
+            asm.Block(
+                (
+                    asm.Unpack(table_slt, table_v),
+                    asm.StoreDict(
+                        table_slt,
+                        key_v,
+                        val_v,
+                    ),
+                    asm.Repack(table_slt),
+                    asm.Return(asm.LoadDict(table_slt, key_v)),
+                )
+            ),
+        )
+
+    table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
+    table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
+    table3 = tabletype(
+        asm.TupleFType.from_tuple((float, int)),
+        asm.TupleFType.from_tuple((float, float)),
+    )
+    table4 = tabletype(
+        asm.TupleFType.from_tuple((float, asm.TupleFType.from_tuple((int, float)))),
+        asm.TupleFType.from_tuple((float, float)),
+    )
+    nestedtype = asm.TupleFType.from_tuple((int, float))
+    table5 = tabletype(int, int)
+
+    mod = compiler(
+        asm.Module(
+            (
+                func(table1, 1),
+                func(table2, 2),
+                func(table3, 3),
+                func(table4, 4),
+                func(table5, 5),
+            )
+        )
+    )
+
+    # what's important here is that you can call setidx_1 on table1 and
+    # setidx_2 on table2.
+    assert mod.setidx_1(
+        table1,
+        table1.key_type.from_fields(1, 2),
+        table1.value_type.from_fields(2, 3, 4),
+    ) == table1.value_type.from_fields(2, 3, 4)
+
+    assert mod.setidx_2(
+        table2,
+        table2.key_type.from_fields(1),
+        table2.value_type.from_fields(2, 3, 4, 5),
+    ) == table2.value_type.from_fields(2, 3, 4, 5)
+
+    assert mod.setidx_3(
+        table3,
+        table3.key_type.from_fields(0.1, 2),
+        table3.value_type.from_fields(0.2, 0.2),
+    ) == table3.value_type.from_fields(0.2, 0.2)
+
+    assert mod.setidx_4(
+        table4,
+        table4.key_type.from_fields(
+            0.1,
+            nestedtype.from_fields(1, 0.2),
+        ),
+        table4.value_type.from_fields(0.2, 0.2),
+    ) == table4.value_type.from_fields(0.2, 0.2)
+
+    assert mod.setidx_5(table5, 3, 2) == 2

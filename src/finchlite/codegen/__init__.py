@@ -6,6 +6,12 @@ from .c_codegen import (
     CKernel,
     CLibrary,
 )
+from .hashtable import (
+    CHashTable,
+    CHashTableFType,
+    NumbaHashTable,
+    NumbaHashTableFType,
+)
 from .numba_codegen import (
     NumbaCompiler,
     NumbaGenerator,
@@ -22,6 +28,8 @@ __all__ = [
     "CCode",
     "CCompiler",
     "CGenerator",
+    "CHashTable",
+    "CHashTableFType",
     "CKernel",
     "CLibrary",
     "CLowerer",
@@ -30,6 +38,8 @@ __all__ = [
     "NumbaCode",
     "NumbaCompiler",
     "NumbaGenerator",
+    "NumbaHashTable",
+    "NumbaHashTableFType",
     "NumbaKernel",
     "NumbaLibrary",
     "NumbaLowerer",

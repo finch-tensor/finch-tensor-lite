@@ -15,27 +15,10 @@ from ..finch_logic import (
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler, NotationGenerator
 from .executor import LogicExecutor
-from .normalize import LogicNormalizer
-from .optimize import (
-    DefaultLogicOptimizer,
-    concordize,
-    flatten_plans,
-    isolate_aggregates,
-    isolate_tables,
-    lift_fields,
-    materialize_squeeze_expand_productions,
-    normalize_names,
-    optimize,
-    pretty_labels,
-    propagate_copy_queries,
-    propagate_fields,
-    propagate_map_queries,
-    propagate_map_queries_backward,
-    propagate_transpose_queries,
-    push_fields,
-    set_loop_order,
-)
-from .stages import LogicNotationLowerer
+from .normalize import LogicNormalizer, normalize_names
+from .optimize import DefaultLogicOptimizer
+from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .standardize import LogicStandardizer
 
 __all__ = [
     "Aggregate",
@@ -44,9 +27,11 @@ __all__ = [
     "Field",
     "Literal",
     "LogicCompiler",
+    "LogicEinsumLowerer",
     "LogicExecutor",
     "LogicNormalizer",
     "LogicNotationLowerer",
+    "LogicStandardizer",
     "MapJoin",
     "NotationGenerator",
     "Plan",
@@ -59,22 +44,5 @@ __all__ = [
     "Reorder",
     "Table",
     "Value",
-    "concordize",
-    "flatten_plans",
-    "isolate_aggregates",
-    "isolate_tables",
-    "lift_fields",
-    "lift_subqueries",
-    "materialize_squeeze_expand_productions",
     "normalize_names",
-    "optimize",
-    "pretty_labels",
-    "propagate_copy_queries",
-    "propagate_copy_queries",
-    "propagate_fields",
-    "propagate_map_queries",
-    "propagate_map_queries_backward",
-    "propagate_transpose_queries",
-    "push_fields",
-    "set_loop_order",
 ]
