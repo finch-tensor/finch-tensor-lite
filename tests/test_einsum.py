@@ -2368,7 +2368,6 @@ class TestEinsumIndirectAccess:
 
     def test_indirect_min_reduction(self, rng):
         """Test indirect access with min reduction: Result min= A[BCoords[i]]"""
-        from finchlite.algebra import promote_min
 
         A = rng.random((6,))
         B = rng.random((6,))
@@ -2620,7 +2619,7 @@ class TestEinsumIndirectAccess:
         )
 
     def test_two_sparse_iterators_outer_product(self, rng):
-        """A[BCoords[i]] * C[DCoords[j]] with independent iterators producing 2D result."""
+        """Result[i, j] = A[BCoords[i]] * C[DCoords[j]]"""
         B = np.zeros((6,))
         B[[0, 3, 5]] = rng.random(3)
         sparse_B = SparseTensor.from_dense_tensor(B)

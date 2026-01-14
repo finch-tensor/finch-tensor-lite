@@ -144,7 +144,9 @@ class PointwiseEinsumMachine:
                 return tns.flat[flat_idx]  # return a 1-d array by definition
 
             # access a tensor with an indirect access index
-            case ein.Access(tns, idxs) if any(not isinstance(idx, ein.Index) for idx in idxs):
+            case ein.Access(tns, idxs) if any(
+                not isinstance(idx, ein.Index) for idx in idxs
+            ):
                 assert self.loops is not None
 
                 tns = self(tns)
@@ -173,11 +175,7 @@ class PointwiseEinsumMachine:
                 evaled_idxs: list[np.ndarray] = [
                     xp.arange(iterator_size)
                     if isinstance(idx, ein.Index)
-                    else (
-                        indirect_result
-                        if idx is first_indirect
-                        else self(idx).flat
-                    )
+                    else (indirect_result if idx is first_indirect else self(idx).flat)
                     for idx in current_idxs
                 ]
 
@@ -222,11 +220,7 @@ class PointwiseEinsumMachine:
                 tns = xp.permute_dims(tns, perm)  # permute the dimensions
                 return xp.expand_dims(
                     tns,
-                    [
-                        i
-                        for i in range(len(self.loops))
-                        if self.loops[i] not in idxs
-                    ],
+                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
             # get non-zero elements/data array of a sparse tensor
             case ein.GetAttr(obj, ein.Literal("elems"), _):
