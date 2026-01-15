@@ -62,13 +62,7 @@ def insert_statistics(
             st = ST.aggregate(op, init, reduce_indices, arg)
             cache[node] = st
             return st
-
-        case Alias():
-            st = bindings.get(node)
-            if st is None:
-                raise ValueError(f"No TensorStats bound to alias {node}")
-            cache[node] = st
-            return st
+        
 
         case Reorder():
             child = insert_statistics(ST, node.arg, bindings, replace, cache)
@@ -80,7 +74,12 @@ def insert_statistics(
                 idxs = [f.name for f in node.idxs]
                 tensor = ST(node.tns.val, idxs)
             elif isinstance(node.tns, Alias):
-                tensor = bindings[node.tns]
+                base_stats = bindings.get(node.tns)
+                if base_stats is None :
+                    raise ValueError(f"No TensorStats bound to alias {node.tns}")
+                
+                new_indices = tuple(f.name for f in node.idxs)
+                tensor = ST.relabel(node.tns,new_indices)
 
             if (node not in cache) or replace:
                 cache[node] = tensor

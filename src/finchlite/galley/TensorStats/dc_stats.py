@@ -1576,18 +1576,22 @@ class DCStats(TensorStats):
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
         return min_weight
-
+    
     @staticmethod
-    def relabel(stats: "TensorStats", relabel_indices: Iterable[str]) -> "DCStats":
+    def relabel(stats: "TensorStats", relabel_indices: tuple[str, ...]) -> "DCStats":
+        '''
         new_axes = set(relabel_indices)
         new_dims = {m: stats.get_dim_size(m) for m in new_axes}
         new_fill = stats.fill_value
-        new_def = TensorDef(new_axes, new_dims, new_fill)
+        '''
+        d = stats.tensordef
+        new_def = TensorDef.relabel(d,relabel_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs)
 
     @staticmethod
-    def reorder(stats: "TensorStats", reorder_indices: Iterable[str]) -> "DCStats":
+    def reorder(stats: "TensorStats", reorder_indices: tuple[str, ...]) -> "DCStats":
+        '''
         new_axes = set(reorder_indices)
         for old_idx in stats.index_set:
             if old_idx not in new_axes and stats.get_dim_size(old_idx) != 1:
@@ -1603,7 +1607,8 @@ class DCStats(TensorStats):
                 new_dims[idx] = stats.get_dim_size(idx)
             else:
                 new_dims[idx] = 1
-
-        new_def = TensorDef(new_axes, new_dims, stats.fill_value)
+        '''
+        d = stats.tensordef
+        new_def = TensorDef.reorder(d,reorder_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs)

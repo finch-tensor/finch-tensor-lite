@@ -331,6 +331,30 @@ def test_aggregate_and_issimilar():
     assert ds_agg.fill_value == dsa.fill_value
     assert DenseStats.issimilar(dsa, dsa)
 
+def test_relabel_dense_stats():
+    arr = fl.asarray(np.zeros((2, 3)))
+    table = Table(Literal(arr), (Field("i"), Field("j")))
+    
+    stats = insert_statistics(
+        ST=DenseStats,
+        node=table,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    new_stats = DenseStats.relabel(stats, ("row", "col"))
+
+    assert new_stats.index_set == ("row", "col")
+
+    assert new_stats.get_dim_size("row") == 2.0
+    
+    assert new_stats.get_dim_size("col") == 3.0
+
+    assert new_stats.fill_value == stats.fill_value
+
+    with pytest.raises(ValueError):
+        DenseStats.relabel(stats, ("x", "y", "z"))
 
 # ─────────────────────────────── DCStats tests ─────────────────────────────
 
@@ -1367,7 +1391,6 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
 
 # ─────────────────────────────── Annotated_Query tests ─────────────────────────────
 @pytest.mark.parametrize(
