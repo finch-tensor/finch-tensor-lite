@@ -200,3 +200,11 @@ register_property(
     "return_type",
     tuple_return_type,
 )
+
+
+register_property(
+    make_tuple,
+    "numba_literal",
+    "__attr__",
+    lambda func, ctx, *args: f"({','.join([ctx(arg) for arg in args])},)",
+)

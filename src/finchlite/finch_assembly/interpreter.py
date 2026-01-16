@@ -54,12 +54,6 @@ class HaltState:
     return_value: Any = None
 
 
-def check_isinstance(obj, cls):
-    if hasattr(obj, "ftype"):
-        return obj.ftype == cls
-    return isinstance(obj, cls)
-
-
 class AssemblyInterpreter(AssemblyLoader):
     """
     An interpreter for FinchAssembly.
@@ -164,7 +158,7 @@ class AssemblyInterpreter(AssemblyLoader):
                 )
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_e = self(val)
-                if not check_isinstance(val_e, var_t):
+                if not fisinstance(val_e, var_t):
                     raise TypeError(
                         f"Assigned value {val_e} is not of type {var_t} for "
                         f"variable '{var_n}'."

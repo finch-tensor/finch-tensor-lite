@@ -394,7 +394,7 @@ def test_concordize():
         )
     )
 
-    result = concordize(plan)
+    result = concordize(plan, bindings={})
     assert result == expected
 
 
