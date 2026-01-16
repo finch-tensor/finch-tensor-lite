@@ -24,7 +24,6 @@ class DenseLevelFields(NamedTuple):
 class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     lvl_t: LevelFType
     dimension_type: Any = None
-    op: Any = None
 
     @property
     def struct_name(self):
@@ -178,11 +177,11 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         )
 
     def from_fields(self, lvl, dimension, pos) -> "DenseLevel":
-        return DenseLevel(_format=self, lvl=lvl, dimension=dimension)
+        return DenseLevel(lvl=lvl, dimension=dimension)
 
 
-def dense(lvl, dimension_type=None):
-    return DenseLevelFType(lvl, dimension_type=dimension_type)
+def dense(dimension_type: type = np.intp) -> tuple:
+    return (DenseLevel, dimension_type)
 
 
 @dataclass
@@ -191,9 +190,8 @@ class DenseLevel(Level):
     A class representing dense level.
     """
 
-    _format: DenseLevelFType
     lvl: Level
-    dimension: np.intp
+    dimension: np.integer
 
     @property
     def shape(self) -> tuple:
@@ -208,7 +206,9 @@ class DenseLevel(Level):
 
     @property
     def ftype(self) -> DenseLevelFType:
-        return self._format
+        # mypy does not understand that dataclasses generate __hash__ and __eq__
+        # https://github.com/python/mypy/issues/19799
+        return DenseLevelFType(self.lvl.ftype, type(self.dimension))  # type: ignore[abstract]
 
     @property
     def val(self) -> Any:

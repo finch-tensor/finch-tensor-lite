@@ -412,13 +412,14 @@ register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, format=None) -> Any:
+def asarray(arg: Any, shape=None, format=None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
 
     Args:
         arg: The object to be converted.
+        shape: The shape of the result array.
         format: The format for the result array.
 
     Returns:
@@ -428,8 +429,28 @@ def asarray(arg: Any, format=None) -> Any:
         if hasattr(arg, "asarray"):
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
+    if callable(format):
+        return format(arg)
 
-    return format(arg)
+    if shape is None:
+        shape = arg.shape
+
+    match format:
+        case (type, lvls):
+            return type(_construct_levels(arg, shape, list(lvls)))
+        case _:
+            raise Exception(f"The format is incorrect: {format}")
+
+
+def _construct_levels(obj, shape, lvls):
+    match lvls:
+        case [(lvl, *args)]:
+            return lvl(*args, obj)
+        case [(lvl, *args), *tail]:
+            return lvl(
+                _construct_levels(obj, shape[1:], tail),
+                *[f(v) for f, v in zip(args, [shape[0]], strict=True)],
+            )
 
 
 def lazy(arr) -> LazyTensor:

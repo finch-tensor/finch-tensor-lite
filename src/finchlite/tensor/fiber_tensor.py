@@ -207,7 +207,7 @@ class FiberTensor(Tensor):
         """
         Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
-        return FiberTensorFType(self.lvl.ftype, type(self.pos))
+        return FiberTensorFType(self.lvl.ftype)
 
     @property
     def shape(self):
@@ -318,16 +318,19 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns).obj
-        assert isinstance(tns, FiberTensorFields)
+        pos = tns.pos if hasattr(tns, "pos") else asm.Literal(self.position_type(0))
+        dirty_bit = tns.dirty_bit if hasattr(tns, "dirty_bit") else asm.Literal(False)
         op = mode.op if isinstance(mode, ntn.Update) else None
         obj = self.lvl_t.get_fields_class(
             tns.lvl,
             tns.buf_s,
-            pos=asm.Literal(self.position_type(0)),
-            op=op,
-            dirty_bit=False,
+            pos,
+            op,
+            dirty_bit,
         )
-        return self.lvl_t.level_unfurl(ctx, ntn.Stack(obj, self), ext, mode, proto)
+        return self.lvl_t.level_unfurl(
+            ctx, ntn.Stack(obj, self), ext, mode, proto, obj.pos
+        )
 
     def lower_freeze(self, ctx, tns, op):
         return self.lvl_t.level_lower_freeze(ctx, tns.obj.buf_s, op, tns.obj.pos)
@@ -368,18 +371,16 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         return FiberTensor(*args)
 
 
-def fiber_tensor(lvl: LevelFType):
+def fiber_tensor(lvls: tuple):
     """
     Creates a FiberTensorFType with the given level ftype and position type.
 
     Args:
         lvl: The level ftype to be used for the tensor.
     Returns:
-        An instance of FiberTensorFType.
+        An instance of a fiber tensor format.
     """
-    # mypy does not understand that dataclasses generate __hash__ and __eq__
-    # https://github.com/python/mypy/issues/19799
-    return FiberTensorFType(lvl)  # type: ignore[abstract]
+    return (FiberTensor, lvls)
 
 
 register_property(FiberTensor, "asarray", "__attr__", lambda x: x)
