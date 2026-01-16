@@ -47,6 +47,10 @@ class BufferizedNDArray(Tensor):
     def __array__(self):
         return self.to_numpy()
 
+    def flatten(self):
+        """Return a flattened copy of the array."""
+        return self.to_numpy().flatten()
+
     @property
     def ftype(self):
         """

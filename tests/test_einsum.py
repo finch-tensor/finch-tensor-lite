@@ -1,8 +1,14 @@
+import operator
+from typing import Any
+
 import pytest
 
 import numpy as np
 
 import finchlite
+import finchlite.finch_einsum as ein
+from finchlite.algebra import overwrite, promote_max, promote_min
+from finchlite.tensor import SparseTensor
 
 from .conftest import finch_assert_allclose
 
@@ -10,6 +16,25 @@ from .conftest import finch_assert_allclose
 @pytest.fixture
 def rng():
     return np.random.default_rng(42)
+
+
+def test_pass_through(rng):
+    """Test pass through of a tensor"""
+    A = rng.random((5, 5))
+
+    B = finchlite.einop("B[i,j] = A[i,j]", A=A)
+
+    finch_assert_allclose(B, A)
+
+
+def test_transpose(rng):
+    """Test basic addition with transpose"""
+    A = rng.random((5, 5))
+
+    B = finchlite.einop("B[i,j] = A[j, i]", A=A)
+    B_ref = A.T
+
+    finch_assert_allclose(B, B_ref)
 
 
 def test_basic_addition_with_transpose(rng):
@@ -1118,3 +1143,1802 @@ class TestEinsumDataTypes:
         expected = np.einsum("ij", A)
 
         finch_assert_allclose(result, expected)
+
+
+class TestEinsumIndirectAccess:
+    """Test einsum with indirect access"""
+
+    def run_einsum_plan(
+        self, prgm: ein.Plan, bindings: dict[str, Any], expected: np.ndarray
+    ):
+        """Runs an einsum plan and returns the result"""
+        interpreter = ein.EinsumInterpreter()
+        result = interpreter(prgm, bindings)[0]
+
+        finch_assert_allclose(result, expected)
+
+    def test_indirect_elementwise_multiplication(self, rng):
+        """Test indirect elementwise multiplication but no indirect assignment"""
+
+        A = rng.random((5, 5))
+        B = rng.random((5, 5))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+
+        # A is sparse
+        # C[i] = AElems[i] * B[ACoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("A"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("B"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        result = finchlite.multiply(A, B).flatten()
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
+        )
+
+    def test_indirect_elementwise_addition(self, rng):
+        """Test indirect elementwise addition"""
+
+        A = rng.random((4, 4))
+        B = rng.random((4, 4))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+
+        # C[i] = AElems[i] + B[ACoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.add),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("A"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("B"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        result = (A + B).flatten()
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
+        )
+
+    def test_indirect_multiple_reads(self, rng):
+        """Test multiple indirect reads from the same tensor"""
+
+        A = rng.random((3, 3))
+        B = rng.random((3, 3))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # C[i] = AElems[i] * BElems[i]
+        # Both A and B are sparse, reading their elements directly
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("A"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        result = finchlite.multiply(A, B).flatten()
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): sparse_B}, result
+        )
+
+    def test_indirect_with_constant(self, rng):
+        """Test indirect access combined with constant"""
+
+        A = rng.random((4, 4))
+        B = rng.random((4, 4))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+
+        # C[i] = AElems[i] * B[ACoords[i]] + 5.0
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.add),
+                        args=(
+                            ein.Call(
+                                op=ein.Literal(operator.mul),
+                                args=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("elems"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Access(
+                                        tns=ein.Alias("B"),
+                                        idxs=(
+                                            ein.Access(
+                                                tns=ein.GetAttr(
+                                                    obj=ein.Alias("A"),
+                                                    attr=ein.Literal("coords"),
+                                                    dim=None,
+                                                ),
+                                                idxs=(ein.Index("i"),),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            ein.Literal(5.0),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        result = (A * B + 5.0).flatten()
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
+        )
+
+    def test_indirect_nested_operations(self, rng):
+        """Test nested operations with indirect access"""
+
+        A = rng.random((3, 3))
+        B = rng.random((3, 3))
+        C = rng.random((3, 3))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+
+        # D[i] = (AElems[i] + B[ACoords[i]]) * C[ACoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Call(
+                                op=ein.Literal(operator.add),
+                                args=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("elems"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Access(
+                                        tns=ein.Alias("B"),
+                                        idxs=(
+                                            ein.Access(
+                                                tns=ein.GetAttr(
+                                                    obj=ein.Alias("A"),
+                                                    attr=ein.Literal("coords"),
+                                                    dim=None,
+                                                ),
+                                                idxs=(ein.Index("i"),),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("C"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        result = ((A + B) * C).flatten()
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): sparse_A, ein.Alias("B"): B, ein.Alias("C"): C},
+            result,
+        )
+
+    def test_indirect_direct_access_only(self, rng):
+        """Test accessing only the indirect coordinates"""
+
+        A = rng.random((8,))
+        B = rng.random((8,))
+
+        sparse_A = SparseTensor.from_dense_tensor(A)
+
+        # C[i] = B[ACoords[i]] (read B indirectly, without using A's elements)
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("B"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("A"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Result should be B's values at A's coordinates
+        expected = B[A != 0]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, expected
+        )
+
+    def test_double_indirection(self, rng):
+        """Test double indirection: A[B[CCoords[i]]]"""
+
+        # Create small arrays to ensure valid indexing
+        A = rng.random((8,))
+        # B contains integer indices into A (0-7)
+        B = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        rng.shuffle(B)
+        # C is sparse
+        C = rng.random((8,))
+
+        sparse_C = SparseTensor.from_dense_tensor(C)
+
+        # D[i] = A[B[CCoords[i]]]
+        # First get CCoords[i], then use that to index B, then use B's value to index A
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.Alias("B"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("C"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: for each non-zero position in C, get its coord,
+        # index into B, then index into A
+        c_coords = sparse_C.coords
+        expected = A[B[c_coords]].flatten()
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C},
+            expected,
+        )
+
+    def test_triple_indirection(self, rng):
+        """Test triple indirection: A[B[C[DCoords[i]]]]"""
+
+        # Create arrays with valid indexing ranges
+        A = rng.random((8,))
+        B = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        rng.shuffle(B)
+        C = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        rng.shuffle(C)
+        D = rng.random((8,))
+
+        sparse_D = SparseTensor.from_dense_tensor(D)
+
+        # E[i] = A[B[C[DCoords[i]]]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.Alias("B"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.Alias("C"),
+                                        idxs=(
+                                            ein.Access(
+                                                tns=ein.GetAttr(
+                                                    obj=ein.Alias("D"),
+                                                    attr=ein.Literal("coords"),
+                                                    dim=None,
+                                                ),
+                                                idxs=(ein.Index("i"),),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: chain of indirections
+        d_coords = sparse_D.coords
+        expected = A[B[C[d_coords]]].flatten()
+        self.run_einsum_plan(
+            prgm,
+            {
+                ein.Alias("A"): A,
+                ein.Alias("B"): B,
+                ein.Alias("C"): C,
+                ein.Alias("D"): sparse_D,
+            },
+            expected,
+        )
+
+    def test_mixed_direct_indirect_indexing_2d(self, rng):
+        """Test mixed indexing: A[BCoords[i], j] - one indirect, one direct"""
+
+        A = rng.random((5, 4))
+        B = rng.random((5,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # C[i, j] = A[BCoords[i], j]
+        # First index is indirect (from B's coords), second is direct
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("j"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A rows indexed by B's coords, all columns
+        b_coords = sparse_B.coords
+        expected = A[b_coords.flatten(), :]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_direct_indirect_indexing_reversed(self, rng):
+        """
+        Test mixed indexing reversed
+        A[i, BCoords[j]] - first direct, second indirect
+        """
+
+        A = rng.random((4, 6))
+        B = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # C[i, j] = A[i, BCoords[j]]
+        # First index is direct, second is indirect
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("i"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("j"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: all rows of A, columns indexed by B's coords
+        b_coords = sparse_B.coords
+        expected = A[:, b_coords.flatten()]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_both_indices_indirect_same_source(self, rng):
+        """Test both indices indirect from same source: A[BCoords[i], BCoords[i]]"""
+
+        A = rng.random((6, 6))
+        B = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # C[i] = A[BCoords[i], BCoords[i]]
+        # Extracting diagonal-like elements using indirect coordinates
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A[coords, coords] - pseudo-diagonal at indirect positions
+        b_coords = sparse_B.coords
+        expected = A[b_coords.flatten(), b_coords.flatten()]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_both_indices_indirect_different_sources(self, rng):
+        """
+        Test both indices indirect from different sources:
+        A[BCoords[i], CCoords[i]]
+        """
+
+        A = rng.random((6, 6))
+        B = rng.random((6,))
+        C = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_C = SparseTensor.from_dense_tensor(C)
+
+        # D[i] = A[BCoords[i], CCoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("C"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A indexed by pairs of coords from B and C
+        # This requires both to have the same number of non-zero elements
+        b_coords = sparse_B.coords.flatten()
+        c_coords = sparse_C.coords.flatten()
+        expected = A[b_coords, c_coords]
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): sparse_B, ein.Alias("C"): sparse_C},
+            expected,
+        )
+
+    def test_double_indirection_with_operation(self, rng):
+        """Test double indirection combined with arithmetic operation"""
+
+        A = rng.random((8,))
+        B = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        rng.shuffle(B)
+        C = rng.random((8,))
+
+        sparse_C = SparseTensor.from_dense_tensor(C)
+
+        # E[i] = A[B[CCoords[i]]] * CElems[i]
+        # Double indirection plus multiplication with sparse elements
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.Alias("B"),
+                                        idxs=(
+                                            ein.Access(
+                                                tns=ein.GetAttr(
+                                                    obj=ein.Alias("C"),
+                                                    attr=ein.Literal("coords"),
+                                                    dim=None,
+                                                ),
+                                                idxs=(ein.Index("i"),),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("C"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        c_coords = sparse_C.coords.flatten()
+        c_elems = sparse_C.data
+        expected = A[B[c_coords]] * c_elems
+
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C},
+            expected,
+        )
+
+    def test_mixed_indexing_with_computation(self, rng):
+        """Test mixed direct/indirect indexing with computation"""
+
+        A = rng.random((5, 5))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # D[i, j] = A[BCoords[i], j] + BElems[i]
+        # Mixed indexing plus addition with sparse elements
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.add),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Index("j"),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        b_elems = sparse_B.data
+        expected = A[b_coords, :] + b_elems[:, np.newaxis]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_3d_tensor_access(self, rng):
+        """Test indirect access on 3D tensor with mixed indices"""
+
+        A = rng.random((3, 4, 5))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # C[i, j, k] = A[i, BCoords[j], k]
+        # Middle dimension is indirectly indexed
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j"), ein.Index("k")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("i"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("j"),),
+                            ),
+                            ein.Index("k"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = A[:, b_coords, :]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_indirect_and_direct(self, rng):
+        """
+        Test A[BCoords[i], i] where same iterator 'i' is used both as indirect
+        coordinate lookup AND as direct index.
+
+        Semantics: For each non-zero position in B, access A at row=BCoords[i],
+        col=i where i ranges over 0..nnz-1.
+
+        This tests the diagonal-like access pattern through sparse coordinates.
+        """
+        # A is 5x5, B is sparse with exactly 5 non-zeros so nnz == ncols
+        A = rng.random((5, 5))
+        B = rng.random((5,))  # All non-zero, so nnz = 5
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[BCoords[i], i]
+        # For i in 0..4: access A[coord_i, i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A[BCoords[i], i] for i in 0..nnz-1
+        b_coords = sparse_B.coords.flatten()
+        expected = A[b_coords, np.arange(len(b_coords))]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_nnz_less_than_dim(self, rng):
+        """
+        Test A[BCoords[i], i] where nnz < dimension size.
+
+        B has fewer non-zeros than A's column dimension.
+        This tests that the direct index 'i' correctly uses nnz
+        (from indirect) rather than dim size.
+        """
+        A = rng.random((10, 10))
+        # B has only 3 non-zeros out of 10
+        B = np.zeros((10,))
+        B[2] = rng.random()
+        B[5] = rng.random()
+        B[8] = rng.random()
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+        assert sparse_B.coords.shape[0] == 3  # Verify nnz = 3
+
+        # Result[i] = A[BCoords[i], i] for i in 0..2
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        # Expected: A[coords[0], 0], A[coords[1], 1], A[coords[2], 2]
+        b_coords = sparse_B.coords.flatten()  # [2, 5, 8]
+        expected = A[b_coords, np.arange(len(b_coords))]  # A[2,0], A[5,1], A[8,2]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_reversed_order(self, rng):
+        """
+        Test A[i, BCoords[i]] - direct index first, then indirect.
+
+        Same semantics but reversed axis order.
+        """
+        A = rng.random((5, 8))
+        B = rng.random((5,))  # nnz = 5
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[i, BCoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("i"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = A[np.arange(len(b_coords)), b_coords]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_with_operation(self, rng):
+        """
+        Test A[BCoords[i], i] * BElems[i] - mixed indexing combined with
+        element access.
+        """
+        A = rng.random((6, 6))
+        B = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[BCoords[i], i] * BElems[i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Index("i"),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        b_elems = sparse_B.data
+        expected = A[b_coords, np.arange(len(b_coords))] * b_elems
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_3d_tensor(self, rng):
+        """
+        Test A[BCoords[i], i, j] - mixed indexing with additional free index.
+
+        Result should have shape (nnz, J).
+        """
+        A = rng.random((4, 4, 5))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i, j] = A[BCoords[i], i, j]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                            ein.Index("j"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        # Expected: A[BCoords[i], i, :] for each i
+        expected = A[b_coords, np.arange(len(b_coords)), :]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_same_iterator_sandwich(self, rng):
+        """
+        Test A[i, BCoords[i], i] - direct index on both sides of indirect.
+
+        This tests non-contiguous direct indices sharing the same iterator
+        as an indirect access.
+        """
+        A = rng.random((4, 6, 4))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i] = A[i, BCoords[i], i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("i"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        nnz = len(b_coords)
+        # Expected: A[i, BCoords[i], i] = extract "diagonal" through indirect middle
+        expected = A[np.arange(nnz), b_coords, np.arange(nnz)]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_mixed_two_iterators_interleaved(self, rng):
+        """
+        Test A[BCoords[i], j, i] - two different iterators, one used both
+        directly and indirectly.
+
+        This creates a 2D result: for each (i, j), access A[BCoords[i], j, i].
+        """
+        A = rng.random((5, 3, 5))
+        B = rng.random((5,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[i, j] = A[BCoords[i], j, i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("j"),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        nnz = len(b_coords)
+        expected = np.zeros((nnz, 3))
+        for i in range(nnz):
+            for j in range(3):
+                expected[i, j] = A[b_coords[i], j, i]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_sum_reduction(self, rng):
+        """Test indirect access with sum reduction: Result += A[BCoords[i]]"""
+        A = rng.random((8,))
+        B = rng.random((8,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(operator.add),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = np.sum(A[b_coords])
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_max_reduction(self, rng):
+        """Test indirect access with max reduction: Result max= A[BCoords[i]]"""
+        from finchlite.algebra import promote_max
+
+        A = rng.random((10,))
+        B = np.zeros((10,))
+        B[1] = 1.0
+        B[4] = 1.0
+        B[7] = 1.0
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(promote_max),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = np.max(A[b_coords])
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_min_reduction(self, rng):
+        """Test indirect access with min reduction: Result min= A[BCoords[i]]"""
+
+        A = rng.random((6,))
+        B = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(promote_min),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = np.min(A[b_coords])
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_partial_reduction(self, rng):
+        """Test indirect access with partial reduction over one axis."""
+        A = rng.random((5, 4))
+        B = rng.random((5,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[j] += A[BCoords[i], j]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(operator.add),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("j"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("j"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = np.sum(A[b_coords, :], axis=0)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_reduction_with_multiplication(self, rng):
+        """Test indirect access reduction with element multiplication."""
+        A = rng.random((6,))
+        B = rng.random((6,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result += BElems[i] * A[BCoords[i]]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(operator.add),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        expected = np.sum(B * A)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_mixed_iterator_reduction(self, rng):
+        """Test A[BCoords[i], i] with sum reduction."""
+        A = rng.random((5, 5))
+        B = rng.random((5,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result += A[BCoords[i], i]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(operator.add),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("i"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = np.sum(A[b_coords, np.arange(len(b_coords))])
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_indirect_2d_reduction_to_1d(self, rng):
+        """Test 2D indirect access reducing one dimension."""
+        A = rng.random((4, 5, 3))
+        B = rng.random((4,))
+
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        # Result[k] += A[BCoords[i], j, k]
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(operator.add),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("k"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("j"),
+                            ein.Index("k"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = np.sum(A[b_coords, :, :], axis=(0, 1))
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_nested_indirect_access(self, rng):
+        """A[B[CCoords[i]]] - chained indirection through three tensors."""
+        C = np.zeros((8,))
+        C[[1, 4, 6]] = rng.random(3)
+        sparse_C = SparseTensor.from_dense_tensor(C)
+
+        B = np.array([7, 2, 0, 5, 3, 6, 1, 4])  # permutation
+        A = rng.random((8,))
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Access(
+                                tns=ein.Alias("B"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("C"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        c_coords = sparse_C.coords.flatten()
+        expected = A[B[c_coords]]
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C},
+            expected,
+        )
+
+    def test_two_sparse_iterators_outer_product(self, rng):
+        """Result[i, j] = A[BCoords[i]] * C[DCoords[j]]"""
+        B = np.zeros((6,))
+        B[[0, 3, 5]] = rng.random(3)
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        D = np.zeros((4,))
+        D[[1, 2]] = rng.random(2)
+        sparse_D = SparseTensor.from_dense_tensor(D)
+
+        A = rng.random((6,))
+        C = rng.random((4,))
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("C"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("D"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("j"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        d_coords = sparse_D.coords.flatten()
+        expected = C[d_coords][:, np.newaxis] * A[b_coords][np.newaxis, :]
+        self.run_einsum_plan(
+            prgm,
+            {
+                ein.Alias("A"): A,
+                ein.Alias("B"): sparse_B,
+                ein.Alias("C"): C,
+                ein.Alias("D"): sparse_D,
+            },
+            expected,
+        )
+
+    def test_permutation_coords_inverse_mapping(self, rng):
+        """Sparse coords form a perfect reverse permutation."""
+        n = 7
+        B_coords = np.arange(n - 1, -1, -1).reshape(-1, 1)
+        B_data = rng.random(n)
+        sparse_B = SparseTensor(data=B_data, coords=B_coords, shape=(n,))
+
+        A = rng.random((n,))
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"),),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        expected = B_data * A[::-1]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_4d_tensor_indirect_middle_dim(self, rng):
+        """
+        4D tensor with indirect access in second dimension only.
+        Result[a, i, c, d] = A[a, BCoords[i], c, d]
+        """
+
+        A = rng.random((3, 8, 4, 5))
+        B = np.zeros((8,))
+        B[[1, 3, 7]] = rng.random(3)
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(
+                        ein.Index("a"),
+                        ein.Index("i"),
+                        ein.Index("c"),
+                        ein.Index("d"),
+                    ),
+                    arg=ein.Access(
+                        tns=ein.Alias("A"),
+                        idxs=(
+                            ein.Index("a"),
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("coords"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Index("c"),
+                            ein.Index("d"),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        expected = A[:, b_coords, :, :]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_triple_mixed_indices_complex_reduction(self, rng):
+        """A[BCoords[i], i, j] * C[j] with reduction over both i and j."""
+        A = rng.random((5, 5, 4))
+        B = np.zeros((5,))
+        B[[0, 2, 4]] = rng.random(3)
+        sparse_B = SparseTensor.from_dense_tensor(B)
+        C = rng.random((4,))
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(operator.add),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Index("i"),
+                                    ein.Index("j"),
+                                ),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("C"),
+                                idxs=(ein.Index("j"),),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        nnz = len(b_coords)
+        sliced = A[b_coords, np.arange(nnz), :]
+        expected = np.sum(sliced * C[np.newaxis, :])
+        self.run_einsum_plan(
+            prgm,
+            {ein.Alias("A"): A, ein.Alias("B"): sparse_B, ein.Alias("C"): C},
+            expected,
+        )
+
+    def test_single_nonzero_boundary(self, rng):
+        """Sparse tensor with exactly one nonzero at max boundary index."""
+        n = 100
+        B_coords = np.array([[n - 1]])
+        B_data = rng.random(1)
+        sparse_B = SparseTensor(data=B_data, coords=B_coords, shape=(n,))
+
+        A = rng.random((n, 3))
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Index("j"),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        expected = B_data[:, np.newaxis] * A[[n - 1], :]
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
+
+    def test_max_reduction_with_indirect(self, rng):
+        """Max reduction with indirect access."""
+        A = rng.random((10,))
+        B = np.zeros((10,))
+        B[[2, 5, 8]] = rng.random(3)
+        sparse_B = SparseTensor.from_dense_tensor(B)
+
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(promote_max),
+                    tns=ein.Alias("Result"),
+                    idxs=(),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.GetAttr(
+                                    obj=ein.Alias("B"),
+                                    attr=ein.Literal("elems"),
+                                    dim=None,
+                                ),
+                                idxs=(ein.Index("i"),),
+                            ),
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
+
+        b_coords = sparse_B.coords.flatten()
+        b_elems = sparse_B.data
+        expected = np.max(b_elems * A[b_coords])
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
+        )
