@@ -6,8 +6,6 @@ from ..symbolic import (
     BasicBlock,
     ControlFlowGraph,
     Namespace,
-    PostWalk,
-    Rewrite,
 )
 from .nodes import (
     AssemblyNode,
@@ -31,7 +29,6 @@ from .nodes import (
     Return,
     SetAttr,
     Store,
-    TaggedVariable,
     Unpack,
     Variable,
     WhileLoop,
@@ -40,25 +37,7 @@ from .nodes import (
 
 def assembly_build_cfg(node: AssemblyNode):
     ctx = AssemblyCFGBuilder(namespace=Namespace(node))
-
-    # build cfg based on the numbered AST and return it
-    return ctx.build(assembly_number_uses(node))
-
-
-def assembly_number_uses(root: AssemblyNode) -> AssemblyNode:
-    """
-    Number every Variable occurrence in a post-order traversal.
-    """
-    counters: dict[str, int] = {}
-
-    def rule(node):
-        match node:
-            case Variable(name, _) as var:
-                idx = counters.get(name, 0)
-                counters[name] = idx + 1
-                return TaggedVariable(var, idx)
-
-    return Rewrite(PostWalk(rule))(root)
+    return ctx.build(node)
 
 
 class AssemblyCFGBuilder:
@@ -68,6 +47,10 @@ class AssemblyCFGBuilder:
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
         self.namespace = namespace or Namespace()
+
+    def emit(self, stmt) -> None:
+        """Add a statement to the current block, assigning it a unique stmt id."""
+        self.current_block.add_statement(self.cfg.number_statement(stmt))
 
     def build(self, node: AssemblyNode) -> ControlFlowGraph:
         return self(node)
@@ -89,7 +72,7 @@ class AssemblyCFGBuilder:
                 | Assign()
                 | Assert()
             ):
-                self.current_block.add_statement(node)
+                self.emit(node)
             case Block(bodies):
                 for body in bodies:
                     self(body, break_block, return_block)
@@ -106,12 +89,12 @@ class AssemblyCFGBuilder:
                 before_block.add_successor(else_block)
 
                 self.current_block = if_block
-                self.current_block.add_statement(Assert(cond))
+                self.emit(Assert(cond))
                 self(body, break_block, return_block)
                 self.current_block.add_successor(after_block)
 
                 self.current_block = else_block
-                self.current_block.add_statement(
+                self.emit(
                     Assert(
                         Call(
                             Literal(operator.not_),
@@ -133,13 +116,13 @@ class AssemblyCFGBuilder:
                 before_block.add_successor(after_block)
 
                 self.current_block = body_block
-                self.current_block.add_statement(Assert(cond))
+                self.emit(Assert(cond))
                 self(body, after_block, return_block)
 
                 self.current_block.add_successor(body_block)
                 self.current_block.add_successor(after_block)
                 self.current_block = after_block
-                self.current_block.add_statement(
+                self.emit(
                     Assert(
                         Call(
                             Literal(operator.not_),
@@ -151,8 +134,8 @@ class AssemblyCFGBuilder:
                 before_block = self.current_block
 
                 fic_var_name = self.namespace.freshen("j")
-                fic_var = TaggedVariable(Variable(fic_var_name, np.int64), 0)
-                before_block.add_statement(Assign(fic_var, start))
+                fic_var = Variable(fic_var_name, np.int64)
+                self.emit(Assign(fic_var, start))
 
                 # create while loop condition: j < end
                 loop_condition = Call(Literal(operator.lt), (fic_var, end))
@@ -177,8 +160,8 @@ class AssemblyCFGBuilder:
                 before_block = self.current_block
 
                 fic_var_name = self.namespace.freshen("j")
-                fic_var = TaggedVariable(Variable(fic_var_name, np.int64), 0)
-                before_block.add_statement(Assign(fic_var, Literal(np.int64(0))))
+                fic_var = Variable(fic_var_name, np.int64)
+                self.emit(Assign(fic_var, Literal(np.int64(0))))
 
                 # create while loop condition: i < length(buf)
                 loop_condition = Call(Literal(operator.lt), (fic_var, Length(buf)))
@@ -200,26 +183,24 @@ class AssemblyCFGBuilder:
 
                 self(WhileLoop(loop_condition, loop_body), break_block, return_block)
             case Return(value):
-                self.current_block.add_statement(Return(value))
+                self.emit(Return(value))
                 assert return_block
                 self.current_block.add_successor(return_block)
                 unreachable_block = self.cfg.new_block()
                 self.current_block = unreachable_block
             case Break():
-                self.current_block.add_statement(Break())
+                self.emit(Break())
                 assert break_block
                 self.current_block.add_successor(break_block)
                 unreachable_block = self.cfg.new_block()
                 self.current_block = unreachable_block
             case Function(_, args, body):
                 for arg in args:
-                    match arg:
-                        case TaggedVariable():
-                            self.current_block.add_statement(Assign(arg, arg))
-                        case _:
-                            raise NotImplementedError(
-                                f"Unrecognized argument type: {arg}"
-                            )
+                    if not isinstance(arg, Variable):
+                        raise NotImplementedError(f"Unrecognized argument type: {arg}")
+
+                    # Ensure arguments appear as assigned/defined for dataflow.
+                    self.emit(Assign(arg, arg))
 
                 self(body, break_block, return_block)
             case Module(funcs):
@@ -229,14 +210,11 @@ class AssemblyCFGBuilder:
                             f"Unrecognized function type: {type(func)}"
                         )
 
-                    if isinstance(func.name, TaggedVariable):
-                        func_name = func.name.variable.name
-                    elif isinstance(func.name, Variable):
-                        func_name = func.name.name
-                    else:
+                    if not isinstance(func.name, Variable):
                         raise NotImplementedError(
                             f"Unrecognized function name type: {type(func.name)}"
                         )
+                    func_name = func.name.name
 
                     # set block names to the function name
                     self.cfg.block_name = func_name

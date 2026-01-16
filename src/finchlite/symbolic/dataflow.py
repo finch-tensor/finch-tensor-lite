@@ -1,5 +1,20 @@
 import copy
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+TStmt = TypeVar("TStmt")
+
+
+@dataclass(frozen=True)
+class NumberedStatement(Generic[TStmt]):
+    """A statement annotated with a unique, CFG-local, monotonically increasing id."""
+
+    id: int
+    stmt: TStmt
+
+    def __str__(self) -> str:
+        return f"[{self.id}] {self.stmt}"
 
 
 class BasicBlock:
@@ -56,8 +71,16 @@ class ControlFlowGraph:
         self.block_name = ""
         self.blocks: dict[str, BasicBlock] = {}
 
+        # Statement ids are used by dataflow analyses to identify definition sites.
+        self.stmt_counter = 0
+
         self.entry_block = self.new_block_custom("ENTRY")
         self.exit_block = self.new_block_custom("EXIT")
+
+    def number_statement(self, stmt):
+        sid = self.stmt_counter
+        self.stmt_counter += 1
+        return NumberedStatement(sid, stmt)
 
     def new_block(self) -> BasicBlock:
         bid = f"{self.block_name}_{self.block_counter}"

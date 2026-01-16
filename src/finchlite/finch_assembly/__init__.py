@@ -1,5 +1,5 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
+from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
 from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
@@ -32,7 +32,6 @@ from .nodes import (
     Stack,
     Store,
     StoreDict,
-    TaggedVariable,
     Unpack,
     Variable,
     WhileLoop,
@@ -94,7 +93,6 @@ __all__ = [
     "Stack",
     "Store",
     "StoreDict",
-    "TaggedVariable",
     "TupleFType",
     "Unpack",
     "Variable",
@@ -102,7 +100,6 @@ __all__ = [
     "assembly_build_cfg",
     "assembly_check_types",
     "assembly_copy_propagation",
-    "assembly_number_uses",
     "element_type",
     "length_type",
 ]
