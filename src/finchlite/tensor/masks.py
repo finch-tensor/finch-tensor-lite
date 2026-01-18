@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -81,7 +82,8 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
         return self.body.level_asm_unpack(ctx, var_n, val_body)
 
     def level_lower_dim(self, ctx, obj, r):
-        return self.body.level_lower_dim(ctx, obj, r)
+        val_body = asm.GetAttr(obj, asm.Literal("body"))
+        return self.body.level_lower_dim(ctx, val_body, r)
 
     def next_level(self):
         return self.lvl_t
@@ -104,7 +106,7 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
 
     @property
     def struct_fields(self):
-        return [("body", self.body)] + self.body.struct_fields
+        return [("body", self.body), ("stride", self.body.dimension_type)]
 
 
 @dataclass
@@ -141,7 +143,7 @@ class LoTriMask(Level):
 
 
 def tril(x, /, *, k: int = 0):
-    # TODO: make a copy of x
+    x = deepcopy(x)
     if k != 0:
         raise Exception(f"Only k=0 is supported, but got: {k}")
     lvl = x.lvl

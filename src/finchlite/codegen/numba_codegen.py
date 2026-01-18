@@ -94,13 +94,6 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
-    from .numba_codegen import (
-        numba_globals,
-        numba_jitclass_type,
-        numba_structnames,
-        numba_structs,
-    )
-
     if ftype_ in numba_structs:
         return numba_structs[ftype_]
 
@@ -131,6 +124,7 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[ftype_] = new_struct
     numba_globals[new_struct.__name__] = new_struct
+    # logger.debug(f"Numba class:\n{class_src}")
     return new_struct
 
 
@@ -929,6 +923,14 @@ register_property(
     "__attr__",
     lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
 )
+
+for fn in [min, max]:
+    register_property(
+        fn,
+        "numba_literal",
+        "__attr__",
+        lambda fn, ctx, x, y: f"{fn.__name__}({ctx(x)}, {ctx(y)})",
+    )
 
 register_property(
     InitWrite,
