@@ -223,6 +223,15 @@ def is_associative(op: Any) -> bool:
     return as_finch_operator(op).is_associative
 
 
+for op in (
+    operator.ge,
+    operator.le,
+    operator.eq,
+    operator.sub,
+):
+    register_property(op, "__call__", "is_associative", lambda op: False)
+
+
 def is_commutative(op: Any) -> bool:
     return as_finch_operator(op).is_commutative
 

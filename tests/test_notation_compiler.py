@@ -9,9 +9,8 @@ import finchlite.finch_notation as ntn
 from finchlite import ftype
 from finchlite.compile import (
     BufferizedNDArray,
-    ExtentFType,
+    Extent,
     NotationCompiler,
-    dimension,
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
@@ -53,9 +52,22 @@ def test_matrix_multiplication(a, b):
     b_kj = ntn.Variable("b_kj", np.float64)
     c_ij = ntn.Variable("c_ij", np.float64)
 
-    m = ntn.Variable("m", ExtentFType(np.int64, np.int64))
-    n = ntn.Variable("n", ExtentFType(np.int64, np.int64))
-    p = ntn.Variable("p", ExtentFType(np.int64, np.int64))
+    m = ntn.Variable("m", np.int64)
+    n = ntn.Variable("n", np.int64)
+    p = ntn.Variable("p", np.int64)
+
+    m_ext = ntn.Call(
+        ntn.Literal(Extent),
+        (ntn.Literal(np.int64(0)), ntn.Variable("m", np.int64)),
+    )
+    n_ext = ntn.Call(
+        ntn.Literal(Extent),
+        (ntn.Literal(np.int64(0)), ntn.Variable("n", np.int64)),
+    )
+    p_ext = ntn.Call(
+        ntn.Literal(Extent),
+        (ntn.Literal(np.int64(0)), ntn.Variable("p", np.int64)),
+    )
 
     prgm = ntn.Module(
         (
@@ -64,30 +76,24 @@ def test_matrix_multiplication(a, b):
                 (C, A, B),
                 ntn.Block(
                     (
-                        ntn.Assign(
-                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
-                        ),
-                        ntn.Assign(
-                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
-                        ),
-                        ntn.Assign(
-                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
-                        ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
                             C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
-                            m,
+                            m_ext,
                             ntn.Loop(
                                 k,
-                                p,
+                                p_ext,
                                 ntn.Loop(
                                     j,
-                                    n,
+                                    n_ext,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -177,9 +183,13 @@ def test_matrix_multiplication_regression(file_regression):
     b_kj = ntn.Variable("b_kj", np.float64)
     c_ij = ntn.Variable("c_ij", np.float64)
 
-    m = ntn.Variable("m", ExtentFType(np.int64, np.int64))
-    n = ntn.Variable("n", ExtentFType(np.int64, np.int64))
-    p = ntn.Variable("p", ExtentFType(np.int64, np.int64))
+    m = ntn.Variable("m", np.int64)
+    n = ntn.Variable("n", np.int64)
+    p = ntn.Variable("p", np.int64)
+
+    m_ext = ntn.Call(ntn.Literal(Extent), (ntn.Literal(np.int64(0)), m))
+    n_ext = ntn.Call(ntn.Literal(Extent), (ntn.Literal(np.int64(0)), n))
+    p_ext = ntn.Call(ntn.Literal(Extent), (ntn.Literal(np.int64(0)), p))
 
     prgm = ntn.Module(
         (
@@ -188,21 +198,12 @@ def test_matrix_multiplication_regression(file_regression):
                 (C, A, B),
                 ntn.Block(
                     (
-                        ntn.Assign(
-                            m,
-                            ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0))),
-                        ),
-                        ntn.Assign(
-                            n,
-                            ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1))),
-                        ),
-                        ntn.Assign(
-                            p,
-                            ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1))),
-                        ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
                             C_,
                             ntn.Literal(0.0),
@@ -211,13 +212,13 @@ def test_matrix_multiplication_regression(file_regression):
                         ),
                         ntn.Loop(
                             i,
-                            m,
+                            m_ext,
                             ntn.Loop(
                                 k,
-                                p,
+                                p_ext,
                                 ntn.Loop(
                                     j,
-                                    n,
+                                    n_ext,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
