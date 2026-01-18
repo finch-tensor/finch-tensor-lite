@@ -140,7 +140,14 @@ class SequencePass(LoopletPass):
         ext_2 = SimpleExtentFType(
             ext.result_format.get_start(ext),
             asm.Call(
-                asm.Literal(operator.add), (split_var.get(), asm.Literal(np.intp(1)))
+                asm.Literal(min),
+                (
+                    asm.Call(
+                        asm.Literal(operator.add),
+                        (split_var.get(), asm.Literal(np.intp(1))),
+                    ),
+                    ext.result_format.get_end(ext),
+                ),
             ),
         )
         ctx_2 = ctx.scope()
