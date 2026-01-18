@@ -9,7 +9,7 @@ import numpy as np
 import numba
 
 from .. import finch_assembly as asm
-from ..algebra import query_property, register_property
+from ..algebra import InitWrite, query_property, register_property
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
 from ..finch_assembly.struct import (  # type: ignore[import-untyped]
@@ -928,4 +928,11 @@ register_property(
     "numba_literal",
     "__attr__",
     lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+)
+
+register_property(
+    InitWrite,
+    "numba_literal",
+    "__attr__",
+    lambda fn, ctx, x, y: ctx(y),
 )

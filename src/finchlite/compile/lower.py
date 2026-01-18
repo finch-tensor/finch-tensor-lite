@@ -14,6 +14,7 @@ from ..finch_assembly import (
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyStructFType,
+    AssemblyTransform,
 )
 from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
@@ -148,7 +149,7 @@ class SingletonExtent:
         ctx_2(body)
 
 
-class FinchCompileError(Exception):
+class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
     """
     Exception raised during Finch compilation.
     This is used to indicate errors in the compilation process.
@@ -158,6 +159,22 @@ class FinchCompileError(Exception):
         super().__init__(f"{message}:\n{pprint(node)}")
         self.message = message
         self.node = node
+
+
+@dataclass
+class SimpleExtentFType:  # TODO: Remove once solved in Lookup looplet
+    start: Any
+    end: Any
+
+    def get_start(self, ext):
+        return self.start
+
+    def get_end(self, ext):
+        return self.end
+
+    @property
+    def result_format(self):
+        return self
 
 
 @dataclass(eq=True, frozen=True)
@@ -203,12 +220,12 @@ class ExtentFType(AssemblyStructFType):
             case _:
                 return asm.GetAttr(ext, asm.Literal("end"))
 
-    def lower_loop(self, ctx, idx, ext, body):
+    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
         """
         Lower a loop with the given index and body.
         This is used to compile the loop into assembly.
         """
-        lower_looplets(ctx, idx, ext, body)
+        lower_looplets(ctx, idx, visited_idxs, ext, body)
         return
 
     def default_loop(self, ctx, idx, ext, body):
@@ -261,8 +278,8 @@ class SingletonExtentFType:
     def get_end(self, ext):
         return asm.GetAttr(ext, "idx")
 
-    def lower_loop(self, ctx, idx, ext, body):
-        lower_looplets(ctx, idx, ext, body)
+    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
+        lower_looplets(ctx, idx, visited_idxs, ext, body)
         return
 
     def default_loop(self, ctx, idx, ext, body):
@@ -298,6 +315,7 @@ class NotationCompiler(NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
+        ctx_transforms: tuple[AssemblyTransform, ...] = (),
         ctx_lower: NotationLowerer | None = None,
     ):
         if ctx_load is None:
@@ -305,10 +323,13 @@ class NotationCompiler(NotationLoader):
         if ctx_lower is None:
             ctx_lower = AssemblyGenerator()
         self.ctx_load: AssemblyLoader = ctx_load
+        self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
 
     def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
+        for transform in self.ctx_transforms:
+            asm_code = transform(asm_code)
         logger.debug(asm_code)
         return self.ctx_load(asm_code)
 
@@ -419,7 +440,7 @@ class AssemblyContext(Context):
         assert self.access_modes[tns_var] == ntn.Read()
         del self.access_modes[tns_var]
 
-    def __call__(self, prgm):
+    def __call__(self, prgm, visited_idxs=()):
         """
         Lower Finch Notation to Finch Assembly. First we check for early
         simplifications, then we call the normal lowering for the outermost
@@ -432,7 +453,7 @@ class AssemblyContext(Context):
                 return expr
             case ntn.Call(f, args):
                 f_e = self(f)
-                args_e = [self(arg) for arg in args]
+                args_e = tuple(self(arg) for arg in args)
                 return asm.Call(f_e, args_e)
             case ntn.Assign(var, val):
                 self.exec(asm.Assign(self(var), self(val)))
@@ -496,7 +517,7 @@ class AssemblyContext(Context):
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                ext.result_format.lower_loop(self, idx, self(ext), body)
+                ext.result_format.lower_loop(self, idx, visited_idxs, self(ext), body)
                 return None
             case ntn.Dimension(tns, ntn.Literal(r)):
                 assert isinstance(r, int)
@@ -597,7 +618,7 @@ def instantiate(ctx, prgm):
     return Rewrite(PostWalk(instantiate_node))(prgm)
 
 
-def lower_looplets(ctx, idx, ext, body):
+def lower_looplets(ctx, idx, visited_idxs, ext, body):
     body = instantiate(ctx, body)
     ctx_2 = ctx.scope()
 
@@ -606,12 +627,12 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
+                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, proto=None)
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
-    ctx_3 = LoopletContext(ctx, idx)
+    ctx_3 = LoopletContext(ctx, idx, visited_idxs)
     ctx_3(ext, body)
 
 
@@ -638,9 +659,10 @@ class DefaultPass(LoopletPass):
 
 
 class LoopletContext(Context):
-    def __init__(self, ctx, idx):
+    def __init__(self, ctx, idx, visited_idxs):
         self.ctx = ctx  # AssemblyContext
         self.idx = idx
+        self.visited_idxs = visited_idxs
 
     def freshen(self, *tags):
         return self.ctx.freshen(*tags)
@@ -656,7 +678,7 @@ class LoopletContext(Context):
 
     def scope(self):
         blk = self.ctx.scope()
-        return LoopletContext(blk, self.idx)
+        return LoopletContext(blk, self.idx, self.visited_idxs)
 
     def emit(self):
         return self.ctx.emit()
@@ -675,7 +697,7 @@ class LoopletContext(Context):
         pass_ = self.select_pass(body)
         if pass_ is None:
             ctx_2 = self.ctx.scope()
-            ctx_2(body)
+            ctx_2(body)  # NotationContext
             return ctx_2.emit()
-        pass_(self, self.idx, ext, body)
+        pass_(self, self.idx, self.visited_idxs, ext, body)
         return None

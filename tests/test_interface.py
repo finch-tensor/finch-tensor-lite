@@ -1388,3 +1388,50 @@ def test_flatten(array_shape, expected_shape, wrapper):
         result = finchlite.compute(result)
 
     finch_assert_equal(result, expected, strict=True)
+
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize(
+    "arr",
+    [
+        np.array([[2, 0, 3], [1, 3, -3], [6, 0, 1]]),
+        np.full((5, 8), 9, dtype=np.float64),
+        np.full((3, 4, 3), 4, dtype=np.int64),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        finchlite.lazy,
+    ],
+)
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda xp, x, y: xp.multiply(x, y),
+        lambda xp, x, y: xp.add(x, y),
+        lambda xp, x, _: xp.sum(x, axis=0),
+    ],
+)
+def test_tril(arr: np.ndarray, wrapper, op):
+    # construct dense format
+    fmt = finchlite.fiber_tensor(
+        (
+            *[finchlite.dense() for _ in range(arr.ndim)],
+            finchlite.element(
+                arr.dtype.type(0), arr.dtype, np.intp, finchlite.NumpyBufferFType
+            ),
+        )
+    )
+    f_arr = finchlite.asarray(arr, format=fmt)
+    tril_arr = finchlite.tril(f_arr)
+    f_arr_2 = finchlite.asarray(arr, format=fmt)
+
+    wrap_arr = wrapper(tril_arr)
+    wrap_arr_2 = wrapper(f_arr_2)
+    plan = op(finchlite, wrap_arr, wrap_arr_2)
+    result = finchlite.compute(plan) if isinstance(plan, finchlite.LazyTensor) else plan
+
+    expected = op(np, np.tril(arr), arr)
+    finch_assert_equal(result, expected, strict=True)

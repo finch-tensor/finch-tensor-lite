@@ -1,5 +1,7 @@
 import math
 import operator
+from dataclasses import dataclass
+from typing import Any
 
 from . import algebra
 from .algebra import is_associative, is_commutative, is_idempotent
@@ -83,20 +85,22 @@ algebra.register_property(
 )
 
 
+@dataclass(eq=True, frozen=True)
 class InitWrite:
     """
-    InitWrite may assert that its first argument is
-    equal to z, and returns its second argument. This is useful when you want to
-    communicate to the compiler that the tensor has already been initialized to
-    a specific value.
+    InitWrite may assert that its first argument is equal to `value`, and returns
+    its second argument. This is useful when you want to communicate to the compiler
+    that the tensor has already been initialized to a specific value.
     """
 
-    def __init__(self, value):
-        self.value = value
+    value: Any
 
     def __call__(self, x, y):
         assert x == self.value, f"Expected {self.value}, got {x}"
         return y
+
+    def __str__(self):
+        return f"InitWrite({self.value})"
 
 
 algebra.register_property(
@@ -104,6 +108,14 @@ algebra.register_property(
     "__call__",
     "return_type",
     lambda op, x, y: y,
+)
+
+
+algebra.register_property(
+    InitWrite,
+    "__call__",
+    "is_annihilator",
+    lambda op, val: False,
 )
 
 

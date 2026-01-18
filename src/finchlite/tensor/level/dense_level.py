@@ -152,7 +152,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
 
         def child_accessor(ctx: LoopletContext, idx):
             pos_2 = asm.Variable(
-                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.position_type
+                ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(
                 asm.Assign(
@@ -165,7 +165,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                                 asm.Literal(operator.mul),
                                 (
                                     asm.GetAttr(tns.lvl, asm.Literal("stride")),
-                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
+                                    asm.Variable(idx.name, idx.type),
                                 ),
                             ),
                         ),
