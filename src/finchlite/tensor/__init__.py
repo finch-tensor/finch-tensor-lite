@@ -7,6 +7,9 @@ from .level import (
     dense,
     element,
 )
+from .masks import (
+    tril,
+)
 
 __all__ = [
     "DenseLevel",
@@ -20,4 +23,5 @@ __all__ = [
     "dense",
     "element",
     "fiber_tensor",
+    "tril",
 ]

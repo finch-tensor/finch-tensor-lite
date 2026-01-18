@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -41,7 +41,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape=(), val=None):
+    def __call__(self, shape, *, val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
@@ -174,7 +174,7 @@ class ElementLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    _format: ElementLevelFType
+    _format: ElementLevelFType = field(repr=False)
     _val: Any | None = None
 
     def __post_init__(self):
@@ -198,9 +198,6 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
-
-    def __repr__(self):
-        return f"ElementLevel(val={self._val})"
 
     def __str__(self):
         return f"ElementLevel(val={self._val})"
