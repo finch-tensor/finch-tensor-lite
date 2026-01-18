@@ -62,7 +62,7 @@ from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.standardize import LogicStandardizer
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
-from ..finch_assembly import AssemblyInterpreter
+from ..finch_assembly import AssemblyInterpreter, AssemblySimplify
 from ..finch_logic import (
     Alias,
     Field,
@@ -105,7 +105,13 @@ COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
+                LogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                        )
+                    )
+                )
             )
         )
     )

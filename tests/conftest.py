@@ -8,7 +8,7 @@ from numpy.testing import assert_allclose, assert_equal
 
 from finchlite import get_default_scheduler, set_default_scheduler
 from finchlite.finch_logic import Field
-from finchlite.interface.fuse import INTERPRET_LOGIC
+from finchlite.interface.fuse import COMPILE_NUMBA, INTERPRET_LOGIC
 
 
 @pytest.fixture(scope="session")
@@ -44,6 +44,13 @@ def random_wrapper(rng):
 def interpreter_scheduler():
     ctx = get_default_scheduler()
     yield set_default_scheduler(ctx=INTERPRET_LOGIC)
+    set_default_scheduler(ctx=ctx)
+
+
+@pytest.fixture
+def numba_compiler():
+    ctx = get_default_scheduler()
+    yield set_default_scheduler(ctx=COMPILE_NUMBA)
     set_default_scheduler(ctx=ctx)
 
 

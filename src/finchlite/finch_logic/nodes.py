@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
 from finchlite.algebra.algebra import fixpoint_type, return_type
@@ -304,7 +304,7 @@ class Literal(LogicNode):
             return id(self.val) == id(value.val)
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"val": self.val})
 
 
 @dataclass(eq=True, frozen=True)
