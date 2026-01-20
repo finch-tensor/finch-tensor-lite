@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -12,9 +12,9 @@ from ..fiber_tensor import Level, LevelFType
 class ElementLevelFields(NamedTuple):
     lvl: asm.Variable
     buf_s: NumpyBufferFType
-    nind: int
-    pos: asm.AssemblyNode
-    op: Any
+    pos: asm.Variable | asm.Literal
+    op: asm.Literal
+    dirty_bit: bool
 
 
 @dataclass(unsafe_hash=True)
@@ -71,19 +71,8 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         return 0
 
     @property
-    def lvl_t(self):
-        raise Exception("ElementLevel is a leaf level.")
-
-    def from_kwargs(self, **kwargs) -> "ElementLevelFType":
-        f_v = kwargs.get("fill_value", self.fill_value)
-        e_t = kwargs.get("element_type", self.element_type)
-        p_t = kwargs.get("position_type", self.position_type)
-        b_f = kwargs.get("buffer_factory", self.buffer_factory)
-        v_f = kwargs.get("buffer_type", self.buffer_type)
-        return ElementLevelFType(f_v, e_t, p_t, b_f, v_f)  # type: ignore[abstract]
-
-    def to_kwargs(self):
-        return asdict(self)
+    def shape_type(self):
+        return ()
 
     def from_fields(self, val=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
@@ -93,11 +82,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    @property
-    def shape_type(self):
-        return ()
-
-    def asm_unpack(self, ctx, var_n, val):
+    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
         buf = asm.Variable(f"{var_n}_buf", self.buffer_type)
         buf_e = asm.GetAttr(val, asm.Literal("val"))
         ctx.exec(asm.Assign(buf, buf_e))
@@ -105,19 +90,21 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         ctx.exec(asm.Unpack(buf_s, buf))
         return buf_s
 
-    def get_fields_class(self, tns, buf_s, nind, pos, op):
-        return ElementLevelFields(tns, buf_s, nind, pos, op)
+    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
+        return ElementLevelFields(tns, buf_s, pos, op, dirty_bit)
 
-    def lower_declare(self, ctx, tns, init, op, shape):
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(tns, i_var, asm.Literal(init.val))
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns), body))
 
-    def lower_unwrap(self, ctx, obj):
-        return asm.Load(obj.buf_s, obj.pos)
+    def level_lower_unwrap(self, ctx, obj, pos):
+        assert isinstance(obj, ElementLevelFields)
+        return asm.Load(obj.buf_s, pos)
 
-    def lower_increment(self, ctx, obj, val):
-        lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
+    def level_lower_increment(self, ctx, obj, val, pos):
+        assert isinstance(obj, ElementLevelFields)
+        lowered_pos = asm.Variable(pos.name, pos.type)
         ctx.exec(
             asm.Store(
                 obj.buf_s,
@@ -129,17 +116,20 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             )
         )
 
-    def lower_freeze(self, ctx, tns, op):
+    def level_lower_freeze(self, ctx, tns, op):
         return tns
 
-    def lower_thaw(self, ctx, tns, op):
+    def level_lower_thaw(self, ctx, tns, op):
         return tns
 
-    def lower_dim(self, ctx, obj, r):
-        raise NotImplementedError("DenseLevelFType does not support lower_dim.")
+    def level_lower_dim(self, ctx, obj, r):
+        raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
-    def unfurl(self, ctx, tns, ext, mode, proto):
-        raise NotImplementedError("ElementLevelFType does not support unfurl.")
+    def level_unfurl(self, ctx, tns, ext, mode, proto):
+        raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
+
+    def next_level(self):
+        raise NotImplementedError("ElementLevelFType does not support next_level.")
 
 
 def element(
