@@ -30,27 +30,6 @@ class AssemblyStructFType(FType, ABC):
         setattr(obj, attr, value)
         return
 
-    @abstractmethod
-    def from_kwargs(self, **kwargs) -> "AssemblyStructFType":
-        """
-        Protocol for constructing Finch tensors from keyword arguments.
-        Here are currently supported arguments. They are all optional,
-        each implementor decides which fields to select:
-        - lvl_t: LevelFType
-        - fill_value: np.number
-        - element_type: type
-        - position_type: type
-        - dimension_type: type
-        - shape_type: tuple[type, ...]
-        - buffer_factory: type
-        - buffer_type: BufferFType
-        - ndim: int
-        """
-        ...
-
-    @abstractmethod
-    def to_kwargs(self) -> dict: ...
-
     @property
     def struct_fieldnames(self) -> list[str]:
         return [name for (name, _) in self.struct_fields]
@@ -109,12 +88,6 @@ class NamedTupleFType(ImmutableStructFType):
     def struct_fields(self):
         return self._struct_fields
 
-    def from_kwargs(self, **kwargs) -> "TupleFType":
-        raise NotImplementedError
-
-    def to_kwargs(self) -> dict:
-        raise NotImplementedError
-
     def fisinstance(self, other):
         if not isinstance(other, tuple) or not hasattr(other, "_fields"):
             return False
@@ -171,12 +144,6 @@ class TupleFType(ImmutableStructFType):
     @property
     def struct_fields(self):
         return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
-
-    def from_kwargs(self, **kwargs) -> "TupleFType":
-        raise NotImplementedError
-
-    def to_kwargs(self) -> dict:
-        raise NotImplementedError
 
     def fisinstance(self, other):
         """

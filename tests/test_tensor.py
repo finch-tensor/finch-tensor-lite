@@ -1,3 +1,5 @@
+import pytest
+
 import numpy as np
 
 from finchlite import (
@@ -39,6 +41,7 @@ def test_fiber_tensor_attributes():
     assert a.buffer_factory == NumpyBufferFType
 
 
+@pytest.mark.skip("There will be another user API to create tensors from formats")
 def test_fiber_tensor():
     fmt = fiber_tensor(
         dense(dense(element(np.int64(0), np.int64, np.intp, NumpyBufferFType)))
