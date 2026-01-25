@@ -56,6 +56,8 @@ from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
+import threading
+
 from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.standardize import LogicStandardizer
 from ..codegen import NumbaCompiler
@@ -74,7 +76,7 @@ from ..finch_logic import (
 from ..symbolic import gensym
 from .lazy import lazy
 
-_DEFAULT_SCHEDULER = None
+_DEFAULT_SCHEDULER = threading.local()
 
 
 INTERPRET_LOGIC = LogicInterpreter()
@@ -108,8 +110,6 @@ def set_default_scheduler(
     *,
     ctx: LogicEvaluator = INTERPRET_NOTATION,
 ):
-    global _DEFAULT_SCHEDULER
-
     if ctx is not None:
         _DEFAULT_SCHEDULER = ctx
 
@@ -118,8 +118,11 @@ set_default_scheduler()
 
 
 def get_default_scheduler():
-    global _DEFAULT_SCHEDULER
-    return _DEFAULT_SCHEDULER
+    try:
+        return _DEFAULT_SCHEDULER.value
+    except AttributeError:
+        _DEFAULT_SCHEDULER.value = INTERPRET_NOTATION
+        return _DEFAULT_SCHEDULER.value
 
 
 def compute(arg, ctx=None):

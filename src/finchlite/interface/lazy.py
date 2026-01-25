@@ -1,4 +1,5 @@
 from __future__ import annotations
+import threading
 
 import bisect
 import builtins
@@ -100,6 +101,7 @@ class LazyTensorFType(TensorFType):
 
 
 effect_stamp = 0
+effect_stamp_lock = threading.Lock()
 
 
 class EffectBlob:
@@ -124,15 +126,16 @@ class EffectBlob:
         stmt: LogicStatement | None = None,
         blobs: tuple[EffectBlob, ...] | None = None,
     ):
-        global effect_stamp
+        global effect_stamp, effect_stamp_lock
         if stmt is None:
             stmt = Plan()
         if blobs is None:
             blobs = ()
         self.stmt = stmt
         self.blobs = blobs
-        self.stamp = effect_stamp
-        effect_stamp += 1
+        with effect_stamp_lock:
+            self.stamp = effect_stamp
+            effect_stamp += 1
 
     def exec(self, stmt: LogicStatement) -> EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
