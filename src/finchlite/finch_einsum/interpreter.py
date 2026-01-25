@@ -13,7 +13,7 @@ from finchlite.symbolic.ftype import fisinstance
 
 from ..algebra import overwrite, promote_max, promote_min
 from ..symbolic import ftype
-from . import nodes as ein
+from . import EinsumExpression, nodes as ein
 
 nary_ops = {
     operator.add: "add",
@@ -167,15 +167,18 @@ class PointwiseEinsumMachine:
                 current_idxs = [idxs[i] for i in target_axes]
 
                 # Find the first indirect access to get the iterator size
-                first_indirect = indirect_idxs[0]
-                indirect_result = self(first_indirect).flat
-                iterator_size = len(indirect_result)
+                evaled_indirect = {
+                    idx: self(idx).flat for idx in current_idxs if not isinstance(idx, ein.Index)
+                }
+                iterator_size = min([
+                    len(evaled_idx) for _, evaled_idx in evaled_indirect.items()
+                ])
 
                 # evaluate the associated access indices
                 evaled_idxs: list[np.ndarray] = [
                     xp.arange(iterator_size)
                     if isinstance(idx, ein.Index)
-                    else (indirect_result if idx is first_indirect else self(idx).flat)
+                    else evaled_indirect[idx]
                     for idx in current_idxs
                 ]
 
@@ -267,6 +270,98 @@ class EinsumMachine:
                     if arg not in self.bindings:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
+            # einsum with indirect assignment indices
+            case ein.Einsum(ein.Literal(op), tns, idxs, arg) if any(
+                not isinstance(idx, ein.Index) for idx in idxs
+            ):
+                # true iterator indicies
+                true_axes: set[ein.Index] = set().union(*[
+                    idx.get_idxs() for idx in idxs if not isinstance(idx, ein.Index)
+                ])
+                sorted_true_axes: list[ein.Index] = sorted(true_axes, key=lambda x: x.name)
+
+                # map all iterator axes to indirect axes that use them
+                child_axes: dict[ein.Index, tuple[ein.EinsumExpression, ...]] = {
+                    axes: tuple([
+                        idx for idx in idxs if not isinstance(idx, ein.Index) and axes in idx.get_idxs()
+                    ])
+                    for axes in true_axes
+                }
+
+                # all indicies we need to iterate over
+                loops = set(arg.get_idxs()).union(true_axes)
+                loops = sorted(loops, key=lambda x: x.name)
+
+                # evaluate the pointwise expression
+                ctx = PointwiseEinsumMachine(
+                    self.xp, self.bindings, loops, self.verbose
+                )
+                evaled_arg = ctx(arg)
+
+                # evaluate the size of each "true axis" based on dimensions of evaled_arg
+                true_axes_ctxs = {
+                    idx: PointwiseEinsumMachine(
+                        self.xp, self.bindings, idx.get_idxs(), self.verbose
+                    )
+                    for idx in idxs if not isinstance(idx, ein.Index)
+                }
+                evaled_assign_axes = {
+                    idx: true_axes_ctxs[idx](idx).flat
+                    for idx in idxs if not isinstance(idx, ein.Index)
+                }
+
+                # get the size of each "true axis" iterator
+                axes_sizes = {
+                    axes: min(
+                        [len(evaled_assign_axes[idx]) for idx in child_idxs]
+                        + [evaled_arg.shape[loops.index(axes)]]
+                    )
+                    for axes, child_idxs in child_axes.items()
+                }
+
+                # put true axes arrange into evaled_assign_axes
+                for axes in true_axes:
+                    evaled_assign_axes[axes] = xp.arange(axes_sizes[axes])
+                # gets the previously evaluated arranges for the true axes
+                axes_evaled = tuple([
+                    evaled_assign_axes[axes] for axes in sorted_true_axes
+                ])
+
+                # cartesian product of the true axes
+                grids = xp.meshgrid(*axes_evaled, indexing="ij") 
+                idx_to_grid_values: dict[ein.EinsumExpression, np.ndarray] = {
+                    child_idx: evaled_assign_axes[child_idx][grid] 
+                    for i, grid in enumerate(grids)
+                    for child_idx in (child_axes[sorted_true_axes[i]] + (sorted_true_axes[i],))
+                }
+                indirect_assign_idxs = tuple([
+                    idx_to_grid_values[idx] for idx in idxs
+                ])
+
+                # get the int idxs of the axes that we reduce/remove
+                reduced_axes_idxs = tuple([
+                    i for i in range(len(loops)) if loops[i] not in true_axes
+                ])
+                if reduced_axes_idxs:
+                    if op != overwrite: # actual reduction
+                        reduce_op = getattr(xp, reduction_ops[op])
+                        evaled_arg = reduce_op(evaled_arg, axis=reduced_axes_idxs)
+                    else: # only take last element of the reduced axes
+                        for i in sorted(reduced_axes_idxs, reverse=True):
+                            evaled_arg = xp.take(evaled_arg, -1, axis=i)
+
+                # perform the scatter/assignment
+                if tns not in self.bindings or self.bindings[tns].ndim == 0:
+                    raise ValueError(f"Destination tensor {tns} must be pre-allocated.")
+
+                # we need to handle collisions in write addresses
+                if op == overwrite: # direct assignment
+                    self.bindings[tns][indirect_assign_idxs] = evaled_arg
+                else:
+                    nary_op = getattr(xp, nary_ops[op])
+                    self.bindings[tns][indirect_assign_idxs] = nary_op(self.bindings[tns][indirect_assign_idxs], evaled_arg)
+
+                return (self.bindings[tns],)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
