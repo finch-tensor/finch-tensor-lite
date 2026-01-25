@@ -50,13 +50,13 @@ Performance:
   or `with_scheduler`.
 """
 
+import threading
+
 from finchlite.autoschedule import LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.formatter import LogicFormatter
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
-
-import threading
 
 from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.standardize import LogicStandardizer
@@ -111,7 +111,7 @@ def set_default_scheduler(
     ctx: LogicEvaluator = INTERPRET_NOTATION,
 ):
     if ctx is not None:
-        _DEFAULT_SCHEDULER = ctx
+        _DEFAULT_SCHEDULER.value = ctx
 
 
 set_default_scheduler()

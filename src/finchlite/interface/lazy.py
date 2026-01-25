@@ -1,10 +1,10 @@
 from __future__ import annotations
-import threading
 
 import bisect
 import builtins
 import operator
 import sys
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
