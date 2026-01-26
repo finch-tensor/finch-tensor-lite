@@ -279,7 +279,7 @@ class EinsumMachine:
             ):
                 # true iterator indicies
                 true_axes: set[ein.Index] = set().union(
-                    *[idx.get_idxs() for idx in idxs if not isinstance(idx, ein.Index)]
+                    *[idx.get_idxs() for idx in idxs]
                 )
                 sorted_true_axes: list[ein.Index] = sorted(
                     true_axes, key=lambda x: x.name
@@ -337,7 +337,6 @@ class EinsumMachine:
                 axes_evaled = tuple(
                     [evaled_assign_axes[axes] for axes in sorted_true_axes]
                 )
-
                 # cartesian product of the true axes
                 grids = xp.meshgrid(*axes_evaled, indexing="ij")
                 idx_to_grid_values: dict[ein.EinsumExpression, np.ndarray] = {
