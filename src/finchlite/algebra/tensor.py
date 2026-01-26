@@ -73,24 +73,6 @@ class Tensor(FTyped, ABC):
         ...
 
     @property
-    def fill_value(self) -> Any:
-        """Default value to fill the tensor."""
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self):
-        """Data type of the tensor elements."""
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple:
-        """Shape type of the tensor. The shape type is a tuple of the index
-        types in the tensor. It's the type of each element in tns.shape. It
-        should be an actual tuple, rather than a tuple type, so that it can hold
-        e.g. dtypes, formats, or types, and so that we can easily index it."""
-        return self.ftype.shape_type
-
-    @property
     @abstractmethod
     def shape(self) -> tuple:
         """Shape of the tensor."""
@@ -111,9 +93,11 @@ def fill_value(arg: Any) -> Any:
     Raises:
         AttributeError: If the fill value is not implemented for the given type.
     """
-    if hasattr(arg, "fill_value"):
+    if isinstance(arg, TensorFType):
         return arg.fill_value
-    return ftype(arg).fill_value
+    if isinstance(arg, Tensor):
+        return arg.ftype.fill_value
+    raise AttributeError(f"Expected Tensor or TensorFType, instead got {type(arg)}")
 
 
 def element_type(arg: Any):
@@ -130,9 +114,11 @@ def element_type(arg: Any):
     Raises:
         AttributeError: If the element type is not implemented for the given type.
     """
-    if hasattr(arg, "element_type"):
+    if isinstance(arg, (Tensor, TensorFType)):
         return arg.element_type
-    return ftype(arg).element_type
+    if isinstance(arg, Tensor):
+        return arg.ftype.element_type
+    raise AttributeError(f"Expected Tensor or TensorFType, instead got {type(arg)}")
 
 
 def shape_type(arg: Any) -> tuple:
@@ -148,6 +134,8 @@ def shape_type(arg: Any) -> tuple:
     Raises:
         AttributeError: If the shape type is not implemented for the given type.
     """
-    if hasattr(arg, "shape_type"):
+    if isinstance(arg, (Tensor, TensorFType)):
         return arg.shape_type
-    return ftype(arg).shape_type
+    if isinstance(arg, Tensor):
+        return arg.ftype.shape_type
+    raise AttributeError(f"Expected Tensor or TensorFType, instead got {type(arg)}")
