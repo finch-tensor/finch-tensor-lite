@@ -30,7 +30,7 @@ class DenseStats(TensorStats):
     @staticmethod
     def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
 
-        axes_set = [set(s.index_set) for s in args]
+        axes_set = [set(s.index_order) for s in args]
         same_axes = all(axes_set[0]==axes for axes in axes_set)
 
         def_args = [stat.tensordef for stat in args]
@@ -80,7 +80,7 @@ class DenseStats(TensorStats):
     @staticmethod
     def reorder(stats: "TensorStats", reorder_indices: tuple[str, ...]) -> "DenseStats":
         '''
-        for old_idx in stats.index_set:
+        for old_idx in stats.index_order:
             if old_idx not in set(reorder_indices) and stats.get_dim_size(old_idx) != 1:
                 raise ValueError(
                     f"Trying to drop dimension '{old_idx}' of size"
@@ -90,7 +90,7 @@ class DenseStats(TensorStats):
 
         new_dims = OrderedDict()
         for idx in reorder_indices:
-            if idx in stats.index_set:
+            if idx in stats.index_order:
                 new_dims[idx] = stats.get_dim_size(idx)
             else:
                 new_dims[idx] = 1

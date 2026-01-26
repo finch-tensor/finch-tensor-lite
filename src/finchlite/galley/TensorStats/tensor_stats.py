@@ -82,12 +82,12 @@ class TensorStats(ABC):
         return self.tensordef.get_dim_size(idx)
 
     @property
-    def index_set(self) -> set[str]:
-        return self.tensordef.index_set
+    def index_order(self) -> set[str]:
+        return self.tensordef.index_order
 
-    @index_set.setter
-    def index_set(self, value: set[str]):
-        self.tensordef.index_set = value
+    @index_order.setter
+    def index_order(self, value: set[str]):
+        self.tensordef.index_order = value
 
     @property
     def fill_value(self) -> Any:

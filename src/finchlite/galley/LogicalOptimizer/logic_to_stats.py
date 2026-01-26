@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from ...finch_logic import (
+    Plan,
     Aggregate,
     Alias,
     Field,
@@ -79,13 +80,22 @@ def insert_statistics(
                     raise ValueError(f"No TensorStats bound to alias {node.tns}")
                 
                 new_indices = tuple(f.name for f in node.idxs)
-                tensor = ST.relabel(node.tns,new_indices)
+                tensor = ST.relabel(base_stats,new_indices)
 
             if (node not in cache) or replace:
                 cache[node] = tensor
             return cache[node]
+        
+        case Plan():
+            last_result = None 
+            for body in node.bodies:
+                last_result = insert_statistics(ST,body,bindings,replace,cache)
+            return last_result
 
+        case _:
+            raise TypeError(f"Unhandled node type: {type(node)}")
 
+'''
 def get_lazy_tensor_stats(
     lazy_tensor: LazyTensor, StatsImpl: TensorStats
 ) -> TensorStats:
@@ -96,3 +106,21 @@ def get_lazy_tensor_stats(
     return insert_statistics(
         ST=StatsImpl, node=root_node, bindings=bindings, replace=replace, cache=cache
     )
+'''
+
+def get_lazy_tensor_stats(
+        lazy_tensor : LazyTensor, StatsImpl : TensorStats
+)   -> TensorStats:
+    trace = lazy_tensor.ctx.trace()
+    cache: dict[object, TensorStats] = {}
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+    replace = False
+
+    last_stats = None
+
+    for stmt in trace:
+        last_stats = insert_statistics(ST=StatsImpl,node=stmt,bindings=bindings,replace=replace,cache=cache)
+
+    return last_stats
+
+
