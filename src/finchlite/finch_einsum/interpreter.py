@@ -274,9 +274,9 @@ class EinsumMachine:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             # einsum with indirect assignment indices
-            case ein.Einsum(ein.Literal(op), tns, idxs, arg) if any(
-                not isinstance(idx, ein.Index) for idx in idxs
-            ):
+            case ein.Einsum(ein.Literal(op), tns, idxs, arg): # if any(
+            #    not isinstance(idx, ein.Index) for idx in idxs
+            #):
                 # true iterator indicies
                 true_axes: set[ein.Index] = set().union(
                     *[idx.get_idxs() for idx in idxs]
@@ -332,13 +332,13 @@ class EinsumMachine:
 
                 # put true axes arrange into evaled_assign_axes
                 for axes in true_axes:
-                    evaled_assign_axes[axes] = xp.arange(axes_sizes[axes])
+                    evaled_assign_axes[axes] = self.xp.arange(axes_sizes[axes])
                 # gets the previously evaluated arranges for the true axes
                 axes_evaled = tuple(
                     [evaled_assign_axes[axes] for axes in sorted_true_axes]
                 )
                 # cartesian product of the true axes
-                grids = xp.meshgrid(*axes_evaled, indexing="ij")
+                grids = self.xp.meshgrid(*axes_evaled, indexing="ij")
                 idx_to_grid_values: dict[ein.EinsumExpression, np.ndarray] = {
                     child_idx: evaled_assign_axes[child_idx][grid]
                     for i, grid in enumerate(grids)
@@ -358,47 +358,55 @@ class EinsumMachine:
                         evaled_arg = reduce_op(evaled_arg, axis=reduced_axes_idxs)
                     else:  # only take last element of the reduced axes
                         for i in sorted(reduced_axes_idxs, reverse=True):
-                            evaled_arg = xp.take(evaled_arg, -1, axis=i)
+                            evaled_arg = self.xp.take(evaled_arg, -1, axis=i)
 
                 # perform the scatter/assignment
                 if tns not in self.bindings or self.bindings[tns].ndim == 0:
-                    raise ValueError(f"Destination tensor {tns} must be pre-allocated.")
-
+                    # pre allocate the destination tensor
+                    dims = tuple([
+                        axes_sizes[idx] if isinstance(idx, ein.Index) else 
+                        axes_sizes[next(iter(idx.get_idxs()))]
+                        for idx in idxs
+                    ])
+                    self.bindings[tns] = self.xp.zeros(dims, dtype=evaled_arg.dtype)
+                
                 # we need to handle collisions in write addresses
                 if op == overwrite:  # direct assignment
                     self.bindings[tns][indirect_assign_idxs] = evaled_arg
                 else:
-                    nary_op = getattr(xp, nary_ops[op])
+                    nary_op = getattr(self.xp, nary_ops[op])
                     self.bindings[tns][indirect_assign_idxs] = nary_op(
                         self.bindings[tns][indirect_assign_idxs], evaled_arg
                     )
 
                 return (self.bindings[tns],)
-            case ein.Einsum(ein.Literal(op), tns, idxs, arg):
-                loops = set(arg.get_idxs()).union(set(idxs))
-                loops = sorted(loops, key=lambda x: x.name)
-                ctx = PointwiseEinsumMachine(
-                    self.xp, self.bindings, loops, self.verbose
-                )
-                arg = ctx(arg)
-                axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
-                if op != overwrite:
-                    op = getattr(xp, reduction_ops[op])
-                    val = op(arg, axis=axis)
-                else:
-                    val = arg
-                    for i in sorted(axis, reverse=True):
-                        val = xp.take(val, -1, axis=i)
-                dropped = [idx for idx in loops if idx in idxs]
-                axis = [dropped.index(idx) for idx in idxs]
-                if tns in self.bindings:
-                    if self.bindings[tns].ndim == 0:
-                        self.bindings[tns][()] = val
+                '''
+                case ein.Einsum(ein.Literal(op), tns, idxs, arg):
+                    loops = set(arg.get_idxs()).union(set(idxs))
+                    loops = sorted(loops, key=lambda x: x.name)
+                    ctx = PointwiseEinsumMachine(
+                        self.xp, self.bindings, loops, self.verbose
+                    )
+                    arg = ctx(arg)
+                    axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
+                    if op != overwrite:
+                        op = getattr(xp, reduction_ops[op])
+                        val = op(arg, axis=axis)
                     else:
-                        self.bindings[tns][:] = xp.permute_dims(val, axis)
-                else:
-                    self.bindings[tns] = xp.permute_dims(val, axis)
-                return (self.bindings[tns],)
+                        val = arg
+                        for i in sorted(axis, reverse=True):
+                            val = xp.take(val, -1, axis=i)
+                    dropped = [idx for idx in loops if idx in idxs]
+                    axis = [dropped.index(idx) for idx in idxs]
+                    if tns in self.bindings:
+                        if self.bindings[tns].ndim == 0:
+                            self.bindings[tns][()] = val
+                        else:
+                            self.bindings[tns][:] = xp.permute_dims(val, axis)
+                    else:
+                        self.bindings[tns] = xp.permute_dims(val, axis)
+                    return (self.bindings[tns],)
+                '''
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
 

@@ -13,6 +13,30 @@ from finchlite.tensor import SparseTensor
 from .conftest import finch_assert_allclose
 
 
+"""
+@pytest.fixture(autouse=True)
+def use_numpy_einsum_interpreter(monkeypatch):
+    #Temporary fixture: patch finchlite.einop/einsum to use numpy-based interpreter directly.
+    
+    def patched_einop(prgm, **kwargs):
+        stmt = ein.parse_einop(prgm)
+        prgm_obj = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+        ctx = ein.EinsumInterpreter(xp=np)  # Use numpy instead of lazy module
+        bindings = {ein.Alias(k): v for k, v in kwargs.items()}
+        return ctx(prgm_obj, bindings)[0]
+    
+    def patched_einsum(subscripts, *args, **kwargs):
+        stmt, bindings = ein.parse_einsum(subscripts, *args)
+        prgm_obj = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+        ctx = ein.EinsumInterpreter(xp=np)  # Use numpy instead of lazy module
+        bindings = {ein.Alias(k): v for k, v in bindings.items()}
+        return ctx(prgm_obj, bindings)[0]
+    
+    monkeypatch.setattr(finchlite, "einop", patched_einop)
+    monkeypatch.setattr(finchlite, "einsum", patched_einsum)
+"""
+
+
 @pytest.fixture
 def rng():
     return np.random.default_rng(42)
