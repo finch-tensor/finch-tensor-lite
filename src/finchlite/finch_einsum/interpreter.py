@@ -166,16 +166,21 @@ class PointwiseEinsumMachine:
                 # get associated access indices w/ the first indirect access
                 current_idxs = [idxs[i] for i in target_axes]
 
-                # Find the first indirect access to get the iterator size
-                first_indirect = indirect_idxs[0]
-                indirect_result = self(first_indirect).flat
-                iterator_size = len(indirect_result)
+                # evaluate all the indirect access indices
+                evaled_indirect = {
+                    idx: self(idx).ravel()
+                    for idx in current_idxs if not isinstance(idx, ein.Index)
+                }
+                # calculate the domain of the iterator index
+                iterator_size: int = min([
+                    len(evaled_idx) for evaled_idx in evaled_indirect.values()
+                ])
 
                 # evaluate the associated access indices
                 evaled_idxs: list[np.ndarray] = [
                     xp.arange(iterator_size)
                     if isinstance(idx, ein.Index)
-                    else (indirect_result if idx is first_indirect else self(idx).flat)
+                    else evaled_indirect[idx]
                     for idx in current_idxs
                 ]
 
