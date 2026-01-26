@@ -114,7 +114,7 @@ def element_type(arg: Any):
     Raises:
         AttributeError: If the element type is not implemented for the given type.
     """
-    if isinstance(arg, (Tensor, TensorFType)):
+    if isinstance(arg, TensorFType):
         return arg.element_type
     if isinstance(arg, Tensor):
         return arg.ftype.element_type
@@ -134,7 +134,7 @@ def shape_type(arg: Any) -> tuple:
     Raises:
         AttributeError: If the shape type is not implemented for the given type.
     """
-    if isinstance(arg, (Tensor, TensorFType)):
+    if isinstance(arg, TensorFType):
         return arg.shape_type
     if isinstance(arg, Tensor):
         return arg.ftype.shape_type

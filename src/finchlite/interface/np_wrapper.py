@@ -1,6 +1,6 @@
 from typing import Any
 import numpy as np
-from .tensor import Tensor, TensorFType
+from ..algebra.tensor import Tensor, TensorFType
 
 class NumPyFType(TensorFType):
     def __init__(self, dtype: np.dtype, ndim: int):
@@ -22,6 +22,14 @@ class NumPyFType(TensorFType):
     def __call__(self, shape: tuple) -> 'NumPyWrapper':
         #creates a zero-filled tensor
         return NumPyWrapper(np.zeros(shape, dtype=self._dtype))
+    
+    def __eq__(self, other):
+        if not isinstance(other, NumPyFType):
+            return False
+        return self._dtype == other._dtype and self._ndim == other._ndim
+
+    def __hash__(self):
+        return hash((self._dtype, self._ndim))
 
 class NumPyWrapper(Tensor):
     def __init__(self, data: np.ndarray):
