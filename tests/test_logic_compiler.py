@@ -26,7 +26,6 @@ from finchlite.interface import INTERPRET_NOTATION
 from .conftest import finch_assert_equal, reset_name_counts
 
 
-@pytest.mark.skip(reason="Overwrite loops break result")
 def test_logic_compiler(file_regression):
     plan = Plan(
         bodies=(
@@ -63,7 +62,7 @@ def test_logic_compiler(file_regression):
     bindings = {
         Alias(name="A0"): BufferizedNDArray(np.array([[1, 2], [3, 4]])),
         Alias(name="A1"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
-        Alias(name="A2"): BufferizedNDArray(np.array([[0, 0], [0, 0]])),
+        Alias(name="A2"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
     }
 
     program = NotationGenerator()(

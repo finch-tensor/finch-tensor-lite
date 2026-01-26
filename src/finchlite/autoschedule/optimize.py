@@ -44,6 +44,10 @@ from .standardize import (
 def with_unique_lhs(
     f, root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
+    """
+    Ensures all left-hand sides (LHS) of queries are unique by inserting new
+    tensors.
+    """
     spc = Namespace(root)
     for var in bindings:
         spc.freshen(var.name)
@@ -65,6 +69,7 @@ def with_unique_lhs(
             case Alias() as a if a in renames:
                 return renames[a]
             case Produces(args):
+                #TODO this is wrong, it produces duplicates.
                 return Produces(args + tuple(writes.values()))
 
     root = Rewrite(PostWalk(rule_0))(root)
@@ -78,7 +83,7 @@ def with_unique_lhs(
                     idxs = tuple(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
-                    bodies.append(Query(v, Table(k, idxs)))
+                    bodies.append(Query(k, Table(v, idxs)))
                 return Plan(
                     tuple(bodies) + (Produces(args[: len(args) - len(writes)]),)
                 )
@@ -336,15 +341,19 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
                 chains.append(list(intersect(intersect(idxs_1, idxs_2), root.fields())))
     chains.extend([f] for f in root.fields())
 
+    need_fix = False
     try:
         result = toposort(chains)
     except CycleInFields:
         import warnings
 
-        warnings.warn("Cycle in fields detected.", stacklevel=1)
-        return root.fields()
+        warnings.warn("Cycle in fields detected, need to permute.", stacklevel=1)
+        need_fix = True
+        result = root.fields()
 
-    if reduce(max, [len(c) for c in chains], 0) < len(set(join_chains(*chains))):
+    if need_fix or reduce(max, [len(c) for c in chains], 0) < len(
+        set(join_chains(*chains))
+    ):
         counts: dict[Field, int] = {}
         for chain in chains:
             for f in chain:
