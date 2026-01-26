@@ -1428,7 +1428,8 @@ class DCStats(TensorStats):
         stats_dcs: list[dict[tuple[frozenset[str], frozenset[str]], float]] = []
         for stats in all_stats:
             dcs: dict[tuple[frozenset[str], frozenset[str]], float] = {}
-            Z = new_def.index_set - stats.tensordef.index_set
+            Z = tuple(x for x in new_def.index_order if x not in stats.tensordef.index_order)
+            #Z = new_def.index_order - stats.tensordef.index_order
             Z_dim_size = new_def.get_dim_space_size(Z)
             for dc in stats.dcs:
                 new_key = (dc.from_indices, dc.to_indices)
@@ -1447,7 +1448,7 @@ class DCStats(TensorStats):
             if count == len(all_stats):
                 total = sum(d.get(key, 0.0) for d in stats_dcs)
                 X, Y = key
-                if Y.issubset(new_def.index_set):
+                if Y.issubset(new_def.index_order):
                     total = min(total, new_def.get_dim_space_size(Y))
                 new_dcs[key] = min(float(2**64), total)
 
@@ -1478,7 +1479,7 @@ class DCStats(TensorStats):
         join_like_args: list[TensorStats] = []
         union_like_args: list[TensorStats] = []
         for stats in all_stats:
-            if len(stats.tensordef.index_set) == 0:
+            if len(stats.tensordef.index_order) == 0:
                 continue
             if is_annihilator(op, stats.tensordef.fill_value):
                 join_like_args.append(stats)
@@ -1493,8 +1494,8 @@ class DCStats(TensorStats):
             return DCStats._merge_dc_join(new_def, join_like_dc)
         if len(join_like_args) == 0:
             return DCStats._merge_dc_union(new_def, union_like_dc)
-        join_cover = set().union(*(s.tensordef.index_set for s in join_like_dc))
-        if join_cover == new_def.index_set:
+        join_cover = set().union(*(s.tensordef.index_order for s in join_like_dc))
+        if join_cover == set(new_def.index_order):
             return DCStats._merge_dc_join(new_def, join_like_dc)
         return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
 
@@ -1576,3 +1577,39 @@ class DCStats(TensorStats):
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
         return min_weight
+    
+    @staticmethod
+    def relabel(stats: "TensorStats", relabel_indices: tuple[str, ...]) -> "DCStats":
+        '''
+        new_axes = set(relabel_indices)
+        new_dims = {m: stats.get_dim_size(m) for m in new_axes}
+        new_fill = stats.fill_value
+        '''
+        d = stats.tensordef
+        new_def = TensorDef.relabel(d,relabel_indices)
+        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        return DCStats.from_def(new_def, dcs)
+
+    @staticmethod
+    def reorder(stats: "TensorStats", reorder_indices: tuple[str, ...]) -> "DCStats":
+        '''
+        new_axes = set(reorder_indices)
+        for old_idx in stats.index_order:
+            if old_idx not in new_axes and stats.get_dim_size(old_idx) != 1:
+                raise ValueError(
+                    f"Trying to drop dimension '{old_idx}' of size"
+                    f" {stats.get_dim_size(old_idx)}."
+                    " Only size 1 dimensions can be dropped."
+                )
+
+        new_dims = {}
+        for idx in reorder_indices:
+            if idx in stats.index_order:
+                new_dims[idx] = stats.get_dim_size(idx)
+            else:
+                new_dims[idx] = 1
+        '''
+        d = stats.tensordef
+        new_def = TensorDef.reorder(d,reorder_indices)
+        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        return DCStats.from_def(new_def, dcs)
