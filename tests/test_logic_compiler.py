@@ -1,7 +1,5 @@
 import operator
 
-import pytest
-
 import numpy as np
 
 import finchlite.finch_logic as logic
@@ -62,7 +60,7 @@ def test_logic_compiler(file_regression):
     bindings = {
         Alias(name="A0"): BufferizedNDArray(np.array([[1, 2], [3, 4]])),
         Alias(name="A1"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
-        Alias(name="A2"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): BufferizedNDArray(np.array([[0, 0], [0, 0]])),
     }
 
     program = NotationGenerator()(

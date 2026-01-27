@@ -69,7 +69,7 @@ def with_unique_lhs(
             case Alias() as a if a in renames:
                 return renames[a]
             case Produces(args):
-                #TODO this is wrong, it produces duplicates.
+                # TODO this is wrong, it produces duplicates.
                 return Produces(args + tuple(writes.values()))
 
     root = Rewrite(PostWalk(rule_0))(root)
