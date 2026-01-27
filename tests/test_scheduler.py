@@ -44,7 +44,7 @@ def test_propagate_map_queries():
         (
             Query(
                 Alias("A10"),
-                Aggregate(Literal("+"), Literal(0), Literal("[1,2,3]"), ()),
+                MapJoin(Literal("+"), (Literal(0), Literal("[1,2,3]"))),
             ),
             Query(Alias("A11"), Table(Alias("A10"), ())),
             Produces((Alias("A11"),)),

@@ -162,7 +162,8 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
 
 
 def propagate_single_use_queries_and_combine_aggregates(
-    root: LogicStatement) -> LogicStatement:
+    root: LogicStatement,
+) -> LogicStatement:
     # TODO: We're not ready for that optimization yet.
     #       First we need to support Literals as MapJoin's
     #       arguments (they're missing `fields`) or promote
