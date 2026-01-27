@@ -314,7 +314,7 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             )
 
 
-def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
+def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[ein.Alias, Any]]:
     args = list(args_)
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
@@ -448,5 +448,5 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[str, Any]]:
             idxs,
             arg,
         ),
-        {in_tnss[i].name: operands[i] for i in range(len(operands))},
+        {in_tnss[i]: operands[i] for i in range(len(operands))},
     )
