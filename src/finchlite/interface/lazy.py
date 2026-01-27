@@ -98,6 +98,9 @@ class LazyTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 effect_stamp = 0
 
@@ -407,12 +410,14 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(
+    np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray.from_numpy(x)
+)
 register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, format=None) -> Any:
+def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
@@ -422,13 +427,15 @@ def asarray(arg: Any, format=None) -> Any:
         format: The format for the result array.
 
     Returns:
-        The array type result of the given object.
+        The Tensor type result of the given object.
     """
     if format is None:
         if hasattr(arg, "asarray"):
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
 
+    if isinstance(arg, np.ndarray):
+        return format.from_numpy(arg)
     return format(arg)
 
 
@@ -1227,6 +1234,9 @@ class DefaultTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class WrapperTensorFType(TensorFType):
@@ -1246,6 +1256,9 @@ class WrapperTensorFType(TensorFType):
         for t in self._child_formats:
             etype = promote_type(etype, t.element_type)
         return etype
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)

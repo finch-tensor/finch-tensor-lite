@@ -48,6 +48,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def __call__(self, shape=(), val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
+
         Args:
             shape: Should be always `()`, used for validation.
             val: The value to store in the ElementLevel instance.
@@ -125,18 +126,21 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto):
+    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def next_level(self):
         raise NotImplementedError("ElementLevelFType does not support next_level.")
+
+    def from_numpy(self, shape, val):
+        return self(shape=shape, val=val)
 
 
 def element(
     fill_value=None,
     element_type=None,
     position_type=None,
-    buffer_factory=None,
+    buffer_factory=NumpyBufferFType,
     buffer_type=None,
 ):
     """
@@ -191,3 +195,9 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
+
+    def __repr__(self):
+        return f"ElementLevel(val={self._val})"
+
+    def __str__(self):
+        return f"ElementLevel(val={self._val})"
