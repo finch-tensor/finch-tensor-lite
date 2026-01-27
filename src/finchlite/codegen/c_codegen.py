@@ -25,11 +25,11 @@ from ..finch_assembly import (
     TupleFType,
 )
 from ..symbolic import Context, FType, Namespace, ScopedDict, fisinstance, ftype
-from ..util import config
-from ..util.cache import file_cache
+from ..util import config, file_cache
+from ..util.logging import LOG_BACKEND_C
 from .stages import CCode, CLowerer
 
-logger = logging.getLogger(__name__)
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)
 
 common_h = Path(__file__).parent / "stc" / "include" / "stc" / "common.h"
 
@@ -392,7 +392,7 @@ class CCompiler(asm.AssemblyLoader):
 
     def __call__(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
-        logger.info(f"Compiling C code:\n{c_code}")
+        logger.debug(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
             cc=self.cc,
