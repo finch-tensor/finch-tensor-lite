@@ -177,7 +177,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             )
         )
 
-    def from_fields(self, lvl, dimension, pos) -> "DenseLevel":
+    def from_fields(self, lvl, dimension) -> "DenseLevel":
         return DenseLevel(lvl=lvl, dimension=dimension)
 
 
