@@ -100,9 +100,7 @@ class LazyTensorFType(TensorFType):
         return self._shape_type
 
 
-effect_stamp = 0
-effect_stamp_lock = threading.Lock()
-
+effect_stamp = threading.local()
 
 class EffectBlob:
     """
@@ -126,16 +124,22 @@ class EffectBlob:
         stmt: LogicStatement | None = None,
         blobs: tuple[EffectBlob, ...] | None = None,
     ):
-        global effect_stamp, effect_stamp_lock
+        global effect_stamp
         if stmt is None:
             stmt = Plan()
         if blobs is None:
             blobs = ()
         self.stmt = stmt
         self.blobs = blobs
-        with effect_stamp_lock:
-            self.stamp = effect_stamp
-            effect_stamp += 1
+        
+        try:
+            curr_stamp = effect_stamp.value
+        except AttributeError:
+            effect_stamp.value = 0
+            curr_stamp = 0
+
+        self.stamp = curr_stamp
+        curr_stamp += 1
 
     def exec(self, stmt: LogicStatement) -> EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
