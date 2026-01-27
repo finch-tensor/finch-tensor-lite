@@ -39,6 +39,17 @@ class SparseTensorFType(TensorFType):
         coords: np.typing.NDArray = np.empty((0, len(shape)), dtype=np.intp)
         return SparseTensor(data, coords, shape, self._element_type)
 
+    
+    # converts an eager tensor to a sparse tensor
+    @classmethod
+    def from_numpy(self, dense_tensor: np.ndarray):
+        coords = np.where(dense_tensor != 0)
+        data = dense_tensor[coords]
+        shape = dense_tensor.shape
+        element_type = dense_tensor.dtype.type
+        coords_array = np.array(coords).T
+        return SparseTensor(data, coords_array, shape, element_type)
+
 
 # currently implemented with COO tensor
 class SparseTensor(EagerTensor):
@@ -62,16 +73,6 @@ class SparseTensor(EagerTensor):
         data = np.array([], dtype=self._element_type)
         coords = np.empty((0, len(shape)), dtype=np.intp)
         return SparseTensor(data, coords, shape, self._element_type)
-
-    # converts an eager tensor to a sparse tensor
-    @classmethod
-    def from_dense_tensor(cls, dense_tensor: np.ndarray):
-        coords = np.where(dense_tensor != 0)
-        data = dense_tensor[coords]
-        shape = dense_tensor.shape
-        element_type = dense_tensor.dtype.type
-        coords_array = np.array(coords).T
-        return cls(data, coords_array, shape, element_type)
 
     @property
     def ftype(self):

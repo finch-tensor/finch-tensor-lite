@@ -8,7 +8,7 @@ import numpy as np
 import finchlite
 import finchlite.finch_einsum as ein
 from finchlite.algebra import overwrite, promote_max, promote_min
-from finchlite.tensor import SparseTensor
+from finchlite.tensor import SparseTensor, SparseTensorFType
 
 from .conftest import finch_assert_allclose
 
@@ -1184,7 +1184,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 5))
         B = rng.random((5, 5))
 
-        sparse_A = SparseTensor.from_dense_tensor(A)
+        sparse_A = SparseTensorFType.from_numpy(A)
 
         # A is sparse
         # C[i] = AElems[i] * B[ACoords[i]]
@@ -1236,7 +1236,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((4, 4))
         B = rng.random((4, 4))
 
-        sparse_A = SparseTensor.from_dense_tensor(A)
+        sparse_A = SparseTensorFType.from_numpy(A)
 
         # C[i] = AElems[i] + B[ACoords[i]]
         prgm = ein.Plan(
@@ -1287,8 +1287,8 @@ class TestEinsumIndirectAccess:
         A = rng.random((3, 3))
         B = rng.random((3, 3))
 
-        sparse_A = SparseTensor.from_dense_tensor(A)
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_A = SparseTensorFType.from_numpy(A)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # C[i] = AElems[i] * BElems[i]
         # Both A and B are sparse, reading their elements directly
@@ -1335,7 +1335,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((4, 4))
         B = rng.random((4, 4))
 
-        sparse_A = SparseTensor.from_dense_tensor(A)
+        sparse_A = SparseTensorFType.from_numpy(A)
 
         # C[i] = AElems[i] * B[ACoords[i]] + 5.0
         prgm = ein.Plan(
@@ -1393,7 +1393,7 @@ class TestEinsumIndirectAccess:
         B = rng.random((3, 3))
         C = rng.random((3, 3))
 
-        sparse_A = SparseTensor.from_dense_tensor(A)
+        sparse_A = SparseTensorFType.from_numpy(A)
 
         # D[i] = (AElems[i] + B[ACoords[i]]) * C[ACoords[i]]
         prgm = ein.Plan(
@@ -1464,7 +1464,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((8,))
         B = rng.random((8,))
 
-        sparse_A = SparseTensor.from_dense_tensor(A)
+        sparse_A = SparseTensorFType.from_numpy(A)
 
         # C[i] = B[ACoords[i]] (read B indirectly, without using A's elements)
         prgm = ein.Plan(
@@ -1508,7 +1508,7 @@ class TestEinsumIndirectAccess:
         # C is sparse
         C = rng.random((8,))
 
-        sparse_C = SparseTensor.from_dense_tensor(C)
+        sparse_C = SparseTensorFType.from_numpy(C)
 
         # D[i] = A[B[CCoords[i]]]
         # First get CCoords[i], then use that to index B, then use B's value to index A
@@ -1562,7 +1562,7 @@ class TestEinsumIndirectAccess:
         rng.shuffle(C)
         D = rng.random((8,))
 
-        sparse_D = SparseTensor.from_dense_tensor(D)
+        sparse_D = SparseTensorFType.from_numpy(D)
 
         # E[i] = A[B[C[DCoords[i]]]]
         prgm = ein.Plan(
@@ -1619,7 +1619,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 4))
         B = rng.random((5,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # C[i, j] = A[BCoords[i], j]
         # First index is indirect (from B's coords), second is direct
@@ -1664,7 +1664,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((4, 6))
         B = rng.random((6,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # C[i, j] = A[i, BCoords[j]]
         # First index is direct, second is indirect
@@ -1706,7 +1706,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((6, 6))
         B = rng.random((6,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # C[i] = A[BCoords[i], BCoords[i]]
         # Extracting diagonal-like elements using indirect coordinates
@@ -1759,8 +1759,8 @@ class TestEinsumIndirectAccess:
         B = rng.random((6,))
         C = rng.random((6,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
-        sparse_C = SparseTensor.from_dense_tensor(C)
+        sparse_B = SparseTensorFType.from_numpy(B)
+        sparse_C = SparseTensorFType.from_numpy(C)
 
         # D[i] = A[BCoords[i], CCoords[i]]
         prgm = ein.Plan(
@@ -1814,7 +1814,7 @@ class TestEinsumIndirectAccess:
         rng.shuffle(B)
         C = rng.random((8,))
 
-        sparse_C = SparseTensor.from_dense_tensor(C)
+        sparse_C = SparseTensorFType.from_numpy(C)
 
         # E[i] = A[B[CCoords[i]]] * CElems[i]
         # Double indirection plus multiplication with sparse elements
@@ -1876,7 +1876,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 5))
         B = rng.random((4,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # D[i, j] = A[BCoords[i], j] + BElems[i]
         # Mixed indexing plus addition with sparse elements
@@ -1931,7 +1931,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((3, 4, 5))
         B = rng.random((4,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # C[i, j, k] = A[i, BCoords[j], k]
         # Middle dimension is indirectly indexed
@@ -1981,7 +1981,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 5))
         B = rng.random((5,))  # All non-zero, so nnz = 5
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[i] = A[BCoords[i], i]
         # For i in 0..4: access A[coord_i, i]
@@ -2026,7 +2026,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 8))
         B = rng.random((5,))  # nnz = 5
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[i] = A[i, BCoords[i]]
         prgm = ein.Plan(
@@ -2068,7 +2068,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((6, 6))
         B = rng.random((6,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[i] = A[BCoords[i], i] * BElems[i]
         prgm = ein.Plan(
@@ -2125,7 +2125,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((4, 4, 5))
         B = rng.random((4,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[i, j] = A[BCoords[i], i, j]
         prgm = ein.Plan(
@@ -2171,7 +2171,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((4, 6, 4))
         B = rng.random((4,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[i] = A[i, BCoords[i], i]
         prgm = ein.Plan(
@@ -2218,7 +2218,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 3, 5))
         B = rng.random((5,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[i, j] = A[BCoords[i], j, i]
         prgm = ein.Plan(
@@ -2262,7 +2262,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((8,))
         B = rng.random((8,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         prgm = ein.Plan(
             (
@@ -2304,7 +2304,7 @@ class TestEinsumIndirectAccess:
         B[4] = 1.0
         B[7] = 1.0
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         prgm = ein.Plan(
             (
@@ -2342,7 +2342,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((6,))
         B = rng.random((6,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         prgm = ein.Plan(
             (
@@ -2379,7 +2379,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 4))
         B = rng.random((5,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[j] += A[BCoords[i], j]
         prgm = ein.Plan(
@@ -2418,7 +2418,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((6,))
         B = rng.random((6,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result += BElems[i] * A[BCoords[i]]
         prgm = ein.Plan(
@@ -2468,7 +2468,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 5))
         B = rng.random((5,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result += A[BCoords[i], i]
         prgm = ein.Plan(
@@ -2507,7 +2507,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((4, 5, 3))
         B = rng.random((4,))
 
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         # Result[k] += A[BCoords[i], j, k]
         prgm = ein.Plan(
@@ -2546,7 +2546,7 @@ class TestEinsumIndirectAccess:
         """A[B[CCoords[i]]] - chained indirection through three tensors."""
         C = np.zeros((8,))
         C[[1, 4, 6]] = rng.random(3)
-        sparse_C = SparseTensor.from_dense_tensor(C)
+        sparse_C = SparseTensorFType.from_numpy(C)
 
         B = np.array([7, 2, 0, 5, 3, 6, 1, 4])  # permutation
         A = rng.random((8,))
@@ -2592,11 +2592,11 @@ class TestEinsumIndirectAccess:
         """Result[i, j] = A[BCoords[i]] * C[DCoords[j]]"""
         B = np.zeros((6,))
         B[[0, 3, 5]] = rng.random(3)
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         D = np.zeros((4,))
         D[[1, 2]] = rng.random(2)
-        sparse_D = SparseTensor.from_dense_tensor(D)
+        sparse_D = SparseTensorFType.from_numpy(D)
 
         A = rng.random((6,))
         C = rng.random((4,))
@@ -2715,7 +2715,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((3, 8, 4, 5))
         B = np.zeros((8,))
         B[[1, 3, 7]] = rng.random(3)
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         prgm = ein.Plan(
             (
@@ -2760,7 +2760,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((5, 5, 4))
         B = np.zeros((5,))
         B[[0, 2, 4]] = rng.random(3)
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
         C = rng.random((4,))
 
         prgm = ein.Plan(
@@ -2865,7 +2865,7 @@ class TestEinsumIndirectAccess:
         A = rng.random((10,))
         B = np.zeros((10,))
         B[[2, 5, 8]] = rng.random(3)
-        sparse_B = SparseTensor.from_dense_tensor(B)
+        sparse_B = SparseTensorFType.from_numpy(B)
 
         prgm = ein.Plan(
             (
