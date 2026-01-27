@@ -42,7 +42,7 @@ class SparseTensorFType(TensorFType):
     
     # converts an eager tensor to a sparse tensor
     @classmethod
-    def from_numpy(self, dense_tensor: np.ndarray):
+    def from_numpy(cls, dense_tensor: np.ndarray):
         coords = np.where(dense_tensor != 0)
         data = dense_tensor[coords]
         shape = dense_tensor.shape
