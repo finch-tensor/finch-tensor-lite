@@ -1,3 +1,4 @@
+import enum
 import operator
 
 import numpy as np
@@ -132,67 +133,82 @@ class PointwiseEinsumMachine:
                 return func(*vals)
 
             # access a tensor with only one indirect access index
-            case ein.Access(tns, idxs) if len(idxs) == 1 and not isinstance(idxs[0], ein.Index):
-                tns = self(tns)  # evaluate the tensor
-                idx = self(idxs[0])
+            # case ein.Access(tns, idxs) if len(idxs) == 1:
+            #    tns = self(tns)  # evaluate the tensor
+            #    if isinstance(idxs[0], ein.Index):
+            #        return tns
+            #    else:
+            #        idx = self(idxs[0])
 
-                flat_idx = (
-                    idx if idx.ndim == 1 else xp.ravel_multi_index(idx.T, tns.shape)
-                )
-                return tns.flat[flat_idx]  # return a 1-d array by definition
+            #        flat_idx = (
+            #            idx if idx.ndim == 1 
+            #            else xp.ravel_multi_index(idx.T, tns.shape)
+            #        )
+            #        tns = tns.flat[flat_idx]  # return a 1-d array by definition
 
-            # access a tensor with an indirect access index
-            case ein.Access(tns, idxs) if any(
-                not isinstance(idx, ein.Index) for idx in idxs
-            ):
+                    #tns shape must be (1, 1, )
+
+            # access a tensor with an one index but multiple dimensions (really only needed for .coord subtensor)
+            case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(idxs[0], ein.Index):
                 assert self.loops is not None
                 tns = self(tns)
 
-                # Evaluate indirect indices, squeeze to 1D (handles COO coords)
-                def squeeze_to_1d(arr):
-                    arr = arr.squeeze()
-                    return arr.reshape(1) if arr.ndim == 0 else arr
+                target_shape = [
+                    -1 if idxs[0] == other_idx else 1 
+                    for other_idx in self.loops
+                ]
+                if tns.ndim == 1:
+                    return tns.reshape(target_shape)
 
-                evaled = {
-                    idx: squeeze_to_1d(self(idx))
-                    for idx in idxs if not isinstance(idx, ein.Index)
+                assert tns.ndim == 2
+                return tuple([
+                    xp.reshape(tns[:, i], target_shape) for i in range(tns.shape[1])
+                ])
+            case ein.Access(tns, idxs): #if any(
+                #not isinstance(idx, ein.Index) for idx in idxs
+            #):
+                assert self.loops is not None
+                tns = self(tns)
+
+                iterator_shapes: dict[ein.Index, tuple[int, ...]] = {
+                    idx: [-1 if idx == other_idx else 1 for other_idx in self.loops]
+                    for idx in idxs if isinstance(idx, ein.Index)
                 }
 
-                # Build loop sizes: indirect indices first, then direct from tensor dims
-                loop_sizes = {
-                    next(iter(idx.get_idxs())): val.shape[0]
-                    for idx, val in evaled.items() if len(idx.get_idxs()) == 1
-                }
-                loop_sizes |= {
-                    idx: tns.shape[i] for i, idx in enumerate(idxs)
-                    if isinstance(idx, ein.Index) and idx not in loop_sizes
-                }
+                evaled_items = [
+                    idx if isinstance(idx, ein.Index) else self(idx)
+                    for idx in idxs
+                ]
+                evaled_items = [
+                    x for item in evaled_items 
+                    for x in 
+                    (item if isinstance(item, tuple) 
+                    else [item])
+                ]
+                assert len(evaled_items) == len(tns.shape)
 
-                # Build loop shape and broadcast index arrays
-                loop_shape = tuple(loop_sizes.get(loop, 1) for loop in self.loops)
+                evaled_items = [
+                    xp.arange(tns.shape[i]).reshape(iterator_shapes[evaled_item]) if isinstance(evaled_item, ein.Index) else evaled_item
+                    for i, evaled_item in enumerate(evaled_items)
+                ]
 
-                def make_idx_array(i, idx):
-                    arr = self.xp.arange(loop_sizes[idx]) if isinstance(idx, ein.Index) else evaled[idx]
-                    shape = [loop_sizes[l] if l in idx.get_idxs() else 1 for l in self.loops]
-                    return xp.broadcast_to(arr.reshape(shape), loop_shape)
-
-                return tns[tuple(make_idx_array(i, idx) for i, idx in enumerate(idxs))]
+                tns = tns[tuple(evaled_items)]
+                print("TNS SHAPE:", tns.shape)
+                return tns
             # access a tensor with a mixture of indices and other expressions
-                
-            case ein.Access(tns, idxs):
-                assert self.loops is not None
+            #case ein.Access(tns, idxs):
+            #    assert self.loops is not None
 
-                tns = self(tns)
-                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
-                    perm += list(range(len(perm), tns.ndim))
+            #    tns = self(tns)
+            #    perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+            #    if hasattr(tns, "ndim") and len(perm) < tns.ndim:
+            #        perm += list(range(len(perm), tns.ndim))
 
-                tns = xp.permute_dims(tns, perm)  # permute the dimensions
-                xp = xp.expand_dims(
-                    tns,
-                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
-                )
-                return xp
+            #    tns = xp.permute_dims(tns, perm)  # permute the dimensions
+            #    return xp.expand_dims(
+            #        tns,
+            #        [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
+            #    )
             # get non-zero elements/data array of a sparse tensor
             case ein.GetAttr(obj, ein.Literal("elems"), _):
                 obj = self(obj)
