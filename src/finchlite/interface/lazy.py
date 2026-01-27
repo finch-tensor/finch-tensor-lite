@@ -4,6 +4,7 @@ import bisect
 import builtins
 import operator
 import sys
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
@@ -102,7 +103,7 @@ class LazyTensorFType(TensorFType):
         raise NotImplementedError
 
 
-effect_stamp = 0
+effect_stamp = threading.local()
 
 
 class EffectBlob:
@@ -134,8 +135,15 @@ class EffectBlob:
             blobs = ()
         self.stmt = stmt
         self.blobs = blobs
-        self.stamp = effect_stamp
-        effect_stamp += 1
+
+        try:
+            curr_stamp = effect_stamp.value
+        except AttributeError:
+            effect_stamp.value = 0
+            curr_stamp = 0
+
+        self.stamp = curr_stamp
+        effect_stamp.value += 1
 
     def exec(self, stmt: LogicStatement) -> EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
