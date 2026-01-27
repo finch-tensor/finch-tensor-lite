@@ -74,7 +74,7 @@ class SuperTensorEinsumInterpreter:
                     ]
 
                     # Restore the logical shape of the SuperTensor.
-                    supertensor = self.bindings[access.tns.name]
+                    supertensor = self.bindings[access.tns]
                     logical_tns = np.empty(
                         supertensor.shape, dtype=supertensor.base.dtype
                     )
@@ -87,8 +87,8 @@ class SuperTensorEinsumInterpreter:
                     )
 
                     # Map the tensor name to its corrected base tensor and index list.
-                    corrected_bindings[access.tns.name] = corrected_supertensor.base
-                    corrected_idx_lists[access.tns.name] = new_idx_list
+                    corrected_bindings[access.tns] = corrected_supertensor.base
+                    corrected_idx_lists[access.tns] = new_idx_list
 
                 # Construct the corrected index list and mode map for the output.
                 new_output_idx_list = sorted(
@@ -103,7 +103,7 @@ class SuperTensorEinsumInterpreter:
                     ]
                     for new_idx in new_output_idx_list
                 ]
-                corrected_idx_lists[output_tns.name] = new_output_idx_list
+                corrected_idx_lists[output_tns] = new_output_idx_list
 
                 # Compute the logical shape of the output SuperTensor.
                 output_shape = [0] * len(output_idxs)
@@ -111,7 +111,7 @@ class SuperTensorEinsumInterpreter:
                     # Find an input tensor which contains this logical index.
                     for access in accesses:
                         if idx in access.idxs:
-                            supertensor = self.bindings[access.tns.name]
+                            supertensor = self.bindings[access.tns]
                             output_shape[output_idxs.index(idx)] = supertensor.shape[
                                 access.idxs.index(idx)
                             ]
@@ -122,10 +122,10 @@ class SuperTensorEinsumInterpreter:
                 def reshape_supertensors(node):
                     match node:
                         case ein.Access(tns, _):
-                            updated_idxs = corrected_idx_lists[tns.name]
+                            updated_idxs = corrected_idx_lists[tns]
                             return ein.Access(tns, tuple(updated_idxs))
                         case ein.Einsum(op, tns, _, arg):
-                            updated_output_idxs = corrected_idx_lists[tns.name]
+                            updated_output_idxs = corrected_idx_lists[tns]
                             return ein.Einsum(op, tns, tuple(updated_output_idxs), arg)
                         case _:
                             return node
@@ -135,12 +135,12 @@ class SuperTensorEinsumInterpreter:
                 # Compute the output base tensor.
                 ctx = EinsumInterpreter()
                 result = ctx(corrected_AST, bindings=corrected_bindings)
-                output_base = corrected_bindings[result[0]]
+                output_base = result[0]
 
                 # Wrap the output base tensor into a SuperTensor.
-                self.bindings[output_tns.name] = SuperTensor(
+                self.bindings[output_tns] = SuperTensor(
                     output_shape, output_base, output_mode_map
                 )
-                return (output_tns.name,)
+                return (self.bindings[output_tns],)
             case _:
                 return None

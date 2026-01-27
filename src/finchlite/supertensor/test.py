@@ -23,7 +23,7 @@ print("Bindings", bindings)
 
 interpreter = ein.EinsumInterpreter()
 output = interpreter(einsum_AST, bindings=bindings)
-result = bindings[output[0]]
+result = output[0]
 print(f"Regular einsum interpreter result:\n{result}\n")
 
 # Using SuperTensorEinsumInterpreter
@@ -39,5 +39,5 @@ supertensor_interpreter = stns.SuperTensorEinsumInterpreter(
     bindings=supertensor_bindings
 )
 output = supertensor_interpreter(supertensor_einsum_AST)
-result = supertensor_bindings[output[0]]
+result = output[0]
 print(f"SuperTensor einsum interpreter result:\n{result}")
