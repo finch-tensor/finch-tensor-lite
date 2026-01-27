@@ -3,11 +3,11 @@
 65536
 2.0
 3.0
-<numba.experimental.jitclass.boxing.Numba_Point>
-<numba.experimental.jitclass.boxing.Numba_tuple>
-<numba.experimental.jitclass.boxing.Numba_Point>
-<numba.experimental.jitclass.boxing.Numba_tuple>
+(1.0, 2.0)
+(1, 4)
+(1.0, 2.0)
+(1, 4)
 9.0
-<numba.experimental.jitclass.boxing.Numba_Point>
-<numba.experimental.jitclass.boxing.Numba_tuple>
+(1.0, 2.0)
+(1, 4)
 9.0
