@@ -102,6 +102,7 @@ class LazyTensorFType(TensorFType):
 
 effect_stamp = threading.local()
 
+
 class EffectBlob:
     """
     The EffectBlob class represents a collection of prior queries in a lazy
@@ -131,7 +132,7 @@ class EffectBlob:
             blobs = ()
         self.stmt = stmt
         self.blobs = blobs
-        
+
         try:
             curr_stamp = effect_stamp.value
         except AttributeError:
@@ -139,7 +140,7 @@ class EffectBlob:
             curr_stamp = 0
 
         self.stamp = curr_stamp
-        curr_stamp += 1
+        effect_stamp.value += 1
 
     def exec(self, stmt: LogicStatement) -> EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
@@ -152,16 +153,18 @@ class EffectBlob:
         return EffectBlob(blobs=(self, *blobs))
 
     def trace(self) -> tuple[LogicStatement, ...]:
-        stmts = list[tuple[int, LogicStatement]]()
+        stmts = list[tuple[int, int, LogicStatement]]()
         seen = set[int]()
         self._trace(seen, stmts)
         stmts.sort()
-        return tuple(stmt for _, stmt in stmts)
+        return tuple(stmt for _, _, stmt in stmts)
 
-    def _trace(self, seen: set[int], stmts: list[tuple[int, LogicStatement]]) -> None:
+    def _trace(
+        self, seen: set[int], stmts: list[tuple[int, int, LogicStatement]]
+    ) -> None:
         if id(self) not in seen:
             seen.add(id(self))
-            stmts.append((self.stamp, self.stmt))
+            stmts.append((self.stamp, id(self.stmt), self.stmt))
             for blob in self.blobs:
                 blob._trace(seen, stmts)
 
