@@ -88,9 +88,7 @@ def with_unique_lhs(
                 args_2 = tuple(
                     unrenames.get(a, a) for a in args[: len(args) - len(writes)]
                 )
-                return Plan(
-                    tuple(bodies) + (Produces(args_2),)
-                )
+                return Plan(tuple(bodies) + (Produces(args_2),))
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)
 

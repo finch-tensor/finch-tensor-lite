@@ -137,9 +137,17 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(self, shape, val):
+    def __call__(self, shape):
         """
         Construct level
+        """
+        ...
+
+    @abstractmethod
+    def from_numpy(self, shape, val):
+        """
+        Construct level from numpy array
+        (TODO not strictly safe, only works for dense, replace later)
         """
         ...
 
@@ -288,9 +296,9 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
 
     def __call__(self, shape: tuple[int, ...]):
         """
-        Creates an instance of a FiberTensor with the given shape and value.
+        Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape, val=None))
+        return FiberTensor(self.lvl_t(shape=shape))
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
@@ -378,7 +386,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         return FiberTensor(*args)
 
     def from_numpy(self, arr: np.ndarray) -> FiberTensor:
-        return FiberTensor(self.lvl_t(arr.shape, arr))
+        return FiberTensor(self.lvl_t.from_numpy(arr.shape, arr))
 
 
 def fiber_tensor(lvl: LevelFType):

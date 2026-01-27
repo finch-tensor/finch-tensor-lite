@@ -45,7 +45,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape, val):
+    def __call__(self, shape=(), val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
@@ -131,6 +131,9 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
 
     def next_level(self):
         raise NotImplementedError("ElementLevelFType does not support next_level.")
+
+    def from_numpy(self, shape, val):
+        return self(shape=shape, val=val)
 
 
 def element(
