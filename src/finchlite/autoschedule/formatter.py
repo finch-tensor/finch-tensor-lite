@@ -1,7 +1,7 @@
 import numpy as np
 
+from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyLibrary
-from finchlite.finch_logic.nodes import TableValueFType
 
 from .. import finch_logic as lgc
 from ..codegen import NumpyBufferFType
@@ -21,17 +21,18 @@ class LogicFormatter(LogicLoader):
     def __call__(
         self,
         prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, lgc.TableValueFType],
+        bindings: dict[lgc.Alias, TensorFType],
     ) -> tuple[
-        AssemblyLibrary, lgc.LogicStatement, dict[lgc.Alias, lgc.TableValueFType]
+        AssemblyLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
         bindings = bindings.copy()
-        fields = prgm.infer_fields({var: val.idxs for var, val in bindings.items()})
         shape_types = prgm.infer_shape_type(
-            {var: val.tns.shape_type for var, val in bindings.items()}, fields
+            {var: val.shape_type for var, val in bindings.items()}
         )
         element_types = prgm.infer_element_type(
-            {var: val.tns.element_type for var, val in bindings.items()}
+            {var: val.element_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement):
@@ -50,13 +51,14 @@ class LogicFormatter(LogicLoader):
                         # TODO: bufferized ndarray seems broken
                         tns = BufferizedNDArrayFType(
                             buffer_type=NumpyBufferFType(element_types[lhs]),
-                            ndim=np.intp(len(fields[lhs])),
+                            ndim=np.intp(len(shape_type)),
                             dimension_type=TupleFType(
-                                struct_name=gensym("ugh"), struct_formats=shape_type
+                                struct_name=gensym("tuple", sep="_"),
+                                struct_formats=shape_type,
                             ),
                         )
                         # tns = NDArrayFType(element_type, np.intp(len(shape_type)))
-                        bindings[lhs] = TableValueFType(tns, fields[lhs])
+                        bindings[lhs] = tns
                 case lgc.Produces(_):
                     pass
                 case _:
@@ -66,5 +68,5 @@ class LogicFormatter(LogicLoader):
 
         formatter(prgm)
 
-        lib, prgm, bindings = self.loader(prgm, bindings)
-        return lib, prgm, bindings
+        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        return lib, bindings, shape_vars

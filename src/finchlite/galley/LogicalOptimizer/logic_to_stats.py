@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from finchlite.finch_logic import (
+from ...finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -14,7 +14,7 @@ from finchlite.finch_logic import (
     Table,
     Value,
 )
-from finchlite.galley.TensorStats import TensorStats
+from ..TensorStats import TensorStats
 
 
 def insert_statistics(
@@ -73,14 +73,14 @@ def insert_statistics(
         return child
 
     if isinstance(node, Table):
-        if not isinstance(node.tns, Literal):
-            raise TypeError("Table.tns must be Literal(...).")
-
-        tensor = node.tns.val
-        idxs = [f.name for f in node.idxs]
+        if isinstance(node.tns, Literal):
+            idxs = [f.name for f in node.idxs]
+            tensor = ST(node.tns.val, idxs)
+        elif isinstance(node.tns, Alias):
+            tensor = bindings[node.tns]
 
         if (node not in cache) or replace:
-            cache[node] = ST(tensor, idxs)
+            cache[node] = tensor
         return cache[node]
 
     if isinstance(node, (Value, Literal)):

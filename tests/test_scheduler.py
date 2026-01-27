@@ -1,24 +1,23 @@
 from operator import add, mul
 
-import pytest
-
 import numpy as np
 
+import finchlite
 from finchlite.autoschedule import (
+    normalize_names,
+)
+from finchlite.autoschedule.optimize import (
+    lift_fields,
+    optimize,
+    propagate_copy_queries,
+    propagate_transpose_queries,
+)
+from finchlite.autoschedule.standardize import (
     concordize,
     flatten_plans,
     isolate_aggregates,
-    lift_fields,
-    materialize_squeeze_expand_productions,
-    normalize_names,
-    optimize,
-    propagate_copy_queries,
-    propagate_fields,
-    propagate_map_queries,
-    propagate_map_queries_backward,
-    propagate_transpose_queries,
     push_fields,
-    set_loop_order,
+    standardize,
 )
 from finchlite.finch_logic import (
     Aggregate,
@@ -33,72 +32,8 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.finch_logic.interpreter import LogicInterpreter
+from finchlite.symbolic.ftype import ftype
 from finchlite.symbolic.gensym import _sg
-
-from .conftest import finch_assert_equal
-
-
-def test_propagate_map_queries():
-    plan = Plan(
-        (
-            Query(
-                Alias("A10"),
-                Aggregate(Literal("+"), Literal(0), Literal("[1,2,3]"), ()),
-            ),
-            Query(Alias("A11"), Alias("A10")),
-            Produces((Alias("A11"),)),
-        )
-    )
-    expected = Plan(
-        (
-            Query(
-                Alias("A11"),
-                MapJoin(Literal("+"), (Literal(0), Literal("[1,2,3]"))),
-            ),
-            Produces((Alias("A11"),)),
-        )
-    )
-
-    result = propagate_map_queries(plan)
-    assert result == expected
-
-
-def test_propagate_fields():
-    plan = Plan(
-        (
-            Query(
-                Alias("A10"),
-                MapJoin(
-                    Literal("op"),
-                    (
-                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Literal("tbl2"), (Field("A2"), Field("A3"))),
-                    ),
-                ),
-            ),
-            Alias("A10"),
-        )
-    )
-
-    expected = Plan(
-        (
-            Query(
-                Alias("A10"),
-                MapJoin(
-                    Literal("op"),
-                    (
-                        Table(Literal("tbl1"), (Field("A1"), Field("A2"))),
-                        Table(Literal("tbl2"), (Field("A2"), Field("A3"))),
-                    ),
-                ),
-            ),
-            Relabel(Alias("A10"), (Field("A1"), Field("A2"), Field("A3"))),
-        )
-    )
-
-    result = propagate_fields(plan)
-    assert result == expected
 
 
 def test_isolate_aggregates():
@@ -135,17 +70,15 @@ def test_isolate_aggregates():
                         ),
                     ),
                     Query(
-                        Alias(f"#A#{_sg.counter + 1}"),
+                        Alias("A0"),
                         Aggregate(
                             Literal("+"),
                             Literal(0),
-                            Alias(f"#A#{_sg.counter}"),
+                            Table(
+                                Alias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))
+                            ),
                             (Field("i1"),),
                         ),
-                    ),
-                    Query(
-                        Alias("A0"),
-                        Alias(f"#A#{_sg.counter + 1}"),
                     ),
                 )
             ),
@@ -236,9 +169,10 @@ def test_push_fields():
 def test_propagate_copy_queries():
     plan = Plan(
         (
-            Query(Alias("A0"), Alias("A0")),
-            Query(Alias("A1"), Alias("A2")),
-            Query(Alias("A1"), Literal(0)),
+            Query(Alias("A0"), Table(Alias("A0"), (Field("i0"),))),
+            Query(Alias("A1"), Table(Alias("A2"), (Field("i1"),))),
+            Query(Alias("A1"), Table(Literal(0), (Field("i1"),))),
+            Produces((Alias("A1"),)),
         )
     )
 
@@ -246,57 +180,13 @@ def test_propagate_copy_queries():
         (
             Plan(),
             Plan(),
-            Query(Alias("A2"), Literal(0)),
+            Query(Alias("A2"), Table(Literal(0), (Field("i1"),))),
+            Produces((Alias("A2"),)),
         )
     )
 
     result = propagate_copy_queries(plan)
     assert result == expected
-
-
-# def test_propagate_into_reformats():
-#    plan = Plan(
-#        (
-#            Query(Alias("A1"), Alias("A0")),
-#            Query(
-#                Alias("D0"),
-#                Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
-#            ),
-#            Query(
-#                Alias("B0"),
-#                Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
-#            ),
-#            Literal(1),
-#            Query(Alias("C0"), Reformat(Literal(3), Alias("B0"))),
-#            Query(Alias("E0"), Reformat(Literal(4), Alias("D0"))),
-#            Literal(2),
-#        )
-#    )
-#
-#    expected = Plan(
-#        (
-#            Query(Alias("A1"), Alias("A0")),
-#            Query(
-#                Alias("E0"),
-#                Reformat(
-#                    Literal(4),
-#                    Aggregate(Literal("*"), Literal(1), Alias("A1"), (Field("i2"),)),
-#                ),
-#            ),
-#            Query(
-#                Alias("C0"),
-#                Reformat(
-#                    Literal(3),
-#                    Aggregate(Literal("+"), Literal(0), Alias("A1"), (Field("i1"),)),
-#                ),
-#            ),
-#            Literal(1),
-#            Literal(2),
-#        )
-#    )
-#
-#    result = propagate_into_reformats(plan)
-#    assert result == expected
 
 
 def test_propagate_transpose_queries():
@@ -305,30 +195,34 @@ def test_propagate_transpose_queries():
             Query(
                 Alias("A1"),
                 Relabel(
-                    Relabel(
+                    Table(
                         Alias("XD"),
                         (Field("i1"), Field("i2")),
                     ),
                     (Field("j1"), Field("j2")),
                 ),
             ),
-            Query(Alias("A2"), Reorder(Alias("A1"), (Field("j2"), Field("j1")))),
+            Query(
+                Alias("A2"),
+                Reorder(
+                    Table(Alias("A1"), (Field("j1"), Field("j2"))),
+                    (Field("j2"), Field("j1")),
+                ),
+            ),
             Produces((Alias("A2"),)),
         )
     )
 
     expected = Plan(
         (
-            Plan(),
-            Plan(),
-            Produces(
-                (
-                    Reorder(
-                        Relabel(Alias("XD"), (Field("j1"), Field("j2"))),
-                        (Field("j2"), Field("j1")),
-                    ),
-                )
+            Query(
+                Alias("A2"),
+                Reorder(
+                    Table(Alias("XD"), (Field("j1"), Field("j2"))),
+                    (Field("j2"), Field("j1")),
+                ),
             ),
+            Produces((Alias("A2"),)),
         )
     )
 
@@ -428,18 +322,18 @@ def test_normalize_names():
 
     expected = Plan(
         (
-            Field("foo_2"),
-            Field("foo_3"),
-            Field("foo_4"),
-            Alias("foo"),
-            Field("A"),
-            Alias("bar"),
-            Field("j"),
-            Alias("test"),
+            Field("i"),
+            Field("i_2"),
+            Field("i_3"),
+            Alias("A"),
+            Field("i_4"),
+            Alias("A_2"),
+            Field("i_5"),
+            Alias("A_3"),
         )
     )
 
-    result = normalize_names(plan)
+    result, bindings = normalize_names(plan, {})
     assert result == expected
 
 
@@ -450,14 +344,14 @@ def test_concordize():
             Query(
                 Alias("A1"),
                 Reorder(
-                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
+                    Table(Alias("A0"), (Field("i0"), Field("i1"))),
                     (Field("i1"), Field("i0")),
                 ),
             ),
             Query(
                 Alias("A2"),
                 Reorder(
-                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
+                    Table(Alias("A0"), (Field("i0"), Field("i1"))),
                     (Field("i1"), Field("i1")),
                 ),
             ),
@@ -469,30 +363,30 @@ def test_concordize():
         (
             Query(Alias("A0"), Table(Literal(0), (Field("i0"), Field("i1")))),
             Query(
-                Alias("A0_2"),
+                Alias("A0_4"),
                 Reorder(
-                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
-                    (Field("i1"), Field("i0")),
+                    Table(Alias("A0"), (Field("i_0"), Field("i_1"))),
+                    (Field("i_1"), Field("i_0")),
                 ),
             ),
             Query(
-                Alias("A0_3"),
+                Alias("A0_5"),
                 Reorder(
-                    Relabel(Alias("A0"), (Field("i0"), Field("i1"))),
-                    (Field("i0"), Field("i1")),
+                    Table(Alias("A0"), (Field("i_0"), Field("i_1"))),
+                    (Field("i_0"), Field("i_1")),
                 ),
             ),
             Query(
                 Alias("A1"),
                 Reorder(
-                    Relabel(Alias("A0_2"), (Field("i1"), Field("i0"))),
+                    Table(Alias("A0_4"), (Field("i1"), Field("i0"))),
                     (Field("i1"), Field("i0")),
                 ),
             ),
             Query(
                 Alias("A2"),
                 Reorder(
-                    Relabel(Alias("A0_3"), (Field("i0"), Field("i1"))),
+                    Table(Alias("A0_5"), (Field("i0"), Field("i1"))),
                     (Field("i1"), Field("i1")),
                 ),
             ),
@@ -543,226 +437,44 @@ def test_flatten_plans():
     assert result == expected
 
 
-def test_propagate_map_queries_backward():
-    plan = Plan(
-        (
-            Query(Alias("A0"), Alias("A1")),
-            Alias("A0"),
-            MapJoin(
-                Literal(mul),
-                (
-                    Table(Literal(10), (Field("i1"),)),
-                    Aggregate(
-                        Literal(add),
-                        Literal(0),
-                        Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
-                        (Field("i2"),),
-                    ),
-                    Table(Literal(10), (Field("i3"),)),
-                ),
-            ),
-            Aggregate(
-                Literal(add),
-                Literal(10),
-                Aggregate(Literal(add), Literal(0), Alias("A2"), (Field("i4"),)),
-                (Field("i5"),),
-            ),
-            Reorder(
-                Aggregate(
-                    Literal(mul),
-                    Literal(1),
-                    Table(Literal(10), (Field("i6"), Field("i7"), Field("i8"))),
-                    (Field("i7"),),
-                ),
-                (Field("i6"), Field("i8")),
-            ),
-        )
-    )
-
-    expected = Plan(
-        (
-            Plan(bodies=()),
-            Alias("A1"),
-            Aggregate(
-                Literal(add),
-                Literal(0),
-                MapJoin(
-                    Literal(mul),
-                    (
-                        Table(Literal(10), (Field("i1"),)),
-                        Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
-                        Table(Literal(10), (Field("i3"),)),
-                    ),
-                ),
-                (Field("i2"),),
-            ),
-            Aggregate(
-                Literal(add), Literal(10), Alias("A2"), (Field("i4"), Field("i5"))
-            ),
-            Reorder(
-                Aggregate(
-                    Literal(mul),
-                    Literal(1),
-                    Table(
-                        Literal(10),
-                        (
-                            Field("i6"),
-                            Field("i7"),
-                            Field("i8"),
-                        ),
-                    ),
-                    (Field("i7"),),
-                ),
-                (Field("i6"), Field("i8")),
-            ),
-        )
-    )
-
-    result = propagate_map_queries_backward(plan)
-    assert result == expected
-
-
-def test_materialize_squeeze_expand_productions():
-    plan = Plan(
-        (
-            Produces(
-                (
-                    Reorder(
-                        Relabel(Alias("A0"), (Field("i2"), Field("i1"))),
-                        (Field("i1"), Field("i2"), Field("i3")),
-                    ),
-                    Reorder(
-                        Relabel(Alias("A0"), (Field("i1"), Field("i2"))),
-                        (Field("i1"), Field("i2")),
-                    ),
-                )
-            ),
-        )
-    )
-
-    expected = Plan(
-        (
-            Plan(
-                (
-                    Query(
-                        Alias(f"#A#{_sg.counter}"),
-                        Reorder(
-                            Relabel(Alias("A0"), (Field("i2"), Field("i1"))),
-                            (Field("i2"), Field("i1"), Field("i3")),
-                        ),
-                    ),
-                    Produces(
-                        (
-                            Reorder(
-                                Relabel(
-                                    Alias(f"#A#{_sg.counter}"),
-                                    (Field("i2"), Field("i1"), Field("i3")),
-                                ),
-                                (Field("i1"), Field("i2"), Field("i3")),
-                            ),
-                            Alias("A0"),
-                        )
-                    ),
-                )
-            ),
-        )
-    )
-
-    result = materialize_squeeze_expand_productions(plan)
-    assert result == expected
-
-
-def test_set_loop_order():
-    plan = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(add),
-            Literal(0),
-            Reorder(
-                MapJoin(
-                    Literal(mul),
-                    (
-                        Reorder(
-                            Relabel(Alias("A"), (Field("i0"), Field("i1"))),
-                            (Field("i0"), Field("i1")),
-                        ),
-                        Reorder(
-                            Relabel(Alias("B"), (Field("i1"), Field("i2"))),
-                            (Field("i1"), Field("i2")),
-                        ),
-                    ),
-                ),
-                (Field("i0"), Field("i2"), Field("i1")),
-            ),
-            (Field("i1"),),
-        ),
-    )
-
-    expected = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(add),
-            Literal(0),
-            Reorder(
-                Reorder(
-                    MapJoin(
-                        Literal(mul),
-                        (
-                            Reorder(
-                                Relabel(Alias("A"), (Field("i0"), Field("i1"))),
-                                (Field("i0"), Field("i1")),
-                            ),
-                            Reorder(
-                                Relabel(Alias("B"), (Field("i1"), Field("i2"))),
-                                (Field("i1"), Field("i2")),
-                            ),
-                        ),
-                    ),
-                    (Field("i0"), Field("i2"), Field("i1")),
-                ),
-                (Field("i0"), Field("i1"), Field("i2")),
-            ),
-            (Field("i1"),),
-        ),
-    )
-
-    result = set_loop_order(plan)
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    "a, b",
-    [
-        (np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])),
-        (np.array([[2, 0], [1, 3]]), np.array([[4, 1], [2, 2]])),
-    ],
-)
-def test_scheduler_e2e_matmul(a, b):
+def test_scheduler_e2e_matmul(file_regression):
+    a = np.array([[1, 2], [3, 4]])
+    b = (np.array([[5, 6], [7, 8]]),)
     i, j, k = Field("i"), Field("j"), Field("k")
 
     plan = Plan(
         (
-            Query(Alias("A"), Table(Literal(a), (i, k))),
-            Query(Alias("B"), Table(Literal(b), (k, j))),
-            Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
+            Query(
+                Alias("AB"),
+                MapJoin(
+                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                ),
+            ),
             Query(
                 Alias("C"),
-                Aggregate(Literal(add), Literal(0), Alias("AB"), (k,)),
+                Aggregate(
+                    Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                ),
             ),
             Produces((Alias("C"),)),
         )
     )
 
-    plan_opt = optimize(plan)
+    plan_opt, bindings = optimize(
+        plan,
+        {
+            Alias("A"): ftype(finchlite.asarray(a)),
+            Alias("B"): ftype(finchlite.asarray(b)),
+        },
+    )
+    plan_opt, bindings = standardize(plan_opt, bindings)
 
-    result = LogicInterpreter()(plan_opt)[0].tns
-
-    expected = np.matmul(a, b)
-
-    finch_assert_equal(result, expected)
+    file_regression.check(
+        str(plan_opt), extension=".txt", basename="test_scheduler_e2e_matmul_plan"
+    )
 
 
-def test_scheduler_e2e_sddmm():
+def test_scheduler_e2e_sddmm(file_regression):
     s = np.array([[2, 4], [6, 0]])
     a = np.array([[1, 2], [3, 2]])
     b = np.array([[9, 8], [6, 5]])
@@ -770,75 +482,40 @@ def test_scheduler_e2e_sddmm():
 
     plan = Plan(
         (
-            Query(Alias("S"), Table(Literal(s), (i, j))),
-            Query(Alias("A"), Table(Literal(a), (i, k))),
-            Query(Alias("B"), Table(Literal(b), (k, j))),
-            Query(Alias("AB"), MapJoin(Literal(mul), (Alias("A"), Alias("B")))),
+            Query(
+                Alias("AB"),
+                MapJoin(
+                    Literal(mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j)))
+                ),
+            ),
             # matmul
-            Query(Alias("C"), Aggregate(Literal(add), Literal(0), Alias("AB"), (k,))),
+            Query(
+                Alias("C"),
+                Aggregate(
+                    Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                ),
+            ),
             # elemwise
-            Query(Alias("RES"), MapJoin(Literal(mul), (Alias("C"), Alias("S")))),
+            Query(
+                Alias("RES"),
+                MapJoin(
+                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i)))
+                ),
+            ),
             Produces((Alias("RES"),)),
         )
     )
 
-    expected_plan = Plan(
-        (
-            Query(Alias("A0"), Table(Literal(a), (Field("i0"), Field("i1")))),
-            Query(Alias("A1"), Table(Literal(b), (Field("i1"), Field("i2")))),
-            Query(Alias("A2"), Table(Literal(s), (Field("i0"), Field("i2")))),
-            Query(
-                Alias("A3"),
-                Aggregate(
-                    Literal(add),
-                    Literal(0),
-                    Reorder(
-                        MapJoin(
-                            Literal(mul),
-                            (
-                                Reorder(
-                                    MapJoin(
-                                        Literal(mul),
-                                        (
-                                            Reorder(
-                                                Relabel(
-                                                    Alias("A0"),
-                                                    (Field("i0"), Field("i1")),
-                                                ),
-                                                (Field("i0"), Field("i1")),
-                                            ),
-                                            Reorder(
-                                                Relabel(
-                                                    Alias("A1"),
-                                                    (Field("i1"), Field("i2")),
-                                                ),
-                                                (Field("i1"), Field("i2")),
-                                            ),
-                                        ),
-                                    ),
-                                    (Field("i0"), Field("i1"), Field("i2")),
-                                ),
-                                Reorder(
-                                    Relabel(Alias("A2"), (Field("i0"), Field("i2"))),
-                                    (Field("i0"), Field("i2")),
-                                ),
-                            ),
-                        ),
-                        (Field("i0"), Field("i1"), Field("i2")),
-                    ),
-                    (Field("i1"),),
-                ),
-            ),
-            Plan((Produces((Alias("A3"),)),)),
-        )
+    plan_opt, bindings = optimize(
+        plan,
+        {
+            Alias("S"): ftype(finchlite.asarray(s)),
+            Alias("A"): ftype(finchlite.asarray(a)),
+            Alias("B"): ftype(finchlite.asarray(b)),
+        },
     )
+    plan_opt, bindings = standardize(plan_opt, bindings)
 
-    plan_opt = optimize(plan)
-
-    assert plan_opt == expected_plan
-
-    result = LogicInterpreter()(plan_opt)[0].tns
-
-    expected = s * np.matmul(a, b)
-
-    finch_assert_equal(result, expected)
+    file_regression.check(
+        str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"
+    )

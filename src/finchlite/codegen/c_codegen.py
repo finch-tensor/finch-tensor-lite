@@ -10,7 +10,7 @@ from collections.abc import Hashable
 from functools import lru_cache
 from pathlib import Path
 from types import NoneType
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 
@@ -19,16 +19,19 @@ from ..algebra import query_property, register_property
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,
+    DictFType,
     ImmutableStructFType,
     MutableStructFType,
     TupleFType,
 )
-from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
+from ..symbolic import Context, FType, Namespace, ScopedDict, fisinstance, ftype
 from ..util import config
 from ..util.cache import file_cache
 from .stages import CCode, CLowerer
 
 logger = logging.getLogger(__name__)
+
+common_h = Path(__file__).parent / "stc" / "include" / "stc" / "common.h"
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -99,6 +102,44 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
+def c_hash(fmt, ctx: "CContext"):
+    """
+    Expand to the name of a macro that c hash can use for hashing fmt.
+
+    Args:
+        ctx: CContext object
+        var_n: name to be supplied. It is a placeholder for a variable with
+        type fmt* (so indirection)
+    """
+    if hasattr(fmt, "c_hash"):
+        return fmt.c_hash(ctx)
+    return query_property(fmt, "c_hash", "__attr__", ctx)
+
+
+def c_hash_default(fmt, ctx: "CContext"):
+    ctx.add_header(f'#include "{common_h}"')
+    return "c_default_hash"
+
+
+def c_eq(fmt, ctx: "CContext"):
+    """
+    Expand to the name of a macro that c eq can use for checking equivalence of fmt.
+
+    Args:
+        ctx: CContext object
+        var_n: name to be supplied. It is a placeholder for a variable with
+        type fmt* (so indirection)
+    """
+    if hasattr(fmt, "c_eq"):
+        return fmt.c_eq(ctx)
+    return query_property(fmt, "c_eq", "__attr__", ctx)
+
+
+def c_eq_default(fmt, ctx: "CContext"):
+    ctx.add_header(f'#include "{common_h}"')
+    return "c_default_eq"
+
+
 def serialize_to_c(fmt, obj):
     """
     Serialize an object to a C-compatible ftype.
@@ -130,7 +171,10 @@ def deserialize_from_c(fmt, obj, c_obj):
     if hasattr(fmt, "deserialize_from_c"):
         fmt.deserialize_from_c(obj, c_obj)
     else:
-        query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
+        try:
+            query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
+        except AttributeError:
+            return
 
 
 def construct_from_c(fmt, c_obj):
@@ -201,6 +245,18 @@ for t in (
         "__attr__",
         lambda fmt, c_obj: fmt(c_obj.value),
     )
+    register_property(
+        t,
+        "c_hash",
+        "__attr__",
+        c_hash_default,
+    )
+    register_property(
+        t,
+        "c_eq",
+        "__attr__",
+        c_eq_default,
+    )
     # ctypes here should be considered pass by value, so no op this.
     register_property(
         t,
@@ -220,6 +276,20 @@ register_property(
     lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
 )
 
+register_property(
+    np.generic,
+    "c_hash",
+    "__attr__",
+    c_hash_default,
+)
+
+register_property(
+    np.generic,
+    "c_eq",
+    "__attr__",
+    c_eq_default,
+)
+
 # pass by value -> no op
 register_property(
     np.generic,
@@ -233,6 +303,20 @@ register_property(
 )
 
 # deserialize_to_c should modify in place. TODO: implement
+
+for typ in (int, float):
+    register_property(
+        typ,
+        "c_hash",
+        "__attr__",
+        c_hash_default,
+    )
+    register_property(
+        typ,
+        "c_eq",
+        "__attr__",
+        c_eq_default,
+    )
 
 
 class CKernel(asm.AssemblyKernel):
@@ -531,6 +615,11 @@ register_property(
 register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 register_property(type(None), "c_type", "__attr__", lambda x: None)
 
+# ints and floats should be serialized and constructed trivially.
+register_property(int, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(float, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(int, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+register_property(float, "construct_from_c", "__attr__", lambda fmt, x: x.value)
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
@@ -613,6 +702,9 @@ class CGenerator(CLowerer):
 class CContext(Context):
     """
     A class to represent a C environment.
+
+    The context has functionality to track which datastructure definitions need
+    to get declared via the stc library.
     """
 
     def __init__(
@@ -837,6 +929,15 @@ class CContext(Context):
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 return buf.result_format.c_length(self, buf)
+            case asm.LoadDict(map, idx):
+                map = self.resolve(map)
+                return map.result_format.c_loaddict(self, map, idx)
+            case asm.ExistsDict(map, idx):
+                map = self.resolve(map)
+                return map.result_format.c_existsdict(self, map, idx)
+            case asm.StoreDict(map, idx, val):
+                map = self.resolve(map)
+                return map.result_format.c_storedict(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -974,6 +1075,45 @@ class CContext(Context):
                 )
 
 
+class CHashableFType(FType):
+    @abstractmethod
+    def c_hash(self, ctx: CContext) -> str:
+        """
+        Emit code from CContext that takes an expression and returns the NAME
+        of a macro that performs our hashing with STC functions.
+
+        Please reference finch_assembly/struct.py for reference.
+
+        The macro should take one argument (type of fmt*, so there is one layer
+        of indirection) and expand to an expression that returns a size_t of
+        the final hash.
+
+        The main idea for implementing this is for unpacked structs where you
+        want the unused bytes to be set to zero.
+
+        This is important to note for immutable structs because you need to do
+        something like &var_n->property if you want to do recursive hashing.
+        """
+        ...
+
+    @abstractmethod
+    def c_eq(self, ctx: CContext) -> str:
+        """
+        Emit code from CContext that takes an expression and returns the NAME
+        of a macro that can be used to check.
+
+        The macro should take two arguments (each a type of fmt*, so there is
+        one layer of indirection) and expand to an expression that checks
+        equality.
+
+        The main idea for implementing this is for unpacked structs where you
+        want the unused bytes to be set to zero.
+
+        This is important to note for immutable structs because you need to do
+        something like &var_n->property if you want to do recursive hashing.
+        """
+
+
 class CArgumentFType(ABC):
     @abstractmethod
     def serialize_to_c(self, obj):
@@ -996,6 +1136,34 @@ class CArgumentFType(ABC):
         """
         Construct a new object based on the return value from c
         """
+
+
+class CDictFType(DictFType, CArgumentFType, ABC):
+    """
+    Abstract base class for the ftype of dictionaries. The ftype defines how
+    the data in a Map is organized and accessed.
+    """
+
+    @abstractmethod
+    def c_existsdict(self, ctx, map, idx):
+        """
+        Return C code which checks whether a given key exists in a map.
+        """
+        ...
+
+    @abstractmethod
+    def c_loaddict(self, ctx, map, idx):
+        """
+        Return C code which gets a value corresponding to a certain key.
+        """
+        ...
+
+    @abstractmethod
+    def c_storedict(self, ctx, buffer, idx, value):
+        """
+        Return C code which stores a certain value given a certain integer tuple key.
+        """
+        ...
 
 
 class CBufferFType(BufferFType, CArgumentFType, ABC):
@@ -1059,7 +1227,7 @@ class CStackFType(ABC):
 
 
 def serialize_struct_to_c(fmt: AssemblyStructFType, obj) -> Any:
-    args = [getattr(obj, name) for name in fmt.struct_fieldnames]
+    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
     return struct_c_type(fmt)(*args)
 
 
@@ -1192,4 +1360,74 @@ register_property(
     "c_type",
     "__attr__",
     lambda fmt: struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
+)
+
+
+class CHashableProperties(TypedDict):
+    eq: str | None
+    hash: str | None
+
+
+def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
+    # this should be true in whatever structs we have.
+    assert isinstance(fmt, Hashable)
+    if fmt in ctx.datastructures:
+        properties: CHashableProperties = ctx.datastructures[fmt]
+        if properties.get("hash") is not None:
+            return properties["hash"]
+    else:
+        ctx.datastructures[fmt] = {}
+
+    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    name = ctx.freshen("hash")
+    ctx.datastructures[fmt]["hash"] = name
+
+    # implement recursion with &{var_n}->{struct_field}
+    var_n = ctx.freshen("var")
+    args = ",".join(
+        f"{macro}(&({var_n})->{field})"
+        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
+    )
+    ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
+    return name
+
+
+register_property(
+    ImmutableStructFType,
+    "c_hash",
+    "__attr__",
+    c_hash_struct,
+)
+
+
+def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
+    # this should be true in whatever structs we have.
+    assert isinstance(fmt, Hashable)
+    if fmt in ctx.datastructures:
+        properties: CHashableProperties = ctx.datastructures[fmt]
+        if properties.get("eq") is not None:
+            return properties["eq"]
+    else:
+        ctx.datastructures[fmt] = {}
+
+    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    name = ctx.freshen("eq")
+    ctx.datastructures[fmt]["eq"] = name
+
+    # implement recursion with &{var_n}->{struct_field}
+    var1_n = ctx.freshen("var")
+    var2_n = ctx.freshen("var")
+    args = " && ".join(
+        f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
+        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
+    )
+    ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
+    return name
+
+
+register_property(
+    ImmutableStructFType,
+    "c_eq",
+    "__attr__",
+    c_eq_struct,
 )

@@ -5,7 +5,6 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import register_property
 from ..symbolic import FType, FTyped, ftype
 
 
@@ -39,7 +38,7 @@ class TensorFType(FType, ABC):
     @abstractmethod
     def __call__(
         self, shape: tuple
-    ) -> Tensor | np.ndarray:  # TODO in the future should return Tensor
+    ) -> Tensor:  # TODO in the future should return Tensor
         """
         Create a tensor instance with the given shape.
 
@@ -50,22 +49,6 @@ class TensorFType(FType, ABC):
             A tensor instance with the specified shape.
         """
         ...
-
-    # TODO: Remove and properly infer result rep
-    def add_levels(self, idxs: list[int]):
-        raise Exception("TODO: to remove")
-
-    # TODO: Remove and properly infer result rep
-    def remove_levels(self, idxs: list[int]):
-        raise Exception("TODO: to remove")
-
-    # TODO: Remove and properly infer result rep
-    def to_kwargs(self) -> dict[str, Any]:
-        raise Exception("TODO: to remove")
-
-    # TODO: Remove and properly infer result rep
-    def from_kwargs(self, **kwargs):
-        raise Exception("TODO: to remove")
 
 
 class Tensor(FTyped, ABC):
@@ -106,6 +89,12 @@ class Tensor(FTyped, ABC):
         should be an actual tuple, rather than a tuple type, so that it can hold
         e.g. dtypes, formats, or types, and so that we can easily index it."""
         return self.ftype.shape_type
+
+    @property
+    @abstractmethod
+    def shape(self) -> tuple:
+        """Shape of the tensor."""
+        ...
 
 
 def fill_value(arg: Any) -> Any:
@@ -162,58 +151,3 @@ def shape_type(arg: Any) -> tuple:
     if hasattr(arg, "shape_type"):
         return arg.shape_type
     return ftype(arg).shape_type
-
-
-class NDArrayFType(TensorFType):
-    """
-    A ftype for NumPy arrays that provides metadata about the array.
-    This includes the fill value, element type, and shape type.
-    """
-
-    def __init__(self, dtype: np.dtype, ndim: np.intp):
-        self._dtype = dtype
-        self._ndim = ndim
-
-    def __eq__(self, other):
-        if not isinstance(other, NDArrayFType):
-            return False
-        return self._dtype == other._dtype and self._ndim == other._ndim
-
-    def __hash__(self):
-        return hash((self._dtype, self._ndim))
-
-    def __repr__(self) -> str:
-        return f"NDArrayFType(dtype={repr(self._dtype)}, ndim={self._ndim})"
-
-    def __call__(self, shape: tuple) -> np.ndarray:
-        """
-        Create a NumPy array with the given shape and the dtype of this ftype.
-
-        Args:
-            shape: The shape of the array to create.
-
-        Returns:
-            A NumPy array with the specified shape and dtype.
-        """
-        return np.full(shape, self.fill_value, dtype=self._dtype)
-
-    @property
-    def ndim(self) -> np.intp:
-        return self._ndim
-
-    @property
-    def fill_value(self) -> Any:
-        return np.zeros((), dtype=self._dtype)[()]
-
-    @property
-    def element_type(self):
-        return self._dtype.type
-
-    @property
-    def shape_type(self) -> tuple:
-        return tuple(np.int_ for _ in range(self._ndim))
-
-
-register_property(
-    np.ndarray, "ftype", "__attr__", lambda x: NDArrayFType(x.dtype, np.intp(x.ndim))
-)

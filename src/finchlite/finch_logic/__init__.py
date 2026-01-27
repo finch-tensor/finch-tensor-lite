@@ -25,10 +25,10 @@ from .nodes import (
     Value,
 )
 from .stages import (
-    LogicEinsumLowerer,
     LogicEvaluator,
     LogicLoader,
     LogicTransform,
+    compute_shape_vars,
 )
 
 __all__ = [
@@ -36,7 +36,6 @@ __all__ = [
     "Alias",
     "Field",
     "Literal",
-    "LogicEinsumLowerer",
     "LogicEvaluator",
     "LogicExpression",
     "LogicInterpreter",
@@ -58,4 +57,5 @@ __all__ = [
     "TableValue",
     "TableValueFType",
     "Value",
+    "compute_shape_vars",
 ]

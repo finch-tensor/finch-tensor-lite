@@ -2,7 +2,14 @@ import operator
 
 import numpy as np
 
-from finchlite.finch_einsum.stages import EinsumEvaluator
+from finchlite.algebra.tensor import TensorFType
+from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
+from finchlite.finch_einsum.stages import (
+    EinsumEvaluator,
+    EinsumLoader,
+    compute_shape_vars,
+)
+from finchlite.symbolic.ftype import fisinstance
 
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
@@ -77,6 +84,7 @@ class EinsumInterpreter(EinsumEvaluator):
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
+        bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(
             xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
         )
@@ -94,13 +102,12 @@ class PointwiseEinsumMachine:
         xp = self.xp
         match node:
             case ein.Literal(val):
-                return val
+                return self.xp.full([1 for _ in self.loops], val)
             case ein.Alias(name):
-                if name not in self.bindings:
+                if node not in self.bindings:
                     raise ValueError(f"Unbound variable: {name}")
-                return self.bindings[name]
-            case ein.Call(func, args):
-                func = self(func)
+                return self.bindings[node]
+            case ein.Call(ein.Literal(func), args):
                 if len(args) == 1:
                     func = getattr(xp, unary_ops[func])
                 else:
@@ -141,8 +148,7 @@ class EinsumMachine:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
-                loops = arg.get_idxs()
-                assert set(idxs).issubset(loops)
+                loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
                 ctx = PointwiseEinsumMachine(
                     self.xp, self.bindings, loops, self.verbose
@@ -153,14 +159,64 @@ class EinsumMachine:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
                 else:
-                    assert set(idxs) == set(loops)
                     val = arg
+                    for i in sorted(axis, reverse=True):
+                        val = xp.take(val, -1, axis=i)
                 dropped = [idx for idx in loops if idx in idxs]
                 axis = [dropped.index(idx) for idx in idxs]
                 if tns in self.bindings:
-                    self.bindings[tns][:] = xp.permute_dims(val, axis)
+                    if self.bindings[tns].ndim == 0:
+                        self.bindings[tns][()] = val
+                    else:
+                        self.bindings[tns][:] = xp.permute_dims(val, axis)
                 else:
                     self.bindings[tns] = xp.permute_dims(val, axis)
                 return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
+
+
+class MockEinsumKernel(AssemblyKernel):
+    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __call__(self, *args):
+        if len(args) != len(self.bindings):
+            raise ValueError(
+                f"Wrong number of arguments passed to kernel, "
+                f"have {len(args)}, expected {len(self.bindings)}"
+            )
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = EinsumInterpreter()
+        return ctx(self.prgm, bindings)
+
+
+class MockEinsumLibrary(AssemblyLibrary):
+    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __getattr__(self, name):
+        if name == "main":
+            return MockEinsumKernel(self.prgm, self.bindings)
+        if name == "prgm":
+            return self.prgm
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+
+class MockEinsumLoader(EinsumLoader):
+    def __init__(self):
+        pass
+
+    def __call__(
+        self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
+    ) -> tuple[
+        MockEinsumLibrary,
+        dict[ein.Alias, TensorFType],
+        dict[ein.Alias, tuple[ein.Index | None, ...]],
+    ]:
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return MockEinsumLibrary(prgm, bindings), bindings, shape_vars
