@@ -87,20 +87,26 @@ OPTIMIZE_LOGIC = LogicNormalizer(
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
-        LogicStandardizer(LogicFormatter(LogicCompiler(NotationInterpreter())))
+        DefaultLogicOptimizer(
+            LogicStandardizer(LogicFormatter(LogicCompiler(NotationInterpreter())))
+        )
     )
 )
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
-        LogicStandardizer(
-            LogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
+        DefaultLogicOptimizer(
+            LogicStandardizer(
+                LogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
+            )
         )
     )
 )
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
-        LogicStandardizer(
-            LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
+        DefaultLogicOptimizer(
+            LogicStandardizer(
+                LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
+            )
         )
     )
 )
