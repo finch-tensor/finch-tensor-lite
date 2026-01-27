@@ -98,7 +98,7 @@ def optimize(
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
     def transform(prgm, bindings):
         prgm = push_fields(prgm)
-        prgm = propagate_single_use_queries_and_combine_aggregates(prgm)
+        prgm = propagate_map_queries_backward(prgm)
 
         prgm = isolate_aggregates(prgm)
 
@@ -161,7 +161,7 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
     return flatten_plans(root)
 
 
-def propagate_single_use_queries_and_combine_aggregates(
+def propagate_map_queries_backward(
     root: LogicStatement,
 ) -> LogicStatement:
     # TODO: We're not ready for that optimization yet.

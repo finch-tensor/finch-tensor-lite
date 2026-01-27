@@ -11,7 +11,7 @@ from finchlite.autoschedule.optimize import (
     optimize,
     propagate_copy_queries,
     propagate_map_queries,
-    propagate_single_use_queries_and_combine_aggregates,
+    propagate_map_queries_backward,
     propagate_transpose_queries,
     set_loop_order,
 )
@@ -64,7 +64,7 @@ def test_propagate_map_queries():
     assert result == expected
 
 
-def test_propagate_single_use_queries_and_combine_aggregates():
+def test_propagate_map_queries_backward():
     plan = Plan(
         (
             Query(Alias("A0"), Alias("A1")),
@@ -153,7 +153,7 @@ def test_propagate_single_use_queries_and_combine_aggregates():
         )
     )
 
-    result = propagate_single_use_queries_and_combine_aggregates(plan)
+    result = propagate_map_queries_backward(plan)
     assert result == expected
 
 
