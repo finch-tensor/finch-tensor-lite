@@ -4,6 +4,7 @@ import bisect
 import builtins
 import operator
 import sys
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
@@ -98,8 +99,11 @@ class LazyTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
-effect_stamp = 0
+
+effect_stamp = threading.local()
 
 
 class EffectBlob:
@@ -131,8 +135,15 @@ class EffectBlob:
             blobs = ()
         self.stmt = stmt
         self.blobs = blobs
-        self.stamp = effect_stamp
-        effect_stamp += 1
+
+        try:
+            curr_stamp = effect_stamp.value
+        except AttributeError:
+            effect_stamp.value = 0
+            curr_stamp = 0
+
+        self.stamp = curr_stamp
+        effect_stamp.value += 1
 
     def exec(self, stmt: LogicStatement) -> EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
@@ -407,12 +418,14 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(
+    np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray.from_numpy(x)
+)
 register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, format=None) -> Any:
+def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
@@ -422,13 +435,15 @@ def asarray(arg: Any, format=None) -> Any:
         format: The format for the result array.
 
     Returns:
-        The array type result of the given object.
+        The Tensor type result of the given object.
     """
     if format is None:
         if hasattr(arg, "asarray"):
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
 
+    if isinstance(arg, np.ndarray):
+        return format.from_numpy(arg)
     return format(arg)
 
 
@@ -1227,6 +1242,9 @@ class DefaultTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class WrapperTensorFType(TensorFType):
@@ -1246,6 +1264,9 @@ class WrapperTensorFType(TensorFType):
         for t in self._child_formats:
             etype = promote_type(etype, t.element_type)
         return etype
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)

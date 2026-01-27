@@ -34,7 +34,7 @@ from finchlite.codegen.numba_codegen import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finchlite.compile import BufferizedNDArray
+from finchlite.compile import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 
@@ -922,11 +922,14 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(np_type, constructed, serialized) is None
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(
     "fmt_fn",
     [
-        lambda x: ftype(BufferizedNDArray(np.zeros((2, 2), x))),
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(dtype),
+            ndim=2,
+            dimension_type=(np.intp, np.intp),
+        ),
         lambda dtype: fiber_tensor(
             dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
         ),
@@ -935,14 +938,14 @@ def test_np_numba_serialization(value, np_type):
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_numba(fmt_fn, dtype):
     ctx = finchlite.get_default_scheduler()  # TODO: as fixture
-    finchlite.set_default_scheduler(mode=finchlite.Mode.COMPILE_NUMBA)
+    finchlite.set_default_scheduler(ctx=finchlite.interface.COMPILE_NUMBA)
 
     a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
     b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
     fmt = fmt_fn(dtype)
-    aa = fmt(a.shape, val=a)
-    bb = fmt(b.shape, val=b)
+    aa = finchlite.asarray(a, format=fmt)
+    bb = finchlite.asarray(b, format=fmt)
 
     wa = finchlite.lazy(aa)
     wb = finchlite.lazy(bb)

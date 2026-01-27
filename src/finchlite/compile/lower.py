@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pprint import pprint
@@ -5,12 +6,11 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.finch_assembly.interpreter import AssemblyInterpreter
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
 from ..finch_assembly import (
+    AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyStructFType,
@@ -18,7 +18,10 @@ from ..finch_assembly import (
 from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
+from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
 
 
 class FinchTensorFType(TensorFType, ABC):
@@ -187,10 +190,18 @@ class ExtentFType(AssemblyStructFType):
         raise TypeError(f"{self.struct_name} is not callable")
 
     def get_start(self, ext):
-        return asm.GetAttr(ext, asm.Literal("start"))
+        match ext:
+            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
+                return start
+            case _:
+                return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
-        return asm.GetAttr(ext, asm.Literal("end"))
+        match ext:
+            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
+                return end
+            case _:
+                return asm.GetAttr(ext, asm.Literal("end"))
 
     def lower_loop(self, ctx, idx, ext, body):
         """
@@ -293,11 +304,12 @@ class NotationCompiler(NotationLoader):
             ctx_load = AssemblyInterpreter()
         if ctx_lower is None:
             ctx_lower = AssemblyGenerator()
-        self.ctx_lower: NotationLowerer = ctx_lower
         self.ctx_load: AssemblyLoader = ctx_load
+        self.ctx_lower: NotationLowerer = ctx_lower
 
     def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
+        logger.debug(asm_code)
         return self.ctx_load(asm_code)
 
 
