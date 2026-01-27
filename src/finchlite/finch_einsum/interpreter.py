@@ -161,9 +161,9 @@ class PointwiseEinsumMachine:
                     return tns.reshape(target_shape)
 
                 assert tns.ndim == 2
-                return tuple([
-                    xp.reshape(tns[:, i], target_shape) for i in range(tns.shape[1])
-                ])
+
+                target_shape = [tns.shape[1]] + target_shape
+                return xp.reshape(xp.transpose(tns), target_shape)
             case ein.Access(tns, idxs): #if any(
                 #not isinstance(idx, ein.Index) for idx in idxs
             #):
@@ -179,12 +179,22 @@ class PointwiseEinsumMachine:
                     idx if isinstance(idx, ein.Index) else self(idx)
                     for idx in idxs
                 ]
-                evaled_items = [
-                    x for item in evaled_items 
-                    for x in 
-                    (item if isinstance(item, tuple) 
-                    else [item])
-                ]
+
+                def flatten_items(items):
+                    new_items = []
+                    for evaled_item in items:
+                        if isinstance(evaled_item, ein.Index):
+                            new_items.append(evaled_item)
+                        elif len(evaled_item.shape) == len(self.loops):
+                            new_items.append(evaled_item)
+                        else:
+                            assert len(evaled_item.shape) == len(self.loops) + 1
+                            new_items.extend([
+                                evaled_item[i] for i in range(evaled_item.shape[0])    
+                            ])
+                    return new_items
+
+                evaled_items = flatten_items(evaled_items)
                 assert len(evaled_items) == len(tns.shape)
 
                 evaled_items = [
