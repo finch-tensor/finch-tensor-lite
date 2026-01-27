@@ -161,9 +161,7 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
     return flatten_plans(root)
 
 
-def propagate_map_queries_backward(
-    root: LogicStatement,
-) -> LogicStatement:
+def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
     # TODO: We're not ready for that optimization yet.
     #       First we need to support Literals as MapJoin's
     #       arguments (they're missing `fields`) or promote
