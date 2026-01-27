@@ -164,9 +164,9 @@ class PointwiseEinsumMachine:
 
                 target_shape = [tns.shape[1]] + target_shape
                 return xp.reshape(xp.transpose(tns), target_shape)
-            case ein.Access(tns, idxs): #if any(
-                #not isinstance(idx, ein.Index) for idx in idxs
-            #):
+            case ein.Access(tns, idxs) if any(
+                not isinstance(idx, ein.Index) for idx in idxs
+            ):
                 assert self.loops is not None
                 tns = self(tns)
 
@@ -199,19 +199,19 @@ class PointwiseEinsumMachine:
                 tns = tns[tuple(evaled_items)]
                 return tns
             # access a tensor with a mixture of indices and other expressions
-            #case ein.Access(tns, idxs):
-            #    assert self.loops is not None
+            case ein.Access(tns, idxs):
+                assert self.loops is not None
 
-            #    tns = self(tns)
-            #    perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-            #    if hasattr(tns, "ndim") and len(perm) < tns.ndim:
-            #        perm += list(range(len(perm), tns.ndim))
+                tns = self(tns)
+                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
+                    perm += list(range(len(perm), tns.ndim))
 
-            #    tns = xp.permute_dims(tns, perm)  # permute the dimensions
-            #    return xp.expand_dims(
-            #        tns,
-            #        [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
-            #    )
+                tns = xp.permute_dims(tns, perm)  # permute the dimensions
+                return xp.expand_dims(
+                    tns,
+                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
+                )
             # get non-zero elements/data array of a sparse tensor
             case ein.GetAttr(obj, ein.Literal("elems"), _):
                 obj = self(obj)
