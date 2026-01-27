@@ -19,8 +19,10 @@ print(f"SuperTensor B:\n{supertensor_B}\n")
 
 # Using regular EinsumInterpreter
 einsum_AST, bindings = ein.parse_einsum("ikl,kjln->ijn", A, B)
-interpreter = ein.EinsumInterpreter(bindings=bindings)
-output = interpreter(einsum_AST)
+print("Bindings", bindings)
+
+interpreter = ein.EinsumInterpreter()
+output = interpreter(einsum_AST, bindings=bindings)
 result = bindings[output[0]]
 print(f"Regular einsum interpreter result:\n{result}\n")
 

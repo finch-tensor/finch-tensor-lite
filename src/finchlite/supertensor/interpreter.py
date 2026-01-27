@@ -133,8 +133,8 @@ class SuperTensorEinsumInterpreter:
                 corrected_AST = Rewrite(PostWalk(reshape_supertensors))(node)
 
                 # Compute the output base tensor.
-                ctx = EinsumInterpreter(bindings=corrected_bindings)
-                result = ctx(corrected_AST)
+                ctx = EinsumInterpreter()
+                result = ctx(corrected_AST, bindings=corrected_bindings)
                 output_base = corrected_bindings[result[0]]
 
                 # Wrap the output base tensor into a SuperTensor.
