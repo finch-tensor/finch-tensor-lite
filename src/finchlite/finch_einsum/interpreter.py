@@ -193,7 +193,6 @@ class PointwiseEinsumMachine:
                 ]
 
                 tns = tns[tuple(evaled_items)]
-                print("TNS SHAPE:", tns.shape)
                 return tns
             # access a tensor with a mixture of indices and other expressions
             #case ein.Access(tns, idxs):

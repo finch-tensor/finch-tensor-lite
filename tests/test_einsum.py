@@ -2643,7 +2643,7 @@ class TestEinsumIndirectAccess:
 
         b_coords = sparse_B.coords.flatten()
         d_coords = sparse_D.coords.flatten()
-        expected = C[d_coords][:, np.newaxis] * A[b_coords][np.newaxis, :]
+        expected = A[b_coords][:, np.newaxis] * C[d_coords][np.newaxis, :]
         self.run_einsum_plan(
             prgm,
             {
@@ -2759,7 +2759,7 @@ class TestEinsumIndirectAccess:
         """A[BCoords[i], i, j] * C[j] with reduction over both i and j."""
         A = rng.random((5, 5, 4))
         B = np.zeros((5,))
-        B[[0, 2, 4]] = rng.random(3)
+        B[[0, 1, 2, 3, 4]] = rng.random(5)
         sparse_B = SparseTensorFType.from_numpy(B)
         C = rng.random((4,))
 
