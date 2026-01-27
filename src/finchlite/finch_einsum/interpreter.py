@@ -180,21 +180,15 @@ class PointwiseEinsumMachine:
                     for idx in idxs
                 ]
 
-                def flatten_items(items):
-                    new_items = []
-                    for evaled_item in items:
-                        if isinstance(evaled_item, ein.Index):
-                            new_items.append(evaled_item)
-                        elif len(evaled_item.shape) == len(self.loops):
-                            new_items.append(evaled_item)
-                        else:
-                            assert len(evaled_item.shape) == len(self.loops) + 1
-                            new_items.extend([
-                                evaled_item[i] for i in range(evaled_item.shape[0])    
-                            ])
-                    return new_items
-
-                evaled_items = flatten_items(evaled_items)
+                # expand coordinate indices to match the tensor shape
+                evaled_items = [
+                    x
+                    for item in evaled_items
+                    for x in (
+                        [item] if isinstance(item, ein.Index) or len(item.shape) == len(self.loops)
+                        else [item[i] for i in range(item.shape[0])]
+                    )
+                ]
                 assert len(evaled_items) == len(tns.shape)
 
                 evaled_items = [
