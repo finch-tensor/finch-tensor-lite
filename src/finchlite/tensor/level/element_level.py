@@ -45,6 +45,25 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
+    def __call__(self, shape, val):
+        """
+        Creates an instance of ElementLevel with the given ftype.
+
+        Args:
+            shape: Should be always `()`, used for validation.
+            val: The value to store in the ElementLevel instance.
+        Returns:
+            An instance of ElementLevel.
+        """
+        # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
+        if val is not None and isinstance(val, np.ndarray):
+            from ...codegen import NumpyBuffer
+
+            val = NumpyBuffer(np.asarray(val).reshape(-1))
+        if len(shape) != 0:
+            raise ValueError("ElementLevelFType must be called with an empty shape.")
+        return ElementLevel(self, val)
+
     def __str__(self):
         return f"ElementLevelFType(fv={self.fill_value})"
 
@@ -118,7 +137,7 @@ def element(
     fill_value=None,
     element_type=None,
     position_type=None,
-    buffer_factory=None,
+    buffer_factory=NumpyBufferFType,
     buffer_type=None,
 ):
     """
@@ -134,11 +153,12 @@ def element(
     Returns:
         An instance of ElementLevelFType.
     """
-    return (
-        ElementLevel,
-        ElementLevelFType(
-            fill_value, element_type, position_type, buffer_factory, buffer_type
-        ),
+    return ElementLevelFType(
+        fill_value=fill_value,
+        element_type=element_type,
+        position_type=position_type,
+        buffer_factory=buffer_factory,
+        buffer_type=buffer_type,
     )
 
 
@@ -156,10 +176,6 @@ class ElementLevel(Level):
             self._val = self._format.buffer_type(
                 len=0, dtype=self._format.element_type()
             )
-        if self._val is not None and isinstance(self._val, np.ndarray):
-            from ...codegen import NumpyBuffer
-
-            self._val = NumpyBuffer(np.asarray(self._val).reshape(-1, copy=False))
 
     @property
     def shape(self) -> tuple:

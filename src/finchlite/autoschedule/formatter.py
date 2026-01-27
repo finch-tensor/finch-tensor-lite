@@ -50,17 +50,15 @@ class LogicFormatter(LogicLoader):
                             for dim in shape_types[lhs]
                         )
 
-                        # TODO: This constructor is awful
-                        # TODO: bufferized ndarray seems broken
+                        # TODO: This constructor is awful - should use suitable rep
                         tns = BufferizedNDArrayFType(
                             buffer_type=NumpyBufferFType(element_types[lhs]),
-                            ndim=np.intp(len(shape_type)),
+                            ndim=len(shape_type),
                             dimension_type=TupleFType(
                                 struct_name=gensym("tuple", sep="_"),
                                 struct_formats=shape_type,
                             ),
                         )
-                        # tns = NDArrayFType(element_type, np.intp(len(shape_type)))
                         bindings[lhs] = tns
                 case lgc.Produces(_):
                     pass

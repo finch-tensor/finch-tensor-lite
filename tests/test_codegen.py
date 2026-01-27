@@ -34,7 +34,7 @@ from finchlite.codegen.numba_codegen import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finchlite.compile import BufferizedNDArray
+from finchlite.compile import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 
@@ -925,9 +925,13 @@ def test_np_numba_serialization(value, np_type):
 @pytest.mark.parametrize(
     "fmt_fn",
     [
-        lambda x: BufferizedNDArray,
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(dtype),
+            ndim=2,
+            dimension_type=(np.intp, np.intp),
+        ),
         lambda dtype: fiber_tensor(
-            (dense(), dense(), element(dtype(0), dtype, np.intp, NumpyBufferFType))
+            dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
         ),
     ],
 )

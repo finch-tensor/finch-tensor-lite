@@ -58,9 +58,9 @@ def test_logic_compiler(file_regression):
     )
 
     bindings = {
-        Alias(name="A0"): BufferizedNDArray(np.array([[1, 2], [3, 4]])),
-        Alias(name="A1"): BufferizedNDArray(np.array([[5, 6], [7, 8]])),
-        Alias(name="A2"): BufferizedNDArray(np.array([[0, 0], [0, 0]])),
+        Alias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
+        Alias(name="A1"): BufferizedNDArray.from_numpy(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
     }
 
     program = NotationGenerator()(

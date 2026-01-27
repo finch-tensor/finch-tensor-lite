@@ -136,6 +136,13 @@ class LevelFType(FType, ABC):
         """
         ...
 
+    @abstractmethod
+    def __call__(self, shape, val):
+        """
+        Construct level
+        """
+        ...
+
 
 class Level(FTyped, ABC):
     """
@@ -279,11 +286,11 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
             ("shape", asm.TupleFType.from_tuple(self.shape_type)),
         ]
 
-    def __call__(self, shape):
+    def __call__(self, shape: tuple[int, ...]):
         """
-        Creates an instance of a FiberTensor with the given arguments.
+        Creates an instance of a FiberTensor with the given shape and value.
         """
-        return FiberTensor(self.lvl_t(shape=shape))
+        return FiberTensor(self.lvl_t(shape, val=None))
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
@@ -367,11 +374,14 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         ctx.exec(asm.Repack(obj.buf_s))
         return
 
-    def from_fields(self, *args) -> "FiberTensor":
+    def from_fields(self, *args) -> FiberTensor:
         return FiberTensor(*args)
 
+    def from_numpy(self, arr: np.ndarray) -> FiberTensor:
+        return FiberTensor(self.lvl_t(arr.shape, arr))
 
-def fiber_tensor(lvls: tuple):
+
+def fiber_tensor(lvl: LevelFType):
     """
     Creates a FiberTensorFType with the given level ftype and position type.
 
@@ -380,7 +390,9 @@ def fiber_tensor(lvls: tuple):
     Returns:
         An instance of a fiber tensor format.
     """
-    return (FiberTensor, lvls)
+    # mypy does not understand that dataclasses generate __hash__ and __eq__
+    # https://github.com/python/mypy/issues/19799
+    return FiberTensorFType(lvl)  # type: ignore[abstract]
 
 
 register_property(FiberTensor, "asarray", "__attr__", lambda x: x)

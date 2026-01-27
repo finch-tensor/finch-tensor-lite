@@ -98,6 +98,9 @@ class LazyTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 effect_stamp = 0
 
@@ -407,50 +410,33 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(
+    np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray.from_numpy(x)
+)
 register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, shape=None, format=None) -> Any:
+def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
 
     Args:
         arg: The object to be converted.
-        shape: The shape of the result array.
         format: The format for the result array.
 
     Returns:
-        The array type result of the given object.
+        The Tensor type result of the given object.
     """
     if format is None:
         if hasattr(arg, "asarray"):
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
-    if callable(format):
-        return format(arg)
 
-    if shape is None:
-        shape = arg.shape
-
-    match format:
-        case (type, lvls):
-            return type(_construct_levels(arg, shape, list(lvls)))
-        case _:
-            raise Exception(f"The format is incorrect: {format}")
-
-
-def _construct_levels(obj, shape, lvls):
-    match lvls:
-        case [(lvl, *args)]:
-            return lvl(*args, obj)
-        case [(lvl, *args), *tail]:
-            return lvl(
-                _construct_levels(obj, shape[1:], tail),
-                *[f(v) for f, v in zip(args, [shape[0]], strict=True)],
-            )
+    if isinstance(arg, np.ndarray):
+        return format.from_numpy(arg)
+    return format(arg)
 
 
 def lazy(arr) -> LazyTensor:
@@ -1248,6 +1234,9 @@ class DefaultTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class WrapperTensorFType(TensorFType):
@@ -1267,6 +1256,9 @@ class WrapperTensorFType(TensorFType):
         for t in self._child_formats:
             etype = promote_type(etype, t.element_type)
         return etype
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
