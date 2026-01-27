@@ -153,18 +153,17 @@ class EffectBlob:
         return EffectBlob(blobs=(self, *blobs))
 
     def trace(self) -> tuple[LogicStatement, ...]:
-        stmts = list[tuple[int, int, LogicStatement]]()
+        stmts = list[tuple[int, LogicStatement]]()
         seen = set[int]()
         self._trace(seen, stmts)
+        print(stmts)
         stmts.sort()
-        return tuple(stmt for _, _, stmt in stmts)
+        return tuple(stmt for _, stmt in stmts)
 
-    def _trace(
-        self, seen: set[int], stmts: list[tuple[int, int, LogicStatement]]
-    ) -> None:
+    def _trace(self, seen: set[int], stmts: list[tuple[int, LogicStatement]]) -> None:
         if id(self) not in seen:
             seen.add(id(self))
-            stmts.append((self.stamp, id(self.stmt), self.stmt))
+            stmts.append((self.stamp, self.stmt))
             for blob in self.blobs:
                 blob._trace(seen, stmts)
 
