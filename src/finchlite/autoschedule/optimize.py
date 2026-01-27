@@ -69,11 +69,12 @@ def with_unique_lhs(
             case Alias() as a if a in renames:
                 return renames[a]
             case Produces(args):
-                # TODO this is wrong, it produces duplicates.
                 return Produces(args + tuple(writes.values()))
 
     root = Rewrite(PostWalk(rule_0))(root)
     root, bindings = f(root, bindings)
+
+    unrenames = {v: k for k, v in renames.items()}
 
     def rule_1(node):
         match node:
@@ -84,8 +85,11 @@ def with_unique_lhs(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
                     bodies.append(Query(k, Table(v, idxs)))
+                args_2 = tuple(
+                    unrenames.get(a, a) for a in args[: len(args) - len(writes)]
+                )
                 return Plan(
-                    tuple(bodies) + (Produces(args[: len(args) - len(writes)]),)
+                    tuple(bodies) + (Produces(args_2),)
                 )
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)

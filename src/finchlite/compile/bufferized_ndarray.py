@@ -14,7 +14,7 @@ from .lower import FinchTensorFType
 
 
 def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
-    return tuple(np.cumprod((1,) + size[::-1]))[-2::-1]
+    return tuple(np.cumprod((1,) + size[::-1]).astype(int))[-2::-1]
 
 
 class BufferizedNDArray(Tensor):
