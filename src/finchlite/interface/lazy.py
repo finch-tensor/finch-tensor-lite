@@ -159,7 +159,6 @@ class EffectBlob:
         stmts = list[tuple[int, LogicStatement]]()
         seen = set[int]()
         self._trace(seen, stmts)
-        print(stmts)
         stmts.sort()
         return tuple(stmt for _, stmt in stmts)
 
