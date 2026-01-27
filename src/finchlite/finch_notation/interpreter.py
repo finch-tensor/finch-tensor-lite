@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
 
+from .. import finch_assembly as asm
 from ..algebra import (
     Tensor,
     TensorFType,
@@ -14,9 +15,9 @@ from ..algebra import (
     register_property,
     shape_type,
 )
-from ..finch_assembly import nodes as asm
 from ..symbolic import ScopedDict, fisinstance, ftype
 from . import nodes as ntn
+from .stages import NotationLoader
 
 
 class TensorViewFType(TensorFType):
@@ -228,7 +229,7 @@ def thaw(tns, op):
         return tns
 
 
-class NotationInterpreterKernel:
+class NotationInterpreterKernel(asm.AssemblyKernel):
     """
     A kernel for interpreting FinchNotation code.
     This is a simple interpreter that executes the assembly code.
@@ -239,11 +240,11 @@ class NotationInterpreterKernel:
         self.func = ntn.Variable(func_n, ret_t)
 
     def __call__(self, *args):
-        args_i = (ntn.Literal(arg) for arg in args)
+        args_i = tuple(ntn.Literal(arg) for arg in args)
         return self.ctx(ntn.Call(self.func, args_i))
 
 
-class NotationInterpreterModule:
+class NotationInterpreterLibrary(asm.AssemblyLibrary):
     """
     A class to represent an interpreted module of FinchNotation.
     """
@@ -272,7 +273,7 @@ class HaltState:
     return_value: Any = None
 
 
-class NotationInterpreter:
+class NotationInterpreter(NotationLoader):
     """
     An interpreter for FinchNotation.
     """
@@ -326,6 +327,12 @@ class NotationInterpreter:
             loop_state=loop_state,
             function_state=function_state,
         )
+
+    @overload
+    def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
+
+    @overload
+    def __call__(self, prgm: ntn.NotationNode | asm.AssemblyNode) -> Any: ...
 
     def __call__(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         """
@@ -405,18 +412,34 @@ class NotationInterpreter:
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
-                match mode:
-                    case ntn.Read():
-                        return access(tns_e, idxs_e)
-                    case ntn.Update(op):
-                        op_e = self(op)
-                        return access(tns_e, idxs_e, op=op_e)
-                    case _:
-                        raise NotImplementedError(f"Unrecognized access mode: {mode}")
+                try:
+                    match mode:
+                        case ntn.Read():
+                            return access(tns_e, idxs_e)
+                        case ntn.Update(op):
+                            op_e = self(op)
+                            return access(tns_e, idxs_e, op=op_e)
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized access mode: {mode}"
+                            )
+                except Exception as e:
+                    print(f"Error during tensor access {prgm}")
+                    raise e
+
+            case ntn.Dimension(tns, r):
+                assert isinstance(tns, ntn.Slot)
+                tns_e = self(tns)
+                r_e = self(r)
+                return tns_e.shape[r_e]
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)
-                increment(tns_e, val_e)
+                try:
+                    increment(tns_e, val_e)
+                except Exception as e:
+                    print(f"Error during tensor increment {prgm}")
+                    raise e
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
@@ -480,7 +503,7 @@ class NotationInterpreter:
                         if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
-                                f"for function '{func_n}'."
+                                f"for function '{func_n}'. have type {ftype(ret_e)}"
                             )
                         return ret_e
                     raise ValueError(
@@ -507,10 +530,10 @@ class NotationInterpreter:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return NotationInterpreterModule(self, kernels)
+                return NotationInterpreterLibrary(self, kernels)
             case ntn.Stack(val):
                 raise NotImplementedError(
-                    "NotationInterpreter does not support symbolic, no target language"
+                    "NotationInterpreter does not support stacks."
                 )
             case _:
                 raise NotImplementedError(

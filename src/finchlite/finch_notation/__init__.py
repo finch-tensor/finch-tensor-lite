@@ -6,6 +6,7 @@ from .nodes import (
     Cached,
     Call,
     Declare,
+    Dimension,
     Freeze,
     Function,
     If,
@@ -16,6 +17,7 @@ from .nodes import (
     Module,
     NotationExpression,
     NotationNode,
+    NotationStatement,
     Read,
     Repack,
     Return,
@@ -28,6 +30,7 @@ from .nodes import (
     Value,
     Variable,
 )
+from .stages import NotationLoader, NotationTransform
 
 __all__ = [
     "Access",
@@ -36,6 +39,7 @@ __all__ = [
     "Cached",
     "Call",
     "Declare",
+    "Dimension",
     "Freeze",
     "Function",
     "If",
@@ -46,7 +50,10 @@ __all__ = [
     "Module",
     "NotationExpression",
     "NotationInterpreter",
+    "NotationLoader",
     "NotationNode",
+    "NotationStatement",
+    "NotationTransform",
     "Read",
     "Repack",
     "Return",

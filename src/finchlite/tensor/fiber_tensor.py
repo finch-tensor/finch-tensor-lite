@@ -1,9 +1,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Any
 
-from finchlite.algebra import Tensor, TensorFType
-from finchlite.symbolic import FType, FTyped
+import numpy as np
+
+from .. import finch_assembly as asm
+from .. import finch_notation as ntn
+from ..algebra import Tensor, register_property
+from ..compile.lower import FinchTensorFType
+from ..symbolic import FType, FTyped
 
 
 class LevelFType(FType, ABC):
@@ -39,7 +44,7 @@ class LevelFType(FType, ABC):
     @abstractmethod
     def shape_type(self):
         """
-        Tuple of types of the dimensions in the shape
+        Tuple of types of the dimensions in the shape.
         """
         ...
 
@@ -59,6 +64,93 @@ class LevelFType(FType, ABC):
         """
         ...
 
+    @property
+    @abstractmethod
+    def buffer_type(self): ...
+
+    @property
+    @abstractmethod
+    def next_level(self):
+        """
+        Get the nested level.
+        """
+        ...
+
+    @abstractmethod
+    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit): ...
+
+    @abstractmethod
+    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+        """
+        Emit code to unfurl the fiber at position `pos` in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_freeze(self, ctx, tns, op, pos):
+        """
+        Emit code to freeze `pos` previously assembled positions in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_thaw(self, ctx, tns, op, pos):
+        """
+        Emit code to thaw `pos` previously assembled positions in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_unwrap(self, ctx, obj, pos):
+        """
+        Emit code to return the unwrapped scalar at position `pos` in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_increment(self, ctx, obj, val, pos):
+        """
+        Emit code to increment position `pos` in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        """
+        Emit code to lower a declare of `pos` previously assembled positions in
+        the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_lower_dim(self, ctx, obj, r):
+        """
+        Emit code to return the size of dimension `r` of the subtensors in the level.
+        """
+        ...
+
+    @abstractmethod
+    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
+        """
+        Emit code unpacking the level.
+        """
+        ...
+
+    @abstractmethod
+    def __call__(self, shape):
+        """
+        Construct level
+        """
+        ...
+
+    @abstractmethod
+    def from_numpy(self, shape, val):
+        """
+        Construct level from numpy array
+        (TODO not strictly safe, only works for dense, replace later)
+        """
+        ...
+
 
 class Level(FTyped, ABC):
     """
@@ -68,11 +160,19 @@ class Level(FTyped, ABC):
 
     @property
     @abstractmethod
-    def shape(self):
+    def shape(self) -> tuple:
         """
         Shape of the fibers in the structure.
         """
         ...
+
+    @property
+    @abstractmethod
+    def stride(self) -> np.integer: ...
+
+    @property
+    @abstractmethod
+    def val(self) -> Any: ...
 
     @property
     def ndim(self):
@@ -98,12 +198,13 @@ class Level(FTyped, ABC):
     def buffer_factory(self):
         return self.ftype.buffer_factory
 
-
-Tp = TypeVar("Tp")
+    @property
+    def buffer_type(self):
+        return self.ftype.buffer_type
 
 
 @dataclass
-class FiberTensor(Tensor, Generic[Tp]):
+class FiberTensor(Tensor):
     """
     A class representing a tensor with fiber structure.
 
@@ -112,25 +213,28 @@ class FiberTensor(Tensor, Generic[Tp]):
     """
 
     lvl: Level
-    pos: Tp
 
     def __repr__(self):
-        res = f"FiberTensor(lvl={self.lvl}"
-        if self.pos is not None:
-            res += f", pos={self.pos}"
-        res += ")"
-        return res
+        return f"FiberTensor(lvl={self.lvl})"
 
     @property
     def ftype(self):
         """
         Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
-        return FiberTensorFType(self.lvl.ftype, type(self.pos))
+        return FiberTensorFType(self.lvl.ftype)
 
     @property
     def shape(self):
         return self.lvl.shape
+
+    @property
+    def stride(self):
+        return self.lvl.stride
+
+    @property
+    def val(self):
+        return self.lvl.val
 
     @property
     def ndim(self):
@@ -154,79 +258,149 @@ class FiberTensor(Tensor, Generic[Tp]):
 
     @property
     def buffer_factory(self):
-        """
-        Returns the ftype of the buffer used for the fibers.
-        This is typically a NumpyBufferFType or similar.
-        """
         return self.lvl.buffer_factory
+
+    def to_numpy(self) -> np.ndarray:
+        # TODO: temporary for dense only. TBD in sparse_level PR
+        return np.reshape(self.lvl.val.arr, self.shape, copy=False)
+
+
+@dataclass(eq=True, frozen=True)
+class FiberTensorFields:
+    lvl: asm.AssemblyExpression
+    buf_s: asm.Slot
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFType(TensorFType):
+class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     """
     An abstract base class representing the ftype of a fiber tensor.
 
     Attributes:
-        lvl: a fiber allocator that manages the fibers in the tensor.
+        lvl_t: The level ftype to be used for the tensor.
     """
 
-    lvl: LevelFType
-    _position_type: type | None = None
+    lvl_t: LevelFType
 
-    def __post_init__(self):
-        if self._position_type is None:
-            self._position_type = self.lvl.position_type
+    @property
+    def struct_name(self):
+        # TODO: include dt = np.dtype(self.buf_t.element_type)
+        return "FiberTensorFType"
 
-    def __call__(self, shape):
+    @property
+    def struct_fields(self):
+        return [
+            ("lvl", self.lvl_t),
+            ("shape", asm.TupleFType.from_tuple(self.shape_type)),
+        ]
+
+    def __call__(self, shape: tuple[int, ...]):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl(shape), self.lvl.position_type(1))
+        return FiberTensor(self.lvl_t(shape=shape))
 
-    @property
-    def shape(self):
-        return self.lvl.shape
+    def __str__(self):
+        return f"FiberTensorFType({self.lvl_t})"
 
     @property
     def ndim(self):
-        return self.lvl.ndim
+        return self.lvl_t.ndim
 
     @property
     def shape_type(self):
-        return self.lvl.shape_type
+        return self.lvl_t.shape_type
 
     @property
     def element_type(self):
-        return self.lvl.element_type
+        return self.lvl_t.element_type
 
     @property
     def fill_value(self):
-        return self.lvl.fill_value
+        return self.lvl_t.fill_value
 
     @property
     def position_type(self):
-        return self._position_type
+        return self.lvl_t.position_type
 
     @property
     def buffer_factory(self):
+        return self.lvl_t.buffer_factory
+
+    @property
+    def buffer_type(self):
+        return self.lvl_t.buffer_type
+
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        tns = ctx.resolve(tns).obj
+        pos = tns.pos if hasattr(tns, "pos") else asm.Literal(self.position_type(0))
+        dirty_bit = tns.dirty_bit if hasattr(tns, "dirty_bit") else asm.Literal(False)
+        op = mode.op if isinstance(mode, ntn.Update) else None
+        obj = self.lvl_t.get_fields_class(
+            tns.lvl,
+            tns.buf_s,
+            pos,
+            op,
+            dirty_bit,
+        )
+        return self.lvl_t.level_unfurl(
+            ctx, ntn.Stack(obj, self), ext, mode, proto, obj.pos
+        )
+
+    def lower_freeze(self, ctx, tns, op):
+        return self.lvl_t.level_lower_freeze(ctx, tns.obj.buf_s, op, tns.obj.pos)
+
+    def lower_thaw(self, ctx, tns, op):
+        return self.lvl_t.level_lower_thaw(ctx, tns.obj.buf_s, op, tns.obj.pos)
+
+    def lower_unwrap(self, ctx, tns):
+        return self.lvl_t.level_lower_unwrap(ctx, tns.obj, tns.obj.pos)
+
+    def lower_increment(self, ctx, tns, val):
+        return self.lvl_t.level_lower_increment(ctx, tns.obj, val, tns.obj.pos)
+
+    def lower_declare(self, ctx, tns, init, op, shape):
+        return self.lvl_t.level_lower_declare(
+            ctx, tns.obj.buf_s, init, op, shape, tns.obj.pos
+        )
+
+    def lower_dim(self, ctx, obj, r):
+        return self.lvl_t.level_lower_dim(ctx, obj.lvl, r)
+
+    def asm_unpack(self, ctx, var_n, val) -> FiberTensorFields:
         """
-        Returns the ftype of the buffer used for the fibers.
-        This is typically a NumpyBufferFType or similar.
+        Unpack the into asm context.
         """
-        return self.lvl.buffer_factory
+        val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
+        buf_s = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+        return FiberTensorFields(val_lvl, buf_s)
+
+    def asm_repack(self, ctx, lhs, obj):
+        """
+        Repack the buffer from the context.
+        """
+        ctx.exec(asm.Repack(obj.buf_s))
+        return
+
+    def from_fields(self, *args) -> FiberTensor:
+        return FiberTensor(*args)
+
+    def from_numpy(self, arr: np.ndarray) -> FiberTensor:
+        return FiberTensor(self.lvl_t.from_numpy(arr.shape, arr))
 
 
-def tensor(lvl: LevelFType, position_type: type | None = None):
+def fiber_tensor(lvl: LevelFType):
     """
     Creates a FiberTensorFType with the given level ftype and position type.
 
     Args:
         lvl: The level ftype to be used for the tensor.
-        pos_type: The type of positions within the tensor. Defaults to None.
-
     Returns:
-        An instance of FiberTensorFType.
+        An instance of a fiber tensor format.
     """
     # mypy does not understand that dataclasses generate __hash__ and __eq__
     # https://github.com/python/mypy/issues/19799
-    return FiberTensorFType(lvl, position_type)  # type: ignore[abstract]
+    return FiberTensorFType(lvl)  # type: ignore[abstract]
+
+
+register_property(FiberTensor, "asarray", "__attr__", lambda x: x)

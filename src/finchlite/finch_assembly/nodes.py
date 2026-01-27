@@ -51,11 +51,26 @@ class AssemblyTree(AssemblyNode, TermTree):
 
 
 class AssemblyExpression(AssemblyNode):
+    """
+    Assembly AST expression base class.
+
+    An assembly expression is a program node which evaluates to a value.
+    """
+
     @property
     @abstractmethod
     def result_format(self):
         """Returns the type of the expression."""
         ...
+
+
+class AssemblyStatement(AssemblyNode):
+    """
+    Assembly AST statement base class.
+
+    An assembly statement is a program node nested inside a function which does
+    not produce a value, but may modify the state of the machine.
+    """
 
 
 @dataclass(eq=True, frozen=True)
@@ -98,7 +113,7 @@ class Variable(AssemblyExpression, NamedTerm):
         return self.type
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"name": self.name, "type": self.type})
 
     @property
     def symbol(self) -> str:
@@ -178,7 +193,7 @@ class Slot(AssemblyExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Unpack(AssemblyTree):
+class Unpack(AssemblyTree, AssemblyStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
@@ -199,7 +214,7 @@ class Unpack(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Repack(AssemblyTree):
+class Repack(AssemblyTree, AssemblyStatement):
     """
     Registers updates from a symbolic object `val` with the original
     object. The original object may now be accessed and modified.
@@ -217,7 +232,7 @@ class Repack(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(AssemblyTree):
+class Assign(AssemblyTree, AssemblyStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
     to `lhs`.
@@ -227,7 +242,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: TaggedVariable | Variable | Stack
+    lhs: TaggedVariable | Variable
     rhs: AssemblyExpression
 
     @property
@@ -260,7 +275,7 @@ class GetAttr(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class SetAttr(AssemblyTree):
+class SetAttr(AssemblyTree, AssemblyStatement):
     """
     Represents a setter for an attribute `attr` of an object `obj`.
     Attributes:
@@ -332,7 +347,7 @@ class Load(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Store(AssemblyTree):
+class Store(AssemblyTree, AssemblyStatement):
     """
     Represents storing a value into a buffer at a given index.
 
@@ -352,7 +367,69 @@ class Store(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Resize(AssemblyTree):
+class ExistsDict(AssemblyExpression, AssemblyTree):
+    """
+    Represents checking whether an integer tuple key is in a map.
+
+    Attributes:
+        map: The map to load from.
+        index: The key to check for existence.
+    """
+
+    map: Slot | Stack
+    index: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index]
+
+    def result_format(self):
+        return bool
+
+
+@dataclass(eq=True, frozen=True)
+class LoadDict(AssemblyExpression, AssemblyTree):
+    """
+    Represents loading a value from a map given an integer tuple key.
+
+    Attributes:
+        map: The map to load from.
+        index: The key value
+    """
+
+    dct: Slot | Stack
+    index: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.dct, self.index]
+
+    def result_format(self):
+        return self.dct.result_format.value_type
+
+
+@dataclass(eq=True, frozen=True)
+class StoreDict(AssemblyTree, AssemblyStatement):
+    """
+    Represents storing a value into a buffer given an integer tuple key.
+
+    Attributes:
+        map: The map to load from.
+        index1: The first integer in the pair
+        index2: The second integer in the pair
+    """
+
+    map: Slot | Stack
+    index: AssemblyExpression
+    value: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index, self.value]
+
+
+@dataclass(eq=True, frozen=True)
+class Resize(AssemblyTree, AssemblyStatement):
     """
     Represents resizing a buffer to a new size.
 
@@ -391,7 +468,7 @@ class Length(AssemblyExpression, AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class ForLoop(AssemblyTree):
+class ForLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a for loop that iterates over a range of values.
 
@@ -402,10 +479,10 @@ class ForLoop(AssemblyTree):
         body: The body of the loop to execute.
     """
 
-    var: Variable
+    var: Variable | TaggedVariable
     start: AssemblyExpression
     end: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -414,7 +491,7 @@ class ForLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class BufferLoop(AssemblyTree):
+class BufferLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a loop that iterates over the elements of a buffer.
 
@@ -425,8 +502,8 @@ class BufferLoop(AssemblyTree):
     """
 
     buffer: Slot | Stack
-    var: Variable
-    body: AssemblyNode
+    var: Variable | TaggedVariable
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -435,7 +512,7 @@ class BufferLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class WhileLoop(AssemblyTree):
+class WhileLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a while loop that executes as long as the condition is true.
 
@@ -445,7 +522,7 @@ class WhileLoop(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -454,7 +531,7 @@ class WhileLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class If(AssemblyTree):
+class If(AssemblyTree, AssemblyStatement):
     """
     Represents an if statement that executes the body if the condition is true.
 
@@ -464,7 +541,7 @@ class If(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -473,7 +550,7 @@ class If(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assert(AssemblyTree):
+class Assert(AssemblyTree, AssemblyStatement):
     """
     Represents an assert node which asserts that expression is true.
     Used in the dataflow analysis to assert conditions in conditionals and loops.
@@ -491,7 +568,7 @@ class Assert(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(AssemblyTree):
+class IfElse(AssemblyTree, AssemblyStatement):
     """
     Represents an if-else statement that executes the body if the condition
     is true, otherwise executes else_body.
@@ -503,8 +580,8 @@ class IfElse(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
-    else_body: AssemblyNode
+    body: AssemblyStatement
+    else_body: AssemblyStatement
 
     @property
     def children(self):
@@ -528,7 +605,7 @@ class Function(AssemblyTree):
 
     name: Variable
     args: tuple[Variable, ...]
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -543,7 +620,7 @@ class Function(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Return(AssemblyTree):
+class Return(AssemblyTree, AssemblyStatement):
     """
     Represents a return statement that returns `arg` from the current function.
     Halts execution of the function body.
@@ -561,7 +638,7 @@ class Return(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Break(AssemblyTree):
+class Break(AssemblyTree, AssemblyStatement):
     """
     Represents a break statement that exits the current loop.
     """
@@ -573,7 +650,7 @@ class Break(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Block(AssemblyTree):
+class Block(AssemblyTree, AssemblyStatement):
     """
     Represents a statement that executes a sequence of statements `bodies...`.
 
@@ -581,7 +658,7 @@ class Block(AssemblyTree):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyNode, ...] = ()
+    bodies: tuple[AssemblyStatement, ...] = ()
 
     @property
     def children(self):
@@ -603,7 +680,7 @@ class Module(AssemblyTree):
         funcs: The functions defined in the module.
     """
 
-    funcs: tuple[AssemblyNode, ...]
+    funcs: tuple[Function, ...]
 
     @property
     def children(self):
@@ -616,7 +693,7 @@ class Module(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Print(AssemblyTree):
+class Print(AssemblyTree, AssemblyStatement):
     """
     Print values of give variables.
 
@@ -679,7 +756,7 @@ class AssemblyPrinterContext(Context):
                         raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
             case GetAttr(obj, attr):
-                return f"getattr({obj}, {attr})"
+                return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
             case Call(Literal(_) as lit, args):
@@ -692,10 +769,17 @@ class AssemblyPrinterContext(Context):
                 return None
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
+            case LoadDict(map, idx):
+                return f"loadmap({self(map)}, {self(idx)})"
+            case ExistsDict(map, idx):
+                return f"existsmap({self(map)}, {self(idx)})"
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
+                return None
+            case StoreDict(map, idx, val):
+                self.exec(f"{feed}storemap({self(map)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")

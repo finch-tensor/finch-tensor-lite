@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pprint import pprint
@@ -8,21 +9,37 @@ import numpy as np
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
-from ..finch_assembly import AssemblyStructFType
+from ..finch_assembly import (
+    AssemblyInterpreter,
+    AssemblyLibrary,
+    AssemblyLoader,
+    AssemblyStructFType,
+)
+from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
+from ..util.logging import LOG_ASSEMBLY
+from .stages import NotationLowerer
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
 
 
 class FinchTensorFType(TensorFType, ABC):
     @abstractmethod
-    def lower_unwrap(tns):
+    def lower_dim(self, ctx, obj, i):
+        """
+        Get the dimension of the tensor at mode i.
+        """
+
+    @abstractmethod
+    def lower_unwrap(self, ctx, obj):
         """
         Unwrap a tensor view to get the underlying tensor.
         This is used to get the original tensor from a tensor view.
         """
 
     @abstractmethod
-    def lower_increment(tns, val):
+    def lower_increment(self, ctx, obj, val):
         """
         Increment a tensor view with an operation and value.
         This updates the tensor at the specified index with the operation and value.
@@ -47,7 +64,10 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def unfurl(self, ctx, tns, ext, mode, proto): ...
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        """
+        Unfurl a tensor.
+        """
 
 
 @dataclass(eq=True, frozen=True)
@@ -82,10 +102,7 @@ def dimension(tns, mode: int) -> Extent:
 
 
 def numba_lower_dimension(ctx, tns, mode: int) -> str:
-    return (
-        f"Numba_Extent(type({ctx(tns)}.shape.element_{mode})(0), "
-        f"{ctx(tns)}.shape.element_{mode})"
-    )
+    return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
 
 
 register_property(
@@ -93,6 +110,14 @@ register_property(
     "__call__",
     "return_type",
     lambda op, x, y: ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
+)
+
+
+register_property(
+    Extent,
+    "__call__",
+    "return_type",
+    lambda op, x, y: ExtentFType(x, y),  # type: ignore[abstract]
 )
 
 
@@ -158,14 +183,25 @@ class ExtentFType(AssemblyStructFType):
     def struct_fields(self):
         return [("start", np.intp), ("end", np.intp)]
 
+    def from_fields(self, start, stop) -> "Extent":
+        return Extent(start, stop)
+
     def __call__(self, *args):
         raise TypeError(f"{self.struct_name} is not callable")
 
     def get_start(self, ext):
-        return asm.GetAttr(ext, asm.Literal("start"))
+        match ext:
+            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
+                return start
+            case _:
+                return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
-        return asm.GetAttr(ext, asm.Literal("end"))
+        match ext:
+            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
+                return end
+            case _:
+                return asm.GetAttr(ext, asm.Literal("end"))
 
     def lower_loop(self, ctx, idx, ext, body):
         """
@@ -258,17 +294,39 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler:
-    def __init__(self, ctx):
-        self.ctx = ctx
+class NotationCompiler(NotationLoader):
+    def __init__(
+        self,
+        ctx_load: AssemblyLoader | None = None,
+        ctx_lower: NotationLowerer | None = None,
+    ):
+        if ctx_load is None:
+            ctx_load = AssemblyInterpreter()
+        if ctx_lower is None:
+            ctx_lower = AssemblyGenerator()
+        self.ctx_load: AssemblyLoader = ctx_load
+        self.ctx_lower: NotationLowerer = ctx_lower
 
-    def __call__(self, prgm):
-        ctx_2 = NotationContext()
+    def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
+        asm_code = self.ctx_lower(prgm)
+        logger.debug(asm_code)
+        return self.ctx_load(asm_code)
 
-        return self.ctx(ctx_2(prgm))
+
+class AssemblyGenerator(NotationLowerer):
+    """
+    Compiles Finch Notation to Finch Assembly.
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, term: ntn.Module) -> asm.Module:
+        ctx = AssemblyContext()
+        return ctx(term)
 
 
-class NotationContext(Context):
+class AssemblyContext(Context):
     """
     Compiles Finch Notation to Finch Assembly. Holds the state of the
     compilation process.
@@ -281,6 +339,7 @@ class NotationContext(Context):
         epilogue=None,
         bindings=None,
         slots=None,
+        access_modes=None,
         types=None,
         func_state=None,
     ):
@@ -289,10 +348,13 @@ class NotationContext(Context):
             bindings = ScopedDict()
         if slots is None:
             slots = ScopedDict()
+        if access_modes is None:
+            access_modes = ScopedDict()
         if types is None:
             types = ScopedDict()
         self.bindings = bindings
         self.slots = slots
+        self.access_modes = access_modes
         self.types = types
         self.func_state = func_state
 
@@ -304,6 +366,7 @@ class NotationContext(Context):
         blk = super().block()
         blk.bindings = self.bindings
         blk.slots = self.slots
+        blk.access_modes = self.access_modes
         blk.types = self.types
         blk.func_state = self.func_state
         return blk
@@ -315,6 +378,7 @@ class NotationContext(Context):
         blk = self.block()
         blk.bindings = self.bindings.scope()
         blk.slots = self.slots.scope()
+        blk.access_modes = self.access_modes.scope()
         blk.types = self.types.scope()
         return blk
 
@@ -339,6 +403,21 @@ class NotationContext(Context):
                 return node
             case _:
                 raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+
+    def _freeze_tensor(self, tns_var: str, op: ntn.Literal | None) -> None:
+        if op is None:
+            assert tns_var not in self.access_modes
+        else:
+            assert self.access_modes[tns_var] == ntn.Update(op)
+        self.access_modes[tns_var] = ntn.Read()
+
+    def _thaw_tensor(self, tns_var: str, op: ntn.Literal) -> None:
+        assert self.access_modes[tns_var] == ntn.Read()
+        self.access_modes[tns_var] = ntn.Update(op)
+
+    def _rm_tensor_from_accesses(self, tns_var: str) -> None:
+        assert self.access_modes[tns_var] == ntn.Read()
+        del self.access_modes[tns_var]
 
     def __call__(self, prgm):
         """
@@ -387,6 +466,7 @@ class NotationContext(Context):
                 var = asm.Variable(var_n, var_t)
                 self.exec(asm.Assign(var, val_code))
                 self.types[var_n] = var_t
+                self._freeze_tensor(var_n, op=None)
                 self.slots[var_n] = var_t.asm_unpack(
                     self, var_n, asm.Variable(var_n, var_t)
                 )
@@ -397,38 +477,45 @@ class NotationContext(Context):
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
+                self._rm_tensor_from_accesses(var_n)
                 var_t.asm_repack(self, var_n, obj)
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, _)):
                 assert isinstance(mode, ntn.Read)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
-                return tns.result_format.lower_unwrap(self, tns.obj)
+                return tns.result_format.lower_unwrap(self, tns)
             case ntn.Increment(ntn.Access(tns, mode, _), val):
                 assert isinstance(mode, ntn.Update)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
                 val_e = self(val)
-                return tns.result_format.lower_increment(self, tns.obj, val_e)
+                return tns.result_format.lower_increment(self, tns, val_e)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                # first instantiate tensors
                 ext.result_format.lower_loop(self, idx, self(ext), body)
                 return None
+            case ntn.Dimension(tns, ntn.Literal(r)):
+                assert isinstance(r, int)
+                tns = self.resolve(tns)
+                return tns.result_format.lower_dim(self, tns.obj, r)
             case ntn.Declare(tns, init, op, shape):
+                self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
                 return tns.result_format.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
+                self._freeze_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 op_e = self(op)
                 return tns.result_format.lower_freeze(self, tns, op_e)
             case ntn.Thaw(tns, op):
+                self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 op_e = self(op)
                 return tns.result_format.lower_thaw(self, tns, op_e)
@@ -552,7 +639,7 @@ class DefaultPass(LoopletPass):
 
 class LoopletContext(Context):
     def __init__(self, ctx, idx):
-        self.ctx = ctx  # NotationContext
+        self.ctx = ctx  # AssemblyContext
         self.idx = idx
 
     def freshen(self, *tags):

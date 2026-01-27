@@ -5,7 +5,6 @@ import pytest
 
 import numpy  # noqa: F401, ICN001
 import numpy as np
-from numpy.testing import assert_equal
 
 import finchlite  # noqa: F401
 import finchlite.finch_notation as ntn
@@ -31,6 +30,8 @@ from finchlite.finch_notation import (  # noqa: F401
     Update,
     Variable,
 )
+
+from .conftest import finch_assert_equal
 
 
 @pytest.mark.parametrize(
@@ -92,11 +93,11 @@ def test_matrix_multiplication(a, b):
                             i,
                             m,
                             ntn.Loop(
-                                j,
-                                n,
+                                k,
+                                p,
                                 ntn.Loop(
-                                    k,
-                                    p,
+                                    j,
+                                    n,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -149,7 +150,7 @@ def test_matrix_multiplication(a, b):
 
     expected = np.matmul(a, b)
 
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
     assert prgm == eval(repr(prgm))
 

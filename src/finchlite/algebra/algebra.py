@@ -434,6 +434,9 @@ for fn, func in [
     (np.logical_or, lambda op, other_op: other_op == np.logical_and),
     (operator.pow, lambda op, other_op: False),
     (operator.truediv, lambda op, other_op: False),
+    (operator.add, lambda op, other_op: False),
+    (max, lambda op, other_op: False),
+    (min, lambda op, other_op: False),
 ]:
     register_property(fn, "__call__", "is_distributive", func)
 

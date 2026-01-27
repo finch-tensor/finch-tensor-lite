@@ -6,6 +6,7 @@ from .. import algebra
 from ..symbolic import FType, ScopedDict, ftype
 from . import nodes as asm
 from .buffer import BufferFType
+from .dct import DictFType
 from .struct import AssemblyStructFType
 
 
@@ -81,6 +82,12 @@ class AssemblyTypeChecker:
                 f"The variable '{var_n}' is not defined in the current context."
             ) from KeyError
 
+    def check_dict(self, dct):
+        map_type = self.check_expr(dct)
+        if isinstance(map_type, DictFType):
+            return map_type
+        raise AssemblyTypeError(f"Expected map, got {map_type}.")
+
     def check_buffer(self, buffer):
         buffer_type = self.check_expr(buffer)
         if isinstance(buffer_type, BufferFType):
@@ -134,10 +141,20 @@ class AssemblyTypeChecker:
             case asm.Length(buffer):
                 buffer_type = self.check_buffer(buffer)
                 return buffer_type.length_type
+            case asm.ExistsDict(dct, index):
+                map_type = self.check_dict(dct)
+                index_type = self.check_expr(index)
+                check_type_match(map_type.key_type, index_type)
+                return bool
+            case asm.LoadDict(dct, index):
+                map_type = self.check_dict(dct)
+                index_type = self.check_expr(index)
+                check_type_match(map_type.key_type, index_type)
+                return map_type.value_type
             case _:
                 raise ValueError(f"Ill-formed AssemblyExpression:  {type(expr)}.")
 
-    def check_stmt(self, stmt: asm.AssemblyNode):
+    def check_stmt(self, stmt: asm.AssemblyStatement):
         if isinstance(stmt, asm.AssemblyExpression):
             self.check_expr(stmt)
             return None
@@ -181,6 +198,13 @@ class AssemblyTypeChecker:
                 value_type = self.check_expr(value)
                 check_type_match(buffer_type.element_type, value_type)
                 return None
+            case asm.StoreDict(map, index, value):
+                map_type = self.check_dict(map)
+                index_type = self.check_expr(index)
+                value_type = self.check_expr(value)
+                check_type_match(map_type.key_type, index_type)
+                check_type_match(map_type.value_type, value_type)
+                return None
             case asm.Resize(buffer, new_size):
                 buffer_type = self.check_buffer(buffer)
                 new_size_type = self.check_expr(new_size)
@@ -222,23 +246,6 @@ class AssemblyTypeChecker:
                 if body_type is None or else_body_type is None:
                     return None
                 return body_type
-            case asm.Function(asm.Variable(func_name, return_type), args, body):
-                check_type(return_type)
-                if self.function_state:
-                    raise AssemblyTypeError(
-                        f"Cannot nest function definitions:  '{func_name}'."
-                    )
-                body_scope = self.scope(function_state=FunctionState(return_type))
-                for arg in args:
-                    check_type(arg.type)
-                    body_scope.ctxt[arg.name] = arg.type
-                body_type = body_scope.check_stmt(body)
-                if body_type is None:
-                    raise AssemblyTypeError(
-                        f"Function '{func_name}' is not guaranteed to return."
-                    )
-                check_type_match(return_type, body_type)
-                return None
             case asm.Return(arg):
                 return_type = self.check_expr(arg)
                 self.check_return_type(return_type)
@@ -264,6 +271,28 @@ class AssemblyTypeChecker:
             case _:
                 raise ValueError(f"Ill-formed statement:  {type(stmt)}.")
 
+    def check_function(self, func: asm.AssemblyNode):
+        match func:
+            case asm.Function(asm.Variable(func_name, return_type), args, body):
+                check_type(return_type)
+                if self.function_state:
+                    raise AssemblyTypeError(
+                        f"Cannot nest function definitions:  '{func_name}'."
+                    )
+                body_scope = self.scope(function_state=FunctionState(return_type))
+                for arg in args:
+                    check_type(arg.type)
+                    body_scope.ctxt[arg.name] = arg.type
+                body_type = body_scope.check_stmt(body)
+                if body_type is None:
+                    raise AssemblyTypeError(
+                        f"Function '{func_name}' is not guaranteed to return."
+                    )
+                check_type_match(return_type, body_type)
+                return
+            case _:
+                raise ValueError(f"Ill-formed function:  {type(func)}.")
+
     def check_module(self, mod: asm.AssemblyNode):
         defined_funcs = []
         match mod:
@@ -274,7 +303,7 @@ class AssemblyTypeChecker:
                         raise AssemblyTypeError(
                             f"Two functions defined with the name '{func_name}'."
                         )
-                    self.check_stmt(func)
+                    self.check_function(func)
                     defined_funcs.append(func_name)
                 return
             case _:
@@ -284,10 +313,15 @@ class AssemblyTypeChecker:
         if isinstance(prgm, asm.Module):
             self.check_module(prgm)
             return None
+        if isinstance(prgm, asm.Function):
+            self.check_function(prgm)
+            return None
+        if isinstance(prgm, asm.AssemblyStatement):
+            self.check_stmt(prgm)
+            return None
         if isinstance(prgm, asm.AssemblyExpression):
             return self.check_expr(prgm)
-        self.check_stmt(prgm)
-        return None
+        raise ValueError(f"Ill-formed program:  {type(prgm)}.")
 
 
 def check_is_index_type(index_type):

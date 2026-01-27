@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, query_property, return_type
+from ..algebra import element_type, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, NamedTerm, Term, TermTree, literal_repr
+from ..symbolic import Context, FType, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 
@@ -49,6 +49,8 @@ class NotationTree(NotationNode, TermTree):
 class NotationExpression(NotationNode):
     """
     Notation AST expression base class.
+
+    A Notation expression is a program node which evaluates to a value.
     """
 
     @property
@@ -58,6 +60,15 @@ class NotationExpression(NotationNode):
         Get the type of the expression.
         """
         ...
+
+
+class NotationStatement(NotationNode):
+    """
+    Notation AST statement base class.
+
+    A Notation statement is a program node nested inside a function which does
+    not produce a value, but may modify the state of the machine.
+    """
 
 
 @dataclass(eq=True, frozen=True)
@@ -70,7 +81,7 @@ class Literal(NotationExpression):
 
     @property
     def result_format(self):
-        return type(self.val)
+        return ftype(self.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"val": self.val})
@@ -129,7 +140,7 @@ class Call(NotationTree, NotationExpression):
     """
 
     op: Literal
-    args: tuple[NotationNode, ...]
+    args: tuple[NotationExpression, ...]
 
     @property
     def result_format(self):
@@ -174,15 +185,38 @@ class AccessFType(FType):
 
 
 @dataclass(eq=True, frozen=True)
+class Dimension(NotationTree, NotationExpression):
+    """
+    Notation AST expression representing the dimension of tensor `tns` in
+    rank `r`.
+    """
+
+    tns: NotationExpression
+    r: Literal
+
+    @property
+    def result_format(self):
+        return self.tns.shape_type[self.r.val]
+
+    @classmethod
+    def from_children(cls, tns, r):
+        return cls(tns, r)
+
+    @property
+    def children(self):
+        return [self.tns, self.r]
+
+
+@dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
     Notation AST expression representing the value of tensor `tns` at the indices
     `idx...`.
     """
 
-    tns: NotationNode
+    tns: NotationExpression
     mode: AccessMode
-    idxs: tuple[NotationNode, ...]
+    idxs: tuple[NotationExpression, ...]
 
     @property
     def result_format(self):
@@ -223,7 +257,7 @@ class Update(AccessMode, NotationTree):
         op: The operation used to update the value of the tensor.
     """
 
-    op: NotationNode
+    op: Literal
 
     @property
     def children(self):
@@ -231,13 +265,13 @@ class Update(AccessMode, NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Increment(NotationTree):
+class Increment(NotationTree, NotationStatement):
     """
     Notation AST statement that updates the value `lhs` using `rhs`.
     """
 
-    lhs: NotationNode
-    rhs: NotationNode
+    lhs: Access
+    rhs: NotationExpression
 
     @property
     def children(self):
@@ -245,7 +279,7 @@ class Increment(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Unwrap(NotationTree):
+class Unwrap(NotationTree, NotationExpression):
     """
     Notation AST statement that unwraps the scalar value from a 0-dimensional
     tensor `arg`.
@@ -274,8 +308,8 @@ class Cached(NotationTree, NotationExpression):
     properties about it.
     """
 
-    arg: NotationNode
-    ref: NotationNode
+    arg: NotationExpression
+    ref: NotationExpression
 
     @property
     def result_format(self):
@@ -287,14 +321,14 @@ class Cached(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class Loop(NotationTree):
+class Loop(NotationTree, NotationStatement):
     """
     Notation AST statement that runs `body` for each value of `idx` in `ext`.
     """
 
-    idx: NotationNode
-    ext: NotationNode
-    body: NotationNode
+    idx: Variable
+    ext: NotationExpression
+    body: NotationStatement
 
     @property
     def children(self):
@@ -302,13 +336,13 @@ class Loop(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class If(NotationTree):
+class If(NotationTree, NotationStatement):
     """
     Notation AST statement that only executes `body` if `cond` is true.
     """
 
-    cond: NotationNode
-    body: NotationNode
+    cond: NotationExpression
+    body: NotationStatement
 
     @property
     def children(self):
@@ -316,15 +350,15 @@ class If(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(NotationTree):
+class IfElse(NotationTree, NotationStatement):
     """
     Notation AST statement that executes `then_body` if `cond` is true, otherwise
     executes `else_body`.
     """
 
-    cond: NotationNode
-    then_body: NotationNode
-    else_body: NotationNode
+    cond: NotationExpression
+    then_body: NotationStatement
+    else_body: NotationStatement
 
     @property
     def children(self):
@@ -332,13 +366,13 @@ class IfElse(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(NotationTree):
+class Assign(NotationTree, NotationStatement):
     """
     Notation AST statement that defines `lhs` as having the value `rhs`.
     """
 
-    lhs: NotationNode
-    rhs: NotationNode
+    lhs: Variable
+    rhs: NotationExpression
 
     @property
     def children(self):
@@ -393,7 +427,7 @@ class Slot(NotationExpression, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Unpack(NotationTree):
+class Unpack(NotationTree, NotationStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
@@ -414,7 +448,7 @@ class Unpack(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Repack(NotationTree):
+class Repack(NotationTree, NotationStatement):
     """
     Registers updates from a symbolic object `val` with the original
     object `obj`. The original object may now be accessed and modified.
@@ -434,16 +468,16 @@ class Repack(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Declare(NotationTree, NotationExpression):
+class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
     with `op` in the current scope.
     """
 
-    tns: NotationNode
-    init: NotationNode
-    op: NotationNode
-    shape: tuple[NotationNode, ...]
+    tns: NotationExpression
+    init: Literal
+    op: Literal
+    shape: tuple[NotationExpression, ...]
 
     @property
     def children(self):
@@ -456,81 +490,44 @@ class Declare(NotationTree, NotationExpression):
         """
         return cls(tns, init, op, shape)
 
-    @property
-    def result_format(self):
-        """
-        Returns the type of the declared tensor.
-        """
-        return query_property(
-            self.tns.result_format,
-            "declare",
-            "return_type",
-            self.op.result_format,
-            *[s.result_format for s in self.shape],
-        )
-
 
 @dataclass(eq=True, frozen=True)
-class Freeze(NotationTree, NotationExpression):
+class Freeze(NotationTree, NotationStatement):
     """
     Notation AST statement that freezes `tns` in the current scope after
     modifications with `op`.
     """
 
-    tns: NotationNode
-    op: NotationNode
+    tns: NotationExpression
+    op: Literal
 
     @property
     def children(self):
         return [self.tns, self.op]
 
-    @property
-    def result_format(self):
-        """
-        Returns the type of the frozen tensor.
-        """
-        return query_property(
-            self.tns.result_format,
-            "freeze",
-            "return_type",
-            self.op.result_format,
-        )
-
 
 @dataclass(eq=True, frozen=True)
-class Thaw(NotationTree, NotationExpression):
+class Thaw(NotationTree, NotationStatement):
     """
     Notation AST statement that thaws `tns` in the current scope, moving the tensor
     from read-only mode to update-only mode with a reduction operator `op`.
     """
 
-    tns: NotationNode
-    op: NotationNode
+    tns: NotationExpression
+    op: Literal
 
     @property
     def children(self):
         return [self.tns, self.op]
 
-    @property
-    def result_format(self):
-        """
-        Returns the type of the thawed tensor.
-        """
-        return query_property(
-            self.tns.result_format,
-            "thaw",
-            "return_type",
-            self.op.result_format,
-        )
-
 
 @dataclass(eq=True, frozen=True)
-class Block(NotationTree):
+class Block(NotationTree, NotationStatement):
     """
     Notation AST statement that executes each of its arguments in turn.
     """
 
-    bodies: tuple[NotationNode, ...]
+    bodies: tuple[NotationStatement, ...]
 
     @classmethod
     def from_children(cls, *bodies):
@@ -557,7 +554,7 @@ class Function(NotationTree):
 
     name: Variable
     args: tuple[Variable, ...]
-    body: NotationNode
+    body: NotationStatement
 
     @property
     def children(self):
@@ -572,13 +569,13 @@ class Function(NotationTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Return(NotationTree):
+class Return(NotationTree, NotationStatement):
     """
     Notation AST statement that returns the value of `val` from the current
     function.
     """
 
-    val: NotationNode
+    val: NotationExpression
 
     @property
     def children(self):
@@ -600,7 +597,7 @@ class Module(NotationTree):
         funcs: The functions defined in the module.
     """
 
-    funcs: tuple[NotationNode, ...]
+    funcs: tuple[Function, ...]
 
     @property
     def children(self):
@@ -656,6 +653,10 @@ class NotationPrinterContext(Context):
             case Assign(Variable(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
+            case Dimension(tns, r):
+                tns_e = self(tns)
+                r_e = self(r)
+                return f"{tns_e}.shape[{r_e}]"
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]

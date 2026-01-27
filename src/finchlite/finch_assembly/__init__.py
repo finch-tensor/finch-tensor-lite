@@ -1,12 +1,10 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import (
-    AssemblyCFGBuilder,
-    assembly_build_cfg,
-    assembly_number_uses,
-)
+from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
 from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
+from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
+    AssemblyExpression,
     AssemblyNode,
     Assert,
     Assign,
@@ -14,6 +12,7 @@ from .nodes import (
     Break,
     BufferLoop,
     Call,
+    ExistsDict,
     ForLoop,
     Function,
     GetAttr,
@@ -22,6 +21,7 @@ from .nodes import (
     Length,
     Literal,
     Load,
+    LoadDict,
     Module,
     Print,
     Repack,
@@ -31,21 +31,34 @@ from .nodes import (
     Slot,
     Stack,
     Store,
+    StoreDict,
     TaggedVariable,
     Unpack,
     Variable,
     WhileLoop,
 )
-from .struct import AssemblyStructFType, NamedTupleFType, TupleFType
+from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
+from .struct import (
+    AssemblyStructFType,
+    ImmutableStructFType,
+    MutableStructFType,
+    NamedTupleFType,
+    TupleFType,
+)
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 
 __all__ = [
     "AssemblyCFGBuilder",
     "AssemblyCopyPropagation",
+    "AssemblyExpression",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
+    "AssemblyKernel",
+    "AssemblyLibrary",
+    "AssemblyLoader",
     "AssemblyNode",
     "AssemblyStructFType",
+    "AssemblyTransform",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
     "Assert",
@@ -56,15 +69,21 @@ __all__ = [
     "BufferFType",
     "BufferLoop",
     "Call",
+    "Dict",
+    "DictFType",
+    "ExistsDict",
     "ForLoop",
     "Function",
     "GetAttr",
     "If",
     "IfElse",
+    "ImmutableStructFType",
     "Length",
     "Literal",
     "Load",
+    "LoadDict",
     "Module",
+    "MutableStructFType",
     "NamedTupleFType",
     "Print",
     "Repack",
@@ -74,6 +93,7 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
+    "StoreDict",
     "TaggedVariable",
     "TupleFType",
     "Unpack",

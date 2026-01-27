@@ -9,13 +9,13 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
+from .stage import Stage
 from .term import (
-    PostOrderDFS,
-    PreOrderDFS,
     Term,
     TermTree,
     literal_repr,
 )
+from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 __all__ = [
     "BasicBlock",
@@ -35,10 +35,14 @@ __all__ = [
     "Reflector",
     "Rewrite",
     "ScopedDict",
+    "Stage",
     "Term",
     "TermTree",
     "fisinstance",
+    "fisinstance",
     "ftype",
     "gensym",
+    "intree",
+    "isdescendant",
     "literal_repr",
 ]
