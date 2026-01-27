@@ -12,10 +12,6 @@ from ..fiber_tensor import Level, LevelFType
 class ElementLevelFields(NamedTuple):
     lvl: asm.Variable
     buf_s: NumpyBufferFType
-    pos: asm.Variable | asm.Literal
-    op: asm.Literal
-    dirty_bit: bool
-
 
 @dataclass(unsafe_hash=True)
 class ElementLevelFType(LevelFType, asm.AssemblyStructFType):

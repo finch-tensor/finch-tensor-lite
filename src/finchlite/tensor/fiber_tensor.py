@@ -213,6 +213,8 @@ class FiberTensor(Tensor):
     """
 
     lvl: Level
+    pos: asm.Variable | asm.Literal
+    dirty_bit: bool
 
     def __repr__(self):
         return f"FiberTensor(lvl={self.lvl})"
@@ -267,8 +269,9 @@ class FiberTensor(Tensor):
 
 @dataclass(eq=True, frozen=True)
 class FiberTensorFields:
-    lvl: asm.AssemblyExpression
-    buf_s: asm.Slot
+    lvl: Any
+    pos: asm.AssemblyExpression
+    dirty_bit: asm.AssemblyExpression
 
 
 @dataclass(unsafe_hash=True)
@@ -292,13 +295,15 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         return [
             ("lvl", self.lvl_t),
             ("shape", asm.TupleFType.from_tuple(self.shape_type)),
+            ("pos", self.position_type),
+            ("dirty_bit", np.bool_),
         ]
 
     def __call__(self, shape: tuple[int, ...]):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape=shape))
+        return FiberTensor(self.lvl_t(shape=shape), self.position_type(0), False)
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
@@ -372,8 +377,9 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         Unpack the into asm context.
         """
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
-        buf_s = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
-        return FiberTensorFields(val_lvl, buf_s)
+        pos = asm.GetAttr(val, asm.Literal("pos"))
+        dirty_bit = asm.GetAttr(val, asm.Literal("dirty_bit"))
+        return FiberTensorFields(val_lvl, pos, dirty_bit)
 
     def asm_repack(self, ctx, lhs, obj):
         """

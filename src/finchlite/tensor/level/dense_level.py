@@ -9,16 +9,11 @@ from ... import finch_notation as ntn
 from ...codegen import NumpyBufferFType
 from ...compile import LoopletContext
 from ...compile import looplets as lplt
-from ..fiber_tensor import FiberTensorFType, Level, LevelFType
+from ..fiber_tensor import FiberTensorFType, FiberTensorFields, Level, LevelFType
 
 
 class DenseLevelFields(NamedTuple):
-    lvl: asm.Variable
-    buf_s: NumpyBufferFType
-    pos: asm.Variable | asm.Literal
-    op: asm.Literal
-    dirty_bit: bool
-
+    lvl: Any
 
 @dataclass(unsafe_hash=True)
 class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
@@ -145,8 +140,8 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         )
 
     def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
-        assert isinstance(stack.obj, DenseLevelFields)
-        tns: DenseLevelFields = stack.obj
+        tns: FiberTensorFields = stack.obj
+        lvl: DenseLevelFields = tns.lvl
         assert isinstance(stack.type, FiberTensorFType)
         ft_ftype: FiberTensorFType = stack.type
 
@@ -160,11 +155,11 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                     asm.Call(
                         asm.Literal(operator.add),
                         (
-                            tns.pos,
+                            pos,
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 (
-                                    asm.GetAttr(tns.lvl, asm.Literal("stride")),
+                                    asm.GetAttr(lvl, asm.Literal("stride")),
                                     asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ),
                             ),
@@ -173,11 +168,11 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 )
             )
             return ntn.Stack(
-                self.lvl_t.get_fields_class(
-                    asm.GetAttr(tns.lvl, asm.Literal("lvl")),
-                    tns.buf_s,
+                FiberTensorFields(
+                    DenseLevelFields(
+                        asm.GetAttr(lvl, asm.Literal("lvl")),
+                    ),
                     pos_2,
-                    tns.op,
                     tns.dirty_bit,
                 ),
                 FiberTensorFType(ft_ftype.lvl_t.next_level()),  # type: ignore[abstract]
