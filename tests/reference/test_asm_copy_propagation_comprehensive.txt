@@ -3,109 +3,113 @@ ENTRY_0: #succs=[compute_2, main_5]
 EXIT_1: #succs=[]
 
 compute_2: #succs=[compute_3]
-    x_0: int64 = x_0
-    y_0: int64 = y_0
-    temp_0: int64 = x_1 	# x_1 = x_0
-    temp_1: int64 = add(temp_2, y_1) 	# temp_2 = x_1, y_1 = y_0
-    return temp_3 	# temp_3 = x_1
+    [0] x: int64 = x
+    [1] y: int64 = y
+    [2] temp: int64 = x 	# x = ('x', 0)
+    [3] temp: int64 = add(temp, y) 	# temp = ('x', 0), y = ('y', 1)
+    [4] return temp
 
 compute_3: #succs=[EXIT_1]
 
 compute_4: #succs=[compute_3]
 
 main_5: #succs=[main_7, main_8]
-    a_0: int64 = 10
-    b_0: int64 = a_1
-    c_0: int64 = b_1 	# b_1 = a_1
-    d_0: int64 = 5
+    [5] a: int64 = 10
+    [6] b: int64 = a
+    [7] c: int64 = b 	# b = ('a', 5)
+    [8] d: int64 = 5
 
 main_6: #succs=[EXIT_1]
 
 main_7: #succs=[main_9]
-    assert(gt(c_1, 5)) 	# c_1 = b_1
-    a_2: int64 = add(a_3, d_1)
-    b_2: int64 = a_4
+    [9] assert(gt(c, 5)) 	# c = ('b', 6)
+    [10] a: int64 = add(a, d)
+    [11] b: int64 = a
 
 main_8: #succs=[main_9]
-    assert(not_(gt(c_1, 5))) 	# c_1 = b_1
+    [12] assert(not_(gt(c, 5))) 	# c = ('b', 6)
 
 main_9: #succs=[main_10, main_11]
-    result_0: int64 = 0
-    j_3_0: int64 = 0
+    [13] result: int64 = 0
+    [14] j_3: int64 = 0
 
 main_10: #succs=[main_12, main_13]
-    assert(lt(j_3_0, 5))
-    i_0: int64 = j_3_0
-    temp_4: int64 = i_1 	# i_1 = j_3_0
-    result_1: int64 = add(result_2, temp_5) 	# temp_5 = i_1
+    [15] assert(lt(j_3, 5))
+    [16] i: int64 = j_3
+    [17] temp: int64 = i
+    [18] result: int64 = add(result, temp) 	# temp = ('i', 16)
 
 main_11: #succs=[main_15, main_16]
-    assert(not_(lt(j_3_0, 5)))
+    [25] assert(not_(lt(j_3, 5)))
 
 main_12: #succs=[main_14]
-    assert(eq(mod(i_2, 2), 0)) 	# i_2 = j_3_0
-    result_3: int64 = mul(result_4, 2)
+    [19] assert(eq(mod(i, 2), 0))
+    [20] assert(eq(mod(i, 2), 0))
+    [21] result: int64 = mul(result, 2)
 
 main_13: #succs=[main_14]
-    assert(not_(eq(mod(i_2, 2), 0))) 	# i_2 = j_3_0
+    [22] assert(not_(eq(mod(i, 2), 0)))
+    [23] assert(not_(eq(mod(i, 2), 0)))
 
 main_14: #succs=[main_10, main_11]
-    j_3_0: int64 = add(j_3_0, 1)
+    [24] j_3: int64 = add(j_3, 1)
 
 main_15: #succs=[main_17]
-    assert(gt(result_5, 20))
-    c_2: int64 = result_6
-    result_7: int64 = add(c_3, b_3) 	# c_3 = result_6
+    [26] assert(gt(result, 20))
+    [27] c: int64 = result
+    [28] result: int64 = add(c, b)
 
 main_16: #succs=[main_17]
-    assert(not_(gt(result_5, 20)))
-    c_4: int64 = b_4
-    result_8: int64 = mul(c_5, 3) 	# c_5 = b_4
+    [29] assert(not_(gt(result, 20)))
+    [30] c: int64 = b
+    [31] result: int64 = mul(c, 3)
 
 main_17: #succs=[main_18, main_19]
-    j_4_0: int64 = 0
+    [32] j_4: int64 = 0
 
 main_18: #succs=[main_20, main_21]
-    assert(lt(j_4_0, 3))
-    i_3: int64 = j_4_0
-    a_5: int64 = i_4 	# i_4 = j_4_0
-    j_5_0: int64 = 0
+    [33] assert(lt(j_4, 3))
+    [34] i: int64 = j_4
+    [35] a: int64 = i
+    [36] j_5: int64 = 0
 
 main_19: #succs=[main_22, main_23]
-    assert(not_(lt(j_4_0, 3)))
-    d_2: int64 = result_11
+    [46] assert(not_(lt(j_4, 3)))
+    [47] d: int64 = result
 
 main_20: #succs=[main_20, main_21]
-    assert(lt(j_5_0, 2))
-    j_0: int64 = j_5_0
-    b_5: int64 = j_1 	# j_1 = j_5_0
-    result_9: int64 = add(result_10, add(a_6, b_6)) 	# b_6 = j_1
-    j_5_0: int64 = add(j_5_0, 1)
+    [37] assert(lt(j_5, 2))
+    [38] assert(lt(j_5, 2))
+    [39] j: int64 = j_5
+    [40] b: int64 = j
+    [41] result: int64 = add(result, add(a, b)) 	# b = ('j', 39)
+    [42] j_5: int64 = add(j_5, 1)
 
 main_21: #succs=[main_18, main_19]
-    assert(not_(lt(j_5_0, 2)))
-    j_4_0: int64 = add(j_4_0, 1)
+    [43] assert(not_(lt(j_5, 2)))
+    [44] assert(not_(lt(j_5, 2)))
+    [45] j_4: int64 = add(j_4, 1)
 
 main_22: #succs=[main_25, main_26]
-    assert(lt(d_3, 100)) 	# d_3 = result_11
-    c_6: int64 = d_4 	# d_4 = result_11
+    [48] assert(lt(d, 100))
+    [49] c: int64 = d
 
 main_23: #succs=[main_24]
-    assert(not_(lt(d_3, 100))) 	# d_3 = result_11
-    result_14: int64 = d_5 	# d_5 = result_11
+    [54] assert(not_(lt(d, 100)))
+    [55] result: int64 = d
 
 main_24: #succs=[main_6]
-    a_7: int64 = result_15
-    b_7: int64 = a_8 	# a_8 = result_15
-    return b_8 	# b_8 = a_8
+    [56] a: int64 = result
+    [57] b: int64 = a
+    [58] return b 	# b = ('a', 56)
 
 main_25: #succs=[main_27]
-    assert(gt(c_7, 50)) 	# c_7 = d_4
-    result_12: int64 = mul(c_8, 2) 	# c_8 = d_4
+    [50] assert(gt(c, 50)) 	# c = ('d', 47)
+    [51] result: int64 = mul(c, 2) 	# c = ('d', 47)
 
 main_26: #succs=[main_27]
-    assert(not_(gt(c_7, 50))) 	# c_7 = d_4
-    result_13: int64 = c_9 	# c_9 = d_4
+    [52] assert(not_(gt(c, 50))) 	# c = ('d', 47)
+    [53] result: int64 = c 	# c = ('d', 47)
 
 main_27: #succs=[main_24]
 
