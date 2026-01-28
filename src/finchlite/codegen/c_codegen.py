@@ -656,6 +656,42 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
+ctype_print_fmt: dict[Any, str] = {
+    ctypes.c_bool: "%u",
+    ctypes.c_char: "%d",
+    ctypes.c_wchar: "%d",
+    ctypes.c_byte: "%d",
+    ctypes.c_ubyte: "%d",
+    ctypes.c_int8: "%d",
+    ctypes.c_int16: "%d",
+    ctypes.c_int32: "%d",
+    ctypes.c_int64: "%ld",
+    ctypes.c_uint8: "%u",
+    ctypes.c_uint16: "%u",
+    ctypes.c_uint32: "%u",
+    ctypes.c_uint64: "%lu",
+    ctypes.c_char_p: "%s",
+    ctypes.c_wchar_p: "%s",
+    # use standard types instead of aliases
+    # ctypes.c_short: "",
+    # ctypes.c_ushort: "",
+    # ctypes.c_int: "",
+    # ctypes.c_uint: "",
+    # ctypes.c_long: "",
+    # ctypes.c_ulong: "",
+    # ctypes.c_longlong: "",
+    # ctypes.c_ulonglong: "",
+    # ctypes.c_size_t: "",
+    # ctypes.c_ssize_t: "",
+    ctypes.c_float: "%f",
+    ctypes.c_double: "%f",
+    # ctypes.c_char_p: "",
+    # ctypes.c_wchar_p: "",
+    # ctypes.c_void_p: "",
+    # ctypes.py_object: "",
+}
+
+
 class CGenerator(CLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = CContext()
@@ -1015,6 +1051,23 @@ class CContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
+                return None
+            case asm.Print(args):
+                self.add_header("#include <stdio.h>")
+                args_value_str = ""
+                fmt_str = ""
+                for arg in args:
+                    if c_type(arg.type) in ctype_print_fmt:
+                        fmt_str = fmt_str + f"{ctype_print_fmt[c_type(arg.type)]},"
+                        args_value_str = args_value_str + f"{self(arg)},"
+                    else:
+                        fmt_str = fmt_str + "%s,"
+                        args_value_str = (
+                            args_value_str + f'"{self.ctype_name(c_type(arg.type))}",'
+                        )
+                fmt_str = fmt_str[:-1]
+                args_value_str = args_value_str[:-1]
+                self.exec(f'{feed}printf("{fmt_str}\\n", {args_value_str});')
                 return None
             case _:
                 raise NotImplementedError(
