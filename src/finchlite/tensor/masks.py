@@ -47,6 +47,12 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
     def lvl_t(self):
         return self.body.lvl_t
 
+    def __call__(self, shape):
+        return LoTriMask(self.lvl_t(shape=shape))
+
+    def from_numpy(self, shape, arr):
+        return LoTriMask(self.lvl_t.from_numpy(shape, arr))
+
     def level_lower_freeze(self, ctx, tns, op, pos):
         return self.body.level_lower_freeze(self, ctx, tns, op, pos)
 
