@@ -5,7 +5,7 @@ from typing import Any
 from ..algebra import return_type
 from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
-from .buffer import element_type, length_type
+from .buffer import length_type
 
 
 class AssemblyNode(Term):
@@ -343,7 +343,7 @@ class Load(AssemblyExpression, AssemblyTree):
     @property
     def result_format(self):
         """Returns the type of the expression."""
-        return element_type(self.buffer.result_format)
+        return self.buffer.result_format.element_type
 
 
 @dataclass(eq=True, frozen=True)
