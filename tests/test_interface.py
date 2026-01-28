@@ -1425,14 +1425,13 @@ def test_flatten(array_shape, expected_shape, wrapper):
 )
 def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
     # construct dense format
-    fmt = finchlite.fiber_tensor(
-        (
-            *[finchlite.dense() for _ in range(arr1.ndim)],
-            finchlite.element(
-                arr1.dtype.type(0), arr1.dtype, np.intp, finchlite.NumpyBufferFType
-            ),
-        )
+    fmt = finchlite.element(
+        arr1.dtype.type(0), arr1.dtype, np.intp, finchlite.NumpyBufferFType
     )
+    for _ in range(arr1.ndim):
+        fmt = finchlite.dense(fmt)
+    fmt = finchlite.fiber_tensor(fmt)
+
     f_arr = finchlite.asarray(arr1, format=fmt)
     tril_arr = finchlite.tril(f_arr)
     f_arr_2 = finchlite.asarray(arr2, format=fmt)

@@ -41,7 +41,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, *, lvl=None, shape=None):
+    def __call__(self, *, shape):
         """
         Creates an instance of DenseLevel with the given ftype.
 
@@ -51,7 +51,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             An instance of DenseLevel.
         """
         lvl = self.lvl_t(shape=shape[1:])
-        return DenseLevel(self, lvl, self.dimension_type(shape[0]))
+        return DenseLevel(lvl, self.dimension_type(shape[0]))
 
     def from_numpy(self, shape, val):
         """
