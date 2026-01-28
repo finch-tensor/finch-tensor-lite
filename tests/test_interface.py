@@ -84,15 +84,15 @@ class TestEagerTensorFType(finchlite.TensorFType):
 
     @property
     def fill_value(self):
-        return finchlite.fill_value(self.fmt)
+        return self.fmt.fill_value
 
     @property
     def element_type(self):
-        return finchlite.element_type(self.fmt)
+        return self.fmt.element_type
 
     @property
     def shape_type(self):
-        return finchlite.shape_type(self.fmt)
+        return self.fmt.shape_type
 
 
 class TestEagerTensor(finchlite.EagerTensor):
@@ -122,6 +122,18 @@ class TestEagerTensor(finchlite.EagerTensor):
     @property
     def ftype(self):
         return TestEagerTensorFType(finchlite.ftype(self.array))
+
+    @property
+    def fill_value(self):
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self):
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self):
+        return self.ftype.shape_type
 
     def to_numpy(self):
         return self.array

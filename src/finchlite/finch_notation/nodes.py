@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, return_type
+from ..algebra import return_type
 from ..finch_assembly import AssemblyNode
 from ..symbolic import Context, FType, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
@@ -181,7 +181,7 @@ class AccessFType(FType):
         """
         Returns the element type of the access ftype.
         """
-        return element_type(self.obj)
+        return self.obj.element_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -295,7 +295,7 @@ class Unwrap(NotationTree, NotationExpression):
         """
         Returns the type of the unwrapped value.
         """
-        return element_type(self.arg.result_format)
+        return self.arg.result_format.element_type
 
 
 @dataclass(eq=True, frozen=True)

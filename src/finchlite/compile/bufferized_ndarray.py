@@ -66,6 +66,21 @@ class BufferizedNDArray(Tensor):
     def ndim(self):
         return np.intp(len(self._shape))
 
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
     def declare(self, init, op, shape):
         """
         Declare a bufferized NDArray with the given initialization value,
@@ -321,6 +336,21 @@ class BufferizedNDArrayAccessor(Tensor):
     @property
     def shape(self):
         return self.tns.shape[self.nind :]
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def access(self, indices, op):
         if len(indices) + self.nind > self.tns.ndim:

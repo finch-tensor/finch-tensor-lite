@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from ..symbolic import FType, FTyped, ftype
+from ..symbolic import FType, FTyped
 
 
 class TensorFType(FType, ABC):
@@ -77,65 +77,3 @@ class Tensor(FTyped, ABC):
     def shape(self) -> tuple:
         """Shape of the tensor."""
         ...
-
-
-def fill_value(arg: Any) -> Any:
-    """The fill value for the given argument.  The fill value is the
-    default value for a tensor when it is created with a given shape and dtype,
-    as well as the background value for sparse tensors.
-
-    Args:
-        arg: The argument to determine the fill value for.
-
-    Returns:
-        The fill value for the given argument.
-
-    Raises:
-        AttributeError: If the fill value is not implemented for the given type.
-    """
-    if isinstance(arg, TensorFType):
-        return arg.fill_value
-    if isinstance(arg, Tensor):
-        return arg.ftype.fill_value
-    raise AttributeError(f"Expected Tensor or TensorFType, instead got {type(arg)}")
-
-
-def element_type(arg: Any):
-    """The element type of the given argument.  The element type is the scalar type of
-    the elements in a tensor, which may be different from the data type of the
-    tensor.
-
-    Args:
-        arg: The tensor to determine the element type for.
-
-    Returns:
-        The element type of the given tensor.
-
-    Raises:
-        AttributeError: If the element type is not implemented for the given type.
-    """
-    if isinstance(arg, TensorFType):
-        return arg.element_type
-    if isinstance(arg, Tensor):
-        return arg.ftype.element_type
-    raise AttributeError(f"Expected Tensor or TensorFType, instead got {type(arg)}")
-
-
-def shape_type(arg: Any) -> tuple:
-    """The shape type of the given argument. The shape type is a tuple holding
-    the type of each value returned by arg.shape.
-
-    Args:
-        arg: The object to determine the shape type for.
-
-    Returns:
-        The shape type of the given object.
-
-    Raises:
-        AttributeError: If the shape type is not implemented for the given type.
-    """
-    if isinstance(arg, TensorFType):
-        return arg.shape_type
-    if isinstance(arg, Tensor):
-        return arg.ftype.shape_type
-    raise AttributeError(f"Expected Tensor or TensorFType, instead got {type(arg)}")
