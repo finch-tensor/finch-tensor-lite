@@ -1,11 +1,12 @@
 import operator
-from typing import Any, NamedTuple
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor
+from ..algebra import InitWrite, Tensor, overwrite
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import fisinstance, ftype
@@ -118,10 +119,12 @@ class BufferizedNDArray(Tensor):
         return f"BufferizedNDArray(shape={self.shape})"
 
 
-class BufferizedNDArrayFields(NamedTuple):
+@dataclass(unsafe_hash=True)
+class BufferizedNDArrayFields:
     stride: tuple[asm.Variable, ...]
     buf: asm.Variable
     buf_s: asm.Slot
+    dirty_bit: bool
 
 
 class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
@@ -240,7 +243,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             asm.Literal(f"element_{r}"),
         )
 
-    def lower_declare(self, ctx, tns, init, op, shape):
+    def lower_declare(self, ctx, tns: ntn.Stack, init, op, shape):
         i_var = asm.Variable("i", self.buf_t.length_type)
         body = asm.Store(
             tns.obj.buf_s,
@@ -250,6 +253,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ctx.exec(
             asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns.obj.buf_s), body)
         )
+        tns.obj.dirty_bit = True
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -290,7 +294,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf_t)
         ctx.exec(asm.Unpack(buf_s, buf))
 
-        return BufferizedNDArrayFields(tuple(stride), val, buf_s)
+        return BufferizedNDArrayFields(tuple(stride), val, buf_s, dirty_bit=False)
 
     def asm_repack(self, ctx, lhs, obj):
         """
@@ -364,7 +368,8 @@ class BufferizedNDArrayAccessor(Tensor):
         return self
 
 
-class BufferizedNDArrayAccessorFields(NamedTuple):
+@dataclass(eq=True, frozen=True)
+class BufferizedNDArrayAccessorFields:
     tns: BufferizedNDArrayFields
     nind: int
     pos: asm.AssemblyNode
@@ -465,40 +470,39 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def lower_unwrap(self, ctx, tns):
         return asm.Load(tns.obj.tns.buf_s, tns.obj.pos)
 
-    def lower_increment(self, ctx, tns, val):
+    def lower_increment(self, ctx, tns: ntn.Stack, val):
         obj = tns.obj
         lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
-        ctx.exec(
-            asm.Store(
-                obj.tns.buf_s,
-                lowered_pos,
-                asm.Call(
-                    asm.Literal(self.op.val),
-                    [asm.Load(obj.tns.buf_s, lowered_pos), val],
-                ),
-            )
+        increment_call = asm.Call(
+            asm.Literal(self.op.val),
+            (asm.Load(obj.tns.buf_s, lowered_pos), val),
         )
+        if obj.tns.dirty_bit and self.op.val is overwrite:
+            increment_call = asm.Call(
+                asm.Literal(InitWrite(tns.type.fill_value)),
+                (asm.Load(obj.tns.buf_s, lowered_pos), increment_call),
+            )
+
+        ctx.exec(asm.Store(obj.tns.buf_s, lowered_pos, increment_call))
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         def child_accessor(ctx, idx):
-            pos_2 = asm.Variable(
-                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.pos
-            )
+            pos_2 = asm.Variable(ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.pos)
             ctx.exec(
                 asm.Assign(
                     pos_2,
                     asm.Call(
                         asm.Literal(operator.add),
-                        [
+                        (
                             tns.obj.pos,
                             asm.Call(
                                 asm.Literal(operator.mul),
-                                [
+                                (
                                     tns.obj.tns.stride[self.nind],
-                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
-                                ],
+                                    asm.Variable(idx.name, idx.type),
+                                ),
                             ),
-                        ],
+                        ),
                     ),
                 )
             )

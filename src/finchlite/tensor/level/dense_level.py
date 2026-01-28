@@ -41,7 +41,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, *, lvl=None, shape=None):
+    def __call__(self, *, shape):
         """
         Creates an instance of DenseLevel with the given ftype.
 
@@ -51,7 +51,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             An instance of DenseLevel.
         """
         lvl = self.lvl_t(shape=shape[1:])
-        return DenseLevel(self, lvl, self.dimension_type(shape[0]))
+        return DenseLevel(lvl, self.dimension_type(shape[0]))
 
     def from_numpy(self, shape, val):
         """
@@ -152,7 +152,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
 
         def child_accessor(ctx: LoopletContext, idx):
             pos_2 = asm.Variable(
-                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.position_type
+                ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(
                 asm.Assign(
@@ -165,7 +165,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                                 asm.Literal(operator.mul),
                                 (
                                     asm.GetAttr(tns.lvl, asm.Literal("stride")),
-                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
+                                    asm.Variable(idx.name, idx.type),
                                 ),
                             ),
                         ),
