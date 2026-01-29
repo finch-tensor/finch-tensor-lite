@@ -87,11 +87,7 @@ class StatsMachine:
                 op = node.op.val
                 init = node.init.val if isinstance(node.init, Literal) else None
                 arg = self(node.arg)
-                reduce_indices = list(
-                    dict.fromkeys(
-                        [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
-                    )
-                )
+                reduce_indices = [idx.name for idx in node.idxs]
                 return self.ST.aggregate(op, init, reduce_indices, arg)
 
             case Reorder():
@@ -140,8 +136,8 @@ def calculate_estimated_error(node : LogicNode, StatsImpl : TensorStats,
             if est_nnz == 0.0 :
                 rel_err = 0.0
             else :
-                #rel_err = float('inf')
-                raise ValueError(f"Estimator produced {est_nnz} nnz when there are 0 nnz in the output")
+                rel_err = float('inf')
+               
         else :
            rel_err = (abs(actual_nnz-est_nnz)/actual_nnz)
     
