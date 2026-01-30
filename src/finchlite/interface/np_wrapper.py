@@ -34,6 +34,9 @@ class NumPyFType(TensorFType):
     def __hash__(self):
         return hash((self._dtype, self._ndim))
 
+    def from_numpy(self, arr: np.ndarray) -> "NumPyWrapper":
+        return NumPyWrapper(arr)
+
 
 class NumPyWrapper(Tensor):
     def __init__(self, data: np.ndarray):
