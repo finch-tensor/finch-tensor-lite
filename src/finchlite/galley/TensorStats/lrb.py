@@ -23,6 +23,7 @@ class RegionNNZ:
     width: int
     nonempty_counts: np.ndarray
     max_region_nnz: np.ndarray
+    sum_region_nnz: np.ndarray
 
 
 def compute_axis_region_nnz(
@@ -139,12 +140,14 @@ def nnz_to_regions(axis: str, nnz: np.ndarray, regions: int) -> RegionNNZ:
 
     nonempty = np.zeros(regions, dtype=np.int64)
     max_regions = np.zeros(regions, dtype=np.int64)
+    sum_regions = np.zeros(regions, dtype=np.int64)
 
     for idx in range(nnz.shape[0]):
+        rid = idx // width
+        sum_regions[rid] += nnz[idx]
+
         if nnz[idx] <= 0:
             continue
-
-        rid = idx // width
 
         nonempty[rid] += 1
         if nnz[idx] > max_regions[rid]:
@@ -156,6 +159,7 @@ def nnz_to_regions(axis: str, nnz: np.ndarray, regions: int) -> RegionNNZ:
         width=width,
         nonempty_counts=nonempty,
         max_region_nnz=max_regions,
+        sum_region_nnz=sum_regions,
     )
 
 
@@ -206,13 +210,15 @@ def lrb_matmul_stats(
 
     total = 0.0
     for r in range(regions):
-        jr = max(regA.nonempty_counts[r], regB.nonempty_counts[r])
         amax = regA.max_region_nnz[r]
         bmax = regB.max_region_nnz[r]
+        nnzA_r = regA.sum_region_nnz[r]
+        nnzB_r = regB.sum_region_nnz[r]
 
-        if jr == 0.0 or amax == 0.0 or bmax == 0.0:
+        if amax == 0 or bmax == 0 or nnzA_r == 0 or nnzB_r == 0:
             continue
-        total += jr * amax * bmax
+
+        total += min(nnzA_r * bmax, amax * nnzB_r)
 
     total = min(total, i_size * k_size)
 
