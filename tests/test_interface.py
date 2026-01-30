@@ -82,6 +82,9 @@ class TestEagerTensorFType(finchlite.TensorFType):
             np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
         )
 
+    def from_numpy(self, arr):
+        return TestEagerTensor(arr)
+
     @property
     def fill_value(self):
         return finchlite.fill_value(self.fmt)
