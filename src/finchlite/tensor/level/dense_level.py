@@ -24,7 +24,6 @@ class DenseLevelFields(NamedTuple):
 class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     lvl_t: LevelFType
     dimension_type: Any = None
-    op: Any = None
 
     @property
     def struct_name(self):
@@ -53,6 +52,19 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         """
         lvl = self.lvl_t(shape=shape[1:])
         return DenseLevel(self, lvl, self.dimension_type(shape[0]))
+
+    def from_numpy(self, shape, val):
+        """
+        Creates an instance of DenseLevel with the given shape.
+
+        Args:
+            shape: The shape to be used for the level.
+            val: Value to pass to ElementLevel.
+        Returns:
+            An instance of DenseLevel.
+        """
+        lvl = self.lvl_t.from_numpy(shape[1:], val)
+        return DenseLevel(lvl, self.dimension_type(shape[0]))
 
     def __str__(self):
         return f"DenseLevelFType({self.lvl_t})"
@@ -177,8 +189,8 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             )
         )
 
-    def from_fields(self, lvl, dimension, pos) -> "DenseLevel":
-        return DenseLevel(_format=self, lvl=lvl, dimension=dimension)
+    def from_fields(self, lvl, dimension) -> "DenseLevel":
+        return DenseLevel(lvl=lvl, dimension=dimension)
 
 
 def dense(lvl, dimension_type=None):
@@ -191,9 +203,8 @@ class DenseLevel(Level):
     A class representing dense level.
     """
 
-    _format: DenseLevelFType
     lvl: Level
-    dimension: np.intp
+    dimension: np.integer
 
     @property
     def shape(self) -> tuple:
@@ -208,8 +219,13 @@ class DenseLevel(Level):
 
     @property
     def ftype(self) -> DenseLevelFType:
-        return self._format
+        # mypy does not understand that dataclasses generate __hash__ and __eq__
+        # https://github.com/python/mypy/issues/19799
+        return DenseLevelFType(self.lvl.ftype, type(self.dimension))  # type: ignore[abstract]
 
     @property
     def val(self) -> Any:
         return self.lvl.val
+
+    def __str__(self):
+        return f"DenseLevel(lvl={self.lvl}, dim={self.dimension})"

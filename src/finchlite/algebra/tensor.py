@@ -36,19 +36,19 @@ class TensorFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(
-        self, shape: tuple
-    ) -> Tensor:  # TODO in the future should return Tensor
+    def __call__(self, shape: tuple) -> Tensor:
         """
         Create a tensor instance with the given shape.
 
         Args:
             shape: The shape of the tensor to create.
-
         Returns:
             A tensor instance with the specified shape.
         """
         ...
+
+    @abstractmethod
+    def from_numpy(self, arr: np.ndarray) -> Tensor: ...
 
 
 class Tensor(FTyped, ABC):

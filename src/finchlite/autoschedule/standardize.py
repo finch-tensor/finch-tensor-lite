@@ -111,7 +111,9 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     return Rewrite(PostWalk(rule))(root)
 
 
-def concordize(root: LogicStatement) -> LogicStatement:
+def concordize(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
 
@@ -132,18 +134,18 @@ def concordize(root: LogicStatement) -> LogicStatement:
                     )
                 return None
 
+    def _get_swizzle_queries(lhs: Alias) -> tuple[Query, ...]:
+        ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
+        idxs = tuple([Field(f"i_{i}") for i in range(ndims)])
+        return tuple(
+            Query(alias, Reorder(Table(lhs, idxs), tuple(idxs[p] for p in perm)))
+            for perm, alias in needed_swizzles[lhs].items()
+        )
+
     def rule_1(ex):
         match ex:
             case Query(lhs, _) as q if lhs in needed_swizzles:
-                ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
-                idxs = tuple([Field(f"i_{i}") for i in range(ndims)])
-                swizzle_queries = tuple(
-                    Query(
-                        alias, Reorder(Table(lhs, idxs), tuple(idxs[p] for p in perm))
-                    )
-                    for perm, alias in needed_swizzles[lhs].items()
-                )
-
+                swizzle_queries = _get_swizzle_queries(lhs)
                 return Plan((q, *swizzle_queries))
 
     root = flatten_plans(root)
@@ -152,6 +154,11 @@ def concordize(root: LogicStatement) -> LogicStatement:
             root = Plan(tuple(bodies))
             root = Rewrite(PostWalk(rule_0))(root)
             root = Rewrite(PostWalk(rule_1))(root)
+            # Consider also aliases from input arguments.
+            for alias in bindings:
+                if alias in needed_swizzles:
+                    swizzle_queries = _get_swizzle_queries(alias)
+                    root = Plan((*swizzle_queries, root))
             return flatten_plans(Plan((root, prod)))
         case _:
             raise Exception(f"Invalid root: {root}")
@@ -163,9 +170,7 @@ def push_fields(root: LogicExpression) -> LogicExpression: ...
 def push_fields(root: LogicStatement) -> LogicStatement: ...
 @overload
 def push_fields(root: LogicNode) -> LogicNode: ...
-
-
-def push_fields(root: LogicNode) -> LogicNode:
+def push_fields(root):
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
@@ -292,7 +297,7 @@ def standardize(
     prgm = push_fields(prgm)
     prgm = drop_reorders(prgm)
     prgm = drop_with_aggregation(prgm)
-    prgm = concordize(prgm)
+    prgm = concordize(prgm, bindings)
     prgm = drop_reorders(prgm)
     prgm = flatten_plans(prgm)
     return normalize_names(prgm, bindings)

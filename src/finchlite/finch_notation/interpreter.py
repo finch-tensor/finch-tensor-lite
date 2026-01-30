@@ -245,7 +245,7 @@ class NotationInterpreterKernel(asm.AssemblyKernel):
         self.func = ntn.Variable(func_n, ret_t)
 
     def __call__(self, *args):
-        args_i = (ntn.Literal(arg) for arg in args)
+        args_i = tuple(ntn.Literal(arg) for arg in args)
         return self.ctx(ntn.Call(self.func, args_i))
 
 
