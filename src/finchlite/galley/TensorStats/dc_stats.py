@@ -42,7 +42,7 @@ class DCStats(TensorStats):
     number of non-fill values without materializing sparse coordinates.
     """
 
-    def __init__(self, tensor: Any, fields: Iterable[str]):
+    def __init__(self, tensor: Any, fields: tuple[str,...]):
         """
         Initialize DCStats from a tensor and its axis names, build the TensorDef,
         and compute degree constraint (DC) records from the tensor’s structure.
@@ -1503,7 +1503,7 @@ class DCStats(TensorStats):
     def aggregate(
         op: Callable[..., Any],
         init: Any | None,
-        reduce_indices: Iterable[str],
+        reduce_indices: tuple[str, ...],
         stats: "TensorStats",
     ) -> "TensorStats":
         """
@@ -1519,7 +1519,7 @@ class DCStats(TensorStats):
             DCStats: Statistics with a reduced TensorDef (over `reduce_indices`) and the
             same DC set carried over from the input.
         """
-        fields = list(reduce_indices)
+        fields = reduce_indices
         if len(fields) == 0:
             new_def = stats.tensordef.copy()
         else:

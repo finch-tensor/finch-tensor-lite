@@ -55,11 +55,7 @@ def insert_statistics(
             op = node.op.val
             init = node.init.val if isinstance(node.init, Literal) else None
             arg = insert_statistics(ST, node.arg, bindings, replace, cache)
-            reduce_indices = list(
-                dict.fromkeys(
-                    [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
-                )
-            )
+            reduce_indices = [idx.name for idx in node.idxs]
             st = ST.aggregate(op, init, reduce_indices, arg)
             cache[node] = st
             return st
@@ -87,7 +83,7 @@ def insert_statistics(
             return cache[node]
         
         case Plan():
-            last_result = None 
+            last_result = () 
             for body in node.bodies:
                 last_result = insert_statistics(ST,body,bindings,replace,cache)
             return last_result

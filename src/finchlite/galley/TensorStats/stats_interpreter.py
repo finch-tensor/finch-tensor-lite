@@ -42,16 +42,14 @@ class StatsMachine:
             print(f"Evaluating: {node}")
         match node :
             case Plan():
-                last_result = None 
+                last_result = ()
                 for body in node.bodies :
                     last_result = self(body)
                 return last_result
             
             case Query():
                 rhs_stats = self(node.rhs)
-
-                if isinstance(node.lhs,Alias):
-                    self.bindings[node.lhs] = rhs_stats
+                self.bindings[node.lhs] = rhs_stats
                 return rhs_stats
             
             case Alias():

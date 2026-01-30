@@ -59,7 +59,7 @@ class TensorDef:
         Return
             :TensorDef with a new reindexed index_order and dim sizes
         """
-        new_axis = list(new_axis)
+
         new_dim_sizes = OrderedDict((axis, self.dim_sizes[axis]) for axis in new_axis)
         return TensorDef(
             index_order=new_axis,
@@ -124,7 +124,7 @@ class TensorDef:
     def fill_value(self, value: Any):
         self._fill_value = value
 
-    def get_dim_space_size(self, idx:tuple[str, ...]) -> float:
+    def get_dim_space_size(self, idx:Iterable[str]) -> float:
         prod = 1
         for i in idx:
             prod *= int(self.dim_sizes[i])
