@@ -104,16 +104,17 @@ class PointwiseEinsumMachine:
         self.bindings = bindings
         self.loops = loops
         self.verbose = verbose
+        self.loop_sizes = dict()
+        self.expected_size = []
 
     def map_idxs(self, idxs_to_map: tuple[ein.Index, ...], tns_shape: tuple[int, ...]):
         assert self.loops is not None
 
         def map_individual(individual_idx: ein.EinsumExpression, dim_idx: int):
-            if isinstance(individual_idx, ein.Index):
-                shape = [-1 if individual_idx == other_idx else 1 for other_idx in self.loops]
-                return [self.xp.arange(tns_shape[dim_idx]).reshape(shape)]
-
+            self.expected_size.append(tns_shape[dim_idx])
             individual_evaled = self(individual_idx)
+            self.expected_size.pop()
+
             if len(individual_evaled.shape) == 1 + len(self.loops):
                 return [individual_evaled[i] for i in range(individual_evaled.shape[0])]
 
@@ -171,6 +172,12 @@ class PointwiseEinsumMachine:
 
                 target_shape = [tns.shape[1]] + target_shape
                 return xp.reshape(xp.transpose(tns), target_shape)
+            case ein.Index(_):
+                shape = [-1 if node == other_idx else 1 for other_idx in self.loops]
+                if node in self.loop_sizes:
+                    assert self.loop_sizes[node] == self.expected_size[-1]
+                self.loop_sizes[node] = self.expected_size[-1]
+                return self.xp.arange(self.expected_size[-1]).reshape(shape)
             case ein.Access(tns, idxs) if any(
                 not isinstance(idx, ein.Index) for idx in idxs
             ):
@@ -185,6 +192,10 @@ class PointwiseEinsumMachine:
                 assert self.loops is not None
 
                 tns = self(tns)
+                assert len(idxs) == len(tns.shape)
+                for i, idx in enumerate(idxs):
+                    self.loop_sizes[idx] = tns.shape[i]
+
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
                 if hasattr(tns, "ndim") and len(perm) < tns.ndim:
                     perm += list(range(len(perm), tns.ndim))
