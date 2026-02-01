@@ -15,23 +15,24 @@ from .conftest import finch_assert_allclose
 
 @pytest.fixture(autouse=True)
 def use_numpy_einsum_interpreter(monkeypatch):
-    #Temporary fixture: patch finchlite.einop/einsum to use numpy-based interpreter directly.
-    
+    # Temporary fixture: patch finchlite.einop/einsum to use numpy-based interpreter directly.
+
     def patched_einop(prgm, **kwargs):
         stmt = ein.parse_einop(prgm)
         prgm_obj = ein.Plan((stmt, ein.Produces((stmt.tns,))))
         ctx = ein.EinsumInterpreter(xp=np)  # Use numpy instead of lazy module
         bindings = {ein.Alias(k): v for k, v in kwargs.items()}
         return ctx(prgm_obj, bindings)[0]
-    
+
     def patched_einsum(subscripts, *args, **kwargs):
         stmt, bindings = ein.parse_einsum(subscripts, *args)
         prgm_obj = ein.Plan((stmt, ein.Produces((stmt.tns,))))
         ctx = ein.EinsumInterpreter(xp=np)  # Use numpy instead of lazy module
         return ctx(prgm_obj, bindings)[0]
-    
+
     monkeypatch.setattr(finchlite, "einop", patched_einop)
     monkeypatch.setattr(finchlite, "einsum", patched_einsum)
+
 
 @pytest.fixture
 def rng():
@@ -2600,45 +2601,47 @@ class TestEinsumIndirectAccess:
         A = rng.random((6,))
         C = rng.random((4,))
 
-        prgm = ein.Plan((
-            ein.Einsum(
-                op=ein.Literal(overwrite),
-                tns=ein.Alias("Result"),
-                idxs=(ein.Index("i"), ein.Index("j")),
-                arg=ein.Call(
-                    op=ein.Literal(operator.mul),
-                    args=(
-                        ein.Access(
-                            tns=ein.Alias("A"),
-                            idxs=(
-                                ein.Access(
-                                    tns=ein.GetAttr(
-                                        obj=ein.Alias("B"),
-                                        attr=ein.Literal("coords"),
-                                        dim=None,
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(
+                            ein.Access(
+                                tns=ein.Alias("A"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("B"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("i"),),
                                     ),
-                                    idxs=(ein.Index("i"),),
                                 ),
                             ),
-                        ),
-                        ein.Access(
-                            tns=ein.Alias("C"),
-                            idxs=(
-                                ein.Access(
-                                    tns=ein.GetAttr(
-                                        obj=ein.Alias("D"),
-                                        attr=ein.Literal("coords"),
-                                        dim=None,
+                            ein.Access(
+                                tns=ein.Alias("C"),
+                                idxs=(
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("D"),
+                                            attr=ein.Literal("coords"),
+                                            dim=None,
+                                        ),
+                                        idxs=(ein.Index("j"),),
                                     ),
-                                    idxs=(ein.Index("j"),),
                                 ),
                             ),
                         ),
                     ),
                 ),
-            ),
-            ein.Produces((ein.Alias("Result"),)),
-        ))
+                ein.Produces((ein.Alias("Result"),)),
+            )
+        )
 
         b_coords = sparse_B.coords.flatten()
         d_coords = sparse_D.coords.flatten()
@@ -2910,7 +2913,6 @@ class TestEinsumIndirectAccess:
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
         )
 
-
     def test_bare_indices(self, rng):
         """
         Test einsum with bare indices
@@ -2919,23 +2921,41 @@ class TestEinsumIndirectAccess:
         A = rng.random((10,))
         B = rng.random((10,))
 
-        prgm = ein.Plan((
-            ein.Einsum(
-                op=ein.Literal(overwrite),
-                tns=ein.Alias("Result"),
-                idxs=(ein.Index("i"), ein.Index("j")),
-                arg=ein.Call(op=ein.Literal(operator.add), args=(
-                    ein.Call(
-                        op=ein.Literal(operator.mul),
-                        args=(ein.Access(tns=ein.Alias("A"), idxs=(ein.Index("i"),)), ein.Access(tns=ein.Alias("B"), idxs=(ein.Index("j"),)),),
-                    ), 
-                    ein.Call(op=ein.Literal(operator.add), args=(ein.Index("i"), ein.Index("j"),)),
-                ),),
-            ),
-            ein.Produces((ein.Alias("Result"),)),
-        ))
-
-        expected = np.outer(A, B) + (np.arange(10).reshape(-1, 1) + np.arange(10).reshape(1, -1))
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): A, ein.Alias("B"): B}, expected
+        prgm = ein.Plan(
+            (
+                ein.Einsum(
+                    op=ein.Literal(overwrite),
+                    tns=ein.Alias("Result"),
+                    idxs=(ein.Index("i"), ein.Index("j")),
+                    arg=ein.Call(
+                        op=ein.Literal(operator.add),
+                        args=(
+                            ein.Call(
+                                op=ein.Literal(operator.mul),
+                                args=(
+                                    ein.Access(
+                                        tns=ein.Alias("A"), idxs=(ein.Index("i"),)
+                                    ),
+                                    ein.Access(
+                                        tns=ein.Alias("B"), idxs=(ein.Index("j"),)
+                                    ),
+                                ),
+                            ),
+                            ein.Call(
+                                op=ein.Literal(operator.add),
+                                args=(
+                                    ein.Index("i"),
+                                    ein.Index("j"),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                ein.Produces((ein.Alias("Result"),)),
+            )
         )
+
+        expected = np.outer(A, B) + (
+            np.arange(10).reshape(-1, 1) + np.arange(10).reshape(1, -1)
+        )
+        self.run_einsum_plan(prgm, {ein.Alias("A"): A, ein.Alias("B"): B}, expected)

@@ -1,4 +1,3 @@
-import enum
 import operator
 
 import numpy as np
@@ -13,7 +12,6 @@ from finchlite.finch_einsum.stages import (
 from finchlite.symbolic.ftype import fisinstance
 
 from ..algebra import overwrite, promote_max, promote_min
-from ..symbolic import ftype
 from . import nodes as ein
 
 nary_ops = {
@@ -124,17 +122,12 @@ class PointwiseEinsumMachine:
         idx_tns = []
         for idx in idxs_to_map:
             idx_tns.extend(map_individual(idx, len(idx_tns)))
-        
+
         assert len(idx_tns) == len(tns_shape)
 
         return tuple(idx_tns)
 
     def __call__(self, node):
-        from ..tensor import (
-            SparseTensor,
-            SparseTensorFType,
-        )
-
         xp = self.xp
         match node:
             case ein.Literal(val):
@@ -161,14 +154,15 @@ class PointwiseEinsumMachine:
                 return func(*vals)
 
             # access a tensor with an one index but multiple dimensions (really only needed for .coord subtensor)
-            case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(idxs[0], ein.Index):
+            case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(
+                idxs[0], ein.Index
+            ):
                 assert self.loops is not None
                 tns = self(tns)
                 self.loop_sizes[idxs[0]] = tns.shape[0]
 
                 target_shape = [
-                    -1 if idxs[0] == other_idx else 1 
-                    for other_idx in self.loops
+                    -1 if idxs[0] == other_idx else 1 for other_idx in self.loops
                 ]
                 if tns.ndim == 1:
                     return tns.reshape(target_shape)
@@ -178,7 +172,11 @@ class PointwiseEinsumMachine:
                 return xp.reshape(xp.transpose(tns), target_shape)
             case ein.Index(_):
                 shape = [-1 if node == other_idx else 1 for other_idx in self.loops]
-                size = self.loop_sizes[node] if node in self.loop_sizes else self.expected_size[-1]
+                size = (
+                    self.loop_sizes[node]
+                    if node in self.loop_sizes
+                    else self.expected_size[-1]
+                )
                 return self.xp.arange(size).reshape(shape)
             case ein.Access(tns, idxs) if any(
                 not isinstance(idx, ein.Index) for idx in idxs

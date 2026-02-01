@@ -39,7 +39,6 @@ class SparseTensorFType(TensorFType):
         coords: np.typing.NDArray = np.empty((0, len(shape)), dtype=np.intp)
         return SparseTensor(data, coords, shape, self._element_type)
 
-    
     # converts an eager tensor to a sparse tensor
     @classmethod
     def from_numpy(cls, dense_tensor: np.ndarray):
