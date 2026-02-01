@@ -1860,7 +1860,7 @@ class TestEinsumIndirectAccess:
         )
 
         c_coords = sparse_C.coords.flatten()
-        c_elems = sparse_C.data
+        c_elems = sparse_C.elems
         expected = A[B[c_coords]] * c_elems
 
         self.run_einsum_plan(
@@ -1918,7 +1918,7 @@ class TestEinsumIndirectAccess:
         )
 
         b_coords = sparse_B.coords.flatten()
-        b_elems = sparse_B.data
+        b_elems = sparse_B.elems
         expected = A[b_coords, :] + b_elems[:, np.newaxis]
         self.run_einsum_plan(
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
@@ -2109,7 +2109,7 @@ class TestEinsumIndirectAccess:
         )
 
         b_coords = sparse_B.coords.flatten()
-        b_elems = sparse_B.data
+        b_elems = sparse_B.elems
         expected = A[b_coords, np.arange(len(b_coords))] * b_elems
         self.run_einsum_plan(
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
@@ -2659,7 +2659,7 @@ class TestEinsumIndirectAccess:
         n = 7
         B_coords = np.arange(n - 1, -1, -1).reshape(-1, 1)
         B_data = rng.random(n)
-        sparse_B = SparseTensor(data=B_data, coords=B_coords, shape=(n,))
+        sparse_B = SparseTensor(elems=B_data, coords=B_coords, shape=(n,))
 
         A = rng.random((n,))
 
@@ -2812,7 +2812,7 @@ class TestEinsumIndirectAccess:
         n = 100
         B_coords = np.array([[n - 1]])
         B_data = rng.random(1)
-        sparse_B = SparseTensor(data=B_data, coords=B_coords, shape=(n,))
+        sparse_B = SparseTensor(elems=B_data, coords=B_coords, shape=(n,))
 
         A = rng.random((n, 3))
 
@@ -2904,7 +2904,7 @@ class TestEinsumIndirectAccess:
         )
 
         b_coords = sparse_B.coords.flatten()
-        b_elems = sparse_B.data
+        b_elems = sparse_B.elems
         expected = np.max(b_elems * A[b_coords])
         self.run_einsum_plan(
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected

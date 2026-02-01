@@ -55,16 +55,16 @@ class SparseTensorFType(TensorFType):
 class SparseTensor(EagerTensor):
     def __init__(
         self,
-        data: np.typing.NDArray,
+        elems: np.typing.NDArray,
         coords: np.typing.NDArray,
         shape: tuple,
         element_type=np.float64,
     ):
-        if data.shape[0] != coords.shape[0]:
+        if elems.shape[0] != coords.shape[0]:
             raise ValueError("data and coords must have the same number of rows")
 
         self.coords = coords
-        self.data = data
+        self.elems = elems
         self._shape = shape
         self._element_type = element_type
 
@@ -100,17 +100,17 @@ class SparseTensor(EagerTensor):
         matching_indices = np.where(mask)[0]
 
         if len(matching_indices) > 0:
-            return self.data[matching_indices[0]]
+            return self.elems[matching_indices[0]]
         return 0
 
     def __str__(self):
         return (
-            f"SparseTensor(data={self.data}, coords={self.coords},"
+            f"SparseTensor(data={self.elems}, coords={self.coords},"
             f" shape={self.shape}, element_type={self._element_type})"
         )
 
     def to_dense(self) -> np.ndarray:
         dense_tensor = np.zeros(self.shape, dtype=self._element_type)
         for i in range(self.coords.shape[0]):
-            dense_tensor[tuple(self.coords[i])] = self.data[i]
+            dense_tensor[tuple(self.coords[i])] = self.elems[i]
         return dense_tensor

@@ -207,28 +207,14 @@ class PointwiseEinsumMachine:
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
-            # get non-zero elements/data array of a sparse tensor
-            case ein.GetAttr(obj, ein.Literal("elems"), _):
+            case ein.GetAttr(obj, ein.Literal(attr), dim):
                 obj = self(obj)
-                assert isinstance(obj, SparseTensor)
-                return obj.data
-            # get coord array of a sparse tensor
-            case ein.GetAttr(obj, ein.Literal("coords"), dim):
-                obj = self(obj)
-                assert isinstance(ftype(obj), SparseTensorFType)
-                assert isinstance(obj, SparseTensor)
-
-                # return the coord array for the given dimension or all dimensions
-                return obj.coords if dim is None else obj.coords[:, dim].flat
-            # gets the shape of a sparse tensor at a given dimension
-            case ein.GetAttr(obj, ein.Literal("shape"), dim):
-                obj = self(obj)
-                assert isinstance(ftype(obj), SparseTensorFType)
-                assert isinstance(obj, SparseTensor)
-                assert dim is not None
-
-                # return the shape for the given dimension
-                return obj.shape[dim]
+                if not hasattr(obj, attr):
+                    raise ValueError(f"Object {obj} has no attribute {attr}")
+                val = getattr(obj, attr)
+                if dim is not None:
+                    val = val[:, dim].flat
+                return val
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
 
