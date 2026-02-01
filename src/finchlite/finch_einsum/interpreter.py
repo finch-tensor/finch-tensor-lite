@@ -154,6 +154,10 @@ class PointwiseEinsumMachine:
                 else:
                     func = getattr(xp, nary_ops[func])
                 vals = [self(arg) for arg in args]
+                # Promote to common dtype for Array API compatibility
+                if len(vals) > 1:
+                    common_dtype = xp.result_type(*vals)
+                    vals = [xp.astype(v, common_dtype) for v in vals]
                 return func(*vals)
 
             # access a tensor with an one index but multiple dimensions (really only needed for .coord subtensor)

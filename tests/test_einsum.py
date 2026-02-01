@@ -2925,15 +2925,18 @@ class TestEinsumIndirectAccess:
                 op=ein.Literal(overwrite),
                 tns=ein.Alias("Result"),
                 idxs=(ein.Index("i"), ein.Index("j")),
-                arg=ein.Call(op=ein.Literal(operator.add), args=(ein.Call(
-                    op=ein.Literal(operator.mul),
-                    args=(ein.Access(tns=ein.Alias("A"), idxs=(ein.Index("i"),)), ein.Access(tns=ein.Alias("B"), idxs=(ein.Index("j"),)),),
-                ), ein.Index("i"), ein.Index("j"),),),
+                arg=ein.Call(op=ein.Literal(operator.add), args=(
+                    ein.Call(
+                        op=ein.Literal(operator.mul),
+                        args=(ein.Access(tns=ein.Alias("A"), idxs=(ein.Index("i"),)), ein.Access(tns=ein.Alias("B"), idxs=(ein.Index("j"),)),),
+                    ), 
+                    ein.Call(op=ein.Literal(operator.add), args=(ein.Index("i"), ein.Index("j"),)),
+                ),),
             ),
             ein.Produces((ein.Alias("Result"),)),
         ))
 
-        expected = A * B + np.arange(10) + np.arange(10)
+        expected = np.outer(A, B) + (np.arange(10).reshape(-1, 1) + np.arange(10).reshape(1, -1))
         self.run_einsum_plan(
             prgm, {ein.Alias("A"): A, ein.Alias("B"): B}, expected
         )
