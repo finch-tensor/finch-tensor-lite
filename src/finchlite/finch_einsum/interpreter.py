@@ -160,6 +160,7 @@ class PointwiseEinsumMachine:
             case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(idxs[0], ein.Index):
                 assert self.loops is not None
                 tns = self(tns)
+                self.loop_sizes[idxs[0]] = tns.shape[0]
 
                 target_shape = [
                     -1 if idxs[0] == other_idx else 1 
@@ -169,15 +170,12 @@ class PointwiseEinsumMachine:
                     return tns.reshape(target_shape)
 
                 assert tns.ndim == 2
-
                 target_shape = [tns.shape[1]] + target_shape
                 return xp.reshape(xp.transpose(tns), target_shape)
             case ein.Index(_):
                 shape = [-1 if node == other_idx else 1 for other_idx in self.loops]
-                if node in self.loop_sizes:
-                    assert self.loop_sizes[node] == self.expected_size[-1]
-                self.loop_sizes[node] = self.expected_size[-1]
-                return self.xp.arange(self.expected_size[-1]).reshape(shape)
+                size = self.loop_sizes[node] if node in self.loop_sizes else self.expected_size[-1]
+                return self.xp.arange(size).reshape(shape)
             case ein.Access(tns, idxs) if any(
                 not isinstance(idx, ein.Index) for idx in idxs
             ):

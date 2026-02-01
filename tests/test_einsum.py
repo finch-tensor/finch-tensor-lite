@@ -2910,3 +2910,30 @@ class TestEinsumIndirectAccess:
         self.run_einsum_plan(
             prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
         )
+
+
+    def test_bare_indices(self, rng):
+        """
+        Test einsum with bare indices
+        Result[i, j] = A[i] * B[j] + i + j
+        """
+        A = rng.random((10,))
+        B = rng.random((10,))
+
+        prgm = ein.Plan((
+            ein.Einsum(
+                op=ein.Literal(overwrite),
+                tns=ein.Alias("Result"),
+                idxs=(ein.Index("i"), ein.Index("j")),
+                arg=ein.Call(op=ein.Literal(operator.add), args=(ein.Call(
+                    op=ein.Literal(operator.mul),
+                    args=(ein.Access(tns=ein.Alias("A"), idxs=(ein.Index("i"),)), ein.Access(tns=ein.Alias("B"), idxs=(ein.Index("j"),)),),
+                ), ein.Index("i"), ein.Index("j"),),),
+            ),
+            ein.Produces((ein.Alias("Result"),)),
+        ))
+
+        expected = A * B + np.arange(10) + np.arange(10)
+        self.run_einsum_plan(
+            prgm, {ein.Alias("A"): A, ein.Alias("B"): B}, expected
+        )
