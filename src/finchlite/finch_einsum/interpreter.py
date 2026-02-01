@@ -105,6 +105,29 @@ class PointwiseEinsumMachine:
         self.loops = loops
         self.verbose = verbose
 
+    def map_idxs(self, idxs_to_map: tuple[ein.Index, ...], tns_shape: tuple[int, ...]):
+        assert self.loops is not None
+
+        def map_individual(individual_idx: ein.EinsumExpression, dim_idx: int):
+            if isinstance(individual_idx, ein.Index):
+                shape = [-1 if individual_idx == other_idx else 1 for other_idx in self.loops]
+                return [self.xp.arange(tns_shape[dim_idx]).reshape(shape)]
+
+            individual_evaled = self(individual_idx)
+            if len(individual_evaled.shape) == 1 + len(self.loops):
+                return [individual_evaled[i] for i in range(individual_evaled.shape[0])]
+
+            assert len(individual_evaled.shape) == len(self.loops)
+            return [individual_evaled]
+
+        idx_tns = []
+        for idx in idxs_to_map:
+            idx_tns.extend(map_individual(idx, len(idx_tns)))
+        
+        assert len(idx_tns) == len(tns_shape)
+
+        return tuple(idx_tns)
+
     def __call__(self, node):
         from ..tensor import (
             SparseTensor,
@@ -132,22 +155,6 @@ class PointwiseEinsumMachine:
                 vals = [self(arg) for arg in args]
                 return func(*vals)
 
-            # access a tensor with only one indirect access index
-            # case ein.Access(tns, idxs) if len(idxs) == 1:
-            #    tns = self(tns)  # evaluate the tensor
-            #    if isinstance(idxs[0], ein.Index):
-            #        return tns
-            #    else:
-            #        idx = self(idxs[0])
-
-            #        flat_idx = (
-            #            idx if idx.ndim == 1 
-            #            else xp.ravel_multi_index(idx.T, tns.shape)
-            #        )
-            #        tns = tns.flat[flat_idx]  # return a 1-d array by definition
-
-                    #tns shape must be (1, 1, )
-
             # access a tensor with an one index but multiple dimensions (really only needed for .coord subtensor)
             case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(idxs[0], ein.Index):
                 assert self.loops is not None
@@ -170,33 +177,8 @@ class PointwiseEinsumMachine:
                 assert self.loops is not None
                 tns = self(tns)
 
-                iterator_shapes: dict[ein.Index, tuple[int, ...]] = {
-                    idx: [-1 if idx == other_idx else 1 for other_idx in self.loops]
-                    for idx in idxs if isinstance(idx, ein.Index)
-                }
-
-                evaled_items = [
-                    idx if isinstance(idx, ein.Index) else self(idx)
-                    for idx in idxs
-                ]
-
-                # expand coordinate indices to match the tensor shape
-                evaled_items = [
-                    x
-                    for item in evaled_items
-                    for x in (
-                        [item] if isinstance(item, ein.Index) or len(item.shape) == len(self.loops)
-                        else [item[i] for i in range(item.shape[0])]
-                    )
-                ]
-                assert len(evaled_items) == len(tns.shape)
-
-                evaled_items = [
-                    xp.arange(tns.shape[i]).reshape(iterator_shapes[evaled_item]) if isinstance(evaled_item, ein.Index) else evaled_item
-                    for i, evaled_item in enumerate(evaled_items)
-                ]
-
-                tns = tns[tuple(evaled_items)]
+                evaled_items = self.map_idxs(idxs, tns.shape)
+                tns = tns[evaled_items]
                 return tns
             # access a tensor with a mixture of indices and other expressions
             case ein.Access(tns, idxs):
