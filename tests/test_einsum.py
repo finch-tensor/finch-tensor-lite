@@ -15,7 +15,7 @@ from .conftest import finch_assert_allclose
 
 @pytest.fixture(autouse=True)
 def use_numpy_einsum_interpreter(monkeypatch):
-    # Temporary fixture: patch finchlite.einop/einsum to use numpy-based interpreter directly.
+    # Temporary fixture: patch finchlite.einop/einsum to use numpy-based interpreter.
 
     def patched_einop(prgm, **kwargs):
         stmt = ein.parse_einop(prgm)

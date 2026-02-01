@@ -102,8 +102,8 @@ class PointwiseEinsumMachine:
         self.bindings = bindings
         self.loops = loops
         self.verbose = verbose
-        self.loop_sizes = dict()
-        self.expected_size = []
+        self.loop_sizes: dict[ein.Index, int] = {}
+        self.expected_size: list[int] = []
 
     def map_idxs(self, idxs_to_map: tuple[ein.Index, ...], tns_shape: tuple[int, ...]):
         assert self.loops is not None
@@ -119,7 +119,7 @@ class PointwiseEinsumMachine:
             assert len(individual_evaled.shape) == len(self.loops)
             return [individual_evaled]
 
-        idx_tns = []
+        idx_tns: list = []
         for idx in idxs_to_map:
             idx_tns.extend(map_individual(idx, len(idx_tns)))
 
@@ -153,7 +153,7 @@ class PointwiseEinsumMachine:
                     vals = [xp.astype(v, common_dtype) for v in vals]
                 return func(*vals)
 
-            # access a tensor with an one index but multiple dimensions (really only needed for .coord subtensor)
+            # access a tensor with an one index but multiple dimensions
             case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(
                 idxs[0], ein.Index
             ):
@@ -185,8 +185,7 @@ class PointwiseEinsumMachine:
                 tns = self(tns)
 
                 evaled_items = self.map_idxs(idxs, tns.shape)
-                tns = tns[evaled_items]
-                return tns
+                return tns[evaled_items]
             # access a tensor with a mixture of indices and other expressions
             case ein.Access(tns, idxs):
                 assert self.loops is not None
