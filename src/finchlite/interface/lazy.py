@@ -1979,5 +1979,4 @@ def einsum(prgm, *args, **kwargs):
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
-    bindings = {ein.Alias(k): v for k, v in bindings.items()}
     return ctx(prgm, bindings)[0]

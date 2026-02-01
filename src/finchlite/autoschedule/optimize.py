@@ -237,7 +237,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
             ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
                 return Reorder(
                     Aggregate(op_1, init_1, arg, idxs_1 + idxs_2),
-                    setdiff(idxs_3, idxs_1),
+                    setdiff(idxs_3, idxs_2),
                 )
 
         return None
