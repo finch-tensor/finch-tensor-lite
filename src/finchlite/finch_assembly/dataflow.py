@@ -27,16 +27,16 @@ class AbstractAssemblyDataflow(DataFlowAnalysis):
         """Annotate a statement with lattice values.
 
         Delegates expression traversal and collection of (name,value) pairs to
-        ``print_lattice_value`` which now returns the annotation list directly.
+        ``get_lattice_value`` which now returns the annotation list directly.
         """
-        annotations = self.print_lattice_value(state, stmt)
+        annotations = self.get_lattice_value(state, stmt)
         if annotations:
             annostr = ", ".join(f"{name} = {str(val)}" for name, val in annotations)
             return f"{stmt} \t# {annostr}"
         return str(stmt)
 
     @abstractmethod
-    def print_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
+    def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         """Return list of (var_instance_name, lattice_value) pairs for a stmt/expr."""
         ...
 
@@ -56,7 +56,7 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         """Copy propagation is a forward analysis."""
         return "forward"
 
-    def print_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
+    def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         """Collect lattice annotations for variables used in a stmt or expr."""
         annotated: list[tuple[str, object]] = []
         target = stmt
