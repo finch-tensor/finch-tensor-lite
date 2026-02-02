@@ -124,8 +124,6 @@ class PointwiseEinsumMachine:
         self.loops = loops
         self.dims = dims
         self.verbose = verbose
-        self.loop_sizes: dict[ein.Index, int] = {}
-        self.expected_size: list[int] = []
         self.tns_ctx = TensorEinsumMachine(bindings)
 
     def __call__(self, node):
