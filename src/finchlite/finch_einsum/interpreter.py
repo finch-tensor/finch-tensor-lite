@@ -152,6 +152,7 @@ class PointwiseEinsumMachine:
                 for _ in range(len(self.loops) - self.loops.index(idx) - 1):
                     tns = self.xp.expand_dims(tns, -1)
                 return tns
+            #TODO add back the old access logic when idxs is just vanilla indices
             case ein.Access(tns, idxs):
                 assert self.loops is not None
                 tns = self.tns_ctx(tns)

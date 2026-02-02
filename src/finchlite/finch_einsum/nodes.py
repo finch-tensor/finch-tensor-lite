@@ -200,7 +200,7 @@ class GetAttr(EinsumExpression, EinsumTree):
 
     obj: EinsumExpression
     attr: Literal
-    dim: int | None
+    dim: int | None #TODO remove this and adjust tests
 
     @classmethod
     def from_children(cls, *children: Term) -> Self:
