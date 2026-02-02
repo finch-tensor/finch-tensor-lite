@@ -19,13 +19,13 @@ from finchlite.finch_logic import LogicEvaluator, LogicInterpreter
 import numpy as np
 from ..TensorStats import TensorStats
 from finchlite.algebra.tensor import TensorFType
-class StatsInterpreter(LogicEvaluator):
+class StatsInterpreter():
 
     def __init__(self,StatsImpl : TensorStats,verbose = False):
         self.ST = StatsImpl
         self.verbose = verbose
 
-    def __call__(self,node:LogicNode,bindings : OrderedDict[Alias, TensorStats]=None) -> TensorStats :
+    def __call__(self,node:LogicNode,bindings : OrderedDict[Alias, TensorStats]=None) -> TensorStats | tuple[TensorStats, ...] :
         machine = StatsMachine(StatsImpl=self.ST,bindings=bindings,verbose=self.verbose)
         return machine(node)
 
@@ -37,7 +37,7 @@ class StatsMachine:
         self.bindings = bindings
         self.verbose = verbose
     
-    def __call__(self,node) -> TensorStats | None:
+    def __call__(self,node) -> TensorStats | tuple[TensorStats, ...]:
         if self.verbose :
             print(f"Evaluating: {node}")
         match node :
@@ -50,7 +50,7 @@ class StatsMachine:
             case Query():
                 rhs_stats = self(node.rhs)
                 self.bindings[node.lhs] = rhs_stats
-                return rhs_stats
+                return (rhs_stats,)
             
             case Alias():
                 stats = self.bindings.get(node)

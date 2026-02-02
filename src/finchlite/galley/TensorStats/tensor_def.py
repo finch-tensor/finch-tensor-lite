@@ -9,6 +9,9 @@ import numpy as np
 from finchlite.finch_logic import (
     MapJoin,
     Table,
+    Literal,
+    Alias,
+    Field,
 )
 from ...algebra import fill_value, is_idempotent, is_identity
 
@@ -147,14 +150,14 @@ class TensorDef:
             TensorDef: A new TensorDef representing the merged tensor.
         """
         new_fill_value = op(*(s.fill_value for s in args))
-        new_index_order = MapJoin(op, [
-            Table(f"_{i}", list(a.index_order)) for i, a in enumerate(args)
-        ]).fields()
+        new_index_order = MapJoin(Literal(op), tuple(
+            Table(Alias(f"_{i}"), tuple(map(Field,(a.index_order)))) for i, a in enumerate(args)
+        )).fields()
         new_dim_sizes: dict = {}
         for index in new_index_order:
             for s in args:
                 if index in s.index_order:
-                    new_dim_sizes[index] = s.dim_sizes[index]
+                    new_dim_sizes[index.name] = s.dim_sizes[index.name]
                     break
         assert set(new_dim_sizes.keys()) == set(new_index_order)
         return TensorDef(new_index_order, new_dim_sizes, new_fill_value)
