@@ -128,28 +128,6 @@ class PointwiseEinsumMachine:
         self.expected_size: list[int] = []
         self.tns_ctx = TensorEinsumMachine(bindings)
 
-    def map_idxs(self, idxs_to_map: tuple[ein.Index, ...], tns_shape: tuple[int, ...]):
-        assert self.loops is not None
-
-        def map_individual(individual_idx: ein.EinsumExpression, dim_idx: int):
-            self.expected_size.append(tns_shape[dim_idx])
-            individual_evaled = self(individual_idx)
-            self.expected_size.pop()
-
-            if len(individual_evaled.shape) == 1 + len(self.loops):
-                return [individual_evaled[i] for i in range(individual_evaled.shape[0])]
-
-            assert len(individual_evaled.shape) == len(self.loops)
-            return [individual_evaled]
-
-        idx_tns: list = []
-        for idx in idxs_to_map:
-            idx_tns.extend(map_individual(idx, len(idx_tns)))
-
-        assert len(idx_tns) == len(tns_shape)
-
-        return tuple(idx_tns)
-
     def __call__(self, node):
         xp = self.xp
         match node:
@@ -171,58 +149,16 @@ class PointwiseEinsumMachine:
                     common_dtype = xp.result_type(*vals)
                     vals = [xp.astype(v, common_dtype) for v in vals]
                 return func(*vals)
-
-            # access a tensor with an one index but multiple dimensions
-            case ein.Access(tns, idxs) if len(idxs) == 1 and isinstance(
-                idxs[0], ein.Index
-            ):
-                assert self.loops is not None
-                tns = self.tns_ctx(tns)
-                self.loop_sizes[idxs[0]] = tns.shape[0]
-
-                target_shape = [
-                    -1 if idxs[0] == other_idx else 1 for other_idx in self.loops
-                ]
-                if tns.ndim == 1:
-                    return tns.reshape(target_shape)
-
-                assert tns.ndim == 2
-                target_shape = [tns.shape[1]] + target_shape
-                return xp.reshape(xp.transpose(tns), target_shape)
-            case ein.Index(_):
-                shape = [-1 if node == other_idx else 1 for other_idx in self.loops]
-                size = (
-                    self.loop_sizes[node]
-                    if node in self.loop_sizes
-                    else self.expected_size[-1]
-                )
-                return self.xp.arange(size).reshape(shape)
-            case ein.Access(tns, idxs) if any(
-                not isinstance(idx, ein.Index) for idx in idxs
-            ):
-                assert self.loops is not None
-                tns = self.tns_ctx(tns)
-
-                evaled_items = self.map_idxs(idxs, tns.shape)
-                return tns[evaled_items]
-            # access a tensor with a mixture of indices and other expressions
+            case ein.Index(_) as idx:
+                tns = self.xp.arange(self.dims[idx])
+                for _ in range(len(self.loops) - self.loops.index(idx) - 1):
+                    tns = self.xp.expand_dims(tns, -1)
+                return tns
             case ein.Access(tns, idxs):
                 assert self.loops is not None
-
                 tns = self.tns_ctx(tns)
-                assert len(idxs) == len(tns.shape)
-                for i, idx in enumerate(idxs):
-                    self.loop_sizes[idx] = tns.shape[i]
-
-                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
-                    perm += list(range(len(perm), tns.ndim))
-
-                tns = xp.permute_dims(tns, perm)  # permute the dimensions
-                return xp.expand_dims(
-                    tns,
-                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
-                )
+                evaled_items = tuple(self(idx) for idx in idxs)
+                return tns[evaled_items]
             case ein.GetAttr(obj, ein.Literal(attr), dim):
                 obj = self(obj)
                 if not hasattr(obj, attr):
@@ -262,7 +198,6 @@ class EinsumMachine:
                 for node in PostOrderDFS(arg):
                     match node:
                         case ein.Access(tns_2, idxs_2):
-                            print(tns_2)
                             for idx, dim in zip(idxs_2, self.tns_ctx(tns_2).shape, strict=True):
                                 if isinstance(idx, ein.Index):
                                     dims[idx] = dim
