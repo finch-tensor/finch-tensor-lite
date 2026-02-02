@@ -1212,7 +1212,15 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("A"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("coords"),
+                                            dim=1,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -1263,7 +1271,15 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("A"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("coords"),
+                                            dim=1,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -1365,7 +1381,15 @@ class TestEinsumIndirectAccess:
                                                 tns=ein.GetAttr(
                                                     obj=ein.Alias("A"),
                                                     attr=ein.Literal("coords"),
-                                                    dim=None,
+                                                    dim=0,
+                                                ),
+                                                idxs=(ein.Index("i"),),
+                                            ),
+                                            ein.Access(
+                                                tns=ein.GetAttr(
+                                                    obj=ein.Alias("A"),
+                                                    attr=ein.Literal("coords"),
+                                                    dim=1,
                                                 ),
                                                 idxs=(ein.Index("i"),),
                                             ),
@@ -1423,7 +1447,15 @@ class TestEinsumIndirectAccess:
                                                 tns=ein.GetAttr(
                                                     obj=ein.Alias("A"),
                                                     attr=ein.Literal("coords"),
-                                                    dim=None,
+                                                    dim=0,
+                                                ),
+                                                idxs=(ein.Index("i"),),
+                                            ),
+                                            ein.Access(
+                                                tns=ein.GetAttr(
+                                                    obj=ein.Alias("A"),
+                                                    attr=ein.Literal("coords"),
+                                                    dim=1,
                                                 ),
                                                 idxs=(ein.Index("i"),),
                                             ),
@@ -1438,7 +1470,15 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("A"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
+                                        ),
+                                        idxs=(ein.Index("i"),),
+                                    ),
+                                    ein.Access(
+                                        tns=ein.GetAttr(
+                                            obj=ein.Alias("A"),
+                                            attr=ein.Literal("coords"),
+                                            dim=1,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -1480,7 +1520,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("A"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -1528,7 +1568,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("C"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -1584,7 +1624,7 @@ class TestEinsumIndirectAccess:
                                                 tns=ein.GetAttr(
                                                     obj=ein.Alias("D"),
                                                     attr=ein.Literal("coords"),
-                                                    dim=None,
+                                                    dim=0,
                                                 ),
                                                 idxs=(ein.Index("i"),),
                                             ),
@@ -1636,7 +1676,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -1682,7 +1722,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("j"),),
                             ),
@@ -1723,7 +1763,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -1731,7 +1771,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -1776,7 +1816,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -1784,7 +1824,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("C"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -1837,7 +1877,7 @@ class TestEinsumIndirectAccess:
                                                 tns=ein.GetAttr(
                                                     obj=ein.Alias("C"),
                                                     attr=ein.Literal("coords"),
-                                                    dim=None,
+                                                    dim=0,
                                                 ),
                                                 idxs=(ein.Index("i"),),
                                             ),
@@ -1896,7 +1936,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -1949,7 +1989,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("j"),),
                             ),
@@ -1998,7 +2038,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2043,7 +2083,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2087,7 +2127,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2141,7 +2181,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2188,7 +2228,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2234,7 +2274,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2277,7 +2317,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2319,7 +2359,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2357,7 +2397,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2395,7 +2435,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2445,7 +2485,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2484,7 +2524,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2523,7 +2563,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2567,7 +2607,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("C"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2617,7 +2657,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2630,7 +2670,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("D"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("j"),),
                                     ),
@@ -2690,7 +2730,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2738,7 +2778,7 @@ class TestEinsumIndirectAccess:
                                 tns=ein.GetAttr(
                                     obj=ein.Alias("B"),
                                     attr=ein.Literal("coords"),
-                                    dim=None,
+                                    dim=0,
                                 ),
                                 idxs=(ein.Index("i"),),
                             ),
@@ -2781,7 +2821,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2843,7 +2883,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),
@@ -2893,7 +2933,7 @@ class TestEinsumIndirectAccess:
                                         tns=ein.GetAttr(
                                             obj=ein.Alias("B"),
                                             attr=ein.Literal("coords"),
-                                            dim=None,
+                                            dim=0,
                                         ),
                                         idxs=(ein.Index("i"),),
                                     ),

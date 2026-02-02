@@ -1,4 +1,6 @@
 import operator
+from typing import Any
+from unittest import case
 
 import numpy as np
 
@@ -10,6 +12,7 @@ from finchlite.finch_einsum.stages import (
     compute_shape_vars,
 )
 from finchlite.symbolic.ftype import fisinstance
+from finchlite.symbolic.traversal import PostOrderDFS
 
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
@@ -95,15 +98,35 @@ class EinsumInterpreter(EinsumEvaluator):
         )
         return machine(node)
 
+class TensorEinsumMachine:
+    def __init__(self, bindings):
+        self.bindings = bindings
+    
+    def __call__(self, node):
+        match node:
+            case ein.Alias(name):
+                if node not in self.bindings:
+                    raise ValueError(f"Unbound variable: {name}")
+                return self.bindings[node]
+            case ein.GetAttr(obj, ein.Literal(attr), dim):
+                obj = self(obj)
+                if not hasattr(obj, attr):
+                    raise ValueError(f"Object {obj} has no attribute {attr}")
+                val = getattr(obj, attr)
+                if dim is not None:
+                    val = val[:, dim]
+                return val
 
 class PointwiseEinsumMachine:
-    def __init__(self, xp, bindings, loops, verbose):
+    def __init__(self, xp, bindings, loops, dims, verbose):
         self.xp = xp
         self.bindings = bindings
         self.loops = loops
+        self.dims = dims
         self.verbose = verbose
         self.loop_sizes: dict[ein.Index, int] = {}
         self.expected_size: list[int] = []
+        self.tns_ctx = TensorEinsumMachine(bindings)
 
     def map_idxs(self, idxs_to_map: tuple[ein.Index, ...], tns_shape: tuple[int, ...]):
         assert self.loops is not None
@@ -137,10 +160,6 @@ class PointwiseEinsumMachine:
                 if hasattr(val, "ndim") and val.ndim > 0:
                     return val
                 return self.xp.full([1 for _ in self.loops], val)
-            case ein.Alias(name):
-                if node not in self.bindings:
-                    raise ValueError(f"Unbound variable: {name}")
-                return self.bindings[node]
             case ein.Call(ein.Literal(func), args):
                 if len(args) == 1:
                     func = getattr(xp, unary_ops[func])
@@ -158,7 +177,7 @@ class PointwiseEinsumMachine:
                 idxs[0], ein.Index
             ):
                 assert self.loops is not None
-                tns = self(tns)
+                tns = self.tns_ctx(tns)
                 self.loop_sizes[idxs[0]] = tns.shape[0]
 
                 target_shape = [
@@ -182,7 +201,7 @@ class PointwiseEinsumMachine:
                 not isinstance(idx, ein.Index) for idx in idxs
             ):
                 assert self.loops is not None
-                tns = self(tns)
+                tns = self.tns_ctx(tns)
 
                 evaled_items = self.map_idxs(idxs, tns.shape)
                 return tns[evaled_items]
@@ -190,7 +209,7 @@ class PointwiseEinsumMachine:
             case ein.Access(tns, idxs):
                 assert self.loops is not None
 
-                tns = self(tns)
+                tns = self.tns_ctx(tns)
                 assert len(idxs) == len(tns.shape)
                 for i, idx in enumerate(idxs):
                     self.loop_sizes[idx] = tns.shape[i]
@@ -220,6 +239,7 @@ class EinsumMachine:
     def __init__(self, xp, bindings, verbose):
         self.xp = xp
         self.bindings = bindings
+        self.tns_ctx = TensorEinsumMachine(bindings)
         self.verbose = verbose
 
     def __call__(self, node):
@@ -238,8 +258,16 @@ class EinsumMachine:
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
+                dims : dict[ein.Index, Any] = {}
+                for node in PostOrderDFS(arg):
+                    match node:
+                        case ein.Access(tns_2, idxs_2):
+                            print(tns_2)
+                            for idx, dim in zip(idxs_2, self.tns_ctx(tns_2).shape, strict=True):
+                                if isinstance(idx, ein.Index):
+                                    dims[idx] = dim
                 ctx = PointwiseEinsumMachine(
-                    self.xp, self.bindings, loops, self.verbose
+                    self.xp, self.bindings, loops, dims, self.verbose
                 )
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
