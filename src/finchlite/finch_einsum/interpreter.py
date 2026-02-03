@@ -1,6 +1,5 @@
 import operator
 from typing import Any
-from unittest import case
 
 import numpy as np
 
@@ -98,10 +97,11 @@ class EinsumInterpreter(EinsumEvaluator):
         )
         return machine(node)
 
+
 class TensorEinsumMachine:
     def __init__(self, bindings):
         self.bindings = bindings
-    
+
     def __call__(self, node):
         match node:
             case ein.Alias(name):
@@ -116,6 +116,7 @@ class TensorEinsumMachine:
                 if not hasattr(obj, attr):
                     raise ValueError(f"Object {obj} has no attribute {attr}")
                 return getattr(obj, attr)
+
 
 class PointwiseEinsumMachine:
     def __init__(self, xp, bindings, loops, dims, verbose):
@@ -155,7 +156,9 @@ class PointwiseEinsumMachine:
             case ein.Access(tns, (ein.Literal(dim),)):
                 tns = self.tns_ctx(tns)
                 return tns[dim]
-            case ein.Access(tns, idxs) if all(isinstance(idx, ein.Index) for idx in idxs):
+            case ein.Access(tns, idxs) if all(
+                isinstance(idx, ein.Index) for idx in idxs
+            ):
                 assert self.loops is not None
 
                 tns = self.tns_ctx(tns)
@@ -174,7 +177,7 @@ class PointwiseEinsumMachine:
                 assert self.loops is not None
                 tns = self.tns_ctx(tns)
                 evaled_items = tuple(self(idx) for idx in idxs)
-                return tns[evaled_items] 
+                return tns[evaled_items]
             case ein.GetAttr(obj, ein.Literal(attr)):
                 obj = self(obj)
                 if not hasattr(obj, attr):
@@ -207,13 +210,16 @@ class EinsumMachine:
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
-                dims : dict[ein.Index, Any] = {}
-                for node in PostOrderDFS(arg):
-                    match node:
-                        case ein.Access(tns_2, idxs_2) if not all(not isinstance(idx, ein.Index) for idx in idxs_2):
-                            for idx, dim in zip(idxs_2, self.tns_ctx(tns_2).shape, strict=True):
-                                if isinstance(idx, ein.Index):
-                                    dims[idx] = dim
+                dims: dict[ein.Index, Any] = {
+                    idx: dim
+                    for node in PostOrderDFS(arg)
+                    if isinstance(node, ein.Access)
+                    and not all(not isinstance(idx, ein.Index) for idx in node.idxs)
+                    for idx, dim in zip(
+                        node.idxs, self.tns_ctx(node.tns).shape, strict=True
+                    )
+                    if isinstance(idx, ein.Index)
+                }
                 ctx = PointwiseEinsumMachine(
                     self.xp, self.bindings, loops, dims, self.verbose
                 )
