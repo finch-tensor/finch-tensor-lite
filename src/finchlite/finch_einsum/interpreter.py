@@ -152,12 +152,26 @@ class PointwiseEinsumMachine:
                 for _ in range(len(self.loops) - self.loops.index(idx) - 1):
                     tns = self.xp.expand_dims(tns, -1)
                 return tns
-            #TODO add back the old access logic when idxs is just vanilla indices
+            case ein.Access(tns, idxs) if all(isinstance(idx, ein.Index) for idx in idxs):
+                assert self.loops is not None
+
+                tns = self.tns_ctx(tns)
+                assert len(idxs) == len(tns.shape)
+
+                perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
+                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
+                    perm += list(range(len(perm), tns.ndim))
+
+                tns = xp.permute_dims(tns, perm)  # permute the dimensions
+                return xp.expand_dims(
+                    tns,
+                    [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
+                )
             case ein.Access(tns, idxs):
                 assert self.loops is not None
                 tns = self.tns_ctx(tns)
                 evaled_items = tuple(self(idx) for idx in idxs)
-                return tns[evaled_items]
+                return tns[evaled_items] 
             case ein.GetAttr(obj, ein.Literal(attr), dim):
                 obj = self(obj)
                 if not hasattr(obj, attr):
