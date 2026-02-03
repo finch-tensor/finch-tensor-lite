@@ -36,7 +36,7 @@ class SparseTensorFType(TensorFType):
     def __call__(self, shape: tuple) -> "SparseTensor":
         """Create an empty SparseTensor with the given shape."""
         data: np.typing.NDArray = np.array([], dtype=self._element_type)
-        coords: np.typing.NDArray = np.empty((0, len(shape)), dtype=np.intp)
+        coords: np.typing.NDArray = np.empty((len(shape), 0), dtype=np.intp)
         return SparseTensor(data, coords, shape, self._element_type)
 
     # converts an eager tensor to a sparse tensor
@@ -46,7 +46,7 @@ class SparseTensorFType(TensorFType):
         data = dense_tensor[coords]
         shape = dense_tensor.shape
         element_type = dense_tensor.dtype.type
-        coords_array = np.array(coords).T
+        coords_array = np.array(coords)
         return SparseTensor(data, coords_array, shape, element_type)
 
 
@@ -59,19 +59,15 @@ class SparseTensor(EagerTensor):
         shape: tuple,
         element_type=np.float64,
     ):
-        if elems.shape[0] != coords.shape[0]:
-            raise ValueError("data and coords must have the same number of rows")
+        assert len(elems.shape) == 1
+        assert len(coords.shape) == 2
+        assert coords.shape[0] == len(shape)
+        assert coords.shape[1] == len(elems)
 
-        self.coords = coords
-        self.elems = elems
+        self._elems = elems
+        self._coords = coords
         self._shape = shape
         self._element_type = element_type
-
-    def __call__(self, shape: tuple) -> "SparseTensor":
-        """Create an empty SparseTensor with the given shape."""
-        data = np.array([], dtype=self._element_type)
-        coords = np.empty((0, len(shape)), dtype=np.intp)
-        return SparseTensor(data, coords, shape, self._element_type)
 
     @property
     def ftype(self):
@@ -82,20 +78,28 @@ class SparseTensor(EagerTensor):
         return self._shape
 
     @property
+    def coords(self):
+        return self._coords
+
+    @property
+    def elems(self):
+        return self._elems
+
+    @property
     def ndim(self) -> np.intp:
         return np.intp(len(self._shape))
 
     # calculates the ratio of non-zero elements to the total number of elements
     @property
     def density(self):
-        return self.coords.shape[0] / np.prod(self.shape)
+        return len(self._elems) / np.prod(self._shape)
 
     def __getitem__(self, idx: tuple):
         if len(idx) != self.ndim:
             raise ValueError(f"Index must have {self.ndim} dimensions")
 
         # coords is a 2D array where each row is a coordinate
-        mask = np.all(self.coords == idx, axis=1)
+        mask = np.all(self.coords == idx, axis=0)
         matching_indices = np.where(mask)[0]
 
         if len(matching_indices) > 0:
@@ -110,6 +114,6 @@ class SparseTensor(EagerTensor):
 
     def to_dense(self) -> np.ndarray:
         dense_tensor = np.zeros(self.shape, dtype=self._element_type)
-        for i in range(self.coords.shape[0]):
-            dense_tensor[tuple(self.coords[i])] = self.elems[i]
+        for i in range(self.coords.shape[1]):
+            dense_tensor[tuple(self.coords[:, i])] = self._elems[i]
         return dense_tensor

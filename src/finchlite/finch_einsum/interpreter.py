@@ -108,14 +108,14 @@ class TensorEinsumMachine:
                 if node not in self.bindings:
                     raise ValueError(f"Unbound variable: {name}")
                 return self.bindings[node]
-            case ein.GetAttr(obj, ein.Literal(attr), dim):
+            case ein.Access(tns, (ein.Literal(dim),)):
+                tns = self(tns)
+                return tns[dim]
+            case ein.GetAttr(obj, ein.Literal(attr)):
                 obj = self(obj)
                 if not hasattr(obj, attr):
                     raise ValueError(f"Object {obj} has no attribute {attr}")
-                val = getattr(obj, attr)
-                if dim is not None:
-                    val = val[:, dim]
-                return val
+                return getattr(obj, attr)
 
 class PointwiseEinsumMachine:
     def __init__(self, xp, bindings, loops, dims, verbose):
@@ -152,6 +152,9 @@ class PointwiseEinsumMachine:
                 for _ in range(len(self.loops) - self.loops.index(idx) - 1):
                     tns = self.xp.expand_dims(tns, -1)
                 return tns
+            case ein.Access(tns, (ein.Literal(dim),)):
+                tns = self.tns_ctx(tns)
+                return tns[dim]
             case ein.Access(tns, idxs) if all(isinstance(idx, ein.Index) for idx in idxs):
                 assert self.loops is not None
 
@@ -172,14 +175,11 @@ class PointwiseEinsumMachine:
                 tns = self.tns_ctx(tns)
                 evaled_items = tuple(self(idx) for idx in idxs)
                 return tns[evaled_items] 
-            case ein.GetAttr(obj, ein.Literal(attr), dim):
+            case ein.GetAttr(obj, ein.Literal(attr)):
                 obj = self(obj)
                 if not hasattr(obj, attr):
                     raise ValueError(f"Object {obj} has no attribute {attr}")
-                val = getattr(obj, attr)
-                if dim is not None:
-                    val = val[:, dim].flat
-                return val
+                return getattr(obj, attr)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
 
@@ -210,7 +210,7 @@ class EinsumMachine:
                 dims : dict[ein.Index, Any] = {}
                 for node in PostOrderDFS(arg):
                     match node:
-                        case ein.Access(tns_2, idxs_2):
+                        case ein.Access(tns_2, idxs_2) if not all(not isinstance(idx, ein.Index) for idx in idxs_2):
                             for idx, dim in zip(idxs_2, self.tns_ctx(tns_2).shape, strict=True):
                                 if isinstance(idx, ein.Index):
                                     dims[idx] = dim
