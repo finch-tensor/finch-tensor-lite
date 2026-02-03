@@ -15,26 +15,22 @@ class TensorFType(FType, ABC):
         return np.intp(len(self.shape_type))
 
     @property
-    @abstractmethod
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        ...
+        return self.ftype.fill_value
 
     @property
-    @abstractmethod
-    def element_type(self) -> Any:
+    def element_type(self):
         """Data type of the tensor elements."""
-        ...
+        return self.ftype.element_type
 
     @property
-    @abstractmethod
-    def shape_type(self) -> tuple[type, ...]:
+    def shape_type(self) -> tuple:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
         should be an actual tuple, rather than a tuple type, so that it can hold
         e.g. dtypes, formats, or types, and so that we can easily index it."""
-        ...
-
+        return self.ftype.shape_type
     @abstractmethod
     def __call__(self, shape: tuple) -> Tensor:
         """
