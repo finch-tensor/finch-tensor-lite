@@ -162,7 +162,6 @@ class PointwiseEinsumMachine:
                 assert len(idxs) == len(tns.shape)
 
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                perm += list(range(len(perm), tns.ndim))
 
                 tns = xp.permute_dims(tns, perm)  # permute the dimensions
                 return xp.expand_dims(
