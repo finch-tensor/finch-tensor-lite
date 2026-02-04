@@ -109,13 +109,15 @@ class TensorEinsumMachine:
                     raise ValueError(f"Unbound variable: {name}")
                 return self.bindings[node]
             case ein.Access(tns, (ein.Literal(dim),)):
-                tns = self(tns)
-                return tns[dim]
+                evaled: Any = self(tns)
+                return evaled[dim]
             case ein.GetAttr(obj, ein.Literal(attr)):
-                obj = self(obj)
-                if not hasattr(obj, attr):
+                evaled = self(obj)
+                if not hasattr(evaled, attr):
                     raise ValueError(f"Object {obj} has no attribute {attr}")
-                return getattr(obj, attr)
+                return getattr(evaled, attr)
+            case _:
+                raise ValueError(f"Unknown tensor einsum type: {type(node)}")
 
 
 class PointwiseEinsumMachine:
