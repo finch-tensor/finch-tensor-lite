@@ -153,9 +153,6 @@ class PointwiseEinsumMachine:
                 for _ in range(len(self.loops) - self.loops.index(idx) - 1):
                     tns = self.xp.expand_dims(tns, -1)
                 return tns
-            case ein.Access(tns, (ein.Literal(dim),)):
-                tns = self.tns_ctx(tns)
-                return tns[dim]
             case ein.Access(tns, idxs) if all(
                 isinstance(idx, ein.Index) for idx in idxs
             ):
