@@ -3,7 +3,7 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.algebra.tensor import TensorFType
+from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_einsum.stages import (
     EinsumEvaluator,
@@ -102,7 +102,7 @@ class TensorEinsumMachine:
     def __init__(self, bindings):
         self.bindings = bindings
 
-    def __call__(self, node):
+    def __call__(self, node) -> Tensor:
         match node:
             case ein.Alias(name):
                 if node not in self.bindings:
@@ -162,8 +162,7 @@ class PointwiseEinsumMachine:
                 assert len(idxs) == len(tns.shape)
 
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-                if hasattr(tns, "ndim") and len(perm) < tns.ndim:
-                    perm += list(range(len(perm), tns.ndim))
+                perm += list(range(len(perm), tns.ndim))
 
                 tns = xp.permute_dims(tns, perm)  # permute the dimensions
                 return xp.expand_dims(
