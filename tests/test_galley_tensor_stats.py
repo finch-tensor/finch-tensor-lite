@@ -5,6 +5,7 @@ import pytest
 
 import numpy as np
 
+import finchlite
 import finchlite as fl
 from finchlite.finch_logic import (
     Aggregate,
@@ -14,18 +15,25 @@ from finchlite.finch_logic import (
     Table,
 )
 from finchlite.galley.LogicalOptimizer import (
+    AnnotatedQuery,
+    find_lowest_roots,
+    get_idx_connected_components,
+    get_lazy_tensor_stats,
+    get_reducible_idxs,
     insert_statistics,
+    replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
+from finchlite.interface import lazy
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
 
 def test_copy_and_getters():
-    td = TensorDef(index_set=["i", "j"], dim_sizes={"i": 2.0, "j": 3.0}, fill_value=42)
+    td = TensorDef(index_order=("i", "j"), dim_sizes={"i": 2.0, "j": 3.0}, fill_value=42)
     td_copy = td.copy()
     assert td_copy is not td
-    assert td_copy.index_set == {"i", "j"}
+    assert td_copy.index_order == ("i", "j")
     assert td_copy.dim_sizes == {"i": 2.0, "j": 3.0}
     assert td_copy.get_dim_size("j") == 3.0
     assert td_copy.fill_value == 42
@@ -40,31 +48,27 @@ def test_copy_and_getters():
 )
 def test_reindex_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
-    td = TensorDef(index_set=orig_axes, dim_sizes=dim_sizes, fill_value=0)
+    td = TensorDef(index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0)
     td2 = td.reindex_def(new_axes)
-    assert td2.index_set == set(new_axes)
+    assert td2.index_order == tuple(new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
 
 
-def test_set_fill_value_and_relabel_index():
-    td = TensorDef(index_set=["i"], dim_sizes={"i": 5.0}, fill_value=0)
+def test_set_fill_value():
+    td = TensorDef(index_order=("i",), dim_sizes={"i": 5.0}, fill_value=0)
     td2 = td.set_fill_value(7)
     assert td2.fill_value == 7
 
-    td3 = td2.relabel_index("i", "k")
-    assert "k" in td3.index_set and "i" not in td3.index_set
-    assert td3.get_dim_size("k") == 5.0
-
 
 def test_add_dummy_idx():
-    td = TensorDef(index_set=["i"], dim_sizes={"i": 3.0}, fill_value=0)
+    td = TensorDef(index_order=("i",), dim_sizes={"i": 3.0}, fill_value=0)
     td2 = td.add_dummy_idx("j")
-    assert td2.index_set == {"i", "j"}
+    assert td2.index_order == ("i", "j")
     assert td2.get_dim_size("j") == 1.0
 
     td3 = td2.add_dummy_idx("j")
-    assert td3.index_set == {"i", "j"}
+    assert td3.index_order == ("i", "j")
 
 
 @pytest.mark.parametrize(
@@ -73,34 +77,34 @@ def test_add_dummy_idx():
         # union of axes; first-wins on dim size; add fills
         (
             [
-                ({"i", "j"}, {"i": 10.0, "j": 5.0}, 2.0),
-                ({"i", "k"}, {"i": 20.0, "k": 7.0}, 3.0),
+                (("i", "j"), {"i": 10.0, "j": 5.0}, 2.0),
+                (("i", "k"), {"i": 20.0, "k": 7.0}, 3.0),
             ],
             op.add,
-            {"i", "j", "k"},
+            ("i", "j", "k"),
             {"i": 10.0, "j": 5.0, "k": 7.0},
             5.0,
         ),
         # same axes: max over fills; first-wins on size still applies
         (
             [
-                ({"i"}, {"i": 6.0}, 2.0),
-                ({"i"}, {"i": 9.0}, 4.0),
+                (("i"), {"i": 6.0}, 2.0),
+                (("i"), {"i": 9.0}, 4.0),
             ],
             max,
-            {"i"},
+            ("i",),
             {"i": 6.0},
             4.0,
         ),
         # three defs; sum fills via variadic callable
         (
             [
-                ({"i"}, {"i": 5.0}, 1.0),
-                ({"i"}, {"i": 5.0}, 2.0),
-                ({"i"}, {"i": 5.0}, 3.0),
+                (("i"), {"i": 5.0}, 1.0),
+                (("i"), {"i": 5.0}, 2.0),
+                (("i"), {"i": 5.0}, 3.0),
             ],
             lambda *xs: sum(xs),
-            {"i"},
+            ("i",),
             {"i": 5.0},
             6.0,
         ),
@@ -109,7 +113,7 @@ def test_add_dummy_idx():
 def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
     objs = [TensorDef(ax, dims, fv) for (ax, dims, fv) in defs]
     out = TensorDef.mapjoin(func, *objs)
-    assert out.index_set == expected_axes
+    assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
     assert out.fill_value == expected_fill
 
@@ -117,7 +121,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
 @pytest.mark.parametrize(
     (
         "op_func",
-        "index_set",
+        "index_order",
         "dim_sizes",
         "fill_value",
         "reduce_fields",
@@ -126,69 +130,71 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         "expected_fill",
     ),
     [
+
         # addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
         (
             op.add,
-            ["i", "j", "k"],
+            
+            ("i", "j", "k"),
             {"i": 10.0, "j": 5.0, "k": 3.0},
             0.5,
-            ["j"],
-            {"i", "k"},
+            ("j",),
+            ("i", "k"),
             {"i": 10.0, "k": 3.0},
             0.5 * 5,
         ),
         # addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
         (
             op.add,
-            ["a", "b", "c", "d"],
+            ("a", "b", "c", "d"),
             {"a": 2.0, "b": 4.0, "c": 8.0, "d": 16.0},
             7.0,
-            ["b", "d"],
-            {"a", "c"},
+            ("b", "d"),
+            ("a", "c"),
             {"a": 2.0, "c": 8.0},
             7.0 * (4 * 16),
         ),
         # addition: no-op when reduce set is empty (n = 1) → fill unchanged
         (
             op.add,
-            ["x", "y"],
+            ("x", "y"),
             {"x": 3.0, "y": 9.0},
             1.0,
             [],
-            {"x", "y"},
+            ("x", "y"),
             {"x": 3.0, "y": 9.0},
             1.0,
         ),
         # addition: missing axis in reduce set → nothing reduced → fill unchanged
         (
             op.add,
-            ["i", "j"],
+            ("i", "j"),
             {"i": 5.0, "j": 6.0},
             0.0,
-            ["z"],
-            {"i", "j"},
+            ("z",),
+            ("i", "j"),
             {"i": 5.0, "j": 6.0},
             0.0,
         ),
         # multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
         (
             op.mul,
-            ["i", "j"],
+            ("i", "j"),
             {"i": 2.0, "j": 3.0},
             2.0,
-            ["j"],
-            {"i"},
+            ("j",),
+            ("i",),
             {"i": 2.0},
             8.0,
         ),
         # idempotent op: reduce entire axis → empty shape
         (
             min,
-            ["i"],
+            ("i",),
             {"i": 4.0},
             7.0,
-            ["i"],
-            set(),
+            ("i",),
+            tuple(),
             {},
             7.0,
         ),
@@ -196,7 +202,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
 )
 def test_tensordef_aggregate(
     op_func,
-    index_set,
+    index_order,
     dim_sizes,
     fill_value,
     reduce_fields,
@@ -204,10 +210,10 @@ def test_tensordef_aggregate(
     expected_dims,
     expected_fill,
 ):
-    d = TensorDef(index_set=index_set, dim_sizes=dim_sizes, fill_value=fill_value)
+    d = TensorDef(index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value)
     out = TensorDef.aggregate(op_func, None, reduce_fields, d)
 
-    assert out.index_set == expected_axes
+    assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
     assert out.fill_value == expected_fill
 
@@ -225,7 +231,7 @@ def test_from_tensor_and_getters():
         replace=False,
         cache={},
     )
-    assert stats.index_set == {"i", "j"}
+    assert stats.index_order == ("i", "j")
     assert stats.get_dim_size("i") == 2.0
     assert stats.get_dim_size("j") == 3.0
     assert stats.fill_value == 0
@@ -252,7 +258,7 @@ def test_estimate_non_fill_values(shape, expected):
         cache={},
     )
 
-    assert stats.index_set == set(axes)
+    assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected
 
 
@@ -279,7 +285,7 @@ def test_mapjoin_mul_and_add():
         ST=DenseStats, node=node_mul, bindings=OrderedDict(), replace=False, cache=cache
     )
 
-    assert dsm.index_set == {"i", "j", "k"}
+    assert dsm.index_order == ("i", "j", "k")
     assert dsm.get_dim_size("i") == 2.0
     assert dsm.get_dim_size("j") == 3.0
     assert dsm.get_dim_size("k") == 4.0
@@ -290,7 +296,7 @@ def test_mapjoin_mul_and_add():
         ST=DenseStats, node=node_add, bindings=OrderedDict(), replace=False, cache=cache
     )
 
-    assert ds_sum.index_set == {"i", "j"}
+    assert ds_sum.index_order == ("i", "j")
     assert ds_sum.get_dim_size("i") == 2.0
     assert ds_sum.get_dim_size("j") == 3.0
     assert ds_sum.fill_value == 1.0 + 2.0
@@ -316,11 +322,35 @@ def test_aggregate_and_issimilar():
         ST=DenseStats, node=node_add, bindings=OrderedDict(), replace=False, cache={}
     )
 
-    assert ds_agg.index_set == {"i"}
+    assert ds_agg.index_order == ("i",)
     assert ds_agg.get_dim_size("i") == 2.0
     assert ds_agg.fill_value == dsa.fill_value
     assert DenseStats.issimilar(dsa, dsa)
 
+def test_relabel_dense_stats():
+    arr = fl.asarray(np.zeros((2, 3)))
+    table = Table(Literal(arr), (Field("i"), Field("j")))
+    
+    stats = insert_statistics(
+        ST=DenseStats,
+        node=table,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    new_stats = DenseStats.relabel(stats, ("row", "col"))
+
+    assert new_stats.index_order == ("row", "col")
+
+    assert new_stats.get_dim_size("row") == 2.0
+    
+    assert new_stats.get_dim_size("col") == 3.0
+
+    assert new_stats.fill_value == stats.fill_value
+
+    with pytest.raises(ValueError):
+        DenseStats.relabel(stats, ("x", "y", "z"))
 
 # ─────────────────────────────── DCStats tests ─────────────────────────────
 
@@ -779,7 +809,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     new_def = TensorDef(frozenset({"i"}), dims, 0)
     out = DCStats._merge_dc_join(new_def, stats_objs)
 
-    assert out.tensordef.index_set == {"i"}
+    assert out.tensordef.index_order == ("i",)
     assert out.tensordef.dim_sizes == dims
     assert out.dcs == expected_dcs
 
@@ -872,7 +902,8 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
     new_def = TensorDef(frozenset(new_dims.keys()), new_dims, 0)
     out = DCStats._merge_dc_union(new_def, stats_objs)
 
-    assert out.tensordef.index_set == set(new_dims.keys())
+    #Does the order matter here ? - > Changed tuple to set as throwing assert error 
+    assert set(out.tensordef.index_order) == set(new_dims.keys())
     assert dict(out.tensordef.dim_sizes) == new_dims
     assert out.dcs == expected_dcs
 
@@ -1357,3 +1388,376 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+# ─────────────────────────────── Annotated_Query tests ─────────────────────────────
+@pytest.mark.parametrize(
+    "reduce_idxs,parent_idxs,expected",
+    [
+        # Some indices have parents
+        (["i", "j", "k"], {"i": [], "j": ["i"], "k": []}, ["i", "k"]),
+        # Keys missing from parent map should be treated as zero parents.
+        (["i", "j", "k"], {"j": ["i"]}, ["i", "k"]),
+        # All have parents
+        (["a", "b"], {"a": ["b"], "b": ["a"]}, []),
+        # Empty input
+        ([], {}, []),
+        # Order preserved among reducible indices
+        (["x", "y", "z"], {"y": ["x"]}, ["x", "z"]),
+    ],
+)
+def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
+    names = set(reduce_idxs)
+    names.update(parent_idxs.keys())
+    for i in parent_idxs.values():
+        names.update(i)
+
+    fields: dict[str, Field] = {x: Field(x) for x in names}
+    reduce_fields: list[Field] = [fields[name] for name in reduce_idxs]
+    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(
+        (fields[key], [fields[p] for p in parents])
+        for key, parents in parent_idxs.items()
+    )
+
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = object
+    aq.output_name = None
+    aq.reduce_idxs = reduce_fields
+    aq.point_expr = None
+    aq.idx_lowest_root = OrderedDict()
+    aq.idx_op = OrderedDict()
+    aq.idx_init = OrderedDict()
+    aq.parent_idxs = parent_fields
+    aq.original_idx = OrderedDict()
+    aq.connected_components = []
+    aq.connected_idxs = OrderedDict()
+    aq.output_order = None
+    aq.output_format = None
+
+    result = [field.name for field in get_reducible_idxs(aq)]
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "parent_idxs, connected_idxs, expected",
+    [
+        # Single component; order within component follows connected_idxs key order
+        (
+            {},
+            {"a": ["b"], "b": ["a"]},
+            [["a", "b"]],
+        ),
+        # Two components: {a,b} and {c}
+        (
+            {},
+            {"a": ["b"], "b": ["a"], "c": []},
+            [["a", "b"], ["c"]],
+        ),
+        # Parent edge is ignored for connectivity
+        (
+            {"b": ["a"]},
+            {"a": ["b"], "b": ["a"]},
+            [["a"], ["b"]],
+        ),
+        # Ordering across components is enforced
+        (
+            {"b": ["a"]},
+            {"b": [], "a": []},
+            [["a"], ["b"]],
+        ),
+        # Chain of three separate components with parents
+        (
+            {"b": ["a"], "c": ["b"]},
+            {"c": [], "b": [], "a": []},
+            [["a"], ["b"], ["c"]],
+        ),
+        # Single big component
+        (
+            {"b": ["a"], "c": ["b"]},
+            {"a": ["b"], "b": ["a", "c"], "c": ["b"]},
+            [["a"], ["b"], ["c"]],
+        ),
+    ],
+)
+def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
+    names: set[str] = set(parent_idxs.keys()) | set(connected_idxs.keys())
+    for i in parent_idxs.values():
+        names.update(i)
+    for j in connected_idxs.values():
+        names.update(j)
+
+    name = {x: Field(x) for x in names}
+
+    parent_field_idxs: dict[Field, list[Field]] = {
+        name[k]: [name[p] for p in v] for k, v in parent_idxs.items()
+    }
+    connected_field_idxs: dict[Field, list[Field]] = {
+        name[k]: [name[n] for n in v] for k, v in connected_idxs.items()
+    }
+
+    components = get_idx_connected_components(parent_field_idxs, connected_field_idxs)
+    result = [[field.name for field in comp] for comp in components]
+
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "expr,node_to_replace,new_node,nodes_to_remove,expected_names",
+    [
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            set(),
+            ["a", "a", "c"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("c"), (Field("c"),))},
+            ["a", "a"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("c"), (Field("c"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("c"), (Field("c"),))},
+            ["a", "b"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("a"), (Field("a"),)),
+            {Table(Literal("b"), (Field("b"),))},
+            ["a", "c"],
+        ),
+        (
+            MapJoin(
+                Literal("op"),
+                (
+                    Table(Literal("a"), (Field("a"),)),
+                    Table(Literal("b"), (Field("b"),)),
+                    Table(Literal("c"), (Field("c"),)),
+                ),
+            ),
+            Table(Literal("c"), (Field("c"),)),
+            Table(Literal("a"), (Field("a"),)),
+            set(),
+            ["a", "b", "a"],
+        ),
+    ],
+)
+def test_replace_and_remove_nodes(
+    expr,
+    node_to_replace,
+    new_node,
+    nodes_to_remove,
+    expected_names,
+):
+    out = replace_and_remove_nodes(
+        expr=expr,
+        node_to_replace=node_to_replace,
+        new_node=new_node,
+        nodes_to_remove=nodes_to_remove,
+    )
+
+    result = [tbl.idxs[0].name for tbl in out.args]
+    assert result == expected_names
+
+
+@pytest.mark.parametrize(
+    "root, idx_name, expected",
+    [
+        # Distributive case:
+        # root = MapJoin(mul, [A(i), B(j)]), reduce over j → [B]
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("i"),)),
+                    Table(Literal("B"), (Field("j"),)),
+                ),
+            ),
+            "j",
+            ["B"],
+        ),
+        # Split-push case:
+        # root = MapJoin(add, [A(i), B(i), C(j)]), reduce over i → [C, A, B]
+        (
+            MapJoin(
+                Literal(op.add),
+                (
+                    Table(Literal("A"), (Field("i"),)),
+                    Table(Literal("B"), (Field("i"),)),
+                    Table(Literal("C"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            ["C", "A", "B"],
+        ),
+        # Leaf case:
+        # root = Table(A(i)), reduce over i → [A]
+        (
+            Table(Literal("A"), (Field("i"),)),
+            "i",
+            ["A"],
+        ),
+        # Nested case:
+        # root = MapJoin(mul, [A(i,j), B(j)]), reduce over i → [A]
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("i"), Field("j"))),
+                    Table(Literal("B"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            ["A"],
+        ),
+        # Special case: max(C(i), D(j)), reduce over i → [max(C,D)]
+        (
+            MapJoin(
+                Literal(max),
+                (
+                    Table(Literal("C"), (Field("i"),)),
+                    Table(Literal("D"), (Field("j"),)),
+                ),
+            ),
+            "i",
+            [
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal("C"), (Field("i"),)),
+                        Table(Literal("D"), (Field("j"),)),
+                    ),
+                )
+            ],
+        ),
+        # root = MapJoin(mul, [A(j), MapJoin(max, [B(i), C(j)])]), reduce over i
+        (
+            MapJoin(
+                Literal(op.mul),
+                (
+                    Table(Literal("A"), (Field("j"),)),
+                    MapJoin(
+                        Literal(max),
+                        (
+                            Table(Literal("B"), (Field("i"),)),
+                            Table(Literal("C"), (Field("j"),)),
+                        ),
+                    ),
+                ),
+            ),
+            "i",
+            [
+                MapJoin(
+                    Literal(max),
+                    (
+                        Table(Literal("B"), (Field("i"),)),
+                        Table(Literal("C"), (Field("j"),)),
+                    ),
+                )
+            ],
+        ),
+    ],
+)
+def test_find_lowest_roots(root, idx_name, expected):
+    roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
+
+    # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
+    if expected and not isinstance(expected[0], str):
+        assert roots == expected
+    else:
+        # All other cases:
+        result: list[str] = []
+        for node in roots:
+            assert isinstance(node, Table)
+            assert isinstance(node.tns, Literal)
+            result.append(node.tns.val)
+
+        assert result == expected
+
+
+@pytest.mark.parametrize(
+    "expr_func, expected_dim_sizes, expected_index_order, expected_fill_value, "
+    "expected_non_fill",
+    [
+        # Base MapJoin: C = A + B
+        (
+            lambda A, B: A + B,
+            {"i": 2, "j": 3},
+            ("i", "j"),
+            0.0,
+            6.0,
+        ),
+        # Aggregate: D = C.sum(axis=0)
+        (
+            lambda A, B: finchlite.sum(A + B, axis=0),
+            {"j": 3},
+            ("j",),
+            0.0,
+            3.0,
+        ),
+        # Combination : F = ((A + B) * 3).sum(axis=1)
+        (
+            lambda A, B: finchlite.sum((A + B) * 3, axis=1),
+            {"i": 2},
+            ("i",),
+            0.0,
+            2.0,
+        ),
+    ],
+)
+def test_lazy_tensor_stats_parametrized(
+    expr_func,
+    expected_dim_sizes,
+    expected_index_order,
+    expected_fill_value,
+    expected_non_fill,
+):
+    arr1 = np.zeros((2, 3))
+    arr2 = np.ones((2, 3))
+    A = lazy(arr1)
+    B = lazy(arr2)
+
+    expr = expr_func(A, B)
+    stats = get_lazy_tensor_stats(expr, DenseStats)
+
+    assert isinstance(stats, DenseStats)
+    #The names of the indices are changed hence setting them back to the expected ones - Check
+    if expected_index_order:
+            stats = DenseStats.relabel(stats, expected_index_order)
+    assert stats.dim_sizes == expected_dim_sizes
+    assert stats.index_order == expected_index_order
+    assert stats.fill_value == expected_fill_value
+    assert stats.estimate_non_fill_values() == expected_non_fill
