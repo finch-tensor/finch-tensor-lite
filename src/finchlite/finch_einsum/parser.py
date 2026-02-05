@@ -158,7 +158,7 @@ lark_parser = Lark("""
     mul_expr: unary_expr ((MUL | DIV | FLOORDIV | MOD) unary_expr)*
     unary_expr: (PLUS | MINUS | TILDE) unary_expr | power_expr
     power_expr: primary (POW unary_expr)?
-    primary: call_func | access | literal | "(" expr ")"
+    primary: call_func | access | literal | IDX | "(" expr ")"
 
     OR: "or"
     AND: "and"
@@ -186,7 +186,7 @@ lark_parser = Lark("""
     OP: "+" | "-" | "*" | "or" | "and" | "|" | "&" | "^" | "<<" | ">>"
           | "//" | "/" | "%" | "**" | ">" | "<" | ">=" | "<=" | "==" | "!="
 
-    access: TNS "[" (IDX ",")* IDX? "]"
+    access: TNS "[" (primary ",")* primary? "]"
     call_func: (FUNC_NAME "(" (expr ",")* expr?  ")")
     literal: bool_literal | complex_literal | float_literal | int_literal
     bool_literal: BOOL
@@ -223,6 +223,9 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             | "literal",
             [child],
         ):
+            # Handle IDX tokens directly to avoid recursing with a non-Tree
+            if hasattr(child, 'type') and child.type == 'IDX':
+                return ein.Index(child.value)
             return _parse_einop_expr(child)
         case Tree(
             "or_expr"
@@ -265,7 +268,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
         case Tree("access", [tns, *idxs]):
             return ein.Access(
                 ein.Alias(tns.value),  # type: ignore[union-attr]
-                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
+                tuple(_parse_einop_expr(idx) for idx in idxs),
             )
         case Tree("bool_literal", (val,)):
             return ein.Literal(val.value == "True")  # type: ignore[union-attr]
@@ -289,12 +292,11 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             [Tree("increment", [Tree("access", [tns, *idxs]), op_token, expr_node])],
         ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
-            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
             op = ein.Literal(reduction_ops[op_token.value])  # type: ignore[union-attr]
             return ein.Einsum(
                 op,
                 ein.Alias(tns.value),  # type: ignore[union-attr]
-                idxs_exprs,
+                tuple(_parse_einop_expr(idx) for idx in idxs),
                 arg,  # type: ignore[union-attr]
             )
 
@@ -304,7 +306,7 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             return ein.Einsum(
                 op,
                 ein.Alias(tns.value),  # type: ignore[union-attr]
-                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
+                tuple(_parse_einop_expr(idx) for idx in idxs),
                 arg,
             )
 
