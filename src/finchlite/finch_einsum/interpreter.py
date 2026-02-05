@@ -223,7 +223,17 @@ class EinsumMachine:
                     self.xp, self.bindings, loops, dims, self.verbose
                 )
                 arg = ctx(arg)
-                axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
+
+                # Collect all ein.Index used in the LHS idxs (including nested)
+                assign_idxs = {
+                    individual_idx
+                    for idx in idxs
+                    for individual_idx in idx.get_idxs()
+                }
+
+                axis = tuple(
+                    i for i in range(len(loops)) if loops[i] not in assign_idxs
+                )
                 if op != overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
@@ -233,7 +243,7 @@ class EinsumMachine:
                         val = xp.take(val, -1, axis=i)
 
                 if any(not isinstance(idx, ein.Index) for idx in idxs):
-                    loops2 = [idx for idx in loops if idx in idxs]
+                    loops2 = [idx for idx in loops if idx in assign_idxs]
                     ctx2 = PointwiseEinsumMachine(
                         self.xp, self.bindings, loops2, dims, self.verbose
                     )
