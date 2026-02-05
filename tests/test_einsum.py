@@ -1173,9 +1173,9 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]]
+        # Result[i] = A.elems[i] * B[A.coords[0,i], A.coords[1,i]]
         Result = finchlite.einop(
-            "Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]]",
+            "Result[i] = A.elems[i] * B[A.coords[0,i], A.coords[1,i]]",
             A=sparse_A,
             B=B,
         )
@@ -1191,9 +1191,9 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # Result[i] = A.elems[i] + B[A.coords[0][i], A.coords[1][i]]
+        # Result[i] = A.elems[i] + B[A.coords[0,i], A.coords[1,i]]
         Result = finchlite.einop(
-            "Result[i] = A.elems[i] + B[A.coords[0][i], A.coords[1][i]]",
+            "Result[i] = A.elems[i] + B[A.coords[0,i], A.coords[1,i]]",
             A=sparse_A,
             B=B,
         )
@@ -1229,9 +1229,9 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]] + 5.0
+        # Result[i] = A.elems[i] * B[A.coords[0,i], A.coords[1,i]] + 5.0
         Result = finchlite.einop(
-            "Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]] + 5.0",
+            "Result[i] = A.elems[i] * B[A.coords[0,i], A.coords[1,i]] + 5.0",
             A=sparse_A,
             B=B,
         )
@@ -1249,8 +1249,8 @@ class TestEinsumIndirectAccess:
         sparse_A = SparseTensorFType.from_numpy(A)
 
         Result = finchlite.einop(
-            "Result[i] = (A.elems[i] + B[A.coords[0][i], A.coords[1][i]]) \
-            * C[A.coords[0][i], A.coords[1][i]]",
+            "Result[i] = (A.elems[i] + B[A.coords[0,i], A.coords[1,i]]) \
+            * C[A.coords[0,i], A.coords[1,i]]",
             A=sparse_A,
             B=B,
             C=C,
@@ -1267,9 +1267,9 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # Result[i] = B[A.coords[0][i]] (read B indirectly, without using A's elements)
+        # Result[i] = B[A.coords[0,i]] (read B indirectly, without using A's elements)
         Result = finchlite.einop(
-            "Result[i] = B[A.coords[0][i]]",
+            "Result[i] = B[A.coords[0,i]]",
             A=sparse_A,
             B=B,
         )
@@ -1279,7 +1279,7 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_double_indirection(self, rng):
-        """Test double indirection: A[B[C.coords[0][i]]]"""
+        """Test double indirection: A[B[C.coords[0,i]]]"""
 
         # Create small arrays to ensure valid indexing
         A = rng.random((8,))
@@ -1291,11 +1291,11 @@ class TestEinsumIndirectAccess:
 
         sparse_C = SparseTensorFType.from_numpy(C)
 
-        # Result[i] = A[B[C.coords[0][i]]]
-        # First get C.coords[0][i], then
+        # Result[i] = A[B[C.coords[0,i]]]
+        # First get C.coords[0,i], then
         # use that to index B, then use B's value to index A
         Result = finchlite.einop(
-            "Result[i] = A[B[C.coords[0][i]]]",
+            "Result[i] = A[B[C.coords[0,i]]]",
             A=A,
             B=B,
             C=sparse_C,
@@ -1308,7 +1308,7 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_triple_indirection(self, rng):
-        """Test triple indirection: A[B[C[D.coords[0][i]]]]"""
+        """Test triple indirection: A[B[C[D.coords[0,i]]]]"""
 
         # Create arrays with valid indexing ranges
         A = rng.random((8,))
@@ -1320,9 +1320,9 @@ class TestEinsumIndirectAccess:
 
         sparse_D = SparseTensorFType.from_numpy(D)
 
-        # Result[i] = A[B[C[D.coords[0][i]]]]
+        # Result[i] = A[B[C[D.coords[0,i]]]]
         Result = finchlite.einop(
-            "Result[i] = A[B[C[D.coords[0][i]]]]",
+            "Result[i] = A[B[C[D.coords[0,i]]]]",
             A=A,
             B=B,
             C=C,
@@ -1335,17 +1335,17 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_mixed_direct_indirect_indexing_2d(self, rng):
-        """Test mixed indexing: A[B.coords[0][i], j] - one indirect, one direct"""
+        """Test mixed indexing: A[B.coords[0,i], j] - one indirect, one direct"""
 
         A = rng.random((5, 4))
         B = rng.random((5,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i, j] = A[B.coords[0][i], j]
+        # Result[i, j] = A[B.coords[0,i], j]
         # First index is indirect (from B's coords), second is direct
         Result = finchlite.einop(
-            "Result[i, j] = A[B.coords[0][i], j]",
+            "Result[i, j] = A[B.coords[0,i], j]",
             A=A,
             B=sparse_B,
         )
@@ -1358,7 +1358,7 @@ class TestEinsumIndirectAccess:
     def test_mixed_direct_indirect_indexing_reversed(self, rng):
         """
         Test mixed indexing reversed
-        A[i, B.coords[0][j]] - first direct, second indirect
+        A[i, B.coords[0,j]] - first direct, second indirect
         """
 
         A = rng.random((4, 6))
@@ -1366,10 +1366,10 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i, j] = A[i, B.coords[0][j]]
+        # Result[i, j] = A[i, B.coords[0,j]]
         # First index is direct, second is indirect
         Result = finchlite.einop(
-            "Result[i, j] = A[i, B.coords[0][j]]",
+            "Result[i, j] = A[i, B.coords[0,j]]",
             A=A,
             B=sparse_B,
         )
@@ -1381,7 +1381,7 @@ class TestEinsumIndirectAccess:
 
     def test_both_indices_indirect_same_source(self, rng):
         """
-        Test both indices indirect from same source: A[B.coords[0][i], B.coords[0][i]]
+        Test both indices indirect from same source: A[B.coords[0,i], B.coords[0,i]]
         """
 
         A = rng.random((6, 6))
@@ -1389,10 +1389,10 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i] = A[B.coords[0][i], B.coords[0][i]]
+        # Result[i] = A[B.coords[0,i], B.coords[0,i]]
         # Extracting diagonal-like elements using indirect coordinates
         Result = finchlite.einop(
-            "Result[i] = A[B.coords[0][i], B.coords[0][i]]",
+            "Result[i] = A[B.coords[0,i], B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1405,7 +1405,7 @@ class TestEinsumIndirectAccess:
     def test_both_indices_indirect_different_sources(self, rng):
         """
         Test both indices indirect from different sources:
-        A[B.coords[0][i], C.coords[0][i]]
+        A[B.coords[0,i], C.coords[0,i]]
         """
 
         A = rng.random((6, 6))
@@ -1415,9 +1415,9 @@ class TestEinsumIndirectAccess:
         sparse_B = SparseTensorFType.from_numpy(B)
         sparse_C = SparseTensorFType.from_numpy(C)
 
-        # Result[i] = A[B.coords[0][i], C.coords[0][i]]
+        # Result[i] = A[B.coords[0,i], C.coords[0,i]]
         Result = finchlite.einop(
-            "Result[i] = A[B.coords[0][i], C.coords[0][i]]",
+            "Result[i] = A[B.coords[0,i], C.coords[0,i]]",
             A=A,
             B=sparse_B,
             C=sparse_C,
@@ -1440,10 +1440,10 @@ class TestEinsumIndirectAccess:
 
         sparse_C = SparseTensorFType.from_numpy(C)
 
-        # Result[i] = A[B[C.coords[0][i]]] * C.elems[i]
+        # Result[i] = A[B[C.coords[0,i]]] * C.elems[i]
         # Double indirection plus multiplication with sparse elements
         Result = finchlite.einop(
-            "Result[i] = A[B[C.coords[0][i]]] * C.elems[i]",
+            "Result[i] = A[B[C.coords[0,i]]] * C.elems[i]",
             A=A,
             B=B,
             C=sparse_C,
@@ -1462,10 +1462,10 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i, j] = A[B.coords[0][i], j] + B.elems[i]
+        # Result[i, j] = A[B.coords[0,i], j] + B.elems[i]
         # Mixed indexing plus addition with sparse elements
         Result = finchlite.einop(
-            "Result[i, j] = A[B.coords[0][i], j] + B.elems[i]",
+            "Result[i, j] = A[B.coords[0,i], j] + B.elems[i]",
             A=A,
             B=sparse_B,
         )
@@ -1483,10 +1483,10 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i, j, k] = A[i, B.coords[0][j], k]
+        # Result[i, j, k] = A[i, B.coords[0,j], k]
         # Middle dimension is indirectly indexed
         Result = finchlite.einop(
-            "Result[i, j, k] = A[i, B.coords[0][j], k]",
+            "Result[i, j, k] = A[i, B.coords[0,j], k]",
             A=A,
             B=sparse_B,
         )
@@ -1497,10 +1497,10 @@ class TestEinsumIndirectAccess:
 
     def test_mixed_same_iterator_indirect_and_direct(self, rng):
         """
-        Test A[B.coords[0][i], i] where same iterator 'i' is used both as indirect
+        Test A[B.coords[0,i], i] where same iterator 'i' is used both as indirect
         coordinate lookup AND as direct index.
 
-        Semantics: For each non-zero position in B, access A at row=B.coords[0][i],
+        Semantics: For each non-zero position in B, access A at row=B.coords[0,i],
         col=i where i ranges over 0..nnz-1.
 
         This tests the diagonal-like access pattern through sparse coordinates.
@@ -1511,22 +1511,22 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i] = A[B.coords[0][i], i]
+        # Result[i] = A[B.coords[0,i], i]
         # For i in 0..4: access A[coord_i, i]
         Result = finchlite.einop(
-            "Result[i] = A[B.coords[0][i], i]",
+            "Result[i] = A[B.coords[0,i], i]",
             A=A,
             B=sparse_B,
         )
 
-        # Expected: A[B.coords[0][i], i] for i in 0..nnz-1
+        # Expected: A[B.coords[0,i], i] for i in 0..nnz-1
         b_coords = sparse_B.coords.flatten()
         expected = A[b_coords, np.arange(len(b_coords))]
         finch_assert_allclose(Result, expected)
 
     def test_mixed_same_iterator_reversed_order(self, rng):
         """
-        Test A[i, B.coords[0][i]] - direct index first, then indirect.
+        Test A[i, B.coords[0,i]] - direct index first, then indirect.
 
         Same semantics but reversed axis order.
         """
@@ -1535,9 +1535,9 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i] = A[i, B.coords[0][i]]
+        # Result[i] = A[i, B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[i] = A[i, B.coords[0][i]]",
+            "Result[i] = A[i, B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1548,7 +1548,7 @@ class TestEinsumIndirectAccess:
 
     def test_mixed_same_iterator_with_operation(self, rng):
         """
-        Test A[B.coords[0][i], i] * B.elems[i] - mixed indexing combined with
+        Test A[B.coords[0,i], i] * B.elems[i] - mixed indexing combined with
         element access.
         """
         A = rng.random((6, 6))
@@ -1556,9 +1556,9 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i] = A[B.coords[0][i], i] * B.elems[i]
+        # Result[i] = A[B.coords[0,i], i] * B.elems[i]
         Result = finchlite.einop(
-            "Result[i] = A[B.coords[0][i], i] * B.elems[i]",
+            "Result[i] = A[B.coords[0,i], i] * B.elems[i]",
             A=A,
             B=sparse_B,
         )
@@ -1570,7 +1570,7 @@ class TestEinsumIndirectAccess:
 
     def test_mixed_same_iterator_3d_tensor(self, rng):
         """
-        Test A[B.coords[0][i], i, j] - mixed indexing with additional free index.
+        Test A[B.coords[0,i], i, j] - mixed indexing with additional free index.
 
         Result should have shape (nnz, J).
         """
@@ -1579,21 +1579,21 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i, j] = A[B.coords[0][i], i, j]
+        # Result[i, j] = A[B.coords[0,i], i, j]
         Result = finchlite.einop(
-            "Result[i, j] = A[B.coords[0][i], i, j]",
+            "Result[i, j] = A[B.coords[0,i], i, j]",
             A=A,
             B=sparse_B,
         )
 
         b_coords = sparse_B.coords.flatten()
-        # Expected: A[B.coords[0][i], i, :] for each i
+        # Expected: A[B.coords[0,i], i, :] for each i
         expected = A[b_coords, np.arange(len(b_coords)), :]
         finch_assert_allclose(Result, expected)
 
     def test_mixed_same_iterator_sandwich(self, rng):
         """
-        Test A[i, B.coords[0][i], i] - direct index on both sides of indirect.
+        Test A[i, B.coords[0,i], i] - direct index on both sides of indirect.
 
         This tests non-contiguous direct indices sharing the same iterator
         as an indirect access.
@@ -1603,34 +1603,34 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i] = A[i, B.coords[0][i], i]
+        # Result[i] = A[i, B.coords[0,i], i]
         Result = finchlite.einop(
-            "Result[i] = A[i, B.coords[0][i], i]",
+            "Result[i] = A[i, B.coords[0,i], i]",
             A=A,
             B=sparse_B,
         )
 
         b_coords = sparse_B.coords.flatten()
         nnz = len(b_coords)
-        # Expected: A[i, B.coords[0][i], i] = extract "diagonal" through indirect middle
+        # Expected: A[i, B.coords[0,i], i] = extract "diagonal" through indirect middle
         expected = A[np.arange(nnz), b_coords, np.arange(nnz)]
         finch_assert_allclose(Result, expected)
 
     def test_mixed_two_iterators_interleaved(self, rng):
         """
-        Test A[B.coords[0][i], j, i] - two different iterators, one used both
+        Test A[B.coords[0,i], j, i] - two different iterators, one used both
         directly and indirectly.
 
-        This creates a 2D result: for each (i, j), access A[B.coords[0][i], j, i].
+        This creates a 2D result: for each (i, j), access A[B.coords[0,i], j, i].
         """
         A = rng.random((5, 3, 5))
         B = rng.random((5,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[i, j] = A[B.coords[0][i], j, i]
+        # Result[i, j] = A[B.coords[0,i], j, i]
         Result = finchlite.einop(
-            "Result[i, j] = A[B.coords[0][i], j, i]",
+            "Result[i, j] = A[B.coords[0,i], j, i]",
             A=A,
             B=sparse_B,
         )
@@ -1644,15 +1644,15 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_indirect_sum_reduction(self, rng):
-        """Test indirect access with sum reduction: Result += A[B.coords[0][i]]"""
+        """Test indirect access with sum reduction: Result += A[B.coords[0,i]]"""
         A = rng.random((8,))
         B = rng.random((8,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[] += A[B.coords[0][i]]
+        # Result[] += A[B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[] += A[B.coords[0][i]]",
+            "Result[] += A[B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1662,7 +1662,7 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_indirect_max_reduction(self, rng):
-        """Test indirect access with max reduction: Result max= A[B.coords[0][i]]"""
+        """Test indirect access with max reduction: Result max= A[B.coords[0,i]]"""
 
         A = rng.random((10,))
         B = np.zeros((10,))
@@ -1672,9 +1672,9 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[] max= A[B.coords[0][i]]
+        # Result[] max= A[B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[] max= A[B.coords[0][i]]",
+            "Result[] max= A[B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1684,16 +1684,16 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_indirect_min_reduction(self, rng):
-        """Test indirect access with min reduction: Result min= A[B.coords[0][i]]"""
+        """Test indirect access with min reduction: Result min= A[B.coords[0,i]]"""
 
         A = rng.random((6,))
         B = rng.random((6,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[] min= A[B.coords[0][i]]
+        # Result[] min= A[B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[] min= A[B.coords[0][i]]",
+            "Result[] min= A[B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1709,9 +1709,9 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[j] += A[B.coords[0][i], j]
+        # Result[j] += A[B.coords[0,i], j]
         Result = finchlite.einop(
-            "Result[j] += A[B.coords[0][i], j]",
+            "Result[j] += A[B.coords[0,i], j]",
             A=A,
             B=sparse_B,
         )
@@ -1727,9 +1727,9 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[] += B.elems[i] * A[B.coords[0][i]]
+        # Result[] += B.elems[i] * A[B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[] += B.elems[i] * A[B.coords[0][i]]",
+            "Result[] += B.elems[i] * A[B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1738,15 +1738,15 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_indirect_mixed_iterator_reduction(self, rng):
-        """Test A[B.coords[0][i], i] with sum reduction."""
+        """Test A[B.coords[0,i], i] with sum reduction."""
         A = rng.random((5, 5))
         B = rng.random((5,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[] += A[B.coords[0][i], i]
+        # Result[] += A[B.coords[0,i], i]
         Result = finchlite.einop(
-            "Result[] += A[B.coords[0][i], i]",
+            "Result[] += A[B.coords[0,i], i]",
             A=A,
             B=sparse_B,
         )
@@ -1762,9 +1762,9 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[k] += A[B.coords[0][i], j, k]
+        # Result[k] += A[B.coords[0,i], j, k]
         Result = finchlite.einop(
-            "Result[k] += A[B.coords[0][i], j, k]",
+            "Result[k] += A[B.coords[0,i], j, k]",
             A=A,
             B=sparse_B,
         )
@@ -1774,7 +1774,7 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_nested_indirect_access(self, rng):
-        """A[B[C.coords[0][i]]] - chained indirection through three tensors."""
+        """A[B[C.coords[0,i]]] - chained indirection through three tensors."""
         C = np.zeros((8,))
         C[[1, 4, 6]] = rng.random(3)
         sparse_C = SparseTensorFType.from_numpy(C)
@@ -1782,9 +1782,9 @@ class TestEinsumIndirectAccess:
         B = np.array([7, 2, 0, 5, 3, 6, 1, 4])  # permutation
         A = rng.random((8,))
 
-        # Result[i] = A[B[C.coords[0][i]]]
+        # Result[i] = A[B[C.coords[0,i]]]
         Result = finchlite.einop(
-            "Result[i] = A[B[C.coords[0][i]]]",
+            "Result[i] = A[B[C.coords[0,i]]]",
             A=A,
             B=B,
             C=sparse_C,
@@ -1795,7 +1795,7 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_two_sparse_iterators_outer_product(self, rng):
-        """Result[i, j] = A[B.coords[0][i]] * C[D.coords[0][j]]"""
+        """Result[i, j] = A[B.coords[0,i]] * C[D.coords[0,j]]"""
         B = np.zeros((6,))
         B[[0, 3, 5]] = rng.random(3)
         sparse_B = SparseTensorFType.from_numpy(B)
@@ -1807,9 +1807,9 @@ class TestEinsumIndirectAccess:
         A = rng.random((6,))
         C = rng.random((4,))
 
-        # Result[i, j] = A[B.coords[0][i]] * C[D.coords[0][j]]
+        # Result[i, j] = A[B.coords[0,i]] * C[D.coords[0,j]]
         Result = finchlite.einop(
-            "Result[i, j] = A[B.coords[0][i]] * C[D.coords[0][j]]",
+            "Result[i, j] = A[B.coords[0,i]] * C[D.coords[0,j]]",
             A=A,
             B=sparse_B,
             C=C,
@@ -1830,9 +1830,9 @@ class TestEinsumIndirectAccess:
 
         A = rng.random((n,))
 
-        # Result[i] = B.elems[i] * A[B.coords[0][i]]
+        # Result[i] = B.elems[i] * A[B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[i] = B.elems[i] * A[B.coords[0][i]]",
+            "Result[i] = B.elems[i] * A[B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )
@@ -1843,7 +1843,7 @@ class TestEinsumIndirectAccess:
     def test_4d_tensor_indirect_middle_dim(self, rng):
         """
         4D tensor with indirect access in second dimension only.
-        Result[a, i, c, d] = A[a, B.coords[0][i], c, d]
+        Result[a, i, c, d] = A[a, B.coords[0,i], c, d]
         """
 
         A = rng.random((3, 8, 4, 5))
@@ -1851,9 +1851,9 @@ class TestEinsumIndirectAccess:
         B[[1, 3, 7]] = rng.random(3)
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[a, i, c, d] = A[a, B.coords[0][i], c, d]
+        # Result[a, i, c, d] = A[a, B.coords[0,i], c, d]
         Result = finchlite.einop(
-            "Result[a, i, c, d] = A[a, B.coords[0][i], c, d]",
+            "Result[a, i, c, d] = A[a, B.coords[0,i], c, d]",
             A=A,
             B=sparse_B,
         )
@@ -1863,16 +1863,16 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_triple_mixed_indices_complex_reduction(self, rng):
-        """A[B.coords[0][i], i, j] * C[j] with reduction over both i and j."""
+        """A[B.coords[0,i], i, j] * C[j] with reduction over both i and j."""
         A = rng.random((5, 5, 4))
         B = np.zeros((5,))
         B[[0, 1, 2, 3, 4]] = rng.random(5)
         sparse_B = SparseTensorFType.from_numpy(B)
         C = rng.random((4,))
 
-        # Result[] += A[B.coords[0][i], i, j] * C[j]
+        # Result[] += A[B.coords[0,i], i, j] * C[j]
         Result = finchlite.einop(
-            "Result[] += A[B.coords[0][i], i, j] * C[j]",
+            "Result[] += A[B.coords[0,i], i, j] * C[j]",
             A=A,
             B=sparse_B,
             C=C,
@@ -1893,9 +1893,9 @@ class TestEinsumIndirectAccess:
 
         A = rng.random((n, 3))
 
-        # Result[i, j] = B.elems[i] * A[B.coords[0][i], j]
+        # Result[i, j] = B.elems[i] * A[B.coords[0,i], j]
         Result = finchlite.einop(
-            "Result[i, j] = B.elems[i] * A[B.coords[0][i], j]",
+            "Result[i, j] = B.elems[i] * A[B.coords[0,i], j]",
             A=A,
             B=sparse_B,
         )
@@ -1910,9 +1910,9 @@ class TestEinsumIndirectAccess:
         B[[2, 5, 8]] = rng.random(3)
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # Result[] max= B.elems[i] * A[B.coords[0][i]]
+        # Result[] max= B.elems[i] * A[B.coords[0,i]]
         Result = finchlite.einop(
-            "Result[] max= B.elems[i] * A[B.coords[0][i]]",
+            "Result[] max= B.elems[i] * A[B.coords[0,i]]",
             A=A,
             B=sparse_B,
         )

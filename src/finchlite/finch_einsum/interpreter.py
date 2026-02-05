@@ -108,9 +108,6 @@ class TensorEinsumMachine:
                 if node not in self.bindings:
                     raise ValueError(f"Unbound variable: {name}")
                 return self.bindings[node]
-            case ein.Access(tns, (ein.Literal(dim),)):
-                evaled: Any = self(tns)
-                return evaled[dim]
             case ein.GetAttr(obj, ein.Literal(attr)):
                 evaled = self(obj)
                 if not hasattr(evaled, attr):

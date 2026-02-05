@@ -186,11 +186,11 @@ lark_parser = Lark("""
     OP: "+" | "-" | "*" | "or" | "and" | "|" | "&" | "^" | "<<" | ">>"
           | "//" | "/" | "%" | "**" | ">" | "<" | ">=" | "<=" | "==" | "!="
 
-    // Tensor expression: supports chained access and attribute access
-    // e.g., A, A.elems, A.coords[0], A.coords[0][i]
-    tns_expr: tns_expr "." ATTR -> getattr
-            | tns_expr "[" (primary ",")* primary? "]" -> access
-            | TNS -> tns_base
+    // Tensor expression: supports attribute access
+    // e.g., A, A.elems, A.coords[0][i]
+    tns_expr: tns_getattr | tns_base
+    tns_getattr: tns_expr "." ATTR
+    tns_base: TNS
 
     // Top-level access used in assignments (Result[i] = ...)
     access: tns_expr "[" (primary ",")* primary? "]"
@@ -276,16 +276,9 @@ def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
             return ein.Call(op, (_parse_einop_expr(arg),))
         case Tree("access", [tns_expr, *idxs]):
             return ein.Access(
-                _parse_einop_expr(tns_expr),
+                _parse_einop_tns(tns_expr),
                 tuple(_parse_einop_expr(idx) for idx in idxs),
             )
-        case Tree("getattr", [obj, attr]):
-            return ein.GetAttr(
-                obj=_parse_einop_expr(obj),
-                attr=ein.Literal(attr.value),  # type: ignore[union-attr]
-            )
-        case Tree("tns_base", [tns]):
-            return ein.Alias(tns.value)  # type: ignore[union-attr]
         case Tree("bool_literal", (val,)):
             return ein.Literal(val.value == "True")  # type: ignore[union-attr]
         case Tree("int_literal", (val,)):
@@ -300,15 +293,20 @@ def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
-def _extract_tns_name(tns_expr: Tree | Token) -> str:
+def _parse_einop_tns(tns_expr: Tree | Token) -> str:
     """Extract the tensor name from a tns_expr tree (expecting tns_base)."""
     match tns_expr:
-        case Tree("tns_base", [tns]):
-            return tns.value  # type: ignore[union-attr, return-value]
-        case _:
-            raise ValueError(
-                f"Left-hand side of assignment must be an access, got {tns_expr}"
+        case Tree("tns_expr", [child]):
+            return _parse_einop_tns(child)
+        case Tree("tns_getattr", [obj, attr]):
+            return ein.GetAttr(
+                obj=_parse_einop_tns(obj),
+                attr=ein.Literal(attr.value),  # type: ignore[union-attr]
             )
+        case Tree("tns_base", [tns]):
+            return ein.Alias(tns.value)  # type: ignore[union-attr]
+        case _:
+            raise ValueError(f"Unknown tree structure: {tns_expr}")
 
 
 def parse_einop(expr: str) -> ein.EinsumNode:
@@ -325,9 +323,12 @@ def parse_einop(expr: str) -> ein.EinsumNode:
         ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             op = ein.Literal(reduction_ops[op_token.value])  # type: ignore[union-attr]
+            tns = _parse_einop_tns(tns_expr)
+            if not isinstance(tns, ein.Alias):
+                raise ValueError(f"Increment target must be a tensor alias, got {tns}.")
             return ein.Einsum(
                 op,
-                ein.Alias(_extract_tns_name(tns_expr)),
+                tns,
                 tuple(_parse_einop_expr(idx) for idx in idxs),
                 arg,  # type: ignore[union-attr]
             )
@@ -337,9 +338,12 @@ def parse_einop(expr: str) -> ein.EinsumNode:
         ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             op = ein.Literal(overwrite)
+            tns = _parse_einop_tns(tns_expr)
+            if not isinstance(tns, ein.Alias):
+                raise ValueError(f"Increment target must be a tensor alias, got {tns}.")
             return ein.Einsum(
                 op,
-                ein.Alias(_extract_tns_name(tns_expr)),
+                tns,
                 tuple(_parse_einop_expr(idx) for idx in idxs),
                 arg,
             )
