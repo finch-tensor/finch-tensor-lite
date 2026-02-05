@@ -32,7 +32,7 @@ class EinsumLoader(ABC):
     ]:
         """
         Generate Finch Library from the given logic and input types, with a
-        single method called main which implements the logic. Also return a
+        single method called `main` which implements the logic. Also return a
         dictionary including additional tables needed to run the kernel.
         """
 

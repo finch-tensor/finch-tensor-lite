@@ -28,6 +28,8 @@ assembly_parser = Lark(
     _stmt: assign
          | increment
          | for_loop
+         | if
+         | if_else
          | resize
          | _COMMENT
     ?access_expr: access_expr OP access_expr | CNAME | INT
@@ -37,7 +39,9 @@ assembly_parser = Lark(
     assign: lhs "=" expr
     increment: lhs OP "=" expr
     resize: "resize" "(" CNAME "," access_expr ")"
-    for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ _stmt* _NEWLINE+ "end"
+    for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ block _NEWLINE+ "end"
+    if: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
+    if_else: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "else" _NEWLINE+ block _NEWLINE+ "end"
 """  # noqa: E501
 )
 
@@ -46,10 +50,16 @@ _OPS = {
     "-": operator.sub,
     "*": operator.mul,
     "/": operator.truediv,
+    "<": operator.lt,
+    "<=": operator.le,
+    ">": operator.gt,
+    ">=": operator.ge,
 }
 
 
-def parse_assembly(code: str, vars: dict[str, asm.Variable]) -> asm.AssemblyStatement:
+def parse_assembly(
+    code: str, vars: dict[str, asm.Variable], position_type: type = np.intp
+) -> asm.AssemblyStatement:
     tree = assembly_parser.parse(code.strip())
 
     def ctx(tree: Tree):
@@ -59,17 +69,27 @@ def parse_assembly(code: str, vars: dict[str, asm.Variable]) -> asm.AssemblyStat
             case Token("OP", val):
                 return _OPS[val]
             case Token("INT", val):
-                return asm.Literal(int(val))
+                return asm.Literal(position_type(val))
             case Token("DECIMAL", val):
                 return asm.Literal(float(val))
             case Tree("start", [Tree("block", bodies)]):
                 return asm.Block(tuple(ctx(b) for b in bodies))
-            case Tree("for_loop", [i, start, stop, *bodies]):
+            case Tree("for_loop", [i, start, stop, Tree("block", bodies)]):
                 return asm.ForLoop(
                     ctx(i),
                     ctx(start),
                     ctx(stop),
                     asm.Block(tuple(ctx(b) for b in bodies)),
+                )
+            case Tree("if", [cond, *bodies]):
+                return asm.If(ctx(cond), asm.Block(tuple(ctx(b) for b in bodies)))
+            case Tree(
+                "if_else", [cond, Tree("block", bodies), Tree("block", else_bodies)]
+            ):
+                return asm.IfElse(
+                    ctx(cond),
+                    asm.Block(tuple(ctx(b) for b in bodies)),
+                    asm.Block(tuple(ctx(b) for b in else_bodies)),
                 )
             case Tree("resize", [arr, size]):
                 return asm.Call(asm.Literal(np.resize), (ctx(arr), ctx(size)))
