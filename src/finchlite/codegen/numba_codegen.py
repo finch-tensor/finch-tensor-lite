@@ -750,6 +750,10 @@ class NumbaContext(Context):
                         )
                     self(func)
                 return None
+            case asm.Print(args):
+                for arg in args:
+                    self.exec(f"{feed}print({self(arg)})")
+                return None
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
 
