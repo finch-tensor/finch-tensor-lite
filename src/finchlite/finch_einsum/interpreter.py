@@ -202,7 +202,9 @@ class EinsumMachine:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
-                loops = set(arg.get_idxs()).union(set(idxs))
+                loops = set(arg.get_idxs()).union(
+                    [idx for idx in idxs if isinstance(idx, ein.Index)]
+                )
                 loops = sorted(loops, key=lambda x: x.name)
                 dims: dict[ein.Index, Any] = {
                     idx: dim
@@ -218,7 +220,15 @@ class EinsumMachine:
                     self.xp, self.bindings, loops, dims, self.verbose
                 )
                 arg = ctx(arg)
-                axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
+
+                # Collect all ein.Index used in the LHS idxs (including nested)
+                assign_idxs = {
+                    individual_idx for idx in idxs for individual_idx in idx.get_idxs()
+                }
+
+                axis = tuple(
+                    i for i in range(len(loops)) if loops[i] not in assign_idxs
+                )
                 if op != overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
@@ -226,15 +236,32 @@ class EinsumMachine:
                     val = arg
                     for i in sorted(axis, reverse=True):
                         val = xp.take(val, -1, axis=i)
-                dropped = [idx for idx in loops if idx in idxs]
-                axis = [dropped.index(idx) for idx in idxs]
-                if tns in self.bindings:
-                    if self.bindings[tns].ndim == 0:
-                        self.bindings[tns][()] = val
-                    else:
-                        self.bindings[tns][:] = xp.permute_dims(val, axis)
+
+                if any(not isinstance(idx, ein.Index) for idx in idxs):
+                    loops2 = [idx for idx in loops if idx in assign_idxs]
+                    ctx2 = PointwiseEinsumMachine(
+                        self.xp, self.bindings, loops2, dims, self.verbose
+                    )
+                    evaled = tuple([ctx2(idx) for idx in idxs])
+
+                    # assert tns in self.bindings
+                    if tns not in self.bindings:
+                        estimated_size = tuple(
+                            evaled_i.max(initial=-1) + 1 for evaled_i in evaled
+                        )
+                        self.bindings[tns] = xp.zeros(estimated_size, dtype=val.dtype)
+
+                    self.bindings[tns][evaled] = val
                 else:
-                    self.bindings[tns] = xp.permute_dims(val, axis)
+                    dropped = [idx for idx in loops if idx in idxs]
+                    axis = [dropped.index(idx) for idx in idxs]
+                    if tns in self.bindings:
+                        if self.bindings[tns].ndim == 0:
+                            self.bindings[tns][()] = val
+                        else:
+                            self.bindings[tns][:] = xp.permute_dims(val, axis)
+                    else:
+                        self.bindings[tns] = xp.permute_dims(val, axis)
                 return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")

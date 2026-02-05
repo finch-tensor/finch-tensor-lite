@@ -1941,3 +1941,181 @@ class TestEinsumIndirectAccess:
             np.arange(10).reshape(-1, 1) + np.arange(10).reshape(1, -1)
         )
         finch_assert_allclose(Result, expected)
+
+
+class TestEinsumIndirectAssignment:
+    """Test einsum with indirect assignment"""
+
+    def test_scatter_values_to_indices(self, rng):
+        """
+        Scatter values from a source array to positions in the result
+        Result[A.coords[0][i]] = A.elems[i]
+        """
+        A = np.zeros((8,))
+        A[[1, 3, 5, 7]] = rng.random(4)
+        sparse_A = SparseTensorFType.from_numpy(A)
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i]] = A.elems[i]",
+            A=sparse_A,
+        )
+
+        expected = A.copy()
+        finch_assert_allclose(Result, expected)
+
+    def test_scatter_sum_reduction(self, rng):
+        """
+        Sum-scatter: multiple values may scatter to the same index
+        Result[A.coords[0][i]] += A.elems[i]
+        """
+        A = np.zeros((8,))
+        A[[1, 3, 5, 7]] = rng.random(4)
+        sparse_A = SparseTensorFType.from_numpy(A)
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i]] += A.elems[i]",
+            A=sparse_A,
+        )
+
+        expected = A.copy()
+        finch_assert_allclose(Result, expected)
+
+    def test_scatter_with_transformation(self, rng):
+        """
+        Scatter transformed values
+        Result[A.coords[0][i]] = A.elems[i] * 2 + i
+        """
+        A = np.zeros((6,))
+        A[[0, 2, 4]] = rng.random(3)
+        sparse_A = SparseTensorFType.from_numpy(A)
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i]] = A.elems[i] * 2 + i",
+            A=sparse_A,
+        )
+
+        coords = sparse_A.coords.flatten()
+        elems = sparse_A.elems
+        # Output size is max(coords) + 1 = 5 (coords are [0, 2, 4])
+        expected = np.zeros(int(coords.max()) + 1)
+        for idx, (coord, elem) in enumerate(zip(coords, elems, strict=True)):
+            expected[coord] = elem * 2 + idx
+        finch_assert_allclose(Result, expected)
+
+    def test_indirect_2d_assignment(self, rng):
+        """
+        Scatter to 2D positions using coordinates from sparse tensor
+        Result[A.coords[0][i], A.coords[1][i]] = A.elems[i]
+        """
+        A = np.zeros((4, 4))
+        A[0, 1] = rng.random()
+        A[1, 3] = rng.random()
+        A[2, 0] = rng.random()
+        A[3, 2] = rng.random()
+        sparse_A = SparseTensorFType.from_numpy(A)
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i], A.coords[1][i]] = A.elems[i]",
+            A=sparse_A,
+        )
+
+        expected = A.copy()
+        finch_assert_allclose(Result, expected)
+
+    def test_gather_and_scatter(self, rng):
+        """
+        Gather from B using A's coords and scatter to result at same coords
+        Result[A.coords[0][i]] = B[A.coords[0][i]]
+        """
+        A = np.zeros((8,))
+        A[[2, 4, 6]] = rng.random(3)
+        sparse_A = SparseTensorFType.from_numpy(A)
+        B = rng.random((8,))
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i]] = B[A.coords[0][i]]",
+            A=sparse_A,
+            B=B,
+        )
+
+        coords = sparse_A.coords.flatten()
+        # Output size is max(coords) + 1 = 7 (coords are [2, 4, 6])
+        expected = np.zeros(int(coords.max()) + 1)
+        expected[coords] = B[coords]
+        finch_assert_allclose(Result, expected)
+
+    def test_permutation_scatter(self, rng):
+        """
+        Use a permutation array to scatter values
+        Result[P[i]] = A[i]
+        """
+        A = rng.random((5,))
+        P = np.array([3, 0, 4, 1, 2])  # permutation
+
+        Result = finchlite.einop(
+            "Result[P[i]] = A[i]",
+            A=A,
+            P=P,
+        )
+
+        expected = np.zeros(5)
+        expected[P] = A
+        finch_assert_allclose(Result, expected)
+
+    def test_inverse_permutation_scatter(self, rng):
+        """
+        Inverse permutation: Result[i] such that Result[P[i]] = A[i]
+        Effectively Result = A[P^-1]
+        """
+        A = rng.random((6,))
+        P = np.array([4, 1, 5, 0, 3, 2])  # permutation
+
+        Result = finchlite.einop(
+            "Result[P[i]] = A[i]",
+            A=A,
+            P=P,
+        )
+
+        expected = np.zeros(6)
+        for i in range(6):
+            expected[P[i]] = A[i]
+        finch_assert_allclose(Result, expected)
+
+    def test_scatter_reduction_max(self, rng):
+        """
+        Max-scatter: keep the maximum value at each scattered position
+        Result[A.coords[0][i]] max= A.elems[i]
+        """
+        A = np.zeros((8,))
+        A[[1, 3, 5, 7]] = rng.random(4)
+        sparse_A = SparseTensorFType.from_numpy(A)
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i]] max= A.elems[i]",
+            A=sparse_A,
+        )
+
+        expected = A.copy()
+        finch_assert_allclose(Result, expected)
+
+    def test_scatter_with_computation(self, rng):
+        """
+        Scatter with computation involving multiple tensors
+        Result[A.coords[0][i]] = B[A.coords[0][i]] * A.elems[i]
+        """
+        A = np.zeros((6,))
+        A[[0, 2, 5]] = rng.random(3)
+        sparse_A = SparseTensorFType.from_numpy(A)
+        B = rng.random((6,))
+
+        Result = finchlite.einop(
+            "Result[A.coords[0][i]] = B[A.coords[0][i]] * A.elems[i]",
+            A=sparse_A,
+            B=B,
+        )
+
+        coords = sparse_A.coords.flatten()
+        elems = sparse_A.elems
+        expected = np.zeros(6)
+        expected[coords] = B[coords] * elems
+        finch_assert_allclose(Result, expected)
