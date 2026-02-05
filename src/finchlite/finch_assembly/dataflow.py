@@ -9,6 +9,15 @@ from .nodes import (
 )
 
 
+# TODO: make a dataflow_preprocess step as a separate function
+    # desugar + number statements
+
+
+# TODO: make a dataflow_postprocess step as a separate function
+    # remove numbering annotations (NumberedStatement wrappers)
+
+
+# TODO: make it for testing only, and rename it (?)
 def assembly_copy_propagation(node: AssemblyNode):
     """
     Run copy-propagation on a FinchAssembly node.
@@ -18,6 +27,13 @@ def assembly_copy_propagation(node: AssemblyNode):
     ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
     ctx.analyze()
     return ctx
+
+
+# TODO: implement a collect_lattice_values function
+
+
+# TODO: implement actual copy propagation apply using Rewriter and the collected lattice values from the analysis context.
+    # for each statement, if a variable is known to be a copy, replace it with the source variable.
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
