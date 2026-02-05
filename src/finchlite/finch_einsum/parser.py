@@ -3,7 +3,7 @@ from typing import Any
 
 import numpy as np
 
-from lark import Lark, Tree
+from lark import Lark, Token, Tree
 
 from ..algebra import overwrite, promote_max, promote_min
 from ..symbolic import Namespace
@@ -211,7 +211,7 @@ lark_parser = Lark("""
 """)
 
 
-def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
+def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
     match t:
         case Tree(
             "start"
@@ -233,8 +233,8 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             [child],
         ):
             # Handle IDX tokens directly to avoid recursing with a non-Tree
-            if hasattr(child, "type") and child.type == "IDX":
-                return ein.Index(child.value)
+            if isinstance(child, Token) and child.type == "IDX":
+                return ein.Index(str(child.value))
             return _parse_einop_expr(child)
         case Tree(
             "or_expr"
@@ -300,7 +300,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
-def _extract_tns_name(tns_expr: Tree) -> str:
+def _extract_tns_name(tns_expr: Tree | Token) -> str:
     """Extract the tensor name from a tns_expr tree (expecting tns_base)."""
     match tns_expr:
         case Tree("tns_base", [tns]):

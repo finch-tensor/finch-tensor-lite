@@ -104,9 +104,11 @@ def compute_shape_vars(
                     idx_bindings = {}
                 for node in PostOrderDFS(arg):
                     match node:
-                        case ein.Access(var, idxs_2):
+                        case ein.Access(access_tns, idxs_2) if isinstance(
+                            access_tns, ein.Alias
+                        ):
                             for idx_2, dim in zip(
-                                idxs_2, dim_bindings[var], strict=True
+                                idxs_2, dim_bindings[access_tns], strict=True
                             ):
                                 assert isinstance(idx_2, ein.Index)
                                 if idx_2 in idx_bindings:
