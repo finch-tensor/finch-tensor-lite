@@ -1169,15 +1169,6 @@ class TestEinsumDataTypes:
 class TestEinsumIndirectAccess:
     """Test einsum with indirect access"""
 
-    def run_einsum_plan(
-        self, prgm: ein.Plan, bindings: dict[str, Any], expected: np.ndarray
-    ):
-        """Runs an einsum plan and returns the result"""
-        interpreter = ein.EinsumInterpreter()
-        result = interpreter(prgm, bindings)[0]
-
-        finch_assert_allclose(result, expected)
-
     def test_indirect_elementwise_multiplication(self, rng):
         """Test indirect elementwise multiplication but no indirect assignment"""
 
@@ -1186,60 +1177,15 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # A is sparse
-        # C[i] = AElems[i] * B[ACoords[i]]
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Call(
-                        op=ein.Literal(operator.mul),
-                        args=(
-                            ein.Access(
-                                tns=ein.GetAttr(
-                                    obj=ein.Alias("A"),
-                                    attr=ein.Literal("elems"),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                            ein.Access(
-                                tns=ein.Alias("B"),
-                                idxs=(
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("A"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(0),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("A"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(1),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]]
+        Result = finchlite.einop(
+            "Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]]",
+            A=sparse_A,
+            B=B,
         )
 
-        result = finchlite.multiply(A, B).flatten()
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
-        )
+        expected = finchlite.multiply(A, B).flatten()
+        finch_assert_allclose(Result, expected)
 
     def test_indirect_elementwise_addition(self, rng):
         """Test indirect elementwise addition"""
@@ -1249,58 +1195,15 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # C[i] = AElems[i] + B[ACoords[i]]
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Call(
-                        op=ein.Literal(operator.add),
-                        args=(
-                            ein.Access(
-                                tns=ein.GetAttr(
-                                    obj=ein.Alias("A"), attr=ein.Literal("elems")
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                            ein.Access(
-                                tns=ein.Alias("B"),
-                                idxs=(
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("A"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(0),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("A"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(1),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = A.elems[i] + B[A.coords[0][i], A.coords[1][i]]
+        Result = finchlite.einop(
+            "Result[i] = A.elems[i] + B[A.coords[0][i], A.coords[1][i]]",
+            A=sparse_A,
+            B=B,
         )
 
-        result = (A + B).flatten()
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
-        )
+        expected = (A + B).flatten()
+        finch_assert_allclose(Result, expected)
 
     def test_indirect_multiple_reads(self, rng):
         """Test multiple indirect reads from the same tensor"""
@@ -1311,42 +1214,16 @@ class TestEinsumIndirectAccess:
         sparse_A = SparseTensorFType.from_numpy(A)
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # C[i] = AElems[i] * BElems[i]
+        # Result[i] = A.elems[i] * B.elems[i]
         # Both A and B are sparse, reading their elements directly
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Call(
-                        op=ein.Literal(operator.mul),
-                        args=(
-                            ein.Access(
-                                tns=ein.GetAttr(
-                                    obj=ein.Alias("A"),
-                                    attr=ein.Literal("elems"),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                            ein.Access(
-                                tns=ein.GetAttr(
-                                    obj=ein.Alias("B"),
-                                    attr=ein.Literal("elems"),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        Result = finchlite.einop(
+            "Result[i] = A.elems[i] * B.elems[i]",
+            A=sparse_A,
+            B=sparse_B,
         )
 
-        result = finchlite.multiply(A, B).flatten()
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): sparse_B}, result
-        )
+        expected = finchlite.multiply(A, B).flatten()
+        finch_assert_allclose(Result, expected)
 
     def test_indirect_with_constant(self, rng):
         """Test indirect access combined with constant"""
@@ -1356,65 +1233,15 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # C[i] = AElems[i] * B[ACoords[i]] + 5.0
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Call(
-                        op=ein.Literal(operator.add),
-                        args=(
-                            ein.Call(
-                                op=ein.Literal(operator.mul),
-                                args=(
-                                    ein.Access(
-                                        tns=ein.GetAttr(
-                                            obj=ein.Alias("A"),
-                                            attr=ein.Literal("elems"),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                    ein.Access(
-                                        tns=ein.Alias("B"),
-                                        idxs=(
-                                            ein.Access(
-                                                tns=ein.Access(
-                                                    ein.GetAttr(
-                                                        obj=ein.Alias("A"),
-                                                        attr=ein.Literal("coords"),
-                                                    ),
-                                                    (ein.Literal(0),),
-                                                ),
-                                                idxs=(ein.Index("i"),),
-                                            ),
-                                            ein.Access(
-                                                tns=ein.Access(
-                                                    ein.GetAttr(
-                                                        obj=ein.Alias("A"),
-                                                        attr=ein.Literal("coords"),
-                                                    ),
-                                                    (ein.Literal(1),),
-                                                ),
-                                                idxs=(ein.Index("i"),),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            ein.Literal(5.0),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]] + 5.0
+        Result = finchlite.einop(
+            "Result[i] = A.elems[i] * B[A.coords[0][i], A.coords[1][i]] + 5.0",
+            A=sparse_A,
+            B=B,
         )
 
-        result = (A * B + 5.0).flatten()
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, result
-        )
+        expected = (A * B + 5.0).flatten()
+        finch_assert_allclose(Result, expected)
 
     def test_indirect_nested_operations(self, rng):
         """Test nested operations with indirect access"""
@@ -1425,91 +1252,16 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # D[i] = (AElems[i] + B[ACoords[i]]) * C[ACoords[i]]
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Call(
-                        op=ein.Literal(operator.mul),
-                        args=(
-                            ein.Call(
-                                op=ein.Literal(operator.add),
-                                args=(
-                                    ein.Access(
-                                        tns=ein.GetAttr(
-                                            obj=ein.Alias("A"),
-                                            attr=ein.Literal("elems"),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                    ein.Access(
-                                        tns=ein.Alias("B"),
-                                        idxs=(
-                                            ein.Access(
-                                                tns=ein.Access(
-                                                    ein.GetAttr(
-                                                        obj=ein.Alias("A"),
-                                                        attr=ein.Literal("coords"),
-                                                    ),
-                                                    (ein.Literal(0),),
-                                                ),
-                                                idxs=(ein.Index("i"),),
-                                            ),
-                                            ein.Access(
-                                                tns=ein.Access(
-                                                    ein.GetAttr(
-                                                        obj=ein.Alias("A"),
-                                                        attr=ein.Literal("coords"),
-                                                    ),
-                                                    (ein.Literal(1),),
-                                                ),
-                                                idxs=(ein.Index("i"),),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            ein.Access(
-                                tns=ein.Alias("C"),
-                                idxs=(
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("A"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(0),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("A"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(1),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = (A.elems[i] + B[A.coords[0][i], A.coords[1][i]]) * C[A.coords[0][i], A.coords[1][i]]
+        Result = finchlite.einop(
+            "Result[i] = (A.elems[i] + B[A.coords[0][i], A.coords[1][i]]) * C[A.coords[0][i], A.coords[1][i]]",
+            A=sparse_A,
+            B=B,
+            C=C,
         )
 
-        result = ((A + B) * C).flatten()
-        self.run_einsum_plan(
-            prgm,
-            {ein.Alias("A"): sparse_A, ein.Alias("B"): B, ein.Alias("C"): C},
-            result,
-        )
+        expected = ((A + B) * C).flatten()
+        finch_assert_allclose(Result, expected)
 
     def test_indirect_direct_access_only(self, rng):
         """Test accessing only the indirect coordinates"""
@@ -1519,41 +1271,19 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # C[i] = B[ACoords[i]] (read B indirectly, without using A's elements)
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Access(
-                        tns=ein.Alias("B"),
-                        idxs=(
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("A"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = B[A.coords[0][i]] (read B indirectly, without using A's elements)
+        Result = finchlite.einop(
+            "Result[i] = B[A.coords[0][i]]",
+            A=sparse_A,
+            B=B,
         )
 
         # Result should be B's values at A's coordinates
         expected = B[A != 0]
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): sparse_A, ein.Alias("B"): B}, expected
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_double_indirection(self, rng):
-        """Test double indirection: A[B[CCoords[i]]]"""
+        """Test double indirection: A[B[C.coords[0][i]]]"""
 
         # Create small arrays to ensure valid indexing
         A = rng.random((8,))
@@ -1565,51 +1295,23 @@ class TestEinsumIndirectAccess:
 
         sparse_C = SparseTensorFType.from_numpy(C)
 
-        # D[i] = A[B[CCoords[i]]]
-        # First get CCoords[i], then use that to index B, then use B's value to index A
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Access(
-                        tns=ein.Alias("A"),
-                        idxs=(
-                            ein.Access(
-                                tns=ein.Alias("B"),
-                                idxs=(
-                                    ein.Access(
-                                        tns=ein.Access(
-                                            ein.GetAttr(
-                                                obj=ein.Alias("C"),
-                                                attr=ein.Literal("coords"),
-                                            ),
-                                            (ein.Literal(0),),
-                                        ),
-                                        idxs=(ein.Index("i"),),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = A[B[C.coords[0][i]]]
+        # First get C.coords[0][i], then use that to index B, then use B's value to index A
+        Result = finchlite.einop(
+            "Result[i] = A[B[C.coords[0][i]]]",
+            A=A,
+            B=B,
+            C=sparse_C,
         )
 
         # Expected: for each non-zero position in C, get its coord,
         # index into B, then index into A
         c_coords = sparse_C.coords
         expected = A[B[c_coords]].flatten()
-        self.run_einsum_plan(
-            prgm,
-            {ein.Alias("A"): A, ein.Alias("B"): B, ein.Alias("C"): sparse_C},
-            expected,
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_triple_indirection(self, rng):
-        """Test triple indirection: A[B[C[DCoords[i]]]]"""
+        """Test triple indirection: A[B[C[D.coords[0][i]]]]"""
 
         # Create arrays with valid indexing ranges
         A = rng.random((8,))
@@ -1621,105 +1323,45 @@ class TestEinsumIndirectAccess:
 
         sparse_D = SparseTensorFType.from_numpy(D)
 
-        # E[i] = A[B[C[DCoords[i]]]]
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Access(
-                        tns=ein.Alias("A"),
-                        idxs=(
-                            ein.Access(
-                                tns=ein.Alias("B"),
-                                idxs=(
-                                    ein.Access(
-                                        tns=ein.Alias("C"),
-                                        idxs=(
-                                            ein.Access(
-                                                tns=ein.Access(
-                                                    ein.GetAttr(
-                                                        obj=ein.Alias("D"),
-                                                        attr=ein.Literal("coords"),
-                                                    ),
-                                                    (ein.Literal(0),),
-                                                ),
-                                                idxs=(ein.Index("i"),),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = A[B[C[D.coords[0][i]]]]
+        Result = finchlite.einop(
+            "Result[i] = A[B[C[D.coords[0][i]]]]",
+            A=A,
+            B=B,
+            C=C,
+            D=sparse_D,
         )
 
         # Expected: chain of indirections
         d_coords = sparse_D.coords
         expected = A[B[C[d_coords]]].flatten()
-        self.run_einsum_plan(
-            prgm,
-            {
-                ein.Alias("A"): A,
-                ein.Alias("B"): B,
-                ein.Alias("C"): C,
-                ein.Alias("D"): sparse_D,
-            },
-            expected,
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_mixed_direct_indirect_indexing_2d(self, rng):
-        """Test mixed indexing: A[BCoords[i], j] - one indirect, one direct"""
+        """Test mixed indexing: A[B.coords[0][i], j] - one indirect, one direct"""
 
         A = rng.random((5, 4))
         B = rng.random((5,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # C[i, j] = A[BCoords[i], j]
+        # Result[i, j] = A[B.coords[0][i], j]
         # First index is indirect (from B's coords), second is direct
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"), ein.Index("j")),
-                    arg=ein.Access(
-                        tns=ein.Alias("A"),
-                        idxs=(
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("B"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                            ein.Index("j"),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        Result = finchlite.einop(
+            "Result[i, j] = A[B.coords[0][i], j]",
+            A=A,
+            B=sparse_B,
         )
 
         # Expected: A rows indexed by B's coords, all columns
         b_coords = sparse_B.coords
         expected = A[b_coords.flatten(), :]
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_mixed_direct_indirect_indexing_reversed(self, rng):
         """
         Test mixed indexing reversed
-        A[i, BCoords[j]] - first direct, second indirect
+        A[i, B.coords[0][j]] - first direct, second indirect
         """
 
         A = rng.random((4, 6))
@@ -1727,99 +1369,44 @@ class TestEinsumIndirectAccess:
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # C[i, j] = A[i, BCoords[j]]
+        # Result[i, j] = A[i, B.coords[0][j]]
         # First index is direct, second is indirect
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"), ein.Index("j")),
-                    arg=ein.Access(
-                        tns=ein.Alias("A"),
-                        idxs=(
-                            ein.Index("i"),
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("B"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("j"),),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        Result = finchlite.einop(
+            "Result[i, j] = A[i, B.coords[0][j]]",
+            A=A,
+            B=sparse_B,
         )
 
         # Expected: all rows of A, columns indexed by B's coords
         b_coords = sparse_B.coords
         expected = A[:, b_coords.flatten()]
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_both_indices_indirect_same_source(self, rng):
-        """Test both indices indirect from same source: A[BCoords[i], BCoords[i]]"""
+        """Test both indices indirect from same source: A[B.coords[0][i], B.coords[0][i]]"""
 
         A = rng.random((6, 6))
         B = rng.random((6,))
 
         sparse_B = SparseTensorFType.from_numpy(B)
 
-        # C[i] = A[BCoords[i], BCoords[i]]
+        # Result[i] = A[B.coords[0][i], B.coords[0][i]]
         # Extracting diagonal-like elements using indirect coordinates
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Access(
-                        tns=ein.Alias("A"),
-                        idxs=(
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("B"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("B"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        Result = finchlite.einop(
+            "Result[i] = A[B.coords[0][i], B.coords[0][i]]",
+            A=A,
+            B=sparse_B,
         )
 
         # Expected: A[coords, coords] - pseudo-diagonal at indirect positions
         b_coords = sparse_B.coords
         expected = A[b_coords.flatten(), b_coords.flatten()]
-        self.run_einsum_plan(
-            prgm, {ein.Alias("A"): A, ein.Alias("B"): sparse_B}, expected
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_both_indices_indirect_different_sources(self, rng):
         """
         Test both indices indirect from different sources:
-        A[BCoords[i], CCoords[i]]
+        A[B.coords[0][i], C.coords[0][i]]
         """
 
         A = rng.random((6, 6))
@@ -1829,41 +1416,12 @@ class TestEinsumIndirectAccess:
         sparse_B = SparseTensorFType.from_numpy(B)
         sparse_C = SparseTensorFType.from_numpy(C)
 
-        # D[i] = A[BCoords[i], CCoords[i]]
-        prgm = ein.Plan(
-            (
-                ein.Einsum(
-                    op=ein.Literal(overwrite),
-                    tns=ein.Alias("Result"),
-                    idxs=(ein.Index("i"),),
-                    arg=ein.Access(
-                        tns=ein.Alias("A"),
-                        idxs=(
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("B"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                            ein.Access(
-                                tns=ein.Access(
-                                    ein.GetAttr(
-                                        obj=ein.Alias("C"),
-                                        attr=ein.Literal("coords"),
-                                    ),
-                                    (ein.Literal(0),),
-                                ),
-                                idxs=(ein.Index("i"),),
-                            ),
-                        ),
-                    ),
-                ),
-                ein.Produces((ein.Alias("Result"),)),
-            )
+        # Result[i] = A[B.coords[0][i], C.coords[0][i]]
+        Result = finchlite.einop(
+            "Result[i] = A[B.coords[0][i], C.coords[0][i]]",
+            A=A,
+            B=sparse_B,
+            C=sparse_C,
         )
 
         # Expected: A indexed by pairs of coords from B and C
@@ -1871,11 +1429,7 @@ class TestEinsumIndirectAccess:
         b_coords = sparse_B.coords.flatten()
         c_coords = sparse_C.coords.flatten()
         expected = A[b_coords, c_coords]
-        self.run_einsum_plan(
-            prgm,
-            {ein.Alias("A"): A, ein.Alias("B"): sparse_B, ein.Alias("C"): sparse_C},
-            expected,
-        )
+        finch_assert_allclose(Result, expected)
 
     def test_double_indirection_with_operation(self, rng):
         """Test double indirection combined with arithmetic operation"""
