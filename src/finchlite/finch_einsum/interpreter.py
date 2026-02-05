@@ -229,15 +229,21 @@ class EinsumMachine:
                     val = arg
                     for i in sorted(axis, reverse=True):
                         val = xp.take(val, -1, axis=i)
-                dropped = [idx for idx in loops if idx in idxs]
-                axis = [dropped.index(idx) for idx in idxs]
-                if tns in self.bindings:
-                    if self.bindings[tns].ndim == 0:
-                        self.bindings[tns][()] = val
-                    else:
-                        self.bindings[tns][:] = xp.permute_dims(val, axis)
+
+                if any(not isinstance(idx, ein.Index) for idx in idxs):
+                    evaled = tuple([ctx(tns) for tns in tns])
+                    assert tns in self.bindings
+                    self.bindings[tns][evaled] = val
                 else:
-                    self.bindings[tns] = xp.permute_dims(val, axis)
+                    dropped = [idx for idx in loops if idx in idxs]
+                    axis = [dropped.index(idx) for idx in idxs]
+                    if tns in self.bindings:
+                        if self.bindings[tns].ndim == 0:
+                            self.bindings[tns][()] = val
+                        else:
+                            self.bindings[tns][:] = xp.permute_dims(val, axis)
+                    else:
+                        self.bindings[tns] = xp.permute_dims(val, axis)
                 return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
