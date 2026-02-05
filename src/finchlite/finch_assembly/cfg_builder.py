@@ -90,10 +90,6 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
                     b2 = go(b)
                     new_bodies.append(b2)
 
-                    # Insert loop-exit assertion immediately after each while.
-                    if isinstance(b2, WhileLoop):
-                        new_bodies.append(Assert(_as_not_expr(b2.condition)))
-
                 return Block(tuple(new_bodies))
             case If(cond, body):
                 return go(IfElse(cond, body, Block(())))
@@ -108,7 +104,9 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
             case WhileLoop(cond, body):
                 body_block = go(body)
                 body_block = Block((Assert(cond), *body_block.bodies))
-                return WhileLoop(cond, body_block)
+
+                # Insert loop-exit assertion immediately after each while.
+                return Block((WhileLoop(cond, body_block), Assert(_as_not_expr(cond))))
             case ForLoop(var, start, end, body):
                 fic_var_name = namespace.freshen("j")
                 fic_var = Variable(fic_var_name, np.int64)
@@ -234,34 +232,43 @@ class AssemblyCFGBuilder:
             case IfElse(cond, body, else_body):
                 before_block = self.current_block
 
+                # create blocks for if, else, and after
                 if_block = self.cfg.new_block()
                 else_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
 
+                # connect before block to if and else blocks
                 before_block.add_successor(if_block)
                 before_block.add_successor(else_block)
 
+                # fill in the if block
                 self.current_block = if_block
                 self(body, break_block, return_block)
                 self.current_block.add_successor(after_block)
 
+                # fill in the else block
                 self.current_block = else_block
                 self(else_body, break_block, return_block)
                 self.current_block.add_successor(after_block)
 
+                # continue building after the if-else
                 self.current_block = after_block
             case WhileLoop(cond, body):
                 before_block = self.current_block
 
+                # create blocks for the loop body and the code after the loop
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
 
+                # connect before block to the loop body and the after block
                 before_block.add_successor(body_block)
                 before_block.add_successor(after_block)
 
+                # fill in the loop body
                 self.current_block = body_block
                 self(body, after_block, return_block)
 
+                # connect the end of loop body back to the beginning to form the loop
                 self.current_block.add_successor(body_block)
                 self.current_block.add_successor(after_block)
                 self.current_block = after_block
