@@ -205,7 +205,7 @@ class EinsumMachine:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
-                loops = set(arg.get_idxs()).union(set(idxs))
+                loops = set(arg.get_idxs()).union(set([idx for idx in idxs if isinstance(idx, ein.Index)]))
                 loops = sorted(loops, key=lambda x: x.name)
                 dims: dict[ein.Index, Any] = {
                     idx: dim
@@ -231,8 +231,17 @@ class EinsumMachine:
                         val = xp.take(val, -1, axis=i)
 
                 if any(not isinstance(idx, ein.Index) for idx in idxs):
-                    evaled = tuple([ctx(tns) for tns in tns])
-                    assert tns in self.bindings
+                    loops2 = [idx for idx in loops if idx in idxs]
+                    ctx2 = PointwiseEinsumMachine(
+                        self.xp, self.bindings, loops2, dims, self.verbose
+                    )
+                    evaled = tuple([ctx2(idx) for idx in idxs])
+                    
+                    #assert tns in self.bindings
+                    if tns not in self.bindings:
+                        estimated_size = tuple(evaled_i.max(initial=-1) + 1 for evaled_i in evaled)
+                        self.bindings[tns] = xp.zeros(estimated_size, dtype=val.dtype)
+
                     self.bindings[tns][evaled] = val
                 else:
                     dropped = [idx for idx in loops if idx in idxs]
