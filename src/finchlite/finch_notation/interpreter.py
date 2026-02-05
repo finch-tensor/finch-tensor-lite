@@ -9,11 +9,8 @@ from .. import finch_assembly as asm
 from ..algebra import (
     Tensor,
     TensorFType,
-    element_type,
-    fill_value,
     query_property,
     register_property,
-    shape_type,
 )
 from ..symbolic import ScopedDict, fisinstance, ftype
 from . import nodes as ntn
@@ -53,7 +50,7 @@ class TensorViewFType(TensorFType):
 
     @property
     def element_type(self):
-        return element_type(self.tns)
+        return self.tns.element_type
 
     @property
     def fill_value(self):
@@ -61,7 +58,7 @@ class TensorViewFType(TensorFType):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return fill_value(self.tns)
+        return self.tns.fill_value
 
     @property
     def shape_type(self):
@@ -69,7 +66,7 @@ class TensorViewFType(TensorFType):
         Get the shape type of the tensor view.
         This is the shape type of the tensor at the specified indices.
         """
-        return shape_type(self.tns)[len(self.idxs) : -1]
+        return self.tns.shape_type[len(self.idxs) : -1]
 
 
 class TensorView(Tensor):
@@ -114,7 +111,7 @@ class TensorView(Tensor):
         Get the element type of the tensor view.
         This is the type of the elements in the tensor at the specified indices.
         """
-        return element_type(self.tns)
+        return self.tns.ftype.element_type
 
     @property
     def fill_value(self):
@@ -122,7 +119,15 @@ class TensorView(Tensor):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return self.tns.fill_value
+        return self.tns.ftype.fill_value
+
+    @property
+    def shape_type(self):
+        """
+        Get the shape type of the tensor view.
+        This is the shape type of the tensor at the specified indices.
+        """
+        return self.tns.ftype.shape_type[len(self.idxs) : -1]
 
     def access(self, idxs, op=None):
         """
