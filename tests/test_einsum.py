@@ -1998,7 +1998,7 @@ class TestEinsumIndirectAssignment:
         elems = sparse_A.elems
         # Output size is max(coords) + 1 = 5 (coords are [0, 2, 4])
         expected = np.zeros(int(coords.max()) + 1)
-        for idx, (coord, elem) in enumerate(zip(coords, elems)):
+        for idx, (coord, elem) in enumerate(zip(coords, elems, strict=True)):
             expected[coord] = elem * 2 + idx
         finch_assert_allclose(Result, expected)
 

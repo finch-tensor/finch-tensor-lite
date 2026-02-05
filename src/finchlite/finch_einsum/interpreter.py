@@ -226,9 +226,7 @@ class EinsumMachine:
 
                 # Collect all ein.Index used in the LHS idxs (including nested)
                 assign_idxs = {
-                    individual_idx
-                    for idx in idxs
-                    for individual_idx in idx.get_idxs()
+                    individual_idx for idx in idxs for individual_idx in idx.get_idxs()
                 }
 
                 axis = tuple(
