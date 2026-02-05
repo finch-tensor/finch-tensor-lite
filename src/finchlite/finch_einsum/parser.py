@@ -233,7 +233,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             [child],
         ):
             # Handle IDX tokens directly to avoid recursing with a non-Tree
-            if hasattr(child, 'type') and child.type == 'IDX':
+            if hasattr(child, "type") and child.type == "IDX":
                 return ein.Index(child.value)
             return _parse_einop_expr(child)
         case Tree(
@@ -307,7 +307,7 @@ def _extract_tns_name(tns_expr: Tree) -> str:
             return tns.value  # type: ignore[union-attr, return-value]
         case _:
             raise ValueError(
-                f"Left-hand side of assignment must be a simple tensor access, got {tns_expr}"
+                f"Left-hand side of assignment must be an access, got {tns_expr}"
             )
 
 
@@ -316,7 +316,12 @@ def parse_einop(expr: str) -> ein.EinsumNode:
     match tree:
         case Tree(
             "start",
-            [Tree("increment", [Tree("access", [tns_expr, *idxs]), op_token, expr_node])],
+            [
+                Tree(
+                    "increment",
+                    [Tree("access", [tns_expr, *idxs]), op_token, expr_node],
+                )
+            ],
         ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             op = ein.Literal(reduction_ops[op_token.value])  # type: ignore[union-attr]
@@ -327,7 +332,9 @@ def parse_einop(expr: str) -> ein.EinsumNode:
                 arg,  # type: ignore[union-attr]
             )
 
-        case Tree("start", [Tree("assign", [Tree("access", [tns_expr, *idxs]), expr_node])]):
+        case Tree(
+            "start", [Tree("assign", [Tree("access", [tns_expr, *idxs]), expr_node])]
+        ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             op = ein.Literal(overwrite)
             return ein.Einsum(

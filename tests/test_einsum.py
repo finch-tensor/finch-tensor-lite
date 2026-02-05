@@ -1,5 +1,3 @@
-from typing import Any
-
 import pytest
 
 import numpy as np
@@ -1250,9 +1248,9 @@ class TestEinsumIndirectAccess:
 
         sparse_A = SparseTensorFType.from_numpy(A)
 
-        # Result[i] = (A.elems[i] + B[A.coords[0][i], A.coords[1][i]]) * C[A.coords[0][i], A.coords[1][i]]
         Result = finchlite.einop(
-            "Result[i] = (A.elems[i] + B[A.coords[0][i], A.coords[1][i]]) * C[A.coords[0][i], A.coords[1][i]]",
+            "Result[i] = (A.elems[i] + B[A.coords[0][i], A.coords[1][i]]) \
+            * C[A.coords[0][i], A.coords[1][i]]",
             A=sparse_A,
             B=B,
             C=C,
@@ -1294,7 +1292,8 @@ class TestEinsumIndirectAccess:
         sparse_C = SparseTensorFType.from_numpy(C)
 
         # Result[i] = A[B[C.coords[0][i]]]
-        # First get C.coords[0][i], then use that to index B, then use B's value to index A
+        # First get C.coords[0][i], then
+        # use that to index B, then use B's value to index A
         Result = finchlite.einop(
             "Result[i] = A[B[C.coords[0][i]]]",
             A=A,
@@ -1381,7 +1380,9 @@ class TestEinsumIndirectAccess:
         finch_assert_allclose(Result, expected)
 
     def test_both_indices_indirect_same_source(self, rng):
-        """Test both indices indirect from same source: A[B.coords[0][i], B.coords[0][i]]"""
+        """
+        Test both indices indirect from same source: A[B.coords[0][i], B.coords[0][i]]
+        """
 
         A = rng.random((6, 6))
         B = rng.random((6,))
