@@ -1,9 +1,8 @@
 import operator
-from typing import Any
 
 import numpy as np
 
-from finchlite.algebra.tensor import Tensor, TensorFType
+from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_einsum.stages import (
     EinsumEvaluator,
@@ -11,7 +10,6 @@ from finchlite.finch_einsum.stages import (
     compute_shape_vars,
 )
 from finchlite.symbolic.ftype import fisinstance
-from finchlite.symbolic.traversal import PostOrderDFS
 
 from ..algebra import overwrite, promote_max, promote_min
 from . import nodes as ein
@@ -84,99 +82,48 @@ class EinsumInterpreter(EinsumEvaluator):
         self.verbose = verbose
 
     def __call__(self, node, bindings=None):
-        from ..tensor import SparseTensor
-
         if bindings is None:
             bindings = {}
-        bindings = {
-            k: v if isinstance(v, SparseTensor) else self.xp.asarray(v)
-            for k, v in bindings.items()
-        }
+        bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(
             xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
         )
         return machine(node)
 
 
-class TensorEinsumMachine:
-    def __init__(self, bindings):
-        self.bindings = bindings
-
-    def __call__(self, node) -> Tensor:
-        match node:
-            case ein.Alias(name):
-                if node not in self.bindings:
-                    raise ValueError(f"Unbound variable: {name}")
-                return self.bindings[node]
-            case ein.GetAttr(obj, ein.Literal(attr)):
-                evaled = self(obj)
-                if not hasattr(evaled, attr):
-                    raise ValueError(f"Object {obj} has no attribute {attr}")
-                return getattr(evaled, attr)
-            case _:
-                raise ValueError(f"Unknown tensor einsum type: {type(node)}")
-
-
 class PointwiseEinsumMachine:
-    def __init__(self, xp, bindings, loops, dims, verbose):
+    def __init__(self, xp, bindings, loops, verbose):
         self.xp = xp
         self.bindings = bindings
         self.loops = loops
-        self.dims = dims
         self.verbose = verbose
-        self.tns_ctx = TensorEinsumMachine(bindings)
 
     def __call__(self, node):
         xp = self.xp
         match node:
             case ein.Literal(val):
-                # If val is already an array, return it directly
-                # (e.g., from recursive access).
-                # Otherwise, broadcast the scalar to match the loop dimensions
-                if hasattr(val, "ndim") and val.ndim > 0:
-                    return val
                 return self.xp.full([1 for _ in self.loops], val)
+            case ein.Alias(name):
+                if node not in self.bindings:
+                    raise ValueError(f"Unbound variable: {name}")
+                return self.bindings[node]
             case ein.Call(ein.Literal(func), args):
                 if len(args) == 1:
                     func = getattr(xp, unary_ops[func])
                 else:
                     func = getattr(xp, nary_ops[func])
                 vals = [self(arg) for arg in args]
-                # Promote to common dtype for Array API compatibility
-                if len(vals) > 1:
-                    common_dtype = xp.result_type(*vals)
-                    vals = [xp.astype(v, common_dtype) for v in vals]
                 return func(*vals)
-            case ein.Index(_) as idx:
-                tns = self.xp.arange(self.dims[idx])
-                for _ in range(len(self.loops) - self.loops.index(idx) - 1):
-                    tns = self.xp.expand_dims(tns, -1)
-                return tns
-            case ein.Access(tns, idxs) if all(
-                isinstance(idx, ein.Index) for idx in idxs
-            ):
+            case ein.Access(tns, idxs):
+                assert len(idxs) == len(set(idxs))
                 assert self.loops is not None
-
-                tns = self.tns_ctx(tns)
-                assert len(idxs) == len(tns.shape)
-
                 perm = [idxs.index(idx) for idx in self.loops if idx in idxs]
-
-                tns = xp.permute_dims(tns, perm)  # permute the dimensions
+                tns = self(tns)
+                tns = xp.permute_dims(tns, perm)
                 return xp.expand_dims(
                     tns,
                     [i for i in range(len(self.loops)) if self.loops[i] not in idxs],
                 )
-            case ein.Access(tns, idxs):
-                assert self.loops is not None
-                tns = self.tns_ctx(tns)
-                evaled_items = tuple(self(idx) for idx in idxs)
-                return tns[evaled_items]
-            case ein.GetAttr(obj, ein.Literal(attr)):
-                obj = self(obj)
-                if not hasattr(obj, attr):
-                    raise ValueError(f"Object {obj} has no attribute {attr}")
-                return getattr(obj, attr)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
 
@@ -185,7 +132,6 @@ class EinsumMachine:
     def __init__(self, xp, bindings, verbose):
         self.xp = xp
         self.bindings = bindings
-        self.tns_ctx = TensorEinsumMachine(bindings)
         self.verbose = verbose
 
     def __call__(self, node):
@@ -202,33 +148,13 @@ class EinsumMachine:
                         raise ValueError(f"Unbound variable: {arg}")
                 return tuple(self.bindings[arg] for arg in args)
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
-                loops = set(arg.get_idxs()).union(
-                    [idx for idx in idxs if isinstance(idx, ein.Index)]
-                )
+                loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
-                dims: dict[ein.Index, Any] = {
-                    idx: dim
-                    for node in PostOrderDFS(arg)
-                    if isinstance(node, ein.Access)
-                    and not all(not isinstance(idx, ein.Index) for idx in node.idxs)
-                    for idx, dim in zip(
-                        node.idxs, self.tns_ctx(node.tns).shape, strict=True
-                    )
-                    if isinstance(idx, ein.Index)
-                }
                 ctx = PointwiseEinsumMachine(
-                    self.xp, self.bindings, loops, dims, self.verbose
+                    self.xp, self.bindings, loops, self.verbose
                 )
                 arg = ctx(arg)
-
-                # Collect all ein.Index used in the LHS idxs (including nested)
-                assign_idxs = {
-                    individual_idx for idx in idxs for individual_idx in idx.get_idxs()
-                }
-
-                axis = tuple(
-                    i for i in range(len(loops)) if loops[i] not in assign_idxs
-                )
+                axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
                 if op != overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
@@ -236,32 +162,15 @@ class EinsumMachine:
                     val = arg
                     for i in sorted(axis, reverse=True):
                         val = xp.take(val, -1, axis=i)
-
-                if any(not isinstance(idx, ein.Index) for idx in idxs):
-                    loops2 = [idx for idx in loops if idx in assign_idxs]
-                    ctx2 = PointwiseEinsumMachine(
-                        self.xp, self.bindings, loops2, dims, self.verbose
-                    )
-                    evaled = tuple([ctx2(idx) for idx in idxs])
-
-                    # assert tns in self.bindings
-                    if tns not in self.bindings:
-                        estimated_size = tuple(
-                            evaled_i.max(initial=-1) + 1 for evaled_i in evaled
-                        )
-                        self.bindings[tns] = xp.zeros(estimated_size, dtype=val.dtype)
-
-                    self.bindings[tns][evaled] = val
-                else:
-                    dropped = [idx for idx in loops if idx in idxs]
-                    axis = [dropped.index(idx) for idx in idxs]
-                    if tns in self.bindings:
-                        if self.bindings[tns].ndim == 0:
-                            self.bindings[tns][()] = val
-                        else:
-                            self.bindings[tns][:] = xp.permute_dims(val, axis)
+                dropped = [idx for idx in loops if idx in idxs]
+                axis = [dropped.index(idx) for idx in idxs]
+                if tns in self.bindings:
+                    if self.bindings[tns].ndim == 0:
+                        self.bindings[tns][()] = val
                     else:
-                        self.bindings[tns] = xp.permute_dims(val, axis)
+                        self.bindings[tns][:] = xp.permute_dims(val, axis)
+                else:
+                    self.bindings[tns] = xp.permute_dims(val, axis)
                 return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")

@@ -1,23 +1,19 @@
 from abc import abstractmethod
 
 from ..symbolic import DataFlowAnalysis, PostOrderDFS
-from .cfg_builder import assembly_build_cfg
+from .cfg_builder import NumberedStatement, assembly_build_cfg
 from .nodes import (
     AssemblyNode,
     Assign,
-    TaggedVariable,
     Variable,
 )
 
 
 def assembly_copy_propagation(node: AssemblyNode):
-    """Run copy-propagation on a FinchAssembly node.
-
-    Args:
-        node: Root FinchAssembly node to analyze.
-
-    Returns:
-        AssemblyCopyPropagation: The completed analysis context.
+    """
+    Run copy-propagation on a FinchAssembly node.
+    Args: node: Root FinchAssembly node to analyze.
+    Returns: AssemblyCopyPropagation: The completed analysis context.
     """
     ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
     ctx.analyze()
@@ -31,16 +27,16 @@ class AbstractAssemblyDataflow(DataFlowAnalysis):
         """Annotate a statement with lattice values.
 
         Delegates expression traversal and collection of (name,value) pairs to
-        ``print_lattice_value`` which now returns the annotation list directly.
+        ``get_lattice_value`` which now returns the annotation list directly.
         """
-        annotations = self.print_lattice_value(state, stmt)
+        annotations = self.get_lattice_value(state, stmt)
         if annotations:
             annostr = ", ".join(f"{name} = {str(val)}" for name, val in annotations)
             return f"{stmt} \t# {annostr}"
         return str(stmt)
 
     @abstractmethod
-    def print_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
+    def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         """Return list of (var_instance_name, lattice_value) pairs for a stmt/expr."""
         ...
 
@@ -48,33 +44,65 @@ class AbstractAssemblyDataflow(DataFlowAnalysis):
 class AssemblyCopyPropagation(AbstractAssemblyDataflow):
     """Copy propagation for FinchAssembly.
 
-    Lattice: a mapping ``{ var_name: TaggedVariable }`` describing simple copy
-    relationships between variables. The analysis is forward and only records
-    direct copies; expressions and literals are not propagated.
+    Lattice:
+    - defs: mapping ``{ var_name: sid | None }`` describing a unique reaching
+        definition id for each variable (None means "not uniquely defined").
+    - copies: mapping ``{ dst_var: (src_var, src_def_id) }`` describing a direct
+        copy ``dst_var = src_var`` that is valid only if ``src_var`` still has the
+        same unique reaching definition ``src_def_id``.
     """
 
     def direction(self) -> str:
-        """
-        Copy propagation is a forward analysis.
-        """
+        """Copy propagation is a forward analysis."""
         return "forward"
 
-    def print_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
+    def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         """Collect lattice annotations for variables used in a stmt or expr."""
         annotated: list[tuple[str, object]] = []
         target = stmt
+
+        if isinstance(target, NumberedStatement):
+            target = target.stmt
+
         match target:
             case Assign(_, rhs):
                 target = rhs
 
+        copies = state.get("copies", {}) if isinstance(state, dict) else {}
+
         for node in PostOrderDFS(target):
             match node:
-                case TaggedVariable(Variable(name, _), id):
-                    if name in state:
-                        annotated.append((f"{name}_{id}", state[name]))
+                case Variable(name, _):
+                    if name in copies:
+                        annotated.append((name, copies[name]))
                 case _:
                     continue
         return annotated
+
+    def _normalize_state(self, state: dict) -> dict:
+        if not state:
+            return {"defs": {}, "copies": {}}
+
+        if "defs" not in state or "copies" not in state:
+            # allow old/empty shapes; upgrade in place
+            return {"defs": state.get("defs", {}), "copies": state.get("copies", {})}
+
+        return state
+
+    def _unpack_stmt(self, stmt):
+        if isinstance(stmt, NumberedStatement):
+            return stmt.sid, stmt.stmt
+        return None, stmt
+
+    def _prune_inconsistent_copies(self, defs: dict, copies: dict) -> dict:
+        pruned: dict[str, tuple[str, int | None]] = {}
+        for dst, (src, src_def) in copies.items():
+            if src_def is None:
+                continue
+            if defs.get(src) != src_def:
+                continue
+            pruned[dst] = (src, src_def)
+        return pruned
 
     def transfer(self, stmts, state: dict) -> dict:
         """Transfer function over a sequence of statements.
@@ -91,41 +119,73 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         Returns:
             dict: The outgoing lattice mapping after processing ``stmts``.
         """
-        new_state = state.copy()
+        state = self._normalize_state(state)
+        new_state = {"defs": state["defs"].copy(), "copies": state["copies"].copy()}
 
-        for stmt in stmts:
+        defs: dict[str, int | None] = new_state["defs"]
+        copies: dict[str, tuple[str, int | None]] = new_state["copies"]
+
+        for wrapped in stmts:
+            sid, stmt = self._unpack_stmt(wrapped)
             match stmt:
-                case Assign(TaggedVariable(var, _), rhs):
-                    var_name = var.name
+                case Assign(Variable(lhs_name, _), rhs):
+                    # Any assignment kills previous copy info involving lhs.
+                    copies.pop(lhs_name, None)
 
-                    # invalidate any copies that directly point to this variable name
-                    to_remove: list[str] = []
-                    for name, val in new_state.items():
-                        # `val` should be TaggedVariable, otherwise something is wrong
-                        assert isinstance(val, TaggedVariable)
+                    # If some other variable was known to be a copy of lhs, kill it
+                    # because lhs's value changed.
+                    to_remove = [
+                        dst for dst, (src, _) in copies.items() if src == lhs_name
+                    ]
+                    for dst in to_remove:
+                        copies.pop(dst, None)
 
-                        if val.variable.name == var_name:
-                            to_remove.append(name)
+                    # Update reaching definition for lhs.
+                    defs[lhs_name] = sid
 
-                    for name in to_remove:
-                        new_state.pop(name)
+                    # If rhs is a variable with a unique reaching def, record a copy.
+                    if isinstance(rhs, Variable):
+                        rhs_name = rhs.name
+                        rhs_def = defs.get(rhs_name)
+                        if rhs_def is not None:
+                            copies[lhs_name] = (rhs_name, rhs_def)
 
-                    # after all copies invalidated, add new state for variable `var`
-                    # only if rhs is a TaggedVariable (only direct copies)
-                    if isinstance(rhs, TaggedVariable):
-                        new_state[var_name] = rhs
+                    # Ensure all recorded copies remain consistent with current defs.
+                    new_state["copies"] = self._prune_inconsistent_copies(defs, copies)
+                    copies = new_state["copies"]
+                case _:
+                    continue
 
         return new_state
 
     def join(self, state_1: dict, state_2: dict) -> dict:
-        """Meet operator for copy-propagation.
-        (set-like intersection on keys where values are equal).
+        """Meet operator for must copy-propagation.
+
+        - defs join: keep a def id only if both agree, else None.
+        - copies join: keep a copy only if both agree exactly, and it remains
+          consistent with the joined defs.
         """
-        result = {}
 
-        # only keep copy relationships that exist in both states with the same value
-        for var_name in state_1:
-            if var_name in state_2 and state_1[var_name] == state_2[var_name]:
-                result[var_name] = state_1[var_name]
+        s1 = self._normalize_state(state_1)
+        s2 = self._normalize_state(state_2)
 
-        return result
+        defs_1: dict[str, int | None] = s1["defs"]
+        defs_2: dict[str, int | None] = s2["defs"]
+        copies_1: dict[str, tuple[str, int | None]] = s1["copies"]
+        copies_2: dict[str, tuple[str, int | None]] = s2["copies"]
+
+        joined_defs: dict[str, int | None] = {}
+        for name in set(defs_1) | set(defs_2):
+            v1 = defs_1.get(name)
+            v2 = defs_2.get(name)
+            joined_defs[name] = v1 if v1 == v2 else None
+
+        joined_copies: dict[str, tuple[str, int | None]] = {
+            dst: val
+            for dst, val in copies_1.items()
+            if dst in copies_2 and copies_2[dst] == val
+        }
+
+        joined_copies = self._prune_inconsistent_copies(joined_defs, joined_copies)
+
+        return {"defs": joined_defs, "copies": joined_copies}

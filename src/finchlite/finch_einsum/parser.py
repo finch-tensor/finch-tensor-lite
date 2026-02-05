@@ -3,7 +3,7 @@ from typing import Any
 
 import numpy as np
 
-from lark import Lark, Token, Tree
+from lark import Lark, Tree
 
 from ..algebra import overwrite, promote_max, promote_min
 from ..symbolic import Namespace
@@ -158,7 +158,7 @@ lark_parser = Lark("""
     mul_expr: unary_expr ((MUL | DIV | FLOORDIV | MOD) unary_expr)*
     unary_expr: (PLUS | MINUS | TILDE) unary_expr | power_expr
     power_expr: primary (POW unary_expr)?
-    primary: call_func | access | literal | IDX | "(" expr ")"
+    primary: call_func | access | literal | "(" expr ")"
 
     OR: "or"
     AND: "and"
@@ -186,15 +186,7 @@ lark_parser = Lark("""
     OP: "+" | "-" | "*" | "or" | "and" | "|" | "&" | "^" | "<<" | ">>"
           | "//" | "/" | "%" | "**" | ">" | "<" | ">=" | "<=" | "==" | "!="
 
-    // Tensor expression: supports attribute access
-    // e.g., A, A.elems, A.coords[0][i]
-    tns_expr: tns_getattr | tns_base
-    tns_getattr: tns_expr "." ATTR
-    tns_base: TNS
-
-    // Top-level access used in assignments (Result[i] = ...)
-    access: tns_expr "[" (primary ",")* primary? "]"
-
+    access: TNS "[" (IDX ",")* IDX? "]"
     call_func: (FUNC_NAME "(" (expr ",")* expr?  ")")
     literal: bool_literal | complex_literal | float_literal | int_literal
     bool_literal: BOOL
@@ -206,12 +198,11 @@ lark_parser = Lark("""
     COMPLEX: (SIGNED_FLOAT | SIGNED_INT) ("j" | "J")
     IDX: CNAME
     TNS: CNAME
-    ATTR: CNAME
     FUNC_NAME: CNAME
 """)
 
 
-def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
+def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
     match t:
         case Tree(
             "start"
@@ -232,9 +223,6 @@ def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
             | "literal",
             [child],
         ):
-            # Handle IDX tokens directly to avoid recursing with a non-Tree
-            if isinstance(child, Token) and child.type == "IDX":
-                return ein.Index(str(child.value))
             return _parse_einop_expr(child)
         case Tree(
             "or_expr"
@@ -274,10 +262,10 @@ def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
         case Tree("unary_expr" | "not_expr", [op, arg]):
             op = ein.Literal(unary_ops[op.value])  # type: ignore[union-attr]
             return ein.Call(op, (_parse_einop_expr(arg),))
-        case Tree("access", [tns_expr, *idxs]):
+        case Tree("access", [tns, *idxs]):
             return ein.Access(
-                _parse_einop_tns(tns_expr),
-                tuple(_parse_einop_expr(idx) for idx in idxs),
+                ein.Alias(tns.value),  # type: ignore[union-attr]
+                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
             )
         case Tree("bool_literal", (val,)):
             return ein.Literal(val.value == "True")  # type: ignore[union-attr]
@@ -293,58 +281,30 @@ def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
-def _parse_einop_tns(tns_expr: Tree | Token) -> ein.EinsumExpression:
-    """Extract the tensor name from a tns_expr tree (expecting tns_base)."""
-    match tns_expr:
-        case Tree("tns_expr", [child]):
-            return _parse_einop_tns(child)
-        case Tree("tns_getattr", [obj, attr]):
-            return ein.GetAttr(
-                obj=_parse_einop_tns(obj),
-                attr=ein.Literal(attr.value),  # type: ignore[union-attr]
-            )
-        case Tree("tns_base", [tns]):
-            return ein.Alias(tns.value)  # type: ignore[union-attr]
-        case _:
-            raise ValueError(f"Unknown tree structure: {tns_expr}")
-
-
 def parse_einop(expr: str) -> ein.EinsumNode:
     tree = lark_parser.parse(expr)
     match tree:
         case Tree(
             "start",
-            [
-                Tree(
-                    "increment",
-                    [Tree("access", [tns_expr, *idxs]), op_token, expr_node],
-                )
-            ],
+            [Tree("increment", [Tree("access", [tns, *idxs]), op_token, expr_node])],
         ):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
+            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
             op = ein.Literal(reduction_ops[op_token.value])  # type: ignore[union-attr]
-            tns = _parse_einop_tns(tns_expr)
-            if not isinstance(tns, ein.Alias):
-                raise ValueError(f"Increment target must be a tensor alias, got {tns}.")
             return ein.Einsum(
                 op,
-                tns,
-                tuple(_parse_einop_expr(idx) for idx in idxs),
+                ein.Alias(tns.value),  # type: ignore[union-attr]
+                idxs_exprs,
                 arg,  # type: ignore[union-attr]
             )
 
-        case Tree(
-            "start", [Tree("assign", [Tree("access", [tns_expr, *idxs]), expr_node])]
-        ):
+        case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
             op = ein.Literal(overwrite)
-            tns = _parse_einop_tns(tns_expr)
-            if not isinstance(tns, ein.Alias):
-                raise ValueError(f"Increment target must be a tensor alias, got {tns}.")
             return ein.Einsum(
                 op,
-                tns,
-                tuple(_parse_einop_expr(idx) for idx in idxs),
+                ein.Alias(tns.value),  # type: ignore[union-attr]
+                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
                 arg,
             )
 
