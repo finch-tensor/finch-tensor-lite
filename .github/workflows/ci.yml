@@ -7,37 +7,36 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        python: ['3.11', '3.12', '3.13']
-        include:
-          - os: macos-latest
-            python: '3.11'
-          - os: windows-latest
-            python: '3.11'
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        environment: [test, mindeps]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          python-version: ${{ matrix.python }}
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-      - name: Configure Poetry
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            poetry env use python
-          else
-            poetry env use python${{ matrix.python }}
-          fi
-      - name: Install package
-        run: |
-          poetry install --extras test
+          pixi-version: v0.63.2
+          cache: true
+          environments: >-
+            default
+            ${{ matrix.environment }}
       - name: Run tests
-        run: |
-          poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
+        run: pixi run -e ${{ matrix.environment }} test --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.environment }}.xml
       - uses: codecov/codecov-action@v5
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.63.2
+          cache: true
+          environments: pre-commit
+      - name: Run pre-commit
+        run: pixi run pre-commit
 
 on:
   # Trigger the workflow on push or pull request,
