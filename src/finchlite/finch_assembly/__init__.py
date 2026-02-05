@@ -36,6 +36,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import (
     AssemblyStructFType,
@@ -56,6 +57,7 @@ __all__ = [
     "AssemblyLibrary",
     "AssemblyLoader",
     "AssemblyNode",
+    "AssemblySimplify",
     "AssemblyStructFType",
     "AssemblyTransform",
     "AssemblyTypeChecker",
