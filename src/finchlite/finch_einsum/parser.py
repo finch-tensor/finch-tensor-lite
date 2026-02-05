@@ -293,7 +293,7 @@ def _parse_einop_expr(t: Tree | Token) -> ein.EinsumExpression:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
-def _parse_einop_tns(tns_expr: Tree | Token) -> str:
+def _parse_einop_tns(tns_expr: Tree | Token) -> ein.EinsumExpression:
     """Extract the tensor name from a tns_expr tree (expecting tns_base)."""
     match tns_expr:
         case Tree("tns_expr", [child]):
