@@ -4,7 +4,7 @@ from finchlite.finch_assembly.dataflow import (
     assembly_dataflow_preprocess,
 )
 
-from .nodes import (
+from .util.nodes import (
     create_asm_comprehensive_node,
     create_asm_dot_node,
     create_asm_if_node,

@@ -1,10 +1,13 @@
 import operator
+
 import numpy as np
+
 import finchlite.finch_assembly as asm
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
-from finchlite.compile import dimension
 from finchlite.codegen.numpy_buffer import NumpyBuffer
+from finchlite.compile import dimension
+
 
 def create_ntn_simple_node() -> ntn.NotationNode:
     i = ntn.Variable("i", np.int64)
@@ -26,7 +29,7 @@ def create_ntn_simple_node() -> ntn.NotationNode:
     n = ntn.Variable("n", np.int64)
     p = ntn.Variable("p", np.int64)
 
-    prgm = ntn.Module(
+    return ntn.Module(
         (
             ntn.Function(
                 ntn.Variable("matmul", np.ndarray),
@@ -105,7 +108,6 @@ def create_ntn_simple_node() -> ntn.NotationNode:
         )
     )
 
-    return prgm
 
 def create_log_simple_node() -> log.LogicNode:
     s = np.array([[2, 4], [6, 0]])
@@ -113,7 +115,7 @@ def create_log_simple_node() -> log.LogicNode:
     b = np.array([[9, 8], [6, 5]])
     i, j, k = log.Field("i"), log.Field("j"), log.Field("k")
 
-    prgm = log.Plan(
+    return log.Plan(
         (
             log.Query(log.Alias("S"), log.Table(log.Literal(s), (i, j))),
             log.Query(log.Alias("A"), log.Table(log.Literal(a), (i, k))),
@@ -142,11 +144,10 @@ def create_log_simple_node() -> log.LogicNode:
         )
     )
 
-    return prgm
 
 def create_asm_if_node() -> asm.AssemblyNode:
     var = asm.Variable("a", np.int64)
-    prgm = asm.Module(
+    return asm.Module(
         (
             asm.Function(
                 asm.Variable("if_else", np.int64),
@@ -206,7 +207,6 @@ def create_asm_if_node() -> asm.AssemblyNode:
         )
     )
 
-    return prgm
 
 def create_asm_dot_node() -> asm.AssemblyNode:
     c = asm.Variable("c", np.float64)
@@ -218,7 +218,7 @@ def create_asm_dot_node() -> asm.AssemblyNode:
     bb_v = asm.Variable("b", bb.ftype)
     bb_slt = asm.Slot("b_", bb.ftype)
 
-    prgm = asm.Module(
+    return asm.Module(
         (
             asm.Function(
                 asm.Variable("dot_product", np.float64),
@@ -265,7 +265,6 @@ def create_asm_dot_node() -> asm.AssemblyNode:
         )
     )
 
-    return prgm
 
 def create_asm_comprehensive_node() -> asm.AssemblyNode:
     a = asm.Variable("a", np.int64)
