@@ -9,7 +9,7 @@ from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
 
 
-def create_ntn_simple_node() -> ntn.NotationNode:
+def create_ntn_simple_node():
     i = ntn.Variable("i", np.int64)
     j = ntn.Variable("j", np.int64)
     k = ntn.Variable("k", np.int64)
@@ -109,7 +109,7 @@ def create_ntn_simple_node() -> ntn.NotationNode:
     )
 
 
-def create_log_simple_node() -> log.LogicNode:
+def create_log_simple_node():
     s = np.array([[2, 4], [6, 0]])
     a = np.array([[1, 2], [3, 2]])
     b = np.array([[9, 8], [6, 5]])
@@ -145,7 +145,7 @@ def create_log_simple_node() -> log.LogicNode:
     )
 
 
-def create_asm_if_node() -> asm.AssemblyNode:
+def create_asm_if_node():
     var = asm.Variable("a", np.int64)
     return asm.Module(
         (
@@ -208,7 +208,7 @@ def create_asm_if_node() -> asm.AssemblyNode:
     )
 
 
-def create_asm_dot_node() -> asm.AssemblyNode:
+def create_asm_dot_node():
     c = asm.Variable("c", np.float64)
     i = asm.Variable("i", np.int64)
     ab = NumpyBuffer(np.array([1, 2, 3], dtype=np.float64))
@@ -266,7 +266,7 @@ def create_asm_dot_node() -> asm.AssemblyNode:
     )
 
 
-def create_asm_comprehensive_node() -> asm.AssemblyNode:
+def create_asm_comprehensive_node():
     a = asm.Variable("a", np.int64)
     b = asm.Variable("b", np.int64)
     c = asm.Variable("c", np.int64)

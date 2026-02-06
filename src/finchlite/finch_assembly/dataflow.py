@@ -61,7 +61,13 @@ def assembly_copy_propagation_debug(node: AssemblyNode):
 
 
 def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
-    """Apply copy-propagation to a FinchAssembly node."""
+    """
+    Apply copy-propagation to a FinchAssembly node.
+    Args:
+        node: Root FinchAssembly node to optimize.
+    Returns:
+        AssemblyNode: The optimized FinchAssembly node.
+    """
 
     # Run copy-propagation analysis to collect replacements.
     ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
@@ -70,7 +76,7 @@ def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
 
     # Replace variables in a statement according to the collected replacements.
     def replace_vars(target: AssemblyNode, sid: int):
-        def rw_var(n: AssemblyNode) -> AssemblyNode:
+        def rw_var(n: AssemblyNode):
             match n:
                 case Variable(name, vtype):
                     key = (sid, name)
