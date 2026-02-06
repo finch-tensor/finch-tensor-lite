@@ -55,7 +55,7 @@ def insert_statistics(
             op = node.op.val
             init = node.init.val if isinstance(node.init, Literal) else None
             arg = insert_statistics(ST, node.arg, bindings, replace, cache)
-            reduce_indices = [idx.name for idx in node.idxs]
+            reduce_indices = [idx for idx in node.idxs]
             st = ST.aggregate(op, init, reduce_indices, arg)
             cache[node] = st
             return st
@@ -68,14 +68,14 @@ def insert_statistics(
         
         case Table():
             if isinstance(node.tns, Literal):
-                idxs = [f.name for f in node.idxs]
+                idxs = [f for f in node.idxs]
                 tensor = ST(node.tns.val, idxs)
             elif isinstance(node.tns, Alias):
                 base_stats = bindings.get(node.tns)
                 if base_stats is None :
                     raise ValueError(f"No TensorStats bound to alias {node.tns}")
                 
-                new_indices = tuple(f.name for f in node.idxs)
+                new_indices = tuple(f for f in node.idxs)
                 tensor = ST.relabel(base_stats,new_indices)
 
             if (node not in cache) or replace:
@@ -83,7 +83,6 @@ def insert_statistics(
             return cache[node]
         
         case Plan():
-            last_result = () 
             for body in node.bodies:
                 last_result = insert_statistics(ST,body,bindings,replace,cache)
             return last_result
@@ -111,8 +110,6 @@ def get_lazy_tensor_stats(
     cache: dict[object, TensorStats] = {}
     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
     replace = False
-
-    last_stats = None
 
     for stmt in trace:
         last_stats = insert_statistics(ST=StatsImpl,node=stmt,bindings=bindings,replace=replace,cache=cache)

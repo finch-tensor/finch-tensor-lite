@@ -19,6 +19,7 @@ from finchlite.finch_logic import LogicEvaluator, LogicInterpreter
 import numpy as np
 from ..TensorStats import TensorStats
 from finchlite.algebra.tensor import TensorFType
+from typing import Any
 class StatsInterpreter():
 
     def __init__(self,StatsImpl : TensorStats,verbose = False):
@@ -67,7 +68,7 @@ class StatsMachine:
                     if base_stats is None :
                         raise ValueError(f"No TensorStats bound to alias {node.tns}")
                     
-                    new_indices = tuple(f.name for f in node.idxs)
+                    new_indices = tuple(f for f in node.idxs)
                     tensor = self.ST.relabel(base_stats,new_indices)
                 return tensor
 
@@ -85,7 +86,7 @@ class StatsMachine:
                 op = node.op.val
                 init = node.init.val if isinstance(node.init, Literal) else None
                 arg = self(node.arg)
-                reduce_indices = [idx.name for idx in node.idxs]
+                reduce_indices = [idx for idx in node.idxs]
                 return self.ST.aggregate(op, init, reduce_indices, arg)
 
             case Reorder():
@@ -93,7 +94,7 @@ class StatsMachine:
 
             case Relabel():
                 base_stats = self(node.arg)
-                new_indices = tuple(f.name for f in node.idxs)
+                new_indices = tuple(f for f in node.idxs)
                 return self.ST.relabel(base_stats,new_indices)
             
             case Produces(args):

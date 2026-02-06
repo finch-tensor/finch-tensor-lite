@@ -30,12 +30,12 @@ from finchlite.interface import lazy
 
 
 def test_copy_and_getters():
-    td = TensorDef(index_order=("i", "j"), dim_sizes={"i": 2.0, "j": 3.0}, fill_value=42)
+    td = TensorDef(index_order=(Field("i"), Field("j")), dim_sizes={Field("i"): 2.0, Field("j"): 3.0}, fill_value=42)
     td_copy = td.copy()
     assert td_copy is not td
-    assert td_copy.index_order == ("i", "j")
-    assert td_copy.dim_sizes == {"i": 2.0, "j": 3.0}
-    assert td_copy.get_dim_size("j") == 3.0
+    assert td_copy.index_order == (Field("i"), Field("j"))
+    assert td_copy.dim_sizes == {Field("i"): 2.0, Field("j"): 3.0}
+    assert td_copy.get_dim_size(Field("j")) == 3.0
     assert td_copy.fill_value == 42
 
 
@@ -56,19 +56,19 @@ def test_reindex_def(orig_axes, new_axes):
 
 
 def test_set_fill_value():
-    td = TensorDef(index_order=("i",), dim_sizes={"i": 5.0}, fill_value=0)
+    td = TensorDef(index_order=(Field("i"),), dim_sizes={Field("i"): 5.0}, fill_value=0)
     td2 = td.set_fill_value(7)
     assert td2.fill_value == 7
 
 
 def test_add_dummy_idx():
-    td = TensorDef(index_order=("i",), dim_sizes={"i": 3.0}, fill_value=0)
-    td2 = td.add_dummy_idx("j")
-    assert td2.index_order == ("i", "j")
-    assert td2.get_dim_size("j") == 1.0
+    td = TensorDef(index_order=(Field("i"),), dim_sizes={Field("i"): 3.0}, fill_value=0)
+    td2 = td.add_dummy_idx(Field("j"))
+    assert td2.index_order == (Field("i"), Field("j"))
+    assert td2.get_dim_size(Field("j")) == 1.0
 
-    td3 = td2.add_dummy_idx("j")
-    assert td3.index_order == ("i", "j")
+    td3 = td2.add_dummy_idx(Field("j"))
+    assert td3.index_order == (Field("i"), Field("j"))
 
 
 @pytest.mark.parametrize(
@@ -383,16 +383,16 @@ def test_dc_stats_scalar(tensor, fields, expected_dcs):
             fl.asarray(np.array([1, 1, 1, 1])),
             ["i"],
             {
-                DC(frozenset(), frozenset(["i"]), 4.0),
-                DC(frozenset(["i"]), frozenset(["i"]), 1.0),
+                DC(frozenset(), frozenset([Field("i")]), 4.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i")]), 1.0),
             },
         ),
         (
             fl.asarray(np.array([0, 1, 0, 0, 1])),
             ["i"],
             {
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset("i"), frozenset(["i"]), 1.0),
+                DC(frozenset(), frozenset([Field("i")]), 2.0),
+                DC(frozenset(Field("i")), frozenset([Field("i")]), 1.0),
             },
         ),
     ],
@@ -419,11 +419,11 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
             fl.asarray(np.ones((3, 3), dtype=int)),
             ["i", "j"],
             {
-                DC(frozenset(), frozenset(["i", "j"]), 9.0),
-                DC(frozenset(), frozenset(["i"]), 3.0),
-                DC(frozenset(), frozenset(["j"]), 3.0),
-                DC(frozenset(["i"]), frozenset(["i", "j"]), 3.0),
-                DC(frozenset(["j"]), frozenset(["i", "j"]), 3.0),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 9.0),
+                DC(frozenset(), frozenset([Field("i")]), 3.0),
+                DC(frozenset(), frozenset([Field("j")]), 3.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i"), Field("j")]), 3.0),
+                DC(frozenset([Field("j")]), frozenset([Field("i"), Field("j")]), 3.0),
             },
         ),
         (
@@ -439,11 +439,11 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
             ),
             ["i", "j"],
             {
-                DC(frozenset(), frozenset(["i", "j"]), 4.0),
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset(), frozenset(["j"]), 3.0),
-                DC(frozenset(["i"]), frozenset(["i", "j"]), 2.0),
-                DC(frozenset(["j"]), frozenset(["i", "j"]), 2.0),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 4.0),
+                DC(frozenset(), frozenset([Field("i")]), 2.0),
+                DC(frozenset(), frozenset([Field("j")]), 3.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i"), Field("j")]), 2.0),
+                DC(frozenset([Field("j")]), frozenset([Field("i"), Field("j")]), 2.0),
             },
         ),
     ],
@@ -470,13 +470,13 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
             fl.asarray(np.ones((2, 2, 2), dtype=int)),
             ["i", "j", "k"],
             {
-                DC(frozenset(), frozenset(["i", "j", "k"]), 8.0),
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset(), frozenset(["j"]), 2.0),
-                DC(frozenset(), frozenset(["k"]), 2.0),
-                DC(frozenset(["i"]), frozenset(["i", "j", "k"]), 4.0),
-                DC(frozenset(["j"]), frozenset(["i", "j", "k"]), 4.0),
-                DC(frozenset(["k"]), frozenset(["i", "j", "k"]), 4.0),
+                DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 8.0),
+                DC(frozenset(), frozenset([Field("i")]), 2.0),
+                DC(frozenset(), frozenset([Field("j")]), 2.0),
+                DC(frozenset(), frozenset([Field("k")]), 2.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i"), Field("j"), Field("k")]), 4.0),
+                DC(frozenset([Field("j")]), frozenset([Field("i"), Field("j"), Field("k")]), 4.0),
+                DC(frozenset([Field("k")]), frozenset([Field("i"), Field("j"), Field("k")]), 4.0),
             },
         ),
         (
@@ -491,13 +491,13 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
             ),
             ["i", "j", "k"],
             {
-                DC(frozenset(), frozenset(["i", "j", "k"]), 3.0),
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset(), frozenset(["j"]), 2.0),
-                DC(frozenset(), frozenset(["k"]), 2.0),
-                DC(frozenset(["i"]), frozenset(["i", "j", "k"]), 2.0),
-                DC(frozenset(["j"]), frozenset(["i", "j", "k"]), 2.0),
-                DC(frozenset(["k"]), frozenset(["i", "j", "k"]), 2.0),
+                DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 3.0),
+                DC(frozenset(), frozenset([Field("i")]), 2.0),
+                DC(frozenset(), frozenset([Field("j")]), 2.0),
+                DC(frozenset(), frozenset([Field("k")]), 2.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i"), Field("j"), Field("k")]), 2.0),
+                DC(frozenset([Field("j")]), frozenset([Field("i"), Field("j"), Field("k")]), 2.0),
+                DC(frozenset([Field("k")]), frozenset([Field("i"), Field("j"), Field("k")]), 2.0),
             },
         ),
     ],
@@ -524,15 +524,15 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
             fl.asarray(np.ones((2, 2, 2, 2), dtype=int)),
             ["i", "j", "k", "l"],
             {
-                DC(frozenset(), frozenset(["i", "j", "k", "l"]), 16.0),
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset(), frozenset(["j"]), 2.0),
-                DC(frozenset(), frozenset(["k"]), 2.0),
-                DC(frozenset(), frozenset(["l"]), 2.0),
-                DC(frozenset(["i"]), frozenset(["i", "j", "k", "l"]), 8.0),
-                DC(frozenset(["j"]), frozenset(["i", "j", "k", "l"]), 8.0),
-                DC(frozenset(["k"]), frozenset(["i", "j", "k", "l"]), 8.0),
-                DC(frozenset(["l"]), frozenset(["i", "j", "k", "l"]), 8.0),
+                DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 16.0),
+                DC(frozenset(), frozenset([Field("i")]), 2.0),
+                DC(frozenset(), frozenset([Field("j")]), 2.0),
+                DC(frozenset(), frozenset([Field("k")]), 2.0),
+                DC(frozenset(), frozenset([Field("l")]), 2.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 8.0),
+                DC(frozenset([Field("j")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 8.0),
+                DC(frozenset([Field("k")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 8.0),
+                DC(frozenset([Field("l")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 8.0),
             },
         ),
         (
@@ -553,15 +553,15 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
             ),
             ["i", "j", "k", "l"],
             {
-                DC(frozenset(), frozenset(["i", "j", "k", "l"]), 3.0),
-                DC(frozenset(), frozenset(["i"]), 2.0),
-                DC(frozenset(), frozenset(["j"]), 2.0),
-                DC(frozenset(), frozenset(["k"]), 2.0),
-                DC(frozenset(), frozenset(["l"]), 2.0),
-                DC(frozenset(["i"]), frozenset(["i", "j", "k", "l"]), 2.0),
-                DC(frozenset(["j"]), frozenset(["i", "j", "k", "l"]), 2.0),
-                DC(frozenset(["k"]), frozenset(["i", "j", "k", "l"]), 2.0),
-                DC(frozenset(["l"]), frozenset(["i", "j", "k", "l"]), 2.0),
+                DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 3.0),
+                DC(frozenset(), frozenset([Field("i")]), 2.0),
+                DC(frozenset(), frozenset([Field("j")]), 2.0),
+                DC(frozenset(), frozenset([Field("k")]), 2.0),
+                DC(frozenset(), frozenset([Field("l")]), 2.0),
+                DC(frozenset([Field("i")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 2.0),
+                DC(frozenset([Field("j")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 2.0),
+                DC(frozenset([Field("k")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 2.0),
+                DC(frozenset([Field("l")]), frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), 2.0),
             },
         ),
     ],
@@ -587,9 +587,9 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
         (
             {"i": 1000, "j": 1000},
             [
-                DC(frozenset(["i"]), frozenset(["j"]), 5),
-                DC(frozenset(["j"]), frozenset(["i"]), 25),
-                DC(frozenset(), frozenset(["i", "j"]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 5),
+                DC(frozenset([Field("j")]), frozenset([Field("i")]), 25),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
             ],
             50,
         ),
@@ -607,7 +607,7 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset(["i", "j"]), dims, 0)
+    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims, 0)
     stat.dcs = set(dcs)
 
     assert stat.estimate_non_fill_values() == expected_nnz
@@ -619,8 +619,8 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 1000, "k": 1000},
             [
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(), frozenset(["i", "j"]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
             ],
             50 * 5,
         ),
@@ -639,7 +639,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -650,9 +650,9 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 1000, "k": 1000, "l": 1000},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 50),
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["l"]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("l")]), 5),
             ],
             50 * 5 * 5,
         ),
@@ -671,7 +671,7 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset(["i", "j", "k", "l"]), dims, 0)
+    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k"),Field("l")]), dims, 0)
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -682,15 +682,15 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 1000, "k": 1000},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 50),
-                DC(frozenset(["i"]), frozenset(["j"]), 5),
-                DC(frozenset(["j"]), frozenset(["i"]), 5),
-                DC(frozenset(), frozenset(["j", "k"]), 50),
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["j"]), 5),
-                DC(frozenset(), frozenset(["i", "k"]), 50),
-                DC(frozenset(["i"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 5),
+                DC(frozenset([Field("j")]), frozenset([Field("i")]), 5),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("j")]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             50 * 5,
         ),
@@ -709,7 +709,7 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -720,15 +720,15 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 1000, "k": 1000},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 1),
-                DC(frozenset(["i"]), frozenset(["j"]), 1),
-                DC(frozenset(["j"]), frozenset(["i"]), 1),
-                DC(frozenset(), frozenset(["j", "k"]), 50),
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["j"]), 5),
-                DC(frozenset(), frozenset(["i", "k"]), 50),
-                DC(frozenset(["i"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 1),
+                DC(frozenset([Field("j")]), frozenset([Field("i")]), 1),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("j")]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             1 * 5,
         ),
@@ -747,7 +747,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0)
+    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -760,13 +760,13 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
             {"i": 1000},
             [
                 {
-                    DC(frozenset(), frozenset({"i"}), 5.0),
-                    DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                    DC(frozenset(), frozenset({Field("i")}), 5.0),
+                    DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
                 }
             ],
             {
-                DC(frozenset(), frozenset({"i"}), 5.0),
-                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                DC(frozenset(), frozenset({Field("i")}), 5.0),
+                DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
             },
         ),
         # Two inputs: overlap takes min; unique keys are preserved
@@ -774,18 +774,18 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
             {"i": 1000},
             [
                 {
-                    DC(frozenset(), frozenset({"i"}), 5.0),
-                    DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                    DC(frozenset(), frozenset({Field("i")}), 5.0),
+                    DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
                 },
                 {
-                    DC(frozenset(), frozenset({"i"}), 2.0),
-                    DC(frozenset({"i"}), frozenset({"i"}), 3.0),
+                    DC(frozenset(), frozenset({Field("i")}), 2.0),
+                    DC(frozenset({Field("i")}), frozenset({Field("i")}), 3.0),
                     DC(frozenset(), frozenset(), 7.0),
                 },
             ],
             {
-                DC(frozenset(), frozenset({"i"}), 2.0),
-                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                DC(frozenset(), frozenset({Field("i")}), 2.0),
+                DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
                 DC(frozenset(), frozenset(), 7.0),
             },
         ),
@@ -802,14 +802,14 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
             replace=False,
             cache={},
         )
-        s.tensordef = TensorDef(frozenset({"i"}), dims, 0)
+        s.tensordef = TensorDef(frozenset({Field("i")}), dims, 0)
         s.dcs = set(dcs)
         stats_objs.append(s)
 
-    new_def = TensorDef(frozenset({"i"}), dims, 0)
+    new_def = TensorDef(frozenset({Field("i")}), dims, 0)
     out = DCStats._merge_dc_join(new_def, stats_objs)
 
-    assert out.tensordef.index_order == ("i",)
+    assert out.tensordef.index_order == (Field("i"),)
     assert out.tensordef.dim_sizes == dims
     assert out.dcs == expected_dcs
 
@@ -824,14 +824,14 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
                 (
                     {"i"},
                     {
-                        DC(frozenset(), frozenset({"i"}), 5.0),
-                        DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                        DC(frozenset(), frozenset({Field("i")}), 5.0),
+                        DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
                     },
                 )
             ],
             {
-                DC(frozenset(), frozenset({"i"}), 5.0),
-                DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                DC(frozenset(), frozenset({Field("i")}), 5.0),
+                DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
             },
         ),
         # Two inputs, same axes: overlap SUMs; keys not in all inputs are dropped
@@ -841,41 +841,41 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
                 (
                     {"i"},
                     {
-                        DC(frozenset(), frozenset({"i"}), 5.0),
-                        DC(frozenset({"i"}), frozenset({"i"}), 1.0),
+                        DC(frozenset(), frozenset({Field("i")}), 5.0),
+                        DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
                     },
                 ),
                 (
                     {"i"},
                     {
-                        DC(frozenset(), frozenset({"i"}), 2.0),
-                        DC(frozenset({"i"}), frozenset({"i"}), 3.0),
+                        DC(frozenset(), frozenset({Field("i")}), 2.0),
+                        DC(frozenset({Field("i")}), frozenset({Field("i")}), 3.0),
                         DC(frozenset(), frozenset(), 7.0),
                     },
                 ),
             ],
             {
-                DC(frozenset(), frozenset({"i"}), 7.0),
-                DC(frozenset({"i"}), frozenset({"i"}), 4.0),
+                DC(frozenset(), frozenset({Field("i")}), 7.0),
+                DC(frozenset({Field("i")}), frozenset({Field("i")}), 4.0),
             },
         ),
         # Lifting across extra axes (Z) + consensus then SUM
         (
             {"i": 10, "j": 4},
             [
-                ({"i"}, {DC(frozenset(), frozenset({"i"}), 3.0)}),
-                ({"j"}, {DC(frozenset(), frozenset({"j"}), 2.0)}),
+                ({"i"}, {DC(frozenset(), frozenset({Field("i")}), 3.0)}),
+                ({"j"}, {DC(frozenset(), frozenset({Field("j")}), 2.0)}),
             ],
-            {DC(frozenset(), frozenset({"i", "j"}), 32.0)},
+            {DC(frozenset(), frozenset({Field("i"), Field("j")}), 32.0)},
         ),
         # Clamp by dense capacity of Y
         (
             {"i": 5},
             [
-                ({"i"}, {DC(frozenset(), frozenset({"i"}), 7.0)}),
-                ({"i"}, {DC(frozenset(), frozenset({"i"}), 9.0)}),
+                ({"i"}, {DC(frozenset(), frozenset({Field("i")}), 7.0)}),
+                ({"i"}, {DC(frozenset(), frozenset({Field("i")}), 9.0)}),
             ],
-            {DC(frozenset(), frozenset({"i"}), 5.0)},
+            {DC(frozenset(), frozenset({Field("i")}), 5.0)},
         ),
     ],
 )
@@ -913,9 +913,9 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
     [
         (
             {"i": 1000},
-            [DC(frozenset(), frozenset(["i"]), 1)],
+            [DC(frozenset(), frozenset([Field("i")]), 1)],
             {"i": 1000},
-            [DC(frozenset(), frozenset(["i"]), 1)],
+            [DC(frozenset(), frozenset([Field("i")]), 1)],
             2,
         ),
     ],
@@ -927,14 +927,14 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s1.tensordef = TensorDef(frozenset({"i"}), dims1, 0)
+    s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s2.tensordef = TensorDef(frozenset({"i"}), dims2, 0)
+    s2.tensordef = TensorDef(frozenset({Field("i")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
@@ -950,9 +950,9 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     [
         (
             {"i": 1000, "j": 1000},
-            [DC(frozenset(), frozenset(["i", "j"]), 1)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 1)],
             {"i": 1000, "j": 1000},
-            [DC(frozenset(), frozenset(["i", "j"]), 1)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 1)],
             2,
         ),
     ],
@@ -966,7 +966,7 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 0)
+    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -975,7 +975,7 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s2.tensordef = TensorDef(frozenset({"i", "j"}), dims2, 0)
+    s2.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
@@ -991,9 +991,9 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     [
         (
             {"i": 1000},
-            [DC(frozenset(), frozenset(["i"]), 5)],
+            [DC(frozenset(), frozenset([Field("i")]), 5)],
             {"j": 100},
-            [DC(frozenset(), frozenset(["j"]), 10)],
+            [DC(frozenset(), frozenset([Field("j")]), 10)],
             10 * 1000 + 5 * 100,
         ),
     ],
@@ -1005,14 +1005,14 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s1.tensordef = TensorDef(frozenset({"i"}), dims1, 0)
+    s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s2.tensordef = TensorDef(frozenset({"j"}), dims2, 0)
+    s2.tensordef = TensorDef(frozenset({Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
@@ -1028,9 +1028,9 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     [
         (
             {"i": 1000, "j": 100},
-            [DC(frozenset(), frozenset(["i", "j"]), 5)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
             {"j": 100, "k": 1000},
-            [DC(frozenset(), frozenset(["j", "k"]), 10)],
+            [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
             10 * 1000 + 5 * 1000,
         ),
     ],
@@ -1045,7 +1045,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 0)
+    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -1055,7 +1055,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s2.tensordef = TensorDef(frozenset({"j", "k"}), dims2, 0)
+    s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(op.add), (node1, node2))
@@ -1074,11 +1074,11 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     [
         (
             {"i": 1000, "j": 100},
-            [DC(frozenset(), frozenset(["i", "j"]), 5)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
             {"j": 100, "k": 1000},
-            [DC(frozenset(), frozenset(["j", "k"]), 10)],
+            [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
             {"i": 1000, "j": 100, "k": 1000},
-            [DC(frozenset(), frozenset(["i", "j", "k"]), 10)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)],
             10 * 1000 + 5 * 1000 + 10,
         ),
     ],
@@ -1094,7 +1094,7 @@ def test_large_disjoint_disjunction_dc_card(
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s1.tensordef = TensorDef(frozenset({"i", "j"}), dims1, 1)
+    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 1)
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -1103,7 +1103,7 @@ def test_large_disjoint_disjunction_dc_card(
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s2.tensordef = TensorDef(frozenset({"j", "k"}), dims2, 1)
+    s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 1)
     s2.dcs = set(dcs2)
 
     node3 = Table(
@@ -1113,7 +1113,7 @@ def test_large_disjoint_disjunction_dc_card(
     s3 = insert_statistics(
         ST=DCStats, node=node3, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s3.tensordef = TensorDef(frozenset({"i", "j", "k"}), dims3, 1)
+    s3.tensordef = TensorDef(frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1)
     s3.dcs = set(dcs3)
 
     map = MapJoin(Literal(op.mul), (node1, node2))
@@ -1132,11 +1132,11 @@ def test_large_disjoint_disjunction_dc_card(
     [
         (
             {"i": 1000, "j": 100},
-            [DC(frozenset(), frozenset(["i", "j"]), 5)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
             {"j": 100, "k": 1000},
-            [DC(frozenset(), frozenset(["j", "k"]), 10)],
+            [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
             {"i": 1000, "j": 100, "k": 1000},
-            [DC(frozenset(), frozenset(["i", "j", "k"]), 10)],
+            [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)],
             10,
         ),
     ],
@@ -1152,7 +1152,7 @@ def test_mixture_disjoint_disjunction_dc_card(
     s1 = insert_statistics(
         ST=DCStats, node=node1, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s1.tensordef = TensorDef(frozenset(["i", "j"]), dims1, 1)
+    s1.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims1, 1)
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -1161,7 +1161,7 @@ def test_mixture_disjoint_disjunction_dc_card(
     s2 = insert_statistics(
         ST=DCStats, node=node2, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s2.tensordef = TensorDef(frozenset(["j", "k"]), dims2, 1)
+    s2.tensordef = TensorDef(frozenset([Field("j"), Field("k")]), dims2, 1)
     s2.dcs = set(dcs2)
 
     node3 = Table(
@@ -1171,7 +1171,7 @@ def test_mixture_disjoint_disjunction_dc_card(
     s3 = insert_statistics(
         ST=DCStats, node=node3, bindings=OrderedDict(), replace=False, cache=cache
     )
-    s3.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims3, 0)
+    s3.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0)
     s3.dcs = set(dcs3)
 
     map = MapJoin(Literal(op.mul), (node1, node2))
@@ -1194,15 +1194,15 @@ def test_mixture_disjoint_disjunction_dc_card(
         (
             {"i": 1000, "j": 1000, "k": 1000},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 50),
-                DC(frozenset(["i"]), frozenset(["j"]), 5),
-                DC(frozenset(["j"]), frozenset(["i"]), 5),
-                DC(frozenset(), frozenset(["j", "k"]), 50),
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["j"]), 5),
-                DC(frozenset(), frozenset(["i", "k"]), 50),
-                DC(frozenset(["i"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 5),
+                DC(frozenset([Field("j")]), frozenset([Field("i")]), 5),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("j")]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             1,
         ),
@@ -1218,7 +1218,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
     stat = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
-    stat.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
     stat.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -1240,15 +1240,15 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 1000, "k": 1000},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 1),
-                DC(frozenset(["i"]), frozenset(["j"]), 1),
-                DC(frozenset(["j"]), frozenset(["i"]), 1),
-                DC(frozenset(), frozenset(["j", "k"]), 50),
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["j"]), 5),
-                DC(frozenset(), frozenset(["i", "k"]), 50),
-                DC(frozenset(["i"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 1),
+                DC(frozenset([Field("j")]), frozenset([Field("i")]), 1),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("j")]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             5,
         ),
@@ -1264,7 +1264,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
     st = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
-    st.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    st.tensordef = TensorDef(frozenset([Field("i"),Field("j"), Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -1286,15 +1286,15 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 1000, "k": 1000},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 1),
-                DC(frozenset(["i"]), frozenset(["j"]), 1),
-                DC(frozenset(["j"]), frozenset(["i"]), 1),
-                DC(frozenset(), frozenset(["j", "k"]), 50),
-                DC(frozenset(["j"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["j"]), 5),
-                DC(frozenset(), frozenset(["i", "k"]), 50),
-                DC(frozenset(["i"]), frozenset(["k"]), 5),
-                DC(frozenset(["k"]), frozenset(["i"]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 1),
+                DC(frozenset([Field("j")]), frozenset([Field("i")]), 1),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
+                DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("j")]), 5),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 50),
+                DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
+                DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             5,
         ),
@@ -1310,7 +1310,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
     st = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
-    st.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -1333,9 +1333,9 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         (
             {"i": 100, "j": 100, "k": 100},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 100),
-                DC(frozenset(["i"]), frozenset(["j"]), 2),
-                DC(frozenset(), frozenset(["j", "k"]), 50),
+                DC(frozenset(), frozenset([Field("i"),Field("j")]), 100),
+                DC(frozenset([Field("i")]), frozenset([Field("j")]), 2),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
             ],
             ["j"],
             5000,
@@ -1344,8 +1344,8 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         (
             {"i": 100, "j": 100, "k": 100},
             [
-                DC(frozenset(), frozenset(["i", "k"]), 900),
-                DC(frozenset(["i"]), frozenset(["k"]), 1),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 900),
+                DC(frozenset([Field("i")]), frozenset([Field("k")]), 1),
             ],
             ["i", "k"],
             100,
@@ -1354,9 +1354,9 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         (
             {"i": 1000, "j": 100, "k": 10},
             [
-                DC(frozenset(), frozenset(["i", "j"]), 5),
-                DC(frozenset(), frozenset(["j", "k"]), 80),
-                DC(frozenset(), frozenset(["i", "k"]), 1),
+                DC(frozenset(), frozenset([Field("i"), Field("j")]), 5),
+                DC(frozenset(), frozenset([Field("j"), Field("k")]), 80),
+                DC(frozenset(), frozenset([Field("i"), Field("k")]), 1),
             ],
             ["i"],
             5,
@@ -1373,7 +1373,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     st = insert_statistics(
         ST=DCStats, node=node, bindings=OrderedDict(), replace=False, cache=cache
     )
-    st.tensordef = TensorDef(frozenset(["i", "j", "k"]), dims, 0.0)
+    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"),Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
 
     reduce_fields = tuple(Field(ax) for ax in reduce_indices)

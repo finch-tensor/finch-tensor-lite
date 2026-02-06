@@ -19,8 +19,8 @@ from ...algebra import fill_value, is_idempotent, is_identity
 class TensorDef:
     def __init__(
         self,
-        index_order : tuple[str, ...],
-        dim_sizes: Mapping[str, float],
+        index_order : tuple[Field, ...],
+        dim_sizes: Mapping[Field, float],
         fill_value: Any,
     ):
         self._index_order = tuple(index_order)
@@ -40,7 +40,7 @@ class TensorDef:
 
     @classmethod
     # indices ->()
-    def from_tensor(cls, tensor: Any, indices: tuple[str, ...]) -> "TensorDef":
+    def from_tensor(cls, tensor: Any, indices: tuple[Field, ...]) -> "TensorDef":
         """
         Storing axis, sizes, and fill_value of the tensor
 
@@ -57,7 +57,7 @@ class TensorDef:
             fill_value=fv,
         )
 
-    def reindex_def(self, new_axis:tuple[str, ...]) -> "TensorDef":
+    def reindex_def(self, new_axis:tuple[Field, ...]) -> "TensorDef":
         """
         Return
             :TensorDef with a new reindexed index_order and dim sizes
@@ -82,7 +82,7 @@ class TensorDef:
         )
 
 
-    def add_dummy_idx(self, idx: str) -> "TensorDef":
+    def add_dummy_idx(self, idx: Field) -> "TensorDef":
         """
         Add a new axis `idx` of size 1
 
@@ -101,22 +101,22 @@ class TensorDef:
         return TensorDef(new_index_order, new_dim_sizes, self.fill_value)
 
     @property
-    def dim_sizes(self) -> Mapping[str, float]:
+    def dim_sizes(self) -> Mapping[Field, float]:
         return self._dim_sizes
 
     @dim_sizes.setter
-    def dim_sizes(self, value: Mapping[str, float]):
+    def dim_sizes(self, value: Mapping[Field, float]):
         self._dim_sizes = OrderedDict(value)
 
-    def get_dim_size(self, idx: str) -> float:
+    def get_dim_size(self, idx: Field) -> float:
         return self.dim_sizes[idx]
 
     @property
-    def index_order(self) -> tuple[str, ...]:
+    def index_order(self) -> tuple[Field, ...]:
         return self._index_order
 
     @index_order.setter
-    def index_order(self, value: Iterable[str]):
+    def index_order(self, value: Iterable[Field]):
         self._index_order = tuple(value)
 
     @property
@@ -127,7 +127,7 @@ class TensorDef:
     def fill_value(self, value: Any):
         self._fill_value = value
 
-    def get_dim_space_size(self, idx:Iterable[str]) -> float:
+    def get_dim_space_size(self, idx:Iterable[Field]) -> float:
         prod = 1
         for i in idx:
             prod *= int(self.dim_sizes[i])
@@ -151,13 +151,13 @@ class TensorDef:
         """
         new_fill_value = op(*(s.fill_value for s in args))
         new_index_order = MapJoin(Literal(op), tuple(
-            Table(Alias(f"_{i}"), tuple(map(Field,(a.index_order)))) for i, a in enumerate(args)
+            Table(Alias(f"_{i}"), tuple((a.index_order))) for i, a in enumerate(args)
         )).fields()
         new_dim_sizes: dict = {}
         for index in new_index_order:
             for s in args:
                 if index in s.index_order:
-                    new_dim_sizes[index.name] = s.dim_sizes[index.name]
+                    new_dim_sizes[index] = s.dim_sizes[index]
                     break
         assert set(new_dim_sizes.keys()) == set(new_index_order)
         return TensorDef(new_index_order, new_dim_sizes, new_fill_value)
@@ -166,7 +166,7 @@ class TensorDef:
     def aggregate(
         op: Callable,
         init: Any | None,
-        reduce_indices: tuple[str, ...],
+        reduce_indices: tuple[Field, ...],
         d: "TensorDef",
     ) -> "TensorDef":
         """
@@ -222,7 +222,7 @@ class TensorDef:
     
     @staticmethod
     def relabel(d: "TensorDef",
-                 relabel_indices: tuple[str, ...]) -> "TensorDef":
+                 relabel_indices: tuple[Field, ...]) -> "TensorDef":
         """
         Relabel the axes in the given TensorDef to new labels
 
@@ -248,7 +248,7 @@ class TensorDef:
         return TensorDef(relabel_indices,new_dim_sizes,d.fill_value)
     
     @staticmethod
-    def reorder(stats: "TensorDef", reorder_indices: tuple[str, ...]) -> "TensorDef":
+    def reorder(stats: "TensorDef", reorder_indices: tuple[Field, ...]) -> "TensorDef":
         for old_idx in stats.index_order:
             if old_idx not in set(reorder_indices) and stats.get_dim_size(old_idx) != 1:
                 raise ValueError(

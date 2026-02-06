@@ -4,6 +4,7 @@ from typing import Any, Self
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 from collections import OrderedDict
+from finchlite.finch_logic import Field
 
 class DenseStats(TensorStats):
     @classmethod
@@ -47,7 +48,7 @@ class DenseStats(TensorStats):
     def aggregate(
         op: Callable[..., Any],
         init: Any | None,
-        reduce_indices: tuple[str,...],
+        reduce_indices: tuple[Field,...],
         stats: "TensorStats",
     ) -> "DenseStats":
         d = stats.tensordef
@@ -64,7 +65,7 @@ class DenseStats(TensorStats):
         )
 
     @staticmethod
-    def relabel(stats: "TensorStats", relabel_indices: tuple[str, ...]) -> "DenseStats":
+    def relabel(stats: "TensorStats", relabel_indices: tuple[Field, ...]) -> "DenseStats":
         '''
         new_axes = tuple(relabel_indices)
         new_dims = OrderedDict((m, stats.get_dim_size(m)) for m in new_axes)
@@ -78,7 +79,7 @@ class DenseStats(TensorStats):
         return DenseStats.from_def(new_def)
 
     @staticmethod
-    def reorder(stats: "TensorStats", reorder_indices: tuple[str, ...]) -> "DenseStats":
+    def reorder(stats: "TensorStats", reorder_indices: tuple[Field, ...]) -> "DenseStats":
         '''
         for old_idx in stats.index_order:
             if old_idx not in set(reorder_indices) and stats.get_dim_size(old_idx) != 1:
