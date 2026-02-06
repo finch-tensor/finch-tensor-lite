@@ -36,13 +36,16 @@ def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
         AssemblyNode: The postprocessed FinchAssembly node.
     """
 
+    # TODO: implement resugaring
+    # (removing function epilogue + empty Else branches in IfElse)
+
     # Remove numbering from numbered statements.
-    def rw(x: AssemblyNode) -> AssemblyNode:
+    def rw(x: AssemblyNode):
         match x:
             case NumberedStatement(stmt, _):
                 return stmt
-            case _:
-                return x
+
+        return None
 
     return Rewrite(PostWalk(rw))(node)
 
@@ -82,9 +85,8 @@ def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
                     key = (sid, name)
                     if key in lattice:
                         return Variable(lattice[key], vtype)
-                case _:
-                    return n
-            return n
+
+            return None
 
         return Rewrite(PostWalk(rw_var))(target)
 
@@ -101,8 +103,8 @@ def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
                     case _:
                         new_stmt = replace_vars(stmt, sid)
                         return NumberedStatement(new_stmt, sid)
-            case _:
-                return x
+
+        return None
 
     return Rewrite(PostWalk(rw))(node)
 

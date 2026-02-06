@@ -52,8 +52,7 @@ def assembly_build_cfg(
     node: AssemblyNode, namespace: Namespace | None = None
 ) -> ControlFlowGraph:
     """
-    Build control-flow graph for a FinchAssembly node and apply desugaring
-    and statement numbering.
+    Build control-flow graph for a FinchAssembly node.
     Args:
         node: Root FinchAssembly node to build CFG for.
         namespace: Optional Namespace for variable name management.
