@@ -36,6 +36,7 @@ def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
         AssemblyNode: The postprocessed FinchAssembly node.
     """
 
+    # Remove numbering from numbered statements.
     def rw(x: AssemblyNode) -> AssemblyNode:
         match x:
             case NumberedStatement(stmt, _):
@@ -59,12 +60,38 @@ def assembly_copy_propagation_debug(node: AssemblyNode):
     return ctx
 
 
-# TODO: implement actual copy propagation apply using Rewriter and
-# the collected lattice values from the analysis context.
-# for each statement, if a variable is known to be a copy, replace it with
-# the source variable.
 def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
     """Apply copy-propagation to a FinchAssembly node."""
+
+    # Run copy-propagation analysis to collect replacements.
+    ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
+    ctx.analyze()
+    lattice: dict[tuple[int, str], str] = ctx.collect_copy_replacements()
+
+    # Replace variables in a statement according to the collected replacements.
+    def replace_vars(target: AssemblyNode, sid: int):
+        def rw_var(n: AssemblyNode) -> AssemblyNode:
+            match n:
+                case Variable(name, vtype):
+                    key = (sid, name)
+                    if key in lattice:
+                        return Variable(lattice[key], vtype)
+                case _:
+                    return n
+            return n
+
+        return Rewrite(PostWalk(rw_var))(target)
+
+    # Rewrite each numbered statement to replace variables.
+    def rw(x: AssemblyNode):
+        match x:
+            case NumberedStatement(stmt, sid):
+                new_stmt = replace_vars(stmt, sid)
+                return NumberedStatement(new_stmt, sid)
+            case _:
+                return x
+
+    return Rewrite(PostWalk(rw))(node)
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
