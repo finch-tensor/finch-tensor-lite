@@ -2,7 +2,7 @@ def compute(x: int64, y: int64) -> int64:
     x: int64 = x
     y: int64 = y
     temp: int64 = x
-    x: int64 = add(x, y)
+    temp: int64 = add(x, y)
     return temp
 
 def main() -> int64:

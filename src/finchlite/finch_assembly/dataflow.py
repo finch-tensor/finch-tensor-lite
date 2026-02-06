@@ -92,8 +92,15 @@ def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
     def rw(x: AssemblyNode):
         match x:
             case NumberedStatement(stmt, sid):
-                new_stmt = replace_vars(stmt, sid)
-                return NumberedStatement(new_stmt, sid)
+                match stmt:
+                    # if Assign, replace vars only on rhs to avoid replacing lhs
+                    case Assign(lhs, rhs):
+                        rhs = replace_vars(rhs, sid)
+                        new_stmt = Assign(lhs, rhs)
+                        return NumberedStatement(new_stmt, sid)
+                    case _:
+                        new_stmt = replace_vars(stmt, sid)
+                        return NumberedStatement(new_stmt, sid)
             case _:
                 return x
 
