@@ -1,3 +1,4 @@
+import finchlite
 from .dc_stats import DC, DCStats
 from .dense_stat import DenseStats
 from .tensor_def import TensorDef
@@ -10,3 +11,16 @@ __all__ = [
     "TensorDef",
     "TensorStats",
 ]
+from finchlite.finch_einsum.nodes import (
+    Access,
+    Alias,
+    Call,
+    Einsum,
+    EinsumExpression,
+    EinsumNode,
+    EinsumStatement,
+    Index,
+    Literal,
+    Plan,
+    Produces,
+)

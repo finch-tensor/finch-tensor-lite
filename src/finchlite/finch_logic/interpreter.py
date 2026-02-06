@@ -129,7 +129,7 @@ class LogicMachine:
                 if len(arg.idxs) != len(idxs):
                     raise ValueError("The number of indices in the relabel must match")
                 return TableValue(arg.tns, idxs)
-            case Reorder(arg, idxs):
+            case Reorder(arg, idxs):  # A = (2,3), B = Reorder(A,(j,i))
                 arg = self(arg)
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx not in idxs and dim != 1:
@@ -143,9 +143,15 @@ class LogicMachine:
                     dims, fill_value(arg.tns), dtype=element_type(arg.tns)
                 )
                 for crds in product(*[range(dim) for dim in dims]):
-                    node_crds = dict(zip(idxs, crds, strict=True))
-                    in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
-                    result[*crds] = arg.tns[*in_crds]
+                    node_crds = dict(
+                        zip(idxs, crds, strict=True)
+                    )  # node_crds = ((j,2), (i,1))
+                    in_crds = [
+                        node_crds.get(idx, 0) for idx in arg.idxs
+                    ]  # in_crds = (1,2)
+                    result[*crds] = arg.tns[
+                        *in_crds
+                    ]  # result(2,1) = arg.tns(1,2) - Transpose
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
