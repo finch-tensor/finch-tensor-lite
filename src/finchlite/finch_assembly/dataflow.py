@@ -63,6 +63,8 @@ def assembly_copy_propagation_debug(node: AssemblyNode):
 # the collected lattice values from the analysis context.
 # for each statement, if a variable is known to be a copy, replace it with
 # the source variable.
+def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
+    """Apply copy-propagation to a FinchAssembly node."""
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
