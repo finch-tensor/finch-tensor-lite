@@ -5,7 +5,7 @@ import numpy as np
 import finchlite.finch_assembly as asm
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.finch_assembly.cfg_builder import assembly_build_cfg
-from finchlite.finch_assembly.dataflow import assembly_copy_propagation
+from finchlite.finch_assembly.dataflow import assembly_copy_propagation_debug
 
 
 def test_asm_cfg_printer_if(file_regression):
@@ -197,7 +197,7 @@ def test_asm_copy_propagation_if(file_regression):
         )
     )
 
-    copy_propagation = assembly_copy_propagation(root)
+    copy_propagation = assembly_copy_propagation_debug(root)
     file_regression.check(str(copy_propagation), extension=".txt")
 
 
@@ -258,7 +258,7 @@ def test_asm_copy_propagation_dot(file_regression):
         )
     )
 
-    copy_propagation = assembly_copy_propagation(prgm)
+    copy_propagation = assembly_copy_propagation_debug(prgm)
     file_regression.check(str(copy_propagation), extension=".txt")
 
 
@@ -664,5 +664,5 @@ def test_asm_copy_propagation_comprehensive(file_regression):
 
     root = asm.Module((helper_func, main_func))
 
-    copy_propagation = assembly_copy_propagation(root)
+    copy_propagation = assembly_copy_propagation_debug(root)
     file_regression.check(str(copy_propagation), extension=".txt")
