@@ -45,12 +45,13 @@ def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
 
     return Rewrite(PostWalk(rw))(node)
 
+
 def assembly_copy_propagation_debug(node: AssemblyNode):
     """
     Run copy-propagation on a FinchAssembly node (debug/testing only).
-    Args: 
+    Args:
         node: Root FinchAssembly node to analyze.
-    Returns: 
+    Returns:
         AssemblyCopyPropagation: The completed analysis context.
     """
     ctx = AssemblyCopyPropagation(assembly_build_cfg(node))

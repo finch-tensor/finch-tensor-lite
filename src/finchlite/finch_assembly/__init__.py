@@ -1,6 +1,16 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg
-from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation_debug
+from .cfg_builder import (
+    AssemblyCFGBuilder,
+    assembly_build_cfg,
+    assembly_desugar,
+    assembly_number_statements,
+)
+from .dataflow import (
+    AssemblyCopyPropagation,
+    assembly_copy_propagation_debug,
+    assembly_dataflow_postprocess,
+    assembly_dataflow_preprocess,
+)
 from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
@@ -100,6 +110,10 @@ __all__ = [
     "assembly_build_cfg",
     "assembly_check_types",
     "assembly_copy_propagation_debug",
+    "assembly_dataflow_postprocess",
+    "assembly_dataflow_preprocess",
+    "assembly_desugar",
+    "assembly_number_statements",
     "element_type",
     "length_type",
 ]

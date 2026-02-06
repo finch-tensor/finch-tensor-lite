@@ -48,15 +48,22 @@ class NumberedStatement(AssemblyStatement):
         return str(self.stmt)
 
 
-def assembly_build_cfg(node: AssemblyNode):
-    """Build control-flow graph for a FinchAssembly node and apply desugaring
-    and statement numbering."""
-    namespace = Namespace(node)
-    desugared = assembly_desugar(node, namespace=namespace)
-    numbered = assembly_number_statements(desugared)
+def assembly_build_cfg(
+    node: AssemblyNode, namespace: Namespace | None = None
+) -> ControlFlowGraph:
+    """
+    Build control-flow graph for a FinchAssembly node and apply desugaring
+    and statement numbering.
+    Args:
+        node: Root FinchAssembly node to build CFG for.
+        namespace: Optional Namespace for variable name management.
+    Returns:
+        ControlFlowGraph: The constructed control-flow graph.
+    """
 
+    namespace = namespace or Namespace(node)
     ctx = AssemblyCFGBuilder(namespace=namespace)
-    return ctx.build(numbered)
+    return ctx.build(node)
 
 
 def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
