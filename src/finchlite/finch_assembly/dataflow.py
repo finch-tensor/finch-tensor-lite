@@ -16,7 +16,8 @@ from .nodes import (
     Variable,
 )
 
-"""Dataflow analysis and transformations for FinchAssembly."""
+# Type variable for dataflow analysis context,
+# bound to AbstractAssemblyDataflow or its subclasses.
 AnalysisT = TypeVar("AnalysisT", bound="AbstractAssemblyDataflow")
 
 
@@ -46,19 +47,6 @@ def assembly_dataflow_run(
     ctx, pre_node = assembly_dataflow_analyze(node, analysis_cls)
     updated = apply(pre_node, ctx)
     return assembly_dataflow_postprocess(updated)
-
-
-def assembly_copy_propagation_debug(node: AssemblyNode):
-    """
-    Run copy-propagation on a FinchAssembly node (debug/testing only).
-    Args:
-        node: Root FinchAssembly node to analyze.
-    Returns:
-        AssemblyCopyPropagation: The completed analysis context.
-    """
-    ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
-    ctx.analyze()
-    return ctx
 
 
 def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:

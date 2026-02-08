@@ -13,7 +13,6 @@ from .cfg_builder import (
 from .dataflow import (
     AssemblyCopyPropagation,
     assembly_copy_propagation,
-    assembly_copy_propagation_debug,
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
@@ -117,7 +116,6 @@ __all__ = [
     "assembly_build_cfg",
     "assembly_check_types",
     "assembly_copy_propagation",
-    "assembly_copy_propagation_debug",
     "assembly_dataflow_analyze",
     "assembly_dataflow_postprocess",
     "assembly_dataflow_preprocess",
