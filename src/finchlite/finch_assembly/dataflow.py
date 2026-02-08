@@ -1,14 +1,14 @@
 import copy
 from abc import abstractmethod
+from collections.abc import Callable
+from typing import TypeVar
 
-from ..symbolic import DataFlowAnalysis, Namespace, PostOrderDFS, PostWalk, Rewrite
+from ..symbolic import DataFlowAnalysis, PostOrderDFS, PostWalk, Rewrite
 from .cfg_builder import (
     NumberedStatement,
     assembly_build_cfg,
-    assembly_desugar,
-    assembly_number_statements,
-    assembly_resugar,
-    assembly_unwrap_numbered_statements,
+    assembly_dataflow_postprocess,
+    assembly_dataflow_preprocess,
 )
 from .nodes import (
     AssemblyNode,
@@ -16,40 +16,36 @@ from .nodes import (
     Variable,
 )
 
-# TODO: come up with a structured way to specify preprocessing, cfg_building,
-# postprocessing steps for dataflow analyses, to avoid
-# having to manually call them in the right order each time.
-# OR
-# just comment what should be called before and after each analysis,
-# and trust the user to do it right :)
-# OR
-# implement checks at the beginning of each step to verify valid output
+"""Dataflow analysis and transformations for FinchAssembly."""
+AnalysisT = TypeVar("AnalysisT", bound="AbstractAssemblyDataflow")
 
 
-def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
+def assembly_dataflow_analyze(
+    node: AssemblyNode, analysis_cls: type[AnalysisT]
+) -> tuple[AnalysisT, AssemblyNode]:
     """
-    Preprocess a FinchAssembly node for dataflow analysis (desugar + number statements).
-    Args:
-        node: Root FinchAssembly node to preprocess.
+    Run preprocessing + CFG build + analysis for a dataflow pass.
+
     Returns:
-        AssemblyNode: The preprocessed FinchAssembly node.
+        (analysis_ctx, preprocessed_node)
     """
-    namespace = Namespace(node)
-    return assembly_number_statements(assembly_desugar(node, namespace=namespace))
+    pre_node = assembly_dataflow_preprocess(node)
+    ctx = analysis_cls(assembly_build_cfg(pre_node))
+    ctx.analyze()
+    return ctx, pre_node
 
 
-def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
+def assembly_dataflow_run(
+    node: AssemblyNode,
+    analysis_cls: type[AnalysisT],
+    apply: Callable[[AssemblyNode, AnalysisT], AssemblyNode],
+) -> AssemblyNode:
     """
-    Postprocess a FinchAssembly node after
-    dataflow analysis (remove numbering + resugar).
-    Args:
-        node: Root FinchAssembly node to postprocess.
-    Returns:
-        AssemblyNode: The postprocessed FinchAssembly node.
+    Run a full dataflow pass (preprocess -> analyze -> apply -> postprocess).
     """
-
-    node = assembly_unwrap_numbered_statements(node)
-    return assembly_resugar(node)
+    ctx, pre_node = assembly_dataflow_analyze(node, analysis_cls)
+    updated = apply(pre_node, ctx)
+    return assembly_dataflow_postprocess(updated)
 
 
 def assembly_copy_propagation_debug(node: AssemblyNode):
@@ -74,41 +70,41 @@ def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
         AssemblyNode: The optimized FinchAssembly node.
     """
 
-    # Run copy-propagation analysis to collect replacements.
-    ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
-    ctx.analyze()
-    lattice: dict[tuple[int, str], str] = ctx.collect_copy_replacements()
+    def apply(pre_node: AssemblyNode, ctx: AssemblyCopyPropagation) -> AssemblyNode:
+        lattice: dict[tuple[int, str], str] = ctx.collect_copy_replacements()
 
-    # Replace variables in a statement according to the collected replacements.
-    def replace_vars(target: AssemblyNode, sid: int):
-        def rw_var(n: AssemblyNode):
-            match n:
-                case Variable(name, vtype):
-                    key = (sid, name)
-                    if key in lattice:
-                        return Variable(lattice[key], vtype)
+        # Replace variables in a statement according to the collected replacements.
+        def replace_vars(target: AssemblyNode, sid: int):
+            def rw_var(n: AssemblyNode):
+                match n:
+                    case Variable(name, vtype):
+                        key = (sid, name)
+                        if key in lattice:
+                            return Variable(lattice[key], vtype)
+
+                return None
+
+            return Rewrite(PostWalk(rw_var))(target)
+
+        # Rewrite each numbered statement to replace variables.
+        def rw(x: AssemblyNode):
+            match x:
+                case NumberedStatement(stmt, sid):
+                    match stmt:
+                        # if Assign, replace vars only on rhs to avoid replacing lhs
+                        case Assign(lhs, rhs):
+                            rhs = replace_vars(rhs, sid)
+                            new_stmt = Assign(lhs, rhs)
+                            return NumberedStatement(new_stmt, sid)
+                        case _:
+                            new_stmt = replace_vars(stmt, sid)
+                            return NumberedStatement(new_stmt, sid)
 
             return None
 
-        return Rewrite(PostWalk(rw_var))(target)
+        return Rewrite(PostWalk(rw))(pre_node)
 
-    # Rewrite each numbered statement to replace variables.
-    def rw(x: AssemblyNode):
-        match x:
-            case NumberedStatement(stmt, sid):
-                match stmt:
-                    # if Assign, replace vars only on rhs to avoid replacing lhs
-                    case Assign(lhs, rhs):
-                        rhs = replace_vars(rhs, sid)
-                        new_stmt = Assign(lhs, rhs)
-                        return NumberedStatement(new_stmt, sid)
-                    case _:
-                        new_stmt = replace_vars(stmt, sid)
-                        return NumberedStatement(new_stmt, sid)
-
-        return None
-
-    return Rewrite(PostWalk(rw))(node)
+    return assembly_dataflow_run(node, AssemblyCopyPropagation, apply)
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):

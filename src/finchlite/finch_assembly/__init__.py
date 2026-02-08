@@ -1,7 +1,10 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
 from .cfg_builder import (
     AssemblyCFGBuilder,
+    NumberedStatement,
     assembly_build_cfg,
+    assembly_dataflow_postprocess,
+    assembly_dataflow_preprocess,
     assembly_desugar,
     assembly_number_statements,
     assembly_resugar,
@@ -11,8 +14,8 @@ from .dataflow import (
     AssemblyCopyPropagation,
     assembly_copy_propagation,
     assembly_copy_propagation_debug,
-    assembly_dataflow_postprocess,
-    assembly_dataflow_preprocess,
+    assembly_dataflow_analyze,
+    assembly_dataflow_run,
 )
 from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
@@ -97,6 +100,7 @@ __all__ = [
     "Module",
     "MutableStructFType",
     "NamedTupleFType",
+    "NumberedStatement",
     "Print",
     "Repack",
     "Resize",
@@ -114,8 +118,10 @@ __all__ = [
     "assembly_check_types",
     "assembly_copy_propagation",
     "assembly_copy_propagation_debug",
+    "assembly_dataflow_analyze",
     "assembly_dataflow_postprocess",
     "assembly_dataflow_preprocess",
+    "assembly_dataflow_run",
     "assembly_desugar",
     "assembly_number_statements",
     "assembly_resugar",

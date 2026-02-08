@@ -263,6 +263,32 @@ def assembly_resugar(node: AssemblyNode) -> AssemblyNode:
     return Rewrite(PostWalk(rw))(node)
 
 
+def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
+    """
+    Preprocess a FinchAssembly node for dataflow analysis (desugar + number statements).
+    Args:
+        node: Root FinchAssembly node to preprocess.
+    Returns:
+        AssemblyNode: The preprocessed FinchAssembly node.
+    """
+    namespace = Namespace(node)
+    return assembly_number_statements(assembly_desugar(node, namespace=namespace))
+
+
+def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
+    """
+    Postprocess a FinchAssembly node after
+    dataflow analysis (remove numbering + resugar).
+    Args:
+        node: Root FinchAssembly node to postprocess.
+    Returns:
+        AssemblyNode: The postprocessed FinchAssembly node.
+    """
+
+    node = assembly_unwrap_numbered_statements(node)
+    return assembly_resugar(node)
+
+
 class AssemblyCFGBuilder:
     """Incrementally builds control-flow graph for Finch Assembly IR."""
 
