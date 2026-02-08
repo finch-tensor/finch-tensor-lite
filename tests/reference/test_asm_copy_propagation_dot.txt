@@ -1,6 +1,4 @@
 def dot_product(a: np_buf_t(float64), b: np_buf_t(float64)) -> float64:
-    a: np_buf_t(float64) = a
-    b: np_buf_t(float64) = b
     c: float64 = 0.0
     a_: np_buf_t(float64) = unpack(a)
     b_: np_buf_t(float64) = unpack(b)

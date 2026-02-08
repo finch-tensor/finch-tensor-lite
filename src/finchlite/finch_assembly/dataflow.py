@@ -7,12 +7,23 @@ from .cfg_builder import (
     assembly_build_cfg,
     assembly_desugar,
     assembly_number_statements,
+    assembly_resugar,
+    assembly_unwrap_numbered_statements,
 )
 from .nodes import (
     AssemblyNode,
     Assign,
     Variable,
 )
+
+# TODO: come up with a structured way to specify preprocessing, cfg_building,
+# postprocessing steps for dataflow analyses, to avoid
+# having to manually call them in the right order each time.
+# OR
+# just comment what should be called before and after each analysis,
+# and trust the user to do it right :)
+# OR
+# implement checks at the beginning of each step to verify valid output
 
 
 def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
@@ -29,25 +40,16 @@ def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
 
 def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
     """
-    Postprocess a FinchAssembly node after dataflow analysis (remove numbering).
+    Postprocess a FinchAssembly node after
+    dataflow analysis (remove numbering + resugar).
     Args:
         node: Root FinchAssembly node to postprocess.
     Returns:
         AssemblyNode: The postprocessed FinchAssembly node.
     """
 
-    # TODO: implement resugaring
-    # (removing function epilogue + empty Else branches in IfElse)
-
-    # Remove numbering from numbered statements.
-    def rw(x: AssemblyNode):
-        match x:
-            case NumberedStatement(stmt, _):
-                return stmt
-
-        return None
-
-    return Rewrite(PostWalk(rw))(node)
+    node = assembly_unwrap_numbered_statements(node)
+    return assembly_resugar(node)
 
 
 def assembly_copy_propagation_debug(node: AssemblyNode):

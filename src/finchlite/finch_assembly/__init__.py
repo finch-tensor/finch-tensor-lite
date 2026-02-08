@@ -4,6 +4,8 @@ from .cfg_builder import (
     assembly_build_cfg,
     assembly_desugar,
     assembly_number_statements,
+    assembly_resugar,
+    assembly_unwrap_numbered_statements,
 )
 from .dataflow import (
     AssemblyCopyPropagation,
@@ -116,6 +118,8 @@ __all__ = [
     "assembly_dataflow_preprocess",
     "assembly_desugar",
     "assembly_number_statements",
+    "assembly_resugar",
+    "assembly_unwrap_numbered_statements",
     "element_type",
     "length_type",
 ]

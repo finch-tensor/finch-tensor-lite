@@ -1,6 +1,4 @@
 def compute(x: int64, y: int64) -> int64:
-    x: int64 = x
-    y: int64 = y
     temp: int64 = x
     temp: int64 = add(x, y)
     return temp
@@ -13,8 +11,6 @@ def main() -> int64:
     if gt(c, 5):
         a: int64 = add(a, d)
         b: int64 = a
-    else:
-
     result: int64 = 0
     j_3: int64 = 0
     while lt(j_3, 5):
@@ -23,8 +19,6 @@ def main() -> int64:
         result: int64 = add(result, i)
         if eq(mod(i, 2), 0):
             result: int64 = mul(result, 2)
-        else:
-
         j_3: int64 = add(j_3, 1)
     if gt(result, 20):
         c: int64 = result
