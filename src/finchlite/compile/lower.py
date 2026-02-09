@@ -4,21 +4,12 @@ from dataclasses import dataclass
 from pprint import pprint
 from typing import Any
 
-import numpy as np
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, register_property
-from ..finch_assembly import (
-    AssemblyInterpreter,
-    AssemblyLibrary,
-    AssemblyLoader,
-    AssemblyStructFType,
-    AssemblyTransform,
-)
+from ..algebra import TensorFType
+from ..finch_assembly import AssemblyInterpreter, AssemblyLibrary, AssemblyLoader
 from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
-from ..util import qual_str
 from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer
 
@@ -71,85 +62,7 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
 
-@dataclass(eq=True, frozen=True)
-class Extent:
-    """
-    A class to represent the extent of a loop variable.
-    This is used to define the start and end values of a loop.
-    """
-
-    start: Any
-    end: Any
-
-    def loop(self, ctx, idx, body):
-        for idx_e in range(self.start, self.end):
-            # Create a new scope for each iteration
-            ctx_2 = ctx.scope(loop_state=HaltState())
-            # Assign the loop variable
-            ctx_2.bindings[idx.name] = idx.type_(idx_e)
-            # Execute the body of the loop
-            ctx_2(body)
-
-    @property
-    def ftype(self):
-        return ExtentFType(
-            np.asarray(self.start).dtype.type, np.asarray(self.end).dtype.type
-        )
-
-
-def dimension(tns, mode: int) -> Extent:
-    end = tns.shape[mode]
-    return Extent(type(end)(0), end)
-
-
-def numba_lower_dimension(ctx, tns, mode: int) -> str:
-    return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
-
-
-register_property(
-    dimension,
-    "__call__",
-    "return_type",
-    lambda op, x, y: ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
-)
-
-
-register_property(
-    Extent,
-    "__call__",
-    "return_type",
-    lambda op, x, y: ExtentFType(x, y),  # type: ignore[abstract]
-)
-
-
-register_property(
-    dimension,
-    "numba_literal",
-    "__attr__",
-    lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
-)
-
-
-@dataclass(eq=True, frozen=True)
-class ExtentFields:
-    start: Any
-    end: Any
-
-
-@dataclass(eq=True, frozen=True)
-class SingletonExtent:
-    idx: Any
-
-    def loop(self, ctx, idx, body):
-        # Create a new scope for each iteration
-        ctx_2 = ctx.scope(loop_state=HaltState())
-        # Assign the loop variable
-        ctx_2.bindings[idx.name] = idx.type_(self.idx)
-        # Execute the body of the loop
-        ctx_2(body)
-
-
-class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
+class FinchCompileError(Exception):
     """
     Exception raised during Finch compilation.
     This is used to indicate errors in the compilation process.
@@ -159,145 +72,6 @@ class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
         super().__init__(f"{message}:\n{pprint(node)}")
         self.message = message
         self.node = node
-
-
-@dataclass
-class SimpleExtentFType:  # TODO: Remove once solved in Lookup looplet
-    start: Any
-    end: Any
-
-    def get_start(self, ext):
-        return self.start
-
-    def get_end(self, ext):
-        return self.end
-
-    @property
-    def result_format(self):
-        return self
-
-
-@dataclass(eq=True, frozen=True)
-class ExtentFType(AssemblyStructFType):
-    start: Any
-    end: Any
-
-    def __repr__(self):
-        return f"ExtentFType(start={qual_str(self.start)}, end={qual_str(self.end)})"
-
-    @classmethod
-    def stack(cls, start, end):
-        return ntn.Stack(
-            ExtentFields(start, end),
-            ExtentFType(start.result_format, end.result_format),
-        )
-
-    @property
-    def struct_name(self):
-        return "Extent"
-
-    @property
-    def struct_fields(self):
-        return [("start", np.intp), ("end", np.intp)]
-
-    def from_fields(self, start, stop) -> "Extent":
-        return Extent(start, stop)
-
-    def __call__(self, *args):
-        raise TypeError(f"{self.struct_name} is not callable")
-
-    def get_start(self, ext):
-        match ext:
-            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
-                return start
-            case _:
-                return asm.GetAttr(ext, asm.Literal("start"))
-
-    def get_end(self, ext):
-        match ext:
-            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
-                return end
-            case _:
-                return asm.GetAttr(ext, asm.Literal("end"))
-
-    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
-        """
-        Lower a loop with the given index and body.
-        This is used to compile the loop into assembly.
-        """
-        lower_looplets(ctx, idx, visited_idxs, ext, body)
-        return
-
-    def default_loop(self, ctx, idx, ext, body):
-        def assert_lowered(node):
-            match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
-                        raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
-                        )
-            return
-
-        map(assert_lowered, PostOrderDFS(body))
-
-        idx = asm.Variable(ctx.freshen(idx.name), idx.result_format)
-        ctx_2 = ctx.scope()
-        ctx_2.bindings[idx.name] = idx
-        ctx_2(body)
-        body_3 = asm.Block(ctx_2.emit())
-        ctx.exec(
-            asm.ForLoop(
-                idx,
-                self.get_start(ext),
-                self.get_end(ext),
-                body_3,
-            )
-        )
-        return
-
-
-@dataclass(eq=True, frozen=True)
-class SingletonExtentFields:
-    idx: Any
-
-
-@dataclass(eq=True, frozen=True)
-class SingletonExtentFType:
-    idx: Any
-
-    @classmethod
-    def stack(cls, idx):
-        return ntn.Stack(
-            SingletonExtentFields(idx),
-            SingletonExtentFType(idx.result_format),
-        )
-
-    def get_start(self, ext):
-        return asm.GetAttr(ext, "idx")
-
-    def get_end(self, ext):
-        return asm.GetAttr(ext, "idx")
-
-    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
-        lower_looplets(ctx, idx, visited_idxs, ext, body)
-        return
-
-    def default_loop(self, ctx, idx, ext, body):
-        def assert_lowered(node):
-            match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
-                        raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
-                        )
-            return
-
-        map(assert_lowered, PostOrderDFS(body))
-
-        ctx_2 = ctx.scope()
-        ctx_2.bindings[idx.name] = self.get_start(ext)
-        ctx_2(body)
-        return ctx_2.emit()
 
 
 @dataclass(eq=True)

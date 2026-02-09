@@ -9,6 +9,7 @@ from finchlite.finch_logic.nodes import LogicExpression
 from finchlite.finch_logic.stages import LogicLoader
 from finchlite.symbolic import gensym
 
+from ..algebra.utils import intersect, setdiff
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -32,7 +33,6 @@ from ..symbolic import (
     PreWalk,
     Rewrite,
 )
-from ._utils import intersect, setdiff
 from .standardize import (
     concordize,
     flatten_plans,

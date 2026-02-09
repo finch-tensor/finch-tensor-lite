@@ -9,7 +9,9 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..compile.lower import LoopletPass, SimpleExtentFType, SingletonExtentFType
+from ..compile.extents import Extent, SimpleExtentFType, SingletonExtentFType, get_end, get_start, get_unit
+from ..compile.lower import LoopletPass
+from ..finch_notation.proves import prove
 from ..symbolic import PostWalk
 
 
@@ -80,12 +82,59 @@ class Spike:
     body: Any
     tail: Any
 
+    @property
+    def pass_request(self):
+        return SpikePass()
+
+    def truncate(self, ext_1, ext_2):
+        if prove(
+            ntn.Call(
+                ntn.Literal(operator.ge),
+                (
+                    ntn.Call(
+                        ntn.Literal(operator.sub), (get_end(ext_1), get_unit(ext_1))
+                    ),
+                    get_end(ext_2),
+                ),
+            )
+        ):
+            return Run(self.body)
+        if prove(ntn.Call(ntn.Literal(operator.eq), (get_end(ext_1), get_end(ext_2)))):
+            return self
+        raise NotImplementedError
+
 
 @dataclass
 class SpikePass(LoopletPass):
     @property
     def priority(self):
         return 0
+
+    def __call__(self, ctx, idx, ext, body):
+        def spike_body(node):
+            match node:
+                case ntn.Access(Spike(body, _), mode, (j, *idxs)) if j == idx:
+                    return ntn.Access(body(ctx), mode, (j, *idxs))
+
+        body_body = PostWalk(spike_body)(body)
+        body_ctx = ctx.scope()
+        body_ext = Extent(
+            get_start(ext),
+            asm.Call(asm.Literal(operator.sub), (get_end(ext), get_unit(ext))),
+        )
+        body_ctx(body_ext, body_body)
+
+        def spike_tail(node):
+            match node:
+                case ntn.Access(Spike(_, tail), mode, (j, *idxs)) if j == idx:
+                    return ntn.Access(tail(ctx), mode, (j, *idxs))
+
+        tail_body = PostWalk(spike_tail)(body)
+        tail_ctx = ctx.scope()
+        tail_ext = SingletonExtentFType.stack(get_end(ext))
+        tail_ctx(tail_ext, tail_body)
+
+        ctx.exec(asm.Block((*body_ctx.emit(), *tail_ctx.emit())))
 
 
 @dataclass
