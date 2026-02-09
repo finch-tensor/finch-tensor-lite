@@ -5,6 +5,7 @@ from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_logic.nodes import LogicExpression, LogicNode
 
 from ..algebra import overwrite
+from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -31,7 +32,6 @@ from ..symbolic import (
     Rewrite,
     gensym,
 )
-from ._utils import intersect, is_subsequence, setdiff, with_subsequence
 from .normalize import normalize_names
 
 

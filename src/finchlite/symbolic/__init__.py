@@ -5,6 +5,7 @@ from .gensym import gensym
 from .rewriters import (
     Chain,
     Fixpoint,
+    Memo,
     PostWalk,
     PreWalk,
     Rewrite,
@@ -26,6 +27,7 @@ __all__ = [
     "FType",
     "FTyped",
     "Fixpoint",
+    "Memo",
     "NamedTerm",
     "Namespace",
     "PostOrderDFS",

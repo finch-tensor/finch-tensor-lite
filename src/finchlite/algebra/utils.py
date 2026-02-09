@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 
 
 def intersect(x1: Iterable, x2: Iterable) -> tuple:
@@ -11,6 +11,14 @@ def extend_uniqe(x1: Iterable, x2: Iterable) -> tuple:
 
 def is_subsequence(x1: Iterable, x2: Iterable) -> bool:
     return tuple(x1) == tuple(x for x in x2 if x in x1)
+
+
+def is_disjoint(x1: Iterable, x2: Iterable) -> bool:
+    return not any(x in x2 for x in x1)
+
+
+def all_unique(x: Collection) -> bool:
+    return len(set(x)) == len(x)
 
 
 def setdiff(x1: Iterable, x2: Iterable) -> tuple:
