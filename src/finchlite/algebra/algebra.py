@@ -346,6 +346,8 @@ for op in (
     np.logical_and,
     np.logical_or,
     np.logical_xor,
+    max,
+    min,
 ):
     register_property(op, "__call__", "is_associative", lambda op: True)
 
@@ -363,6 +365,8 @@ for op in (
     np.logical_and,
     np.logical_or,
     np.logical_xor,
+    max,
+    min,
 ):
     register_property(op, "__call__", "is_commutative", lambda op: True)
 

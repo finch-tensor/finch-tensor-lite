@@ -15,7 +15,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
 from ..algebra import make_tuple, overwrite
-from ..compile import Extent
+from ..compile.extents import Extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, compute_shape_vars
 from ..finch_notation import NotationInterpreter

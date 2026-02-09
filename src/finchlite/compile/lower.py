@@ -203,6 +203,9 @@ class ExtentFType(AssemblyStructFType):
             case _:
                 return asm.GetAttr(ext, asm.Literal("end"))
 
+    def get_unit(self, ext):
+        return self.start(1)
+
     def lower_loop(self, ctx, idx, ext, body):
         """
         Lower a loop with the given index and body.
