@@ -1,30 +1,9 @@
-ENTRY_0: #succs=[if_else_2]
-
-EXIT_1: #succs=[]
-
-if_else_2: #succs=[if_else_4, if_else_5]
-    [0] a: int64 = 5
-
-if_else_3: #succs=[EXIT_1]
-
-if_else_4: #succs=[if_else_6]
-    [1] assert(eq(a, 5))
-    [2] a: int64 = add(a, 10)
-
-if_else_5: #succs=[if_else_6]
-    [3] assert(not_(eq(a, 5)))
-
-if_else_6: #succs=[if_else_7, if_else_8]
-
-if_else_7: #succs=[if_else_9]
-    [4] assert(lt(a, 15))
-    [5] a: int64 = sub(a, 3)
-
-if_else_8: #succs=[if_else_9]
-    [6] assert(not_(lt(a, 15)))
-    [7] a: int64 = mul(a, 2)
-
-if_else_9: #succs=[if_else_3]
-    [8] return a
-
-if_else_10: #succs=[if_else_3]
+def if_else() -> int64:
+    a: int64 = 5
+    if eq(a, 5):
+        a: int64 = add(a, 10)
+    if lt(a, 15):
+        a: int64 = sub(a, 3)
+    else:
+        a: int64 = mul(a, 2)
+    return a

@@ -41,6 +41,15 @@ from .nodes import (
 
 @dataclass(eq=True, frozen=True)
 class NumberedStatement(AssemblyStatement):
+    """
+    Wrapper for AssemblyStatement that assigns a unique id to each statement
+    for easier tracking in the CFG.
+
+    Attributes:
+        stmt: The original AssemblyStatement being wrapped.
+        sid: A unique integer identifier for the statement.
+    """
+
     stmt: AssemblyStatement
     sid: int
 
@@ -48,15 +57,21 @@ class NumberedStatement(AssemblyStatement):
         return str(self.stmt)
 
 
-def assembly_build_cfg(node: AssemblyNode):
-    """Build control-flow graph for a FinchAssembly node and apply desugaring
-    and statement numbering."""
-    namespace = Namespace(node)
-    desugared = assembly_desugar(node, namespace=namespace)
-    numbered = assembly_number_statements(desugared)
+def assembly_build_cfg(
+    node: AssemblyNode, namespace: Namespace | None = None
+) -> ControlFlowGraph:
+    """
+    Build control-flow graph for a FinchAssembly node.
+    Args:
+        node: Root FinchAssembly node to build CFG for.
+        namespace: Optional Namespace for variable name management.
+    Returns:
+        ControlFlowGraph: The constructed control-flow graph.
+    """
 
+    namespace = namespace or Namespace(node)
     ctx = AssemblyCFGBuilder(namespace=namespace)
-    return ctx.build(numbered)
+    return ctx.build(node)
 
 
 def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
@@ -184,6 +199,94 @@ def assembly_number_statements(root: AssemblyNode) -> AssemblyNode:
         return None
 
     return Rewrite(PostWalk(rw))(root)
+
+
+def assembly_unwrap_numbered_statements(node: AssemblyNode) -> AssemblyNode:
+    """Remove NumberedStatement wrappers from statements."""
+
+    def rw(x: AssemblyNode):
+        match x:
+            case NumberedStatement(stmt, _):
+                return stmt
+
+        return None
+
+    return Rewrite(PostWalk(rw))(node)
+
+
+def assembly_resugar(node: AssemblyNode) -> AssemblyNode:
+    """
+    Resugar core AST shapes back to surface syntax after CFG construction.
+        - `IfElse(cond, body, Block())` -> `If(cond, body)`
+        - `Assert(cond)` removed
+        - Prologue in `Function` bodies of the form `Assign(arg, arg)` removed
+    """
+
+    # Helper to drop function prologue of the form `Assign(arg, arg)`.
+    def _drop_function_prologue(
+        args: tuple[Variable, ...], body: AssemblyStatement
+    ) -> AssemblyStatement:
+        if not isinstance(body, Block):
+            return body
+
+        bodies = list(body.bodies)
+        idx = 0
+        for arg in args:
+            if idx >= len(bodies):
+                break
+            match bodies[idx]:
+                case Assign(lhs, rhs) if lhs == arg and rhs == arg:
+                    idx += 1
+                    continue
+            break
+
+        if idx:
+            return Block(tuple(bodies[idx:]))
+        return body
+
+    def rw(x: AssemblyNode):
+        match x:
+            case Function(name, args, body):
+                # Drop function prologue of the form `Assign(arg, arg)`
+                return Function(name, args, _drop_function_prologue(args, body))
+            case Block(bodies):
+                # Drop `Assert` statements.
+                new_bodies = [body for body in bodies if not isinstance(body, Assert)]
+                return Block(tuple(new_bodies))
+            case IfElse(cond, then_body, else_body):
+                # Resugar `IfElse(cond, body, Block())` to `If(cond, body)`.
+                if isinstance(else_body, Block) and len(else_body.bodies) == 0:
+                    return If(cond, then_body)
+
+        return None
+
+    return Rewrite(PostWalk(rw))(node)
+
+
+def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
+    """
+    Preprocess a FinchAssembly node for dataflow analysis (desugar + number statements).
+    Args:
+        node: Root FinchAssembly node to preprocess.
+    Returns:
+        AssemblyNode: The preprocessed FinchAssembly node.
+    """
+    namespace = Namespace(node)
+    return assembly_number_statements(assembly_desugar(node, namespace=namespace))
+
+
+def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
+    """
+    Postprocess a FinchAssembly node after
+    dataflow analysis (remove numbering + resugar).
+    Args:
+        node: Root FinchAssembly node to postprocess.
+    Returns:
+        AssemblyNode: The postprocessed FinchAssembly node.
+    """
+
+    node = assembly_unwrap_numbered_statements(node)
+    return assembly_resugar(node)
 
 
 class AssemblyCFGBuilder:
