@@ -1,4 +1,4 @@
-from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type
+from .algebra import Tensor, TensorFType
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,

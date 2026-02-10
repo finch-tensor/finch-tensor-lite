@@ -41,11 +41,10 @@ class NumPyFType(TensorFType):
 class NumPyWrapper(Tensor):
     def __init__(self, data: np.ndarray):
         self._data = np.asarray(data)
-        self._ftype = NumPyFType(self._data.dtype, self._data.ndim)
 
     @property
     def ftype(self) -> NumPyFType:
-        return self._ftype
+        return NumPyFType(self._data.dtype, self._data.ndim)
 
     @property
     def shape(self) -> tuple:
