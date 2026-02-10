@@ -1,3 +1,14 @@
+"""
+Parser for Finch Assembly in Python's multiline strings.
+
+Supports constructing assembly nodes objects from parsed strings.
+
+There is also a dedicated VS Code extension for proper highlighting
+of tagged strings: https://github.com/finch-tensor/vscode-finch-assembly.
+The extension is not yet available on VS Code marketplace. You can find
+installation file here: https://github.com/finch-tensor/vscode-finch-assembly/releases
+"""
+
 import operator
 
 import numpy as np
@@ -60,6 +71,36 @@ _OPS = {
 def parse_assembly(
     code: str, vars: dict[str, asm.Variable], position_type: type = np.intp
 ) -> asm.AssemblyStatement:
+    """
+    Parse Finch Assembly code and convert it to assembly node objects.
+
+    Takes a string containing Finch Assembly code and transforms it into a structured
+    representation using assembly nodes. The parser supports assignments, increments,
+    for loops, if/if-else statements, array accesses, and arithmetic/logical operations.
+
+    Args:
+        code: The Finch Assembly code to parse. Should start with "finch" or "finch-asm"
+            followed by assembly statements. Comments (C/C++ style) are supported.
+        vars: Dictionary mapping variable names (as strings) to Variable objects.
+            Used to resolve variable references in the assembly code.
+        position_type: NumPy integer type to use for integer literals. Affects the dtype
+            of parsed integer constants. (default: np.intp)
+
+    Returns:
+        A Finch Assembly Block representing the parsed code.
+
+    Raises:
+        Exception: If the parser encounters unrecognized syntax or tree nodes.
+
+    Example:
+        >>> from finchlite.finch_assembly import nodes as asm
+        >>> import numpy as np
+        >>> vars = {"i": asm.Variable("i", int), "arr": asm.Variable("arr", np.ndarray)}
+        >>> code = '''finch
+        ... arr[i] = 42
+        ... '''
+        >>> stmt = parse_assembly(code, vars)
+    """
     tree = assembly_parser.parse(code.strip())
 
     def ctx(tree: Tree):
@@ -81,7 +122,7 @@ def parse_assembly(
                     ctx(stop),
                     asm.Block(tuple(ctx(b) for b in bodies)),
                 )
-            case Tree("if", [cond, *bodies]):
+            case Tree("if", [cond, Tree("block", bodies)]):
                 return asm.If(ctx(cond), asm.Block(tuple(ctx(b) for b in bodies)))
             case Tree(
                 "if_else", [cond, Tree("block", bodies), Tree("block", else_bodies)]
