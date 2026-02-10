@@ -79,4 +79,4 @@ class HollowData:
     lvl: Any
 
     def ndims(self) -> int:
-        return 1 + self.lvl.ndims()
+        return self.lvl.ndims()
