@@ -7,7 +7,12 @@ from typing import Any
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType
-from ..finch_assembly import AssemblyInterpreter, AssemblyLibrary, AssemblyLoader
+from ..finch_assembly import (
+    AssemblyInterpreter,
+    AssemblyLibrary,
+    AssemblyLoader,
+    AssemblyTransform,
+)
 from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util.logging import LOG_ASSEMBLY
@@ -419,6 +424,9 @@ class LoopletPass(ABC):
         assert isinstance(other, LoopletPass)
         return self.priority < other.priority
 
+    def combine_with(self, other: "LoopletPass"):
+        return max(self, other)
+
 
 class DefaultPass(LoopletPass):
     @property
@@ -464,6 +472,8 @@ class LoopletContext(Context):
                     if j == self.idx:
                         return tns.pass_request
             return DefaultPass()
+
+        # TODO: combine styles and result style
 
         return max(map(pass_request, PostOrderDFS(body)))
 

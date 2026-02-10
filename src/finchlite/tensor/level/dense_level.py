@@ -6,15 +6,18 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...codegen import NumpyBufferFType
 from ...compile import LoopletContext
 from ...compile import looplets as lplt
 from ..fiber_tensor import FiberTensorFType, Level, LevelFType
 
 
+class DenseLevelSlots(NamedTuple):
+    pass
+
+
 class DenseLevelFields(NamedTuple):
     lvl: asm.Variable
-    buf_s: NumpyBufferFType
+    lvls_slots: tuple[DenseLevelSlots, ...]
     pos: asm.Variable | asm.Literal
     op: asm.Literal
     dirty_bit: bool
@@ -43,7 +46,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
 
     def __call__(self, *, shape):
         """
-        Creates an instance of DenseLevel with the given ftype.
+        Creates an instance of DenseLevel.
 
         Args:
             shape: The shape to be used for the level. (mandatory)
@@ -112,12 +115,15 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def next_level(self):
         return self.lvl_t
 
-    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
-        return DenseLevelFields(tns, buf_s, pos, op, dirty_bit)
+    def get_fields_class(self, tns, lvls_slots, pos, op, dirty_bit):
+        return DenseLevelFields(tns, lvls_slots, pos, op, dirty_bit)
 
-    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
+    def level_asm_unpack(self, ctx, var_n, val) -> list:
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
-        return self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+        return (DenseLevelSlots(),) + self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+
+    def level_asm_repack(self, ctx, lvls_slots):
+        self.lvl_t.level_asm_repack(ctx, lvls_slots[1:])
 
     def level_lower_dim(self, ctx, obj, r):
         if r == 0:
@@ -175,7 +181,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             return ntn.Stack(
                 self.lvl_t.get_fields_class(
                     asm.GetAttr(tns.lvl, asm.Literal("lvl")),
-                    tns.buf_s,
+                    tns.lvls_slots[1:],
                     pos_2,
                     tns.op,
                     tns.dirty_bit,

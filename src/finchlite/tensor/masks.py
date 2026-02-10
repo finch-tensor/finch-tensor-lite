@@ -97,8 +97,8 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
     def asm_repack(self, ctx, lhs, obj):
         return self.body.asm_repack(ctx, lhs, obj)
 
-    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
-        return self.body.get_fields_class(tns, buf_s, pos, op, dirty_bit)
+    def get_fields_class(self, tns, lvls_slots, pos, op, dirty_bit):
+        return self.body.get_fields_class(tns, lvls_slots, pos, op, dirty_bit)
 
     def from_fields(self, lvl) -> "LoTriMask":
         return LoTriMask(lvl)

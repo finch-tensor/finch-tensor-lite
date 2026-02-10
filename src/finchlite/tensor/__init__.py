@@ -4,8 +4,11 @@ from .level import (
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
+    SparseListLevel,
+    SparseListLevelFType,
     dense,
     element,
+    sparse_list,
 )
 from .masks import (
     tril,
@@ -20,8 +23,11 @@ __all__ = [
     "FiberTensorFType",
     "Level",
     "LevelFType",
+    "SparseListLevel",
+    "SparseListLevelFType",
     "dense",
     "element",
     "fiber_tensor",
+    "sparse_list",
     "tril",
 ]

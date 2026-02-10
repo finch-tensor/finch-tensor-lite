@@ -93,6 +93,9 @@ class Literal(AssemblyExpression):
         return literal_repr(type(self).__name__, {"val": self.val})
 
 
+L = Literal
+
+
 @dataclass(eq=True, frozen=True)
 class Variable(AssemblyExpression, NamedTerm):
     """

@@ -5,9 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
-from finchlite.algebra.algebra import fixpoint_type, return_type
-
-from ..algebra import promote_max, promote_type
+from ..algebra import fixpoint_type, promote_max, promote_type, return_type
 from ..symbolic import (
     Context,
     FType,
@@ -58,10 +56,10 @@ Notes on Finch Logic IR:
 Finch Logic IR is an intermediate representation (IR) used in the Finch Tensor
 Lite framework. It is designed to represent logical operations and transformations
 on tensors in a structured and abstract manner. The Logic IR is built around the
-concept of "tables," which are tensors with named dimensions, allowing for more
+concept of "tables", which are tensors with named dimensions, allowing for more
 intuitive manipulation and reasoning about tensor operations.
 
-Dimensions in Finch Logic IR are represented using "fields," which are named
+Dimensions in Finch Logic IR are represented using "fields", which are named
 entities that index the dimensions of a tensor. This naming convention helps
 clarify the relationships between different tensors and their dimensions during
 operations such as mapping, aggregation, reordering, and relabeling.
@@ -69,7 +67,7 @@ operations such as mapping, aggregation, reordering, and relabeling.
 Fields may not be used to represent different dimension sizes within the same
 logic program.
 
-Tables may be referenced using "aliases," which are symbolic names that refer to
+Tables may be referenced using "aliases", which are symbolic names that refer to
 specific tables within the program. Evaluators for Finch logic may accept a list
 of bindings from aliases to tables, allowing the logic program to modify the
 state of tensors. Queries in Finch Logic IR can bind the result of an expression
@@ -118,8 +116,7 @@ class LogicNode(Term, ABC):
     Represents a Finch Logic IR node. Finch uses a variant of Concrete Field Notation
     as an intermediate representation.
 
-    The LogicNode struct represents many different Finch IR nodes. The nodes are
-    differentiated by a `FinchLogic.LogicNodeKind` enum.
+    The LogicNode struct represents many different Finch IR nodes.
     """
 
     @classmethod
@@ -173,7 +170,7 @@ class LogicExpression(LogicNode):
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> tuple[T | None, ...]:
         """Compute per-dimension values, combining using `op`. When dimensions
-        are expanded, None is used.  When dimensions are contracted, the value
+        are expanded, None is used. When dimensions are contracted, the value
         is combined with None."""
         ...
 
@@ -494,7 +491,7 @@ class MapJoin(LogicTree, LogicExpression):
 class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
-    with `init`.  `idxs` are the dimensions to reduce. May happen in any order.
+    with `init`. `idxs` are the dimensions to reduce. May happen in any order.
 
     Attributes:
         op: The reduction operation.
@@ -594,7 +591,7 @@ class Reorder(LogicTree, LogicExpression):
 class Relabel(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that relabels the dimensions of `arg` to be
-    `idxs...`.
+    `idxs...`. Number of fields of `arg` and `idxs` must match.
 
     Attributes:
         arg: The argument to relabel.

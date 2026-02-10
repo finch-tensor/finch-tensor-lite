@@ -562,7 +562,9 @@ class NumbaContext(Context):
                 return str(value)
             case asm.Variable(name, _) | asm.Slot(name, _):
                 return name.replace("#", "_")
-            case asm.Assign(asm.Variable(var_n, var_t) as var, val):
+            case asm.Assign(
+                asm.Variable(var_n, var_t) as var, val
+            ):  # TODO: Can we allow `x[...] = ...`?
                 val_code = self(val)
                 var_code = self(var)
                 if val.result_format != var_t:

@@ -349,6 +349,14 @@ for op in (
 ):
     register_property(op, "__call__", "is_associative", lambda op: True)
 
+for op in (
+    operator.ge,
+    operator.le,
+    operator.eq,
+    operator.sub,
+):
+    register_property(op, "__call__", "is_associative", lambda op: False)
+
 
 def is_commutative(op: Any) -> bool:
     return query_property(op, "__call__", "is_commutative")
@@ -634,10 +642,16 @@ for fn in [
 
 for fn in [
     operator.add,
+    operator.sub,
     operator.mul,
     operator.xor,
     np.logical_xor,
     np.logaddexp,
+    operator.ge,
+    operator.le,
+    operator.lt,
+    operator.gt,
+    operator.eq,
 ]:
     register_property(fn, "__call__", "is_idempotent", lambda op: False)
 

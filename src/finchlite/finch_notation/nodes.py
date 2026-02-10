@@ -87,6 +87,9 @@ class Literal(NotationExpression):
         return literal_repr(type(self).__name__, {"val": self.val})
 
 
+L = Literal
+
+
 @dataclass(eq=True, frozen=True)
 class Value(NotationExpression):
     """

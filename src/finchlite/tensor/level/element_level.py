@@ -9,9 +9,13 @@ from ...symbolic import FType, ftype
 from ..fiber_tensor import Level, LevelFType
 
 
+class ElementLevelSlots(NamedTuple):
+    buf_s: asm.Slot
+
+
 class ElementLevelFields(NamedTuple):
     lvl: asm.Variable
-    buf_s: NumpyBufferFType
+    lvls_slots: tuple[ElementLevelSlots]
     pos: asm.Variable | asm.Literal
     op: asm.Literal
     dirty_bit: bool
@@ -83,16 +87,21 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
+    def level_asm_unpack(self, ctx, var_n, val) -> tuple[ElementLevelSlots]:
         buf = asm.Variable(f"{var_n}_buf", self.buffer_type)
         buf_e = asm.GetAttr(val, asm.Literal("val"))
         ctx.exec(asm.Assign(buf, buf_e))
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buffer_type)
         ctx.exec(asm.Unpack(buf_s, buf))
-        return buf_s
 
-    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
-        return ElementLevelFields(tns, buf_s, pos, op, dirty_bit)
+        return (ElementLevelSlots(buf_s),)
+
+    def level_asm_repack(self, ctx, lvls_slots):
+        slots = lvls_slots[0]
+        ctx.exec(asm.Repack(slots.buf_s))
+
+    def get_fields_class(self, tns, lvls_slots, pos, op, dirty_bit):
+        return ElementLevelFields(tns, lvls_slots, pos, op, dirty_bit)
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         i_var = asm.Variable("i", self.buffer_type.length_type)
@@ -101,18 +110,19 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
 
     def level_lower_unwrap(self, ctx, obj, pos):
         assert isinstance(obj, ElementLevelFields)
-        return asm.Load(obj.buf_s, pos)
+        return asm.Load(obj.lvls_slots[0].buf_s, pos)
 
     def level_lower_increment(self, ctx, obj, val, pos):
         assert isinstance(obj, ElementLevelFields)
+        buf_s = obj.lvls_slots[0].buf_s
         lowered_pos = asm.Variable(pos.name, pos.type)
         ctx.exec(
             asm.Store(
-                obj.buf_s,
+                buf_s,
                 lowered_pos,
                 asm.Call(
                     asm.Literal(obj.op.val),
-                    [asm.Load(obj.buf_s, lowered_pos), val],
+                    [asm.Load(buf_s, lowered_pos), val],
                 ),
             )
         )

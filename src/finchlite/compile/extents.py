@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from operator import add, sub
 from typing import Any
 
 import numpy as np
@@ -97,15 +98,37 @@ class ExtentFType(AssemblyStructFType):
                 return asm.GetAttr(ext, asm.Literal("end"))
 
     def get_unit(self, ext):
-        return self.start(1)
+        # TODO: fix
+        return ntn.Literal(np.intp(1))
 
-    def lower_loop(self, ctx, idx, ext, body):
+    def get_measure(self, ext):
+        return ntn.Call(ntn.Literal(sub), (ext.get_end(), ext.get_start()))
+
+    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
         """
         Lower a loop with the given index and body.
         This is used to compile the loop into assembly.
         """
-        lower_looplets(ctx, idx, ext, body)
+        lower_looplets(ctx, idx, visited_idxs, ext, body)
         return
+
+    def bound_below(self, size) -> "ExtentFType":
+        return self._bound_ext(size, max)
+
+    def bound_above(self, size) -> "ExtentFType":
+        return self._bound_ext(size, min)
+
+    def _bound_ext(self, size, func) -> "ExtentFType":
+        return ExtentFType(
+            self.start,
+            ntn.Cached(
+                self.end,
+                ntn.Call(
+                    ntn.Literal(func),
+                    (self.end, ntn.Call(ntn.Literal(add), (self.start, size))),
+                ),
+            ),
+        )
 
     def default_loop(self, ctx, idx, ext, body):
         def assert_lowered(node):
@@ -170,8 +193,8 @@ class SingletonExtentFType:
     def get_end(self, ext):
         return asm.GetAttr(ext, "idx")
 
-    def lower_loop(self, ctx, idx, ext, body):
-        lower_looplets(ctx, idx, ext, body)
+    def lower_loop(self, ctx, idx, visited_idxs, ext, body):
+        lower_looplets(ctx, idx, visited_idxs, ext, body)
         return
 
     def default_loop(self, ctx, idx, ext, body):
@@ -190,6 +213,22 @@ class SingletonExtentFType:
         ctx_2.bindings[idx.name] = self.get_start(ext)
         ctx_2(body)
         return ctx_2.emit()
+
+
+@dataclass(frozen=True)
+class SimpleExtentFType:  # TODO: Remove once solved in Lookup looplet
+    start: Any
+    end: Any
+
+    def get_start(self, ext):
+        return self.start
+
+    # def get_end(self, ext):
+    #     return self.end
+
+    @property
+    def result_format(self):
+        return self
 
 
 class _CombineStyle(Enum):
@@ -220,15 +259,28 @@ def union_extents(ext_1: Extent, ext_2: Extent) -> Extent:
 
 
 def get_start(ext: Extent) -> Any:
-    return ext.ftype.get_start(ext)
+    original_ext = ext
+    if hasattr(ext, "result_format"):
+        ext = ext.result_format
+    elif hasattr(ext, "ftype"):
+        ext = ext.ftype
+    return ext.get_start(original_ext)
 
 
 def get_end(ext: Extent) -> Any:
-    return ext.ftype.get_end(ext)
+    original_ext = ext
+    if hasattr(ext, "result_format"):
+        ext = ext.result_format
+    elif hasattr(ext, "ftype"):
+        ext = ext.ftype
+    return ext.get_end(original_ext)
 
 
 def get_unit(ext: Extent) -> Any:
-    return ext.ftype.get_unit(ext)
+    original_ext = ext
+    if hasattr(ext, "ftype"):
+        ext = ext.ftype
+    return ext.get_unit(original_ext)
 
 
 def dimension(tns, mode: int) -> Extent:

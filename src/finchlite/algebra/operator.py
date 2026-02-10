@@ -3,6 +3,8 @@ import operator
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
 from . import algebra
 from .algebra import is_associative, is_commutative, is_idempotent
 
@@ -233,6 +235,32 @@ def cansplitpush(x, y):
         and is_commutative(x)
         and is_associative(x)
     )
+
+
+def scansearch(
+    arr: np.ndarray, x: np.integer, lo: np.integer, hi: np.integer
+) -> np.integer:
+    dtype = lo.dtype.type
+    u = dtype(1)
+    d = dtype(1)
+    p = lo
+
+    # searching for binary search bounds
+    while p < hi and arr[p] < x:
+        d <<= 0x01
+        p += d
+    lo = p - d
+    hi = min(p, hi) + u
+
+    # binary searching within those bounds
+    while lo < hi - u:
+        m = lo + ((hi - lo) >> 0x01)
+        if arr[m] < x:
+            lo = m
+        else:
+            hi = m
+
+    return hi
 
 
 def make_tuple(*args):
