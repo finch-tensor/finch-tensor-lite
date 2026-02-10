@@ -57,6 +57,7 @@ class NumberedStatement(AssemblyStatement):
         return str(self.stmt)
 
 
+# TODO: add desugaring when building the CFG, but don't change the original node
 def assembly_build_cfg(
     node: AssemblyNode, namespace: Namespace | None = None
 ) -> ControlFlowGraph:
@@ -73,7 +74,7 @@ def assembly_build_cfg(
     ctx = AssemblyCFGBuilder(namespace=namespace)
     return ctx.build(node)
 
-
+# TODO: remove desugaring on a node
 def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
     """
     Lower surface syntax to a core AST shape before CFG construction.
@@ -213,7 +214,7 @@ def assembly_unwrap_numbered_statements(node: AssemblyNode) -> AssemblyNode:
 
     return Rewrite(PostWalk(rw))(node)
 
-
+# TODO: remove resugaring on the original node
 def assembly_resugar(node: AssemblyNode) -> AssemblyNode:
     """
     Resugar core AST shapes back to surface syntax after CFG construction.
@@ -262,7 +263,7 @@ def assembly_resugar(node: AssemblyNode) -> AssemblyNode:
 
     return Rewrite(PostWalk(rw))(node)
 
-
+# TODO: not necessary anymore when I remove desugaring on the original node
 def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
     """
     Preprocess a FinchAssembly node for dataflow analysis (desugar + number statements).
@@ -274,7 +275,7 @@ def assembly_dataflow_preprocess(node: AssemblyNode) -> AssemblyNode:
     namespace = Namespace(node)
     return assembly_number_statements(assembly_desugar(node, namespace=namespace))
 
-
+# TODO: not necessary anymore when I remove resugaring on the original node
 def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
     """
     Postprocess a FinchAssembly node after
