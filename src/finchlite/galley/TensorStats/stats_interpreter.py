@@ -64,7 +64,7 @@ class StatsMachine:
             print(f"Evaluating: {node}")
         match node:
             case Plan():
-                last_result : TensorStats | tuple[TensorStats, ...] = ()
+                last_result: TensorStats | tuple[TensorStats, ...] = ()
                 for body in node.bodies:
                     last_result = self(body)
                 return last_result

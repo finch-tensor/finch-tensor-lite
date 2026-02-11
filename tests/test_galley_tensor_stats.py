@@ -249,10 +249,10 @@ def test_from_tensor_and_getters():
 )
 def test_estimate_non_fill_values(shape, expected):
     axes = tuple(Field(f"x{i}") for i in range(len(shape)))
-    #axes = [f"x{i}" for i in range(len(shape))]
+    # axes = [f"x{i}" for i in range(len(shape))]
     arr = fl.asarray(np.zeros(shape))
-    node = Table(Literal(arr),axes)
-    #node = Table(Literal(arr), tuple(Field(a) for a in axes))
+    node = Table(Literal(arr), axes)
+    # node = Table(Literal(arr), tuple(Field(a) for a in axes))
 
     stats = insert_statistics(
         ST=DenseStats,
@@ -666,7 +666,7 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
     ],
 )
 def test_single_tensor_card(dims, dcs, expected_nnz):
-    dims = {Field(k):v for k,v in dims.items()}
+    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
@@ -698,7 +698,7 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
     ],
 )
 def test_1_join_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k):v for k,v in dims.items()}
+    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -731,7 +731,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_2_join_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k):v for k,v in dims.items()}
+    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k"), Field("l")),
@@ -772,7 +772,7 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_triangle_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k):v for k,v in dims.items()}
+    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -811,7 +811,7 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_triangle_small_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k):v for k,v in dims.items()}
+    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -957,7 +957,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     ],
 )
 def test_merge_dc_union(new_dims, inputs, expected_dcs):
-    new_dims = {Field(k):v for k,v in new_dims.items()}
+    new_dims = {Field(k): v for k, v in new_dims.items()}
     cache = {}
     stats_objs = []
     for idx_set, dcs in inputs:
@@ -973,7 +973,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
             cache=cache,
         )
         field_idx_set = frozenset(Field(x) for x in idx_set)
-        field_dims = {Field(k):new_dims[Field(k)] for k in idx_set}
+        field_dims = {Field(k): new_dims[Field(k)] for k in idx_set}
 
         td = TensorDef(field_idx_set, field_dims, 0)
         stats_objs.append(DCStats.from_def(td, set(dcs)))
@@ -1115,9 +1115,8 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     ],
 )
 def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
-
-    dims1 = {Field(k):v for k,v in dims1.items()}
-    dims2 = {Field(k):v for k,v in dims2.items()}
+    dims1 = {Field(k): v for k, v in dims1.items()}
+    dims2 = {Field(k): v for k, v in dims2.items()}
     cache = {}
 
     node1 = Table(
@@ -1168,9 +1167,9 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
 def test_large_disjoint_disjunction_dc_card(
     dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
 ):
-    dims1 = {Field(k):v for k,v in dims1.items()}
-    dims2 = {Field(k):v for k,v in dims2.items()}
-    dims3 = {Field(k):v for k,v in dims3.items()}
+    dims1 = {Field(k): v for k, v in dims1.items()}
+    dims2 = {Field(k): v for k, v in dims2.items()}
+    dims3 = {Field(k): v for k, v in dims3.items()}
     cache = {}
 
     node1 = Table(

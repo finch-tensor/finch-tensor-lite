@@ -587,7 +587,7 @@ def get_reduce_query(
     stats_cache[query_expr] = aq.ST.aggregate(
         agg_op,
         agg_init,
-        tuple([i for i in final_idxs_to_be_reduced]),
+        tuple(final_idxs_to_be_reduced),
         stats_cache[query_expr.arg],
     )
 
@@ -634,7 +634,7 @@ def reduce_idx(
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
-    alias_idxs = [idx for idx in aq.bindings[alias_expr].index_order]
+    alias_idxs = list(aq.bindings[alias_expr].index_order)
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),
