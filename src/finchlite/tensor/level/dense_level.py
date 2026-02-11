@@ -12,7 +12,7 @@ from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFTyp
 
 
 class DenseLevelFields(NamedTuple):
-    pass
+    lvl_asm: asm.AssemblyExpression
 
 
 @dataclass(unsafe_hash=True)
@@ -109,17 +109,20 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         return self._lvl_t
 
     def level_asm_unpack(self, ctx, var_n, val) -> tuple[DenseLevelFields, ...]:
-        val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
-        return (DenseLevelFields(),) + self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+        return (
+            DenseLevelFields(val),
+            *self.lvl_t.level_asm_unpack(
+                ctx, var_n, asm.GetAttr(val, asm.Literal("lvl"))
+            ),
+        )
 
     def level_asm_repack(self, ctx, lvls_slots):
         self.lvl_t.level_asm_repack(ctx, lvls_slots[1:])
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvls_slots, r):
         if r == 0:
-            return asm.GetAttr(obj, asm.Literal("dimension"))
-        obj = asm.GetAttr(obj, asm.Literal("lvl"))
-        return self.lvl_t.level_lower_dim(ctx, obj, r - 1)
+            return asm.GetAttr(lvls_slots[0].lvl_asm, asm.Literal("dimension"))
+        return self.lvl_t.level_lower_dim(ctx, lvls_slots[1:], r - 1)
 
     def level_lower_declare(self, ctx, lvls_slots, init, op, shape, pos):
         return self.lvl_t.level_lower_declare(ctx, lvls_slots[1:], init, op, shape, pos)
@@ -143,6 +146,8 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
         tns: FiberTensorFields = stack.obj
         ft_ftype: FiberTensorFType = stack.type
+        assert isinstance(tns.lvls_slots[0], DenseLevelFields)
+        lvl = tns.lvls_slots[0].lvl_asm
 
         def child_accessor(ctx: LoopletContext, idx):
             pos_2 = asm.Variable(
@@ -158,7 +163,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 (
-                                    asm.GetAttr(tns.lvl, asm.Literal("stride")),
+                                    asm.GetAttr(lvl, asm.Literal("stride")),
                                     asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ),
                             ),
@@ -167,12 +172,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 )
             )
             return ntn.Stack(
-                FiberTensorFields(
-                    asm.GetAttr(tns.lvl, asm.Literal("lvl")),
-                    tns.lvls_slots[1:],
-                    pos_2,
-                    tns.dirty_bit,
-                ),
+                FiberTensorFields(tns.lvls_slots[1:], pos_2, tns.dirty_bit),
                 FiberTensorFType(ft_ftype.lvl_t.lvl_t),  # type: ignore[abstract]
             )
 

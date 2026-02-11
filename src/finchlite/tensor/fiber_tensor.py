@@ -267,7 +267,6 @@ class FiberTensor(Tensor):
 
 @dataclass(eq=True, frozen=True)
 class FiberTensorFields:
-    lvl: asm.AssemblyExpression
     lvls_slots: tuple[Any, ...]
     pos: asm.AssemblyExpression
     dirty_bit: asm.AssemblyExpression
@@ -359,7 +358,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         )
 
     def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, obj.lvl, r)
+        return self.lvl_t.level_lower_dim(ctx, obj.lvls_slots, r)
 
     def asm_unpack(self, ctx, var_n, val) -> FiberTensorFields:
         """
@@ -369,7 +368,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         lvls_slots = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
         pos = asm.GetAttr(val, asm.Literal("pos"))
         dirty_bit = asm.GetAttr(val, asm.Literal("dirty_bit"))
-        return FiberTensorFields(val_lvl, lvls_slots, pos, dirty_bit)
+        return FiberTensorFields(lvls_slots, pos, dirty_bit)
 
     def asm_repack(self, ctx, lhs, obj):
         """
