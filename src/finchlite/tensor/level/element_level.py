@@ -84,7 +84,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         return ElementLevel(_format=self, _val=val)
 
     def _get_buf_s(self, lvls_slots: tuple) -> asm.Slot:
-        assert len(lvls_slots) and isinstance(lvls_slots[0], ElementLevelFields)
+        assert len(lvls_slots) == 1 and isinstance(lvls_slots[0], ElementLevelFields)
         return lvls_slots[0].buf_s
 
     def level_asm_unpack(self, ctx, var_n, val) -> tuple[ElementLevelFields]:
