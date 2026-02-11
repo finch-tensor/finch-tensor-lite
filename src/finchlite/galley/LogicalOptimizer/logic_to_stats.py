@@ -2,22 +2,21 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
+from finchlite.interface import LazyTensor
+
 from ...finch_logic import (
-    Plan,
     Aggregate,
     Alias,
-    Field,
     Literal,
     LogicNode,
     MapJoin,
+    Plan,
     Query,
     Reorder,
     Table,
-    Value,
 )
-from finchlite.interface import LazyTensor
 from ..TensorStats import TensorStats
-
+from finchlite.galley.TensorStats.stats_interpreter import StatsInterpreter
 
 def insert_statistics(
     ST,
@@ -59,38 +58,42 @@ def insert_statistics(
             st = ST.aggregate(op, init, reduce_indices, arg)
             cache[node] = st
             return st
-        
 
         case Reorder():
             child = insert_statistics(ST, node.arg, bindings, replace, cache)
             cache[node] = child
             return child
-        
+
         case Table():
             if isinstance(node.tns, Literal):
                 idxs = [f for f in node.idxs]
                 tensor = ST(node.tns.val, idxs)
             elif isinstance(node.tns, Alias):
                 base_stats = bindings.get(node.tns)
-                if base_stats is None :
+                if base_stats is None:
                     raise ValueError(f"No TensorStats bound to alias {node.tns}")
-                
+
                 new_indices = tuple(f for f in node.idxs)
-                tensor = ST.relabel(base_stats,new_indices)
+                tensor = ST.relabel(base_stats, new_indices)
 
             if (node not in cache) or replace:
                 cache[node] = tensor
             return cache[node]
-        
+            '''
         case Plan():
-            for body in node.bodies:
-                last_result = insert_statistics(ST,body,bindings,replace,cache)
+            if not node.bodies :
+                return None
+            last_result = insert_statistics(ST, node.bodies[0], bindings, replace, cache)
+            for body in node.bodies[1:]:
+                last_result = insert_statistics(ST, body, bindings, replace, cache)
             return last_result
+            '''
 
         case _:
             raise TypeError(f"Unhandled node type: {type(node)}")
 
-'''
+
+"""
 def get_lazy_tensor_stats(
     lazy_tensor: LazyTensor, StatsImpl: TensorStats
 ) -> TensorStats:
@@ -101,19 +104,22 @@ def get_lazy_tensor_stats(
     return insert_statistics(
         ST=StatsImpl, node=root_node, bindings=bindings, replace=replace, cache=cache
     )
-'''
+"""
+
 
 def get_lazy_tensor_stats(
-        lazy_tensor : LazyTensor, StatsImpl : TensorStats
-)   -> TensorStats:
+    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+) -> TensorStats:
     trace = lazy_tensor.ctx.trace()
-    cache: dict[object, TensorStats] = {}
+    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
-    replace = False
-
+    last_stats : TensorStats | tuple[TensorStats,...]
     for stmt in trace:
-        last_stats = insert_statistics(ST=StatsImpl,node=stmt,bindings=bindings,replace=replace,cache=cache)
+        last_stats = interpreter(stmt,bindings)
+    
+    if last_stats is None :
+        raise ValueError("Trace was empty or no stats produced")
+    if isinstance(last_stats,tuple):
+        return last_stats[0]
 
     return last_stats
-
-

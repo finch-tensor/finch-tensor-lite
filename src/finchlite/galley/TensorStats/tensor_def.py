@@ -7,19 +7,20 @@ from typing import Any
 import numpy as np
 
 from finchlite.finch_logic import (
-    MapJoin,
-    Table,
-    Literal,
     Alias,
     Field,
+    Literal,
+    MapJoin,
+    Table,
 )
+
 from ...algebra import fill_value, is_idempotent, is_identity
 
 
 class TensorDef:
     def __init__(
         self,
-        index_order : tuple[Field, ...],
+        index_order: tuple[Field, ...],
         dim_sizes: Mapping[Field, float],
         fill_value: Any,
     ):
@@ -36,7 +37,7 @@ class TensorDef:
             index_order=self._index_order,
             dim_sizes=self._dim_sizes.copy(),
             fill_value=self._fill_value,
-        ) 
+        )
 
     @classmethod
     # indices ->()
@@ -57,7 +58,7 @@ class TensorDef:
             fill_value=fv,
         )
 
-    def reindex_def(self, new_axis:tuple[Field, ...]) -> "TensorDef":
+    def reindex_def(self, new_axis: tuple[Field, ...]) -> "TensorDef":
         """
         Return
             :TensorDef with a new reindexed index_order and dim sizes
@@ -81,7 +82,6 @@ class TensorDef:
             fill_value=fill_value,
         )
 
-
     def add_dummy_idx(self, idx: Field) -> "TensorDef":
         """
         Add a new axis `idx` of size 1
@@ -92,7 +92,6 @@ class TensorDef:
         """
         if idx in self.index_order:
             return self
-        
 
         new_index_order = self.index_order + (idx,)
         new_dim_sizes = dict(self.dim_sizes)
@@ -127,7 +126,7 @@ class TensorDef:
     def fill_value(self, value: Any):
         self._fill_value = value
 
-    def get_dim_space_size(self, idx:Iterable[Field]) -> float:
+    def get_dim_space_size(self, idx: Iterable[Field]) -> float:
         prod = 1
         for i in idx:
             prod *= int(self.dim_sizes[i])
@@ -150,9 +149,12 @@ class TensorDef:
             TensorDef: A new TensorDef representing the merged tensor.
         """
         new_fill_value = op(*(s.fill_value for s in args))
-        new_index_order = MapJoin(Literal(op), tuple(
-            Table(Alias(f"_{i}"), tuple((a.index_order))) for i, a in enumerate(args)
-        )).fields()
+        new_index_order = MapJoin(
+            Literal(op),
+            tuple(
+                Table(Alias(f"_{i}"), tuple(a.index_order)) for i, a in enumerate(args)
+            ),
+        ).fields()
         new_dim_sizes: dict = {}
         for index in new_index_order:
             for s in args:
@@ -219,10 +221,9 @@ class TensorDef:
         )
         new_index_order = tuple(new_dim_sizes)
         return TensorDef(new_index_order, new_dim_sizes, init)
-    
+
     @staticmethod
-    def relabel(d: "TensorDef",
-                 relabel_indices: tuple[Field, ...]) -> "TensorDef":
+    def relabel(d: "TensorDef", relabel_indices: tuple[Field, ...]) -> "TensorDef":
         """
         Relabel the axes in the given TensorDef to new labels
 
@@ -237,16 +238,16 @@ class TensorDef:
         Returns:
         A new TensorDef with relabled indices and the same fill value as the tensor remains unaffected
         """
-        if len(relabel_indices)!=len(d.index_order):
+        if len(relabel_indices) != len(d.index_order):
             raise ValueError(
                 f"Tensor has {len(d.index_order)} dims, "
                 f"but {len(relabel_indices)} names provided."
             )
-        
-        new_dim_sizes = OrderedDict(zip(relabel_indices,d.dim_sizes.values()))
 
-        return TensorDef(relabel_indices,new_dim_sizes,d.fill_value)
-    
+        new_dim_sizes = OrderedDict(zip(relabel_indices, d.dim_sizes.values()))
+
+        return TensorDef(relabel_indices, new_dim_sizes, d.fill_value)
+
     @staticmethod
     def reorder(stats: "TensorDef", reorder_indices: tuple[Field, ...]) -> "TensorDef":
         for old_idx in stats.index_order:
@@ -265,5 +266,3 @@ class TensorDef:
                 new_dims[idx] = 1
 
         return TensorDef(reorder_indices, new_dims, stats.fill_value)
-        
-

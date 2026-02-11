@@ -517,7 +517,9 @@ def get_reduce_query(
                 *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
             )
             relevant_args = [
-                arg for arg in args if set(stats_cache[arg].index_order).issubset(kernel_idxs)
+                arg
+                for arg in args
+                if set(stats_cache[arg].index_order).issubset(kernel_idxs)
             ]
             if len(relevant_args) == len(args):
                 node_to_replace = mj

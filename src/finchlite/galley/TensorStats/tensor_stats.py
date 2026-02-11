@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
-from .tensor_def import TensorDef
 from finchlite.finch_logic import Field
+
+from .tensor_def import TensorDef
+
 
 class TensorStats(ABC):
     tensordef: TensorDef
@@ -60,13 +62,17 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def relabel(stats: "TensorStats", relabel_indices: tuple[Field, ...]) -> "TensorStats":
+    def relabel(
+        stats: "TensorStats", relabel_indices: tuple[Field, ...]
+    ) -> "TensorStats":
         """ """
         ...
 
     @staticmethod
     @abstractmethod
-    def reorder(stats: "TensorStats", reorder_indices: tuple[Field, ...]) -> "TensorStats":
+    def reorder(
+        stats: "TensorStats", reorder_indices: tuple[Field, ...]
+    ) -> "TensorStats":
         """ """
         ...
 
