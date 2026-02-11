@@ -121,31 +121,6 @@ class Variable(AssemblyExpression, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class TaggedVariable(AssemblyExpression):
-    """
-    Represents a numbered Variable assembly node that refers to variable
-    named `name`, with type `type`, and has ID `id`. Used in the the
-    representation of programs which need to distinguish between multiple
-    uses of the same variable, such as SSA or numbered occurrence forms.
-
-    Attributes:
-        variable: The variable that it references.
-        id: The ID of the variable
-    """
-
-    variable: Variable
-    id: int
-
-    @property
-    def result_format(self):
-        """Returns the type of the expression."""
-        return self.variable.result_format()
-
-    def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
-
-
-@dataclass(eq=True, frozen=True)
 class Stack(AssemblyExpression):
     """
     A logical AST expression representing an object using a set `obj` of
@@ -242,7 +217,7 @@ class Assign(AssemblyTree, AssemblyStatement):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: TaggedVariable | Variable
+    lhs: Variable
     rhs: AssemblyExpression
 
     @property
@@ -479,7 +454,7 @@ class ForLoop(AssemblyTree, AssemblyStatement):
         body: The body of the loop to execute.
     """
 
-    var: Variable | TaggedVariable
+    var: Variable
     start: AssemblyExpression
     end: AssemblyExpression
     body: AssemblyStatement
@@ -502,7 +477,7 @@ class BufferLoop(AssemblyTree, AssemblyStatement):
     """
 
     buffer: Slot | Stack
-    var: Variable | TaggedVariable
+    var: Variable
     body: AssemblyStatement
 
     @property
@@ -733,25 +708,19 @@ class AssemblyPrinterContext(Context):
         blk.indent = self.indent + 1
         return blk
 
-    def __call__(self, prgm: AssemblyNode):
+    def __call__(self, prgm: AssemblyNode, emit_calls: bool = False):
         feed = self.feed
         match prgm:
             case Literal(value):
                 return qual_str(value)
             case Assert(exp):
                 return f"assert({self(exp)})"
-            case TaggedVariable(Variable(name, _), id):
-                return f"{name}_{id}"
             case Variable(name, _):
                 return str(name)
             case Assign(lhs, val):
                 match lhs:
                     case Variable(var_n, var_t):
                         self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
-                    case TaggedVariable(Variable(var_n, var_t), id):
-                        self.exec(
-                            f"{feed}{var_n}_{id}: {qual_str(var_t)} = {self(val)}"
-                        )
                     case _:
                         raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
@@ -760,7 +729,11 @@ class AssemblyPrinterContext(Context):
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
             case Call(Literal(_) as lit, args):
-                return f"{self(lit)}({', '.join(self(arg) for arg in args)})"
+                call_expr = f"{self(lit)}({', '.join(self(arg) for arg in args)})"
+                if emit_calls:
+                    self.exec(call_expr)
+                    return None
+                return call_expr
             case Unpack(Slot(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
@@ -789,7 +762,7 @@ class AssemblyPrinterContext(Context):
             case Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
-                    ctx_2(body)
+                    ctx_2(body, emit_calls=True)
                 self.exec(ctx_2.emit())
                 return None
             case ForLoop(var, start, end, body):
@@ -842,8 +815,6 @@ class AssemblyPrinterContext(Context):
                     match arg:
                         case Variable(arg_name, t):
                             arg_decls.append(f"{arg_name}: {qual_str(t)}")
-                        case TaggedVariable(Variable(arg_name, t), id):
-                            arg_decls.append(f"{arg_name}_{id}: {qual_str(t)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -855,8 +826,6 @@ class AssemblyPrinterContext(Context):
                 match name:
                     case Variable(func_name, return_t):
                         func_decl = f"{func_name}"
-                    case TaggedVariable(Variable(func_name, return_t), id):
-                        func_decl = f"{func_name}_{id}"
                     case _:
                         raise NotImplementedError(
                             f"Unrecognized function name type: {name}"
@@ -893,4 +862,4 @@ class AssemblyPrinterContext(Context):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
                 return None
             case node:
-                raise NotImplementedError(node)
+                raise NotImplementedError(node, "AssemblyPrinterContext")

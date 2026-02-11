@@ -6,8 +6,8 @@ dot_product_2: #succs=[dot_product_4, dot_product_5]
     [0] a: np_buf_t(float64) = a
     [1] b: np_buf_t(float64) = b
     [2] c: float64 = 0.0
-    [3] a_: np_buf_t(float64) = unpack(a)
-    [4] b_: np_buf_t(float64) = unpack(b)
+    [3] a_: np_buf_t(float64) = unpack(a) 	# a = ('a', 0)
+    [4] b_: np_buf_t(float64) = unpack(b) 	# b = ('b', 1)
     [5] j: int64 = 0
 
 dot_product_3: #succs=[EXIT_1]
