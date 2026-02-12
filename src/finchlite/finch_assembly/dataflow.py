@@ -1,23 +1,98 @@
+import copy
 from abc import abstractmethod
+from collections.abc import Callable
+from typing import TypeVar
 
-from ..symbolic import DataFlowAnalysis, PostOrderDFS
-from .cfg_builder import NumberedStatement, assembly_build_cfg
+from ..symbolic import DataFlowAnalysis, PostOrderDFS, PostWalk, Rewrite
+from .cfg_builder import (
+    NumberedStatement,
+    assembly_build_cfg,
+    assembly_dataflow_postprocess,
+    assembly_dataflow_preprocess,
+)
 from .nodes import (
     AssemblyNode,
     Assign,
     Variable,
 )
 
+# Type variable for dataflow analysis context,
+# bound to AbstractAssemblyDataflow or its subclasses.
+AnalysisT = TypeVar("AnalysisT", bound="AbstractAssemblyDataflow")
 
-def assembly_copy_propagation(node: AssemblyNode):
+
+def assembly_dataflow_analyze(
+    node: AssemblyNode, analysis_cls: type[AnalysisT]
+) -> tuple[AnalysisT, AssemblyNode]:
     """
-    Run copy-propagation on a FinchAssembly node.
-    Args: node: Root FinchAssembly node to analyze.
-    Returns: AssemblyCopyPropagation: The completed analysis context.
+    Run preprocessing + CFG build + analysis for a dataflow pass.
+
+    Returns:
+        (analysis_ctx, preprocessed_node)
     """
-    ctx = AssemblyCopyPropagation(assembly_build_cfg(node))
+    pre_node = assembly_dataflow_preprocess(node)
+    ctx = analysis_cls(assembly_build_cfg(pre_node))
     ctx.analyze()
-    return ctx
+    return ctx, pre_node
+
+
+def assembly_dataflow_run(
+    node: AssemblyNode,
+    analysis_cls: type[AnalysisT],
+    apply: Callable[[AssemblyNode, AnalysisT], AssemblyNode],
+) -> AssemblyNode:
+    """
+    Run a full dataflow pass (preprocess -> analyze -> apply -> postprocess).
+    """
+    ctx, pre_node = assembly_dataflow_analyze(node, analysis_cls)
+    updated = apply(pre_node, ctx)
+    return assembly_dataflow_postprocess(updated)
+
+
+def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
+    """
+    Apply copy-propagation to a FinchAssembly node.
+    Args:
+        node: Root FinchAssembly node to optimize.
+    Returns:
+        AssemblyNode: The optimized FinchAssembly node.
+    """
+
+    def apply(pre_node: AssemblyNode, ctx: AssemblyCopyPropagation) -> AssemblyNode:
+        lattice: dict[tuple[int, str], str] = ctx.collect_copy_replacements()
+
+        # Replace variables in a statement according to the collected replacements.
+        def replace_vars(target: AssemblyNode, sid: int):
+            def rw_var(n: AssemblyNode):
+                match n:
+                    case Variable(name, vtype):
+                        key = (sid, name)
+                        if key in lattice:
+                            return Variable(lattice[key], vtype)
+
+                return None
+
+            return Rewrite(PostWalk(rw_var))(target)
+
+        # Rewrite each numbered statement to replace variables.
+        def rw(x: AssemblyNode):
+            match x:
+                case NumberedStatement(stmt, sid):
+                    match stmt:
+                        # if Assign, replace vars only on rhs to avoid replacing lhs
+                        case Assign(lhs, rhs):
+                            rhs = replace_vars(rhs, sid)
+                            new_stmt = Assign(lhs, rhs)
+                            return NumberedStatement(new_stmt, sid)
+                        case _:
+                            new_stmt = replace_vars(stmt, sid)
+                            return NumberedStatement(new_stmt, sid)
+
+            return None
+
+        return Rewrite(PostWalk(rw))(pre_node)
+
+    return assembly_dataflow_run(node, AssemblyCopyPropagation, apply)
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
@@ -56,6 +131,31 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         """Copy propagation is a forward analysis."""
         return "forward"
 
+    def collect_copy_replacements(self) -> dict[tuple[int, str], str]:
+        """Collect per-statement copy replacements.
+
+        Returns:
+            dict: Mapping ``(stmt_id, old_var_name) -> new_var_name`` indicating
+                where ``old_var_name`` can be replaced by ``new_var_name`` at
+                statement ``stmt_id`` based on copy-propagation facts.
+        """
+        replacements: dict[tuple[int, str], str] = {}
+
+        for block in self.cfg.blocks.values():
+            input_state = self.input_states.get(block.id, {})
+            state = copy.deepcopy(input_state)
+
+            for stmt in block.statements:
+                sid = getattr(stmt, "sid", None)
+                if sid is not None:
+                    for name, value in self.get_lattice_value(state, stmt):
+                        if isinstance(value, tuple) and value:
+                            replacements[(sid, name)] = value[0]
+
+                state = self.transfer([stmt], state)
+
+        return replacements
+
     def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         """Collect lattice annotations for variables used in a stmt or expr."""
         annotated: list[tuple[str, object]] = []
@@ -78,31 +178,6 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                 case _:
                     continue
         return annotated
-
-    def _normalize_state(self, state: dict) -> dict:
-        if not state:
-            return {"defs": {}, "copies": {}}
-
-        if "defs" not in state or "copies" not in state:
-            # allow old/empty shapes; upgrade in place
-            return {"defs": state.get("defs", {}), "copies": state.get("copies", {})}
-
-        return state
-
-    def _unpack_stmt(self, stmt):
-        if isinstance(stmt, NumberedStatement):
-            return stmt.sid, stmt.stmt
-        return None, stmt
-
-    def _prune_inconsistent_copies(self, defs: dict, copies: dict) -> dict:
-        pruned: dict[str, tuple[str, int | None]] = {}
-        for dst, (src, src_def) in copies.items():
-            if src_def is None:
-                continue
-            if defs.get(src) != src_def:
-                continue
-            pruned[dst] = (src, src_def)
-        return pruned
 
     def transfer(self, stmts, state: dict) -> dict:
         """Transfer function over a sequence of statements.
@@ -189,3 +264,28 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         joined_copies = self._prune_inconsistent_copies(joined_defs, joined_copies)
 
         return {"defs": joined_defs, "copies": joined_copies}
+
+    def _normalize_state(self, state: dict) -> dict:
+        if not state:
+            return {"defs": {}, "copies": {}}
+
+        if "defs" not in state or "copies" not in state:
+            # allow old/empty shapes; upgrade in place
+            return {"defs": state.get("defs", {}), "copies": state.get("copies", {})}
+
+        return state
+
+    def _unpack_stmt(self, stmt):
+        if isinstance(stmt, NumberedStatement):
+            return stmt.sid, stmt.stmt
+        return None, stmt
+
+    def _prune_inconsistent_copies(self, defs: dict, copies: dict) -> dict:
+        pruned: dict[str, tuple[str, int | None]] = {}
+        for dst, (src, src_def) in copies.items():
+            if src_def is None:
+                continue
+            if defs.get(src) != src_def:
+                continue
+            pruned[dst] = (src, src_def)
+        return pruned
