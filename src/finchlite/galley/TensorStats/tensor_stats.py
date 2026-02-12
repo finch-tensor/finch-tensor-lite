@@ -8,7 +8,7 @@ from .tensor_def import TensorDef
 class TensorStats(ABC):
     tensordef: TensorDef
 
-    def __init__(self, tensor: Any, fields: Iterable[str]):
+    def __init__(self, tensor: Any, fields: tuple[str, ...]):
         self.tensordef = TensorDef.from_tensor(tensor, fields)
 
     @staticmethod
@@ -40,7 +40,7 @@ class TensorStats(ABC):
     def aggregate(
         op: Callable[..., Any],
         init: Any | None,
-        reduce_indices: Iterable[str],
+        reduce_indices: tuple[str, ...],
         stats: "TensorStats",
     ) -> "TensorStats":
         """
@@ -58,6 +58,18 @@ class TensorStats(ABC):
         """
         ...
 
+    @staticmethod
+    @abstractmethod
+    def relabel(stats: "TensorStats", relabel_indices: tuple[str, ...]) -> "TensorStats":
+        """ """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def reorder(stats: "TensorStats", reorder_indices: tuple[str, ...]) -> "TensorStats":
+        """ """
+        ...
+
     @property
     def dim_sizes(self) -> Mapping[str, float]:
         return self.tensordef.dim_sizes
@@ -70,12 +82,12 @@ class TensorStats(ABC):
         return self.tensordef.get_dim_size(idx)
 
     @property
-    def index_set(self) -> set[str]:
-        return self.tensordef.index_set
+    def index_order(self) -> tuple[str, ...]:
+        return self.tensordef.index_order
 
-    @index_set.setter
-    def index_set(self, value: set[str]):
-        self.tensordef.index_set = value
+    @index_order.setter
+    def index_order(self, value: tuple[str, ...]):
+        self.tensordef.index_order = value
 
     @property
     def fill_value(self) -> Any:
