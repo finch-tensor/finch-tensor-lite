@@ -1,10 +1,11 @@
 """
-SuitableRep is a class that analyzes query expressions and predicts the representation of results.
+SuitableRep analyzes query expressions and predicts the representation
+of results.
 
 Corresponds to the SuitableRep struct in Finch.jl.
 """
 
-from typing import Any, Union
+from typing import Any
 
 from finchlite.finch_logic.nodes import (
     Aggregate,
@@ -15,7 +16,14 @@ from finchlite.finch_logic.nodes import (
     Reorder,
     Table,
 )
-from finchlite.galley.PhysicalOptimizer.rep_operations import *
+from finchlite.galley.PhysicalOptimizer.rep_operations import (
+    aggregate_rep,
+    data_rep,
+    dropdims_rep,
+    expanddims_rep,
+    map_rep,
+    permutedims_rep,
+)
 from finchlite.galley.PhysicalOptimizer.representation import (
     DenseData,
     ElementData,
@@ -25,9 +33,9 @@ from finchlite.galley.PhysicalOptimizer.representation import (
     SparseData,
 )
 
-Representation = Union[
-    ElementData, DenseData, ExtrudeData, HollowData, RepeatData, SparseData
-]
+Representation = (
+    ElementData | DenseData | ExtrudeData | HollowData | RepeatData | SparseData
+)
 
 
 def toposort(chains: list[list[Any]]) -> list[Any] | None:
@@ -67,7 +75,7 @@ def toposort(chains: list[list[Any]]) -> list[Any] | None:
 
 
 class SuitableRep:
-    def __init__(self, bindings: dict[Any, Representation] = {}):
+    def __init__(self, bindings: dict[Any, Representation] | None = None):
         self.bindings: dict[Any, Representation] = bindings if bindings else {}
 
     def __call__(self, ex: Any) -> Representation:
@@ -81,23 +89,24 @@ class SuitableRep:
                 return data_rep(ex.tns.val)
             if hasattr(ex.tns, "type_"):
                 return data_rep(ex.tns.type_)
-        elif isinstance(ex, Reorder) and isinstance(ex.arg, MapJoin):
+            raise ValueError(f"bad table type: {type(ex)}")
+        if isinstance(ex, Reorder) and isinstance(ex.arg, MapJoin):
             return self._handle_reorder_mapjoin(ex)
-        elif isinstance(ex, Aggregate):
+        if isinstance(ex, Aggregate):
             return self._handle_aggregate(ex)
-        elif isinstance(ex, Reorder):
+        if isinstance(ex, Reorder):
             return self._handle_reorder(ex)
-        elif isinstance(ex, Relabel):
+        if isinstance(ex, Relabel):
             return self(ex.arg)
-        elif isinstance(ex, Literal):
+        if isinstance(ex, Literal):
             return ElementData(ex.val, type(ex.val))
-        else:
-            raise ValueError(f"Unrecognized expression kind: {type(ex)}")
+        raise ValueError(f"Bad expression kind: {type(ex)}")
 
     def _handle_reorder_mapjoin(self, ex: Reorder) -> Representation:
         """
         Handle reorder(mapjoin())
-        Computes canonical ordering of all indices, expands args, applies map_rep, then drops extra dims.
+        Computes canonical ordering of all indices, expands args, applies
+        map_rep, then drops extra dims.
         """
         mapjoin = ex.arg
         idxs = list(ex.idxs)

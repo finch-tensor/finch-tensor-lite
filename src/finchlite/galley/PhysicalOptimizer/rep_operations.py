@@ -1,5 +1,6 @@
 import operator
-from typing import Union
+from collections.abc import Callable
+from typing import Any
 
 from finchlite.galley.PhysicalOptimizer.representation import (
     DenseData,
@@ -10,11 +11,9 @@ from finchlite.galley.PhysicalOptimizer.representation import (
     SparseData,
 )
 
-Representation = Union[
-    ElementData, DenseData, ExtrudeData, HollowData, RepeatData, SparseData
-]
-from collections.abc import Callable
-from typing import Any
+Representation = (
+    ElementData | DenseData | ExtrudeData | HollowData | RepeatData | SparseData
+)
 
 
 def _preserves_sparsity(f: Callable, fill: float = 0.0) -> bool:
@@ -27,7 +26,7 @@ def _preserves_sparsity(f: Callable, fill: float = 0.0) -> bool:
         result2 = f(fill, 1.0)
         if result1 == fill or result2 == fill:
             return True
-    except:
+    except Exception:
         # just in case func is complex
         pass
     return False

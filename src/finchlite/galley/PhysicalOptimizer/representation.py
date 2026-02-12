@@ -58,7 +58,8 @@ class ExtrudeData:
     """
     ExtrudeData(lvl)
 
-    Represents a tensor `A` where `A[:, ..., :, 1]` is the only slice, and is represented by `lvl`.
+    Represents a tensor `A` where `A[:, ..., :, 1]` is the only slice,
+    and is represented by `lvl`.
     """
 
     lvl: Any
