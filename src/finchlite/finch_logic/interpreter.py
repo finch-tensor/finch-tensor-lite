@@ -7,7 +7,7 @@ from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_logic.stages import LogicEvaluator
 
-from ..algebra import element_type, fill_value, fixpoint_type, return_type
+from ..algebra import fixpoint_type, return_type
 from ..symbolic import fisinstance
 from . import nodes as lgc
 from .nodes import (
@@ -93,8 +93,8 @@ class LogicMachine:
                         else:
                             idxs.append(idx)
                             dims[idx] = dim
-                fill_val = op(*[fill_value(arg.tns) for arg in args])
-                dtype = return_type(op, *[element_type(arg.tns) for arg in args])
+                fill_val = op(*[arg.tns.fill_value for arg in args])
+                dtype = return_type(op, *[arg.tns.element_type for arg in args])
                 result = self.make_tensor(
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
                 )
@@ -107,7 +107,7 @@ class LogicMachine:
                 return TableValue(result, tuple(idxs))
             case Aggregate(Literal(op), Literal(init), arg, idxs):
                 arg = self(arg)
-                dtype = fixpoint_type(op, init, element_type(arg.tns))
+                dtype = fixpoint_type(op, init, arg.tns.element_type)
                 new_shape = tuple(
                     dim
                     for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
@@ -140,7 +140,7 @@ class LogicMachine:
                 arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
                 result = self.make_tensor(
-                    dims, fill_value(arg.tns), dtype=element_type(arg.tns)
+                    dims, arg.tns.fill_value, dtype=arg.tns.element_type
                 )
                 for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(zip(idxs, crds, strict=True))
@@ -152,8 +152,8 @@ class LogicMachine:
                 if lhs not in self.bindings:
                     tns = self.make_tensor(
                         rhs.tns.shape,
-                        fill_value(rhs.tns),
-                        dtype=element_type(rhs.tns),
+                        rhs.tns.fill_value,
+                        dtype=rhs.tns.element_type,
                     )
                     self.bindings[lhs] = tns
                 lhs = self(lhs)

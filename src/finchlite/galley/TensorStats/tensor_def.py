@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from ...algebra import fill_value, is_idempotent, is_identity
+from ...algebra import is_idempotent, is_identity
 
 
 class TensorDef:
@@ -41,7 +41,7 @@ class TensorDef:
         dim_sizes = OrderedDict(
             (axis, float(shape[i])) for i, axis in enumerate(indices)
         )
-        fv = fill_value(tensor)
+        fv = tensor.fill_value
 
         return cls(
             index_set=indices,

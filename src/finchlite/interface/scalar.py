@@ -58,6 +58,21 @@ class Scalar(EagerTensor):
     def shape(self):
         return ()
 
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the scalar."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the scalar."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the scalar."""
+        return self.ftype.shape_type
+
     def __getitem__(self, idx):
         return self.val
 

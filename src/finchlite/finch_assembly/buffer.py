@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .. import algebra
 from ..algebra import query_property
 from ..symbolic import FType, FTyped
 
@@ -29,7 +28,7 @@ class Buffer(FTyped, ABC):
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
         """
-        return self.ftype.element_type()
+        return self.ftype.element_type
 
     @property
     def length_type(self):
@@ -72,7 +71,7 @@ def length_type(arg: Any):
 
 
 def element_type(arg: Any):
-    return algebra.element_type(arg)
+    return arg.element_type
 
 
 class BufferFType(FType):
