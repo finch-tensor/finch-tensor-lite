@@ -5,6 +5,7 @@ class Stats:
     """
     Helper class to store the statistics of a tensor. Just for test purposes.
     """
+
     def __init__(self, nnz_per_dim, dim_size):
         """
         Initialize the statistics of a tensor.
@@ -15,13 +16,13 @@ class Stats:
         """
         self.nnz_per_dim = nnz_per_dim
         self.dim_size = dim_size
-    
+
     def estimate_nnz(self, indices):
         """
         Estimate the number of nonzeroes for a given set of indices.
         """
         return self.nnz_per_dim ** len(indices) if indices else 1.0
-    
+
     def get_dim_size(self, index):
         return self.dim_size
 
@@ -31,7 +32,7 @@ def test_dense():
     800 nonzeroes, 1K dimensions. Should be dense.
     """
     stats = Stats(800.0, 1000)
-    formats = select_output_format(stats, ['i', 'j'], ['i', 'j'])
+    formats = select_output_format(stats, ["i", "j"], ["i", "j"])
     assert formats[0] == LevelFormat.DENSE
 
 
@@ -40,7 +41,7 @@ def test_sparse():
     Only 10 nonzeroes, 10K dimensions. Should be sparse.
     """
     stats = Stats(10.0, 10000)
-    formats = select_output_format(stats, ['i', 'j'], ['i', 'j'])
+    formats = select_output_format(stats, ["i", "j"], ["i", "j"])
     assert formats[0] == LevelFormat.SPARSE_LIST
 
 

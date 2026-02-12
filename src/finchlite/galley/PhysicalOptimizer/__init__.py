@@ -1,50 +1,47 @@
-from .representation import (
-    ElementData,
-    SparseData,
-    RepeatData,
-    DenseData,
-    ExtrudeData,
-    HollowData,
+from .format_selector import (
+    LevelFormat,
+    select_output_format,
 )
-
 from .rep_operations import (
-    fill_value,
-    eltype,
-    data_rep,
-    expanddims_rep,
-    map_rep,
     aggregate_rep,
+    data_rep,
     dropdims_rep,
+    eltype,
+    expanddims_rep,
+    fill_value,
+    map_rep,
     permutedims_rep,
 )
-
+from .representation import (
+    DenseData,
+    ElementData,
+    ExtrudeData,
+    HollowData,
+    RepeatData,
+    SparseData,
+)
 from .suitable_rep import (
     SuitableRep,
     toposort,
 )
 
-from .format_selector import (
-    LevelFormat,
-    select_output_format,
-)
-
 __all__ = [
-    "ElementData",
-    "SparseData",
-    "RepeatData",
     "DenseData",
+    "ElementData",
     "ExtrudeData",
     "HollowData",
-    "fill_value",
-    "eltype",
-    "data_rep",
-    "expanddims_rep",
-    "map_rep",
-    "aggregate_rep",
-    "dropdims_rep",
-    "permutedims_rep",
-    "SuitableRep",
-    "toposort",
     "LevelFormat",
+    "RepeatData",
+    "SparseData",
+    "SuitableRep",
+    "aggregate_rep",
+    "data_rep",
+    "dropdims_rep",
+    "eltype",
+    "expanddims_rep",
+    "fill_value",
+    "map_rep",
+    "permutedims_rep",
     "select_output_format",
+    "toposort",
 ]
