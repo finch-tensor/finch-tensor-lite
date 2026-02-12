@@ -26,7 +26,8 @@ def _preserves_sparsity(f: Callable, fill: float = 0.0) -> bool:
         result2 = f(fill, 1.0)
         if result1 == fill or result2 == fill:
             return True
-    except Exception:
+    # bypass so anything can be caught by the exception
+    except Exception:  # noqa: BLE001
         # just in case func is complex
         pass
     return False
