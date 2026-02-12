@@ -2,13 +2,6 @@ from .buffer import Buffer, BufferFType, element_type, length_type
 from .cfg_builder import (
     AssemblyCFGBuilder,
     NumberedStatement,
-    assembly_build_cfg,
-    assembly_dataflow_postprocess,
-    assembly_dataflow_preprocess,
-    assembly_desugar,
-    assembly_number_statements,
-    assembly_resugar,
-    assembly_unwrap_numbered_statements,
 )
 from .dataflow import (
     AssemblyCopyPropagation,
@@ -113,17 +106,10 @@ __all__ = [
     "Unpack",
     "Variable",
     "WhileLoop",
-    "assembly_build_cfg",
     "assembly_check_types",
     "assembly_copy_propagation",
     "assembly_dataflow_analyze",
-    "assembly_dataflow_postprocess",
-    "assembly_dataflow_preprocess",
     "assembly_dataflow_run",
-    "assembly_desugar",
-    "assembly_number_statements",
-    "assembly_resugar",
-    "assembly_unwrap_numbered_statements",
     "element_type",
     "length_type",
 ]

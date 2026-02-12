@@ -12,31 +12,22 @@ def main() -> int64:
         a: int64 = add(a, d)
         b: int64 = a
     result: int64 = 0
-    j_3: int64 = 0
-    while lt(j_3, 5):
-        i: int64 = j_3
+    for i in range(0, 5):
         temp: int64 = i
         result: int64 = add(result, i)
         if eq(mod(i, 2), 0):
             result: int64 = mul(result, 2)
-        j_3: int64 = add(j_3, 1)
     if gt(result, 20):
         c: int64 = result
         result: int64 = add(c, b)
     else:
         c: int64 = b
         result: int64 = mul(c, 3)
-    j_4: int64 = 0
-    while lt(j_4, 3):
-        i: int64 = j_4
+    for i in range(0, 3):
         a: int64 = i
-        j_5: int64 = 0
-        while lt(j_5, 2):
-            j: int64 = j_5
+        for j in range(0, 2):
             b: int64 = j
             result: int64 = add(result, add(a, j))
-            j_5: int64 = add(j_5, 1)
-        j_4: int64 = add(j_4, 1)
     d: int64 = result
     if lt(d, 100):
         c: int64 = d
