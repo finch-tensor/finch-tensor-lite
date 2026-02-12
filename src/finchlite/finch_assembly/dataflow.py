@@ -3,6 +3,8 @@ from abc import abstractmethod
 from collections.abc import Callable
 from typing import TypeVar
 
+from finchlite.symbolic import Namespace
+
 from ..symbolic import DataFlowAnalysis, PostOrderDFS, PostWalk, Rewrite
 from .cfg_builder import (
     NumberedStatement,
@@ -30,8 +32,9 @@ def assembly_dataflow_analyze(
     Returns:
         (analysis_ctx, preprocessed_node)
     """
-    pre_node = assembly_dataflow_preprocess(node)
-    ctx = analysis_cls(assembly_build_cfg(pre_node))
+    namespace = Namespace(node)
+    pre_node, sid = assembly_dataflow_preprocess(node)
+    ctx = analysis_cls(assembly_build_cfg(pre_node, sid=sid, namespace=namespace))
     ctx.analyze()
     return ctx, pre_node
 
