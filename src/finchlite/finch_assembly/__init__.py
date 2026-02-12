@@ -44,6 +44,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .parser import parse_assembly
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import (
     AssemblyStructFType,
@@ -112,4 +113,5 @@ __all__ = [
     "assembly_dataflow_run",
     "element_type",
     "length_type",
+    "parse_assembly",
 ]
