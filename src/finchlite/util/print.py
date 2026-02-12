@@ -16,6 +16,11 @@ class Printer:
 def qual_str(val: Any) -> str:
     if hasattr(val, "__qual_str__"):
         return val.__qual_str__()
-    if isbuiltin(val) or isclass(val) or isfunction(val):
+    if (
+        isbuiltin(val)
+        or isclass(val)
+        or isfunction(val)
+        or hasattr(val, "__qualname__")
+    ):
         return str(val.__qualname__)
     return str(val)
