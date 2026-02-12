@@ -376,8 +376,8 @@ class AssemblyCFGBuilder:
 
                     # connect function exit block to the exit block of the CFG
                     func_exit_block.add_successor(self.cfg.exit_block)
-            case AssemblyStatement():
-                # For other statements, just emit them in the current block.
+            case Assign(_, _):
+                # unnumbered temporary variables for loops
                 self.emit(node)
             case node:
                 raise NotImplementedError(node, "AssemblyCFGBuilder")
