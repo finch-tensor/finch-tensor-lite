@@ -1,23 +1,71 @@
-[project]
+[workspace]
 authors = ["Willow Ahrens <willow.marie.ahrens@gmail.com>"]
 channels = ["conda-forge"]
 description = "Sparse And Structured Tensor Programming"
 name = "finch-tensor-lite"
-platforms = ["osx-arm64"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
 version = "0.1.0"
+preview = ["pixi-build"]
+
+[environments]
+test = { features = ["test"], solve-group = "default" }
+mindeps = { features = ["test", "mindeps"], solve-group = "default" }
+pre-commit = { features = ["pre-commit"], no-default-feature = true }
+
+# finch-tensor-lite package definition #
+
+[package.build.backend]
+name = "pixi-build-python"
+version = "*"
+
+[package.host-dependencies]
+python = ">=3.10,<3.13"
+poetry-core = "*"
+
+[package.run-dependencies]
+numpy = "*"
+numba = "*"
+donfig = "*"
+lark = "*"
+
+# default feature definition #
+
+[dependencies]
+finch-tensor-lite.path = "."
+
+[dev]
+# pulls in host and run dependencies
+finch-tensor-lite.path = "."
 
 [tasks]
 compile = "python -c 'import finchlite'"
 
-[dependencies]
-python = ">=3.10,<3.13"
+# non-default feature definitions #
 
-[pypi-dependencies]
-finch-tensor-lite = { path = ".", editable = true, extras = ["test"] }
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+sparse = "*"
+scipy = "*"
+mypy = "*"
+pytest-mypy = "*"
+pytest-regressions = "*"
 
-[feature.test.tasks]
-test = { cmd = "pytest", depends-on = ["compile"] }
-type-check = { cmd = "mypy ." }
+[feature.test.tasks.test]
+cmd = "pytest"
+depends-on = ["compile"]
+default-environment = "test"
 
-[environments]
-test = ["test"]
+[feature.test.tasks.type-check]
+cmd = "mypy ."
+default-environment = "test"
+
+[feature.mindeps.dependencies]
+python = "3.11.*"
+
+[feature.pre-commit.dependencies]
+pre-commit = "*"
+
+[feature.pre-commit.tasks]
+pre-commit-install = "pre-commit install"
+pre-commit = "pre-commit run -a"
