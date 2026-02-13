@@ -3,6 +3,7 @@ from .TensorStats import (
     DC,
     DCStats,
     DenseStats,
+    UniformStats,
     TensorDef,
     TensorStats,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "AnnotatedQuery",
     "DCStats",
     "DenseStats",
+    "UniformStats",
     "TensorDef",
     "TensorStats",
 ]

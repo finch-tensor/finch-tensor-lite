@@ -126,13 +126,13 @@ class AnnotatedQuery:
 
         reduce_idxs: list[Field] = []
         original_idx: OrderedDict[Field, Field] = OrderedDict(
-            (Field(idx), Field(idx)) for idx in cache[q.rhs].index_set
+            (idx, idx) for idx in cache[q.rhs].index_order
         )
         idx_lowest_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         for idx in starting_reduce_idxs:
             agg_op = idx_op[idx]
             stats_point = cache_point[point_expr]
-            idx_dim_size = stats_point.dim_sizes[idx.name]
+            idx_dim_size = stats_point.dim_sizes[idx]
             lowest_roots = find_lowest_roots(
                 Literal(agg_op), idx, idx_starting_root[idx]
             )
@@ -146,7 +146,7 @@ class AnnotatedQuery:
                     for i, _ in enumerate(lowest_roots, start=1)
                 ]
                 for i, node in enumerate(lowest_roots):
-                    if idx.name not in cache_point[node].index_set:
+                    if idx.name not in cache_point[node].index_order:
                         # If the lowest root doesn't contain the reduction index, we
                         # attempt to remove the reduction via a repeat_operator, i.e.
                         # ∑_i B_j = B_j*|Dom(i)|
@@ -511,13 +511,15 @@ def get_reduce_query(
             # E.g. when you reduce one vertex of a triangle, you should
             # do the other two as well.
             args_with_reduce_idx = [
-                arg for arg in args if original_idx.name in stats_cache[arg].index_set
+                arg for arg in args if original_idx.name in stats_cache[arg].index_order
             ]
             kernel_idxs = set().union(
-                *(stats_cache[arg].index_set for arg in args_with_reduce_idx)
+                *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
             )
             relevant_args = [
-                arg for arg in args if stats_cache[arg].index_set.issubset(kernel_idxs)
+                arg
+                for arg in args
+                if set(stats_cache[arg].index_order).issubset(kernel_idxs)
             ]
             if len(relevant_args) == len(args):
                 node_to_replace = mj
@@ -541,7 +543,7 @@ def get_reduce_query(
                 args_with_idx = [
                     arg
                     for arg in args
-                    if aq.original_idx[idx].name in stats_cache[arg].index_set
+                    if aq.original_idx[idx].name in stats_cache[arg].index_order
                 ]
 
                 if idx in aq.connected_idxs[
@@ -585,7 +587,7 @@ def get_reduce_query(
     stats_cache[query_expr] = aq.ST.aggregate(
         agg_op,
         agg_init,
-        [i.name for i in final_idxs_to_be_reduced],
+        tuple(final_idxs_to_be_reduced),
         stats_cache[query_expr.arg],
     )
 
@@ -632,7 +634,7 @@ def reduce_idx(
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
-    alias_idxs = [Field(idx) for idx in aq.bindings[alias_expr].index_set]
+    alias_idxs = list(aq.bindings[alias_expr].index_order)
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),

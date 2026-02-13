@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
+from finchlite.galley.TensorStats.stats_interpreter import StatsInterpreter
+from finchlite.interface import LazyTensor
+
 from ...finch_logic import (
     Aggregate,
     Alias,
-    Field,
     Literal,
     LogicNode,
     MapJoin,
     Query,
     Reorder,
     Table,
-    Value,
 )
 from ..TensorStats import TensorStats
 
@@ -27,66 +28,75 @@ def insert_statistics(
     if node in cache:
         return cache[node]
 
-    if isinstance(node, Query):
-        stats = insert_statistics(ST, node.rhs, bindings, replace, cache)
-        if isinstance(node.lhs, Alias):
-            bindings[node.lhs] = stats
-        cache[node] = stats
-        return stats
+    match node:
+        case MapJoin():
+            if not isinstance(node.op, Literal):
+                raise TypeError("MapJoin.op must be Literal(...).")
+            op = node.op.val
+            args = [
+                insert_statistics(ST, a, bindings, replace, cache) for a in node.args
+            ]
+            if not args:
+                raise ValueError("MapJoin expects at least one argument with stats.")
+            st = ST.mapjoin(op, *args)
+            cache[node] = st
+            return st
+        case Query():
+            stats = insert_statistics(ST, node.rhs, bindings, replace, cache)
+            if isinstance(node.lhs, Alias):
+                bindings[node.lhs] = stats
+            cache[node] = stats
+            return stats
 
-    if isinstance(node, MapJoin):
-        if not isinstance(node.op, Literal):
-            raise TypeError("MapJoin.op must be Literal(...).")
-        op = node.op.val
+        case Aggregate():
+            if not isinstance(node.op, Literal):
+                raise TypeError("Aggregate.op must be Literal(...).")
+            op = node.op.val
+            init = node.init.val if isinstance(node.init, Literal) else None
+            arg = insert_statistics(ST, node.arg, bindings, replace, cache)
+            reduce_indices = list(node.idxs)
+            st = ST.aggregate(op, init, reduce_indices, arg)
+            cache[node] = st
+            return st
 
-        args = [insert_statistics(ST, a, bindings, replace, cache) for a in node.args]
-        if not args:
-            raise ValueError("MapJoin expects at least one argument with stats.")
+        case Reorder():
+            child = insert_statistics(ST, node.arg, bindings, replace, cache)
+            cache[node] = child
+            return child
 
-        st = ST.mapjoin(op, *args)
-        cache[node] = st
-        return st
+        case Table():
+            if isinstance(node.tns, Literal):
+                idxs = list(node.idxs)
+                tensor = ST(node.tns.val, idxs)
+            elif isinstance(node.tns, Alias):
+                base_stats = bindings.get(node.tns)
+                if base_stats is None:
+                    raise ValueError(f"No TensorStats bound to alias {node.tns}")
 
-    if isinstance(node, Aggregate):
-        if not isinstance(node.op, Literal):
-            raise TypeError("Aggregate.op must be Literal(...).")
-        op = node.op.val
-        init = node.init.val if isinstance(node.init, Literal) else None
-        arg = insert_statistics(ST, node.arg, bindings, replace, cache)
-        reduce_indices = list(
-            dict.fromkeys(
-                [i.name if isinstance(i, Field) else str(i) for i in node.idxs]
-            )
-        )
-        st = ST.aggregate(op, init, reduce_indices, arg)
-        cache[node] = st
-        return st
+                new_indices = tuple(f for f in node.idxs)
+                tensor = ST.relabel(base_stats, new_indices)
 
-    if isinstance(node, Alias):
-        st = bindings.get(node)
-        cache[node] = st
-        return st
+            if (node not in cache) or replace:
+                cache[node] = tensor
+            return cache[node]
 
-    if isinstance(node, Reorder):
-        child = insert_statistics(ST, node.arg, bindings, replace, cache)
-        cache[node] = child
-        return child
+        case _:
+            raise TypeError(f"Unhandled node type: {type(node)}")
 
-    if isinstance(node, Table):
-        if isinstance(node.tns, Literal):
-            idxs = [f.name for f in node.idxs]
-            tensor = ST(node.tns.val, idxs)
-        elif isinstance(node.tns, Alias):
-            tensor = bindings[node.tns]
 
-        if (node not in cache) or replace:
-            cache[node] = tensor
-        return cache[node]
+def get_lazy_tensor_stats(
+    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+) -> TensorStats:
+    trace = lazy_tensor.ctx.trace()
+    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+    last_stats: TensorStats | tuple[TensorStats, ...]
+    for stmt in trace:
+        last_stats = interpreter(stmt, bindings)
 
-    if isinstance(node, (Value, Literal)):
-        val = node.val if isinstance(node, Literal) else node.ex
-        st = ST(val)
-        cache[node] = st
-        return st
+    if last_stats is None:
+        raise ValueError("Trace was empty or no stats produced")
+    if isinstance(last_stats, tuple):
+        return last_stats[0]
 
-    raise TypeError(f"Unsupported node type: {type(node).__name__}")
+    return last_stats
