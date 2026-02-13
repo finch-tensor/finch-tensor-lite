@@ -489,8 +489,9 @@ class AssemblyContext(Context):
                 assert isinstance(mode, ntn.Update)
                 # assert len(idxs) == 0
                 tns = self.resolve(tns)
+                op = mode.op
                 val_e = self(val)
-                return tns.result_format.lower_increment(self, tns, val_e)
+                return tns.result_format.lower_increment(self, tns, op, val_e)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)

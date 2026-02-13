@@ -271,7 +271,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def lower_unwrap(self, ctx, obj): ...
 
-    def lower_increment(self, ctx, obj, val): ...
+    def lower_increment(self, ctx, obj, op, val): ...
 
     def asm_unpack(self, ctx, var_n, val):
         """
@@ -465,7 +465,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def lower_unwrap(self, ctx, tns):
         return asm.Load(tns.obj.tns.buf_s, tns.obj.pos)
 
-    def lower_increment(self, ctx, tns, val):
+    def lower_increment(self, ctx, tns, op, val):
         obj = tns.obj
         lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
         ctx.exec(
@@ -473,7 +473,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 obj.tns.buf_s,
                 lowered_pos,
                 asm.Call(
-                    asm.Literal(self.op.val),
+                    asm.Literal(op.val),
                     [asm.Load(obj.tns.buf_s, lowered_pos), val],
                 ),
             )

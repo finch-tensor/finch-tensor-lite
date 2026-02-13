@@ -6,23 +6,18 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...codegen import NumpyBufferFType
 from ...compile import LoopletContext
 from ...compile import looplets as lplt
-from ..fiber_tensor import FiberTensorFType, Level, LevelFType
+from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
 
 
 class DenseLevelFields(NamedTuple):
-    lvl: asm.Variable
-    buf_s: NumpyBufferFType
-    pos: asm.Variable | asm.Literal
-    op: asm.Literal
-    dirty_bit: bool
+    lvl_asm: asm.AssemblyExpression
 
 
 @dataclass(unsafe_hash=True)
 class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
-    lvl_t: LevelFType
+    _lvl_t: LevelFType
     dimension_type: Any = None
 
     @property
@@ -41,7 +36,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         if self.dimension_type is None:
             self.dimension_type = np.intp
 
-    def __call__(self, *, lvl=None, shape=None):
+    def __call__(self, *, shape):
         """
         Creates an instance of DenseLevel with the given ftype.
 
@@ -51,7 +46,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             An instance of DenseLevel.
         """
         lvl = self.lvl_t(shape=shape[1:])
-        return DenseLevel(self, lvl, self.dimension_type(shape[0]))
+        return DenseLevel(lvl, self.dimension_type(shape[0]))
 
     def from_numpy(self, shape, val):
         """
@@ -109,32 +104,36 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         """
         return self.lvl_t.buffer_factory
 
-    def next_level(self):
-        return self.lvl_t
+    @property
+    def lvl_t(self):
+        return self._lvl_t
 
-    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
-        return DenseLevelFields(tns, buf_s, pos, op, dirty_bit)
+    def level_asm_unpack(self, ctx, var_n, val) -> tuple[DenseLevelFields, ...]:
+        return (
+            DenseLevelFields(val),
+            *self.lvl_t.level_asm_unpack(
+                ctx, var_n, asm.GetAttr(val, asm.Literal("lvl"))
+            ),
+        )
 
-    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
-        val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
-        return self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+    def level_asm_repack(self, ctx, lvls_slots):
+        self.lvl_t.level_asm_repack(ctx, lvls_slots[1:])
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvls_slots, r):
         if r == 0:
-            return asm.GetAttr(obj, asm.Literal("dimension"))
-        obj = asm.GetAttr(obj, asm.Literal("lvl"))
-        return self.lvl_t.level_lower_dim(ctx, obj, r - 1)
+            return asm.GetAttr(lvls_slots[0].lvl_asm, asm.Literal("dimension"))
+        return self.lvl_t.level_lower_dim(ctx, lvls_slots[1:], r - 1)
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
-        return self.lvl_t.level_lower_declare(ctx, tns, init, op, shape, pos)
+    def level_lower_declare(self, ctx, lvls_slots, init, op, shape, pos):
+        return self.lvl_t.level_lower_declare(ctx, lvls_slots[1:], init, op, shape, pos)
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
-        return self.lvl_t.level_lower_freeze(ctx, tns, op, pos)
+    def level_lower_freeze(self, ctx, lvls_slots, op, pos):
+        return self.lvl_t.level_lower_freeze(ctx, lvls_slots[1:], op, pos)
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
-        return self.lvl_t.level_lower_thaw(ctx, tns, op, pos)
+    def level_lower_thaw(self, ctx, lvls_slots, op, pos):
+        return self.lvl_t.level_lower_thaw(ctx, lvls_slots[1:], op, pos)
 
-    def level_lower_increment(self, ctx, obj, val, pos):
+    def level_lower_increment(self, ctx, obj, op, val, pos):
         raise NotImplementedError(
             "DenseLevelFType does not support level_lower_increment."
         )
@@ -145,10 +144,10 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
         )
 
     def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
-        assert isinstance(stack.obj, DenseLevelFields)
-        tns: DenseLevelFields = stack.obj
-        assert isinstance(stack.type, FiberTensorFType)
+        tns: FiberTensorFields = stack.obj
         ft_ftype: FiberTensorFType = stack.type
+        assert isinstance(tns.lvls_slots[0], DenseLevelFields)
+        lvl = tns.lvls_slots[0].lvl_asm
 
         def child_accessor(ctx: LoopletContext, idx):
             pos_2 = asm.Variable(
@@ -160,11 +159,11 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                     asm.Call(
                         asm.Literal(operator.add),
                         (
-                            tns.pos,
+                            pos,
                             asm.Call(
                                 asm.Literal(operator.mul),
                                 (
-                                    asm.GetAttr(tns.lvl, asm.Literal("stride")),
+                                    asm.GetAttr(lvl, asm.Literal("stride")),
                                     asm.Variable(ctx.idx.name, ctx.idx.type_),
                                 ),
                             ),
@@ -173,14 +172,8 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 )
             )
             return ntn.Stack(
-                self.lvl_t.get_fields_class(
-                    asm.GetAttr(tns.lvl, asm.Literal("lvl")),
-                    tns.buf_s,
-                    pos_2,
-                    tns.op,
-                    tns.dirty_bit,
-                ),
-                FiberTensorFType(ft_ftype.lvl_t.next_level()),  # type: ignore[abstract]
+                FiberTensorFields(tns.lvls_slots[1:], pos_2, tns.dirty_bit),
+                FiberTensorFType(ft_ftype.lvl_t.lvl_t),  # type: ignore[abstract]
             )
 
         return lplt.Lookup(
@@ -189,7 +182,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             )
         )
 
-    def from_fields(self, lvl, dimension) -> "DenseLevel":
+    def from_fields(self, lvl, dimension, stride) -> "DenseLevel":
         return DenseLevel(lvl=lvl, dimension=dimension)
 
 
