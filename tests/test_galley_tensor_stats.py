@@ -23,8 +23,108 @@ from finchlite.galley.LogicalOptimizer import (
     insert_statistics,
     replace_and_remove_nodes,
 )
-from finchlite.galley.TensorStats import DC, DCStats, DenseStats, TensorDef
+from finchlite.galley.TensorStats import DC, DCStats, DenseStats, UniformStats, TensorDef
 from finchlite.interface import lazy
+import math
+# ─────────────────────────────── UniformStats tests ─────────────────────────────
+
+def test_uniform_from_tensor_and_getters():
+    data = np.zeros((2, 3))
+    data[0, 0] = 1.0
+    data[1, 1] = 1.0
+    arr = fl.asarray(data)
+    
+    node = Table(Literal(arr), (Field("i"), Field("j")))
+    stats = insert_statistics(
+        ST=UniformStats,
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.index_order == (Field("i"), Field("j"))
+    assert stats.get_dim_size(Field("i")) == 2.0
+    assert stats.get_dim_size(Field("j")) == 3.0
+    assert stats.fill_value == 0
+    assert stats.estimate_non_fill_values() == 2.0
+
+
+@pytest.mark.parametrize(
+    "shape, nnz_indices, expected_nnz",
+    [
+        ((2, 3), [(0,0), (1,1)], 2.0),
+        ((10, 10), [(i, i) for i in range(10)], 10.0),
+        ((5, 5, 5), [], 0.0),
+    ],
+)
+def test_uniform_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
+    axes = tuple(Field(f"x{i}") for i in range(len(shape)))
+    data = np.zeros(shape)
+    for idx in nnz_indices:
+        data[idx] = 1.0
+    
+    arr = fl.asarray(data)
+    node = Table(Literal(arr), axes)
+
+    stats = insert_statistics(
+        ST=UniformStats,
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    assert stats.index_order == tuple(axes)
+    assert stats.estimate_non_fill_values() == expected_nnz
+
+
+def test_uniform_mapjoin_mul_and_add():
+    data_a = np.zeros((10, 10))
+    data_a[:5, :] = 1.0 
+    data_b = np.zeros((10, 10))
+    data_b[:, :5] = 1.0
+    
+    ta = Table(Literal(fl.asarray(data_a)), (Field("i"), Field("j")))
+    tb = Table(Literal(fl.asarray(data_b)), (Field("i"), Field("j")))
+
+    cache = {}
+    insert_statistics(ST=UniformStats, node=ta, bindings=OrderedDict(),replace=False, cache=cache)
+    insert_statistics(ST=UniformStats, node=tb, bindings=OrderedDict(),replace=False, cache=cache)
+
+    # P(a)*P(b) = 0.5 * 0.5 = 0.25 -> 0.25 * 100 = 25 nnz
+    node_mul = MapJoin(Literal(op.mul), (ta, tb))
+    us_mul = insert_statistics(ST=UniformStats, node=node_mul, bindings=OrderedDict(),replace=False, cache=cache)
+    assert us_mul.estimate_non_fill_values() == pytest.approx(25.0)
+    assert us_mul.fill_value == 0.0
+
+    # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
+    node_add = MapJoin(Literal(op.add), (ta, tb))
+    us_add = insert_statistics(ST=UniformStats, node=node_add, bindings=OrderedDict(),replace=False, cache=cache)
+
+    assert us_add.estimate_non_fill_values() == pytest.approx(75.0)
+    
+
+def test_uniform_aggregate_and_issimilar():
+    data = np.eye(10)
+    table = Table(Literal(fl.asarray(data)),(Field("i"),Field("j")))
+    us = insert_statistics(ST=UniformStats,node=table,bindings=OrderedDict(),replace=False,cache={})
+    node_sum = Aggregate(
+        op=Literal(op.add),
+        init=None,
+        arg=table,
+        idxs=(Field("j"),),
+    )
+    us_agg = insert_statistics(ST=UniformStats,node=node_sum,bindings=OrderedDict(),replace=False,cache={})
+    #p=0.1 in our example as only diagonal elements are non zero so 10/100 = 0.1
+    expected_prob = 1 - math.pow(1.0-0.1,10)
+    #post squashing we have just 10 rows left so new vol = 10x1 = 10
+    expected_nnz = expected_prob*10
+    assert us_agg.index_order == (Field("i"),)
+    assert us_agg.get_dim_size(Field("i")) == 10
+    assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
+    assert UniformStats.issimilar(us,us)
+
+
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
