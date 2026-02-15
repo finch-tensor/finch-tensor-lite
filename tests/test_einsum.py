@@ -12,6 +12,25 @@ def rng():
     return np.random.default_rng(42)
 
 
+def test_pass_through(rng):
+    """Test pass through of a tensor"""
+    A = rng.random((5, 5))
+
+    B = finchlite.einop("B[i,j] = A[i,j]", A=A)
+
+    finch_assert_allclose(B, A)
+
+
+def test_transpose(rng):
+    """Test basic addition with transpose"""
+    A = rng.random((5, 5))
+
+    B = finchlite.einop("B[i,j] = A[j, i]", A=A)
+    B_ref = A.T
+
+    finch_assert_allclose(B, B_ref)
+
+
 def test_basic_addition_with_transpose(rng):
     """Test basic addition with transpose"""
     A = rng.random((5, 5))

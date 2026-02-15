@@ -5,8 +5,8 @@ EXIT_1: #succs=[]
 compute_2: #succs=[compute_3]
     [0] x: int64 = x
     [1] y: int64 = y
-    [2] temp: int64 = x
-    [3] temp: int64 = add(temp, y)
+    [2] temp: int64 = x 	# x = ('x', 0)
+    [3] temp: int64 = add(temp, y) 	# temp = ('x', 0), y = ('y', 1)
     [4] return temp
 
 compute_3: #succs=[EXIT_1]
@@ -16,18 +16,18 @@ compute_4: #succs=[compute_3]
 main_5: #succs=[main_7, main_8]
     [5] a: int64 = 10
     [6] b: int64 = a
-    [7] c: int64 = b
+    [7] c: int64 = b 	# b = ('a', 5)
     [8] d: int64 = 5
 
 main_6: #succs=[EXIT_1]
 
 main_7: #succs=[main_9]
-    [9] assert(gt(c, 5))
+    [9] assert(gt(c, 5)) 	# c = ('b', 6)
     [10] a: int64 = add(a, d)
     [11] b: int64 = a
 
 main_8: #succs=[main_9]
-    [12] assert(not_(gt(c, 5)))
+    [12] assert(not_(gt(c, 5))) 	# c = ('b', 6)
 
 main_9: #succs=[main_10, main_11]
     [13] result: int64 = 0
@@ -37,7 +37,7 @@ main_10: #succs=[main_12, main_13]
     [15] assert(lt(j_3, 5))
     [16] i: int64 = j_3
     [17] temp: int64 = i
-    [18] result: int64 = add(result, temp)
+    [18] result: int64 = add(result, temp) 	# temp = ('i', 16)
 
 main_11: #succs=[main_15, main_16]
     [25] assert(not_(lt(j_3, 5)))
@@ -82,7 +82,7 @@ main_20: #succs=[main_20, main_21]
     [38] assert(lt(j_5, 2))
     [39] j: int64 = j_5
     [40] b: int64 = j
-    [41] result: int64 = add(result, add(a, b))
+    [41] result: int64 = add(result, add(a, b)) 	# b = ('j', 39)
     [42] j_5: int64 = add(j_5, 1)
 
 main_21: #succs=[main_18, main_19]
@@ -101,15 +101,15 @@ main_23: #succs=[main_24]
 main_24: #succs=[main_6]
     [56] a: int64 = result
     [57] b: int64 = a
-    [58] return b
+    [58] return b 	# b = ('a', 56)
 
 main_25: #succs=[main_27]
-    [50] assert(gt(c, 50))
-    [51] result: int64 = mul(c, 2)
+    [50] assert(gt(c, 50)) 	# c = ('d', 47)
+    [51] result: int64 = mul(c, 2) 	# c = ('d', 47)
 
 main_26: #succs=[main_27]
-    [52] assert(not_(gt(c, 50)))
-    [53] result: int64 = c
+    [52] assert(not_(gt(c, 50))) 	# c = ('d', 47)
+    [53] result: int64 = c 	# c = ('d', 47)
 
 main_27: #succs=[main_24]
 
