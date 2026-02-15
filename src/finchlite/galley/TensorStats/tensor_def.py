@@ -227,7 +227,8 @@ class TensorDef:
         """
         Relabel the axes in the given TensorDef to new labels
 
-        This constructs a new TensorDef by associating the new labels for axes with the dimension size of the old names.
+        This constructs a new TensorDef by associating the new labels
+        for axes with the dimension size of the old names.
 
         Parameters:
         relabel_indices : tuple[str,...]
@@ -236,7 +237,8 @@ class TensorDef:
             The input tensor definition.
 
         Returns:
-        A new TensorDef with relabled indices and the same fill value as the tensor remains unaffected
+        A new TensorDef with relabled indices and the same fill value
+        as the tensor remains unaffected
         """
         if len(relabel_indices) != len(d.index_order):
             raise ValueError(
@@ -244,7 +246,9 @@ class TensorDef:
                 f"but {len(relabel_indices)} names provided."
             )
 
-        new_dim_sizes = OrderedDict(zip(relabel_indices, d.dim_sizes.values()))
+        new_dim_sizes = OrderedDict(
+            zip(relabel_indices, d.dim_sizes.values(), strict=True)
+        )
 
         return TensorDef(relabel_indices, new_dim_sizes, d.fill_value)
 

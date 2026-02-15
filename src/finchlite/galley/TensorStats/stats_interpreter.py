@@ -99,12 +99,6 @@ class StatsMachine:
                 for arg in node.args:
                     res = self(arg)
                     child_stats_list.append(res)
-
-                """"
-                child_stats = [self(arg) for arg in node.args]
-                if not child_stats:
-                    raise ValueError("MapJoin expects at least one argument with stats.")
-                """
                 return self.ST.mapjoin(node.op.val, *child_stats_list)
 
             case Aggregate():
@@ -156,15 +150,12 @@ def calculate_estimated_error(
         stats_result = (stats_result,)
 
     errors = []
-    for actual_tns, stats_obj in zip(actual_result, stats_result):
+    for actual_tns, stats_obj in zip(actual_result, stats_result, strict=True):
         actual_nnz = float(np.count_nonzero(actual_tns.to_numpy()))
         est_nnz = float(stats_obj.estimate_non_fill_values())
 
         if actual_nnz == 0.0:
-            if est_nnz == 0.0:
-                rel_err = 0.0
-            else:
-                rel_err = float("inf")
+            rel_err = 0.0 if est_nnz == 0.0 else float("inf")
 
         else:
             rel_err = abs(actual_nnz - est_nnz) / actual_nnz
