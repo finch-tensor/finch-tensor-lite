@@ -63,14 +63,14 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
     )
 
     interpreter = StatsInterpreter(StatsImpl=DCStats)
-    result_stats = interpreter(p)[0]
+    result_stats = interpreter(p, {})[0]
 
     expected_rows = shape_a[0]
     expected_cols = shape_b[1]
 
-    assert result_stats.dim_sizes["i"] == expected_rows
-    assert result_stats.dim_sizes["j"] == expected_cols
-    assert result_stats.index_order == ("i", "j")
+    assert result_stats.dim_sizes[i] == expected_rows
+    assert result_stats.dim_sizes[j] == expected_cols
+    assert tuple(f.name for f in result_stats.index_order) == ("i", "j")
 
 
 def test_stats_matmul_error():
@@ -104,6 +104,8 @@ def test_stats_matmul_error():
         )
     )
 
-    errors = calculate_estimated_error(node=p, StatsImpl=DCStats)
+    errors = calculate_estimated_error(
+        node=p, StatsImpl=DCStats, logic_bindings={}, stats_bindings={}
+    )
 
     assert errors[0] == 0.0
