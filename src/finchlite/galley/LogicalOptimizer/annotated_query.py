@@ -511,7 +511,7 @@ def get_reduce_query(
             # E.g. when you reduce one vertex of a triangle, you should
             # do the other two as well.
             args_with_reduce_idx = [
-                arg for arg in args if original_idx.name in stats_cache[arg].index_order
+                arg for arg in args if original_idx in stats_cache[arg].index_order
             ]
             kernel_idxs = set().union(
                 *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
