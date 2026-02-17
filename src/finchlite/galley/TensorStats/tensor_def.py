@@ -6,8 +6,6 @@ from typing import Any
 
 import numpy as np
 
-from ...algebra import is_idempotent, is_identity
-
 from finchlite.finch_logic import (
     Alias,
     Field,
@@ -16,7 +14,7 @@ from finchlite.finch_logic import (
     Table,
 )
 
-
+from ...algebra import is_idempotent, is_identity
 
 
 class TensorDef:
