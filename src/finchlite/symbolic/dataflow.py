@@ -39,7 +39,10 @@ class BasicBlock:
         lines.append(f"{self.id}:{succ_str}")
 
         # Block statements
-        lines.extend(f"    {stmt}" for stmt in self.statements)
+        for stmt in self.statements:
+            sid = getattr(stmt, "sid", None)
+            prefix = f"[{sid}] " if sid is not None else ""
+            lines.append(f"    {prefix}{stmt}")
 
         return "\n".join(lines)
 
@@ -146,7 +149,9 @@ class DataFlowAnalysis(ABC):
 
                 # print each statement using subclasses stmt_str method
                 for stmt in block.statements:
-                    lines.append(f"    {self.stmt_str(stmt, state)}")
+                    sid = getattr(stmt, "sid", None)
+                    prefix = f"[{sid}] " if sid is not None else ""
+                    lines.append(f"    {prefix}{self.stmt_str(stmt, state)}")
                     # advance state with current statement
                     state = self.transfer([stmt], state)
             else:
