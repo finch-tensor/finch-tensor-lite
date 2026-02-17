@@ -65,6 +65,17 @@ _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
 StableNumber = bool | int | float | complex | np.generic
 
+def return_type(op: Any, *args: Any) -> Any:
+    """The return type of the given function on the given argument types.
+
+    Args:
+        op: The function or operator to infer the type for.
+        *args: The types of the arguments.
+
+    Returns:
+        The return type of op(*args: arg_types)
+    """
+    return query_property(op, "__call__", "return_type", *args)
 
 def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
     """Queries a property of an attribute of an object or class.  Properties can
@@ -244,7 +255,6 @@ class ReflexiveFinchOperator(FinchOperator):
 
     
 class UnaryFinchOperator(FinchOperator):
-
     def return_type(self, a):
         return type(getattr(a(True), self.method_name)())
     
@@ -254,7 +264,6 @@ class ComparisonFinchOperator(FinchOperator):
         return bool
     
 class Add(ReflexiveFinchOperator):
-
     method_name = "__add__"
     reflected_method = "__radd__"
 
@@ -275,7 +284,6 @@ class Add(ReflexiveFinchOperator):
     
 
 class Mul(ReflexiveFinchOperator):
-
     method_name = "__mul__"
     reflected_method = "__rmul__"
 
@@ -287,7 +295,6 @@ class Mul(ReflexiveFinchOperator):
     
 
 class Sub(ReflexiveFinchOperator):
-    
     method_name = "__sub__"
     reflected_method = "__rsub__"
 
@@ -295,7 +302,6 @@ class Sub(ReflexiveFinchOperator):
         return operator.sub(a, b)
     
 class MatMul(ReflexiveFinchOperator):
-
     method_name = "__matmul__"
     reflected_method = "__rmatmul__"
 
@@ -306,7 +312,6 @@ class MatMul(ReflexiveFinchOperator):
 
 
 class TrueDiv(ReflexiveFinchOperator):
-
     method_name = "__truediv__"
     reflected_method = "__rtruediv__"
 
@@ -356,7 +361,6 @@ class Pow(ReflexiveFinchOperator):
 
 
 class LShift(ReflexiveFinchOperator):
-
     method_name = "__lshift__"
     reflected_method = "__rlshift__"
 
@@ -368,7 +372,6 @@ class LShift(ReflexiveFinchOperator):
 
 
 class RShift(ReflexiveFinchOperator):
-
     method_name = "__rshift__"
     reflected_method = "__rrshift__"
 
@@ -380,7 +383,6 @@ class RShift(ReflexiveFinchOperator):
 
 
 class And(ReflexiveFinchOperator):
-
     method_name = "__and__"
     reflected_method = "__rand__"
 
@@ -402,7 +404,6 @@ class And(ReflexiveFinchOperator):
 
 
 class Xor(ReflexiveFinchOperator):
-
     method_name = "__xor__"
     reflected_method = "__rxor__"
 
@@ -417,7 +418,6 @@ class Xor(ReflexiveFinchOperator):
 
 
 class Or(ReflexiveFinchOperator):
-
     method_name = "__or__"
     reflected_method = "__ror__"
 
@@ -437,10 +437,8 @@ class Or(ReflexiveFinchOperator):
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, And)
 
-class Abs(UnaryFinchOperator):
-    
-    method_name = "__abs__"
-    
+class Abs(UnaryFinchOperator):    
+    method_name = "__abs__"    
     is_idempotent = True
     
     def __call__(self, a):
@@ -448,9 +446,7 @@ class Abs(UnaryFinchOperator):
 
 
 class Pos(UnaryFinchOperator):
-    
     method_name = "__pos__"
-    
     is_idempotent = True
     
     def __call__(self, a):
@@ -458,17 +454,15 @@ class Pos(UnaryFinchOperator):
 
 
 class Neg(UnaryFinchOperator):
-    
     method_name = "__neg__"
-        
+
     def __call__(self, a):
         return operator.neg(a)
 
 
 class Invert(UnaryFinchOperator):
-    
     method_name = "__invert__"
-    
+
     def __call__(self, a):
         return operator.invert(a)
 
@@ -512,17 +506,7 @@ class Le(ComparisonFinchOperator):
     def __call__(self, a, b):
         return operator.le(a, b)
 
-def return_type(op: Any, *args: Any) -> Any:
-    """The return type of the given function on the given argument types.
 
-    Args:
-        op: The function or operator to infer the type for.
-        *args: The types of the arguments.
-
-    Returns:
-        The return type of op(*args: arg_types)
-    """
-    return query_property(op, "__call__", "return_type", *args)
 
 
 
