@@ -16,5 +16,4 @@ __all__ = [
     "TensorDef",
     "TensorStats",
     "UniformStats",
-    "UniformStats",
 ]
