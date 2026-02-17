@@ -22,7 +22,7 @@ from ...finch_logic import (
     Reorder,
     Table,
 )
-from ..TensorStats import TensorStats
+from .tensor_stats import TensorStats
 
 
 class StatsInterpreter:
