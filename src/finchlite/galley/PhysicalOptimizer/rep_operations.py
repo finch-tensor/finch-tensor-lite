@@ -238,14 +238,14 @@ def aggregate_rep(
     op: Callable, init: Any, rep: Representation, dims: list[int]
 ) -> Representation:
     """Aggregate representation over specified dimensions."""
-    drops = []
+    drops: list[bool] = []
     for i in range(rep.ndims()):
         dim_num = i + 1
         should_drop = dim_num in dims
         drops.append(should_drop)
 
-    drops = tuple(reversed(drops))
-    return _aggregate_rep_def(op, init, rep, *drops)
+    drops_tuple = tuple(reversed(drops))
+    return _aggregate_rep_def(op, init, rep, *drops_tuple)
 
 
 def _aggregate_rep_def(
