@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import element_type, return_type
+from ..algebra import return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, NamedTerm, Term, TermTree, literal_repr
+from ..symbolic import Context, FType, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 
@@ -81,7 +81,7 @@ class Literal(NotationExpression):
 
     @property
     def result_format(self):
-        return type(self.val)
+        return ftype(self.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"val": self.val})
@@ -181,7 +181,30 @@ class AccessFType(FType):
         """
         Returns the element type of the access ftype.
         """
-        return element_type(self.obj)
+        return self.obj.element_type
+
+
+@dataclass(eq=True, frozen=True)
+class Dimension(NotationTree, NotationExpression):
+    """
+    Notation AST expression representing the dimension of tensor `tns` in
+    rank `r`.
+    """
+
+    tns: NotationExpression
+    r: Literal
+
+    @property
+    def result_format(self):
+        return self.tns.shape_type[self.r.val]
+
+    @classmethod
+    def from_children(cls, tns, r):
+        return cls(tns, r)
+
+    @property
+    def children(self):
+        return [self.tns, self.r]
 
 
 @dataclass(eq=True, frozen=True)
@@ -272,7 +295,7 @@ class Unwrap(NotationTree, NotationExpression):
         """
         Returns the type of the unwrapped value.
         """
-        return element_type(self.arg.result_format)
+        return self.arg.result_format.element_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -630,6 +653,10 @@ class NotationPrinterContext(Context):
             case Assign(Variable(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
+            case Dimension(tns, r):
+                tns_e = self(tns)
+                r_e = self(r)
+                return f"{tns_e}.shape[{r_e}]"
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]

@@ -6,14 +6,21 @@ from typing import Any
 
 import numpy as np
 
-import numba  # type: ignore[import-untyped]
+import numba
 
 from .. import finch_assembly as asm
 from ..algebra import query_property, register_property
-from ..finch_assembly import AssemblyStructFType, BufferFType, TupleFType
+from ..finch_assembly import AssemblyStructFType, BufferFType
+from ..finch_assembly.dct import DictFType
+from ..finch_assembly.struct import (  # type: ignore[import-untyped]
+    ImmutableStructFType,
+    MutableStructFType,
+)
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
+from ..util.logging import LOG_BACKEND_NUMBA
+from .stages import NumbaCode, NumbaLowerer
 
-logger = logging.getLogger(__name__)
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NUMBA)
 
 
 # Cache for Numba structs
@@ -34,7 +41,10 @@ def numba_type(t):
     """
     if hasattr(t, "numba_type"):
         return t.numba_type()
-    return query_property(t, "numba_type", "__attr__")
+    try:
+        return query_property(t, "numba_type", "__attr__")
+    except AttributeError:
+        return t
 
 
 def numba_jitclass_type(t):
@@ -60,11 +70,31 @@ register_property(
 )
 
 
+def immutable_struct_jitclass_type(fmt: ImmutableStructFType):
+    return numba.types.Tuple(
+        tuple([numba_jitclass_type(t) for t in fmt.struct_fieldformats])
+    )
+
+
+register_property(
+    ImmutableStructFType,
+    "numba_jitclass_type",
+    "__attr__",
+    immutable_struct_jitclass_type,
+)
+register_property(
+    ImmutableStructFType,
+    "numba_type",
+    "__attr__",
+    lambda t: tuple,
+)
+
+
 def assembly_struct_numba_type(ftype_: Any) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
-    from ..codegen.numba_backend import (
+    from .numba_codegen import (
         numba_globals,
         numba_jitclass_type,
         numba_structnames,
@@ -84,12 +114,12 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     # Build the argument list for __init__
     arg_list = ", ".join(field_names)
     # Build the body of __init__ to assign each argument to ftype_
-    body = "; ".join([f"ftype_.{name} = {name}" for name in field_names])
+    body = "; ".join([f"self.{name} = {name}" for name in field_names])
     # Compose the full class source
     class_src = dedent(
         f"""\
         class {class_name}:
-            def __init__(ftype_, {arg_list}):
+            def __init__(self, {arg_list}):
                 {body if body else "pass"}
             @staticmethod
             def numba_name():
@@ -121,6 +151,20 @@ register_property(
     "numba_jitclass_type",
     "__attr__",
     lambda t: numba.from_dtype(t),
+)
+
+register_property(
+    int,
+    "numba_jitclass_type",
+    "__attr__",
+    lambda t: numba.int32,
+)
+
+register_property(
+    float,
+    "numba_jitclass_type",
+    "__attr__",
+    lambda t: numba.float64,
 )
 
 register_property(
@@ -186,6 +230,37 @@ register_property(
 )
 
 
+def serialize_immutable_to_numba(fmt: ImmutableStructFType, obj):
+    return tuple(
+        serialize_to_numba(childfmt, fmt.struct_getattr(obj, attr))
+        for attr, childfmt in fmt.struct_fields
+    )
+
+
+register_property(
+    ImmutableStructFType, "serialize_to_numba", "__attr__", serialize_immutable_to_numba
+)
+
+
+def immutable_construct_from_numba(fmt: AssemblyStructFType, numba_tuple):
+    return fmt.from_fields(
+        *[
+            construct_from_numba(field_type, field_value)
+            for field_value, (name, field_type) in zip(
+                numba_tuple, fmt.struct_fields, strict=False
+            )
+        ]
+    )
+
+
+register_property(
+    ImmutableStructFType,
+    "construct_from_numba",
+    "__attr__",
+    immutable_construct_from_numba,
+)
+
+
 def deserialize_from_numba(fmt, obj, numba_obj):
     """
     Deserialize a Numba-compatible object back to the original ftype.
@@ -201,7 +276,10 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     if hasattr(fmt, "deserialize_from_numba"):
         fmt.deserialize_from_numba(obj, numba_obj)
     else:
-        query_property(fmt, "deserialize_from_numba", "__attr__", obj, numba_obj)
+        try:
+            query_property(fmt, "deserialize_from_numba", "__attr__", obj, numba_obj)
+        except AttributeError:
+            return
 
 
 register_property(
@@ -253,6 +331,34 @@ register_property(
 )
 
 
+class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
+    """
+    Abstract base class for the ftype of datastructures. The ftype defines how
+    the data in a Map is organized and accessed.
+    """
+
+    @abstractmethod
+    def numba_existsdict(self, ctx: "NumbaContext", map, idx):
+        """
+        Return numba code which checks whether a given key exists in a map.
+        """
+        ...
+
+    @abstractmethod
+    def numba_loaddict(self, ctx, buffer, idx):
+        """
+        Return numba code which gets a value corresponding to a certain key.
+        """
+        ...
+
+    @abstractmethod
+    def numba_storedict(self, ctx, buffer, idx, value):
+        """
+        Return C code which stores a certain value given a certain integer tuple key.
+        """
+        ...
+
+
 class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
     @abstractmethod
     def numba_length(self, ctx: "NumbaContext", buffer):
@@ -290,7 +396,7 @@ class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
         return "list[numpy.ndarray]"
 
 
-class NumbaModule:
+class NumbaLibrary(asm.AssemblyLibrary):
     """
     A class to represent a Numba module.
     """
@@ -307,7 +413,7 @@ class NumbaModule:
         )
 
 
-class NumbaKernel:
+class NumbaKernel(asm.AssemblyKernel):
     def __init__(self, numba_func, ret_type: type, arg_types):
         self.numba_func = numba_func
         self.ret_type = ret_type
@@ -330,15 +436,15 @@ class NumbaKernel:
         return construct_from_numba(self.ret_type, res)
 
 
-class NumbaCompiler:
-    def __init__(self, ctx=None):
+class NumbaCompiler(asm.AssemblyLoader):
+    def __init__(self, ctx: NumbaLowerer | None = None):
         if ctx is None:
             ctx = NumbaGenerator()
-        self.ctx = ctx
+        self.ctx: NumbaLowerer = ctx
 
-    def __call__(self, prgm: asm.Module):
-        numba_code = self.ctx(prgm)
-        logger.info(f"Executing Numba code:\n{numba_code}")
+    def __call__(self, prgm: asm.Module) -> NumbaLibrary:
+        numba_code = self.ctx(prgm).code
+        logger.debug(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
         _globals |= numba_globals
         try:
@@ -363,14 +469,14 @@ class NumbaCompiler:
                         f"Unrecognized function type: {type(func)}"
                     )
 
-        return NumbaModule(kernels)
+        return NumbaLibrary(kernels)
 
 
-class NumbaGenerator:
+class NumbaGenerator(NumbaLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = NumbaContext()
         ctx(prgm)
-        return ctx.emit_global()
+        return NumbaCode(ctx.emit_global())
 
 
 class NumbaContext(Context):
@@ -460,19 +566,20 @@ class NumbaContext(Context):
         match prgm:
             case asm.Literal(value):
                 return str(value)
-            case asm.Variable(name, _):
-                return name
-            case asm.Assign(asm.Variable(var_n, var_t), val):
+            case asm.Variable(name, _) | asm.Slot(name, _):
+                return name.replace("#", "_")
+            case asm.Assign(asm.Variable(var_n, var_t) as var, val):
                 val_code = self(val)
+                var_code = self(var)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
-                    self.exec(f"{feed}{var_n} = {val_code}")
+                    self.exec(f"{feed}{var_code} = {val_code}")
                 else:
                     self.types[var_n] = var_t
                     self.exec(
-                        f"{feed}{var_n}: "
+                        f"{feed}{var_code}: "
                         f"{self.full_name(numba_type(var_t))} = {val_code}"
                     )
                 return None
@@ -508,7 +615,7 @@ class NumbaContext(Context):
                 return None
             case asm.Call(asm.Literal(val), args):
                 return query_property(val, "numba_literal", "__attr__", self, *args)
-            case asm.Unpack(asm.Slot(var_n, var_t), val):
+            case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.slots:
@@ -520,19 +627,21 @@ class NumbaContext(Context):
                         f"Variable '{var_n}' is already defined in the current"
                         f" context, cannot overwrite with slot."
                     )
-                self.exec(f"{feed}{var_n} = {self(val)}")
+                var_code = self(slot)
+                self.exec(f"{feed}{var_code} = {self(val)}")
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.numba_unpack(
-                    self, var_n, asm.Variable(var_n, var_t)
+                    self, var_code, asm.Variable(var_n, var_t)
                 )
                 return None
-            case asm.Repack(asm.Slot(var_n, var_t)):
+            case asm.Repack(asm.Slot(var_n, var_t) as slot):
                 if var_n not in self.slots or var_n not in self.types:
                     raise KeyError(f"Slot {var_n} not found in context, cannot repack")
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
-                var_t.numba_repack(self, var_n, obj)
+                var_code = self(slot)
+                var_t.numba_repack(self, var_code, obj)
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
@@ -548,6 +657,15 @@ class NumbaContext(Context):
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 return buf.result_format.numba_length(self, buf)
+            case asm.LoadDict(dct, idx):
+                dct = self.resolve(dct)
+                return dct.result_format.numba_loaddict(self, dct, idx)
+            case asm.ExistsDict(dct, idx):
+                dct = self.resolve(dct)
+                return dct.result_format.numba_existsdict(self, dct, idx)
+            case asm.StoreDict(dct, idx, val):
+                dct = self.resolve(dct)
+                return dct.result_format.numba_storedict(self, dct, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -597,8 +715,11 @@ class NumbaContext(Context):
                 arg_decls = []
                 for arg in args:
                     match arg:
-                        case asm.Variable(name, t):
-                            arg_decls.append(f"{name}: {self.full_name(numba_type(t))}")
+                        case asm.Variable(name, t) as var:
+                            name_code = self(var)
+                            arg_decls.append(
+                                f"{name_code}: {self.full_name(numba_type(t))}"
+                            )
                             ctx_2.types[name] = t
                         case _:
                             raise NotImplementedError(
@@ -702,13 +823,26 @@ register_property(
 )
 
 
+def immutable_struct_numba_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
+    index = list(fmt.struct_fieldnames).index(attr)
+    return f"{obj}[{index}]"
+
+
+register_property(
+    ImmutableStructFType,
+    "numba_getattr",
+    "__attr__",
+    immutable_struct_numba_getattr,
+)
+
+
 def struct_numba_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
     ctx.emit(f"{ctx.feed}{obj}.{attr} = {val}")
     return
 
 
 register_property(
-    AssemblyStructFType,
+    MutableStructFType,
     "numba_setattr",
     "__attr__",
     struct_numba_setattr,
@@ -716,11 +850,11 @@ register_property(
 
 
 def struct_construct_from_numba(fmt: AssemblyStructFType, numba_struct):
-    kwargs = {
-        name: construct_from_numba(field_type, getattr(numba_struct, name))
+    args = [
+        construct_from_numba(field_type, getattr(numba_struct, name))
         for (name, field_type) in fmt.struct_fields
-    }
-    return fmt(**kwargs)
+    ]
+    return fmt.from_fields(*args)
 
 
 register_property(
@@ -734,15 +868,8 @@ register_property(
 def serialize_tuple_to_numba(fmt, obj):
     if not isinstance(fmt, AssemblyStructFType):
         fmt = ftype(fmt)
-    return numba_type(fmt)(*obj)
+    return numba_type(fmt)(obj)
 
-
-register_property(
-    TupleFType,
-    "serialize_to_numba",
-    "__attr__",
-    serialize_tuple_to_numba,
-)
 
 register_property(
     tuple,
@@ -750,6 +877,23 @@ register_property(
     "__attr__",
     serialize_tuple_to_numba,
 )
+
+# trivial ser/deser
+for t in (int, bool, float):
+    register_property(
+        t,
+        "construct_from_numba",
+        "__attr__",
+        lambda fmt, obj: obj,
+    )
+
+    register_property(
+        t,
+        "serialize_to_numba",
+        "__attr__",
+        lambda fmt, obj: obj,
+    )
+
 
 register_property(
     operator.add,

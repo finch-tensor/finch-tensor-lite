@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
-from finchlite.algebra import (
+from ...algebra import (
     InitWrite,
     cansplitpush,
     is_associative,
@@ -11,7 +11,7 @@ from finchlite.algebra import (
     is_distributive,
     repeat_operator,
 )
-from finchlite.finch_logic import (
+from ...finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -23,8 +23,7 @@ from finchlite.finch_logic import (
     Query,
     Table,
 )
-from finchlite.galley.TensorStats import TensorStats
-from finchlite.symbolic import (
+from ...symbolic import (
     Chain,
     PostWalk,
     PreOrderDFS,
@@ -33,7 +32,7 @@ from finchlite.symbolic import (
     intree,
     isdescendant,
 )
-
+from ..TensorStats import TensorStats
 from .constants import ALLOC_FACTOR, COMPUTE_FACTOR
 from .logic_to_stats import insert_statistics
 
@@ -75,11 +74,10 @@ class AnnotatedQuery:
         bindings : OrderedDict[Alias, TensorStats], optional
             Existing alias→stats environment to seed the analysis.
         """
-        if not isinstance(q, Query):
-            raise ValueError(
-                "Annotated Queries can only be built from queries of the form: "
-                "Query(lhs, rhs)"
-            )
+        assert isinstance(q, Query), (
+            "Annotated Queries can only be built from queries of the form: "
+            "Query(lhs, rhs)"
+        )
         self.ST = ST
         if bindings is None:
             bindings = OrderedDict()
@@ -129,13 +127,13 @@ class AnnotatedQuery:
 
         reduce_idxs: list[Field] = []
         original_idx: OrderedDict[Field, Field] = OrderedDict(
-            (Field(idx), Field(idx)) for idx in cache[q.rhs].index_set
+            (idx, idx) for idx in cache[q.rhs].index_order
         )
         idx_lowest_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         for idx in starting_reduce_idxs:
             agg_op = idx_op[idx]
             stats_point = cache_point[point_expr]
-            idx_dim_size = stats_point.dim_sizes[idx.name]
+            idx_dim_size = stats_point.dim_sizes[idx]
             lowest_roots = find_lowest_roots(
                 Literal(agg_op), idx, idx_starting_root[idx]
             )
@@ -149,7 +147,7 @@ class AnnotatedQuery:
                     for i, _ in enumerate(lowest_roots, start=1)
                 ]
                 for i, node in enumerate(lowest_roots):
-                    if idx.name not in cache_point[node].index_set:
+                    if idx.name not in cache_point[node].index_order:
                         # If the lowest root doesn't contain the reduction index, we
                         # attempt to remove the reduction via a repeat_operator, i.e.
                         # ∑_i B_j = B_j*|Dom(i)|
@@ -391,26 +389,28 @@ def replace_and_remove_nodes(
     nodes_to_remove_set = set(nodes_to_remove)
 
     def replace_remove_rule(node: LogicExpression) -> LogicExpression | None:
-        if isinstance(node, (Plan, Query, Aggregate)):
-            raise ValueError(
-                f"There should be no {type(node).__name__} "
-                "nodes in a pointwise expression."
-            )
-
-        if node == node_to_replace and node not in nodes_to_remove_set:
-            return new_node
-
-        if isinstance(node, MapJoin) and any(
-            (arg == node_to_replace) or (arg in nodes_to_remove) for arg in node.args
-        ):
-            new_args = [arg for arg in node.args if arg not in nodes_to_remove_set]
-
-            for i, arg in enumerate(new_args):
-                if arg == node_to_replace:
-                    new_args[i] = new_node
-
-            return MapJoin(node.op, tuple(new_args))
-        return None
+        match node:
+            case Plan(_) | Query(_, _) | Aggregate(_, _, _, _) as illegal:
+                raise ValueError(
+                    f"There should be no {type(illegal).__name__} "
+                    "nodes in a pointwise expression."
+                )
+            case node if node == node_to_replace and node not in nodes_to_remove_set:
+                return new_node
+            case MapJoin(op, args) if any(
+                (arg == node_to_replace) or (arg in nodes_to_remove) for arg in args
+            ):
+                new_args = []
+                for arg in args:
+                    if arg in nodes_to_remove_set:
+                        continue
+                    if arg == node_to_replace:
+                        new_args.append(new_node)
+                    else:
+                        new_args.append(arg)
+                return MapJoin(op, tuple(new_args))
+            case _:
+                return None
 
     return Rewrite(PostWalk(replace_remove_rule))(expr)
 
@@ -419,53 +419,50 @@ def find_lowest_roots(
     op: Literal, idx: Field, root: LogicExpression
 ) -> list[LogicExpression]:
     """
-        Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
-        safely pushed down to in a logical expression.
+    Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
+    safely pushed down to in a logical expression.
 
-        Parameters
-        ----------
-        op : Literal
-            The reduction operator node (e.g., Literal(operator.add))
-            that we are trying to push down.
-        idx : Field
-            The index (dimension) being reduced over.
-        root : LogicExpression
-            The root logical expression under which we search for the lowest
-            pushdown positions for the reduction.
+    Parameters
+    ----------
+    op : Literal
+        The reduction operator node (e.g., Literal(operator.add))
+        that we are trying to push down.
+    idx : Field
+        The index (dimension) being reduced over.
+    root : LogicExpression
+        The root logical expression under which we search for the lowest
+        pushdown positions for the reduction.
 
-        Returns
-        -------
-        list[LogicExpression]
-    `        A list of expression nodes representing the lowest positions in
-            the expression tree where the reduction over `idx` with operator
-            `op` can be safely pushed down.
+    Returns
+    -------
+    list[LogicExpression]
+        A list of expression nodes representing the lowest positions in
+        the expression tree where the reduction over `idx` with operator
+        `op` can be safely pushed down.
     """
+    match root:
+        case MapJoin(Literal(mj_op), args) as mj:
+            args_with = [arg for arg in args if idx in arg.fields()]
+            args_without = [arg for arg in args if idx not in arg.fields()]
 
-    if isinstance(root, MapJoin):
-        if not isinstance(root.op, Literal):
-            raise TypeError(
-                f"Expected MapJoin.op to be a Literal, got {type(root.op).__name__}"
+            if len(args_with) == 1 and is_distributive(mj_op, op.val):
+                return find_lowest_roots(op, idx, args_with[0])
+
+            if cansplitpush(op.val, mj_op):
+                roots_without: list[LogicExpression] = list(args_without)
+                roots_with: list[LogicExpression] = []
+                for arg in args_with:
+                    roots_with.extend(find_lowest_roots(op, idx, arg))
+                return roots_without + roots_with
+
+            return [mj]
+        case Alias(_) | Table(_, _) as root:
+            return [root]
+        case _:
+            raise ValueError(
+                f"There shouldn't be nodes of type {type(root).__name__} "
+                "during root pushdown."
             )
-        args_with = [arg for arg in root.args if idx in arg.fields]
-        args_without = [arg for arg in root.args if idx not in arg.fields]
-
-        if len(args_with) == 1 and is_distributive(root.op.val, op.val):
-            return find_lowest_roots(op, idx, args_with[0])
-
-        if cansplitpush(op.val, root.op.val):
-            roots_without: list[LogicExpression] = list(args_without)
-            roots_with: list[LogicExpression] = []
-            for arg in args_with:
-                roots_with.extend(find_lowest_roots(op, idx, arg))
-            return roots_without + roots_with
-        return [root]
-
-    if isinstance(root, (Alias, Table)):
-        return [root]
-
-    raise ValueError(
-        f"There shouldn't be nodes of type {type(root).__name__} during root pushdown."
-    )
 
 
 def get_reduce_query(
@@ -508,31 +505,26 @@ def get_reduce_query(
 
     use_root = False
 
-    if isinstance(root_node, MapJoin):
-        if not isinstance(root_node.op, Literal):
-            raise TypeError("MapJoin.op must be Literal(...).")
-
-        if is_distributive(root_node.op.val, reduce_op):
+    match root_node:
+        case MapJoin(Literal(op), args) as mj if is_distributive(op, reduce_op):
             # If you're already reducing one index, then it may
             # make sense to reduce others as well.
             # E.g. when you reduce one vertex of a triangle, you should
             # do the other two as well.
             args_with_reduce_idx = [
-                arg
-                for arg in root_node.args
-                if original_idx.name in stats_cache[arg].index_set
+                arg for arg in args if original_idx in stats_cache[arg].index_order
             ]
             kernel_idxs = set().union(
-                *(stats_cache[arg].index_set for arg in args_with_reduce_idx)
+                *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
             )
             relevant_args = [
                 arg
-                for arg in root_node.args
-                if stats_cache[arg].index_set.issubset(kernel_idxs)
+                for arg in args
+                if set(stats_cache[arg].index_order).issubset(kernel_idxs)
             ]
-            if len(relevant_args) == len(root_node.args):
-                node_to_replace = root_node
-                for node in PreOrderDFS(root_node):
+            if len(relevant_args) == len(args):
+                node_to_replace = mj
+                for node in PreOrderDFS(mj):
                     if node != node_to_replace:
                         nodes_to_remove.add(cast(LogicExpression, node))
             else:
@@ -540,7 +532,10 @@ def get_reduce_query(
                 for arg in relevant_args[1:]:
                     for node in PreOrderDFS(arg):
                         nodes_to_remove.add(cast(LogicExpression, node))
-            query_expr = MapJoin(root_node.op, tuple(relevant_args))
+            query_expr = MapJoin(Literal(op), tuple(relevant_args))
+            stats_cache[query_expr] = aq.ST.mapjoin(
+                op, *[stats_cache[arg] for arg in relevant_args]
+            )
             relevant_args_set = set(relevant_args)
             for idx in reducible_idxs:
                 if aq.idx_op[idx] != aq.idx_op[reduce_idx]:
@@ -548,18 +543,16 @@ def get_reduce_query(
 
                 args_with_idx = [
                     arg
-                    for arg in root_node.args
-                    if aq.original_idx[idx].name in stats_cache[arg].index_set
+                    for arg in args
+                    if aq.original_idx[idx].name in stats_cache[arg].index_order
                 ]
 
                 if idx in aq.connected_idxs[
                     reduce_idx
                 ] and relevant_args_set.issuperset(args_with_idx):
                     idxs_to_be_reduced.add(idx)
-        else:
+        case _:
             use_root = True
-    else:
-        use_root = True
 
     if use_root:
         query_expr = root_node
@@ -590,6 +583,13 @@ def get_reduce_query(
         Literal(agg_init),
         query_expr,
         tuple(final_idxs_to_be_reduced),
+    )
+
+    stats_cache[query_expr] = aq.ST.aggregate(
+        agg_op,
+        agg_init,
+        tuple(final_idxs_to_be_reduced),
+        stats_cache[query_expr.arg],
     )
 
     query = Query(Alias(gensym("A")), query_expr)
@@ -652,11 +652,12 @@ def reduce_idx(
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
+    alias_idxs = list(aq.bindings[alias_expr].index_order)
 
     new_point_expr: LogicExpression = replace_and_remove_nodes(
         expr=cast(LogicExpression, aq.point_expr),
         node_to_replace=node_to_replace,
-        new_node=alias_expr,
+        new_node=Table(alias_expr, tuple(alias_idxs)),
         nodes_to_remove=nodes_to_remove,
     )
     new_reduce_idxs = [x for x in aq.reduce_idxs if x not in reduced_idxs]
@@ -668,6 +669,9 @@ def reduce_idx(
     for idx in aq.idx_lowest_root:
         if idx in reduced_idxs:
             continue
+        root = aq.idx_lowest_root[idx]
+        if root == node_to_replace or root in nodes_to_remove:
+            root = Table(alias_expr, tuple(reduced_idxs))
 
         new_idx_lowest_root[idx] = replace_and_remove_nodes(
             aq.idx_lowest_root[idx], node_to_replace, alias_expr, nodes_to_remove
@@ -722,8 +726,9 @@ def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
     insert_statistics(
         aq.ST, expr, bindings=aq.bindings, replace=True, cache=aq.cache_point
     )
-    if isinstance(expr, Alias):
-        return None
+    match expr:
+        case Table(Alias(_), _):
+            return None
     query = Query(aq.output_name, cast(LogicExpression, expr))
     remaining_cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
     insert_statistics(

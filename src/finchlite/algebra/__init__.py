@@ -19,6 +19,7 @@ from .operator import (
     conjugate,
     first_arg,
     identity,
+    make_tuple,
     overwrite,
     promote_max,
     promote_min,
@@ -27,10 +28,6 @@ from .operator import (
 from .tensor import (
     Tensor,
     TensorFType,
-    TensorPlaceholder,
-    element_type,
-    fill_value,
-    shape_type,
 )
 
 __all__ = [
@@ -38,11 +35,8 @@ __all__ = [
     "StableNumber",
     "Tensor",
     "TensorFType",
-    "TensorPlaceholder",
     "cansplitpush",
     "conjugate",
-    "element_type",
-    "fill_value",
     "first_arg",
     "fixpoint_type",
     "identity",
@@ -53,6 +47,7 @@ __all__ = [
     "is_distributive",
     "is_idempotent",
     "is_identity",
+    "make_tuple",
     "overwrite",
     "promote_max",
     "promote_min",
@@ -61,5 +56,4 @@ __all__ = [
     "register_property",
     "repeat_operator",
     "return_type",
-    "shape_type",
 ]

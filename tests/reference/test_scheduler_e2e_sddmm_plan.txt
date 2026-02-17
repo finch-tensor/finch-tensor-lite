@@ -1,0 +1,4 @@
+A_4 = Aggregate(add, 0, Reorder(MapJoin(mul, MapJoin(mul, Table(A_2, i, i_2), Table(A_3, i_3, i_2)), Table(A, i_3, i)), i_3, i, i_2), i_2)
+A_5 = Reorder(Table(A_4, i_4, i_5), i_5, i_4)
+A_6 = Reorder(Table(A_5, i_5, i_4), i_5, i_4)
+return A_6

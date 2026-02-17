@@ -39,7 +39,10 @@ class BasicBlock:
         lines.append(f"{self.id}:{succ_str}")
 
         # Block statements
-        lines.extend(f"    {stmt}" for stmt in self.statements)
+        for stmt in self.statements:
+            sid = getattr(stmt, "sid", None)
+            prefix = f"[{sid}] " if sid is not None else ""
+            lines.append(f"    {prefix}{stmt}")
 
         return "\n".join(lines)
 
@@ -51,7 +54,7 @@ class ControlFlowGraph:
     block mapping used by dataflow analyses.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.block_counter = 0
         self.block_name = ""
         self.blocks: dict[str, BasicBlock] = {}
@@ -146,7 +149,9 @@ class DataFlowAnalysis(ABC):
 
                 # print each statement using subclasses stmt_str method
                 for stmt in block.statements:
-                    lines.append(f"    {self.stmt_str(stmt, state)}")
+                    sid = getattr(stmt, "sid", None)
+                    prefix = f"[{sid}] " if sid is not None else ""
+                    lines.append(f"    {prefix}{self.stmt_str(stmt, state)}")
                     # advance state with current statement
                     state = self.transfer([stmt], state)
             else:
@@ -192,13 +197,13 @@ class DataFlowAnalysis(ABC):
         """
         ...
 
-    def analyze(self):
+    def analyze(self) -> None:
         """
         Perform the data flow analysis on the control flow graph.
         This method initializes the work list and processes each block.
         """
+        work_list: list[BasicBlock] = list(self.cfg.blocks.values())
         if self.direction() == "forward":
-            work_list: list[BasicBlock] = list(self.cfg.blocks.values())
             while work_list:
                 block = work_list.pop(0)
 
@@ -227,7 +232,6 @@ class DataFlowAnalysis(ABC):
                         if successor not in work_list:
                             work_list.append(successor)
         else:
-            work_list: list[BasicBlock] = list(self.cfg.blocks.values())
             while work_list:
                 block = work_list.pop(0)
 

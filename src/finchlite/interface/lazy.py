@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import bisect
 import builtins
 import operator
 import sys
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
@@ -14,8 +17,6 @@ from .. import finch_einsum as ein
 from ..algebra import (
     Tensor,
     TensorFType,
-    element_type,
-    fill_value,
     first_arg,
     fixpoint_type,
     identity,
@@ -37,20 +38,16 @@ from ..finch_logic import (
     Alias,
     Field,
     Literal,
-    LogicNode,
+    LogicExpression,
+    LogicStatement,
     MapJoin,
-    Relabel,
+    Plan,
+    Query,
     Reorder,
-    Subquery,
     Table,
 )
 from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
-
-
-def identify(data):
-    lhs = Alias(gensym("A"))
-    return Subquery(lhs, data)
 
 
 class LazyTensorFType(TensorFType):
@@ -75,6 +72,19 @@ class LazyTensorFType(TensorFType):
     def __hash__(self):
         return hash((self._fill_value, self._element_type, self._shape_type))
 
+    def __call__(self, shape: tuple) -> LazyTensor:
+        idxs = tuple(Field(gensym("i")) for _ in shape)
+        ctx = EffectBlob()
+        expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
+        data, ctx = ctx.eval(expr)
+        return LazyTensor(
+            data=data,
+            ctx=ctx,
+            shape=shape,
+            fill_value=self._fill_value,
+            element_type=self._element_type,
+        )
+
     @property
     def fill_value(self):
         return self._fill_value
@@ -87,12 +97,88 @@ class LazyTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+
+effect_stamp = threading.local()
+
+
+class EffectBlob:
+    """
+    The EffectBlob class represents a collection of prior queries in a lazy
+    evaluation context, which can be extracted into a linear trace of
+    LogicStatements (in the order they were issued). Note that the global
+    `effect_stamp` counter is required to maintain the relative ordering of
+    effect blobs in the face of in-place mutations to tensors.  Each effect blob
+    contains a logic statement and references to other effect blobs. The
+    datastructure is designed to be immutable, mergeable in O(1) time, and
+    support linear time extraction. To achieve linear time, we use a hash table
+    to avoid re-extracting already seen blobs.
+    """
+
+    stamp: int
+    stmt: LogicStatement
+    blobs: tuple[EffectBlob, ...]
+
+    def __init__(
+        self,
+        stmt: LogicStatement | None = None,
+        blobs: tuple[EffectBlob, ...] | None = None,
+    ):
+        global effect_stamp
+        if stmt is None:
+            stmt = Plan()
+        if blobs is None:
+            blobs = ()
+        self.stmt = stmt
+        self.blobs = blobs
+
+        try:
+            curr_stamp = effect_stamp.value
+        except AttributeError:
+            effect_stamp.value = 0
+            curr_stamp = 0
+
+        self.stamp = curr_stamp
+        effect_stamp.value += 1
+
+    def exec(self, stmt: LogicStatement) -> EffectBlob:
+        return EffectBlob(stmt=stmt, blobs=(self,))
+
+    def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
+        var = Alias(gensym("A"))
+        return var, self.exec(Query(var, ex))
+
+    def join(self, *blobs: EffectBlob) -> EffectBlob:
+        return EffectBlob(blobs=(self, *blobs))
+
+    def trace(self) -> tuple[LogicStatement, ...]:
+        stmts = list[tuple[int, LogicStatement]]()
+        seen = set[int]()
+        self._trace(seen, stmts)
+        stmts.sort()
+        return tuple(stmt for _, stmt in stmts)
+
+    def _trace(self, seen: set[int], stmts: list[tuple[int, LogicStatement]]) -> None:
+        if id(self) not in seen:
+            seen.add(id(self))
+            stmts.append((self.stamp, self.stmt))
+            for blob in self.blobs:
+                blob._trace(seen, stmts)
+
 
 class LazyTensor(OverrideTensor):
     def __init__(
-        self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
+        self,
+        data: Alias,
+        ctx: EffectBlob,
+        shape: tuple,
+        fill_value: Any,
+        element_type: Any,
     ):
-        self.data = data
+        self.data: Alias = data
+        self.ctx = ctx
         self._shape = shape
         self._fill_value = fill_value
         self._element_type = element_type
@@ -112,6 +198,21 @@ class LazyTensor(OverrideTensor):
         The shape is determined by the data and is a static property.
         """
         return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def override_module(self):
         return sys.modules[__name__]
@@ -330,12 +431,14 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
+register_property(
+    np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray.from_numpy(x)
+)
 register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
 register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
 
 
-def asarray(arg: Any, format=None) -> Any:
+def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
@@ -345,13 +448,15 @@ def asarray(arg: Any, format=None) -> Any:
         format: The format for the result array.
 
     Returns:
-        The array type result of the given object.
+        The Tensor type result of the given object.
     """
     if format is None:
         if hasattr(arg, "asarray"):
             return arg.asarray()
         return query_property(arg, "asarray", "__attr__")
 
+    if isinstance(arg, np.ndarray):
+        return format.from_numpy(arg)
     return format(arg)
 
 
@@ -371,11 +476,45 @@ def lazy(arr) -> LazyTensor:
     if isinstance(arr, LazyTensor):
         return arr
     arr = asarray(arr)
-    name = Alias(gensym("A"))
+    tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    tns = Subquery(name, Table(Literal(arr), idxs))
-    return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
+    ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
+    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
+
+
+def full(
+    shape: int | tuple[int, ...],
+    fill_value: bool | complex,
+    *,
+    dtype: Any | None = None,
+):
+    """
+    Returns a new array having a specified shape and filled with fill_value.
+
+    Parameters:
+    - shape (Union[int, Tuple[int, ...]]): output array shape.
+    - fill_value (Union[bool, int, float, complex]): fill value.
+    - dtype (Optional[dtype]): output array data type. If dtype is None, the
+    output array data type must be inferred from fill_value according to the
+    following rules:
+        * If the fill value is an int, the output array data type must be the
+            default integer data type.
+        * If the fill value is a float, the output array data type must be the
+            default real-valued floating-point data type.
+        * If the fill value is a complex number, the output array data type must
+            be the default complex floating-point data type.
+        * If the fill value is a bool, the output array must have a boolean data
+            type. Default: None.
+
+    Returns:
+
+    - out (array): an array where every element is equal to fill_value.
+    """
+    val = lazy(np.full((), fill_value, dtype=dtype))
+    if isinstance(shape, int):
+        shape = (shape,)
+    return broadcast_to(val, shape)
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
@@ -399,8 +538,11 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     arg = lazy(arg)
     axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
+    expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
+    data, ctx = arg.ctx.eval(expr)
     return LazyTensor(
-        Reorder(Relabel(arg.data, idxs), tuple(idxs[i] for i in axis)),
+        data,
+        ctx,
         tuple(arg.shape[i] for i in axis),
         arg.fill_value,
         arg.element_type,
@@ -463,11 +605,12 @@ def expand_dims(
         Field(gensym("i")) if n in axis else idxs_1[n - offset[n]]
         for n in range(x.ndim + len(axis))
     )
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
-    return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def squeeze(
@@ -511,9 +654,10 @@ def squeeze(
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
-    return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def reduce(
@@ -574,10 +718,10 @@ def reduce(
 
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
-    data: LogicNode = Aggregate(
+    data: LogicExpression = Aggregate(
         Literal(op),
         Literal(init),
-        Relabel(x.data, fields),
+        Table(x.data, fields),
         tuple(fields[i] for i in axis),
     )
     if keepdims:
@@ -588,7 +732,8 @@ def reduce(
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
-    return LazyTensor(identify(data), shape, init, dtype)
+    expr, ctx = x.ctx.eval(data)
+    return LazyTensor(expr, ctx, shape, init, dtype)
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -668,11 +813,13 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                 if arg.shape[i - ndim + arg.ndim] != 1:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
-        bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
+        bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
+    expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
-    return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
+    ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
+    data, ctx = ctx.eval(expr)
+    return LazyTensor(data, ctx, shape, new_fill_value, new_element_type)
 
 
 def round(x) -> LazyTensor:
@@ -1108,6 +1255,9 @@ class DefaultTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class WrapperTensorFType(TensorFType):
@@ -1128,34 +1278,54 @@ class WrapperTensorFType(TensorFType):
             etype = promote_type(etype, t.element_type)
         return etype
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
-class NoneTensorFType(DefaultTensorFType):
-    pass
+class FillTensorFType(DefaultTensorFType):
+    def __call__(self, shape: tuple) -> FillTensor:
+        return FillTensor(shape, self.fill_value)
 
 
-class NoneTensor(Tensor):
+class FillTensor(Tensor):
     """
     A tensor that has a specific shape but contains no actual data.
     Used primarily for broadcasting operations where a tensor of a specific
     shape is needed but the values are irrelevant.
     """
 
-    def __init__(self, shape):
+    def __init__(self, shape, fill_value):
         self._shape = shape
+        self._fill_value = fill_value
 
     def __getitem__(self, idxs):
-        return None
+        return self._fill_value
 
     @property
     def shape(self):
         return self._shape
 
     @property
+    def fill_value(self) -> Any:
+        """Default fill value."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor's elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[type, ...]:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
+    @property
     def ftype(self):
-        return NoneTensorFType(
-            None,
-            None,
+        return FillTensorFType(
+            self._fill_value,
+            ftype(self._fill_value),
             tuple(type(dim) for dim in self.shape),
         )
 
@@ -1181,7 +1351,7 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(first_arg, tensor, NoneTensor(shape))
+    return elementwise(first_arg, tensor, FillTensor(shape, None))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
@@ -1206,6 +1376,15 @@ class ConcatTensorFType(WrapperTensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    def __call__(self, shape: tuple) -> ConcatTensor:
+        tns = self._child_formats[0](shape)
+        shape2 = tuple(
+            dim if i != self.concat_axis else self._shape_type[i](0)
+            for i, dim in enumerate(shape)
+        )
+        tnss = (tns,) + tuple(fmt(shape2) for fmt in self._child_formats[1:])
+        return ConcatTensor(*tnss, axis=self.concat_axis)
 
 
 class ConcatTensor(Tensor):
@@ -1283,6 +1462,21 @@ class ConcatTensor(Tensor):
     def shape(self):
         return self._shape
 
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
     def asarray(self):
         return self
 
@@ -1329,6 +1523,11 @@ class SplitDimsTensorFType(WrapperTensorFType):
         ]
         return tuple(shape_type_list)
 
+    def __call__(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError(
+            "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
+
 
 class SplitDimsTensor(Tensor):
     """
@@ -1358,7 +1557,7 @@ class SplitDimsTensor(Tensor):
         self._shape = tensor.shape[: self.axis] + shape + tensor.shape[self.axis + 1 :]
         self.split_shape = shape
         self._ndim = len(self._shape)
-        self._element_type = element_type(tensor)
+        self._element_type = tensor.element_type
         self.dtype = self._element_type
 
     def __getitem__(self, idxs: tuple):
@@ -1402,6 +1601,21 @@ class SplitDimsTensor(Tensor):
     def shape(self):
         return self._shape
 
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
     def asarray(self):
         return self
 
@@ -1414,6 +1628,11 @@ class CombineDimsTensorFType(WrapperTensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    def __call__(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError(
+            "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
 
 
 class CombineDimsTensor(Tensor):
@@ -1456,7 +1675,7 @@ class CombineDimsTensor(Tensor):
             + tensor.shape[self.end_axis + 1 :]
         )
         self._ndim = len(self._shape)
-        self._element_type = element_type(tensor)
+        self._element_type = tensor.element_type
         self.dtype = self._element_type
 
         # Store original dimensions for reconstruction. For ease of access
@@ -1504,6 +1723,21 @@ class CombineDimsTensor(Tensor):
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def asarray(self):
         return self
@@ -1808,13 +2042,14 @@ def einop(prgm, **kwargs):
     stmt = ein.parse_einop(prgm)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
-    ctx = ein.EinsumInterpreter(xp, dict(**kwargs))
-    return ctx(prgm)[0]
+    ctx = ein.EinsumInterpreter(xp)
+    bindings = {ein.Alias(k): v for k, v in kwargs.items()}
+    return ctx(prgm, bindings)[0]
 
 
 def einsum(prgm, *args, **kwargs):
     stmt, bindings = ein.parse_einsum(prgm, *args)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
-    ctx = ein.EinsumInterpreter(xp, bindings)
-    return ctx(prgm)[0]
+    ctx = ein.EinsumInterpreter(xp)
+    return ctx(prgm, bindings)[0]

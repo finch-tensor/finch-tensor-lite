@@ -22,6 +22,14 @@ class ScalarFType(TensorFType):
     def __hash__(self):
         return hash((self._element_type, self._fill_value))
 
+    def __call__(self, shape: tuple) -> Scalar:
+        if shape != ():
+            raise ValueError("ScalarFType can only be called with empty shape ()")
+        return self._element_type(self._fill_value)
+
+    def from_numpy(self, arr):
+        return self(arr)
+
     @property
     def fill_value(self):
         return self._fill_value
@@ -49,6 +57,21 @@ class Scalar(EagerTensor):
     @property
     def shape(self):
         return ()
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the scalar."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the scalar."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the scalar."""
+        return self.ftype.shape_type
 
     def __getitem__(self, idx):
         return self.val

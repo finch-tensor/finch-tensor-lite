@@ -1,14 +1,26 @@
 from collections import OrderedDict
 
-from finchlite.autoschedule.optimize import concordize, flatten_plans, isolate_reformats, isolate_tables, \
-                                        lift_fields, lift_subqueries, materialize_squeeze_expand_productions,\
-                                        normalize_names, pretty_labels, propagate_copy_queries, \
-                                        propagate_fields, propagate_into_reformats, propagate_map_queries, \
-                                        propagate_map_queries_backward, propagate_transpose_queries, \
-                                        push_fields, set_loop_order
-
+from finchlite.autoschedule.optimize import (
+    concordize,
+    flatten_plans,
+    isolate_reformats,
+    isolate_tables,
+    lift_fields,
+    lift_subqueries,
+    materialize_squeeze_expand_productions,
+    normalize_names,
+    pretty_labels,
+    propagate_copy_queries,
+    propagate_fields,
+    propagate_into_reformats,
+    propagate_map_queries,
+    propagate_map_queries_backward,
+    propagate_transpose_queries,
+    push_fields,
+    set_loop_order,
+)
 from finchlite.finch_logic import Alias, LogicNode, Plan, Produces, Query
-from finchlite.galley.TensorStats import TensorStats, DCStats
+from finchlite.galley.TensorStats import DCStats, TensorStats
 
 from .annotated_query import (
     AnnotatedQuery,
@@ -18,6 +30,7 @@ from .annotated_query import (
     reduce_idx,
 )
 from .logic_to_stats import insert_statistics
+
 
 def greedy_query_optimizer(aq: AnnotatedQuery) -> list[Query]:
     queries: list[Query] = []
@@ -86,7 +99,7 @@ def galley_greedy_optimizer(prgm: LogicNode) -> LogicNode:
     prgm = lift_fields(prgm)
     prgm = push_fields(prgm)
     prgm = flatten_plans(prgm)
-    
+
     print("Before greedy optimization:\n", prgm)
     prgm = greedy_optimizer(DCStats, prgm)
     print("After greedy optimization:\n", prgm)

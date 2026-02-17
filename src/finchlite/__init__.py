@@ -1,13 +1,13 @@
-from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type
+from .algebra import Tensor, TensorFType
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
 )
 from .compile import (
+    AssemblyContext,
     BufferizedNDArray,
     Extent,
     ExtentFType,
-    NotationContext,
     dimension,
 )
 from .galley import (
@@ -15,11 +15,13 @@ from .galley import (
     DCStats,
     DenseStats,
     TensorDef,
+    UniformStats,
 )
 from .interface import (
     EagerTensor,
     LazyTensor,
-    Mode,
+    NumPyFType,
+    NumPyWrapper,
     Scalar,
     abs,
     acos,
@@ -142,6 +144,7 @@ from .tensor import (
 
 __all__ = [
     "DC",
+    "AssemblyContext",
     "BufferizedNDArray",
     "DCStats",
     "DenseLevelFType",
@@ -153,8 +156,8 @@ __all__ = [
     "FTyped",
     "FiberTensorFType",
     "LazyTensor",
-    "Mode",
-    "NotationContext",
+    "NumPyFType",
+    "NumPyWrapper",
     "NumpyBuffer",
     "NumpyBufferFType",
     "Reflector",
@@ -162,6 +165,7 @@ __all__ = [
     "Tensor",
     "TensorDef",
     "TensorFType",
+    "UniformStats",
     "abs",
     "acos",
     "acosh",
