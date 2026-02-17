@@ -216,6 +216,9 @@ class FinchOperator(ABC):
     def return_type(self, *arg_types: type) -> Any:
         pass
 
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return False
+
     def is_identity(self):
         return False
 
@@ -245,6 +248,11 @@ class UnaryFinchOperator(FinchOperator):
     def return_type(self, a):
         return type(getattr(a(True), self.method_name)())
     
+
+class ComparisonFinchOperator(FinchOperator):
+    def return_type(self, a, b) -> type:
+        return bool
+    
 class Add(ReflexiveFinchOperator):
 
     method_name = "__add__"
@@ -261,6 +269,9 @@ class Add(ReflexiveFinchOperator):
     
     def is_annihilator(self, arg: Any) ->bool:
         return np.isinf(arg)
+    
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return isinstance(other_op, (Add, Sub))
     
 
 class Mul(ReflexiveFinchOperator):
@@ -385,6 +396,9 @@ class And(ReflexiveFinchOperator):
 
     def is_annihilator(self, arg):
         return not bool(arg)
+    
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return isinstance(other_op, (Or, Xor))
 
 
 class Xor(ReflexiveFinchOperator):
@@ -419,6 +433,9 @@ class Or(ReflexiveFinchOperator):
     
     def is_annihilator(self, arg):
         return bool(arg)
+    
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return isinstance(other_op, And)
 
 class Abs(UnaryFinchOperator):
     
@@ -456,6 +473,44 @@ class Invert(UnaryFinchOperator):
         return operator.invert(a)
 
 
+class Eq(ComparisonFinchOperator):
+    method_name = "__eq__"
+    is_commutative = True
+
+    def __call__(self, a, b):
+        return operator.eq(a, b)
+
+class Ne(ComparisonFinchOperator):
+    method_name = "__ne__"
+    is_commutative = True
+
+    def __call__(self, a, b):
+        return operator.ne(a, b)
+
+class Gt(ComparisonFinchOperator):
+    method_name = "__gt__"
+
+    def __call__(self, a, b):
+        return operator.gt(a, b)
+
+
+class Lt(ComparisonFinchOperator):
+    method_name = "__lt__"
+
+    def __call__(self, a, b):
+        return operator.lt(a, b)
+
+class Ge(ComparisonFinchOperator):
+    method_name = "__ge__"
+
+    def __call__(self, a, b):
+        return operator.ge(a, b)
+
+class Le(ComparisonFinchOperator):
+    method_name = "__le__"
+
+    def __call__(self, a, b):
+        return operator.le(a, b)
 
 def return_type(op: Any, *args: Any) -> Any:
     """The return type of the given function on the given argument types.
@@ -470,169 +525,6 @@ def return_type(op: Any, *args: Any) -> Any:
     return query_property(op, "__call__", "return_type", *args)
 
 
-_reflexive_operators = {
-    operator.add: ("__add__", "__radd__"),
-    operator.sub: ("__sub__", "__rsub__"),
-    operator.mul: ("__mul__", "__rmul__"),
-    operator.matmul: ("__matmul__", "__rmatmul__"),
-    operator.truediv: ("__truediv__", "__rtruediv__"),
-    operator.floordiv: ("__floordiv__", "__rfloordiv__"),
-    operator.mod: ("__mod__", "__rmod__"),
-    divmod: ("__divmod__", "__rdivmod__"),
-    operator.pow: ("__pow__", "__rpow__"),
-    operator.lshift: ("__lshift__", "__rlshift__"),
-    operator.rshift: ("__rshift__", "__rrshift__"),
-    operator.and_: ("__and__", "__rand__"),
-    operator.xor: ("__xor__", "__rxor__"),
-    operator.or_: ("__or__", "__ror__"),
-}
-
-
-def _return_type_reflexive_method(meth):
-    def _return_type_closure(a, b):
-        if issubclass(b, StableNumber):
-            return type(getattr(a(True), meth)(b(True)))
-        raise TypeError(f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}")
-
-    return _return_type_closure
-
-
-def _return_type_reflexive_operator(meth, rmeth):
-    def _return_type_closure(op, a, b):
-        if hasattr(a, meth):
-            try:
-                res = query_property(a, meth, "return_type", b)
-                if res is not type(NotImplemented):
-                    return res
-            except AttributeError:
-                pass
-        return query_property(b, rmeth, "return_type", a)
-
-    return _return_type_closure
-
-
-op: Callable
-
-
-for op, (meth, rmeth) in _reflexive_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            _return_type_reflexive_operator(meth, rmeth),
-        ),
-    )
-
-    for t in StableNumber.__args__:
-        register_property(t, meth, "return_type", _return_type_reflexive_method(meth))
-        register_property(t, rmeth, "return_type", _return_type_reflexive_method(rmeth))
-
-
-_unary_operators: dict[Callable, str] = {
-    operator.abs: "__abs__",
-    operator.pos: "__pos__",
-    operator.neg: "__neg__",
-    operator.invert: "__invert__",
-}
-
-
-_comparison_operators: dict[Callable, str] = {
-    operator.eq: "__eq__",
-    operator.ne: "__ne__",
-    operator.gt: "__gt__",
-    operator.lt: "__lt__",
-    operator.ge: "__ge__",
-    operator.le: "__le__",
-}
-
-
-for op, meth in _comparison_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            lambda op, a, b, meth=meth: bool,
-        ),
-    )
-
-
-def _return_type_unary(meth):
-    def _return_type_closure(a):
-        return type(getattr(a(True), meth)())
-
-    return _return_type_closure
-
-
-for op, meth in _unary_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            lambda op, a, meth=meth: query_property(a, meth, "return_type"),
-        ),
-    )
-
-    for t in StableNumber.__args__:
-        register_property(t, meth, "return_type", _return_type_unary(meth))
-register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
-
-
-def is_associative(op: Any) -> bool:
-    """
-    Returns whether the given function is associative, that is, whether the
-    op(op(a, b), c) == op(a, op(b, c)) for all a, b, c.
-
-    Args:
-        op: The function to check.
-
-    Returns:
-        True if the function can be proven to be associative, False otherwise.
-    """
-    return query_property(op, "__call__", "is_associative")
-
-
-for op in (
-    operator.add,
-    operator.mul,
-    operator.and_,
-    operator.or_,
-    operator.xor,
-    np.logaddexp,
-    np.logical_and,
-    np.logical_or,
-    np.logical_xor,
-):
-    register_property(op, "__call__", "is_associative", lambda op: True)
-
-
-def is_commutative(op: Any) -> bool:
-    return query_property(op, "__call__", "is_commutative")
-
-
-for op in (
-    operator.add,
-    operator.mul,
-    operator.and_,
-    operator.or_,
-    operator.xor,
-    np.logical_and,
-    np.logical_or,
-    np.logical_xor,
-):
-    register_property(op, "__call__", "is_commutative", lambda op: True)
-
-for op in (
-    operator.sub,
-    operator.truediv,
-    operator.floordiv,
-    operator.pow,
-    operator.lshift,
-    operator.rshift,
-):
-    register_property(op, "__call__", "is_commutative", lambda op: False)
 
 
 def is_identity(op: Any, val: Any) -> bool:
@@ -651,14 +543,6 @@ def is_identity(op: Any, val: Any) -> bool:
 
 
 for fn, func in [
-    (operator.add, lambda op, val: val == 0),
-    (operator.mul, lambda op, val: val == 1),
-    (operator.or_, lambda op, val: not bool(val)),
-    (operator.and_, lambda op, val: bool(val)),
-    (operator.truediv, lambda op, val: val == 1),
-    (operator.lshift, lambda op, val: val == 0),
-    (operator.rshift, lambda op, val: val == 0),
-    (operator.pow, lambda op, val: val == 1),
     (np.divide, lambda op, val: val == 1),
     (np.logaddexp, lambda op, val: val == -math.inf),
     (np.logical_and, lambda op, val: bool(val)),
@@ -685,14 +569,9 @@ def is_distributive(op, other_op):
 
 
 for fn, func in [
-    (operator.mul, lambda op, other_op: other_op in (operator.add, operator.sub)),
-    (operator.and_, lambda op, other_op: other_op in (operator.or_, operator.xor)),
-    (operator.or_, lambda op, other_op: other_op == operator.and_),
     (np.logical_and, lambda op, other_op: other_op in (np.logical_or, np.logical_xor)),
     (np.logical_or, lambda op, other_op: other_op == np.logical_and),
-    (operator.pow, lambda op, other_op: False),
-    (operator.truediv, lambda op, other_op: False),
-    (operator.add, lambda op, other_op: False),
+
     (max, lambda op, other_op: False),
     (min, lambda op, other_op: False),
 ]:
@@ -715,10 +594,6 @@ def is_annihilator(op, val):
 
 
 for fn, func in [
-    (operator.add, lambda op, val: np.isinf(val)),
-    (operator.mul, lambda op, val: val == 0),
-    (operator.or_, lambda op, val: bool(val)),
-    (operator.and_, lambda op, val: not bool(val)),
     (np.logaddexp, lambda op, val: val == math.inf),
     (np.logical_and, lambda op, val: not bool(val)),
     (np.logical_or, lambda op, val: bool(val)),
