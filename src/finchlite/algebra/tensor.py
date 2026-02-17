@@ -74,19 +74,25 @@ class Tensor(FTyped, ABC):
 
     @property
     def fill_value(self) -> Any:
-        """Default value to fill the tensor."""
+        """The fill value for the tensor.  The fill value is the
+        default value for a tensor when it is created with a given shape and dtype,
+        as well as the background value for sparse tensors.
+        """
         return self.ftype.fill_value
 
     @property
     def element_type(self):
-        """Data type of the tensor elements."""
+        """The element type of the tensor.  The element type is the scalar type of
+        the elements in a tensor, which may be different from the data type of the
+        tensor.
+        """
         return self.ftype.element_type
 
     @property
     def shape_type(self) -> tuple:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
-        should be an actual tuple, rather than a tuple type, so that it can hold
+        should be an actual tuple, rather than a tupleftype, so that it can hold
         e.g. dtypes, formats, or types, and so that we can easily index it."""
         return self.ftype.shape_type
 
