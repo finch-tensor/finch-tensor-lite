@@ -12,7 +12,8 @@ from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFTyp
 
 
 class DenseLevelFields(NamedTuple):
-    lvl_asm: asm.AssemblyExpression
+    lvl_asm: asm.AssemblyExpression  # assembly expression of the current level
+    next_lvl: NamedTuple
 
 
 @dataclass(unsafe_hash=True)
@@ -108,30 +109,34 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def lvl_t(self):
         return self._lvl_t
 
-    def level_asm_unpack(self, ctx, var_n, val) -> tuple[DenseLevelFields, ...]:
-        return (
-            DenseLevelFields(val),
-            *self.lvl_t.level_asm_unpack(
+    def level_asm_unpack(self, ctx, var_n, val) -> DenseLevelFields:
+        return DenseLevelFields(
+            val,
+            self.lvl_t.level_asm_unpack(
                 ctx, var_n, asm.GetAttr(val, asm.Literal("lvl"))
             ),
         )
 
-    def level_asm_repack(self, ctx, lvls_slots):
-        self.lvl_t.level_asm_repack(ctx, lvls_slots[1:])
+    def level_asm_repack(self, ctx, lvl_fields: DenseLevelFields):
+        self.lvl_t.level_asm_repack(ctx, lvl_fields.next_lvl)
 
-    def level_lower_dim(self, ctx, lvls_slots, r):
+    def level_lower_dim(self, ctx, lvl_fields: DenseLevelFields, r):
         if r == 0:
-            return asm.GetAttr(lvls_slots[0].lvl_asm, asm.Literal("dimension"))
-        return self.lvl_t.level_lower_dim(ctx, lvls_slots[1:], r - 1)
+            return asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension"))
+        return self.lvl_t.level_lower_dim(ctx, lvl_fields.next_lvl, r - 1)
 
-    def level_lower_declare(self, ctx, lvls_slots, init, op, shape, pos):
-        return self.lvl_t.level_lower_declare(ctx, lvls_slots[1:], init, op, shape, pos)
+    def level_lower_declare(
+        self, ctx, lvl_fields: DenseLevelFields, init, op, shape, pos
+    ):
+        return self.lvl_t.level_lower_declare(
+            ctx, lvl_fields.next_lvl, init, op, shape, pos
+        )
 
-    def level_lower_freeze(self, ctx, lvls_slots, op, pos):
-        return self.lvl_t.level_lower_freeze(ctx, lvls_slots[1:], op, pos)
+    def level_lower_freeze(self, ctx, lvl_fields: DenseLevelFields, op, pos):
+        return self.lvl_t.level_lower_freeze(ctx, lvl_fields.next_lvl, op, pos)
 
-    def level_lower_thaw(self, ctx, lvls_slots, op, pos):
-        return self.lvl_t.level_lower_thaw(ctx, lvls_slots[1:], op, pos)
+    def level_lower_thaw(self, ctx, lvl_fields: DenseLevelFields, op, pos):
+        return self.lvl_t.level_lower_thaw(ctx, lvl_fields.next_lvl, op, pos)
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
         raise NotImplementedError(
@@ -146,8 +151,9 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
     def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
         tns: FiberTensorFields = stack.obj
         ft_ftype: FiberTensorFType = stack.type
-        assert isinstance(tns.lvls_slots[0], DenseLevelFields)
-        lvl = tns.lvls_slots[0].lvl_asm
+        assert isinstance(tns.lvl_fields, DenseLevelFields)
+        lvl = tns.lvl_fields.lvl_asm
+        next_lvl = tns.lvl_fields.next_lvl
 
         def child_accessor(ctx: LoopletContext, idx):
             pos_2 = asm.Variable(
@@ -172,7 +178,7 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 )
             )
             return ntn.Stack(
-                FiberTensorFields(tns.lvls_slots[1:], pos_2, tns.dirty_bit),
+                FiberTensorFields(next_lvl, pos_2, tns.dirty_bit),
                 FiberTensorFType(ft_ftype.lvl_t.lvl_t),  # type: ignore[abstract]
             )
 

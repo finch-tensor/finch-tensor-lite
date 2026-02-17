@@ -83,34 +83,34 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    def _get_buf_s(self, lvls_slots: tuple) -> asm.Slot:
-        assert len(lvls_slots) == 1 and isinstance(lvls_slots[0], ElementLevelFields)
-        return lvls_slots[0].buf_s
+    def _get_buf_s(self, lvl_fields) -> asm.Slot:
+        assert isinstance(lvl_fields, ElementLevelFields)
+        return lvl_fields.buf_s
 
-    def level_asm_unpack(self, ctx, var_n, val) -> tuple[ElementLevelFields]:
+    def level_asm_unpack(self, ctx, var_n, val) -> ElementLevelFields:
         buf = asm.Variable(f"{var_n}_buf", self.buffer_type)
         buf_e = asm.GetAttr(val, asm.Literal("val"))
         ctx.exec(asm.Assign(buf, buf_e))
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buffer_type)
         ctx.exec(asm.Unpack(buf_s, buf))
-        return (ElementLevelFields(buf_s),)
+        return ElementLevelFields(buf_s)
 
-    def level_asm_repack(self, ctx, lvls_slots):
-        buf_s = self._get_buf_s(lvls_slots)
+    def level_asm_repack(self, ctx, lvl_fields):
+        buf_s = self._get_buf_s(lvl_fields)
         ctx.exec(asm.Repack(buf_s))
 
-    def level_lower_declare(self, ctx, lvls_slots, init, op, shape, pos):
-        buf_s = self._get_buf_s(lvls_slots)
+    def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
+        buf_s = self._get_buf_s(lvl_fields)
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(buf_s, i_var, asm.Literal(init.val))
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf_s), body))
 
     def level_lower_unwrap(self, ctx, obj: FiberTensorFields, pos):
-        buf_s = self._get_buf_s(obj.lvls_slots)
+        buf_s = self._get_buf_s(obj.lvl_fields)
         return asm.Load(buf_s, pos)
 
     def level_lower_increment(self, ctx, obj: FiberTensorFields, op, val, pos):
-        buf_s = self._get_buf_s(obj.lvls_slots)
+        buf_s = self._get_buf_s(obj.lvl_fields)
         lowered_pos = asm.Variable(pos.name, pos.type)
         ctx.exec(
             asm.Store(
@@ -123,11 +123,11 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             )
         )
 
-    def level_lower_freeze(self, ctx, lvls_slots, op, pos):
-        return lvls_slots[0].buf_s
+    def level_lower_freeze(self, ctx, lvl_fields, op, pos):
+        return self._get_buf_s(lvl_fields)
 
-    def level_lower_thaw(self, ctx, lvls_slots, op, pos):
-        return lvls_slots[0].buf_s
+    def level_lower_thaw(self, ctx, lvl_fields, op, pos):
+        return self._get_buf_s(lvl_fields)
 
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")

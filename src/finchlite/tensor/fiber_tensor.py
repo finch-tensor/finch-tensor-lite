@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -127,10 +127,10 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_asm_unpack(self, ctx, var_n, val) -> tuple:
+    def level_asm_unpack(self, ctx, var_n, val) -> NamedTuple:
         """
-        Emit code unpacking the level. Returns tuple containing named tuples of slots,
-        one for each level.
+        Emit code unpacking the level. Returns nested named tuples containing
+        levels' data.
         """
         ...
 
@@ -267,7 +267,7 @@ class FiberTensor(Tensor):
 
 @dataclass(eq=True, frozen=True)
 class FiberTensorFields:
-    lvls_slots: tuple[Any, ...]
+    lvl_fields: NamedTuple
     pos: asm.AssemblyExpression
     dirty_bit: asm.AssemblyExpression
 
@@ -341,10 +341,10 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         )
 
     def lower_freeze(self, ctx, tns, op):
-        return self.lvl_t.level_lower_freeze(ctx, tns.obj.lvls_slots, op, tns.obj.pos)
+        return self.lvl_t.level_lower_freeze(ctx, tns.obj.lvl_fields, op, tns.obj.pos)
 
     def lower_thaw(self, ctx, tns, op):
-        return self.lvl_t.level_lower_thaw(ctx, tns.obj.lvls_slots, op, tns.obj.pos)
+        return self.lvl_t.level_lower_thaw(ctx, tns.obj.lvl_fields, op, tns.obj.pos)
 
     def lower_unwrap(self, ctx, tns):
         return self.lvl_t.level_lower_unwrap(ctx, tns.obj, tns.obj.pos)
@@ -354,27 +354,27 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.level_lower_declare(
-            ctx, tns.obj.lvls_slots, init, op, shape, tns.obj.pos
+            ctx, tns.obj.lvl_fields, init, op, shape, tns.obj.pos
         )
 
     def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, obj.lvls_slots, r)
+        return self.lvl_t.level_lower_dim(ctx, obj.lvl_fields, r)
 
     def asm_unpack(self, ctx, var_n, val) -> FiberTensorFields:
         """
         Unpack the into asm context.
         """
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
-        lvls_slots = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
+        lvl_fields = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
         pos = asm.GetAttr(val, asm.Literal("pos"))
         dirty_bit = asm.GetAttr(val, asm.Literal("dirty_bit"))
-        return FiberTensorFields(lvls_slots, pos, dirty_bit)
+        return FiberTensorFields(lvl_fields, pos, dirty_bit)
 
     def asm_repack(self, ctx, lhs, obj):
         """
         Repack the buffer from the context.
         """
-        self.lvl_t.level_asm_repack(ctx, obj.lvls_slots)
+        self.lvl_t.level_asm_repack(ctx, obj.lvl_fields)
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args
