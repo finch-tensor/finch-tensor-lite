@@ -3,25 +3,25 @@ ENTRY_0: #succs=[dot_product_2]
 EXIT_1: #succs=[]
 
 dot_product_2: #succs=[dot_product_4, dot_product_5]
-    [0] a: np_buf_t(float64) = a
-    [1] b: np_buf_t(float64) = b
-    [2] c: float64 = 0.0
-    [3] a_: np_buf_t(float64) = unpack(a)
-    [4] b_: np_buf_t(float64) = unpack(b)
-    [5] j: int64 = 0
+    [10] a: np_buf_t(float64) = a
+    [11] b: np_buf_t(float64) = b
+    [0] c: float64 = 0.0
+    [1] a_: np_buf_t(float64) = unpack(a)
+    [2] b_: np_buf_t(float64) = unpack(b)
+    j: int64 = 0
 
 dot_product_3: #succs=[EXIT_1]
 
 dot_product_4: #succs=[dot_product_4, dot_product_5]
-    [6] assert(lt(j, length(slot(a_, np_buf_t(float64)))))
+    [8] assert(lt(j, length(slot(a_, np_buf_t(float64)))))
     [7] i: int64 = j
-    [8] c: float64 = add(c, mul(load(slot(a_, np_buf_t(float64)), i), load(slot(b_, np_buf_t(float64)), i)))
-    [9] j: int64 = add(j, 1)
+    [3] c: float64 = add(c, mul(load(slot(a_, np_buf_t(float64)), i), load(slot(b_, np_buf_t(float64)), i)))
+    j: int64 = add(j, 1)
 
 dot_product_5: #succs=[dot_product_3]
-    [10] assert(not_(lt(j, length(slot(a_, np_buf_t(float64))))))
-    [11] repack(a_)
-    [12] repack(b_)
-    [13] return c
+    [9] assert(not_(lt(j, length(slot(a_, np_buf_t(float64))))))
+    [4] repack(a_)
+    [5] repack(b_)
+    [6] return c
 
 dot_product_6: #succs=[dot_product_3]
