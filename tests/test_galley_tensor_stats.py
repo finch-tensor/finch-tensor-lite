@@ -173,15 +173,15 @@ def test_copy_and_getters():
 @pytest.mark.parametrize(
     ("orig_axes", "new_axes"),
     [
-        (["i", "j"], ["j", "i"]),
-        (["x", "y", "z"], ["z", "y", "x"]),
+        ([Field("i"), Field("j")], [Field("j"), Field("i")]),
+        ([Field("x"), Field("y"), Field("z")], [Field("z"), Field("y"), Field("x")]),
     ],
 )
-def test_relabel_def(orig_axes, new_axes):
+def test_reorder_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
     td = TensorDef(index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0)
-    td2 = TensorDef.relabel(td, tuple(Field(ax) for ax in new_axes))
-    assert td2.index_order == tuple(Field(ax) for ax in new_axes)
+    td2 = TensorDef.reorder(td, tuple(new_axes))
+    assert td2.index_order == tuple(new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
 
@@ -208,35 +208,35 @@ def test_add_dummy_idx():
         # union of axes; first-wins on dim size; add fills
         (
             [
-                (("i", "j"), {"i": 10.0, "j": 5.0}, 2.0),
-                (("i", "k"), {"i": 20.0, "k": 7.0}, 3.0),
+                ((Field("i"), Field("j")), {Field("i"): 10.0, Field("j"): 5.0}, 2.0),
+                ((Field("i"), Field("k")), {Field("i"): 20.0, Field("k"): 7.0}, 3.0),
             ],
             op.add,
-            ("i", "j", "k"),
-            {"i": 10.0, "j": 5.0, "k": 7.0},
+            (Field("i"), Field("j"), Field("k")),
+            {Field("i"): 10.0, Field("j"): 5.0, Field("k"): 7.0},
             5.0,
         ),
         # same axes: max over fills; first-wins on size still applies
         (
             [
-                (("i"), {"i": 6.0}, 2.0),
-                (("i"), {"i": 9.0}, 4.0),
+                ((Field("i"),), {Field("i"): 6.0}, 2.0),
+                ((Field("i"),), {Field("i"): 9.0}, 4.0),
             ],
             max,
-            ("i",),
-            {"i": 6.0},
+            (Field("i"),),
+            {Field("i"): 6.0},
             4.0,
         ),
         # three defs; sum fills via variadic callable
         (
             [
-                (("i"), {"i": 5.0}, 1.0),
-                (("i"), {"i": 5.0}, 2.0),
-                (("i"), {"i": 5.0}, 3.0),
+                ((Field("i"),), {Field("i"): 5.0}, 1.0),
+                ((Field("i"),), {Field("i"): 5.0}, 2.0),
+                ((Field("i"),), {Field("i"): 5.0}, 3.0),
             ],
             lambda *xs: sum(xs),
-            ("i",),
-            {"i": 5.0},
+            (Field("i"),),
+            {Field("i"): 5.0},
             6.0,
         ),
     ],
@@ -264,65 +264,65 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         # addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
         (
             op.add,
-            ("i", "j", "k"),
-            {"i": 10.0, "j": 5.0, "k": 3.0},
+            (Field("i"), Field("j"), Field("k")),
+            {Field("i"): 10.0, Field("j"): 5.0, Field("k"): 3.0},
             0.5,
-            ("j",),
-            ("i", "k"),
-            {"i": 10.0, "k": 3.0},
+            (Field("j"),),
+            (Field("i"), Field("k")),
+            {Field("i"): 10.0, Field("k"): 3.0},
             0.5 * 5,
         ),
         # addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
         (
             op.add,
-            ("a", "b", "c", "d"),
-            {"a": 2.0, "b": 4.0, "c": 8.0, "d": 16.0},
+            (Field("a"), Field("b"), Field("c"), Field("d")),
+            {Field("a"): 2.0, Field("b"): 4.0, Field("c"): 8.0, Field("d"): 16.0},
             7.0,
-            ("b", "d"),
-            ("a", "c"),
-            {"a": 2.0, "c": 8.0},
+            (Field("b"), Field("d")),
+            (Field("a"), Field("c")),
+            {Field("a"): 2.0, Field("c"): 8.0},
             7.0 * (4 * 16),
         ),
         # addition: no-op when reduce set is empty (n = 1) → fill unchanged
         (
             op.add,
-            ("x", "y"),
-            {"x": 3.0, "y": 9.0},
+            (Field("x"), Field("y")),
+            {Field("x"): 3.0, Field("y"): 9.0},
             1.0,
             [],
-            ("x", "y"),
-            {"x": 3.0, "y": 9.0},
+            (Field("x"), Field("y")),
+            {Field("x"): 3.0, Field("y"): 9.0},
             1.0,
         ),
         # addition: missing axis in reduce set → nothing reduced → fill unchanged
         (
             op.add,
-            ("i", "j"),
-            {"i": 5.0, "j": 6.0},
+            (Field("i"), Field("j")),
+            {Field("i"): 5.0, Field("j"): 6.0},
             0.0,
-            ("z",),
-            ("i", "j"),
-            {"i": 5.0, "j": 6.0},
+            (Field("z"),),
+            (Field("i"), Field("j")),
+            {Field("i"): 5.0, Field("j"): 6.0},
             0.0,
         ),
         # multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
         (
             op.mul,
-            ("i", "j"),
-            {"i": 2.0, "j": 3.0},
+            (Field("i"), Field("j")),
+            {Field("i"): 2.0, Field("j"): 3.0},
             2.0,
-            ("j",),
-            ("i",),
-            {"i": 2.0},
+            (Field("j"),),
+            (Field("i"),),
+            {Field("i"): 2.0},
             8.0,
         ),
         # idempotent op: reduce entire axis → empty shape
         (
             min,
-            ("i",),
-            {"i": 4.0},
+            (Field("i"),),
+            {Field("i"): 4.0},
             7.0,
-            ("i",),
+            (Field("i"),),
             (),
             {},
             7.0,
@@ -471,18 +471,18 @@ def test_relabel_dense_stats():
         cache={},
     )
 
-    new_stats = DenseStats.relabel(stats, ("row", "col"))
+    new_stats = DenseStats.relabel(stats, (Field("row"), Field("col")))
 
-    assert new_stats.index_order == ("row", "col")
+    assert new_stats.index_order == (Field("row"), Field("col"))
 
-    assert new_stats.get_dim_size("row") == 2.0
+    assert new_stats.get_dim_size(Field("row")) == 2.0
 
-    assert new_stats.get_dim_size("col") == 3.0
+    assert new_stats.get_dim_size(Field("col")) == 3.0
 
     assert new_stats.fill_value == stats.fill_value
 
     with pytest.raises(ValueError):
-        DenseStats.relabel(stats, ("x", "y", "z"))
+        DenseStats.relabel(stats, (Field("x"), Field("y"), Field("z")))
 
 
 # ─────────────────────────────── DCStats tests ─────────────────────────────
@@ -497,7 +497,7 @@ def test_relabel_dense_stats():
 def test_dc_stats_scalar(tensor, fields, expected_dcs):
     node = Table(
         Literal(fl.asarray(tensor)),
-        tuple(Field(f) for f in fields),
+        tuple(fields),
     )
     stats = insert_statistics(
         ST=DCStats,
@@ -514,7 +514,7 @@ def test_dc_stats_scalar(tensor, fields, expected_dcs):
     [
         (
             fl.asarray(np.array([1, 1, 1, 1])),
-            ["i"],
+            [Field("i")],
             {
                 DC(frozenset(), frozenset([Field("i")]), 4.0),
                 DC(frozenset([Field("i")]), frozenset([Field("i")]), 1.0),
@@ -522,7 +522,7 @@ def test_dc_stats_scalar(tensor, fields, expected_dcs):
         ),
         (
             fl.asarray(np.array([0, 1, 0, 0, 1])),
-            ["i"],
+            [Field("i")],
             {
                 DC(frozenset(), frozenset([Field("i")]), 2.0),
                 DC(frozenset([Field("i")]), frozenset([Field("i")]), 1.0),
@@ -533,7 +533,7 @@ def test_dc_stats_scalar(tensor, fields, expected_dcs):
 def test_dc_stats_vector(tensor, fields, expected_dcs):
     node = Table(
         Literal(tensor),
-        tuple(Field(f) for f in fields),
+        tuple(fields),
     )
     stats = insert_statistics(
         ST=DCStats,
@@ -550,7 +550,7 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
     [
         (
             fl.asarray(np.ones((3, 3), dtype=int)),
-            ["i", "j"],
+            [Field("i"), Field("j")],
             {
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 9.0),
                 DC(frozenset(), frozenset([Field("i")]), 3.0),
@@ -570,7 +570,7 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
                     dtype=int,
                 )
             ),
-            ["i", "j"],
+            [Field("i"), Field("j")],
             {
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 4.0),
                 DC(frozenset(), frozenset([Field("i")]), 2.0),
@@ -584,7 +584,7 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
 def test_dc_stats_matrix(tensor, fields, expected_dcs):
     node = Table(
         Literal(tensor),
-        tuple(Field(f) for f in fields),
+        tuple(fields),
     )
     stats = insert_statistics(
         ST=DCStats,
@@ -601,7 +601,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
     [
         (
             fl.asarray(np.ones((2, 2, 2), dtype=int)),
-            ["i", "j", "k"],
+            [Field("i"), Field("j"), Field("k")],
             {
                 DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 8.0),
                 DC(frozenset(), frozenset([Field("i")]), 2.0),
@@ -634,7 +634,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
                     dtype=int,
                 )
             ),
-            ["i", "j", "k"],
+            [Field("i"), Field("j"), Field("k")],
             {
                 DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 3.0),
                 DC(frozenset(), frozenset([Field("i")]), 2.0),
@@ -662,7 +662,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
 def test_dc_stats_3d(tensor, fields, expected_dcs):
     node = Table(
         Literal(tensor),
-        tuple(Field(f) for f in fields),
+        tuple(fields),
     )
     stats = insert_statistics(
         ST=DCStats,
@@ -679,7 +679,7 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
     [
         (
             fl.asarray(np.ones((2, 2, 2, 2), dtype=int)),
-            ["i", "j", "k", "l"],
+            [Field("i"), Field("j"), Field("k"), Field("l")],
             {
                 DC(
                     frozenset(),
@@ -728,7 +728,7 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
                     dtype=int,
                 )
             ),
-            ["i", "j", "k", "l"],
+            [Field("i"), Field("j"), Field("k"), Field("l")],
             {
                 DC(
                     frozenset(),
@@ -766,7 +766,7 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
 def test_dc_stats_4d(tensor, fields, expected_dcs):
     node = Table(
         Literal(tensor),
-        tuple(Field(f) for f in fields),
+        tuple(fields),
     )
     stats = insert_statistics(
         ST=DCStats,
@@ -782,7 +782,7 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
     "dims, dcs, expected_nnz",
     [
         (
-            {"i": 1000, "j": 1000},
+            {Field("i"): 1000, Field("j"): 1000},
             [
                 DC(frozenset([Field("i")]), frozenset([Field("j")]), 5),
                 DC(frozenset([Field("j")]), frozenset([Field("i")]), 25),
@@ -793,7 +793,6 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
     ],
 )
 def test_single_tensor_card(dims, dcs, expected_nnz):
-    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
@@ -815,7 +814,7 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
     "dims, dcs, expected_nnz",
     [
         (
-            {"i": 1000, "j": 1000, "k": 1000},
+            {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
@@ -825,7 +824,6 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
     ],
 )
 def test_1_join_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -847,7 +845,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
     "dims, dcs, expected_nnz",
     [
         (
-            {"i": 1000, "j": 1000, "k": 1000, "l": 1000},
+            {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000, Field("l"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
                 DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
@@ -858,7 +856,6 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_2_join_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k"), Field("l")),
@@ -882,7 +879,7 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
     "dims, dcs, expected_nnz",
     [
         (
-            {"i": 1000, "j": 1000, "k": 1000},
+            {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
                 DC(frozenset([Field("i")]), frozenset([Field("j")]), 5),
@@ -899,7 +896,6 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_triangle_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -921,7 +917,7 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
     "dims, dcs, expected_nnz",
     [
         (
-            {"i": 1000, "j": 1000, "k": 1000},
+            {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
                 DC(frozenset([Field("i")]), frozenset([Field("j")]), 1),
@@ -938,7 +934,6 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_triangle_small_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -961,7 +956,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
     [
         # Single input passthrough
         (
-            {"i": 1000},
+            {Field("i"): 1000},
             [
                 {
                     DC(frozenset(), frozenset({Field("i")}), 5.0),
@@ -975,7 +970,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
         ),
         # Two inputs: overlap takes min; unique keys are preserved
         (
-            {"i": 1000},
+            {Field("i"): 1000},
             [
                 {
                     DC(frozenset(), frozenset({Field("i")}), 5.0),
@@ -1023,10 +1018,10 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     [
         # Single input passthrough
         (
-            {"i": 1000},
+            {Field("i"): 1000},
             [
                 (
-                    {"i"},
+                    {Field("i")},
                     {
                         DC(frozenset(), frozenset({Field("i")}), 5.0),
                         DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
@@ -1040,17 +1035,17 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
         ),
         # Two inputs, same axes: overlap SUMs; keys not in all inputs are dropped
         (
-            {"i": 1000},
+            {Field("i"): 1000},
             [
                 (
-                    {"i"},
+                    {Field("i")},
                     {
                         DC(frozenset(), frozenset({Field("i")}), 5.0),
                         DC(frozenset({Field("i")}), frozenset({Field("i")}), 1.0),
                     },
                 ),
                 (
-                    {"i"},
+                    {Field("i")},
                     {
                         DC(frozenset(), frozenset({Field("i")}), 2.0),
                         DC(frozenset({Field("i")}), frozenset({Field("i")}), 3.0),
@@ -1065,30 +1060,29 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
         ),
         # Lifting across extra axes (Z) + consensus then SUM
         (
-            {"i": 10, "j": 4},
+            {Field("i"): 10, Field("j"): 4},
             [
-                ({"i"}, {DC(frozenset(), frozenset({Field("i")}), 3.0)}),
-                ({"j"}, {DC(frozenset(), frozenset({Field("j")}), 2.0)}),
+                ({Field("i")}, {DC(frozenset(), frozenset({Field("i")}), 3.0)}),
+                ({Field("j")}, {DC(frozenset(), frozenset({Field("j")}), 2.0)}),
             ],
             {DC(frozenset(), frozenset({Field("i"), Field("j")}), 32.0)},
         ),
         # Clamp by dense capacity of Y
         (
-            {"i": 5},
+            {Field("i"): 5},
             [
-                ({"i"}, {DC(frozenset(), frozenset({Field("i")}), 7.0)}),
-                ({"i"}, {DC(frozenset(), frozenset({Field("i")}), 9.0)}),
+                ({Field("i")}, {DC(frozenset(), frozenset({Field("i")}), 7.0)}),
+                ({Field("i")}, {DC(frozenset(), frozenset({Field("i")}), 9.0)}),
             ],
             {DC(frozenset(), frozenset({Field("i")}), 5.0)},
         ),
     ],
 )
 def test_merge_dc_union(new_dims, inputs, expected_dcs):
-    new_dims = {Field(k): v for k, v in new_dims.items()}
     cache = {}
     stats_objs = []
     for idx_set, dcs in inputs:
-        fields = tuple(Field(ax) for ax in sorted(idx_set))
+        fields = tuple(sorted(idx_set, key=lambda f: f.name))
         shape = (1,) * max(1, len(fields))
         node = Table(Literal(fl.asarray(np.zeros(shape, dtype=int))), fields)
 
@@ -1099,8 +1093,8 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
             replace=False,
             cache=cache,
         )
-        field_idx_set = frozenset(Field(x) for x in idx_set)
-        field_dims = {Field(k): new_dims[Field(k)] for k in idx_set}
+        field_idx_set = frozenset(idx_set)
+        field_dims = {k: new_dims[k] for k in idx_set}
 
         td = TensorDef(field_idx_set, field_dims, 0)
         stats_objs.append(DCStats.from_def(td, set(dcs)))
@@ -1233,17 +1227,15 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     "dims1, dcs1, dims2, dcs2, expected_nnz",
     [
         (
-            {"i": 1000, "j": 100},
+            {Field("i"): 1000, Field("j"): 100},
             [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
-            {"j": 100, "k": 1000},
+            {Field("j"): 100, Field("k"): 1000},
             [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
             10 * 1000 + 5 * 1000,
         ),
     ],
 )
 def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
-    dims1 = {Field(k): v for k, v in dims1.items()}
-    dims2 = {Field(k): v for k, v in dims2.items()}
     cache = {}
 
     node1 = Table(
@@ -1281,11 +1273,11 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
     [
         (
-            {"i": 1000, "j": 100},
+            {Field("i"): 1000, Field("j"): 100},
             [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
-            {"j": 100, "k": 1000},
+            {Field("j"): 100, Field("k"): 1000},
             [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
-            {"i": 1000, "j": 100, "k": 1000},
+            {Field("i"): 1000, Field("j"): 100, Field("k"): 1000},
             [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)],
             10 * 1000 + 5 * 1000 + 10,
         ),
@@ -1294,9 +1286,6 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
 def test_large_disjoint_disjunction_dc_card(
     dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
 ):
-    dims1 = {Field(k): v for k, v in dims1.items()}
-    dims2 = {Field(k): v for k, v in dims2.items()}
-    dims3 = {Field(k): v for k, v in dims3.items()}
     cache = {}
 
     node1 = Table(
@@ -1550,7 +1539,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
                 DC(frozenset([Field("i")]), frozenset([Field("j")]), 2),
                 DC(frozenset(), frozenset([Field("j"), Field("k")]), 50),
             ],
-            ["j"],
+            [Field("j")],
             5000,
         ),
         # Sparse + dense mix
@@ -1560,7 +1549,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
                 DC(frozenset(), frozenset([Field("i"), Field("k")]), 900),
                 DC(frozenset([Field("i")]), frozenset([Field("k")]), 1),
             ],
-            ["i", "k"],
+            [Field("i"), Field("k")],
             100,
         ),
         # Imbalance across dimensions
@@ -1571,7 +1560,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
                 DC(frozenset(), frozenset([Field("j"), Field("k")]), 80),
                 DC(frozenset(), frozenset([Field("i"), Field("k")]), 1),
             ],
-            ["i"],
+            [Field("i")],
             5,
         ),
     ],
@@ -1589,7 +1578,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
 
-    reduce_fields = tuple(Field(ax) for ax in reduce_indices)
+    reduce_fields = tuple(reduce_indices)
     reduce_node = Aggregate(
         op=Literal(op.add),
         init=Literal(0),
@@ -1608,29 +1597,36 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     "reduce_idxs,parent_idxs,expected",
     [
         # Some indices have parents
-        (["i", "j", "k"], {"i": [], "j": ["i"], "k": []}, ["i", "k"]),
+        (
+            [Field("i"), Field("j"), Field("k")],
+            {Field("i"): [], Field("j"): [Field("i")], Field("k"): []},
+            [Field("i"), Field("k")],
+        ),
         # Keys missing from parent map should be treated as zero parents.
-        (["i", "j", "k"], {"j": ["i"]}, ["i", "k"]),
+        (
+            [Field("i"), Field("j"), Field("k")],
+            {Field("j"): [Field("i")]},
+            [Field("i"), Field("k")],
+        ),
         # All have parents
-        (["a", "b"], {"a": ["b"], "b": ["a"]}, []),
+        (
+            [Field("a"), Field("b")],
+            {Field("a"): [Field("b")], Field("b"): [Field("a")]},
+            [],
+        ),
         # Empty input
         ([], {}, []),
         # Order preserved among reducible indices
-        (["x", "y", "z"], {"y": ["x"]}, ["x", "z"]),
+        (
+            [Field("x"), Field("y"), Field("z")],
+            {Field("y"): [Field("x")]},
+            [Field("x"), Field("z")],
+        ),
     ],
 )
 def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
-    names = set(reduce_idxs)
-    names.update(parent_idxs.keys())
-    for i in parent_idxs.values():
-        names.update(i)
-
-    fields: dict[str, Field] = {x: Field(x) for x in names}
-    reduce_fields: list[Field] = [fields[name] for name in reduce_idxs]
-    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(
-        (fields[key], [fields[p] for p in parents])
-        for key, parents in parent_idxs.items()
-    )
+    reduce_fields: list[Field] = reduce_idxs
+    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(parent_idxs)
 
     aq = object.__new__(AnnotatedQuery)
     aq.ST = object
@@ -1647,7 +1643,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.output_order = None
     aq.output_format = None
 
-    result = [field.name for field in get_reducible_idxs(aq)]
+    result = list(get_reducible_idxs(aq))
     assert result == expected
 
 
@@ -1657,59 +1653,51 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
         # Single component; order within component follows connected_idxs key order
         (
             {},
-            {"a": ["b"], "b": ["a"]},
-            [["a", "b"]],
+            {Field("a"): [Field("b")], Field("b"): [Field("a")]},
+            [[Field("a"), Field("b")]],
         ),
         # Two components: {a,b} and {c}
         (
             {},
-            {"a": ["b"], "b": ["a"], "c": []},
-            [["a", "b"], ["c"]],
+            {Field("a"): [Field("b")], Field("b"): [Field("a")], Field("c"): []},
+            [[Field("a"), Field("b")], [Field("c")]],
         ),
         # Parent edge is ignored for connectivity
         (
-            {"b": ["a"]},
-            {"a": ["b"], "b": ["a"]},
-            [["a"], ["b"]],
+            {Field("b"): [Field("a")]},
+            {Field("a"): [Field("b")], Field("b"): [Field("a")]},
+            [[Field("a")], [Field("b")]],
         ),
         # Ordering across components is enforced
         (
-            {"b": ["a"]},
-            {"b": [], "a": []},
-            [["a"], ["b"]],
+            {Field("b"): [Field("a")]},
+            {Field("b"): [], Field("a"): []},
+            [[Field("a")], [Field("b")]],
         ),
         # Chain of three separate components with parents
         (
-            {"b": ["a"], "c": ["b"]},
-            {"c": [], "b": [], "a": []},
-            [["a"], ["b"], ["c"]],
+            {Field("b"): [Field("a")], Field("c"): [Field("b")]},
+            {Field("c"): [], Field("b"): [], Field("a"): []},
+            [[Field("a")], [Field("b")], [Field("c")]],
         ),
         # Single big component
         (
-            {"b": ["a"], "c": ["b"]},
-            {"a": ["b"], "b": ["a", "c"], "c": ["b"]},
-            [["a"], ["b"], ["c"]],
+            {Field("b"): [Field("a")], Field("c"): [Field("b")]},
+            {
+                Field("a"): [Field("b")],
+                Field("b"): [Field("a"), Field("c")],
+                Field("c"): [Field("b")],
+            },
+            [[Field("a")], [Field("b")], [Field("c")]],
         ),
     ],
 )
 def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
-    names: set[str] = set(parent_idxs.keys()) | set(connected_idxs.keys())
-    for i in parent_idxs.values():
-        names.update(i)
-    for j in connected_idxs.values():
-        names.update(j)
-
-    name = {x: Field(x) for x in names}
-
-    parent_field_idxs: dict[Field, list[Field]] = {
-        name[k]: [name[p] for p in v] for k, v in parent_idxs.items()
-    }
-    connected_field_idxs: dict[Field, list[Field]] = {
-        name[k]: [name[n] for n in v] for k, v in connected_idxs.items()
-    }
+    parent_field_idxs: dict[Field, list[Field]] = parent_idxs
+    connected_field_idxs: dict[Field, list[Field]] = connected_idxs
 
     components = get_idx_connected_components(parent_field_idxs, connected_field_idxs)
-    result = [[field.name for field in comp] for comp in components]
+    result = [list(comp) for comp in components]
 
     assert result == expected
 
@@ -1820,7 +1808,7 @@ def test_replace_and_remove_nodes(
                     Table(Literal("B"), (Field("j"),)),
                 ),
             ),
-            "j",
+            Field("j"),
             ["B"],
         ),
         # Split-push case:
@@ -1834,14 +1822,14 @@ def test_replace_and_remove_nodes(
                     Table(Literal("C"), (Field("j"),)),
                 ),
             ),
-            "i",
+            Field("i"),
             ["C", "A", "B"],
         ),
         # Leaf case:
         # root = Table(A(i)), reduce over i → [A]
         (
             Table(Literal("A"), (Field("i"),)),
-            "i",
+            Field("i"),
             ["A"],
         ),
         # Nested case:
@@ -1854,7 +1842,7 @@ def test_replace_and_remove_nodes(
                     Table(Literal("B"), (Field("j"),)),
                 ),
             ),
-            "i",
+            Field("i"),
             ["A"],
         ),
         # Special case: max(C(i), D(j)), reduce over i → [max(C,D)]
@@ -1866,7 +1854,7 @@ def test_replace_and_remove_nodes(
                     Table(Literal("D"), (Field("j"),)),
                 ),
             ),
-            "i",
+            Field("i"),
             [
                 MapJoin(
                     Literal(max),
@@ -1892,7 +1880,7 @@ def test_replace_and_remove_nodes(
                     ),
                 ),
             ),
-            "i",
+            Field("i"),
             [
                 MapJoin(
                     Literal(max),
@@ -1906,7 +1894,7 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
-    roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
+    roots = find_lowest_roots(Literal(op.add), idx_name, root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if expected and not isinstance(expected[0], str):
@@ -1929,24 +1917,24 @@ def test_find_lowest_roots(root, idx_name, expected):
         # Base MapJoin: C = A + B
         (
             lambda A, B: A + B,
-            {"i": 2, "j": 3},
-            ("i", "j"),
+            {Field("i"): 2, Field("j"): 3},
+            (Field("i"), Field("j")),
             0.0,
             6.0,
         ),
         # Aggregate: D = C.sum(axis=0)
         (
             lambda A, B: finchlite.sum(A + B, axis=0),
-            {"j": 3},
-            ("j",),
+            {Field("j"): 3},
+            (Field("j"),),
             0.0,
             3.0,
         ),
         # Combination : F = ((A + B) * 3).sum(axis=1)
         (
             lambda A, B: finchlite.sum((A + B) * 3, axis=1),
-            {"i": 2},
-            ("i",),
+            {Field("i"): 2},
+            (Field("i"),),
             0.0,
             2.0,
         ),
