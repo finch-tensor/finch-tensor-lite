@@ -66,15 +66,17 @@ def data_rep(tns) -> Representation:
     if hasattr(tns, "dtype") and hasattr(tns, "ndim"):
         fill_val = 0
         elem_type = tns.dtype.type if hasattr(tns.dtype, "type") else type(tns.flat[0])
-        result = ElementData(fill_value=fill_val, element_type=elem_type)
+        result: Representation = ElementData(
+            fill_value=fill_val, element_type=elem_type
+        )
         for _ in range(tns.ndim):
             result = DenseData(result)
         return result
 
-    result = ElementData(fill_value(tns), eltype(tns))
+    result_rep: Representation = ElementData(fill_value(tns), eltype(tns))
     for _ in range(tns.ndim if hasattr(tns, "ndim") else 0):
-        result = DenseData(result)
-    return result
+        result_rep = DenseData(result_rep)
+    return result_rep
 
 
 def expanddims_rep(tns: Representation, dims: list[int]) -> Representation:

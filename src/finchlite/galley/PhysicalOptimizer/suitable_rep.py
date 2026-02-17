@@ -47,7 +47,7 @@ def toposort(chains: list[list[Any]]) -> list[Any] | None:
     if not chains:
         return []
 
-    parents = {}
+    parents: dict[Any, int] = {}
     for chain in chains:
         for i, node in enumerate(chain):
             if i == 0:
@@ -100,7 +100,7 @@ class SuitableRep:
             return self(ex.arg)
         if isinstance(ex, Literal):
             return ElementData(ex.val, type(ex.val))
-        raise ValueError(f"Bad expression kind: {type(ex)}")
+        raise ValueError(f"Unrecognized expression kind: {type(ex)}")
 
     def _handle_reorder_mapjoin(self, ex: Reorder) -> Representation:
         """
@@ -109,10 +109,13 @@ class SuitableRep:
         map_rep, then drops extra dims.
         """
         mapjoin = ex.arg
+        assert isinstance(mapjoin, MapJoin)
         idxs = list(ex.idxs)
 
         arg_fields_list = [list(arg.fields()) for arg in mapjoin.args]
         idxs_2 = toposort(arg_fields_list + [idxs])
+        if idxs_2 is None:
+            raise ValueError("Cycle detected in toposort")
 
         reps = []
         for arg in mapjoin.args:
