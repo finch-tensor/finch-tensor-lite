@@ -54,7 +54,7 @@ class LogicMachine:
         if bindings is None:
             bindings = {}
         self.bindings = bindings
-        self.make_tensor = make_tensor  # Added make_tensor argument
+        self.make_tensor = make_tensor
 
     def __call__(self, node):
         if self.verbose:
