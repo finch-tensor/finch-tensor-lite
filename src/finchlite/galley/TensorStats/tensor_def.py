@@ -58,19 +58,6 @@ class TensorDef:
             fill_value=fv,
         )
 
-    def reindex_def(self, new_axis: tuple[Field, ...]) -> "TensorDef":
-        """
-        Return
-            :TensorDef with a new reindexed index_order and dim sizes
-        """
-
-        new_dim_sizes = OrderedDict((axis, self.dim_sizes[axis]) for axis in new_axis)
-        return TensorDef(
-            index_order=new_axis,
-            dim_sizes=new_dim_sizes,
-            fill_value=self.fill_value,
-        )
-
     def set_fill_value(self, fill_value: Any) -> "TensorDef":
         """
         Return
@@ -183,7 +170,7 @@ class TensorDef:
             The reduction operator.
         init : Any | None
             Explicit initial value for the reduction
-        reduce_indices : tuple[str,...]
+        reduce_indices : tuple[Field,...]
             Axis names to reduce/eliminate from the definition.
         d : TensorDef
             The input tensor definition.
@@ -231,7 +218,7 @@ class TensorDef:
         for axes with the dimension size of the old names.
 
         Parameters:
-        relabel_indices : tuple[str,...]
+        relabel_indices : tuple[Field,...]
             Axis names to relabel the names of the old axes.
         d : TensorDef
             The input tensor definition.

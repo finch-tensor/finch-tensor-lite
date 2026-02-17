@@ -177,11 +177,11 @@ def test_copy_and_getters():
         (["x", "y", "z"], ["z", "y", "x"]),
     ],
 )
-def test_reindex_def(orig_axes, new_axes):
+def test_relabel_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
     td = TensorDef(index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0)
-    td2 = td.reindex_def(new_axes)
-    assert td2.index_order == tuple(new_axes)
+    td2 = TensorDef.relabel(td, tuple(Field(ax) for ax in new_axes))
+    assert td2.index_order == tuple(Field(ax) for ax in new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
 
