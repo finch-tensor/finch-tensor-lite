@@ -56,6 +56,8 @@ import math
 import operator
 from collections.abc import Callable, Hashable
 from typing import Any, TypeVar
+from abc import ABC, abstractmethod
+
 
 import numpy as np
 
@@ -197,6 +199,262 @@ for t in StableNumber.__args__:
         "__attr__",
         lambda a, b: promote_type_stable(a, b),
     )
+
+class FinchOperator(ABC):
+
+    method_name: str
+
+    is_associative: bool = False
+    is_commutative: bool = False
+    is_idempotent: bool = False
+
+    @abstractmethod
+    def __call__(self, *args: Any) -> Any:
+        pass
+
+    @abstractmethod
+    def return_type(self, *arg_types: type) -> Any:
+        pass
+
+    def is_identity(self):
+        return False
+
+    def is_annihilator(self, arg: Any):
+        return False
+    
+class ReflexiveFinchOperator(FinchOperator):
+
+    reflected_method: str
+
+    def return_type(self, a, b):
+        if hasattr(a, self.method_name):
+            try:
+                result = type(getattr(a(True), self.method_name)(b(True)))
+                if result is not type(NotImplemented):
+                    return result
+                
+            except (TypeError, AttributeError):
+                pass
+        if hasattr(b, self.reflected_method):
+            return type(getattr(b(True), self.reflected_method)(a(True)))
+        raise TypeError(f"Unsupported operand types: {a}, {b}")
+
+    
+class UnaryFinchOperator(FinchOperator):
+
+    def return_type(self, a):
+        return type(getattr(a(True), self.method_name)())
+    
+class Add(ReflexiveFinchOperator):
+
+    method_name = "__add__"
+    reflected_method = "__radd__"
+
+    is_associative = True
+    is_commutative = True
+
+    def __call__(self, a, b):
+        return operator.add(a, b)
+    
+    def is_identity(self, arg: Any) -> bool:
+        return arg == 0
+    
+    def is_annihilator(self, arg: Any) ->bool:
+        return np.isinf(arg)
+    
+
+class Mul(ReflexiveFinchOperator):
+
+    method_name = "__mul__"
+    reflected_method = "__rmul__"
+
+    def __call__(self, a, b):
+        return operator.mul(a, b)
+
+    def is_identity(self, arg: Any) -> bool:
+        return arg == 1
+    
+
+class Sub(ReflexiveFinchOperator):
+    
+    method_name = "__sub__"
+    reflected_method = "__rsub__"
+
+    def __call__(self, a, b):
+        return operator.sub(a, b)
+    
+class MatMul(ReflexiveFinchOperator):
+
+    method_name = "__matmul__"
+    reflected_method = "__rmatmul__"
+
+    is_associative = True
+
+    def __call__(self, a, b):
+        return operator.matmul(a, b)
+
+
+class TrueDiv(ReflexiveFinchOperator):
+
+    method_name = "__truediv__"
+    reflected_method = "__rtruediv__"
+
+    def __call__(self, a, b):
+        return operator.truediv(a, b)
+    
+    def is_identity(self, arg):
+        return arg == 1
+
+
+class FloorDiv(ReflexiveFinchOperator):
+    method_name = "__floordiv__"
+    reflected_method = "__rfloordiv__"
+
+    def __call__(self, a, b):
+        return operator.floordiv(a, b)
+
+
+class Mod(ReflexiveFinchOperator):
+    method_name = "__mod__"
+    reflected_method = "__rmod__"
+
+    def __call__(self, a, b):
+        return operator.mod(a, b)
+
+
+class DivMod(ReflexiveFinchOperator):
+    method_name = "__divmod__"
+    reflected_method = "__rdivmod__"
+
+    def __call__(self, a, b):
+        return divmod(a, b)
+
+
+class Pow(ReflexiveFinchOperator):
+    method_name = "__pow__"
+    reflected_method = "__rpow__"
+
+    def __call__(self, a, b):
+        return operator.pow(a, b)
+
+    def is_identity(self, arg):
+        return arg == 1
+
+    def is_annihilator(self, arg):
+        return arg == 0
+
+
+class LShift(ReflexiveFinchOperator):
+
+    method_name = "__lshift__"
+    reflected_method = "__rlshift__"
+
+    def __call__(self, a, b):
+        return operator.lshift(a, b)
+    
+    def is_identity(self, arg):
+        return arg == 1
+
+
+class RShift(ReflexiveFinchOperator):
+
+    method_name = "__rshift__"
+    reflected_method = "__rrshift__"
+
+    def __call__(self, a, b):
+        return operator.rshift(a, b)
+    
+    def is_identity(self, arg):
+        return arg == 1
+
+
+class And(ReflexiveFinchOperator):
+
+    method_name = "__and__"
+    reflected_method = "__rand__"
+
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a, b):
+        return operator.and_(a, b)
+    
+    def is_identity(self, arg):
+        return bool(arg)
+
+    def is_annihilator(self, arg):
+        return not bool(arg)
+
+
+class Xor(ReflexiveFinchOperator):
+
+    method_name = "__xor__"
+    reflected_method = "__rxor__"
+
+    is_associative = True
+    is_commutative = True
+
+    def __call__(self, a, b):
+        return operator.xor(a, b)
+
+    def is_identity(self, arg):
+        return arg == 0
+
+
+class Or(ReflexiveFinchOperator):
+
+    method_name = "__or__"
+    reflected_method = "__ror__"
+
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a, b):
+        return operator.or_(a, b)
+
+    def is_identity(self, arg):
+        return not bool(arg)
+    
+    def is_annihilator(self, arg):
+        return bool(arg)
+
+class Abs(UnaryFinchOperator):
+    
+    method_name = "__abs__"
+    
+    is_idempotent = True
+    
+    def __call__(self, a):
+        return operator.abs(a)      
+
+
+class Pos(UnaryFinchOperator):
+    
+    method_name = "__pos__"
+    
+    is_idempotent = True
+    
+    def __call__(self, a):
+        return operator.pos(a)
+
+
+class Neg(UnaryFinchOperator):
+    
+    method_name = "__neg__"
+        
+    def __call__(self, a):
+        return operator.neg(a)
+
+
+class Invert(UnaryFinchOperator):
+    
+    method_name = "__invert__"
+    
+    def __call__(self, a):
+        return operator.invert(a)
+
 
 
 def return_type(op: Any, *args: Any) -> Any:
