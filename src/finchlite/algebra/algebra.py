@@ -446,6 +446,7 @@ class Abs(UnaryFinchOperator):
 
 
 class Pos(UnaryFinchOperator):
+
     method_name = "__pos__"
     is_idempotent = True
     
