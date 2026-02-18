@@ -1,20 +1,9 @@
+# AI modified: 2026-02-17 ada0c7d
 from collections import OrderedDict
 
 from finchlite.autoschedule.optimize import (
     concordize,
-    flatten_plans,
-    isolate_reformats,
-    isolate_tables,
-    lift_fields,
-    lift_subqueries,
-    materialize_squeeze_expand_productions,
-    normalize_names,
-    pretty_labels,
     propagate_copy_queries,
-    propagate_fields,
-    propagate_into_reformats,
-    propagate_map_queries,
-    propagate_map_queries_backward,
     propagate_transpose_queries,
     push_fields,
     set_loop_order,
@@ -78,29 +67,6 @@ def greedy_optimizer(ST: type[TensorStats], plan: Plan):
 
 
 def galley_greedy_optimizer(prgm: LogicNode) -> LogicNode:
-    prgm = lift_subqueries(prgm)
-
-    prgm = propagate_map_queries_backward(prgm)
-
-    prgm = isolate_reformats(prgm)
-    prgm = isolate_tables(prgm)
-    prgm = lift_subqueries(prgm)
-
-    prgm = pretty_labels(prgm)
-
-    prgm = propagate_fields(prgm)
-
-    prgm = propagate_copy_queries(prgm)
-    prgm = propagate_transpose_queries(prgm)
-    prgm = propagate_map_queries(prgm)
-
-    prgm = propagate_fields(prgm)
-    prgm = push_fields(prgm)
-    prgm = lift_fields(prgm)
-    prgm = push_fields(prgm)
-    prgm = flatten_plans(prgm)
-
-    print("Before greedy optimization:\n", prgm)
     prgm = greedy_optimizer(DCStats, prgm)
     print("After greedy optimization:\n", prgm)
     prgm = propagate_transpose_queries(prgm)
@@ -109,12 +75,9 @@ def galley_greedy_optimizer(prgm: LogicNode) -> LogicNode:
 
     prgm = concordize(prgm)
 
-    prgm = materialize_squeeze_expand_productions(prgm)
     prgm = propagate_copy_queries(prgm)
 
-    prgm = propagate_into_reformats(prgm)
     prgm = propagate_copy_queries(prgm)
-    prgm = normalize_names(prgm)
     print("After final optimizations:\n", prgm)
     return prgm
 
@@ -124,5 +87,5 @@ class GalleyLogicOptimizer:
         self.ctx = ctx
 
     def __call__(self, prgm: LogicNode):
-        prgm = galley_greedy_optimizer(prgm)
-        return self.ctx(prgm)
+        self.ctx(prgm)
+        return galley_greedy_optimizer(prgm)
