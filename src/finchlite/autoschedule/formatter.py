@@ -1,17 +1,17 @@
 import logging
 
 import numpy as np
+from abc import ABC, abstractmethod
 
 from .. import finch_logic as lgc
 from ..algebra import TensorFType
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import (
-    LogicFormatSelector,
-    LogicLoader,
-    MockLogicFormatSelector,
-    MockLogicLoader,
-)
+from ..compile import BufferizedNDArrayFType
+from ..codegen import NumpyBufferFType
+from ..finch_assembly import AssemblyLibrary, TupleFType
+from ..finch_logic import LogicLoader, MockLogicLoader
+from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
+
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -20,16 +20,19 @@ class LogicFormatter(LogicLoader):
     def __init__(
         self,
         loader: LogicLoader | None = None,
-        fmt_selector: LogicFormatSelector | None = None,
     ):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
         self.loader = loader
 
-        if fmt_selector is None:
-            fmt_selector = MockLogicFormatSelector()
-        self.fmt_selector = fmt_selector
+    @abstractmethod
+    def get_output_tns_ftype(self, element_type, shape_type):
+        """
+        Return the FType of the output tensor produced within the
+        autoscheduler.
+        """
+        ...
 
     def __call__(
         self,
@@ -60,9 +63,7 @@ class LogicFormatter(LogicLoader):
                             for dim in shape_types[lhs]
                         )
 
-                        tns = self.fmt_selector.get_output_tns_ftype(
-                            element_types[lhs], shape_type
-                        )
+                        tns = self.get_output_tns_ftype(element_types[lhs], shape_type)
 
                         bindings[lhs] = tns
                 case lgc.Produces(_):
@@ -78,3 +79,21 @@ class LogicFormatter(LogicLoader):
 
         lib, bindings, shape_vars = self.loader(prgm, bindings)
         return lib, bindings, shape_vars
+    
+
+class DefaultLogicFormatter(LogicFormatter):
+    def __init__(
+        self,
+        loader: LogicLoader | None = None,
+    ):
+        super().__init__(loader)
+
+    def get_output_tns_ftype(self, element_type, shape_type):
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(element_type),
+            ndim=len(shape_type),
+            dimension_type=TupleFType(
+                struct_name=gensym("tuple", sep="_"),
+                struct_formats=shape_type,
+            ),
+        )

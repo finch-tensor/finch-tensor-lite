@@ -9,16 +9,6 @@ from ..symbolic import Stage
 from . import nodes as lgc
 
 
-class LogicFormatSelector(ABC):
-    @abstractmethod
-    def get_output_tns_ftype(self, element_type, shape_type):
-        """
-        Return the FType of the output tensor produced within the
-        autoscheduler.
-        """
-        ...
-
-
 class LogicEvaluator(Stage):
     @abstractmethod
     def __call__(

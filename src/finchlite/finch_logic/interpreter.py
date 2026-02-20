@@ -4,12 +4,10 @@ import numpy as np
 
 import finchlite
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary, TupleFType
+from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
-from ..compile import BufferizedNDArrayFType
-from ..codegen import NumpyBufferFType
 from ..algebra import fixpoint_type, return_type
-from ..symbolic import fisinstance, gensym
+from ..symbolic import fisinstance
 from . import nodes as lgc
 from .nodes import (
     Aggregate,
@@ -26,7 +24,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicEvaluator, LogicFormatSelector, LogicLoader, compute_shape_vars
+from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
@@ -219,15 +217,3 @@ class MockLogicLoader(LogicLoader):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockLogicLibrary(prgm, bindings), bindings, shape_vars
-
-
-class MockLogicFormatSelector(LogicFormatSelector):
-    def get_output_tns_ftype(self, element_type, shape_type):
-        return BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(element_type),
-            ndim=len(shape_type),
-            dimension_type=TupleFType(
-                struct_name=gensym("tuple", sep="_"),
-                struct_formats=shape_type,
-            ),
-        )
