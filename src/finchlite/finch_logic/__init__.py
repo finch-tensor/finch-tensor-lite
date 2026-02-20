@@ -1,5 +1,6 @@
 from .interpreter import (
     LogicInterpreter,
+    MockLogicFormatSelector,
     MockLogicKernel,
     MockLogicLibrary,
     MockLogicLoader,
@@ -26,6 +27,7 @@ from .nodes import (
 )
 from .stages import (
     LogicEvaluator,
+    LogicFormatSelector,
     LogicLoader,
     LogicTransform,
     compute_shape_vars,
@@ -37,6 +39,7 @@ __all__ = [
     "Field",
     "Literal",
     "LogicEvaluator",
+    "LogicFormatSelector",
     "LogicExpression",
     "LogicInterpreter",
     "LogicLoader",
@@ -45,6 +48,7 @@ __all__ = [
     "LogicTransform",
     "LogicTree",
     "MapJoin",
+    "MockLogicFormatSelector",
     "MockLogicKernel",
     "MockLogicLibrary",
     "MockLogicLoader",
