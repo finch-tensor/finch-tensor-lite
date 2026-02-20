@@ -17,8 +17,6 @@ from .. import finch_einsum as ein
 from ..algebra import (
     Tensor,
     TensorFType,
-    element_type,
-    fill_value,
     first_arg,
     fixpoint_type,
     identity,
@@ -200,6 +198,21 @@ class LazyTensor(OverrideTensor):
         The shape is determined by the data and is a static property.
         """
         return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def override_module(self):
         return sys.modules[__name__]
@@ -467,7 +480,7 @@ def lazy(arr) -> LazyTensor:
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
     ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
-    return LazyTensor(tns, ctx, shape, fill_value(arr), element_type(arr))
+    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
 
 
 def full(
@@ -1294,6 +1307,21 @@ class FillTensor(Tensor):
         return self._shape
 
     @property
+    def fill_value(self) -> Any:
+        """Default fill value."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor's elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[type, ...]:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
+    @property
     def ftype(self):
         return FillTensorFType(
             self._fill_value,
@@ -1434,6 +1462,21 @@ class ConcatTensor(Tensor):
     def shape(self):
         return self._shape
 
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
     def asarray(self):
         return self
 
@@ -1514,7 +1557,7 @@ class SplitDimsTensor(Tensor):
         self._shape = tensor.shape[: self.axis] + shape + tensor.shape[self.axis + 1 :]
         self.split_shape = shape
         self._ndim = len(self._shape)
-        self._element_type = element_type(tensor)
+        self._element_type = tensor.element_type
         self.dtype = self._element_type
 
     def __getitem__(self, idxs: tuple):
@@ -1557,6 +1600,21 @@ class SplitDimsTensor(Tensor):
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def asarray(self):
         return self
@@ -1617,7 +1675,7 @@ class CombineDimsTensor(Tensor):
             + tensor.shape[self.end_axis + 1 :]
         )
         self._ndim = len(self._shape)
-        self._element_type = element_type(tensor)
+        self._element_type = tensor.element_type
         self.dtype = self._element_type
 
         # Store original dimensions for reconstruction. For ease of access
@@ -1665,6 +1723,21 @@ class CombineDimsTensor(Tensor):
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def asarray(self):
         return self

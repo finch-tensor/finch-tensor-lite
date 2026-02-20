@@ -25,7 +25,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 idxs=einidxs,
                 arg=generate_einsum_expr(arg),
             )
-            if operation == overwrite or init != init_value(operation, type(init)):
+            if operation != overwrite and init != init_value(operation, type(init)):
                 return ein.Plan(
                     (
                         ein.Einsum(

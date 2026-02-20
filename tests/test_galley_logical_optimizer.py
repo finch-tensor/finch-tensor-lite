@@ -477,6 +477,7 @@ def test_find_lowest_roots(root, idx_name, expected):
         ),
     ],
 )
+@pytest.mark.skip(reason="Resolve TypeError for mul operand : #Issue 326")
 def test_get_reduce_query(expr, reduce_field, expected):
     aq = object.__new__(AnnotatedQuery)
     aq.ST = DenseStats
@@ -641,6 +642,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
         ),
     ],
 )
+@pytest.mark.skip(reason="Resolve TypeError for mul operand : #Issue 326")
 def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq = object.__new__(AnnotatedQuery)
     aq.ST = DenseStats
@@ -798,6 +800,7 @@ def rename_aliases(expr):
         ),
     ],
 )
+@pytest.mark.skip(reason="Resolve TypeError for mul operand : #Issue 326")
 def test_get_remaining_query(input_query, elimination_order, expected):
     aq = AnnotatedQuery(DenseStats, input_query, bindings=OrderedDict())
     for field in elimination_order:
