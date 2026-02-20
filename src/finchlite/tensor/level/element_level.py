@@ -6,15 +6,11 @@ import numpy as np
 from ... import finch_assembly as asm
 from ...codegen import NumpyBufferFType
 from ...symbolic import FType, ftype
-from ..fiber_tensor import Level, LevelFType
+from ..fiber_tensor import FiberTensorFields, Level, LevelFType
 
 
 class ElementLevelFields(NamedTuple):
-    lvl: asm.Variable
-    buf_s: NumpyBufferFType
-    pos: asm.Variable | asm.Literal
-    op: asm.Literal
-    dirty_bit: bool
+    buf_s: asm.Slot
 
 
 @dataclass(unsafe_hash=True)
@@ -48,6 +44,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def __call__(self, shape=(), val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
+
         Args:
             shape: Should be always `()`, used for validation.
             val: The value to store in the ElementLevel instance.
@@ -74,6 +71,10 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def shape_type(self):
         return ()
 
+    @property
+    def lvl_t(self):
+        raise Exception("ElementLevelFType is the leaf level.")
+
     def from_fields(self, val=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):
@@ -82,61 +83,67 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    def level_asm_unpack(self, ctx, var_n, val) -> asm.Slot:
+    def _get_buf_s(self, lvl_fields) -> asm.Slot:
+        assert isinstance(lvl_fields, ElementLevelFields)
+        return lvl_fields.buf_s
+
+    def level_asm_unpack(self, ctx, var_n, val) -> ElementLevelFields:
         buf = asm.Variable(f"{var_n}_buf", self.buffer_type)
         buf_e = asm.GetAttr(val, asm.Literal("val"))
         ctx.exec(asm.Assign(buf, buf_e))
         buf_s = asm.Slot(f"{var_n}_buf_slot", self.buffer_type)
         ctx.exec(asm.Unpack(buf_s, buf))
-        return buf_s
+        return ElementLevelFields(buf_s)
 
-    def get_fields_class(self, tns, buf_s, pos, op, dirty_bit):
-        return ElementLevelFields(tns, buf_s, pos, op, dirty_bit)
+    def level_asm_repack(self, ctx, lvl_fields):
+        buf_s = self._get_buf_s(lvl_fields)
+        ctx.exec(asm.Repack(buf_s))
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
+        buf_s = self._get_buf_s(lvl_fields)
         i_var = asm.Variable("i", self.buffer_type.length_type)
-        body = asm.Store(tns, i_var, asm.Literal(init.val))
-        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns), body))
+        body = asm.Store(buf_s, i_var, asm.Literal(init.val))
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf_s), body))
 
-    def level_lower_unwrap(self, ctx, obj, pos):
-        assert isinstance(obj, ElementLevelFields)
-        return asm.Load(obj.buf_s, pos)
+    def level_lower_unwrap(self, ctx, obj: FiberTensorFields, pos):
+        buf_s = self._get_buf_s(obj.lvl_fields)
+        return asm.Load(buf_s, pos)
 
-    def level_lower_increment(self, ctx, obj, val, pos):
-        assert isinstance(obj, ElementLevelFields)
+    def level_lower_increment(self, ctx, obj: FiberTensorFields, op, val, pos):
+        buf_s = self._get_buf_s(obj.lvl_fields)
         lowered_pos = asm.Variable(pos.name, pos.type)
         ctx.exec(
             asm.Store(
-                obj.buf_s,
+                buf_s,
                 lowered_pos,
                 asm.Call(
-                    asm.Literal(obj.op.val),
-                    [asm.Load(obj.buf_s, lowered_pos), val],
+                    asm.Literal(op.val),
+                    (asm.Load(buf_s, lowered_pos), val),
                 ),
             )
         )
 
-    def level_lower_freeze(self, ctx, tns, op):
-        return tns
+    def level_lower_freeze(self, ctx, lvl_fields, op, pos):
+        return self._get_buf_s(lvl_fields)
 
-    def level_lower_thaw(self, ctx, tns, op):
-        return tns
+    def level_lower_thaw(self, ctx, lvl_fields, op, pos):
+        return self._get_buf_s(lvl_fields)
 
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto):
+    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
-    def next_level(self):
-        raise NotImplementedError("ElementLevelFType does not support next_level.")
+    def from_numpy(self, shape, val):
+        return self(shape=shape, val=val)
 
 
 def element(
     fill_value=None,
     element_type=None,
     position_type=None,
-    buffer_factory=None,
+    buffer_factory=NumpyBufferFType,
     buffer_type=None,
 ):
     """
@@ -191,3 +198,9 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
+
+    def __repr__(self):
+        return f"ElementLevel(val={self._val})"
+
+    def __str__(self):
+        return f"ElementLevel(val={self._val})"

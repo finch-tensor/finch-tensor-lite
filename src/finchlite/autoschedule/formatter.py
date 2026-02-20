@@ -1,14 +1,17 @@
+import logging
+
 import numpy as np
 
-from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_assembly import AssemblyLibrary
-
 from .. import finch_logic as lgc
+from ..algebra import TensorFType
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
-from ..finch_assembly import TupleFType
+from ..finch_assembly import AssemblyLibrary, TupleFType
 from ..finch_logic import LogicLoader, MockLogicLoader
 from ..symbolic import gensym
+from ..util.logging import LOG_LOGIC_POST_OPT
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
 class LogicFormatter(LogicLoader):
@@ -47,17 +50,15 @@ class LogicFormatter(LogicLoader):
                             for dim in shape_types[lhs]
                         )
 
-                        # TODO: This constructor is awful
-                        # TODO: bufferized ndarray seems broken
+                        # TODO: This constructor is awful - should use suitable rep
                         tns = BufferizedNDArrayFType(
                             buffer_type=NumpyBufferFType(element_types[lhs]),
-                            ndim=np.intp(len(shape_type)),
+                            ndim=len(shape_type),
                             dimension_type=TupleFType(
                                 struct_name=gensym("tuple", sep="_"),
                                 struct_formats=shape_type,
                             ),
                         )
-                        # tns = NDArrayFType(element_type, np.intp(len(shape_type)))
                         bindings[lhs] = tns
                 case lgc.Produces(_):
                     pass
@@ -67,6 +68,8 @@ class LogicFormatter(LogicLoader):
                     )
 
         formatter(prgm)
+
+        logger.debug(prgm)
 
         lib, bindings, shape_vars = self.loader(prgm, bindings)
         return lib, bindings, shape_vars

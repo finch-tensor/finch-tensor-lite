@@ -17,9 +17,10 @@ from ..finch_assembly.struct import (  # type: ignore[import-untyped]
     MutableStructFType,
 )
 from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
+from ..util.logging import LOG_BACKEND_NUMBA
 from .stages import NumbaCode, NumbaLowerer
 
-logger = logging.getLogger(__name__)
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NUMBA)
 
 
 # Cache for Numba structs
@@ -443,7 +444,7 @@ class NumbaCompiler(asm.AssemblyLoader):
 
     def __call__(self, prgm: asm.Module) -> NumbaLibrary:
         numba_code = self.ctx(prgm).code
-        logger.info(f"Executing Numba code:\n{numba_code}")
+        logger.debug(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
         _globals |= numba_globals
         try:
@@ -565,24 +566,24 @@ class NumbaContext(Context):
         match prgm:
             case asm.Literal(value):
                 return str(value)
-            case asm.Variable(name, _):
-                return name
-            case asm.Assign(asm.Variable(var_n, var_t), val):
+            case asm.Variable(name, _) | asm.Slot(name, _):
+                return name.replace("#", "_")
+            case asm.Assign(asm.Variable(var_n, var_t) as var, val):
                 val_code = self(val)
+                var_code = self(var)
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
-                    self.exec(f"{feed}{var_n} = {val_code}")
+                    self.exec(f"{feed}{var_code} = {val_code}")
                 else:
                     self.types[var_n] = var_t
                     self.exec(
-                        f"{feed}{var_n}: "
+                        f"{feed}{var_code}: "
                         f"{self.full_name(numba_type(var_t))} = {val_code}"
                     )
                 return None
             case asm.GetAttr(obj, attr):
-                # print("GetAttr:", obj, obj.result_format, attr, attr.val)
                 obj_code = self(obj)
                 if not obj.result_format.struct_hasattr(attr.val):
                     raise ValueError(f"trying to get missing attr: {attr}")
@@ -614,7 +615,7 @@ class NumbaContext(Context):
                 return None
             case asm.Call(asm.Literal(val), args):
                 return query_property(val, "numba_literal", "__attr__", self, *args)
-            case asm.Unpack(asm.Slot(var_n, var_t), val):
+            case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
                 if var_n in self.slots:
@@ -626,19 +627,21 @@ class NumbaContext(Context):
                         f"Variable '{var_n}' is already defined in the current"
                         f" context, cannot overwrite with slot."
                     )
-                self.exec(f"{feed}{var_n} = {self(val)}")
+                var_code = self(slot)
+                self.exec(f"{feed}{var_code} = {self(val)}")
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.numba_unpack(
-                    self, var_n, asm.Variable(var_n, var_t)
+                    self, var_code, asm.Variable(var_n, var_t)
                 )
                 return None
-            case asm.Repack(asm.Slot(var_n, var_t)):
+            case asm.Repack(asm.Slot(var_n, var_t) as slot):
                 if var_n not in self.slots or var_n not in self.types:
                     raise KeyError(f"Slot {var_n} not found in context, cannot repack")
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
-                var_t.numba_repack(self, var_n, obj)
+                var_code = self(slot)
+                var_t.numba_repack(self, var_code, obj)
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
@@ -712,8 +715,11 @@ class NumbaContext(Context):
                 arg_decls = []
                 for arg in args:
                     match arg:
-                        case asm.Variable(name, t):
-                            arg_decls.append(f"{name}: {self.full_name(numba_type(t))}")
+                        case asm.Variable(name, t) as var:
+                            name_code = self(var)
+                            arg_decls.append(
+                                f"{name_code}: {self.full_name(numba_type(t))}"
+                            )
                             ctx_2.types[name] = t
                         case _:
                             raise NotImplementedError(

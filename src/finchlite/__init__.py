@@ -1,4 +1,4 @@
-from .algebra import Tensor, TensorFType, element_type, fill_value, shape_type
+from .algebra import Tensor, TensorFType
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -15,10 +15,13 @@ from .galley import (
     DCStats,
     DenseStats,
     TensorDef,
+    UniformStats,
 )
 from .interface import (
     EagerTensor,
     LazyTensor,
+    NumPyFType,
+    NumPyWrapper,
     Scalar,
     abs,
     acos,
@@ -153,6 +156,8 @@ __all__ = [
     "FTyped",
     "FiberTensorFType",
     "LazyTensor",
+    "NumPyFType",
+    "NumPyWrapper",
     "NumpyBuffer",
     "NumpyBufferFType",
     "Reflector",
@@ -160,6 +165,7 @@ __all__ = [
     "Tensor",
     "TensorDef",
     "TensorFType",
+    "UniformStats",
     "abs",
     "acos",
     "acosh",

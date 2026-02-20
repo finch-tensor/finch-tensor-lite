@@ -1,6 +1,14 @@
 from .buffer import Buffer, BufferFType, element_type, length_type
-from .cfg_builder import AssemblyCFGBuilder, assembly_build_cfg, assembly_number_uses
-from .dataflow import AssemblyCopyPropagation, assembly_copy_propagation
+from .cfg_builder import (
+    AssemblyCFGBuilder,
+    NumberedStatement,
+)
+from .dataflow import (
+    AssemblyCopyPropagation,
+    assembly_copy_propagation,
+    assembly_dataflow_analyze,
+    assembly_dataflow_run,
+)
 from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
@@ -32,11 +40,11 @@ from .nodes import (
     Stack,
     Store,
     StoreDict,
-    TaggedVariable,
     Unpack,
     Variable,
     WhileLoop,
 )
+from .parser import parse_assembly
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import (
     AssemblyStructFType,
@@ -85,6 +93,7 @@ __all__ = [
     "Module",
     "MutableStructFType",
     "NamedTupleFType",
+    "NumberedStatement",
     "Print",
     "Repack",
     "Resize",
@@ -94,15 +103,15 @@ __all__ = [
     "Stack",
     "Store",
     "StoreDict",
-    "TaggedVariable",
     "TupleFType",
     "Unpack",
     "Variable",
     "WhileLoop",
-    "assembly_build_cfg",
     "assembly_check_types",
     "assembly_copy_propagation",
-    "assembly_number_uses",
+    "assembly_dataflow_analyze",
+    "assembly_dataflow_run",
     "element_type",
     "length_type",
+    "parse_assembly",
 ]
