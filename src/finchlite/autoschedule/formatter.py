@@ -1,17 +1,16 @@
 import logging
+from abc import abstractmethod
 
 import numpy as np
-from abc import ABC, abstractmethod
 
 from .. import finch_logic as lgc
 from ..algebra import TensorFType
-from ..compile import BufferizedNDArrayFType
 from ..codegen import NumpyBufferFType
+from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import AssemblyLibrary, TupleFType
 from ..finch_logic import LogicLoader, MockLogicLoader
 from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
-
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -79,7 +78,7 @@ class LogicFormatter(LogicLoader):
 
         lib, bindings, shape_vars = self.loader(prgm, bindings)
         return lib, bindings, shape_vars
-    
+
 
 class DefaultLogicFormatter(LogicFormatter):
     def __init__(

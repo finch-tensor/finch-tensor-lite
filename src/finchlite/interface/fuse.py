@@ -52,7 +52,7 @@ Performance:
 
 import threading
 
-from finchlite.autoschedule import LogicExecutor, LogicNormalizer, DefaultLogicFormatter
+from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
