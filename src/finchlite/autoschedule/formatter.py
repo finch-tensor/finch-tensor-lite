@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+from abc import ABC, abstractmethod
 
 from .. import finch_logic as lgc
 from ..algebra import TensorFType
@@ -14,12 +15,33 @@ from ..util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
+class TensorCreator(ABC):
+    @abstractmethod
+    def create_default_ftype(self, element_type, shape_type):
+        pass
+
+
+class NDArrayTensorCreator(TensorCreator):
+    def create_default_ftype(self, element_type, shape_type):
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(element_type),
+            ndim=len(shape_type),
+            dimension_type=TupleFType(
+                struct_name=gensym("tuple", sep="_"),
+                struct_formats=shape_type,
+            ),
+        )
+
+
 class LogicFormatter(LogicLoader):
-    def __init__(self, loader: LogicLoader | None = None):
+    def __init__(
+        self, tensor_creator: TensorCreator, loader: LogicLoader | None = None
+    ):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
         self.loader = loader
+        self.tensor_creator = tensor_creator
 
     def __call__(
         self,
@@ -50,15 +72,10 @@ class LogicFormatter(LogicLoader):
                             for dim in shape_types[lhs]
                         )
 
-                        # TODO: This constructor is awful - should use suitable rep
-                        tns = BufferizedNDArrayFType(
-                            buffer_type=NumpyBufferFType(element_types[lhs]),
-                            ndim=len(shape_type),
-                            dimension_type=TupleFType(
-                                struct_name=gensym("tuple", sep="_"),
-                                struct_formats=shape_type,
-                            ),
+                        tns = self.tensor_creator.create_default_ftype(
+                            element_types[lhs], shape_type
                         )
+
                         bindings[lhs] = tns
                 case lgc.Produces(_):
                     pass
