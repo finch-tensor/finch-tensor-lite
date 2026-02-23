@@ -1,4 +1,6 @@
 import logging
+from abc import abstractmethod
+from typing import Any
 
 import numpy as np
 
@@ -15,11 +17,22 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 
 
 class LogicFormatter(LogicLoader):
-    def __init__(self, loader: LogicLoader | None = None):
+    def __init__(
+        self,
+        loader: LogicLoader | None = None,
+    ):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
         self.loader = loader
+
+    @abstractmethod
+    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
+        """
+        Return the FType of the output tensor produced within the
+        autoscheduler.
+        """
+        ...
 
     def __call__(
         self,
@@ -34,8 +47,8 @@ class LogicFormatter(LogicLoader):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        element_types = prgm.infer_element_type(
-            {var: val.element_type for var, val in bindings.items()}
+        fill_values = prgm.infer_fill_value(
+            {var: val.fill_value for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement):
@@ -50,15 +63,8 @@ class LogicFormatter(LogicLoader):
                             for dim in shape_types[lhs]
                         )
 
-                        # TODO: This constructor is awful - should use suitable rep
-                        tns = BufferizedNDArrayFType(
-                            buffer_type=NumpyBufferFType(element_types[lhs]),
-                            ndim=len(shape_type),
-                            dimension_type=TupleFType(
-                                struct_name=gensym("tuple", sep="_"),
-                                struct_formats=shape_type,
-                            ),
-                        )
+                        tns = self.get_output_tns_ftype(fill_values[lhs], shape_type)
+
                         bindings[lhs] = tns
                 case lgc.Produces(_):
                     pass
@@ -73,3 +79,21 @@ class LogicFormatter(LogicLoader):
 
         lib, bindings, shape_vars = self.loader(prgm, bindings)
         return lib, bindings, shape_vars
+
+
+class DefaultLogicFormatter(LogicFormatter):
+    def __init__(
+        self,
+        loader: LogicLoader | None = None,
+    ):
+        super().__init__(loader)
+
+    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(type(fill_value)),
+            ndim=len(shape_type),
+            dimension_type=TupleFType(
+                struct_name=gensym("tuple", sep="_"),
+                struct_formats=shape_type,
+            ),
+        )

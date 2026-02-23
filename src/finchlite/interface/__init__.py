@@ -111,6 +111,7 @@ from .fuse import (
     set_default_scheduler,
 )
 from .lazy import LazyTensor, asarray, lazy
+from .np_wrapper import NumPyFType, NumPyWrapper
 from .scalar import Scalar, ScalarFType
 
 __all__ = [
@@ -121,6 +122,8 @@ __all__ = [
     "OPTIMIZE_LOGIC",
     "EagerTensor",
     "LazyTensor",
+    "NumPyFType",
+    "NumPyWrapper",
     "Scalar",
     "ScalarFType",
     "abs",
