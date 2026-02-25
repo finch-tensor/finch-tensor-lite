@@ -355,7 +355,8 @@ class SequencePass(LoopletPass):
         def sequence_tail(node: ntn.NotationNode):
             match node:
                 case ntn.Access(Sequence() as tns, mode, (j, *idxs)) if (
-                    j == idx and tns == found_sequence
+                    # Reported: https://github.com/python/mypy/issues/20904
+                    j == idx and tns is found_sequence  # type: ignore[has-type]
                 ):
                     return ntn.Access(tns.tail(ctx, idx), mode, (j, *idxs))
 
