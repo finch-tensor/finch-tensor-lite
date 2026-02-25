@@ -5,7 +5,7 @@ from typing import Any
 from ..algebra import return_type
 from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
-from .buffer import element_type, length_type
+from .buffer import length_type
 
 
 class AssemblyNode(Term):
@@ -318,7 +318,7 @@ class Load(AssemblyExpression, AssemblyTree):
     @property
     def result_format(self):
         """Returns the type of the expression."""
-        return element_type(self.buffer.result_format)
+        return self.buffer.result_format.element_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -708,7 +708,7 @@ class AssemblyPrinterContext(Context):
         blk.indent = self.indent + 1
         return blk
 
-    def __call__(self, prgm: AssemblyNode):
+    def __call__(self, prgm: AssemblyNode, emit_calls: bool = False):
         feed = self.feed
         match prgm:
             case Literal(value):
@@ -729,7 +729,11 @@ class AssemblyPrinterContext(Context):
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
             case Call(Literal(_) as lit, args):
-                return f"{self(lit)}({', '.join(self(arg) for arg in args)})"
+                call_expr = f"{self(lit)}({', '.join(self(arg) for arg in args)})"
+                if emit_calls:
+                    self.exec(call_expr)
+                    return None
+                return call_expr
             case Unpack(Slot(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
@@ -758,7 +762,7 @@ class AssemblyPrinterContext(Context):
             case Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
-                    ctx_2(body)
+                    ctx_2(body, emit_calls=True)
                 self.exec(ctx_2.emit())
                 return None
             case ForLoop(var, start, end, body):

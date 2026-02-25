@@ -28,9 +28,6 @@ from .operator import (
 from .tensor import (
     Tensor,
     TensorFType,
-    element_type,
-    fill_value,
-    shape_type,
 )
 
 __all__ = [
@@ -40,8 +37,6 @@ __all__ = [
     "TensorFType",
     "cansplitpush",
     "conjugate",
-    "element_type",
-    "fill_value",
     "first_arg",
     "fixpoint_type",
     "identity",
@@ -61,5 +56,4 @@ __all__ = [
     "register_property",
     "repeat_operator",
     "return_type",
-    "shape_type",
 ]

@@ -41,6 +41,15 @@ from .nodes import (
 
 @dataclass(eq=True, frozen=True)
 class NumberedStatement(AssemblyStatement):
+    """
+    Wrapper for AssemblyStatement that assigns a unique id to each statement
+    for easier tracking in the CFG.
+
+    Attributes:
+        stmt: The original AssemblyStatement being wrapped.
+        sid: A unique integer identifier for the statement.
+    """
+
     stmt: AssemblyStatement
     sid: int
 
@@ -48,18 +57,30 @@ class NumberedStatement(AssemblyStatement):
         return str(self.stmt)
 
 
-def assembly_build_cfg(node: AssemblyNode):
-    """Build control-flow graph for a FinchAssembly node and apply desugaring
-    and statement numbering."""
-    namespace = Namespace(node)
-    desugared = assembly_desugar(node, namespace=namespace)
-    numbered = assembly_number_statements(desugared)
+def assembly_build_cfg(
+    node: AssemblyNode, sid: int, namespace: Namespace
+) -> ControlFlowGraph:
+    """
+    Build control-flow graph for a FinchAssembly node.
+    Args:
+        node: Root FinchAssembly node to build CFG for.
+        sid: Starting statement id for numbering additional
+            statements during CFG desugaring.
+        namespace: Namespace for variable name management.
+    Returns:
+        ControlFlowGraph: The constructed control-flow graph.
+    """
+
+    # desugar the input name and number additional statements for CFG construction
+    desugared_node = assembly_desugar(root=node, sid=sid, namespace=namespace)
 
     ctx = AssemblyCFGBuilder(namespace=namespace)
-    return ctx.build(numbered)
+    return ctx.build(desugared_node)
 
 
-def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
+def assembly_desugar(
+    root: AssemblyNode, sid: int, namespace: Namespace
+) -> AssemblyNode:
     """
     Lower surface syntax to a core AST shape before CFG construction.
 
@@ -72,9 +93,18 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
     """
 
     def _as_not_expr(cond):
+        """Helper to make an expression representing the 'not' of a condition."""
         return Call(Literal(operator.not_), (cond,))
 
+    def _number_stmt(stmt: AssemblyStatement) -> NumberedStatement:
+        """Helper to wrap a statement in a NumberedStatement with a unique id."""
+        nonlocal sid
+        s = NumberedStatement(stmt, sid)
+        sid += 1
+        return s
+
     def go(node: AssemblyNode):
+        """Recursively desugar the AST."""
         match node:
             case Module(funcs):
                 return Module(tuple(go(f) for f in funcs))
@@ -82,7 +112,8 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
                 body_2 = go(body)
 
                 # Make argument definitions explicit so they get statement ids.
-                func_prologue = tuple(Assign(arg, arg) for arg in args)
+                func_prologue = tuple(_number_stmt(Assign(arg, arg)) for arg in args)
+
                 return Function(name, args, Block((*func_prologue, *body_2.bodies)))
             case Block(bodies):
                 new_bodies: list[AssemblyStatement] = []
@@ -97,16 +128,23 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
                 then_block = go(body)
                 else_block = go(else_body)
 
-                then_block = Block((Assert(cond), *then_block.bodies))
-                else_block = Block((Assert(_as_not_expr(cond)), *else_block.bodies))
+                then_block = Block((_number_stmt(Assert(cond)), *then_block.bodies))
+                else_block = Block(
+                    (_number_stmt(Assert(_as_not_expr(cond))), *else_block.bodies)
+                )
 
                 return IfElse(cond, then_block, else_block)
             case WhileLoop(cond, body):
                 body_block = go(body)
-                body_block = Block((Assert(cond), *body_block.bodies))
+                body_block = Block((_number_stmt(Assert(cond)), *body_block.bodies))
 
                 # Insert loop-exit assertion immediately after each while.
-                return Block((WhileLoop(cond, body_block), Assert(_as_not_expr(cond))))
+                return Block(
+                    (
+                        WhileLoop(cond, body_block),
+                        _number_stmt(Assert(_as_not_expr(cond))),
+                    )
+                )
             case ForLoop(var, start, end, body):
                 fic_var_name = namespace.freshen("j")
                 fic_var = Variable(fic_var_name, np.int64)
@@ -124,7 +162,11 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
                     ),
                 )
 
-                loop_body = Block((Assign(var, fic_var), *body_block.bodies, inc))
+                # only number assignment i = j (var = fic_var),
+                # so i is considered in the copy propagation
+                loop_body = Block(
+                    (_number_stmt(Assign(var, fic_var)), *body_block.bodies, inc)
+                )
                 return go(Block((init, WhileLoop(cond, loop_body))))
             case BufferLoop(buf, var, body):
                 fic_var_name = namespace.freshen("j")
@@ -145,7 +187,7 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
 
                 loop_body = Block(
                     (
-                        Assign(var, Load(buf, fic_var)),
+                        _number_stmt(Assign(var, Load(buf, fic_var))),
                         *body_block.bodies,
                         inc,
                     )
@@ -157,8 +199,16 @@ def assembly_desugar(root: AssemblyNode, namespace: Namespace) -> AssemblyNode:
     return go(root)
 
 
-def assembly_number_statements(root: AssemblyNode) -> AssemblyNode:
-    """Wrap each statement with a NumberedStatement containing a unique id."""
+def assembly_dataflow_preprocess(node: AssemblyNode) -> tuple[AssemblyNode, int]:
+    """
+    Preprocess a FinchAssembly node for dataflow analysis (number statements).
+    Args:
+        node: Root FinchAssembly node to preprocess.
+    Returns:
+        AssemblyNode: The preprocessed FinchAssembly node.
+        sid: first unused statement id after preprocessing.
+    """
+
     sid = 0
 
     def rw(x: AssemblyNode) -> AssemblyNode | None:
@@ -183,16 +233,36 @@ def assembly_number_statements(root: AssemblyNode) -> AssemblyNode:
             return s
         return None
 
-    return Rewrite(PostWalk(rw))(root)
+    return Rewrite(PostWalk(rw))(node), sid
+
+
+def assembly_dataflow_postprocess(node: AssemblyNode) -> AssemblyNode:
+    """
+    Postprocess a FinchAssembly node after
+    dataflow analysis (remove numbering).
+    Args:
+        node: Root FinchAssembly node to postprocess.
+    Returns:
+        AssemblyNode: The postprocessed FinchAssembly node.
+    """
+
+    def rw(x: AssemblyNode):
+        match x:
+            case NumberedStatement(stmt, _):
+                return stmt
+
+        return None
+
+    return Rewrite(PostWalk(rw))(node)
 
 
 class AssemblyCFGBuilder:
     """Incrementally builds control-flow graph for Finch Assembly IR."""
 
-    def __init__(self, namespace: Namespace | None = None):
+    def __init__(self, namespace: Namespace):
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
-        self.namespace = namespace or Namespace()
+        self.namespace = namespace
 
     def emit(self, stmt) -> None:
         """Add a statement to the current block."""
@@ -227,9 +297,7 @@ class AssemblyCFGBuilder:
             case Block(bodies):
                 for body in bodies:
                     self(body, break_block, return_block)
-            case If(cond, body):
-                self(IfElse(cond, body, Block()), break_block, return_block)
-            case IfElse(cond, body, else_body):
+            case IfElse(_, body, else_body):
                 before_block = self.current_block
 
                 # create blocks for if, else, and after
@@ -253,7 +321,7 @@ class AssemblyCFGBuilder:
 
                 # continue building after the if-else
                 self.current_block = after_block
-            case WhileLoop(cond, body):
+            case WhileLoop(_, body):
                 before_block = self.current_block
 
                 # create blocks for the loop body and the code after the loop
@@ -308,6 +376,9 @@ class AssemblyCFGBuilder:
 
                     # connect function exit block to the exit block of the CFG
                     func_exit_block.add_successor(self.cfg.exit_block)
+            case Assign(_, _):
+                # unnumbered temporary variables for loops
+                self.emit(node)
             case node:
                 raise NotImplementedError(node, "AssemblyCFGBuilder")
 

@@ -123,7 +123,7 @@ class Access(EinsumExpression, EinsumTree):
     """
 
     tns: Alias
-    idxs: tuple[EinsumExpression, ...]  # (Field('i'), Field('j'))
+    idxs: tuple[Index, ...]  # (Field('i'), Field('j'))
     # Children: None (leaf)
 
     @classmethod
@@ -132,7 +132,7 @@ class Access(EinsumExpression, EinsumTree):
         if len(children) < 1:
             raise ValueError("Access expects at least 1 child")
         tns = cast(Alias, children[0])
-        idxs = cast(tuple[EinsumExpression, ...], children[1:])
+        idxs = cast(tuple[Index, ...], children[1:])
         return cls(tns, tuple(idxs))
 
     @property
@@ -206,7 +206,7 @@ class Einsum(EinsumTree, EinsumStatement):
 
     op: Literal
     tns: Alias
-    idxs: tuple[EinsumExpression, ...]
+    idxs: tuple[Index, ...]
     arg: EinsumExpression
 
     @classmethod
@@ -216,7 +216,7 @@ class Einsum(EinsumTree, EinsumStatement):
             raise ValueError(f"Einsum expects 4 children, got {len(children)}")
         op = cast(Literal, children[0])
         tns = cast(Alias, children[1])
-        idxs = cast(tuple[EinsumExpression, ...], children[2])
+        idxs = cast(tuple[Index, ...], children[2])
         arg = cast(EinsumExpression, children[3])
         return cls(op, tns, idxs, arg)
 
