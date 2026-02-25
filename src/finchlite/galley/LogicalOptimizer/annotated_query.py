@@ -33,6 +33,7 @@ from ...symbolic import (
     isdescendant,
 )
 from ..TensorStats import TensorStats
+from .constants import ALLOC_FACTOR, COMPUTE_FACTOR
 from .logic_to_stats import insert_statistics
 
 
@@ -81,7 +82,7 @@ class AnnotatedQuery:
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
-        cache: dict[object, TensorStats] = {}
+        cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
         insert_statistics(ST, q, bindings=bindings, replace=False, cache=cache)
         self.cache = cache
         output_name = q.lhs
@@ -118,7 +119,7 @@ class AnnotatedQuery:
                     return node
 
         point_expr = Rewrite(PostWalk(Chain([aggregate_annotation_rule])))(expr)
-        cache_point: dict[object, TensorStats] = {}
+        cache_point: OrderedDict[LogicNode, TensorStats] = OrderedDict()
         insert_statistics(
             ST, point_expr, bindings=bindings, replace=False, cache=cache_point
         )
@@ -411,7 +412,7 @@ def replace_and_remove_nodes(
             case _:
                 return None
 
-    return Rewrite(PostWalk(Chain([replace_remove_rule])))(expr)
+    return Rewrite(PostWalk(replace_remove_rule))(expr)
 
 
 def find_lowest_roots(
@@ -596,6 +597,24 @@ def get_reduce_query(
     return query, node_to_replace, nodes_to_remove, reduced_idxs
 
 
+def get_cost_of_reduce(reduce_idx: Field, aq: AnnotatedQuery):
+    query, _, _, reduced_idxs = get_reduce_query(reduce_idx, aq)
+    query_expr: LogicExpression = query.rhs
+    if not isinstance(query_expr, Aggregate):
+        raise ValueError(
+            "The query returned by get_reduce_query should always have an \
+                Aggregate on the rhs!"
+        )
+    cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
+    insert_statistics(aq.ST, query_expr, aq.bindings, replace=False, cache=cache)
+
+    mat_stats = cache[query_expr]
+    comp_stats = cache[query_expr.arg]
+    bytes_stored = mat_stats.estimate_non_fill_values()
+    ops_performed = comp_stats.estimate_non_fill_values()
+    return ops_performed * COMPUTE_FACTOR + bytes_stored * ALLOC_FACTOR
+
+
 def reduce_idx(
     reduce_idx: Field, aq: AnnotatedQuery, do_condense: bool = False
 ) -> Query:
@@ -630,7 +649,6 @@ def reduce_idx(
     query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
         reduce_idx, aq
     )
-
     alias_expr = Alias(query.lhs.name)
     stats_cache = aq.cache_point
     insert_statistics(aq.ST, query, aq.bindings, replace=False, cache=stats_cache)
@@ -655,7 +673,9 @@ def reduce_idx(
         if root == node_to_replace or root in nodes_to_remove:
             root = Table(alias_expr, tuple(reduced_idxs))
 
-        new_idx_lowest_root[idx] = root
+        new_idx_lowest_root[idx] = replace_and_remove_nodes(
+            aq.idx_lowest_root[idx], node_to_replace, alias_expr, nodes_to_remove
+        )
         new_idx_op[idx] = aq.idx_op[idx]
         new_idx_init[idx] = aq.idx_init[idx]
         new_idx_op[aq.original_idx[idx]] = aq.idx_op[idx]
@@ -682,15 +702,14 @@ def reduce_idx(
         replace=True,
         cache=stats_cache,
     )
-
     aq.reduce_idxs = new_reduce_idxs
     aq.point_expr = new_point_expr
     aq.idx_lowest_root = new_idx_lowest_root
     aq.idx_op = new_idx_op
     aq.idx_init = new_idx_init
     aq.parent_idxs = new_parent_idxs
-    aq.connected_idxs = new_connected_idxs
     aq.connected_components = new_components
+    aq.connected_idxs = new_connected_idxs
     return query
 
 
@@ -711,7 +730,7 @@ def get_remaining_query(aq: AnnotatedQuery) -> Query | None:
         case Table(Alias(_), _):
             return None
     query = Query(aq.output_name, cast(LogicExpression, expr))
-    remaining_cache: dict[object, TensorStats] = {}
+    remaining_cache: OrderedDict[LogicNode, TensorStats] = OrderedDict()
     insert_statistics(
         aq.ST, query.rhs, bindings=aq.bindings, replace=True, cache=remaining_cache
     )

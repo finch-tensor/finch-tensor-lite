@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from finchlite.galley.TensorStats.stats_interpreter import StatsInterpreter
-from finchlite.interface import LazyTensor
-
 from ...finch_logic import (
     Aggregate,
     Alias,
@@ -16,6 +13,7 @@ from ...finch_logic import (
     Table,
 )
 from ..TensorStats import TensorStats
+from ..TensorStats.stats_interpreter import StatsInterpreter
 
 
 def insert_statistics(
@@ -23,7 +21,7 @@ def insert_statistics(
     node: LogicNode,
     bindings: OrderedDict[Alias, TensorStats],
     replace: bool,
-    cache: dict[object, TensorStats],
+    cache: OrderedDict[LogicNode, TensorStats],
 ) -> TensorStats:
     if node in cache:
         return cache[node]
@@ -85,7 +83,8 @@ def insert_statistics(
 
 
 def get_lazy_tensor_stats(
-    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+    lazy_tensor: LazyTensor,  # noqa: F821
+    StatsImpl: type[TensorStats],
 ) -> TensorStats:
     trace = lazy_tensor.ctx.trace()
     interpreter = StatsInterpreter(StatsImpl=StatsImpl)

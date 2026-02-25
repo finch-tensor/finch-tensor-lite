@@ -1,4 +1,5 @@
 from .LogicalOptimizer import AnnotatedQuery
+from .LogicalOptimizer.greedy_optimizer import GalleyLogicOptimizer
 from .TensorStats import (
     DC,
     DCStats,
@@ -13,6 +14,7 @@ __all__ = [
     "AnnotatedQuery",
     "DCStats",
     "DenseStats",
+    "GalleyLogicOptimizer",
     "TensorDef",
     "TensorStats",
     "UniformStats",
