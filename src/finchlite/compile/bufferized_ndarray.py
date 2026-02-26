@@ -65,6 +65,21 @@ class BufferizedNDArray(Tensor):
     def ndim(self):
         return np.intp(len(self._shape))
 
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
     def declare(self, init, op, shape):
         """
         Declare a bufferized NDArray with the given initialization value,
@@ -271,7 +286,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     def lower_unwrap(self, ctx, obj): ...
 
-    def lower_increment(self, ctx, obj, val): ...
+    def lower_increment(self, ctx, obj, op, val): ...
 
     def asm_unpack(self, ctx, var_n, val):
         """
@@ -325,6 +340,21 @@ class BufferizedNDArrayAccessor(Tensor):
     @property
     def shape(self):
         return self.tns.shape[self.nind :]
+
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     def access(self, indices, op):
         if len(indices) + self.nind > self.tns.ndim:
@@ -465,7 +495,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def lower_unwrap(self, ctx, tns):
         return asm.Load(tns.obj.tns.buf_s, tns.obj.pos)
 
-    def lower_increment(self, ctx, tns, val):
+    def lower_increment(self, ctx, tns, op, val):
         obj = tns.obj
         lowered_pos = asm.Variable(obj.pos.name, obj.pos.type)
         ctx.exec(
@@ -473,7 +503,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 obj.tns.buf_s,
                 lowered_pos,
                 asm.Call(
-                    asm.Literal(self.op.val),
+                    asm.Literal(op.val),
                     [asm.Load(obj.tns.buf_s, lowered_pos), val],
                 ),
             )

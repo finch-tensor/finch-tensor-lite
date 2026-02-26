@@ -4,7 +4,7 @@ from finchlite.finch_logic.nodes import TableValue
 from .. import finch_logic as lgc
 from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
-from .formatter import LogicFormatter
+from .formatter import DefaultLogicFormatter
 
 
 def extract_tensors(
@@ -38,7 +38,7 @@ def extract_tensors(
 class LogicExecutor(LogicEvaluator):
     def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
         if ctx is None:
-            ctx = LogicFormatter()
+            ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
         self.verbose: bool = verbose
 

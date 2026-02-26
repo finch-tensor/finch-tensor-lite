@@ -52,8 +52,7 @@ Performance:
 
 import threading
 
-from finchlite.autoschedule import LogicExecutor, LogicNormalizer
-from finchlite.autoschedule.formatter import LogicFormatter
+from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
@@ -82,13 +81,17 @@ _DEFAULT_SCHEDULER = threading.local()
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(LogicStandardizer(LogicFormatter(MockLogicLoader())))
+        DefaultLogicOptimizer(
+            LogicStandardizer(DefaultLogicFormatter(MockLogicLoader()))
+        )
     )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(LogicFormatter(LogicCompiler(NotationInterpreter())))
+            LogicStandardizer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
         )
     )
 )
@@ -96,7 +99,9 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                LogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
+                DefaultLogicFormatter(
+                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                )
             )
         )
     )
@@ -105,7 +110,7 @@ COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                LogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
+                DefaultLogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
             )
         )
     )
