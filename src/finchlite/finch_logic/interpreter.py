@@ -5,7 +5,6 @@ import numpy as np
 import finchlite
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
-from finchlite.finch_logic.stages import LogicEvaluator
 
 from ..algebra import fixpoint_type, return_type
 from ..symbolic import fisinstance
@@ -25,7 +24,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicLoader, compute_shape_vars
+from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
