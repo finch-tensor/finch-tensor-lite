@@ -15,6 +15,7 @@ from ..finch_logic import (
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler, NotationGenerator
 from .executor import LogicExecutor
+from .formatter import DefaultLogicFormatter, LogicFormatter
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
@@ -23,12 +24,14 @@ from .standardize import LogicStandardizer
 __all__ = [
     "Aggregate",
     "Alias",
+    "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
     "Field",
     "Literal",
     "LogicCompiler",
     "LogicEinsumLowerer",
     "LogicExecutor",
+    "LogicFormatter",
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicStandardizer",
