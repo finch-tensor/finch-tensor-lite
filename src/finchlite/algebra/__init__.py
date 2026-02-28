@@ -12,8 +12,6 @@ from .algebra import (
     query_property,
     register_property,
     return_type,
-)
-from .operator import (
     InitWrite,
     cansplitpush,
     conjugate,
@@ -25,6 +23,8 @@ from .operator import (
     promote_min,
     repeat_operator,
 )
+
+
 from .tensor import (
     Tensor,
     TensorFType,
