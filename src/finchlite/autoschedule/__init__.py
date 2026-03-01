@@ -18,15 +18,38 @@ from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
+from .rep_operations import (
+    aggregate_rep,
+    data_rep,
+    dropdims_rep,
+    eltype,
+    expanddims_rep,
+    fill_value,
+    map_rep,
+    permutedims_rep,
+)
+from .representation import (
+    DenseData,
+    ElementData,
+    ExtrudeData,
+    HollowData,
+    RepeatData,
+    SparseData,
+)
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
+from .suitable_rep import SuitableRep, toposort
 
 __all__ = [
     "Aggregate",
     "Alias",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
+    "DenseData",
+    "ElementData",
+    "ExtrudeData",
     "Field",
+    "HollowData",
     "Literal",
     "LogicCompiler",
     "LogicEinsumLowerer",
@@ -45,7 +68,19 @@ __all__ = [
     "Query",
     "Relabel",
     "Reorder",
+    "RepeatData",
+    "SparseData",
+    "SuitableRep",
     "Table",
     "Value",
+    "aggregate_rep",
+    "data_rep",
+    "dropdims_rep",
+    "eltype",
+    "expanddims_rep",
+    "fill_value",
+    "map_rep",
     "normalize_names",
+    "permutedims_rep",
+    "toposort",
 ]

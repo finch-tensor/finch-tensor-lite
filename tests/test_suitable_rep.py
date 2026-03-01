@@ -1,5 +1,13 @@
 import numpy as np
 
+from finchlite.autoschedule import (
+    DenseData,
+    ElementData,
+    SparseData,
+    SuitableRep,
+    map_rep,
+    toposort,
+)
 from finchlite.finch_logic.nodes import (
     Aggregate,
     Alias,
@@ -8,14 +16,6 @@ from finchlite.finch_logic.nodes import (
     MapJoin,
     Reorder,
     Table,
-)
-from finchlite.galley.PhysicalOptimizer import (
-    DenseData,
-    ElementData,
-    SparseData,
-    SuitableRep,
-    map_rep,
-    toposort,
 )
 
 
@@ -220,7 +220,7 @@ def test_sparse_plus_sparse():
 
 
 def test_permutedims_simple():
-    from finchlite.galley.PhysicalOptimizer import permutedims_rep
+    from finchlite.autoschedule import permutedims_rep
 
     rep = DenseData(DenseData(ElementData(0, int)))
     result = permutedims_rep(rep, [1, 0])
@@ -228,7 +228,7 @@ def test_permutedims_simple():
 
 
 def test_permutedims_identity():
-    from finchlite.galley.PhysicalOptimizer import permutedims_rep
+    from finchlite.autoschedule import permutedims_rep
 
     rep = DenseData(DenseData(ElementData(0, int)))
     result = permutedims_rep(rep, [0, 1])
@@ -237,7 +237,7 @@ def test_permutedims_identity():
 
 
 def test_permutedims_3d():
-    from finchlite.galley.PhysicalOptimizer import permutedims_rep
+    from finchlite.autoschedule import permutedims_rep
 
     rep = DenseData(DenseData(DenseData(ElementData(0, int))))
     result = permutedims_rep(rep, [2, 0, 1])
@@ -245,7 +245,7 @@ def test_permutedims_3d():
 
 
 def test_permutedims_sparse():
-    from finchlite.galley.PhysicalOptimizer import SparseData, permutedims_rep
+    from finchlite.autoschedule import SparseData, permutedims_rep
 
     rep = SparseData(SparseData(ElementData(0, int)))
     result = permutedims_rep(rep, [1, 0])
@@ -254,7 +254,7 @@ def test_permutedims_sparse():
 
 
 def test_permutedims_mixed():
-    from finchlite.galley.PhysicalOptimizer import SparseData, permutedims_rep
+    from finchlite.autoschedule import SparseData, permutedims_rep
 
     rep = DenseData(SparseData(ElementData(0, int)))
     result = permutedims_rep(rep, [1, 0])

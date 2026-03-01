@@ -2,7 +2,7 @@ import operator
 from collections.abc import Callable
 from typing import Any
 
-from finchlite.galley.PhysicalOptimizer.representation import (
+from .representation import (
     DenseData,
     ElementData,
     ExtrudeData,

@@ -16,7 +16,7 @@ from finchlite.finch_logic.nodes import (
     Reorder,
     Table,
 )
-from finchlite.galley.PhysicalOptimizer.rep_operations import (
+from .rep_operations import (
     aggregate_rep,
     data_rep,
     dropdims_rep,
@@ -24,7 +24,7 @@ from finchlite.galley.PhysicalOptimizer.rep_operations import (
     map_rep,
     permutedims_rep,
 )
-from finchlite.galley.PhysicalOptimizer.representation import (
+from .representation import (
     DenseData,
     ElementData,
     ExtrudeData,
