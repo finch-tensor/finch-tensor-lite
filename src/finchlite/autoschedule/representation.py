@@ -107,4 +107,4 @@ class HollowData:
         return self.lvl.ndims()
     
     def capabilities(self) -> Capabilities:
-        return lvl.capabilities()
+        return self.lvl.capabilities()
