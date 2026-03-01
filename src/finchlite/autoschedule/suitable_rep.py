@@ -31,10 +31,11 @@ from .representation import (
     HollowData,
     RepeatData,
     SparseData,
+    SparseRepeatData
 )
 
 Representation = (
-    ElementData | DenseData | ExtrudeData | HollowData | RepeatData | SparseData
+    ElementData | DenseData | ExtrudeData | HollowData | RepeatData | SparseData | SparseRepeatData
 )
 
 
