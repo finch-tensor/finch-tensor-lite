@@ -10,7 +10,7 @@ from .rw_traits import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class ElementData:
     """Scalar element or 0-dim tensor"""
 
@@ -24,7 +24,7 @@ class ElementData:
         return Capabilities(RandomRead, RandomWrite)
 
 
-@dataclass
+@dataclass(frozen=True)
 class SparseData:
     """Tensor where slices can be entirely fill_value"""
 
@@ -37,7 +37,7 @@ class SparseData:
         return Capabilities(SequentialRead, SequentialWrite)
 
 
-@dataclass
+@dataclass(frozen=True)
 class RepeatData:
     """
     RepeatData(lvl)
@@ -56,7 +56,7 @@ class RepeatData:
         return Capabilities(SequentialRead, SequentialWrite)
 
 
-@dataclass
+@dataclass(frozen=True)
 class SparseRepeatData:
     """
     SparseRepeatData
@@ -73,7 +73,7 @@ class SparseRepeatData:
         return Capabilities(SequentialRead, SequentialWrite)
 
 
-@dataclass
+@dataclass(frozen=True)
 class DenseData:
     """
     DenseData(lvl)
@@ -90,7 +90,7 @@ class DenseData:
         return Capabilities(RandomRead, RandomWrite)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExtrudeData:
     """
     ExtrudeData(lvl)
@@ -108,7 +108,7 @@ class ExtrudeData:
         return Capabilities(RandomRead, None)
 
 
-@dataclass
+@dataclass(frozen=True)
 class HollowData:
     """
     HollowData(lvl)

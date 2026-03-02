@@ -90,25 +90,27 @@ class SuitableRep:
         """
         Predict the representation of the result of the query expression.
         """
-        if isinstance(ex, Alias):
-            return self.bindings[ex]
-        if isinstance(ex, Table):
-            if isinstance(ex.tns, Literal):
-                return data_rep(ex.tns.val)
-            if hasattr(ex.tns, "type_"):
-                return data_rep(ex.tns.type_)
-            raise ValueError(f"bad table type: {type(ex)}")
-        if isinstance(ex, Reorder) and isinstance(ex.arg, MapJoin):
-            return self._handle_reorder_mapjoin(ex)
-        if isinstance(ex, Aggregate):
-            return self._handle_aggregate(ex)
-        if isinstance(ex, Reorder):
-            return self._handle_reorder(ex)
-        if isinstance(ex, Relabel):
-            return self(ex.arg)
-        if isinstance(ex, Literal):
-            return ElementData(ex.val, type(ex.val))
-        raise ValueError(f"Unrecognized expression kind: {type(ex)}")
+        match ex:
+            case Alias():
+                return self.bindings[ex]
+            case Table():
+                if isinstance(ex.tns, Literal):
+                    return data_rep(ex.tns.val)
+                if hasattr(ex.tns, "type_"):
+                    return data_rep(ex.tns.type_)
+                raise ValueError(f"bad table type: {type(ex)}")
+            case Reorder() if isinstance(ex.arg, MapJoin):
+                return self._handle_reorder_mapjoin(ex)
+            case Aggregate():
+                return self._handle_aggregate(ex)
+            case Reorder():
+                return self._handle_reorder(ex)
+            case Relabel():
+                return self(ex.arg)
+            case Literal():
+                return ElementData(ex.val, type(ex.val))
+            case _:
+                raise ValueError(f"Unrecognized expression kind: {type(ex)}")
 
     def _handle_reorder_mapjoin(self, ex: Reorder) -> Representation:
         """

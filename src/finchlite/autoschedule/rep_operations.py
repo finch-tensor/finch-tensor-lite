@@ -37,22 +37,26 @@ def fill_value(rep: Representation) -> Any:
     """
     Returns the fill value for the representation.
     """
-    if isinstance(rep, ElementData):
-        return rep.fill_value
-    if hasattr(rep, "lvl"):
-        return fill_value(rep.lvl)
-    raise ValueError(f"Unsupported representation: {type(rep)}")
+    match rep:
+        case ElementData():
+            return rep.fill_value
+        case _ if hasattr(rep, "lvl"):
+            return fill_value(rep.lvl)
+        case _:
+            raise ValueError(f"Unsupported representation: {type(rep)}")
 
 
 def eltype(rep: Representation) -> type:
     """
     Returns the element type for the representation.
     """
-    if isinstance(rep, ElementData):
-        return rep.element_type
-    if hasattr(rep, "lvl"):
-        return eltype(rep.lvl)
-    raise ValueError(f"Unsupported representation: {type(rep)}")
+    match rep:
+        case ElementData():
+            return rep.element_type
+        case _ if hasattr(rep, "lvl"):
+            return eltype(rep.lvl)
+        case _:
+            raise ValueError(f"Unsupported representation: {type(rep)}")
 
 
 def data_rep(tns) -> Representation:
@@ -99,28 +103,32 @@ def _expanddims_rep_def(
     """
     Expands the dimensions of the representation.
     """
-    if isinstance(tns, ElementData):
-        if dim in dims:
-            return ExtrudeData(_expanddims_rep_def(tns, dim - 1, dims))
-        return tns
-
-    if isinstance(tns, HollowData):
-        return HollowData(_expanddims_rep_def(tns.lvl, dim, dims))
+    match tns:
+        case ElementData():
+            if dim in dims:
+                return ExtrudeData(_expanddims_rep_def(tns, dim - 1, dims))
+            return tns
+        case HollowData():
+            return HollowData(_expanddims_rep_def(tns.lvl, dim, dims))
+        case _:
+            pass
 
     if dim in dims:
         return ExtrudeData(_expanddims_rep_def(tns, dim - 1, dims))
 
     child = _expanddims_rep_def(tns.lvl, dim - 1, dims)
 
-    if isinstance(tns, ExtrudeData):
-        return ExtrudeData(child)
-    if isinstance(tns, SparseData):
-        return SparseData(child)
-    if isinstance(tns, RepeatData):
-        return RepeatData(child)
-    if isinstance(tns, DenseData):
-        return DenseData(child)
-    raise ValueError(f"Unsupported representation: {type(tns)}")
+    match tns:
+        case ExtrudeData():
+            return ExtrudeData(child)
+        case SparseData():
+            return SparseData(child)
+        case RepeatData():
+            return RepeatData(child)
+        case DenseData():
+            return DenseData(child)
+        case _:
+            raise ValueError(f"Unsupported representation: {type(tns)}")
 
 
 def map_rep(f: Callable, *args: Representation) -> Representation:
@@ -146,13 +154,13 @@ def _map_rep_def(f: Callable, args: list[Representation]) -> Representation:
     """
     if any(isinstance(arg, HollowData) for arg in args):
         return _map_rep_def_hollow(f, args)
-    if any(isinstance(arg, SparseData) for arg in args):
+    elif any(isinstance(arg, SparseData) for arg in args):
         return _map_rep_def_sparse(f, args)
-    if any(isinstance(arg, DenseData) for arg in args):
+    elif any(isinstance(arg, DenseData) for arg in args):
         return _map_rep_def_dense(f, args)
-    if any(isinstance(arg, RepeatData) for arg in args):
+    elif any(isinstance(arg, RepeatData) for arg in args):
         return _map_rep_def_repeat(f, args)
-    if any(isinstance(arg, ExtrudeData) for arg in args):
+    elif any(isinstance(arg, ExtrudeData) for arg in args):
         return _map_rep_def_extrude(f, args)
 
     return _map_rep_def_element(f, args)
@@ -254,11 +262,11 @@ def _aggregate_rep_def(
     """
     Aggregate the representation over the dimensions.
     """
-    if isinstance(rep, ElementData):
-        return ElementData(init, type(init))
-
-    if isinstance(rep, HollowData):
-        return HollowData(_aggregate_rep_def(op, init, rep.lvl, *drops))
+    match rep:
+        case ElementData():
+            return ElementData(init, type(init))
+        case HollowData():
+            return HollowData(_aggregate_rep_def(op, init, rep.lvl, *drops))
 
     if not drops:
         return rep
@@ -266,28 +274,26 @@ def _aggregate_rep_def(
     drop = drops[0]
     rest = drops[1:]
 
-    if isinstance(rep, SparseData):
-        if drop:
-            return _aggregate_rep_def(op, init, rep.lvl, *rest)
-        inner_dim = _aggregate_rep_def(op, init, rep.lvl, *rest)
-        if op(init, fill_value(rep)) == init:
-            return SparseData(inner_dim)
-        return DenseData(inner_dim)
-
-    if isinstance(rep, DenseData):
-        if drop:
-            return _aggregate_rep_def(op, init, rep.lvl, *rest)
-        return DenseData(_aggregate_rep_def(op, init, rep.lvl, *rest))
-
-    if isinstance(rep, RepeatData):
-        if drop:
-            return _aggregate_rep_def(op, init, rep.lvl, *rest)
-        return RepeatData(_aggregate_rep_def(op, init, rep.lvl, *rest))
-
-    if isinstance(rep, ExtrudeData):
-        if drop:
-            return _aggregate_rep_def(op, init, rep.lvl, *rest)
-        return ExtrudeData(_aggregate_rep_def(op, init, rep.lvl, *rest))
+    match rep:
+        case SparseData():
+            if drop:
+                return _aggregate_rep_def(op, init, rep.lvl, *rest)
+            inner_dim = _aggregate_rep_def(op, init, rep.lvl, *rest)
+            if op(init, fill_value(rep)) == init:
+                return SparseData(inner_dim)
+            return DenseData(inner_dim)
+        case DenseData():
+            if drop:
+                return _aggregate_rep_def(op, init, rep.lvl, *rest)
+            return DenseData(_aggregate_rep_def(op, init, rep.lvl, *rest))
+        case RepeatData():
+            if drop:
+                return _aggregate_rep_def(op, init, rep.lvl, *rest)
+            return RepeatData(_aggregate_rep_def(op, init, rep.lvl, *rest))
+        case ExtrudeData():
+            if drop:
+                return _aggregate_rep_def(op, init, rep.lvl, *rest)
+            return ExtrudeData(_aggregate_rep_def(op, init, rep.lvl, *rest))
 
     return rep
 
@@ -302,65 +308,68 @@ def dropdims_rep(rep: Representation, dims: list[int]) -> Representation:
 
 
 def collapse_rep(rep: Representation) -> Representation:
-    if isinstance(rep, ElementData):
-        return rep
-    if isinstance(rep, HollowData):
-        child = collapse_rep(rep.lvl)
-        if isinstance(child, HollowData):
-            return collapse_rep(child)
-        return HollowData(child)
-    if isinstance(rep, DenseData):
-        child = collapse_rep(rep.lvl)
-        if isinstance(child, HollowData):
-            return collapse_rep(SparseData(child.lvl))
-        return DenseData(child)
-    if isinstance(rep, SparseData):
-        child = collapse_rep(rep.lvl)
-        if isinstance(child, HollowData):
-            return collapse_rep(SparseData(child.lvl))
-        return SparseData(child)
-    if isinstance(rep, ExtrudeData):
-        child = collapse_rep(rep.lvl)
-        if isinstance(child, HollowData):
-            return HollowData(collapse_rep(ExtrudeData(child.lvl)))
-        return ExtrudeData(child)
-    if isinstance(rep, RepeatData):
-        child = collapse_rep(rep.lvl)
-        if isinstance(child, HollowData):
-            return collapse_rep(RepeatData(child.lvl))
-        return RepeatData(child)
-    return rep
+    match rep:
+        case ElementData():
+            return rep
+        case HollowData():
+            child = collapse_rep(rep.lvl)
+            if isinstance(child, HollowData):
+                return collapse_rep(child)
+            return HollowData(child)
+        case DenseData():
+            child = collapse_rep(rep.lvl)
+            if isinstance(child, HollowData):
+                return collapse_rep(SparseData(child.lvl))
+            return DenseData(child)
+        case SparseData():
+            child = collapse_rep(rep.lvl)
+            if isinstance(child, HollowData):
+                return collapse_rep(SparseData(child.lvl))
+            return SparseData(child)
+        case ExtrudeData():
+            child = collapse_rep(rep.lvl)
+            if isinstance(child, HollowData):
+                return HollowData(collapse_rep(ExtrudeData(child.lvl)))
+            return ExtrudeData(child)
+        case RepeatData():
+            child = collapse_rep(rep.lvl)
+            if isinstance(child, HollowData):
+                return collapse_rep(RepeatData(child.lvl))
+            return RepeatData(child)
+        case _:
+            return rep
 
 
 def _permute_select(rep: Representation, drops: list[bool]) -> Representation:
-    if isinstance(rep, ElementData):
-        return rep
-    if not drops:
+    if isinstance(rep, ElementData) or not drops:
         return rep
     drop = drops[0]
     rest = drops[1:]
-    if isinstance(rep, SparseData):
-        child = _permute_select(rep.lvl, rest)
-        return HollowData(child) if drop else SparseData(child)
-    if isinstance(rep, DenseData):
-        child = _permute_select(rep.lvl, rest)
-        return child if drop else DenseData(child)
-    if isinstance(rep, ExtrudeData):
-        child = _permute_select(rep.lvl, rest)
-        return child if drop else ExtrudeData(child)
-    if isinstance(rep, RepeatData):
-        child = _permute_select(rep.lvl, rest)
-        return child if drop else RepeatData(child)
-    return rep
+    match rep:
+        case SparseData():
+            child = _permute_select(rep.lvl, rest)
+            return HollowData(child) if drop else SparseData(child)
+        case DenseData():
+            child = _permute_select(rep.lvl, rest)
+            return child if drop else DenseData(child)
+        case ExtrudeData():
+            child = _permute_select(rep.lvl, rest)
+            return child if drop else ExtrudeData(child)
+        case RepeatData():
+            child = _permute_select(rep.lvl, rest)
+            return child if drop else RepeatData(child)
+        case _:
+            return rep
 
 
 def _permute_aggregate(
     leaf: Representation, rep: Representation, drops: list[bool]
 ) -> Representation:
-    if isinstance(rep, ElementData):
-        return leaf
-    if isinstance(rep, HollowData):
-        return _permute_aggregate(leaf, rep.lvl, drops)
+    match rep:
+        case ElementData():
+            return leaf
+        case HollowData():
+            return _permute_aggregate(leaf, rep.lvl, drops)
     if not drops:
         return leaf
     drop = drops[0]
@@ -368,15 +377,17 @@ def _permute_aggregate(
     if drop:
         return _permute_aggregate(leaf, rep.lvl, rest)
     child = _permute_aggregate(leaf, rep.lvl, rest)
-    if isinstance(rep, SparseData):
-        return SparseData(child)
-    if isinstance(rep, DenseData):
-        return DenseData(child)
-    if isinstance(rep, ExtrudeData):
-        return ExtrudeData(child)
-    if isinstance(rep, RepeatData):
-        return RepeatData(child)
-    return child
+    match rep:
+        case SparseData():
+            return SparseData(child)
+        case DenseData():
+            return DenseData(child)
+        case ExtrudeData():
+            return ExtrudeData(child)
+        case RepeatData():
+            return RepeatData(child)
+        case _:
+            return child
 
 
 def permutedims_rep(rep: Representation, perm: list[int]) -> Representation:
