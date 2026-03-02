@@ -54,10 +54,9 @@ itself.
 
 import math
 import operator
-from collections.abc import Callable, Hashable
-from typing import Any, TypeVar
 from abc import ABC, abstractmethod
-
+from collections.abc import Hashable
+from typing import Any, TypeVar
 
 import numpy as np
 
@@ -200,12 +199,8 @@ for t in StableNumber.__args__:
         lambda a, b: promote_type_stable(a, b),
     )
 
-    
-
 
 class FinchOperator(ABC):
-
-
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
@@ -236,59 +231,65 @@ class FinchOperator(ABC):
         raise AttributeError(f"{type(self)} has no repeat_operator")
 
 
-#accessor functions for properties
+# accessor functions for properties
+
 
 def is_associative(op: Any) -> bool:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).is_associative
     return query_property(op, "__call__", "is_associative")
 
+
 def is_commutative(op: Any) -> bool:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).is_commutative
     return query_property(op, "__call__", "is_commutative")
 
+
 def is_idempotent(op: Any) -> bool:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).is_idempotent
     return query_property(op, "__call__", "is_idempotent")
 
+
 def is_identity(op: Any, val: Any) -> bool:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).is_identity(val)
     return query_property(op, "__call__", "is_identity", val)
 
+
 def is_annihilator(op: Any, val: Any) -> bool:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).is_annihilator(val)
     return query_property(op, "__call__", "is_annihilator", val)
 
+
 def is_distributive(op: Any, other_op: Any) -> bool:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).is_distributive(as_finch_operator(other_op))
     return query_property(op, "__call__", "is_distributive", other_op)
 
+
 def return_type(op: Any, *args: Any) -> Any:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).return_type(*args)
     return query_property(op, "__call__", "return_type", *args)
 
+
 def init_value(op: Any, arg: Any) -> Any:
-    if op in _operator_map.keys():
+    if op in _operator_map:
         return as_finch_operator(op).init_value(arg)
     return query_property(op, "__call__", "init_value", arg)
 
 
 class ReflexiveFinchOperator(FinchOperator):
-
-
-    def return_type(self, a: Any, b: Any):
+    def return_type(self, a: Any, b: Any) -> type:
         return type(self(a(True), b(True)))
 
 
 class UnaryFinchOperator(FinchOperator):
-    def return_type(self, a: Any):
-        return type(self(a(True), b(True)))
+    def return_type(self, a: Any) -> type:
+        return type(self(a(True)))
 
 
 class ComparisonFinchOperator(FinchOperator):
@@ -297,7 +298,6 @@ class ComparisonFinchOperator(FinchOperator):
 
 
 class Add(ReflexiveFinchOperator):
-
     is_associative = True
     is_commutative = True
 
@@ -310,12 +310,9 @@ class Add(ReflexiveFinchOperator):
     def is_annihilator(self, arg: Any) -> bool:
         return np.isinf(arg)
 
-    def is_distributive(self, other_op: "FinchOperator") -> bool:
-        return isinstance(other_op, (Add, Sub))
-
     def repeat_operator(self):
         return operator.mul
-    
+
     def init_value(self, arg: type[Any]) -> Any:
         if arg is bool:
             return 0
@@ -327,7 +324,6 @@ class Add(ReflexiveFinchOperator):
 
 
 class Mul(ReflexiveFinchOperator):
-
     is_associative = True
     is_commutative = True
 
@@ -339,24 +335,23 @@ class Mul(ReflexiveFinchOperator):
 
     def repeat_operator(self):
         return operator.pow
-    
+
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (Add, Sub))
 
     def is_annihilator(self, val):
         return val == 0
-    
+
     def init_value(self, arg: type[Any]) -> Any:
         return arg(1)
 
-class Sub(ReflexiveFinchOperator):
 
+class Sub(ReflexiveFinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.sub(a, b)
 
 
 class MatMul(ReflexiveFinchOperator):
-
     is_associative = True
 
     def __call__(self, a: Any, b: Any):
@@ -364,7 +359,6 @@ class MatMul(ReflexiveFinchOperator):
 
 
 class TrueDiv(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.truediv(a, b)
 
@@ -373,25 +367,21 @@ class TrueDiv(ReflexiveFinchOperator):
 
 
 class FloorDiv(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.floordiv(a, b)
 
 
 class Mod(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.mod(a, b)
 
 
 class DivMod(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return divmod(a, b)
 
 
 class Pow(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.pow(a, b)
 
@@ -403,7 +393,6 @@ class Pow(ReflexiveFinchOperator):
 
 
 class LShift(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.lshift(a, b)
 
@@ -412,7 +401,6 @@ class LShift(ReflexiveFinchOperator):
 
 
 class RShift(ReflexiveFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.rshift(a, b)
 
@@ -421,7 +409,6 @@ class RShift(ReflexiveFinchOperator):
 
 
 class And(ReflexiveFinchOperator):
-
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -437,13 +424,12 @@ class And(ReflexiveFinchOperator):
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (Or, Xor))
-    
+
     def init_value(self, arg: type[Any]) -> Any:
         return arg(True)
 
 
 class Xor(ReflexiveFinchOperator):
-
     is_associative = True
     is_commutative = True
 
@@ -456,8 +442,8 @@ class Xor(ReflexiveFinchOperator):
     def init_value(self, arg: type[Any]) -> Any:
         return arg(False)
 
-class Or(ReflexiveFinchOperator):
 
+class Or(ReflexiveFinchOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -473,7 +459,7 @@ class Or(ReflexiveFinchOperator):
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, And)
-    
+
     def init_value(self, arg: type[Any]) -> Any:
         return arg(False)
 
@@ -493,13 +479,11 @@ class Pos(UnaryFinchOperator):
 
 
 class Neg(UnaryFinchOperator):
-
     def __call__(self, a: Any):
         return operator.neg(a)
 
 
 class Invert(UnaryFinchOperator):
-
     def __call__(self, a: Any):
         return operator.invert(a)
 
@@ -519,25 +503,21 @@ class Ne(ComparisonFinchOperator):
 
 
 class Gt(ComparisonFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.gt(a, b)
 
 
 class Lt(ComparisonFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.lt(a, b)
 
 
 class Ge(ComparisonFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.ge(a, b)
 
 
 class Le(ComparisonFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.le(a, b)
 
@@ -562,7 +542,6 @@ class UnaryOperator(FinchOperator):
         raise TypeError(f"Unsupported operand type for {self}: {a}")
 
 
-#NP Function Base Classes
 class UnaryBoolOperator(FinchOperator):
     def return_type(self, a: Any) -> type:
         return bool
@@ -660,6 +639,11 @@ class LogicalNot(UnaryBoolOperator):
         return np.logical_not(a)
 
 
+class Truth(UnaryBoolOperator):
+    def __call__(self, a: Any):
+        return bool(a)
+
+
 class Min(FinchOperator):
     is_associative = True
     is_commutative = True
@@ -700,31 +684,38 @@ class Remainder(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.remainder(a, b)
 
+
 class Hypot(BinaryFloatOperator):
     is_commutative = True
 
     def __call__(self, a, b):
         return np.hypot(a, b)
 
+
 class Atan2(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.atan2(a, b)
+
 
 class Copysign(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.copysign(a, b)
 
+
 class Nextafter(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.nextafter(a, b)
+
 
 class IsFinite(UnaryBoolOperator):
     def __call__(self, a):
         return np.isfinite(a)
 
+
 class IsInf(UnaryBoolOperator):
     def __call__(self, a):
         return np.isinf(a)
+
 
 class IsNan(UnaryBoolOperator):
     def __call__(self, a):
@@ -738,12 +729,14 @@ class Real(UnaryOperator):
     def return_type(self, a: Any) -> type:
         return float
 
+
 class Imag(UnaryOperator):
     def __call__(self, a: Any):
         return np.imag(a)
 
     def return_type(self, a: Any) -> type:
         return float
+
 
 class Clip(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
@@ -752,11 +745,13 @@ class Clip(FinchOperator):
     def return_type(self, a: Any, b: Any, c: Any) -> type:
         return float
 
+
 class Equal(BinaryBoolOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
         return np.equal(a, b)
+
 
 class NotEqual(BinaryBoolOperator):
     is_commutative = True
@@ -764,41 +759,51 @@ class NotEqual(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.not_equal(a, b)
 
+
 class Less(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.less(a, b)
+
 
 class LessEqual(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.less_equal(a, b)
 
+
 class Greater(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater(a, b)
+
 
 class GreaterEqual(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater_equal(a, b)
 
+
 class Reciprocal(UnaryOperator):
     def __call__(self, a: Any):
         return np.reciprocal(a)
+
 
 class Sin(UnaryOperator):
     def __call__(self, a: Any):
         return np.sin(a)
 
+
 class Cos(UnaryOperator):
     def __call__(self, a: Any):
         return np.cos(a)
+
 
 class Tan(UnaryOperator):
     def __call__(self, a: Any):
         return np.tan(a)
 
+
 class Sinh(UnaryOperator):
     def __call__(self, a: Any):
         return np.sinh(a)
+
 
 class Cosh(UnaryOperator):
     def __call__(self, a: Any):
@@ -809,29 +814,36 @@ class Tanh(UnaryOperator):
     def __call__(self, a: Any):
         return np.tanh(a)
 
+
 class Atan(UnaryOperator):
     def __call__(self, a: Any):
         return np.atan(a)
+
 
 class Asinh(UnaryOperator):
     def __call__(self, a: Any):
         return np.asinh(a)
 
+
 class Asin(UnaryOperator):
     def __call__(self, a: Any):
         return np.asin(a)
+
 
 class Acos(UnaryOperator):
     def __call__(self, a: Any):
         return np.acos(a)
 
+
 class Acosh(UnaryOperator):
     def __call__(self, a: Any):
         return np.acosh(a)
 
+
 class Atanh(UnaryOperator):
     def __call__(self, a: Any):
         return np.atanh(a)
+
 
 class Round(UnaryOperator):
     is_idempotent = True
@@ -839,11 +851,13 @@ class Round(UnaryOperator):
     def __call__(self, a: Any):
         return np.round(a)
 
+
 class Floor(UnaryOperator):
     is_idempotent = True
 
     def __call__(self, a: Any):
         return np.floor(a)
+
 
 class Ceil(UnaryOperator):
     is_idempotent = True
@@ -851,47 +865,58 @@ class Ceil(UnaryOperator):
     def __call__(self, a: Any):
         return np.ceil(a)
 
+
 class Trunc(UnaryOperator):
     is_idempotent = True
 
     def __call__(self, a: Any):
         return np.trunc(a)
 
+
 class Exp(UnaryOperator):
     def __call__(self, a: Any):
         return np.exp(a)
+
 
 class Expm1(UnaryOperator):
     def __call__(self, a: Any):
         return np.expm1(a)
 
+
 class Log(UnaryOperator):
     def __call__(self, a: Any):
         return np.log(a)
+
 
 class Log1p(UnaryOperator):
     def __call__(self, a: Any):
         return np.log1p(a)
 
+
 class Log2(UnaryOperator):
     def __call__(self, a: Any):
         return np.log2(a)
+
 
 class Log10(UnaryOperator):
     def __call__(self, a: Any):
         return np.log10(a)
 
+
 class Signbit(UnaryBoolOperator):
     def __call__(self, a: Any):
         return np.signbit(a)
+
 
 class Sqrt(UnaryOperator):
     def __call__(self, a: Any):
         return np.sqrt(a)
 
+
 class Square(UnaryOperator):
     def __call__(self, a: Any):
         return np.square(a)
+
 
 class Sign(UnaryOperator):
     def __call__(self, a: Any):
@@ -918,7 +943,7 @@ def fixpoint_type(op: Any, z: Any, t: type) -> type:
     return r
 
 
-#below is used for types, not for operators
+# below is used for types, not for operators
 
 T = TypeVar("T")
 
@@ -971,9 +996,9 @@ def type_max(t: type[T]) -> T:
 
 
 for t, tn in [
-    (bool, lambda x: +math.inf),
-    (int, lambda x: +math.inf),
-    (float, lambda x: +math.inf),
+    (bool, lambda x: math.inf),
+    (int, lambda x: math.inf),
+    (float, lambda x: math.inf),
     (np.bool_, lambda x: x(True)),
     (np.integer, lambda x: np.iinfo(x).max),
     (np.floating, lambda x: np.finfo(x).max),
@@ -993,15 +1018,8 @@ def sum_init_value(t):
     return t(0)
 
 
-for t in StableNumber.__args__:
-    register_property(t, "__add__", "init_value", sum_init_value)
-    register_property(t, "__mul__", "init_value", lambda a: a(True))
-    register_property(t, "__and__", "init_value", lambda a: a(True))
-    register_property(t, "__xor__", "init_value", lambda a: a(False))
-    register_property(t, "__or__", "init_value", lambda a: a(False))
-
-
 # functions ported from ops.py
+
 
 def and_test(a, b):
     return a & b
@@ -1018,8 +1036,10 @@ def not_test(a):
 def ifelse(a, b, c):
     return a if c else b
 
+
 def make_tuple(*args):
     return tuple(args)
+
 
 def identity(x):
     """
@@ -1041,6 +1061,7 @@ def overwrite(x, y):
     """
     return y
 
+
 def promote_min(a, b):
     cast = promote_type(a, b)
     return cast(min(a, b))
@@ -1049,6 +1070,7 @@ def promote_min(a, b):
 def promote_max(a, b):
     cast = promote_type(a, b)
     return max(cast(a), cast(b))
+
 
 class PromoteMin(FinchOperator):
     is_associative = True
@@ -1149,6 +1171,7 @@ class Identity(FinchOperator):
     """
     Returns the input value unchanged.
     """
+
     is_idempotent = True
 
     def __call__(self, x: Any):
@@ -1156,7 +1179,19 @@ class Identity(FinchOperator):
 
     def return_type(self, x: Any) -> type:
         return x
-    
+
+
+class Conjugate(FinchOperator):
+    """
+    Returns the input value unchanged.
+    """
+
+    def __call__(self, x: Any):
+        return np.conjugate(x)
+
+    def return_type(self, x: Any) -> type:
+        return x
+
 
 class MakeTuple(FinchOperator):
     is_commutative = False
@@ -1165,8 +1200,10 @@ class MakeTuple(FinchOperator):
     def __call__(self, *args: Any) -> Any:
         return tuple(args)
 
-    def return_type(self, *args: Any) -> type:
-        return tuple
+    def return_type(self, *args: Any) -> Any:
+        from finchlite.finch_assembly.struct import TupleFType
+
+        return TupleFType.from_tuple(args)
 
 
 def repeat_operator(x):
@@ -1175,17 +1212,7 @@ def repeat_operator(x):
     f(x, x, ..., x)  (n times)  is equal to g(x, n),
     then return g.
     """
-    if not callable(x):
-        raise TypeError("Can't check repeat operator of non-callable objects!")
-    if isinstance(x, FinchOperator):
-        return x.repeat_operator()
-    if is_idempotent(x):
-        return None
-    if x is operator.add:
-        return operator.mul
-    if x is operator.mul:
-        return math.exp
-    return None
+    return as_finch_operator(x).repeat_operator()
 
 
 def cansplitpush(x, y):
@@ -1211,104 +1238,100 @@ def cansplitpush(x, y):
 
 _operator_map: dict[Any, FinchOperator] = {
     # Python Operators
-    operator.add:      Add(),
-    operator.mul:      Mul(),
-    operator.sub:      Sub(),
-    operator.matmul:   MatMul(),
-    operator.truediv:  TrueDiv(),
+    operator.add: Add(),
+    operator.mul: Mul(),
+    operator.sub: Sub(),
+    operator.matmul: MatMul(),
+    operator.truediv: TrueDiv(),
     operator.floordiv: FloorDiv(),
-    operator.mod:      Mod(),
-    operator.pow:      Pow(),
-    operator.lshift:   LShift(),
-    operator.rshift:   RShift(),
-    operator.and_:     And(),
-    operator.xor:      Xor(),
-    operator.or_:      Or(),
-    operator.abs:      Abs(),
-    operator.pos:      Pos(),
-    operator.neg:      Neg(),
-    operator.invert:   Invert(),
-    operator.eq:       Eq(),
-    operator.ne:       Ne(),
-    operator.gt:       Gt(),
-    operator.lt:       Lt(),
-    operator.ge:       Ge(),
-    operator.le:       Le(),
-    min:               Min(),
-    max:               Max(),
-    divmod:            DivMod(),
-    abs:               Abs(),
-
+    operator.truth: Truth(),
+    operator.mod: Mod(),
+    operator.pow: Pow(),
+    operator.lshift: LShift(),
+    operator.rshift: RShift(),
+    operator.and_: And(),
+    operator.xor: Xor(),
+    operator.or_: Or(),
+    operator.abs: Abs(),
+    operator.pos: Pos(),
+    operator.neg: Neg(),
+    operator.invert: Invert(),
+    operator.eq: Eq(),
+    operator.ne: Ne(),
+    operator.gt: Gt(),
+    operator.lt: Lt(),
+    operator.ge: Ge(),
+    operator.le: Le(),
+    min: Min(),
+    max: Max(),
+    divmod: DivMod(),
+    abs: Abs(),
     # NumPy Functions
-    np.divide:         Divide(),
-    np.remainder:      Remainder(),
-    np.hypot:          Hypot(),
-    np.atan2:          Atan2(),
-    np.copysign:       Copysign(),
-    np.nextafter:      Nextafter(),
-    np.logaddexp:      LogAddExp(),
-    np.logical_and:    LogicalAnd(),
-    np.logical_or:     LogicalOr(),
-    np.logical_xor:    LogicalXor(),
-    np.logical_not:    LogicalNot(),
-    np.isfinite:       IsFinite(),
-    np.isinf:          IsInf(),
-    np.isnan:          IsNan(),
-    np.real:           Real(),
-    np.imag:           Imag(),
-    np.clip:           Clip(),
-    np.equal:          Equal(),
-    np.not_equal:      NotEqual(),
-    np.less:           Less(),
-    np.less_equal:     LessEqual(),
-    np.greater:        Greater(),
-    np.greater_equal:  GreaterEqual(),
-    np.reciprocal:     Reciprocal(),
-    np.sin:            Sin(),
-    np.cos:            Cos(),
-    np.tan:            Tan(),
-    np.sinh:           Sinh(),
-    np.cosh:           Cosh(),
-    np.tanh:           Tanh(),
-    np.atan:           Atan(),
-    np.asinh:          Asinh(),
-    np.asin:           Asin(),
-    np.acos:           Acos(),
-    np.acosh:          Acosh(),
-    np.atanh:          Atanh(),
-    np.round:          Round(),
-    np.floor:          Floor(),
-    np.ceil:           Ceil(),
-    np.trunc:          Trunc(),
-    np.exp:            Exp(),
-    np.expm1:          Expm1(),
-    np.log:            Log(),
-    np.log1p:          Log1p(),
-    np.log2:           Log2(),
-    np.log10:          Log10(),
-    np.signbit:        Signbit(),
-    np.sqrt:           Sqrt(),
-    np.square:         Square(),
-    np.sign:           Sign(),
-
-    #conjugate:         Identity(), 
-    make_tuple:        MakeTuple(),
-    promote_min:       PromoteMin(),
-    overwrite:         Overwrite(),
-    first_arg:         FirstArg(),
-    identity:          Identity(),
-    promote_max:       PromoteMax(),
-    make_tuple:        MakeTuple(),
+    np.divide: Divide(),
+    np.remainder: Remainder(),
+    np.hypot: Hypot(),
+    np.atan2: Atan2(),
+    np.copysign: Copysign(),
+    np.nextafter: Nextafter(),
+    np.logaddexp: LogAddExp(),
+    np.logical_and: LogicalAnd(),
+    np.logical_or: LogicalOr(),
+    np.logical_xor: LogicalXor(),
+    np.logical_not: LogicalNot(),
+    np.isfinite: IsFinite(),
+    np.isinf: IsInf(),
+    np.isnan: IsNan(),
+    np.real: Real(),
+    np.imag: Imag(),
+    np.clip: Clip(),
+    np.equal: Equal(),
+    np.not_equal: NotEqual(),
+    np.less: Less(),
+    np.less_equal: LessEqual(),
+    np.greater: Greater(),
+    np.greater_equal: GreaterEqual(),
+    np.reciprocal: Reciprocal(),
+    np.sin: Sin(),
+    np.cos: Cos(),
+    np.tan: Tan(),
+    np.sinh: Sinh(),
+    np.cosh: Cosh(),
+    np.tanh: Tanh(),
+    np.atan: Atan(),
+    np.asinh: Asinh(),
+    np.asin: Asin(),
+    np.acos: Acos(),
+    np.acosh: Acosh(),
+    np.atanh: Atanh(),
+    np.round: Round(),
+    np.floor: Floor(),
+    np.ceil: Ceil(),
+    np.trunc: Trunc(),
+    np.exp: Exp(),
+    np.expm1: Expm1(),
+    np.log: Log(),
+    np.log1p: Log1p(),
+    np.log2: Log2(),
+    np.log10: Log10(),
+    np.signbit: Signbit(),
+    np.sqrt: Sqrt(),
+    np.square: Square(),
+    np.sign: Sign(),
+    conjugate: Conjugate(),
+    promote_min: PromoteMin(),
+    overwrite: Overwrite(),
+    first_arg: FirstArg(),
+    identity: Identity(),
+    promote_max: PromoteMax(),
+    make_tuple: MakeTuple(),
 }
 
 
 def as_finch_operator(f: Any) -> FinchOperator:
-    #given an operator, returns its FinchOperator equivalent by looking up the operator map
+    # Given an operator, returns its FinchOperator equivalent by
+    # looking up the operator map.
     if isinstance(f, FinchOperator):
         return f
-    try:
+    if f in _operator_map:
         return _operator_map[f]
-    except KeyError:
-        raise TypeError(
-            f"No FinchOperator registered for {f}. "
-        )
+    raise TypeError(f"No FinchOperator registered for {f}. ")

@@ -70,7 +70,7 @@ def test_algebra_selected():
     assert is_idempotent(np.logical_xor) is False
     assert is_idempotent(np.logaddexp) is False
     assert repeat_operator(operator.add) is operator.mul
-    assert repeat_operator(operator.mul) is math.exp
+    assert repeat_operator(operator.mul) is operator.pow
     assert repeat_operator(operator.and_) is None
     assert cansplitpush(operator.add, operator.add) is True
     assert cansplitpush(operator.add, operator.mul) is False
