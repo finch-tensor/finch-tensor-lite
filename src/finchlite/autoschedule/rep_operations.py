@@ -154,13 +154,13 @@ def _map_rep_def(f: Callable, args: list[Representation]) -> Representation:
     """
     if any(isinstance(arg, HollowData) for arg in args):
         return _map_rep_def_hollow(f, args)
-    elif any(isinstance(arg, SparseData) for arg in args):
+    if any(isinstance(arg, SparseData) for arg in args):
         return _map_rep_def_sparse(f, args)
-    elif any(isinstance(arg, DenseData) for arg in args):
+    if any(isinstance(arg, DenseData) for arg in args):
         return _map_rep_def_dense(f, args)
-    elif any(isinstance(arg, RepeatData) for arg in args):
+    if any(isinstance(arg, RepeatData) for arg in args):
         return _map_rep_def_repeat(f, args)
-    elif any(isinstance(arg, ExtrudeData) for arg in args):
+    if any(isinstance(arg, ExtrudeData) for arg in args):
         return _map_rep_def_extrude(f, args)
 
     return _map_rep_def_element(f, args)
