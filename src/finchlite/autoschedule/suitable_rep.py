@@ -16,6 +16,7 @@ from finchlite.finch_logic.nodes import (
     Reorder,
     Table,
 )
+
 from .rep_operations import (
     aggregate_rep,
     data_rep,
@@ -31,11 +32,17 @@ from .representation import (
     HollowData,
     RepeatData,
     SparseData,
-    SparseRepeatData
+    SparseRepeatData,
 )
 
 Representation = (
-    ElementData | DenseData | ExtrudeData | HollowData | RepeatData | SparseData | SparseRepeatData
+    ElementData
+    | DenseData
+    | ExtrudeData
+    | HollowData
+    | RepeatData
+    | SparseData
+    | SparseRepeatData
 )
 
 

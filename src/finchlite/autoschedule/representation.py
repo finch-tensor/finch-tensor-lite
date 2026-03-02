@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 from typing import Any
-from .rw_traits import SequentialRead, SequentialWrite, RandomRead, RandomWrite, Capabilities
+
+from .rw_traits import (
+    Capabilities,
+    RandomRead,
+    RandomWrite,
+    SequentialRead,
+    SequentialWrite,
+)
 
 
 @dataclass
@@ -12,7 +19,7 @@ class ElementData:
 
     def ndims(self) -> int:
         return 0
-    
+
     def capabilities(self) -> Capabilities:
         return Capabilities(RandomRead, RandomWrite)
 
@@ -25,8 +32,10 @@ class SparseData:
 
     def ndims(self) -> int:
         return 1 + self.lvl.ndims()
+
     def capabilities(self) -> Capabilities:
         return Capabilities(SequentialRead, SequentialWrite)
+
 
 @dataclass
 class RepeatData:
@@ -46,6 +55,7 @@ class RepeatData:
     def capabilities(self) -> Capabilities:
         return Capabilities(SequentialRead, SequentialWrite)
 
+
 @dataclass
 class SparseRepeatData:
     """
@@ -53,9 +63,12 @@ class SparseRepeatData:
 
     Equivalent to SparseData(RepeatData(lvl))
     """
+
     lvl: Any
+
     def ndims(self) -> int:
         return 1 + self.lvl.ndims()
+
     def capabilities(self) -> Capabilities:
         return Capabilities(SequentialRead, SequentialWrite)
 
@@ -72,8 +85,10 @@ class DenseData:
 
     def ndims(self) -> int:
         return 1 + self.lvl.ndims()
+
     def capabilities(self) -> Capabilities:
         return Capabilities(RandomRead, RandomWrite)
+
 
 @dataclass
 class ExtrudeData:
@@ -88,6 +103,7 @@ class ExtrudeData:
 
     def ndims(self) -> int:
         return 1 + self.lvl.ndims()
+
     def capabilities(self) -> Capabilities:
         return Capabilities(RandomRead, None)
 
@@ -105,6 +121,6 @@ class HollowData:
 
     def ndims(self) -> int:
         return self.lvl.ndims()
-    
+
     def capabilities(self) -> Capabilities:
         return self.lvl.capabilities()
