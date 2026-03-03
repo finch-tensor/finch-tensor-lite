@@ -1,5 +1,7 @@
 import ctypes
+import ctypes.util
 import operator
+import os
 import re
 import subprocess
 import sys
@@ -1143,3 +1145,104 @@ def test_multiple_hashtable(compiler, tabletype):
     ) == table4.value_type.from_fields(0.2, 0.2)
 
     assert mod.setidx_5(table5, 3, 2) == 2
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        CCompiler(),
+        NumbaCompiler(),
+    ],
+)
+def test_print(compiler, capfd, file_regression):
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+    x = (np.int64(1), np.int64(4))
+
+    p_var = asm.Variable("p", ftype(p))
+    x_var = asm.Variable("x", ftype(x))
+    res_var = asm.Variable("res", np.float64)
+
+    i16_var = asm.Variable("i16_var", np.int16)
+    i32_var = asm.Variable("i32_var", np.int32)
+    i64_var = asm.Variable("i64_var", np.int64)
+    f32_var = asm.Variable("f32_var", np.float32)
+    f64_var = asm.Variable("f64_var", np.float64)
+
+    prgm = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("simple_struct", np.float64),
+                    (p_var, x_var),
+                    asm.Block(
+                        (
+                            asm.Assign(i16_var, asm.Literal(np.int16(32767))),
+                            asm.Assign(i32_var, asm.Literal(np.int32(65536))),
+                            asm.Assign(i64_var, asm.Literal(np.int64(65536))),
+                            asm.Assign(f32_var, asm.Literal(np.float32(2.0))),
+                            asm.Assign(f64_var, asm.Literal(np.float64(3.0))),
+                            asm.Print((i16_var, i32_var, i64_var)),
+                            asm.Print(
+                                (
+                                    f32_var,
+                                    f64_var,
+                                )
+                            ),
+                            asm.Print((p_var,)),
+                            asm.Print((x_var,)),
+                            asm.Print((p_var, x_var)),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.mul),
+                                    (
+                                        asm.GetAttr(p_var, asm.Literal("x")),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                    ),
+                                ),
+                            ),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(operator.add),
+                                    (
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(operator.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            asm.Print((res_var,)),
+                            asm.Print((p_var, x_var, res_var)),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = prgm.simple_struct(p, x)
+    assert result == np.float64(9.0)
+
+    # Flush CDLL buffer in order to capture stdout/stderr
+    if os.name == "nt":
+        crt = ctypes.util.find_msvcrt()
+        cdll = ctypes.CDLL(crt) if crt else ctypes.cdll.msvcrt
+    else:
+        cdll = ctypes.CDLL(None)
+    cdll.fflush(None)
+    capture = capfd.readouterr().out
+    if isinstance(compiler, NumbaCompiler):
+        # Normalize runtime object addresses printed by Numba for file regression
+        capture = re.sub(r" object at 0x[0-9a-fA-F]+>", ">", capture)
+
+    file_regression.check(capture, extension=".txt")
