@@ -52,17 +52,14 @@ property of the `fill_value` attribute by defining a `fill_value` in the class
 itself.
 """
 
-import math
 import operator
 from abc import ABC, abstractmethod
 from collections.abc import Hashable
-from typing import Any, TypeVar
+from typing import Any, Optional
 
 import numpy as np
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
-
-StableNumber = bool | int | float | complex | np.generic
 
 
 def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
@@ -126,7 +123,8 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
                 " lambda ...)` or "
             )
         msg += (
-            f"`finchlite.register_property({obj_name},{attr}', '{prop}', lambda ...)`."
+            f"`finchlite.register_property({obj_name}, '{attr}', '{prop}', "
+            "lambda ...)`."
         )
     else:
         msg += f"attribute '{obj_name}.{attr}' has no property '{prop}'. "
@@ -169,21 +167,10 @@ def promote_type(a: Any, b: Any) -> type:
     Returns:
         The common type of the given arguments.
     """
-    if hasattr(a, "promote_type"):
-        res = a.promote_type(b)
-        if res is not NotImplemented:
-            return res
-    if hasattr(b, "promote_type"):
-        res = b.promote_type(a)
-        if res is not NotImplemented:
-            return res
-    try:
-        return query_property(a, "promote_type", "__attr__", b)
-    except AttributeError:
-        return query_property(b, "promote_type", "__attr__", a)
+    return promote_type_stable(a, b)
 
 
-def promote_type_stable(a, b) -> type:
+def promote_type_stable(a: Any, b: Any) -> type:
     a = type(a) if not isinstance(a, type) else a
     b = type(b) if not isinstance(b, type) else b
     if issubclass(a, np.generic) or issubclass(b, np.generic):
@@ -191,26 +178,24 @@ def promote_type_stable(a, b) -> type:
     return type(a(False) + b(False))
 
 
-for t in StableNumber.__args__:
-    register_property(
-        t,
-        "promote_type",
-        "__attr__",
-        lambda a, b: promote_type_stable(a, b),
-    )
-
-
 class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
+    _instance: Optional["FinchOperator"] = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.__qualname__ = cls.__qualname__
+        return cls._instance
 
     @abstractmethod
     def __call__(self, *args: Any) -> Any:
         pass
 
     @abstractmethod
-    def return_type(self, *args: Any) -> Any:
+    def return_type(self, *args: Any) -> type:
         pass
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
@@ -222,7 +207,7 @@ class FinchOperator(ABC):
     def is_annihilator(self, val: Any) -> bool:
         return False
 
-    def init_value(self, arg: type) -> Any:
+    def init_value(self, type_: type) -> Any:
         raise AttributeError(f"{type(self)} has no init_value")
 
     def repeat_operator(self) -> Any:
@@ -235,51 +220,35 @@ class FinchOperator(ABC):
 
 
 def is_associative(op: Any) -> bool:
-    if op in _operator_map:
-        return as_finch_operator(op).is_associative
-    return query_property(op, "__call__", "is_associative")
+    return as_finch_operator(op).is_associative
 
 
 def is_commutative(op: Any) -> bool:
-    if op in _operator_map:
-        return as_finch_operator(op).is_commutative
-    return query_property(op, "__call__", "is_commutative")
+    return as_finch_operator(op).is_commutative
 
 
 def is_idempotent(op: Any) -> bool:
-    if op in _operator_map:
-        return as_finch_operator(op).is_idempotent
-    return query_property(op, "__call__", "is_idempotent")
+    return as_finch_operator(op).is_idempotent
 
 
 def is_identity(op: Any, val: Any) -> bool:
-    if op in _operator_map:
-        return as_finch_operator(op).is_identity(val)
-    return query_property(op, "__call__", "is_identity", val)
+    return as_finch_operator(op).is_identity(val)
 
 
 def is_annihilator(op: Any, val: Any) -> bool:
-    if op in _operator_map:
-        return as_finch_operator(op).is_annihilator(val)
-    return query_property(op, "__call__", "is_annihilator", val)
+    return as_finch_operator(op).is_annihilator(val)
 
 
 def is_distributive(op: Any, other_op: Any) -> bool:
-    if op in _operator_map:
-        return as_finch_operator(op).is_distributive(as_finch_operator(other_op))
-    return query_property(op, "__call__", "is_distributive", other_op)
+    return as_finch_operator(op).is_distributive(as_finch_operator(other_op))
 
 
 def return_type(op: Any, *args: Any) -> Any:
-    if op in _operator_map:
-        return as_finch_operator(op).return_type(*args)
-    return query_property(op, "__call__", "return_type", *args)
+    return as_finch_operator(op).return_type(*args)
 
 
 def init_value(op: Any, arg: Any) -> Any:
-    if op in _operator_map:
-        return as_finch_operator(op).init_value(arg)
-    return query_property(op, "__call__", "init_value", arg)
+    return as_finch_operator(op).init_value(arg)
 
 
 class ReflexiveFinchOperator(FinchOperator):
@@ -311,16 +280,10 @@ class Add(ReflexiveFinchOperator):
         return np.isinf(arg)
 
     def repeat_operator(self):
-        return operator.mul
+        return _operator_map[operator.mul]
 
-    def init_value(self, arg: type[Any]) -> Any:
-        if arg is bool:
-            return 0
-        if arg is np.bool_:
-            return np.int_(0)
-        if issubclass(arg, np.integer):
-            return np.int_(0) if issubclass(arg, np.signedinteger) else np.uint(0)
-        return arg(0)
+    def init_value(self, type_: type) -> Any:
+        return type_(0)
 
 
 class Mul(ReflexiveFinchOperator):
@@ -334,7 +297,7 @@ class Mul(ReflexiveFinchOperator):
         return arg == 1
 
     def repeat_operator(self):
-        return operator.pow
+        return _operator_map[operator.pow]
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (Add, Sub))
@@ -342,8 +305,8 @@ class Mul(ReflexiveFinchOperator):
     def is_annihilator(self, val):
         return val == 0
 
-    def init_value(self, arg: type[Any]) -> Any:
-        return arg(1)
+    def init_value(self, type_: type) -> Any:
+        return type_(1)
 
 
 class Sub(ReflexiveFinchOperator):
@@ -425,8 +388,8 @@ class And(ReflexiveFinchOperator):
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (Or, Xor))
 
-    def init_value(self, arg: type[Any]) -> Any:
-        return arg(True)
+    def init_value(self, type_: type) -> Any:
+        return type_(True)
 
 
 class Xor(ReflexiveFinchOperator):
@@ -439,8 +402,8 @@ class Xor(ReflexiveFinchOperator):
     def is_identity(self, arg):
         return arg == 0
 
-    def init_value(self, arg: type[Any]) -> Any:
-        return arg(False)
+    def init_value(self, type_: type) -> Any:
+        return type_(False)
 
 
 class Or(ReflexiveFinchOperator):
@@ -460,8 +423,8 @@ class Or(ReflexiveFinchOperator):
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, And)
 
-    def init_value(self, arg: type[Any]) -> Any:
-        return arg(False)
+    def init_value(self, type_: type) -> Any:
+        return type_(False)
 
 
 class Abs(UnaryFinchOperator):
@@ -529,6 +492,7 @@ class BinaryFloatOperator(FinchOperator):
 
 class UnaryOperator(FinchOperator):
     def return_type(self, a: Any) -> type:
+        # TODO: Temporary implementation
         if a is np.float16:
             return a
         if a is np.float32:
@@ -574,13 +538,13 @@ class LogAddExp(BinaryFloatOperator):
         return np.logaddexp(a, b)
 
     def is_identity(self, val) -> bool:
-        return val == -math.inf
+        return val == -np.inf
 
     def is_annihilator(self, val) -> bool:
-        return val == math.inf
+        return val == np.inf
 
-    def init_value(self, arg: type[Any]) -> Any:
-        return -math.inf
+    def init_value(self, type_: type) -> Any:
+        return -np.inf
 
 
 class LogicalAnd(LogicalBinaryOperator):
@@ -598,7 +562,7 @@ class LogicalAnd(LogicalBinaryOperator):
     def is_distributive(self, other_op: FinchOperator) -> bool:
         return isinstance(other_op, (LogicalOr, LogicalXor))
 
-    def init_value(self, arg: type[Any]) -> Any:
+    def init_value(self, type_: type) -> Any:
         return True
 
 
@@ -617,7 +581,7 @@ class LogicalOr(LogicalBinaryOperator):
     def is_distributive(self, other_op: FinchOperator) -> bool:
         return isinstance(other_op, LogicalAnd)
 
-    def init_value(self, arg: type[Any]) -> Any:
+    def init_value(self, type_: type) -> Any:
         return False
 
 
@@ -630,7 +594,7 @@ class LogicalXor(LogicalBinaryOperator):
     def is_identity(self, val) -> bool:
         return not bool(val)
 
-    def init_value(self, arg: type[Any]) -> Any:
+    def init_value(self, type_: type) -> Any:
         return False
 
 
@@ -656,10 +620,10 @@ class Min(FinchOperator):
         return type(min(a(True), b(True)))
 
     def is_identity(self, val) -> bool:
-        return val == math.inf
+        return val == np.inf
 
-    def init_value(self, arg: type[Any]):
-        return type_max(arg)
+    def init_value(self, type_: type):
+        return type_max(type_)
 
 
 class Max(FinchOperator):
@@ -674,10 +638,10 @@ class Max(FinchOperator):
         return type(max(a(True), b(True)))
 
     def is_identity(self, val) -> bool:
-        return val == -math.inf
+        return val == -np.inf
 
-    def init_value(self, arg: type[Any]):
-        return type_min(arg)
+    def init_value(self, type_: type):
+        return type_min(type_)
 
 
 class Remainder(BinaryFloatOperator):
@@ -943,17 +907,12 @@ def fixpoint_type(op: Any, z: Any, t: type) -> type:
     return r
 
 
-# below is used for types, not for operators
-
-T = TypeVar("T")
-
-
-def type_min(t: type[T]) -> T:
+def type_min(type_: type) -> Any:
     """
     Returns the minimum value of the given type.
 
     Args:
-        t: The type to determine the minimum value for.
+        type_: The type to determine the minimum value for.
 
     Returns:
         The minimum value of the given type.
@@ -961,28 +920,21 @@ def type_min(t: type[T]) -> T:
     Raises:
         AttributeError: If the minimum value is not implemented for the given type.
     """
-    if hasattr(t, "type_min"):
-        return t.type_min()  # type: ignore[attr-defined]
-    return query_property(t, "type_min", "__attr__")
+    if type_ in (bool, np.bool_):
+        return np.bool_(False)
+    if issubclass(type_, (int, np.integer)):
+        return np.iinfo(type_).min
+    if issubclass(type_, (float, np.floating)):
+        return np.finfo(type_).min
+    raise Exception(f"Unsupported type for type_min: {type_}")
 
 
-for t, tn in [
-    (bool, lambda x: -math.inf),
-    (int, lambda x: -math.inf),
-    (float, lambda x: -math.inf),
-    (np.bool_, lambda x: x(False)),
-    (np.integer, lambda x: np.iinfo(x).min),
-    (np.floating, lambda x: np.finfo(x).min),
-]:
-    register_property(t, "type_min", "__attr__", tn)
-
-
-def type_max(t: type[T]) -> T:
+def type_max(type_: type) -> Any:
     """
     Returns the maximum value of the given type.
 
     Args:
-        t: The type to determine the maximum value for.
+        type_: The type to determine the maximum value for.
 
     Returns:
         The maximum value of the given type.
@@ -990,32 +942,13 @@ def type_max(t: type[T]) -> T:
     Raises:
         AttributeError: If the maximum value is not implemented for the given type.
     """
-    if hasattr(t, "type_max"):
-        return t.type_max()  # type: ignore[attr-defined]
-    return query_property(t, "type_max", "__attr__")
-
-
-for t, tn in [
-    (bool, lambda x: math.inf),
-    (int, lambda x: math.inf),
-    (float, lambda x: math.inf),
-    (np.bool_, lambda x: x(True)),
-    (np.integer, lambda x: np.iinfo(x).max),
-    (np.floating, lambda x: np.finfo(x).max),
-]:
-    register_property(t, "type_max", "__attr__", tn)
-
-
-def sum_init_value(t):
-    if t is bool:
-        return 0
-    if t is np.bool_:
-        return np.int_(0)
-    if issubclass(t, np.integer):
-        if issubclass(t, np.signedinteger):
-            return np.int_(0)
-        return np.uint(0)
-    return t(0)
+    if type_ in (bool, np.bool_):
+        return np.bool_(True)
+    if issubclass(type_, (int, np.integer)):
+        return np.iinfo(type_).max
+    if issubclass(type_, (float, np.floating)):
+        return np.finfo(type_).max
+    raise Exception(f"Unsupported type for type_max: {type_}")
 
 
 # functions ported from ops.py
@@ -1183,7 +1116,7 @@ class Identity(FinchOperator):
 
 class Conjugate(FinchOperator):
     """
-    Returns the input value unchanged.
+    Returns the complex conjugate of the input value.
     """
 
     def __call__(self, x: Any):
@@ -1197,7 +1130,7 @@ class MakeTuple(FinchOperator):
     is_commutative = False
     is_associative = False
 
-    def __call__(self, *args: Any) -> Any:
+    def __call__(self, *args: Any) -> tuple:
         return tuple(args)
 
     def return_type(self, *args: Any) -> Any:
@@ -1319,17 +1252,19 @@ _operator_map: dict[Any, FinchOperator] = {
     np.sign: Sign(),
     conjugate: Conjugate(),
     promote_min: PromoteMin(),
+    promote_max: PromoteMax(),
     overwrite: Overwrite(),
     first_arg: FirstArg(),
     identity: Identity(),
-    promote_max: PromoteMax(),
     make_tuple: MakeTuple(),
 }
 
 
 def as_finch_operator(f: Any) -> FinchOperator:
-    # Given an operator, returns its FinchOperator equivalent by
-    # looking up the operator map.
+    """
+    Given an operator, returns its FinchOperator equivalent by
+    looking up the operator map.
+    """
     if isinstance(f, FinchOperator):
         return f
     if f in _operator_map:

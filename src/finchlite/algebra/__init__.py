@@ -1,5 +1,6 @@
 from .algebra import (
     InitWrite,
+    as_finch_operator,
     cansplitpush,
     conjugate,
     first_arg,
@@ -31,6 +32,7 @@ __all__ = [
     "InitWrite",
     "Tensor",
     "TensorFType",
+    "as_finch_operator",
     "cansplitpush",
     "conjugate",
     "first_arg",
