@@ -90,7 +90,10 @@ class Literal(AssemblyExpression):
         return ftype(self.val)
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"val": self.val})
+
+
+L = Literal
 
 
 @dataclass(eq=True, frozen=True)

@@ -15,6 +15,7 @@ import numpy as np
 
 from lark import Lark, Token, Tree
 
+from ..algebra import scansearch
 from . import nodes as asm
 
 assembly_parser = Lark(
@@ -45,11 +46,12 @@ assembly_parser = Lark(
          | _COMMENT
     ?access_expr: access_expr OP access_expr | CNAME | INT
     access: CNAME "[" access_expr "]"
-    ?expr: CNAME | INT | DECIMAL | access | expr OP expr
+    ?expr: CNAME | INT | DECIMAL | access | scansearch | expr OP expr
     ?lhs: CNAME | access
     assign: lhs "=" expr
     increment: lhs OP "=" expr
     resize: "resize" "(" CNAME "," access_expr ")"
+    scansearch: "scansearch" "(" CNAME "," access_expr "," access_expr "," access_expr ")"
     for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ block _NEWLINE+ "end"
     if: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
     if_else: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "else" _NEWLINE+ block _NEWLINE+ "end"
@@ -134,6 +136,10 @@ def parse_assembly(
                 )
             case Tree("resize", [arr, size]):
                 return asm.Call(asm.Literal(np.resize), (ctx(arr), ctx(size)))
+            case Tree("scansearch", [arr, x, lo, hi]):
+                return asm.Call(
+                    asm.Literal(scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
+                )
             case Tree("assign", [lhs, expr]):
                 return asm.Assign(ctx(lhs), ctx(expr))
             case Tree("access", [tns, access_expr]):
