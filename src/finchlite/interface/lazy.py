@@ -24,8 +24,6 @@ from ..algebra import (
     promote_max,
     promote_min,
     promote_type,
-    query_property,
-    register_property,
     return_type,
 )
 from ..algebra import (
@@ -431,13 +429,6 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-register_property(
-    np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray.from_numpy(x)
-)
-register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
-register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
-
-
 def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.
@@ -451,9 +442,13 @@ def asarray(arg: Any, format: TensorFType | None = None) -> Any:
         The Tensor type result of the given object.
     """
     if format is None:
-        if hasattr(arg, "asarray"):
-            return arg.asarray()
-        return query_property(arg, "asarray", "__attr__")
+        from finchlite.interface.scalar import Scalar
+
+        if isinstance(arg, np.ndarray):
+            return BufferizedNDArray.from_numpy(arg)
+        if np.isscalar(arg) or arg is None:
+            return Scalar(arg)
+        return arg
 
     if isinstance(arg, np.ndarray):
         return format.from_numpy(arg)
@@ -1329,9 +1324,6 @@ class FillTensor(Tensor):
             tuple(type(dim) for dim in self.shape),
         )
 
-    def asarray(self):
-        return self
-
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
@@ -1477,9 +1469,6 @@ class ConcatTensor(Tensor):
         """Shape type of the tensor."""
         return self.ftype.shape_type
 
-    def asarray(self):
-        return self
-
 
 def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     """
@@ -1616,9 +1605,6 @@ class SplitDimsTensor(Tensor):
         """Shape type of the tensor."""
         return self.ftype.shape_type
 
-    def asarray(self):
-        return self
-
 
 @dataclass(frozen=True)
 class CombineDimsTensorFType(WrapperTensorFType):
@@ -1738,9 +1724,6 @@ class CombineDimsTensor(Tensor):
     def shape_type(self) -> tuple:
         """Shape type of the tensor."""
         return self.ftype.shape_type
-
-    def asarray(self):
-        return self
 
 
 def _compute(arg, ctx=None):

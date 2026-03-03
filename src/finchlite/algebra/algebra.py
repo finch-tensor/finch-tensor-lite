@@ -52,16 +52,14 @@ property of the `fill_value` attribute by defining a `fill_value` in the class
 itself.
 """
 
-import math
 import operator
-from collections.abc import Callable, Hashable
-from typing import Any, TypeVar
+from abc import ABC, abstractmethod
+from collections.abc import Hashable
+from typing import Any, Optional
 
 import numpy as np
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
-
-StableNumber = bool | int | float | complex | np.generic
 
 
 def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
@@ -125,7 +123,8 @@ def query_property(obj: type | Hashable, attr: str, prop: str, *args) -> Any:
                 " lambda ...)` or "
             )
         msg += (
-            f"`finchlite.register_property({obj_name},{attr}', '{prop}', lambda ...)`."
+            f"`finchlite.register_property({obj_name}, '{attr}', '{prop}', "
+            "lambda ...)`."
         )
     else:
         msg += f"attribute '{obj_name}.{attr}' has no property '{prop}'. "
@@ -168,21 +167,10 @@ def promote_type(a: Any, b: Any) -> type:
     Returns:
         The common type of the given arguments.
     """
-    if hasattr(a, "promote_type"):
-        res = a.promote_type(b)
-        if res is not NotImplemented:
-            return res
-    if hasattr(b, "promote_type"):
-        res = b.promote_type(a)
-        if res is not NotImplemented:
-            return res
-    try:
-        return query_property(a, "promote_type", "__attr__", b)
-    except AttributeError:
-        return query_property(b, "promote_type", "__attr__", a)
+    return promote_type_stable(a, b)
 
 
-def promote_type_stable(a, b) -> type:
+def promote_type_stable(a: Any, b: Any) -> type:
     a = type(a) if not isinstance(a, type) else a
     b = type(b) if not isinstance(b, type) else b
     if issubclass(a, np.generic) or issubclass(b, np.generic):
@@ -190,282 +178,713 @@ def promote_type_stable(a, b) -> type:
     return type(a(False) + b(False))
 
 
-for t in StableNumber.__args__:
-    register_property(
-        t,
-        "promote_type",
-        "__attr__",
-        lambda a, b: promote_type_stable(a, b),
-    )
+class FinchOperator(ABC):
+    is_associative: bool = False
+    is_commutative: bool = False
+    is_idempotent: bool = False
+    _instance: Optional["FinchOperator"] = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.__qualname__ = cls.__qualname__
+        return cls._instance
+
+    @abstractmethod
+    def __call__(self, *args: Any) -> Any:
+        pass
+
+    @abstractmethod
+    def return_type(self, *args: Any) -> type:
+        pass
+
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return False
+
+    def is_identity(self, val: Any) -> bool:
+        return False
+
+    def is_annihilator(self, val: Any) -> bool:
+        return False
+
+    def init_value(self, type_: type) -> Any:
+        raise AttributeError(f"{type(self)} has no init_value")
+
+    def repeat_operator(self) -> Any:
+        if self.is_idempotent:
+            return None
+        raise AttributeError(f"{type(self)} has no repeat_operator")
 
 
-def return_type(op: Any, *args: Any) -> Any:
-    """The return type of the given function on the given argument types.
-
-    Args:
-        op: The function or operator to infer the type for.
-        *args: The types of the arguments.
-
-    Returns:
-        The return type of op(*args: arg_types)
-    """
-    return query_property(op, "__call__", "return_type", *args)
-
-
-_reflexive_operators = {
-    operator.add: ("__add__", "__radd__"),
-    operator.sub: ("__sub__", "__rsub__"),
-    operator.mul: ("__mul__", "__rmul__"),
-    operator.matmul: ("__matmul__", "__rmatmul__"),
-    operator.truediv: ("__truediv__", "__rtruediv__"),
-    operator.floordiv: ("__floordiv__", "__rfloordiv__"),
-    operator.mod: ("__mod__", "__rmod__"),
-    divmod: ("__divmod__", "__rdivmod__"),
-    operator.pow: ("__pow__", "__rpow__"),
-    operator.lshift: ("__lshift__", "__rlshift__"),
-    operator.rshift: ("__rshift__", "__rrshift__"),
-    operator.and_: ("__and__", "__rand__"),
-    operator.xor: ("__xor__", "__rxor__"),
-    operator.or_: ("__or__", "__ror__"),
-}
-
-
-def _return_type_reflexive_method(meth):
-    def _return_type_closure(a, b):
-        if issubclass(b, StableNumber):
-            return type(getattr(a(True), meth)(b(True)))
-        raise TypeError(f"Unsupported operand type for {type(a)}.{meth}:  {type(b)}")
-
-    return _return_type_closure
-
-
-def _return_type_reflexive_operator(meth, rmeth):
-    def _return_type_closure(op, a, b):
-        if hasattr(a, meth):
-            try:
-                res = query_property(a, meth, "return_type", b)
-                if res is not type(NotImplemented):
-                    return res
-            except AttributeError:
-                pass
-        return query_property(b, rmeth, "return_type", a)
-
-    return _return_type_closure
-
-
-op: Callable
-
-
-for op, (meth, rmeth) in _reflexive_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            _return_type_reflexive_operator(meth, rmeth),
-        ),
-    )
-
-    for t in StableNumber.__args__:
-        register_property(t, meth, "return_type", _return_type_reflexive_method(meth))
-        register_property(t, rmeth, "return_type", _return_type_reflexive_method(rmeth))
-
-
-_unary_operators: dict[Callable, str] = {
-    operator.abs: "__abs__",
-    operator.pos: "__pos__",
-    operator.neg: "__neg__",
-    operator.invert: "__invert__",
-}
-
-
-_comparison_operators: dict[Callable, str] = {
-    operator.eq: "__eq__",
-    operator.ne: "__ne__",
-    operator.gt: "__gt__",
-    operator.lt: "__lt__",
-    operator.ge: "__ge__",
-    operator.le: "__le__",
-}
-
-
-for op, meth in _comparison_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            lambda op, a, b, meth=meth: bool,
-        ),
-    )
-
-
-def _return_type_unary(meth):
-    def _return_type_closure(a):
-        return type(getattr(a(True), meth)())
-
-    return _return_type_closure
-
-
-for op, meth in _unary_operators.items():
-    (
-        register_property(
-            op,
-            "__call__",
-            "return_type",
-            lambda op, a, meth=meth: query_property(a, meth, "return_type"),
-        ),
-    )
-
-    for t in StableNumber.__args__:
-        register_property(t, meth, "return_type", _return_type_unary(meth))
-register_property(operator.truth, "__call__", "return_type", lambda op, a: bool)
+# accessor functions for properties
 
 
 def is_associative(op: Any) -> bool:
-    """
-    Returns whether the given function is associative, that is, whether the
-    op(op(a, b), c) == op(a, op(b, c)) for all a, b, c.
-
-    Args:
-        op: The function to check.
-
-    Returns:
-        True if the function can be proven to be associative, False otherwise.
-    """
-    return query_property(op, "__call__", "is_associative")
-
-
-for op in (
-    operator.add,
-    operator.mul,
-    operator.and_,
-    operator.or_,
-    operator.xor,
-    np.logaddexp,
-    np.logical_and,
-    np.logical_or,
-    np.logical_xor,
-):
-    register_property(op, "__call__", "is_associative", lambda op: True)
+    return as_finch_operator(op).is_associative
 
 
 def is_commutative(op: Any) -> bool:
-    return query_property(op, "__call__", "is_commutative")
+    return as_finch_operator(op).is_commutative
 
 
-for op in (
-    operator.add,
-    operator.mul,
-    operator.and_,
-    operator.or_,
-    operator.xor,
-    np.logical_and,
-    np.logical_or,
-    np.logical_xor,
-):
-    register_property(op, "__call__", "is_commutative", lambda op: True)
-
-for op in (
-    operator.sub,
-    operator.truediv,
-    operator.floordiv,
-    operator.pow,
-    operator.lshift,
-    operator.rshift,
-):
-    register_property(op, "__call__", "is_commutative", lambda op: False)
+def is_idempotent(op: Any) -> bool:
+    return as_finch_operator(op).is_idempotent
 
 
 def is_identity(op: Any, val: Any) -> bool:
-    """
-    Returns whether the given object is an identity for the given function, that is,
-    whether the `op(a, val) == a for all a`.
-
-    Args:
-        op: The function to check.
-        val: The value to check for identity.
-
-    Returns:
-        True if the value can be proven to be an identity, False otherwise.
-    """
-    return query_property(op, "__call__", "is_identity", val)
+    return as_finch_operator(op).is_identity(val)
 
 
-for fn, func in [
-    (operator.add, lambda op, val: val == 0),
-    (operator.mul, lambda op, val: val == 1),
-    (operator.or_, lambda op, val: not bool(val)),
-    (operator.and_, lambda op, val: bool(val)),
-    (operator.truediv, lambda op, val: val == 1),
-    (operator.lshift, lambda op, val: val == 0),
-    (operator.rshift, lambda op, val: val == 0),
-    (operator.pow, lambda op, val: val == 1),
-    (np.divide, lambda op, val: val == 1),
-    (np.logaddexp, lambda op, val: val == -math.inf),
-    (np.logical_and, lambda op, val: bool(val)),
-    (np.logical_or, lambda op, val: not val),
-    (min, lambda op, val: val == math.inf),
-    (max, lambda op, val: val == -math.inf),
-]:
-    register_property(fn, "__call__", "is_identity", func)
+def is_annihilator(op: Any, val: Any) -> bool:
+    return as_finch_operator(op).is_annihilator(val)
 
 
-def is_distributive(op, other_op):
-    """
-    Returns whether the given pair of functions are distributive, that is,
-    whether the `f(a, g(b, c)) = g(f(a, b), f(a, c))` for all a, b, c`.
-
-    Args:
-        op: The function to check.
-        other_op: The other function to check for distributiveness.
-
-    Returns:
-        True if the pair of functions can be proven to be distributive, False otherwise.
-    """
-    return query_property(op, "__call__", "is_distributive", other_op)
+def is_distributive(op: Any, other_op: Any) -> bool:
+    return as_finch_operator(op).is_distributive(as_finch_operator(other_op))
 
 
-for fn, func in [
-    (operator.mul, lambda op, other_op: other_op in (operator.add, operator.sub)),
-    (operator.and_, lambda op, other_op: other_op in (operator.or_, operator.xor)),
-    (operator.or_, lambda op, other_op: other_op == operator.and_),
-    (np.logical_and, lambda op, other_op: other_op in (np.logical_or, np.logical_xor)),
-    (np.logical_or, lambda op, other_op: other_op == np.logical_and),
-    (operator.pow, lambda op, other_op: False),
-    (operator.truediv, lambda op, other_op: False),
-    (operator.add, lambda op, other_op: False),
-    (max, lambda op, other_op: False),
-    (min, lambda op, other_op: False),
-]:
-    register_property(fn, "__call__", "is_distributive", func)
+def return_type(op: Any, *args: Any) -> Any:
+    return as_finch_operator(op).return_type(*args)
 
 
-def is_annihilator(op, val):
-    """
-    Returns whether the given object is an annihilator for the given function, that is,
-    whether the `op(a, val) == val for all a`.
-
-    Args:
-        op: The function to check.
-        val: The value to check for annihilator.
-
-    Returns:
-        True if the value can be proven to be an annihilator, False otherwise.
-    """
-    return query_property(op, "__call__", "is_annihilator", val)
+def init_value(op: Any, arg: Any) -> Any:
+    return as_finch_operator(op).init_value(arg)
 
 
-for fn, func in [
-    (operator.add, lambda op, val: np.isinf(val)),
-    (operator.mul, lambda op, val: val == 0),
-    (operator.or_, lambda op, val: bool(val)),
-    (operator.and_, lambda op, val: not bool(val)),
-    (np.logaddexp, lambda op, val: val == math.inf),
-    (np.logical_and, lambda op, val: not bool(val)),
-    (np.logical_or, lambda op, val: bool(val)),
-]:
-    register_property(fn, "__call__", "is_annihilator", func)
+class ReflexiveFinchOperator(FinchOperator):
+    def return_type(self, a: Any, b: Any) -> type:
+        return type(self(a(True), b(True)))
+
+
+class UnaryFinchOperator(FinchOperator):
+    def return_type(self, a: Any) -> type:
+        return type(self(a(True)))
+
+
+class ComparisonFinchOperator(FinchOperator):
+    def return_type(self, a: Any, b: Any) -> type:
+        return bool
+
+
+class Add(ReflexiveFinchOperator):
+    is_associative = True
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.add(a, b)
+
+    def is_identity(self, arg: Any) -> bool:
+        return arg == 0
+
+    def is_annihilator(self, arg: Any) -> bool:
+        return np.isinf(arg)
+
+    def repeat_operator(self):
+        return _operator_map[operator.mul]
+
+    def init_value(self, type_: type) -> Any:
+        return type_(0)
+
+
+class Mul(ReflexiveFinchOperator):
+    is_associative = True
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.mul(a, b)
+
+    def is_identity(self, arg: Any) -> bool:
+        return arg == 1
+
+    def repeat_operator(self):
+        return _operator_map[operator.pow]
+
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return isinstance(other_op, (Add, Sub))
+
+    def is_annihilator(self, val):
+        return val == 0
+
+    def init_value(self, type_: type) -> Any:
+        return type_(1)
+
+
+class Sub(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.sub(a, b)
+
+
+class MatMul(ReflexiveFinchOperator):
+    is_associative = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.matmul(a, b)
+
+
+class TrueDiv(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.truediv(a, b)
+
+    def is_identity(self, arg):
+        return arg == 1
+
+
+class FloorDiv(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.floordiv(a, b)
+
+
+class Mod(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.mod(a, b)
+
+
+class DivMod(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return divmod(a, b)
+
+
+class Pow(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.pow(a, b)
+
+    def is_identity(self, arg):
+        return arg == 1
+
+    def is_annihilator(self, arg):
+        return arg == 0
+
+
+class LShift(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.lshift(a, b)
+
+    def is_identity(self, arg):
+        return arg == 0
+
+
+class RShift(ReflexiveFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.rshift(a, b)
+
+    def is_identity(self, arg):
+        return arg == 0
+
+
+class And(ReflexiveFinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.and_(a, b)
+
+    def is_identity(self, arg):
+        return bool(arg)
+
+    def is_annihilator(self, arg):
+        return not bool(arg)
+
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return isinstance(other_op, (Or, Xor))
+
+    def init_value(self, type_: type) -> Any:
+        return type_(True)
+
+
+class Xor(ReflexiveFinchOperator):
+    is_associative = True
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.xor(a, b)
+
+    def is_identity(self, arg):
+        return arg == 0
+
+    def init_value(self, type_: type) -> Any:
+        return type_(False)
+
+
+class Or(ReflexiveFinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.or_(a, b)
+
+    def is_identity(self, arg):
+        return not bool(arg)
+
+    def is_annihilator(self, arg):
+        return bool(arg)
+
+    def is_distributive(self, other_op: "FinchOperator") -> bool:
+        return isinstance(other_op, And)
+
+    def init_value(self, type_: type) -> Any:
+        return type_(False)
+
+
+class Abs(UnaryFinchOperator):
+    is_idempotent = True
+
+    def __call__(self, a: Any):
+        return operator.abs(a)
+
+
+class Pos(UnaryFinchOperator):
+    is_idempotent = True
+
+    def __call__(self, a: Any):
+        return operator.pos(a)
+
+
+class Neg(UnaryFinchOperator):
+    def __call__(self, a: Any):
+        return operator.neg(a)
+
+
+class Invert(UnaryFinchOperator):
+    def __call__(self, a: Any):
+        return operator.invert(a)
+
+
+class Eq(ComparisonFinchOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.eq(a, b)
+
+
+class Ne(ComparisonFinchOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return operator.ne(a, b)
+
+
+class Gt(ComparisonFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.gt(a, b)
+
+
+class Lt(ComparisonFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.lt(a, b)
+
+
+class Ge(ComparisonFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.ge(a, b)
+
+
+class Le(ComparisonFinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.le(a, b)
+
+
+class BinaryFloatOperator(FinchOperator):
+    def return_type(self, a: Any, b: Any) -> type:
+        return float
+
+
+class UnaryOperator(FinchOperator):
+    def return_type(self, a: Any) -> type:
+        # TODO: Temporary implementation
+        if a is np.float16:
+            return a
+        if a is np.float32:
+            return a
+        if np.can_cast(a, np.float64):
+            return np.float64
+        if a is np.complex64:
+            return a
+        if a is np.complex128:
+            return a
+        raise TypeError(f"Unsupported operand type for {self}: {a}")
+
+
+class UnaryBoolOperator(FinchOperator):
+    def return_type(self, a: Any) -> type:
+        return bool
+
+
+class BinaryBoolOperator(FinchOperator):
+    def return_type(self, a: Any, b: Any) -> type:
+        return bool
+
+
+class LogicalBinaryOperator(BinaryBoolOperator):
+    is_associative = True
+    is_commutative = True
+
+
+class Divide(BinaryFloatOperator):
+    def __call__(self, a, b):
+        return np.divide(a, b)
+
+    def is_identity(self, val) -> bool:
+        return val == 1
+
+
+class LogAddExp(BinaryFloatOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = False
+
+    def __call__(self, a, b):
+        return np.logaddexp(a, b)
+
+    def is_identity(self, val) -> bool:
+        return val == -np.inf
+
+    def is_annihilator(self, val) -> bool:
+        return val == np.inf
+
+    def init_value(self, type_: type) -> Any:
+        return -np.inf
+
+
+class LogicalAnd(LogicalBinaryOperator):
+    is_idempotent = True
+
+    def __call__(self, a, b):
+        return np.logical_and(a, b)
+
+    def is_identity(self, val) -> bool:
+        return bool(val)
+
+    def is_annihilator(self, val) -> bool:
+        return not bool(val)
+
+    def is_distributive(self, other_op: FinchOperator) -> bool:
+        return isinstance(other_op, (LogicalOr, LogicalXor))
+
+    def init_value(self, type_: type) -> Any:
+        return True
+
+
+class LogicalOr(LogicalBinaryOperator):
+    is_idempotent = True
+
+    def __call__(self, a, b):
+        return np.logical_or(a, b)
+
+    def is_identity(self, val) -> bool:
+        return not bool(val)
+
+    def is_annihilator(self, val) -> bool:
+        return bool(val)
+
+    def is_distributive(self, other_op: FinchOperator) -> bool:
+        return isinstance(other_op, LogicalAnd)
+
+    def init_value(self, type_: type) -> Any:
+        return False
+
+
+class LogicalXor(LogicalBinaryOperator):
+    is_idempotent = False
+
+    def __call__(self, a, b):
+        return np.logical_xor(a, b)
+
+    def is_identity(self, val) -> bool:
+        return not bool(val)
+
+    def init_value(self, type_: type) -> Any:
+        return False
+
+
+class LogicalNot(UnaryBoolOperator):
+    def __call__(self, a):
+        return np.logical_not(a)
+
+
+class Truth(UnaryBoolOperator):
+    def __call__(self, a: Any):
+        return bool(a)
+
+
+class Min(FinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a, b):
+        return min(a, b)
+
+    def return_type(self, a: Any, b: Any) -> type:
+        return type(min(a(True), b(True)))
+
+    def is_identity(self, val) -> bool:
+        return val == np.inf
+
+    def init_value(self, type_: type):
+        return type_max(type_)
+
+
+class Max(FinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a, b):
+        return max(a, b)
+
+    def return_type(self, a: Any, b: Any) -> type:
+        return type(max(a(True), b(True)))
+
+    def is_identity(self, val) -> bool:
+        return val == -np.inf
+
+    def init_value(self, type_: type):
+        return type_min(type_)
+
+
+class Remainder(BinaryFloatOperator):
+    def __call__(self, a, b):
+        return np.remainder(a, b)
+
+
+class Hypot(BinaryFloatOperator):
+    is_commutative = True
+
+    def __call__(self, a, b):
+        return np.hypot(a, b)
+
+
+class Atan2(BinaryFloatOperator):
+    def __call__(self, a, b):
+        return np.atan2(a, b)
+
+
+class Copysign(BinaryFloatOperator):
+    def __call__(self, a, b):
+        return np.copysign(a, b)
+
+
+class Nextafter(BinaryFloatOperator):
+    def __call__(self, a, b):
+        return np.nextafter(a, b)
+
+
+class IsFinite(UnaryBoolOperator):
+    def __call__(self, a):
+        return np.isfinite(a)
+
+
+class IsInf(UnaryBoolOperator):
+    def __call__(self, a):
+        return np.isinf(a)
+
+
+class IsNan(UnaryBoolOperator):
+    def __call__(self, a):
+        return np.isnan(a)
+
+
+class Real(UnaryOperator):
+    def __call__(self, a):
+        return np.real(a)
+
+    def return_type(self, a: Any) -> type:
+        return float
+
+
+class Imag(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.imag(a)
+
+    def return_type(self, a: Any) -> type:
+        return float
+
+
+class Clip(FinchOperator):
+    def __call__(self, a: Any, b: Any, c: Any):
+        return np.clip(a, b, c)
+
+    def return_type(self, a: Any, b: Any, c: Any) -> type:
+        return float
+
+
+class Equal(BinaryBoolOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return np.equal(a, b)
+
+
+class NotEqual(BinaryBoolOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return np.not_equal(a, b)
+
+
+class Less(BinaryBoolOperator):
+    def __call__(self, a: Any, b: Any):
+        return np.less(a, b)
+
+
+class LessEqual(BinaryBoolOperator):
+    def __call__(self, a: Any, b: Any):
+        return np.less_equal(a, b)
+
+
+class Greater(BinaryBoolOperator):
+    def __call__(self, a: Any, b: Any):
+        return np.greater(a, b)
+
+
+class GreaterEqual(BinaryBoolOperator):
+    def __call__(self, a: Any, b: Any):
+        return np.greater_equal(a, b)
+
+
+class Reciprocal(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.reciprocal(a)
+
+
+class Sin(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.sin(a)
+
+
+class Cos(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.cos(a)
+
+
+class Tan(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.tan(a)
+
+
+class Sinh(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.sinh(a)
+
+
+class Cosh(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.cosh(a)
+
+
+class Tanh(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.tanh(a)
+
+
+class Atan(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.atan(a)
+
+
+class Asinh(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.asinh(a)
+
+
+class Asin(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.asin(a)
+
+
+class Acos(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.acos(a)
+
+
+class Acosh(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.acosh(a)
+
+
+class Atanh(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.atanh(a)
+
+
+class Round(UnaryOperator):
+    is_idempotent = True
+
+    def __call__(self, a: Any):
+        return np.round(a)
+
+
+class Floor(UnaryOperator):
+    is_idempotent = True
+
+    def __call__(self, a: Any):
+        return np.floor(a)
+
+
+class Ceil(UnaryOperator):
+    is_idempotent = True
+
+    def __call__(self, a: Any):
+        return np.ceil(a)
+
+
+class Trunc(UnaryOperator):
+    is_idempotent = True
+
+    def __call__(self, a: Any):
+        return np.trunc(a)
+
+
+class Exp(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.exp(a)
+
+
+class Expm1(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.expm1(a)
+
+
+class Log(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.log(a)
+
+
+class Log1p(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.log1p(a)
+
+
+class Log2(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.log2(a)
+
+
+class Log10(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.log10(a)
+
+
+class Signbit(UnaryBoolOperator):
+    def __call__(self, a: Any):
+        return np.signbit(a)
+
+
+class Sqrt(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.sqrt(a)
+
+
+class Square(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.square(a)
+
+
+class Sign(UnaryOperator):
+    def __call__(self, a: Any):
+        return np.sign(a)
 
 
 def fixpoint_type(op: Any, z: Any, t: type) -> type:
@@ -484,21 +903,16 @@ def fixpoint_type(op: Any, z: Any, t: type) -> type:
     r = type(z)
     while r not in s:
         s.add(r)
-        r = return_type(
-            op, type(z), t
-        )  # Assuming `op` is a callable that takes `z` and `t` as arguments
+        r = return_type(op, type(z), t)
     return r
 
 
-T = TypeVar("T")
-
-
-def type_min(t: type[T]) -> T:
+def type_min(type_: type) -> Any:
     """
     Returns the minimum value of the given type.
 
     Args:
-        t: The type to determine the minimum value for.
+        type_: The type to determine the minimum value for.
 
     Returns:
         The minimum value of the given type.
@@ -506,28 +920,21 @@ def type_min(t: type[T]) -> T:
     Raises:
         AttributeError: If the minimum value is not implemented for the given type.
     """
-    if hasattr(t, "type_min"):
-        return t.type_min()  # type: ignore[attr-defined]
-    return query_property(t, "type_min", "__attr__")
+    if type_ in (bool, np.bool_):
+        return np.bool_(False)
+    if issubclass(type_, (int, np.integer)):
+        return np.iinfo(type_).min
+    if issubclass(type_, (float, np.floating)):
+        return np.finfo(type_).min
+    raise Exception(f"Unsupported type for type_min: {type_}")
 
 
-for t, tn in [
-    (bool, lambda x: -math.inf),
-    (int, lambda x: -math.inf),
-    (float, lambda x: -math.inf),
-    (np.bool_, lambda x: x(False)),
-    (np.integer, lambda x: np.iinfo(x).min),
-    (np.floating, lambda x: np.finfo(x).min),
-]:
-    register_property(t, "type_min", "__attr__", tn)
-
-
-def type_max(t: type[T]) -> T:
+def type_max(type_: type) -> Any:
     """
     Returns the maximum value of the given type.
 
     Args:
-        t: The type to determine the maximum value for.
+        type_: The type to determine the maximum value for.
 
     Returns:
         The maximum value of the given type.
@@ -535,226 +942,331 @@ def type_max(t: type[T]) -> T:
     Raises:
         AttributeError: If the maximum value is not implemented for the given type.
     """
-    if hasattr(t, "type_max"):
-        return t.type_max()  # type: ignore[attr-defined]
-    return query_property(t, "type_max", "__attr__")
+    if type_ in (bool, np.bool_):
+        return np.bool_(True)
+    if issubclass(type_, (int, np.integer)):
+        return np.iinfo(type_).max
+    if issubclass(type_, (float, np.floating)):
+        return np.finfo(type_).max
+    raise Exception(f"Unsupported type for type_max: {type_}")
 
 
-for t, tn in [
-    (bool, lambda x: +math.inf),
-    (int, lambda x: +math.inf),
-    (float, lambda x: +math.inf),
-    (np.bool_, lambda x: x(True)),
-    (np.integer, lambda x: np.iinfo(x).max),
-    (np.floating, lambda x: np.finfo(x).max),
-]:
-    register_property(t, "type_max", "__attr__", tn)
+# functions ported from ops.py
 
 
-def init_value(op, arg) -> Any:
-    """Returns the initial value for a reduction operation on the given type.
+def and_test(a, b):
+    return a & b
 
-    Args:
-        op: The reduction operation to determine the initial value for.
-        arg: The type of arguments to be reduced.
 
-    Returns:
-        The initial value for the given operation and type.
+def or_test(a, b):
+    return a | b
 
-    Raises:
-        AttributeError: If the initial value is not implemented for the given type
-        and operation.
+
+def not_test(a):
+    return not a
+
+
+def ifelse(a, b, c):
+    return a if c else b
+
+
+def make_tuple(*args):
+    return tuple(args)
+
+
+def identity(x):
     """
-    return query_property(op, "__call__", "init_value", arg)
-
-
-for op in [operator.add, operator.mul, operator.and_, operator.xor, operator.or_]:
-    (meth, rmeth) = _reflexive_operators[op]
-    register_property(
-        op,
-        "__call__",
-        "init_value",
-        lambda op, arg, meth=meth: query_property(arg, meth, "init_value"),
-    )
-
-for fn, func in [
-    (np.logaddexp, lambda op, val: -math.inf),
-    (np.logical_and, lambda op, val: True),
-    (np.logical_or, lambda op, val: False),
-    (np.logical_xor, lambda op, val: False),
-    (min, lambda op, val: type_max(val)),
-    (max, lambda op, val: type_min(val)),
-]:
-    register_property(fn, "__call__", "init_value", func)
-
-
-def sum_init_value(t):
-    if t is bool:
-        return 0
-    if t is np.bool_:
-        return np.int_(0)
-    if issubclass(t, np.integer):
-        if issubclass(t, np.signedinteger):
-            return np.int_(0)
-        return np.uint(0)
-    return t(0)
-
-
-for t in StableNumber.__args__:
-    register_property(t, "__add__", "init_value", sum_init_value)
-    register_property(t, "__mul__", "init_value", lambda a: a(True))
-    register_property(t, "__and__", "init_value", lambda a: a(True))
-    register_property(t, "__xor__", "init_value", lambda a: a(False))
-    register_property(t, "__or__", "init_value", lambda a: a(False))
-
-
-def is_idempotent(op: Any) -> bool:
+    Returns the input value unchanged.
     """
-    Returns whether the given operator is idempotent over the argument domain,
-    i.e., op(x, x) == x.
+    return x
 
-    Args:
-        op: The operator/function to check.
 
-    Returns:
-        True if the operator is known to be idempotent, False otherwise.
+def first_arg(*args):
     """
-    return query_property(op, "__call__", "is_idempotent")
+    Returns the first argument passed to it.
+    """
+    return args[0] if args else None
 
 
-for fn in [
-    operator.and_,
-    operator.or_,
-    np.logical_and,
-    np.logical_or,
-    min,
-    max,
-]:
-    register_property(fn, "__call__", "is_idempotent", lambda op: True)
+def overwrite(x, y):
+    """
+    overwrite(x, y) returns y always.
+    """
+    return y
 
-for fn in [
-    operator.add,
-    operator.mul,
-    operator.xor,
-    np.logical_xor,
-    np.logaddexp,
-]:
-    register_property(fn, "__call__", "is_idempotent", lambda op: False)
 
-for unary in (
-    np.reciprocal,
-    np.sin,
-    np.cos,
-    np.tan,
-    np.sinh,
-    np.cosh,
-    np.tanh,
-    np.atan,
-    np.asinh,
-    np.asin,
-    np.acos,
-    np.acosh,
-    np.atanh,
-    np.round,
-    np.floor,
-    np.ceil,
-    np.trunc,
-    np.exp,
-    np.expm1,
-    np.log,
-    np.log1p,
-    np.log2,
-    np.log10,
-    np.signbit,
-    np.sqrt,
-    np.square,
-    np.sign,
-):
+def promote_min(a, b):
+    cast = promote_type(a, b)
+    return cast(min(a, b))
 
-    def unary_type(op, a):
-        # TODO: Determine a better way to do this
-        if a is np.float16:
-            return a
-        if a is np.float32:
-            return a
-        if np.can_cast(a, np.float64):
-            return np.float64
-        if a is np.complex64:
-            return a
-        if a is np.complex128:
-            return a
-        raise TypeError(f"Unsupported operand type for {op}:  {a}")
 
-    register_property(
-        unary,
-        "__call__",
-        "return_type",
-        unary_type,
+def promote_max(a, b):
+    cast = promote_type(a, b)
+    return max(cast(a), cast(b))
+
+
+class PromoteMin(FinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a: Any, b: Any):
+        cast = promote_type(type(a), type(b))
+        return cast(min(a, b))
+
+    def return_type(self, a: Any, b: Any) -> type:
+        return promote_type(a, b)
+
+    def init_value(self, arg):
+        return type_max(arg)
+
+
+class PromoteMax(FinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, a: Any, b: Any):
+        cast = promote_type(type(a), type(b))
+        return max(cast(a), cast(b))
+
+    def return_type(self, a: Any, b: Any) -> type:
+        return promote_type(a, b)
+
+    def init_value(self, arg):
+        return type_min(arg)
+
+
+def conjugate(x):
+    """
+    Computes the complex conjugate of the input number
+
+    Parameters
+    ----------
+    x: Any
+        The input number to compute the complex conjugate of.
+
+    Returns
+    ----------
+    Any
+        The complex conjugate of the input number. If the input is not a complex number,
+        it returns the input unchanged.
+    """
+    if hasattr(x, "conjugate"):
+        return x.conjugate()
+    return x
+
+
+class InitWrite(FinchOperator):
+    """
+    InitWrite may assert that its first argument is
+    equal to z, and returns its second argument. This is useful when you want to
+    communicate to the compiler that the tensor has already been initialized to
+    a specific value.
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __call__(self, x: Any, y: Any):
+        assert x == self.value, f"Expected {self.value}, got {x}"
+        return y
+
+    def return_type(self, x: Any, y: Any) -> type:
+        return y
+
+
+class Overwrite(FinchOperator):
+    """
+    Overwrite(x, y) returns y always.
+    """
+
+    def __call__(self, x: Any, y: Any):
+        return y
+
+    def return_type(self, x: Any, y: Any) -> type:
+        return y
+
+
+class FirstArg(FinchOperator):
+    """
+    Returns the first argument passed to it.
+    """
+
+    def __call__(self, *args):
+        return args[0] if args else None
+
+    def return_type(self, *args) -> type:
+        return args[0]
+
+
+class Identity(FinchOperator):
+    """
+    Returns the input value unchanged.
+    """
+
+    is_idempotent = True
+
+    def __call__(self, x: Any):
+        return x
+
+    def return_type(self, x: Any) -> type:
+        return x
+
+
+class Conjugate(FinchOperator):
+    """
+    Returns the complex conjugate of the input value.
+    """
+
+    def __call__(self, x: Any):
+        return np.conjugate(x)
+
+    def return_type(self, x: Any) -> type:
+        return x
+
+
+class MakeTuple(FinchOperator):
+    is_commutative = False
+    is_associative = False
+
+    def __call__(self, *args: Any) -> tuple:
+        return tuple(args)
+
+    def return_type(self, *args: Any) -> Any:
+        from finchlite.finch_assembly.struct import TupleFType
+
+        return TupleFType.from_tuple(args)
+
+
+def repeat_operator(x):
+    """
+    If there exists an operator g such that
+    f(x, x, ..., x)  (n times)  is equal to g(x, n),
+    then return g.
+    """
+    return as_finch_operator(x).repeat_operator()
+
+
+def cansplitpush(x, y):
+    """
+    Return True if a reduction with operator `x` can be 'split-pushed' through
+    a pointwise operator `y`.
+
+    We allow split-push when:
+      - x has a known repeat operator (repeat_operator(x) is not None),
+      - x and y are the same operator,
+      - and x is both commutative and associative.
+    """
+    if not callable(x) or not callable(y):
+        raise TypeError("Can't check splitpush of non-callable operators!")
+
+    return (
+        repeat_operator(x) is not None
+        and x == y
+        and is_commutative(x)
+        and is_associative(x)
     )
 
-for binary_op in (
-    np.divide,
-    np.remainder,
-    np.hypot,
-    np.atan2,
-    np.logaddexp,
-    np.copysign,
-    np.nextafter,
-):
-    register_property(
-        binary_op,
-        "__call__",
-        "return_type",
-        lambda op, a, b, _binary_op=binary_op: float,
-    )
 
-register_property(np.isfinite, "__call__", "return_type", lambda op, a: bool)
-register_property(np.isinf, "__call__", "return_type", lambda op, a: bool)
-register_property(np.isnan, "__call__", "return_type", lambda op, a: bool)
+_operator_map: dict[Any, FinchOperator] = {
+    # Python Operators
+    operator.add: Add(),
+    operator.mul: Mul(),
+    operator.sub: Sub(),
+    operator.matmul: MatMul(),
+    operator.truediv: TrueDiv(),
+    operator.floordiv: FloorDiv(),
+    operator.truth: Truth(),
+    operator.mod: Mod(),
+    operator.pow: Pow(),
+    operator.lshift: LShift(),
+    operator.rshift: RShift(),
+    operator.and_: And(),
+    operator.xor: Xor(),
+    operator.or_: Or(),
+    operator.abs: Abs(),
+    operator.pos: Pos(),
+    operator.neg: Neg(),
+    operator.invert: Invert(),
+    operator.eq: Eq(),
+    operator.ne: Ne(),
+    operator.gt: Gt(),
+    operator.lt: Lt(),
+    operator.ge: Ge(),
+    operator.le: Le(),
+    min: Min(),
+    max: Max(),
+    divmod: DivMod(),
+    abs: Abs(),
+    # NumPy Functions
+    np.divide: Divide(),
+    np.remainder: Remainder(),
+    np.hypot: Hypot(),
+    np.atan2: Atan2(),
+    np.copysign: Copysign(),
+    np.nextafter: Nextafter(),
+    np.logaddexp: LogAddExp(),
+    np.logical_and: LogicalAnd(),
+    np.logical_or: LogicalOr(),
+    np.logical_xor: LogicalXor(),
+    np.logical_not: LogicalNot(),
+    np.isfinite: IsFinite(),
+    np.isinf: IsInf(),
+    np.isnan: IsNan(),
+    np.real: Real(),
+    np.imag: Imag(),
+    np.clip: Clip(),
+    np.equal: Equal(),
+    np.not_equal: NotEqual(),
+    np.less: Less(),
+    np.less_equal: LessEqual(),
+    np.greater: Greater(),
+    np.greater_equal: GreaterEqual(),
+    np.reciprocal: Reciprocal(),
+    np.sin: Sin(),
+    np.cos: Cos(),
+    np.tan: Tan(),
+    np.sinh: Sinh(),
+    np.cosh: Cosh(),
+    np.tanh: Tanh(),
+    np.atan: Atan(),
+    np.asinh: Asinh(),
+    np.asin: Asin(),
+    np.acos: Acos(),
+    np.acosh: Acosh(),
+    np.atanh: Atanh(),
+    np.round: Round(),
+    np.floor: Floor(),
+    np.ceil: Ceil(),
+    np.trunc: Trunc(),
+    np.exp: Exp(),
+    np.expm1: Expm1(),
+    np.log: Log(),
+    np.log1p: Log1p(),
+    np.log2: Log2(),
+    np.log10: Log10(),
+    np.signbit: Signbit(),
+    np.sqrt: Sqrt(),
+    np.square: Square(),
+    np.sign: Sign(),
+    conjugate: Conjugate(),
+    promote_min: PromoteMin(),
+    promote_max: PromoteMax(),
+    overwrite: Overwrite(),
+    first_arg: FirstArg(),
+    identity: Identity(),
+    make_tuple: MakeTuple(),
+}
 
-for logical in (
-    np.logical_and,
-    np.logical_or,
-    np.logical_xor,
-):
-    register_property(
-        logical,
-        "__call__",
-        "return_type",
-        lambda op, a, b, _logical=logical: bool,
-    )
-register_property(np.logical_not, "__call__", "return_type", lambda op, a: bool)
 
-
-for complex_op in (np.real, np.imag):
-    register_property(
-        complex_op,
-        "__call__",
-        "return_type",
-        lambda op, a, _complex_op=complex_op: float,
-    )
-
-
-for ternary_op in (np.clip,):
-    register_property(
-        ternary_op,
-        "__call__",
-        "return_type",
-        lambda op, a, b, c, _ternary_op=ternary_op: float,
-    )
-
-# Register return types for numpy comparison ufuncs
-for comparison in (
-    np.equal,
-    np.not_equal,
-    np.less,
-    np.less_equal,
-    np.greater,
-    np.greater_equal,
-):
-    register_property(
-        comparison,
-        "__call__",
-        "return_type",
-        lambda op, a, b, _comparison=comparison: bool,
-    )
+def as_finch_operator(f: Any) -> FinchOperator:
+    """
+    Given an operator, returns its FinchOperator equivalent by
+    looking up the operator map.
+    """
+    if isinstance(f, FinchOperator):
+        return f
+    if f in _operator_map:
+        return _operator_map[f]
+    raise TypeError(f"No FinchOperator registered for {f}. ")
