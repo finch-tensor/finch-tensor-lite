@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import TensorFType, register_property
+from ..algebra import TensorFType
 from .eager import EagerTensor
 
 
@@ -75,7 +75,3 @@ class Scalar(EagerTensor):
 
     def __getitem__(self, idx):
         return self.val
-
-
-register_property(object, "asarray", "__attr__", lambda x: Scalar(x))
-register_property(Scalar, "asarray", "__attr__", lambda x: x)
