@@ -15,7 +15,7 @@ import numpy as np
 
 from lark import Lark, Token, Tree
 
-from ..algebra.operator import scansearch
+from ..algebra import scansearch
 from . import nodes as asm
 
 assembly_parser = Lark(

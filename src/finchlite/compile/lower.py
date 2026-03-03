@@ -8,9 +8,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, register_property
-from ..algebra.algebra import FinchOperator
-from ..algebra.operator import scansearch
+from ..algebra import TensorFType, register_property, scansearch
+from ..algebra.algebra import FinchOperator, SingletonMeta
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -99,7 +98,7 @@ class Extent(FTyped):
         )
 
 
-class ExtentOp(FinchOperator):
+class ExtentOp(FinchOperator, metaclass=SingletonMeta):
     __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
 
     def __call__(self, start: Any, end: Any) -> Extent:
@@ -125,13 +124,6 @@ register_property(
     lambda op, x, y: ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
 )
 
-register_property(
-    scansearch,
-    "__call__",
-    "return_type",
-    lambda op, arr, x, lo, hi: np.intp,  # type: ignore[abstract]
-)
-
 
 register_property(
     dimension,
@@ -139,6 +131,7 @@ register_property(
     "__attr__",
     lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
 )
+
 
 register_property(
     scansearch,

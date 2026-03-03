@@ -9,8 +9,7 @@ import numpy as np
 import numba
 
 from .. import finch_assembly as asm
-from ..algebra import InitWrite, query_property, register_property
-from ..algebra.operator import scansearch
+from ..algebra import InitWrite, query_property, register_property, scansearch
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
 from ..finch_assembly.struct import (  # type: ignore[import-untyped]
@@ -27,7 +26,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {"scansearch": numba.njit(scansearch)}
+numba_globals: dict[str, Any] = {"scansearch": numba.njit(scansearch._func)}
 
 
 def numba_type(t):

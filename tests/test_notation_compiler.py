@@ -9,7 +9,7 @@ import finchlite.finch_notation as ntn
 from finchlite import ftype
 from finchlite.compile import (
     BufferizedNDArray,
-    Extent,
+    ExtentOp,
     NotationCompiler,
 )
 from finchlite.finch_assembly import AssemblyInterpreter
@@ -57,15 +57,15 @@ def test_matrix_multiplication(a, b):
     p = ntn.Variable("p", np.int64)
 
     m_ext = ntn.Call(
-        ntn.Literal(Extent),
+        ntn.Literal(ExtentOp()),
         (ntn.Literal(np.int64(0)), ntn.Variable("m", np.int64)),
     )
     n_ext = ntn.Call(
-        ntn.Literal(Extent),
+        ntn.Literal(ExtentOp()),
         (ntn.Literal(np.int64(0)), ntn.Variable("n", np.int64)),
     )
     p_ext = ntn.Call(
-        ntn.Literal(Extent),
+        ntn.Literal(ExtentOp()),
         (ntn.Literal(np.int64(0)), ntn.Variable("p", np.int64)),
     )
 
@@ -187,9 +187,9 @@ def test_matrix_multiplication_regression(file_regression):
     n = ntn.Variable("n", np.int64)
     p = ntn.Variable("p", np.int64)
 
-    m_ext = ntn.Call(ntn.Literal(Extent), (ntn.Literal(np.int64(0)), m))
-    n_ext = ntn.Call(ntn.Literal(Extent), (ntn.Literal(np.int64(0)), n))
-    p_ext = ntn.Call(ntn.Literal(Extent), (ntn.Literal(np.int64(0)), p))
+    m_ext = ntn.Call(ntn.Literal(ExtentOp()), (ntn.Literal(np.int64(0)), m))
+    n_ext = ntn.Call(ntn.Literal(ExtentOp()), (ntn.Literal(np.int64(0)), n))
+    p_ext = ntn.Call(ntn.Literal(ExtentOp()), (ntn.Literal(np.int64(0)), p))
 
     prgm = ntn.Module(
         (
