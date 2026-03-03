@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor, register_property
+from ..algebra import Tensor
 from ..compile.lower import FinchTensorFType
 from ..symbolic import FType, FTyped
 
@@ -401,6 +401,3 @@ def fiber_tensor(lvl: LevelFType):
     # mypy does not understand that dataclasses generate __hash__ and __eq__
     # https://github.com/python/mypy/issues/19799
     return FiberTensorFType(lvl)  # type: ignore[abstract]
-
-
-register_property(FiberTensor, "asarray", "__attr__", lambda x: x)

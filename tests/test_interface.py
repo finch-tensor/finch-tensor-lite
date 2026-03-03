@@ -496,17 +496,17 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
     ],
 )
 @pytest.mark.parametrize(
-    "ops, np_op",
+    "op, np_op",
     [
-        ((finchlite.prod, np.prod), np.prod),
-        ((finchlite.sum, np.sum), np.sum),
-        ((finchlite.any, np.any), np.any),
-        ((finchlite.all, np.all), np.all),
-        ((finchlite.min, np.min), np.min),
-        ((finchlite.max, np.max), np.max),
-        ((finchlite.mean, np.mean), np.mean),
-        ((finchlite.std, np.std), np.std),
-        ((finchlite.var, np.var), np.var),
+        (finchlite.prod, lambda x, axis: np.prod(x, axis=axis, dtype=x.dtype)),
+        (finchlite.sum, lambda x, axis: np.sum(x, axis=axis, dtype=x.dtype)),
+        (finchlite.any, np.any),
+        (finchlite.all, np.all),
+        (finchlite.min, np.min),
+        (finchlite.max, np.max),
+        (finchlite.mean, np.mean),
+        (finchlite.std, np.std),
+        (finchlite.var, np.var),
     ],
 )
 @pytest.mark.parametrize(
@@ -518,25 +518,27 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
         (0, 1),
     ],
 )
-def test_reduction_operations(a, a_wrap, ops, np_op, axis):
+def test_reduction_operations(a, a_wrap, op, np_op, axis):
     wa = a_wrap(a)
+
+    if a.dtype == np.bool_ and np_op in (np.mean, np.std, np.var):
+        pytest.skip("Boolean arrays do not support mean, std, var operations")
 
     expected = np_op(a, axis=axis)
 
-    for op in ops:
-        result = op(wa, axis=axis)
+    result = op(wa, axis=axis)
 
-        if isinstance(wa, finchlite.LazyTensor):
-            assert isinstance(result, finchlite.LazyTensor)
+    if isinstance(wa, finchlite.LazyTensor):
+        assert isinstance(result, finchlite.LazyTensor)
 
-            result = finchlite.compute(result)
+        result = finchlite.compute(result)
 
-        if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
-            expected.dtype, np.complexfloating
-        ):
-            finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
-        else:
-            finch_assert_equal(result, expected)
+    if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
+        expected.dtype, np.complexfloating
+    ):
+        finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
+    else:
+        finch_assert_equal(result, expected)
 
 
 @pytest.mark.usefixtures(

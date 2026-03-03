@@ -9,6 +9,7 @@ import numpy as np
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
+from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -96,6 +97,16 @@ class Extent:
         )
 
 
+class ExtentOp(FinchOperator):
+    __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
+
+    def __call__(self, start: Any, end: Any) -> Extent:
+        return Extent(start, end)
+
+    def return_type(self, start: Any, end: Any):
+        return ExtentFType(start, end)  # type: ignore[abstract]
+
+
 def dimension(tns, mode: int) -> Extent:
     end = tns.shape[mode]
     return Extent(type(end)(0), end)
@@ -110,14 +121,6 @@ register_property(
     "__call__",
     "return_type",
     lambda op, x, y: ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
-)
-
-
-register_property(
-    Extent,
-    "__call__",
-    "return_type",
-    lambda op, x, y: ExtentFType(x, y),  # type: ignore[abstract]
 )
 
 
@@ -191,14 +194,14 @@ class ExtentFType(AssemblyStructFType):
 
     def get_start(self, ext):
         match ext:
-            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
+            case asm.Call(asm.Literal(op), (start, _)) if op is ExtentOp():
                 return start
             case _:
                 return asm.GetAttr(ext, asm.Literal("start"))
 
     def get_end(self, ext):
         match ext:
-            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
+            case asm.Call(asm.Literal(op), (_, end)) if op is ExtentOp():
                 return end
             case _:
                 return asm.GetAttr(ext, asm.Literal("end"))

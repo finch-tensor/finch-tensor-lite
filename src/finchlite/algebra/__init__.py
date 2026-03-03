@@ -1,6 +1,11 @@
 from .algebra import (
-    StableNumber,
+    InitWrite,
+    as_finch_operator,
+    cansplitpush,
+    conjugate,
+    first_arg,
     fixpoint_type,
+    identity,
     init_value,
     is_annihilator,
     is_associative,
@@ -8,22 +13,15 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
-    promote_type,
-    query_property,
-    register_property,
-    return_type,
-)
-from .operator import (
-    InitWrite,
-    cansplitpush,
-    conjugate,
-    first_arg,
-    identity,
     make_tuple,
     overwrite,
     promote_max,
     promote_min,
+    promote_type,
+    query_property,
+    register_property,
     repeat_operator,
+    return_type,
 )
 from .tensor import (
     Tensor,
@@ -32,9 +30,9 @@ from .tensor import (
 
 __all__ = [
     "InitWrite",
-    "StableNumber",
     "Tensor",
     "TensorFType",
+    "as_finch_operator",
     "cansplitpush",
     "conjugate",
     "first_arg",
