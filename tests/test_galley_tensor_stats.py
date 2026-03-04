@@ -19,7 +19,6 @@ from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
     find_lowest_roots,
     get_idx_connected_components,
-    get_lazy_tensor_stats,
     get_reducible_idxs,
     insert_statistics,
     replace_and_remove_nodes,
@@ -32,6 +31,7 @@ from finchlite.galley.TensorStats import (
     UniformStats,
 )
 from finchlite.interface import lazy
+from finchlite.interface.lazy import get_lazy_tensor_stats
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
 
