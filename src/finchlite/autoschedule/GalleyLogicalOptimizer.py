@@ -40,14 +40,14 @@ def optimize_plan(plan, ST, bindings):
     Same code as last code chunk in greedy_optimizer.py.
     Uncomment to get a+b, a*b tests working.
     """
-    #if optimized_queries:
-    #    last_body = optimized_queries[-1]
-    #    if isinstance(last_body, Produces):
-    #        n_returns = len(last_body.args)
-    #        query_lhss = [q.lhs for q in optimized_queries if isinstance(q, Query)]
-    #        if len(query_lhss) >= n_returns:
-    #            new_produces_args = tuple(query_lhss[-n_returns:])
-    #            optimized_queries[-1] = Produces(new_produces_args)
+    if optimized_queries:
+        last_body = optimized_queries[-1]
+        if isinstance(last_body, Produces):
+            n_returns = len(last_body.args)
+            query_lhss = [q.lhs for q in optimized_queries if isinstance(q, Query)]
+            if len(query_lhss) >= n_returns:
+                new_produces_args = tuple(query_lhss[-n_returns:])
+                optimized_queries[-1] = Produces(new_produces_args)
 
     return Plan(tuple(optimized_queries))
 
