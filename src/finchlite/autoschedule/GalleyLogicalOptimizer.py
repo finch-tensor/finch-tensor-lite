@@ -69,7 +69,9 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, Plan):
+            print("Input Program: \n", prgm)
             prgm = optimize_plan(prgm, self.ST, bindings)
+            print("Output Program: \n", prgm)
             if self.ctx is not None:
                 return self.ctx(prgm, bindings)
             return prgm

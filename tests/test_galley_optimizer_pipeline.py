@@ -8,7 +8,7 @@ import finchlite.interface as fl_interface
 
 
 # --- TEST 1: out = a * b via frontend ---
-def test_galley_optimizer_1_elementwise_mul():
+def test_elementwise_mul():
     """Running out = a * b with Finch/Galley pipeline using the frontend."""
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
@@ -21,7 +21,7 @@ def test_galley_optimizer_1_elementwise_mul():
 
 
 # --- TEST 2: out = a * b + c * d via frontend ---
-def test_galley_optimizer_2_add_of_elementwise():
+def test_add_of_elementwise():
     """Running out = a * b + c * d with Finch/Galley frontend."""
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
@@ -37,7 +37,7 @@ def test_galley_optimizer_2_add_of_elementwise():
 
 
 # --- TEST 3: sum(A @ B, axis=0) via frontend ---
-def test_galley_optimizer_3_matmul_sum_axis0():
+def test_matmul_sum_axis0():
     """
     Running out = sum_i sum_j (A[i,j] * B[j,k]) with Finch/Galley frontend.
     """
@@ -52,7 +52,7 @@ def test_galley_optimizer_3_matmul_sum_axis0():
 
 
 # --- TEST 4: sum(A@B, axis=0) + sum(C@D, axis=1) ---
-def test_galley_optimizer_4_sum_axis0_plus_sum_axis1():
+def test_sum_axis0_plus_sum_axis1():
     """
     Running out = sum(A @ B, axis=0) + sum(C @ D, axis=1). Correctness vs NumPy.
     """
@@ -74,7 +74,7 @@ def test_galley_optimizer_4_sum_axis0_plus_sum_axis1():
 
 
 # --- TEST 5: Nested aggregates sum(A @ B) ---
-def test_galley_optimizer_5_nested_aggregates_full_sum():
+def test_nested_aggregates_full_sum():
     """
     Nested aggregates: out = sum_i sum_j (A[i,j] * B[j,k]).
     Verified against NumPy.
@@ -92,7 +92,7 @@ def test_galley_optimizer_5_nested_aggregates_full_sum():
 
 
 # --- TEST 6: sum((A @ B) @ C) ---
-def test_galley_optimizer_6_deeper_nesting():
+def test_deeper_nesting():
     """Deeper nesting: out = sum((A @ B) @ C).
     Verified against NumPy."""
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -111,7 +111,7 @@ def test_galley_optimizer_6_deeper_nesting():
 
 
 # --- TEST 7: expand_dims + sum over singleton (extra axis padding) ---
-def test_galley_optimizer_7_expand_dims_sum_singleton():
+def test_expand_dims_sum_singleton():
     """
     Exercises extra axis padding in logic_to_stats: sum(expand_dims(A, 2), axis=2).
     """
