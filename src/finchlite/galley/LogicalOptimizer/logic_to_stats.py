@@ -58,8 +58,9 @@ def insert_statistics(
 
         case Reorder():
             child = insert_statistics(ST, node.arg, bindings, replace, cache)
-            cache[node] = child
-            return child
+            st = ST.reorder(child, node.idxs)
+            cache[node] = st
+            return st
 
         case Table():
             if isinstance(node.tns, Literal):
