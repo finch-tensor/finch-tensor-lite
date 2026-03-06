@@ -87,7 +87,7 @@ class AnnotatedQuery:
         output_name = q.lhs
         expr = q.rhs
         output_format: list[Any] | None = None
-        output_order: list[Field] | None = None
+        output_order: list[Field] = q.rhs.fields()
         starting_reduce_idxs: list[Field] = []
         idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
