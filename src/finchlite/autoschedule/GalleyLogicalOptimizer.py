@@ -10,8 +10,7 @@ from ..galley.LogicalOptimizer.logic_to_stats import insert_statistics
 def optimize_query(query, ST, stats_bindings):
     """Rewrite a single logical Query via greedy reduction over reducible indices."""
     annotated_query = AnnotatedQuery(ST, query, stats_bindings)
-    queries = greedy_query(annotated_query)
-    return queries
+    return greedy_query(annotated_query)
 
 
 def optimize_plan(plan, ST, bindings):
@@ -28,7 +27,8 @@ def optimize_plan(plan, ST, bindings):
         if isinstance(body, Query):
             new_queries = optimize_query(body, ST, stats_bindings)
             for new_query in new_queries:
-                insert_statistics(ST, new_query, stats_bindings, replace=True, cache=cache_dict)
+                insert_statistics(ST, new_query, stats_bindings, replace=True, 
+                                  cache=cache_dict)
             optimized_queries.extend(new_queries)
         else:
             # Produces(...)
@@ -36,7 +36,7 @@ def optimize_plan(plan, ST, bindings):
 
     """
     Works for simple a*b and a+b a*b+b*c etc, but not for anything more complicated.
-    Assume the alias are messed up, make Produce point to the last query, which we assume is the output.
+    Assume the alias are scrambled, make Produce point to the last alias.
     Same code as last code chunk in greedy_optimizer.py.
     Uncomment to get a+b, a*b tests working.
     """
@@ -54,7 +54,8 @@ def optimize_plan(plan, ST, bindings):
 
 class GalleyLogicalOptimizer(LogicEvaluator):
     """
-    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter, then forwards to an optional downstream LogicEvaluator (ctx)
+    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter, 
+    then forwards to an optional downstream LogicEvaluator (ctx)
     """
 
     def __init__(self, ST, ctx: LogicEvaluator | None = None, verbose: bool = False):

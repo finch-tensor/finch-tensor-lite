@@ -1,15 +1,5 @@
 """
-Combined Galley optimizer tests (originally test_galleyOptimizer_1 through test_galleyOptimizer_9).
-
-- TEST 1: out = a * b via frontend (INTERPRET_NOTATION_GALLEY).
-- TEST 2: GalleyLogicalOptimizer alone with a*b and triangle summation.
-- TEST 3: Same as test2 but through full Galley pipeline (LogicNormalizer -> GalleyLogicalOptimizer -> ...).
-- TEST 4: out = a * b + c * d via frontend.
-- TEST 5: out = sum_i sum_j (A[i,j] * B[j,k]) via frontend (sum over axis=0).
-- TEST 6: sum(A@B, axis=0) + sum(C@D, axis=1).
-- TEST 7: Nested aggregates sum_i sum_j (A[i,j] * B[j,k]) (sum over all).
-- TEST 8: sum((A @ B) @ C) — deeper nesting.
-- TEST 9: expand_dims + sum over singleton axis (extra axis padding in logic_to_stats).
+Galley optimizer pipeline tests.
 """
 import operator
 
@@ -47,7 +37,7 @@ def test_galley_optimizer_1_elementwise_mul():
 
 # --- TEST 2: out = a * b + c * d via frontend ---
 def test_galley_optimizer_2_add_of_elementwise():
-    """Running out = a * b + c * d with Finch/Galley pipeline using the frontend."""
+    """Running out = a * b + c * d with Finch/Galley frontend."""
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     c = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
@@ -62,10 +52,11 @@ def test_galley_optimizer_2_add_of_elementwise():
     )
     assert np.allclose(np.array(out), np.array(expected))
 
-
 # --- TEST 3: sum(A @ B, axis=0) via frontend ---
 def test_galley_optimizer_3_matmul_sum_axis0():
-    """Running out = sum_i sum_j (A[i,j] * B[j,k]) with Finch/Galley pipeline using the frontend."""
+    """
+    Running out = sum_i sum_j (A[i,j] * B[j,k]) with Finch/Galley frontend.
+    """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
@@ -78,7 +69,9 @@ def test_galley_optimizer_3_matmul_sum_axis0():
 
 # --- TEST 4: sum(A@B, axis=0) + sum(C@D, axis=1) ---
 def test_galley_optimizer_4_sum_axis0_plus_sum_axis1():
-    """More complex: out = sum(A @ B, axis=0) + sum(C @ D, axis=1). Correctness vs NumPy."""
+    """
+    Running out = sum(A @ B, axis=0) + sum(C @ D, axis=1). Correctness vs NumPy.
+    """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
@@ -98,7 +91,10 @@ def test_galley_optimizer_4_sum_axis0_plus_sum_axis1():
 
 # --- TEST 5: Nested aggregates sum(A @ B) ---
 def test_galley_optimizer_5_nested_aggregates_full_sum():
-    """Nested aggregates: out = sum_i sum_j (A[i,j] * B[j,k]). Verified against NumPy."""
+    """
+    Nested aggregates: out = sum_i sum_j (A[i,j] * B[j,k]). 
+    Verified against NumPy.
+    """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
@@ -113,13 +109,15 @@ def test_galley_optimizer_5_nested_aggregates_full_sum():
 
 # --- TEST 6: sum((A @ B) @ C) ---
 def test_galley_optimizer_6_deeper_nesting():
-    """Deeper nesting: out = sum((A @ B) @ C). Verified against NumPy."""
+    """Deeper nesting: out = sum((A @ B) @ C). 
+    Verified against NumPy."""
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum((fl_interface.lazy(A) @ fl_interface.lazy(B)) @ fl_interface.lazy(C)),
+        fl_interface.sum((fl_interface.lazy(A) @ fl_interface.lazy(B)) 
+                         @ fl_interface.lazy(C)),
         ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
     )
 
@@ -129,7 +127,9 @@ def test_galley_optimizer_6_deeper_nesting():
 
 # --- TEST 7: expand_dims + sum over singleton (extra axis padding) ---
 def test_galley_optimizer_7_expand_dims_sum_singleton():
-    """Exercises extra axis padding in logic_to_stats: sum(expand_dims(A, 2), axis=2)."""
+    """
+    Exercises extra axis padding in logic_to_stats: sum(expand_dims(A, 2), axis=2).
+    """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
 
     expanded = fl_interface.expand_dims(fl_interface.lazy(A), axis=2)
