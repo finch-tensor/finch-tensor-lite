@@ -1,9 +1,10 @@
 """
 Galley logical optimizer: applies greedy query rewriting to logical plans
 """
-from ..galley.LogicalOptimizer.greedy_optimizer import greedy_query
+
+from ..finch_logic import LogicEvaluator, Plan, Produces, Query
 from ..galley.LogicalOptimizer.annotated_query import AnnotatedQuery
-from ..finch_logic import Plan, LogicEvaluator, Produces, Query
+from ..galley.LogicalOptimizer.greedy_optimizer import greedy_query
 from ..galley.LogicalOptimizer.logic_to_stats import insert_statistics
 
 
@@ -27,8 +28,9 @@ def optimize_plan(plan, ST, bindings):
         if isinstance(body, Query):
             new_queries = optimize_query(body, ST, stats_bindings)
             for new_query in new_queries:
-                insert_statistics(ST, new_query, stats_bindings, replace=True,
-                                  cache=cache_dict)
+                insert_statistics(
+                    ST, new_query, stats_bindings, replace=True, cache=cache_dict
+                )
             optimized_queries.extend(new_queries)
         else:
             # Produces(...)
@@ -71,6 +73,5 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             if self.ctx is not None:
                 return self.ctx(prgm, bindings)
             return prgm
-        else:
-            print("This probabiy should not happen")
-            raise ValueError(f"Unsupported program type: {type(prgm)}")
+        print("This probabiy should not happen")
+        raise ValueError(f"Unsupported program type: {type(prgm)}")

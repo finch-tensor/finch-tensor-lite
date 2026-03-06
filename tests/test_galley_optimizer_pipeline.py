@@ -1,25 +1,10 @@
 """
 Galley optimizer pipeline tests.
 """
-import operator
 
 import numpy as np
-import pytest
 
-import finchlite as fl
 import finchlite.interface as fl_interface
-
-from finchlite.finch_logic import (
-    Aggregate,
-    Alias,
-    Field,
-    Literal,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Table,
-)
 
 
 # --- TEST 1: out = a * b via frontend ---
@@ -47,10 +32,9 @@ def test_galley_optimizer_2_add_of_elementwise():
         + fl_interface.lazy(c) * fl_interface.lazy(d),
         ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
     )
-    expected = (
-        np.array(a) * np.array(b) + np.array(c) * np.array(d)
-    )
+    expected = np.array(a) * np.array(b) + np.array(c) * np.array(d)
     assert np.allclose(np.array(out), np.array(expected))
+
 
 # --- TEST 3: sum(A @ B, axis=0) via frontend ---
 def test_galley_optimizer_3_matmul_sum_axis0():
@@ -92,7 +76,7 @@ def test_galley_optimizer_4_sum_axis0_plus_sum_axis1():
 # --- TEST 5: Nested aggregates sum(A @ B) ---
 def test_galley_optimizer_5_nested_aggregates_full_sum():
     """
-    Nested aggregates: out = sum_i sum_j (A[i,j] * B[j,k]). 
+    Nested aggregates: out = sum_i sum_j (A[i,j] * B[j,k]).
     Verified against NumPy.
     """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -109,15 +93,16 @@ def test_galley_optimizer_5_nested_aggregates_full_sum():
 
 # --- TEST 6: sum((A @ B) @ C) ---
 def test_galley_optimizer_6_deeper_nesting():
-    """Deeper nesting: out = sum((A @ B) @ C). 
+    """Deeper nesting: out = sum((A @ B) @ C).
     Verified against NumPy."""
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum((fl_interface.lazy(A) @ fl_interface.lazy(B)) 
-                         @ fl_interface.lazy(C)),
+        fl_interface.sum(
+            (fl_interface.lazy(A) @ fl_interface.lazy(B)) @ fl_interface.lazy(C)
+        ),
         ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
     )
 
