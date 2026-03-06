@@ -27,7 +27,7 @@ def optimize_plan(plan, ST, bindings):
         if isinstance(body, Query):
             new_queries = optimize_query(body, ST, stats_bindings)
             for new_query in new_queries:
-                insert_statistics(ST, new_query, stats_bindings, replace=True, 
+                insert_statistics(ST, new_query, stats_bindings, replace=True,
                                   cache=cache_dict)
             optimized_queries.extend(new_queries)
         else:
@@ -54,7 +54,7 @@ def optimize_plan(plan, ST, bindings):
 
 class GalleyLogicalOptimizer(LogicEvaluator):
     """
-    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter, 
+    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter,
     then forwards to an optional downstream LogicEvaluator (ctx)
     """
 
