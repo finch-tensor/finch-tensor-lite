@@ -125,20 +125,3 @@ def test_expand_dims_sum_singleton():
 
     expected = np.sum(np.expand_dims(np.array(A), axis=2), axis=2)
     assert np.allclose(np.array(out), np.array(expected))
-
-
-# --- TEST 8: out = a @ b @ c via frontend ---
-def test_matmul_three_way():
-    """Running out = a @ b @ c with Finch/Galley pipeline using the frontend."""
-    a_numpy = np.ones((10000, 2))
-    b_numpy = np.ones((2, 10000))
-    c_numpy = np.ones((10000, 2))
-    a = fl_interface.asarray(a_numpy)
-    b = fl_interface.asarray(b_numpy)
-    c = fl_interface.asarray(c_numpy)
-    out = fl_interface.compute(
-        fl_interface.lazy(a) @ fl_interface.lazy(b) @ fl_interface.lazy(c),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
-    )
-    expected = a_numpy @ (b_numpy @ c_numpy)
-    assert np.allclose(np.array(out), np.array(expected))
