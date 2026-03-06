@@ -664,9 +664,9 @@ class DCStats(TensorStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         d_ij = mod.matrix_total_nnz(arr)
-        xi = BufferizedNDArray.from_numpy(np.zeros(arr.shape[0]))
-        yj = BufferizedNDArray.from_numpy(np.zeros(arr.shape[1]))
-        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr, xi, yj)
+        xi_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[0]))
+        yj_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[1]))
+        d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr, xi_vec, yj_vec)
         i_field, j_field = tuple(fields)
 
         return {
