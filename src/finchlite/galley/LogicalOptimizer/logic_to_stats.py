@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from finchlite.galley.TensorStats.stats_interpreter import StatsInterpreter
-from finchlite.interface import LazyTensor
-
 from ...finch_logic import (
     Aggregate,
     Alias,
@@ -61,8 +58,9 @@ def insert_statistics(
 
         case Reorder():
             child = insert_statistics(ST, node.arg, bindings, replace, cache)
-            cache[node] = child
-            return child
+            st = ST.reorder(child, node.idxs)
+            cache[node] = st
+            return st
 
         case Table():
             if isinstance(node.tns, Literal):
@@ -82,21 +80,3 @@ def insert_statistics(
 
         case _:
             raise TypeError(f"Unhandled node type: {type(node)}")
-
-
-def get_lazy_tensor_stats(
-    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
-) -> TensorStats:
-    trace = lazy_tensor.ctx.trace()
-    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
-    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
-    last_stats: TensorStats | tuple[TensorStats, ...]
-    for stmt in trace:
-        last_stats = interpreter(stmt, bindings)
-
-    if last_stats is None:
-        raise ValueError("Trace was empty or no stats produced")
-    if isinstance(last_stats, tuple):
-        return last_stats[0]
-
-    return last_stats

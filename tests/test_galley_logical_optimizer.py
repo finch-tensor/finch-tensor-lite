@@ -17,14 +17,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.galley.LogicalOptimizer import (
     AnnotatedQuery,
-    find_lowest_roots,
-    get_idx_connected_components,
-    get_reduce_query,
-    get_reducible_idxs,
-    get_remaining_query,
     insert_statistics,
-    reduce_idx,
-    replace_and_remove_nodes,
 )
 from finchlite.galley.TensorStats import DenseStats
 
@@ -80,7 +73,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.output_format = None
     aq.bindings = OrderedDict()
 
-    result = [field.name for field in get_reducible_idxs(aq)]
+    result = [field.name for field in AnnotatedQuery.get_reducible_idxs(aq)]
     assert result == expected
 
 
@@ -141,7 +134,9 @@ def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
         name[k]: [name[n] for n in v] for k, v in connected_idxs.items()
     }
 
-    components = get_idx_connected_components(parent_field_idxs, connected_field_idxs)
+    components = AnnotatedQuery.get_idx_connected_components(
+        parent_field_idxs, connected_field_idxs
+    )
     result = [[field.name for field in comp] for comp in components]
 
     assert result == expected
@@ -229,7 +224,7 @@ def test_replace_and_remove_nodes(
     nodes_to_remove,
     expected_names,
 ):
-    out = replace_and_remove_nodes(
+    out = AnnotatedQuery.replace_and_remove_nodes(
         expr=expr,
         node_to_replace=node_to_replace,
         new_node=new_node,
@@ -339,7 +334,7 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
-    roots = find_lowest_roots(Literal(op.add), Field(idx_name), root)
+    roots = AnnotatedQuery.find_lowest_roots(Literal(op.add), Field(idx_name), root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if expected and not isinstance(expected[0], str):
@@ -506,9 +501,8 @@ def test_get_reduce_query(expr, reduce_field, expected):
             if isinstance(i, str):
                 dims[Field(i)] = dims[i]
 
-    query, node_to_replace, nodes_to_remove, reduced_idxs = get_reduce_query(
-        reduce_field,
-        aq,
+    query, node_to_replace, nodes_to_remove, reduced_idxs = aq.get_reduce_query(
+        reduce_field
     )
 
     assert query.rhs == expected
@@ -671,7 +665,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
             if isinstance(k, str):
                 dims[Field(k)] = dims[k]
 
-    query = reduce_idx(reduce_field, aq)
+    query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected_query
 
     alias_expr = Alias(query.lhs.name)
@@ -804,8 +798,8 @@ def rename_aliases(expr):
 def test_get_remaining_query(input_query, elimination_order, expected):
     aq = AnnotatedQuery(DenseStats, input_query, bindings=OrderedDict())
     for field in elimination_order:
-        reduce_idx(field, aq)
-    query = get_remaining_query(aq)
+        aq.reduce_idx(field)
+    query = aq.get_remaining_query()
     if expected is None:
         assert query is None
     else:
@@ -969,5 +963,5 @@ def test_get_remaining_query(input_query, elimination_order, expected):
 )
 def test_annotated_queries(query, reduce_field, expected):
     aq = AnnotatedQuery(DenseStats, query, bindings=OrderedDict())
-    query = reduce_idx(reduce_field, aq)
+    query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected
