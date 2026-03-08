@@ -6,7 +6,7 @@ from ..finch_logic import LogicEvaluator, Plan, Produces, Query
 from ..galley.LogicalOptimizer.annotated_query import AnnotatedQuery
 from ..galley.LogicalOptimizer.greedy_optimizer import greedy_query
 from ..galley.LogicalOptimizer.logic_to_stats import insert_statistics
-
+from ..galley.LogicalOptimizer.query_normalization import preprocess_plan_for_galley
 
 def optimize_query(query, ST, stats_bindings):
     """Rewrite a single logical Query via greedy reduction over reducible indices."""
@@ -19,6 +19,11 @@ def optimize_plan(plan, ST, bindings):
     Optimize a full Plan: run the Galley greedy optimizer on each Query body,
     pass through non-Query bodies (Produces), and update stats bindings.
     """
+    # Preprocess the plan into the canonical form expected by AnnotatedQuery /
+    # greedy_query.
+    plan = preprocess_plan_for_galley(plan)
+    print("[PLAN HERE]")
+    print(plan)
     optimized_queries = []
     # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings = {var: ST(T) for var, T in bindings.items()}
@@ -50,6 +55,9 @@ def optimize_plan(plan, ST, bindings):
             if len(query_lhss) >= n_returns:
                 new_produces_args = tuple(query_lhss[-n_returns:])
                 optimized_queries[-1] = Produces(new_produces_args)
+                
+    print("[OPTIMIZED QUERIES HERE]")
+    print(optimized_queries)
 
     return Plan(tuple(optimized_queries))
 

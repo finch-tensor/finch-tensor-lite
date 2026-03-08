@@ -21,6 +21,7 @@ from ...finch_logic import (
     MapJoin,
     Plan,
     Query,
+    Reorder,
     Table,
 )
 from ...symbolic import (
@@ -469,7 +470,7 @@ class AnnotatedQuery:
                     return roots_without + roots_with
 
                 return [mj]
-            case Alias(_) | Table(_, _) as root:
+            case Alias(_) | Table(_, _) | Reorder(_, _) as root:
                 return [root]
             case _:
                 raise ValueError(
@@ -665,7 +666,8 @@ class AnnotatedQuery:
                 continue
             root = self.idx_lowest_root[idx]
             if root == node_to_replace or root in nodes_to_remove:
-                root = Table(alias_expr, tuple(reduced_idxs))
+                # Use alias_idxs instead of reduced_idxs
+                root = Table(alias_expr, tuple(alias_idxs))
 
             new_idx_lowest_root[idx] = root
             new_idx_op[idx] = self.idx_op[idx]
