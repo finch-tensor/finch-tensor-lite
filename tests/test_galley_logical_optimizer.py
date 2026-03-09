@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 
 import finchlite as fl
+from finchlite.algebra import as_finch_operator
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -242,7 +243,7 @@ def test_replace_and_remove_nodes(
         # root = MapJoin(mul, [A(i), B(j)]), reduce over j → [B]
         (
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal("A"), (Field("i"),)),
                     Table(Literal("B"), (Field("j"),)),
@@ -255,7 +256,7 @@ def test_replace_and_remove_nodes(
         # root = MapJoin(add, [A(i), B(i), C(j)]), reduce over i → [C, A, B]
         (
             MapJoin(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 (
                     Table(Literal("A"), (Field("i"),)),
                     Table(Literal("B"), (Field("i"),)),
@@ -276,7 +277,7 @@ def test_replace_and_remove_nodes(
         # root = MapJoin(mul, [A(i,j), B(j)]), reduce over i → [A]
         (
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal("A"), (Field("i"), Field("j"))),
                     Table(Literal("B"), (Field("j"),)),
@@ -308,7 +309,7 @@ def test_replace_and_remove_nodes(
         # root = MapJoin(mul, [A(j), MapJoin(max, [B(i), C(j)])]), reduce over i
         (
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal("A"), (Field("j"),)),
                     MapJoin(
@@ -334,7 +335,9 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
-    roots = AnnotatedQuery.find_lowest_roots(Literal(op.add), Field(idx_name), root)
+    roots = AnnotatedQuery.find_lowest_roots(
+        Literal(as_finch_operator(op.add)), Field(idx_name), root
+    )
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if expected and not isinstance(expected[0], str):
@@ -356,10 +359,10 @@ def test_find_lowest_roots(root, idx_name, expected):
         (
             # Case 1: expr = sum_i A[i] * B[j]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(B), (Field("j"),)),
@@ -370,10 +373,10 @@ def test_find_lowest_roots(root, idx_name, expected):
             Field("i"),
             # expected: sum_i A[i]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (Table(Literal(A), (Field("i"),)),),
                 ),
                 (Field("i"),),
@@ -382,10 +385,10 @@ def test_find_lowest_roots(root, idx_name, expected):
         (
             # Case 2: expr = sum_i A[i] * A[i]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(A), (Field("i"),)),
@@ -396,10 +399,10 @@ def test_find_lowest_roots(root, idx_name, expected):
             Field("i"),
             # expected: sum_i (A[i] * A[i])
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(A), (Field("i"),)),
@@ -411,10 +414,10 @@ def test_find_lowest_roots(root, idx_name, expected):
         (
             # Case 3: expr = sum_i A[i] * C[i,k] * B[j]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -426,10 +429,10 @@ def test_find_lowest_roots(root, idx_name, expected):
             Field("i"),
             # expected: sum_i (A[i] * C[i,k])
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -441,10 +444,10 @@ def test_find_lowest_roots(root, idx_name, expected):
         (
             # Case 4: expr = sum_i A[i] * C[i,k] * D[k] * B[j]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -457,10 +460,10 @@ def test_find_lowest_roots(root, idx_name, expected):
             Field("i"),
             # expected: sum_i (A[i] * C[i,k] * D[k])
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -472,7 +475,6 @@ def test_find_lowest_roots(root, idx_name, expected):
         ),
     ],
 )
-@pytest.mark.skip(reason="Resolve TypeError for mul operand : #Issue 326")
 def test_get_reduce_query(expr, reduce_field, expected):
     aq = object.__new__(AnnotatedQuery)
     aq.ST = DenseStats
@@ -480,7 +482,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
     aq.idx_lowest_root = OrderedDict({reduce_field: expr.arg})
-    aq.idx_op = OrderedDict({reduce_field: op.add})
+    aq.idx_op = OrderedDict({reduce_field: as_finch_operator(op.add)})
     aq.idx_init = OrderedDict({reduce_field: 0})
     aq.parent_idxs = OrderedDict()
     aq.original_idx = OrderedDict({reduce_field: reduce_field})
@@ -514,7 +516,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
         (
             # Case 1: expr = A[i] * B[j], reduce over i
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal(A), (Field("i"),)),
                     Table(Literal(B), (Field("j"),)),
@@ -523,17 +525,17 @@ def test_get_reduce_query(expr, reduce_field, expected):
             Field("i"),
             # expected query: sum_i A[i]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (Table(Literal(A), (Field("i"),)),),
                 ),
                 (Field("i"),),
             ),
             # expected point expr: alias(i) * B[j]
             lambda alias_expr: MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(alias_expr, ()),
                     Table(Literal(B), (Field("j"),)),
@@ -543,7 +545,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
         (
             # Case 2: expr = A[i] * A[i], reduce over i
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal(A), (Field("i"),)),
                     Table(Literal(A), (Field("i"),)),
@@ -552,10 +554,10 @@ def test_get_reduce_query(expr, reduce_field, expected):
             Field("i"),
             # expected query: sum_i (A[i] * A[i])
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(A), (Field("i"),)),
@@ -569,7 +571,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
         (
             # Case 3: expr = A[i] * C[i,k] * B[j], reduce over i
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal(A), (Field("i"),)),
                     Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -579,10 +581,10 @@ def test_get_reduce_query(expr, reduce_field, expected):
             Field("i"),
             # expected query: sum_i (A[i] * C[i,k])
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -592,7 +594,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             ),
             # expected point expr: alias(k) * B[j]
             lambda alias_expr: MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(alias_expr, (Field("k"),)),
                     Table(Literal(B), (Field("j"),)),
@@ -602,7 +604,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
         (
             # Case 4: expr = A[i] * C[i,k] * D[k] * B[j], reduce over i
             MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(Literal(A), (Field("i"),)),
                     Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -613,10 +615,10 @@ def test_get_reduce_query(expr, reduce_field, expected):
             Field("i"),
             # expected query: sum_i (A[i] * C[i,k] * D[k])
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(C_mat), (Field("i"), Field("k"))),
@@ -627,7 +629,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             ),
             # expected point expr: alias(k) * B[j]
             lambda alias_expr: MapJoin(
-                Literal(op.mul),
+                Literal(as_finch_operator(op.mul)),
                 (
                     Table(alias_expr, (Field("k"),)),
                     Table(Literal(B), (Field("j"),)),
@@ -636,7 +638,6 @@ def test_get_reduce_query(expr, reduce_field, expected):
         ),
     ],
 )
-@pytest.mark.skip(reason="Resolve TypeError for mul operand : #Issue 326")
 def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq = object.__new__(AnnotatedQuery)
     aq.ST = DenseStats
@@ -644,7 +645,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
     aq.idx_lowest_root = OrderedDict({reduce_field: expr})
-    aq.idx_op = OrderedDict({reduce_field: op.add})
+    aq.idx_op = OrderedDict({reduce_field: as_finch_operator(op.add)})
     aq.idx_init = OrderedDict({reduce_field: 0})
     aq.parent_idxs = OrderedDict()
     aq.original_idx = OrderedDict({reduce_field: reduce_field})
@@ -698,7 +699,7 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(A), (Field("i"),)),
@@ -709,7 +710,7 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A), (Field("i"),)),
                         Table(Literal(A), (Field("i"),)),
@@ -721,10 +722,10 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
-                        Literal(op.mul),
+                        Literal(as_finch_operator(op.mul)),
                         (
                             Table(Literal(A), (Field("i"),)),
                             Table(Literal(A), (Field("j"),)),
@@ -737,7 +738,7 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Alias("A"), ()),
                         Table(Literal(A), (Field("j"),)),
@@ -749,10 +750,10 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
-                        Literal(op.mul),
+                        Literal(as_finch_operator(op.mul)),
                         (
                             Table(Literal(A), (Field("i"),)),
                             Table(Literal(A), (Field("j"),)),
@@ -767,7 +768,7 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Alias("A"), ()),
                         Table(Alias("B"), ()),
@@ -780,7 +781,7 @@ def rename_aliases(expr):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     Table(Literal(A), (Field("i"),)),
                     (Field("i"),),
@@ -794,7 +795,6 @@ def rename_aliases(expr):
         ),
     ],
 )
-@pytest.mark.skip(reason="Resolve TypeError for mul operand : #Issue 326")
 def test_get_remaining_query(input_query, elimination_order, expected):
     aq = AnnotatedQuery(DenseStats, input_query, bindings=OrderedDict())
     for field in elimination_order:
@@ -816,10 +816,10 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
-                        Literal(op.mul),
+                        Literal(as_finch_operator(op.mul)),
                         (
                             Table(Literal(A_mat), (Field("i"), Field("j"))),
                             Table(Literal(A_mat), (Field("j"), Field("k"))),
@@ -831,7 +831,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Field("i"),
             # expected: sum_i A[i,j]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 Table(Literal(A_mat), (Field("i"), Field("j"))),
                 (Field("i"),),
@@ -842,10 +842,10 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
-                        Literal(op.mul),
+                        Literal(as_finch_operator(op.mul)),
                         (
                             Table(Literal(A_mat), (Field("i"), Field("j"))),
                             Table(Literal(A_mat), (Field("j"), Field("k"))),
@@ -857,10 +857,10 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Field("j"),
             # expected: unchanged full aggregate over i,j,k
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
-                    Literal(op.mul),
+                    Literal(as_finch_operator(op.mul)),
                     (
                         Table(Literal(A_mat), (Field("i"), Field("j"))),
                         Table(Literal(A_mat), (Field("j"), Field("k"))),
@@ -874,10 +874,10 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
-                        Literal(op.mul),
+                        Literal(as_finch_operator(op.mul)),
                         (
                             Table(Literal(A_mat), (Field("i"), Field("j"))),
                             Table(Literal(A_mat), (Field("j"), Field("k"))),
@@ -889,7 +889,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Field("k"),
             # expected: sum_k A[j,k]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 Table(Literal(A_mat), (Field("j"), Field("k"))),
                 (Field("k"),),
@@ -900,7 +900,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
                         Literal(max),
@@ -915,7 +915,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Field("i"),
             # expected: unchanged
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 MapJoin(
                     Literal(max),
@@ -933,13 +933,13 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Query(
                 Alias("out"),
                 Aggregate(
-                    Literal(op.add),
+                    Literal(as_finch_operator(op.add)),
                     Literal(0),
                     MapJoin(
                         Literal(max),
                         (
                             Aggregate(
-                                Literal(op.add),
+                                Literal(as_finch_operator(op.add)),
                                 Literal(0),
                                 Table(Literal(A_mat), (Field("i"), Field("j"))),
                                 (Field("i"),),
@@ -953,7 +953,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             Field("i"),
             # expected: inner sum over i of A[i,j]
             Aggregate(
-                Literal(op.add),
+                Literal(as_finch_operator(op.add)),
                 Literal(0),
                 Table(Literal(A_mat), (Field("i"), Field("j"))),
                 (Field("i"),),
