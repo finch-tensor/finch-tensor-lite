@@ -14,11 +14,7 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.galley.LogicalOptimizer.query_normalization import (
-    merge_queries,
-    normalize_reorders_in_plan,
-    preprocess_plan_for_galley,
-)
+from finchlite.galley.LogicalOptimizer.query_normalization import preprocess_plan_for_galley
 
 
 def _contains_reorder(expr) -> bool:
@@ -50,10 +46,10 @@ def test_merge_queries_inlines_alias_tables_and_keeps_produced_aliases():
     q2 = Query(Alias("A2"), Table(Alias("A1"), (j, i)))
     plan = Plan((q1, q2, Produces((Alias("A2"),))))
 
-    merged = merge_queries(plan)
-    assert isinstance(merged, Plan)
-    assert len(merged.bodies) == 2
-    out_query, out_produces = merged.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    assert isinstance(preprocessed, Plan)
+    assert len(preprocessed.bodies) == 2
+    out_query, out_produces = preprocessed.bodies
 
     assert isinstance(out_query, Query)
     assert out_query.lhs == Alias("A2")
@@ -86,8 +82,8 @@ def test_normalize_reorders_produces_single_outer_reorder():
     q = Query(Alias("out"), original_rhs)
     plan = Plan((q, Produces((Alias("out"),))))
 
-    normalized = normalize_reorders_in_plan(plan)
-    norm_q, norm_produces = normalized.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    norm_q, norm_produces = preprocessed.bodies
     assert isinstance(norm_q, Query)
 
     # After stripping interior Reorders and collapsing consecutive ones, the
@@ -173,9 +169,9 @@ def test_merge_queries_chain_of_three_aliases():
     q3 = Query(Alias("A3"), Table(Alias("A2"), (i, j)))
     plan = Plan((q1, q2, q3, Produces((Alias("A3"),))))
 
-    merged = merge_queries(plan)
-    assert len(merged.bodies) == 2
-    out_query, out_produces = merged.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    assert len(preprocessed.bodies) == 2
+    out_query, out_produces = preprocessed.bodies
 
     assert out_query.lhs == Alias("A3")
     assert isinstance(out_query.rhs, Table)
@@ -203,9 +199,9 @@ def test_merge_queries_produces_multiple_aliases():
     q2 = Query(Alias("A2"), Table(Alias("A1"), (j, i)))
     plan = Plan((q1, q2, Produces((Alias("A1"), Alias("A2")))))
 
-    merged = merge_queries(plan)
-    assert len(merged.bodies) == 3
-    out_q1, out_q2, out_produces = merged.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    assert len(preprocessed.bodies) == 3
+    out_q1, out_q2, out_produces = preprocessed.bodies
 
     assert out_q1.lhs == Alias("A1")
     assert out_q1.rhs == Table(A_lit, (i, j))
@@ -233,8 +229,8 @@ def test_normalize_reorders_strips_identity_reorder():
     q = Query(Alias("out"), original_rhs)
     plan = Plan((q, Produces((Alias("out"),))))
 
-    normalized = normalize_reorders_in_plan(plan)
-    norm_q, _ = normalized.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    norm_q, _ = preprocessed.bodies
 
     assert norm_q.rhs.fields() == (j, i)
     assert norm_q.rhs.fields() == original_rhs.fields()
@@ -257,8 +253,8 @@ def test_normalize_reorders_nested_reorders_collapse():
     q = Query(Alias("out"), outer)
     plan = Plan((q, Produces((Alias("out"),))))
 
-    normalized = normalize_reorders_in_plan(plan)
-    norm_q, _ = normalized.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    norm_q, _ = preprocessed.bodies
 
     assert norm_q.rhs.fields() == (i, j)
     assert not _contains_reorder(norm_q.rhs)
@@ -282,8 +278,8 @@ def test_normalize_reorders_aggregate_with_reorder_needs_outer():
     q = Query(Alias("out"), original_rhs)
     plan = Plan((q, Produces((Alias("out"),))))
 
-    normalized = normalize_reorders_in_plan(plan)
-    norm_q, _ = normalized.bodies
+    preprocessed = preprocess_plan_for_galley(plan)
+    norm_q, _ = preprocessed.bodies
 
     assert norm_q.rhs.fields() == (i,)
     assert not _contains_reorder(norm_q.rhs)
@@ -398,3 +394,70 @@ def test_preprocess_plan_A_at_B_at_C():
     assert set(out_query.rhs.idxs) == {j, k}
     assert not _contains_reorder(out_query.rhs)
 
+def test_merge_queries_inlines_mapjoin_aggregate_chain():
+    """
+    INPUT (matmul then sum over one axis):
+      A = Table(X, i, i_2)
+      A_2 = Table(Y, i_3, i_4)
+      A_3 = MapJoin(mul, Table(A, i_11, i_12), Table(A_2, i_12, i_13))
+      A_4 = Aggregate(add, 0, Table(A_3, i_16, i_17, i_18), i_17)
+      return A_4
+
+    EXPECTED AFTER merge_queries:
+      A_4 = Aggregate(add, 0, MapJoin(mul, Table(X, i_16, i_17), Table(Y, i_17, i_18)), i_17)
+      A_3 inlined into A_4; A and A_2 inlined to base tensors with alpha-renamed indices.
+    """
+    i = Field("i")
+    i_2 = Field("i_2")
+    i_3 = Field("i_3")
+    i_4 = Field("i_4")
+    i_11 = Field("i_11")
+    i_12 = Field("i_12")
+    i_13 = Field("i_13")
+    i_16 = Field("i_16")
+    i_17 = Field("i_17")
+    i_18 = Field("i_18")
+
+    X_lit = Literal("X")
+    Y_lit = Literal("Y")
+
+    q1 = Query(Alias("A"), Table(X_lit, (i, i_2)))
+    q2 = Query(Alias("A_2"), Table(Y_lit, (i_3, i_4)))
+    a3_rhs = MapJoin(
+        Literal(op.mul),
+        (
+            Table(Alias("A"), (i_11, i_12)),
+            Table(Alias("A_2"), (i_12, i_13)),
+        ),
+    )
+    q3 = Query(Alias("A_3"), a3_rhs)
+    q4 = Query(
+        Alias("A_4"),
+        Aggregate(
+            Literal(op.add),
+            Literal(0),
+            Table(Alias("A_3"), (i_16, i_17, i_18)),
+            (i_17,),
+        ),
+    )
+    plan = Plan((q1, q2, q3, q4, Produces((Alias("A_4"),))))
+
+    preprocessed = preprocess_plan_for_galley(plan)
+
+    assert isinstance(preprocessed, Plan)
+    assert len(preprocessed.bodies) == 2
+    out_query, out_produces = preprocessed.bodies
+
+    assert isinstance(out_query, Query)
+    assert out_query.lhs == Alias("A_4")
+    assert isinstance(out_produces, Produces)
+    assert out_produces.args == (Alias("A_4"),)
+
+    rhs = out_query.rhs
+    assert isinstance(rhs, Aggregate)
+    assert rhs.idxs == (i_17,)
+    assert isinstance(rhs.arg, MapJoin)
+    assert rhs.arg.args[0].tns == X_lit
+    assert rhs.arg.args[0].idxs == (i_16, i_17)
+    assert rhs.arg.args[1].tns == Y_lit
+    assert rhs.arg.args[1].idxs == (i_17, i_18)
