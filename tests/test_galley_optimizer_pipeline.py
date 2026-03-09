@@ -143,3 +143,50 @@ def test_alias_matmul():
 
     expected = A_np @ A_np @ A_np @ A_np @ A_np @ A_np
     assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 9: Performance optimization (cost-based reduction order) ---
+def test_galley_performance_optimization_chain_matmul():
+    """
+    Test Galley performing a real performance optimization based on
+    input data. For a chain matmul A @ B @ C, the greedy optimizer chooses
+    reduction order by cost (flops). With asymmetric shapes, one order is
+    cheaper than the other; Galley picks the cheaper one.
+
+    A(2,10) @ B(10,3) @ C(3,4) -> (2,4)
+    - Reducing middle (j) first: 2*10*3 + 2*3*4 = 60 + 24 = 84 computations
+    - Reducing k first: 10*3*4 + 2*10*4 = 120 + 80 = 200 computations
+
+    Galley's cost model favors the cheaper reduction order.
+    """
+    A = fl_interface.asarray(np.arange(2 * 10, dtype=float).reshape(2, 10))
+    B = fl_interface.asarray(np.arange(10 * 3, dtype=float).reshape(10, 3))
+    C = fl_interface.asarray(np.arange(3 * 4, dtype=float).reshape(3, 4))
+
+    out = fl_interface.compute(
+        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.array(A) @ np.array(B) @ np.array(C)
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 10: Chain matmul A(10,2) @ B(2,10) @ C(10,2) -> (10,2) ---
+def test_galley_chain_matmul_10_2_2_10_10_2():
+    """
+    Chain matmul A(10,2) @ B(2,10) @ C(10,2) -> (10,2)
+    - (A @ B) @ C: (10,2)@(2,10)@(10,2) -> contracts 2, then 10
+    - A @ (B @ C): (10,2)@(2,10)@(10,2) -> contracts 10, then 2
+    """
+    A = fl_interface.asarray(np.arange(10 * 2, dtype=float).reshape(10, 2))
+    B = fl_interface.asarray(np.arange(2 * 10, dtype=float).reshape(2, 10))
+    C = fl_interface.asarray(np.arange(10 * 2, dtype=float).reshape(10, 2))
+
+    out = fl_interface.compute(
+        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.array(A) @ np.array(B) @ np.array(C)
+    assert np.allclose(np.array(out), np.array(expected))

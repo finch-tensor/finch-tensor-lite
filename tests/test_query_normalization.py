@@ -13,6 +13,7 @@ from finchlite.finch_logic import (
     Table,
 )
 from finchlite.galley.LogicalOptimizer.query_normalization import (
+    merge_queries,
     preprocess_plan_for_galley,
 )
 
@@ -394,9 +395,11 @@ def test_preprocess_plan_A_at_B_at_C():
     assert out_query.lhs == Alias("A2")
     assert out_query.rhs.fields() == (i, l_)
 
-    # Single Aggregate with both reduction indices (j, k) after push_aggregates_up
+    # Single Aggregate with both reduction indices after push_aggregates_up.
+    # Internal fields may get fresh names when inlining (e.g. j -> gensym), so
+    # we only assert the count, not the exact names.
     assert isinstance(out_query.rhs, Aggregate)
-    assert set(out_query.rhs.idxs) == {j, k}
+    assert len(out_query.rhs.idxs) == 2
     assert not _contains_reorder(out_query.rhs)
 
 
@@ -468,3 +471,79 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     assert rhs.arg.args[0].idxs == (i_16, i_17)
     assert rhs.arg.args[1].tns == Y_lit
     assert rhs.arg.args[1].idxs == (i_17, i_18)
+
+
+def _collect_reduce_idxs(expr):
+    """Recursively collect all reduction indices from Aggregate nodes."""
+    result = []
+    if isinstance(expr, Aggregate):
+        result.extend(expr.idxs)
+        result.extend(_collect_reduce_idxs(expr.arg))
+    elif isinstance(expr, MapJoin):
+        for arg in expr.args:
+            result.extend(_collect_reduce_idxs(arg))
+    elif isinstance(expr, Reorder):
+        result.extend(_collect_reduce_idxs(expr.arg))
+    elif isinstance(expr, Table):
+        pass
+    return result
+
+
+def test_merge_queries_same_alias_inlined_twice_unique_internal_fields():
+    """
+    When the same alias is inlined multiple times (e.g. B @ B where B = A @ A),
+    internal fields (reduction indices) must get fresh names at each call site
+    to avoid index collisions.
+
+    INPUT:
+      A = Table(X, i, j)
+      B = Aggregate(add, 0, MapJoin(mul, Table(A,i,k), Table(A,k,j)), k)   # A @ A
+      C = Aggregate(add, 0, MapJoin(mul, Table(B,i,m), Table(B,m,j)), m)   # B @ B
+      return C
+
+    After merge_queries, the two inlined copies of B's RHS must use distinct
+    contraction indices; otherwise the computation would be wrong.
+    """
+    i = Field("i")
+    j = Field("j")
+    k = Field("k")
+    m = Field("m")
+    X_lit = Literal("X")
+
+    # B = A @ A: (i,k) @ (k,j) -> (i,j), contracts over k
+    a_rhs = Table(X_lit, (i, j))
+    q_a = Query(Alias("A"), a_rhs)
+    b_rhs = Aggregate(
+        Literal(op.add),
+        Literal(0),
+        MapJoin(
+            Literal(op.mul),
+            (Table(Alias("A"), (i, k)), Table(Alias("A"), (k, j))),
+        ),
+        (k,),
+    )
+    q_b = Query(Alias("B"), b_rhs)
+    # C = B @ B: (i,m) @ (m,j) -> (i,j), contracts over m
+    c_rhs = Aggregate(
+        Literal(op.add),
+        Literal(0),
+        MapJoin(
+            Literal(op.mul),
+            (Table(Alias("B"), (i, m)), Table(Alias("B"), (m, j))),
+        ),
+        (m,),
+    )
+    q_c = Query(Alias("C"), c_rhs)
+    plan = Plan((q_a, q_b, q_c, Produces((Alias("C"),))))
+
+    merged = merge_queries(plan)
+    assert len(merged.bodies) == 2
+    out_query = merged.bodies[0]
+    assert isinstance(out_query, Query)
+    assert out_query.lhs == Alias("C")
+
+    reduce_idxs = _collect_reduce_idxs(out_query.rhs)
+    names = [f.name for f in reduce_idxs]
+    assert len(names) == len(set(names)), (
+        f"Duplicate reduction index names after inlining same alias twice: {names}"
+    )

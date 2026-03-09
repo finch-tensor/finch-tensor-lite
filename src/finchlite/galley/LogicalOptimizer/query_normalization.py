@@ -17,7 +17,7 @@ from ...finch_logic import (
     Reorder,
     Table,
 )
-from ...symbolic import Fixpoint, PostWalk, Rewrite
+from ...symbolic import Fixpoint, PostWalk, Rewrite, gensym
 
 """
 Query merging and reorder normalization for Galley.
@@ -81,6 +81,31 @@ def alpha_rename_expr(
             return Relabel(new_arg, new_idxs)
         case _:
             return expr
+
+
+def _collect_all_fields(expr: LogicExpression) -> set[Field]:
+    """
+    Recursively collect all Field objects appearing in an expression
+    """
+    result: set[Field] = set()
+    match expr:
+        case Table(_, idxs):
+            result.update(idxs)
+        case MapJoin(_, args):
+            for arg in args:
+                result.update(_collect_all_fields(arg))
+        case Aggregate(_, _, arg, idxs):
+            result.update(idxs)
+            result.update(_collect_all_fields(arg))
+        case Reorder(arg, idxs):
+            result.update(idxs)
+            result.update(_collect_all_fields(arg))
+        case Relabel(arg, idxs):
+            result.update(idxs)
+            result.update(_collect_all_fields(arg))
+        case _:
+            pass
+    return result
 
 
 def _push_aggregate_up(expr: LogicExpression) -> LogicExpression | None:
@@ -184,9 +209,21 @@ def _inline_tables_in_expr(
             rhs = alias_to_query[alias].rhs
             orig_fields = rhs.fields()
             if len(orig_fields) != len(idxs):
-                return expr
+                raise ValueError(
+                    f"Alias {alias} has {len(orig_fields)} output fields, "
+                    f"but Table call site requires {len(idxs)} indices"
+                )
 
             mapping: dict[Field, Field] = dict(zip(orig_fields, idxs, strict=True))
+
+            # Assign fresh names to internal non-output fields so that when the same
+            # alias is inlined multiple times, internal indices do not collide.
+            # e.g matmul: A @ A @ A @ A @ A @ A
+            orig_fields_set = set(orig_fields)
+            all_fields = _collect_all_fields(rhs)
+            for f in all_fields:
+                if f not in orig_fields_set:
+                    mapping[f] = Field(gensym("i"))
 
             visiting.add(key)
             try:
@@ -323,10 +360,13 @@ def normalize_reorders_in_query(query: Query) -> Query:
 
     # If stripping reorders changes the set of fields, then attempting to force
     # the original field set back via a new Reorder could ask TensorStats to
-    # drop non-size-1 dimensions. In that case, fall back to the original
-    # query unchanged.
+    # drop non-size-1 dimensions, throw error as this should not happen for 
+    # correctly formed queries.
     if set(inner_fields) != set(out_fields):
-        return query
+        raise ValueError(
+            f"Stripping reorders changed field set: expected {set(out_fields)}, "
+            f"got {set(inner_fields)}"
+        )
 
     # If the inner expression already has the desired field order, we can avoid
     # inserting a redundant Reorder.
