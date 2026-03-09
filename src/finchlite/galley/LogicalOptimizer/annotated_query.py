@@ -409,8 +409,11 @@ class AnnotatedQuery:
                     node == node_to_replace and node not in nodes_to_remove_set
                 ):
                     return new_node
+                case node if node in nodes_to_remove_set:
+                    return None
                 case MapJoin(op, args) if any(
-                    (arg == node_to_replace) or (arg in nodes_to_remove) for arg in args
+                    (arg == node_to_replace) or (arg in nodes_to_remove_set)
+                    for arg in args
                 ):
                     new_args = []
                     for arg in args:
@@ -420,6 +423,8 @@ class AnnotatedQuery:
                             new_args.append(new_node)
                         else:
                             new_args.append(arg)
+                    if len(new_args) == 1:
+                        return new_args[0]
                     return MapJoin(op, tuple(new_args))
                 case _:
                     return None
@@ -661,13 +666,17 @@ class AnnotatedQuery:
         new_idx_init: OrderedDict[Field, Any] = OrderedDict()
         new_parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict()
         new_connected_idxs: OrderedDict[Field, set[Field]] = OrderedDict()
+        alias_table = Table(alias_expr, tuple(alias_idxs))
         for idx in self.idx_lowest_root:
             if idx in reduced_idxs:
                 continue
             root = self.idx_lowest_root[idx]
             if root == node_to_replace or root in nodes_to_remove:
-                # Use alias_idxs instead of reduced_idxs
-                root = Table(alias_expr, tuple(alias_idxs))
+                root = alias_table
+            else:
+                root = AnnotatedQuery.replace_and_remove_nodes(
+                    root, node_to_replace, alias_table, nodes_to_remove,
+                )
 
             new_idx_lowest_root[idx] = root
             new_idx_op[idx] = self.idx_op[idx]

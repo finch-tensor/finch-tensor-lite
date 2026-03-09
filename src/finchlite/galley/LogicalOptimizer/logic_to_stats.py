@@ -35,6 +35,9 @@ def insert_statistics(
             ]
             if not args:
                 raise ValueError("MapJoin expects at least one argument with stats.")
+            if len(args) == 1:
+                cache[node] = args[0]
+                return args[0]
             st = ST.mapjoin(op, *args)
             cache[node] = st
             return st
