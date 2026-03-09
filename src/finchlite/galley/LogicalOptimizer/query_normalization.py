@@ -1,9 +1,27 @@
 from __future__ import annotations
 
+from ...algebra import is_associative, is_commutative, is_distributive
+from ...finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    LogicExpression,
+    LogicNode,
+    LogicStatement,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Relabel,
+    Reorder,
+    Table,
+)
+from ...symbolic import Fixpoint, PostWalk, Rewrite
+
 """
 Query merging and reorder normalization for Galley.
 Rewrites Plan:
-
 
 The transformation has two steps:
 
@@ -22,45 +40,22 @@ The transformation has two steps:
      the original fields() order.
 """
 
-from collections import defaultdict
-from dataclasses import replace
-from typing import Dict, Iterable, List, Optional, Set, Tuple
 
-from ...algebra import is_associative, is_commutative, is_distributive
-from ...finch_logic import (
-    Aggregate,
-    Alias,
-    Field,
-    Literal,
-    LogicExpression,
-    LogicNode,
-    LogicStatement,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Reorder,
-    Relabel,
-    Table,
-)
-from ...symbolic import Fixpoint, PostWalk, Rewrite
-
-
-def _rename_field(idx: Field, mapping: Dict[Field, Field]) -> Field:
+def _rename_field(idx: Field, mapping: dict[Field, Field]) -> Field:
     """Return the renamed field if present, otherwise the original."""
     return mapping.get(idx, idx)
 
 
 def alpha_rename_expr(
-    expr: LogicExpression, mapping: Dict[Field, Field]
+    expr: LogicExpression, mapping: dict[Field, Field]
 ) -> LogicExpression:
     """
     Apply a simple alpha-renaming to expr, replacing any Field that appears
     in mapping with its mapped value.
 
-    This traverses only the LogicExpression nodes that actually store fields 
-    and leaves all other nodes unchanged. 
-    
+    This traverses only the LogicExpression nodes that actually store fields
+    and leaves all other nodes unchanged.
+
     The goal is to rewrite the dimension variables of an alias
     definition to match the index variables at a particular call site.
     """
@@ -98,12 +93,16 @@ def _push_aggregate_up(expr: LogicExpression) -> LogicExpression | None:
     match expr:
         case MapJoin(Literal(mj_op), args):
             for i, arg in enumerate(args):
-                if isinstance(arg, Aggregate) and isinstance(arg.op, Literal) and isinstance(arg.init, Literal):
-                    if is_distributive(mj_op, arg.op.val):
-                        new_args = args[:i] + (arg.arg,) + args[i + 1 :]
-                        return Aggregate(
-                            arg.op, arg.init, MapJoin(expr.op, new_args), arg.idxs
-                        )
+                if (
+                    isinstance(arg, Aggregate)
+                    and isinstance(arg.op, Literal)
+                    and isinstance(arg.init, Literal)
+                    and is_distributive(mj_op, arg.op.val)
+                ):
+                    new_args = args[:i] + (arg.arg,) + args[i + 1 :]
+                    return Aggregate(
+                        arg.op, arg.init, MapJoin(expr.op, new_args), arg.idxs
+                    )
             return None
         case _:
             return None
@@ -135,6 +134,7 @@ def push_aggregates_up(expr: LogicExpression) -> LogicExpression:
     Apply push-aggregate and merge-aggregate rewrites to fixpoint.
     Produces an expression where reduction indices are not parent-related
     """
+
     def rule(node: LogicNode) -> LogicNode | None:
         if isinstance(node, LogicExpression):
             r = _merge_adjacent_aggregates(node)
@@ -151,8 +151,8 @@ def push_aggregates_up(expr: LogicExpression) -> LogicExpression:
 
 def _inline_tables_in_expr(
     expr: LogicExpression,
-    alias_to_query: Dict[Alias, Query],
-    visiting: Optional[Set[Tuple[Alias, Tuple[Field, ...]]]] = None,
+    alias_to_query: dict[Alias, Query],
+    visiting: set[tuple[Alias, tuple[Field, ...]]] | None = None,
 ) -> LogicExpression:
     """
     Recursively inline Table(Alias, ...) nodes using alias_to_query.
@@ -186,9 +186,7 @@ def _inline_tables_in_expr(
             if len(orig_fields) != len(idxs):
                 return expr
 
-            mapping: Dict[Field, Field] = {
-                orig_f: call_f for orig_f, call_f in zip(orig_fields, idxs, strict=True)
-            }
+            mapping: dict[Field, Field] = dict(zip(orig_fields, idxs, strict=True))
 
             visiting.add(key)
             try:
@@ -233,7 +231,7 @@ def merge_queries(plan: Plan) -> Plan:
     if not isinstance(plan, Plan):
         return plan
 
-    bodies: Tuple[LogicNode, ...] = plan.bodies  # type: ignore[assignment]
+    bodies: tuple[LogicNode, ...] = plan.bodies  # type: ignore[assignment]
     if not bodies:
         return plan
 
@@ -248,14 +246,14 @@ def merge_queries(plan: Plan) -> Plan:
         return plan
 
     # Map each alias to the last Query that defines it in the original plan.
-    alias_to_query: Dict[Alias, Query] = {}
+    alias_to_query: dict[Alias, Query] = {}
     for body in bodies:
         if isinstance(body, Query):
             alias_to_query[body.lhs] = body
 
-    produced_aliases: Tuple[Alias, ...] = produces_stmt.args
+    produced_aliases: tuple[Alias, ...] = produces_stmt.args
 
-    new_queries: List[Query] = []
+    new_queries: list[Query] = []
     for alias in produced_aliases:
         defining_query = alias_to_query.get(alias)
         if defining_query is None:
@@ -267,7 +265,7 @@ def merge_queries(plan: Plan) -> Plan:
     if not new_queries:
         return plan
 
-    new_bodies: List[LogicStatement] = []
+    new_bodies: list[LogicStatement] = []
     new_bodies.extend(new_queries)
     new_bodies.append(produces_stmt)
     return Plan(tuple(new_bodies))
@@ -345,7 +343,7 @@ def normalize_reorders_in_plan(plan: Plan) -> Plan:
     if not isinstance(plan, Plan):
         return plan
 
-    new_bodies: List[LogicStatement] = []
+    new_bodies: list[LogicStatement] = []
     for body in plan.bodies:
         if isinstance(body, Query):
             new_bodies.append(normalize_reorders_in_query(body))
@@ -368,16 +366,12 @@ def preprocess_plan_for_galley(plan: Plan) -> Plan:
     """
     merged = merge_queries(plan)
     merged = normalize_reorders_in_plan(merged)
-    new_bodies: List[LogicStatement] = []
+    new_bodies: list[LogicStatement] = []
     for body in merged.bodies:
         if isinstance(body, Query):
-            print("body:", body)
             pushed_rhs = push_aggregates_up(body.rhs)
-            print("pushed_rhs:", pushed_rhs)
             new_bodies.append(Query(body.lhs, pushed_rhs))
         else:
             new_bodies.append(body)
     merged = Plan(tuple(new_bodies))
-    normalized = normalize_reorders_in_plan(merged)
-    return normalized
-
+    return normalize_reorders_in_plan(merged)

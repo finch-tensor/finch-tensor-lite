@@ -1,7 +1,5 @@
 import operator as op
 
-import pytest
-
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -14,7 +12,9 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.galley.LogicalOptimizer.query_normalization import preprocess_plan_for_galley
+from finchlite.galley.LogicalOptimizer.query_normalization import (
+    preprocess_plan_for_galley,
+)
 
 
 def _contains_reorder(expr) -> bool:
@@ -35,7 +35,7 @@ def test_merge_queries_inlines_alias_tables_and_keeps_produced_aliases():
       return A2
 
     EXPECTED AFTER merge_queries:
-      A2 = Table(A, j, i)   # A1 inlined; direct reference to base tensor with reordered fields
+      A2 = Table(A, j, i)   # A1 inlined; direct ref to base tensor w/ reordered fields
       return A2
     """
     i = Field("i")
@@ -66,11 +66,12 @@ def test_normalize_reorders_produces_single_outer_reorder():
     """
     INPUT:
       out = Reorder(Aggregate(add, 0, Reorder(Table(A, i, j), j, i), i), j)
-      (Aggregate reduces i; inner Reorder swaps Table to (j,i); outer Reorder asks for (j,))
+      (Aggregate reduces i; inner Reorder swaps Table to (j,i); outer asks for (j,))
 
     EXPECTED AFTER normalize_reorders_in_plan:
       out = Aggregate(add, 0, Table(A, i, j), i) with fields (j,)
-      Interior Reorders stripped; Aggregate's natural field order (j,) matches output, so no outer Reorder.
+      Interior Reorders stripped; Aggregate's natural (j,) matches output,
+      no outer Reorder.
     """
     i = Field("i")
     j = Field("j")
@@ -100,13 +101,15 @@ def test_normalize_reorders_produces_single_outer_reorder():
 def test_preprocess_plan_for_galley_produces_canonical_queries():
     """
     INPUT:
-      A1 = Aggregate(add, 0, MapJoin(mul, [Table(A, i, j), Table(B, j, k)]), j)   # A @ B -> (i,k)
+      A1 = Aggregate(add, 0, MapJoin(mul, [Table(A,i,j), Table(B,j,k)]), j)
+      # A@B -> (i,k)
       A2 = Reorder(Table(A1, i, k), i, k)   # Reorder
       return A2
 
     EXPECTED AFTER preprocess_plan_for_galley:
-      Single merged query for A2. A1 inlined; # Reorder stripped.
-      A2 = Aggregate(add, 0, MapJoin(mul, [Table(A,i,j), Table(B,j,k)]), j) with fields (i, k).
+      Single merged query for A2. A1 inlined; Reorder stripped.
+      A2 = Aggregate(add, 0, MapJoin(mul, [Table(A,i,j), Table(B,j,k)]), j)
+      with fields (i, k).
       No interior Reorders.
     """
     i = Field("i")
@@ -145,7 +148,6 @@ def test_preprocess_plan_for_galley_produces_canonical_queries():
 
     assert isinstance(out_produces, Produces)
     assert out_produces.args == (Alias("A2"),)
-
 
 
 def test_merge_queries_chain_of_three_aliases():
@@ -350,13 +352,16 @@ def test_preprocess_plan_single_table_no_change():
 def test_preprocess_plan_A_at_B_at_C():
     """
     INPUT (A @ B @ C - chain of two matrix multiplications):
-      A1 = Aggregate(add, 0, MapJoin(mul, [Table(A,i,j), Table(B,j,k)]), j)   # A @ B -> (i,k)
-      A2 = Aggregate(add, 0, MapJoin(mul, [Table(A1,i,k), Table(C,k,l)]), k)  # (A@B) @ C -> (i,l)
+      A1 = Aggregate(add, 0, MapJoin(mul, [Table(A,i,j), Table(B,j,k)]), j)
+      # A@B -> (i,k)
+      A2 = Aggregate(add, 0, MapJoin(mul, [Table(A1,i,k), Table(C,k,l)]), k)
+      # (A@B)@C -> (i,l)
       return A2
 
     EXPECTED AFTER preprocess_plan_for_galley:
       Single merged query for A2. push_aggregates_up distributes mul over add,
-      yielding one Aggregate with reduction indices (j, k) over MapJoin(mul, [MapJoin(mul, A, B), C]).
+      yielding one Aggregate with reduction (j,k) over
+      MapJoin(mul, [MapJoin(mul, A, B), C]).
       No interior Reorders.
     """
     i = Field("i")
@@ -394,6 +399,7 @@ def test_preprocess_plan_A_at_B_at_C():
     assert set(out_query.rhs.idxs) == {j, k}
     assert not _contains_reorder(out_query.rhs)
 
+
 def test_merge_queries_inlines_mapjoin_aggregate_chain():
     """
     INPUT (matmul then sum over one axis):
@@ -404,8 +410,9 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
       return A_4
 
     EXPECTED AFTER merge_queries:
-      A_4 = Aggregate(add, 0, MapJoin(mul, Table(X, i_16, i_17), Table(Y, i_17, i_18)), i_17)
-      A_3 inlined into A_4; A and A_2 inlined to base tensors with alpha-renamed indices.
+      A_4 = Aggregate(add, 0, MapJoin(mul, Table(X, i_16, i_17),
+        Table(Y, i_17, i_18)), i_17)
+      A_3 inlined into A_4; A and A_2 inlined to base tensors w/ alpha-renamed idxs.
     """
     i = Field("i")
     i_2 = Field("i_2")

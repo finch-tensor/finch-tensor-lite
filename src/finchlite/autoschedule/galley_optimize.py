@@ -8,6 +8,7 @@ from ..galley.LogicalOptimizer.greedy_optimizer import greedy_query
 from ..galley.LogicalOptimizer.logic_to_stats import insert_statistics
 from ..galley.LogicalOptimizer.query_normalization import preprocess_plan_for_galley
 
+
 def optimize_query(query, ST, stats_bindings):
     """Rewrite a single logical Query via greedy reduction over reducible indices."""
     annotated_query = AnnotatedQuery(ST, query, stats_bindings)
@@ -55,7 +56,7 @@ def optimize_plan(plan, ST, bindings):
             if len(query_lhss) >= n_returns:
                 new_produces_args = tuple(query_lhss[-n_returns:])
                 optimized_queries[-1] = Produces(new_produces_args)
-                
+
     print("[OPTIMIZED QUERIES HERE]")
     print(optimized_queries)
 

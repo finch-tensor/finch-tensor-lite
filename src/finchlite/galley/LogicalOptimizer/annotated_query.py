@@ -675,7 +675,10 @@ class AnnotatedQuery:
                 root = alias_table
             else:
                 root = AnnotatedQuery.replace_and_remove_nodes(
-                    root, node_to_replace, alias_table, nodes_to_remove,
+                    root,
+                    node_to_replace,
+                    alias_table,
+                    nodes_to_remove,
                 )
 
             new_idx_lowest_root[idx] = root
