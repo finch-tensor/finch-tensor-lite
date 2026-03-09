@@ -190,3 +190,101 @@ def test_galley_chain_matmul_10_2_2_10_10_2():
 
     expected = np.array(A) @ np.array(B) @ np.array(C)
     assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 11: Alias matmul with different base tensors ---
+def test_alias_matmul_two_bases():
+    """
+    Exercises alias-based merging when operands come from different base tensors.
+    B = A1 @ A2, C = B @ B.
+    """
+    A1_np = np.array([[1.0, 2.0], [3.0, 4.0]])
+    A2_np = np.array([[1.0, 0.0], [0.0, 1.0]])
+    A1 = fl_interface.lazy(fl_interface.asarray(A1_np))
+    A2 = fl_interface.lazy(fl_interface.asarray(A2_np))
+    B = A1 @ A2
+    C = B @ B
+    out = fl_interface.compute(C, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+
+    expected = (A1_np @ A2_np) @ (A1_np @ A2_np)
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 12: Chain matmul A(5,4) @ B(4,6) @ C(6,3) -> (5,3) ---
+def test_galley_chain_matmul_5_4_4_6_6_3():
+    """
+    Chain matmul A(5,4) @ B(4,6) @ C(6,3) -> (5,3)
+    - (A @ B) @ C: 5*4*6 + 5*6*3 = 120 + 90 = 210
+    - A @ (B @ C): 4*6*3 + 5*4*3 = 72 + 60 = 132
+    """
+    A = fl_interface.asarray(np.arange(5 * 4, dtype=float).reshape(5, 4))
+    B = fl_interface.asarray(np.arange(4 * 6, dtype=float).reshape(4, 6))
+    C = fl_interface.asarray(np.arange(6 * 3, dtype=float).reshape(6, 3))
+
+    out = fl_interface.compute(
+        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.array(A) @ np.array(B) @ np.array(C)
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 13: Chain matmul A(3,5) @ B(5,2) @ C(2,2) -> (3,2) ---
+def test_galley_chain_matmul_3_5_5_2_2_2():
+    """
+    Chain matmul A(3,5) @ B(5,2) @ C(2,2) -> (3,2)
+    - (A @ B) @ C: 3*5*2 + 3*2*2 = 30 + 12 = 42
+    - A @ (B @ C): 5*2*2 + 3*5*2 = 20 + 30 = 50
+    """
+    A = fl_interface.asarray(np.arange(3 * 5, dtype=float).reshape(3, 5))
+    B = fl_interface.asarray(np.arange(5 * 2, dtype=float).reshape(5, 2))
+    C = fl_interface.asarray(np.arange(2 * 2, dtype=float).reshape(2, 2))
+
+    out = fl_interface.compute(
+        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.array(A) @ np.array(B) @ np.array(C)
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 14: Longer chain matmul A @ B @ C @ D (4 matrices) ---
+def test_galley_chain_matmul_four_matrices():
+    """
+    Longer chain matmul A(6,5) @ B(5,4) @ C(4,3) @ D(3,2) -> (6,2).
+    Exercises Galley on a 4-way chain with more reduction choices.
+    """
+    A = fl_interface.asarray(np.arange(6 * 5, dtype=float).reshape(6, 5))
+    B = fl_interface.asarray(np.arange(5 * 4, dtype=float).reshape(5, 4))
+    C = fl_interface.asarray(np.arange(4 * 3, dtype=float).reshape(4, 3))
+    D = fl_interface.asarray(np.arange(3 * 2, dtype=float).reshape(3, 2))
+
+    out = fl_interface.compute(
+        fl_interface.lazy(A)
+        @ fl_interface.lazy(B)
+        @ fl_interface.lazy(C)
+        @ fl_interface.lazy(D),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.array(A) @ np.array(B) @ np.array(C) @ np.array(D)
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 15: Longer alias chain B @ B @ B @ B (4 matmuls) ---
+def test_alias_matmul_longer_chain():
+    """
+    Longer alias chain: B = A @ A, C = B @ B @ B @ B.
+    Exercises alias merging with more inlined copies (8 uses of A).
+    """
+    A_np = np.array([[1.0, 2.0], [3.0, 4.0]])
+    A = fl_interface.lazy(fl_interface.asarray(A_np))
+    B = A @ A
+    C = B @ B @ B @ B
+    out = fl_interface.compute(C, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+
+    expected = A_np @ A_np @ A_np @ A_np @ A_np @ A_np @ A_np @ A_np
+    assert np.allclose(np.array(out), np.array(expected))
+    
