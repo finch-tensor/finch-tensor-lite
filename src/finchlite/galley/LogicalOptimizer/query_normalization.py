@@ -34,6 +34,7 @@ from ...finch_logic import (
     Literal,
     LogicExpression,
     LogicNode,
+    LogicStatement,
     MapJoin,
     Plan,
     Produces,
@@ -266,7 +267,7 @@ def merge_queries(plan: Plan) -> Plan:
     if not new_queries:
         return plan
 
-    new_bodies: List[LogicNode] = []
+    new_bodies: List[LogicStatement] = []
     new_bodies.extend(new_queries)
     new_bodies.append(produces_stmt)
     return Plan(tuple(new_bodies))
@@ -344,7 +345,7 @@ def normalize_reorders_in_plan(plan: Plan) -> Plan:
     if not isinstance(plan, Plan):
         return plan
 
-    new_bodies: List[LogicNode] = []
+    new_bodies: List[LogicStatement] = []
     for body in plan.bodies:
         if isinstance(body, Query):
             new_bodies.append(normalize_reorders_in_query(body))
@@ -367,7 +368,7 @@ def preprocess_plan_for_galley(plan: Plan) -> Plan:
     """
     merged = merge_queries(plan)
     merged = normalize_reorders_in_plan(merged)
-    new_bodies: List[LogicNode] = []
+    new_bodies: List[LogicStatement] = []
     for body in merged.bodies:
         if isinstance(body, Query):
             print("body:", body)
