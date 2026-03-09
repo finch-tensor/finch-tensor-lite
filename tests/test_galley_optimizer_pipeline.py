@@ -125,3 +125,21 @@ def test_expand_dims_sum_singleton():
 
     expected = np.sum(np.expand_dims(np.array(A), axis=2), axis=2)
     assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 8: Alias Matmul ---
+def test_alias_matmul():
+    """
+    Exercises alias-based query merging and reordering.
+    """
+    A_np = np.array([[1.0, 2.0], [3.0, 4.0]])
+    A = fl_interface.lazy(fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]])))
+    B = A @ A
+    C = B @ B @ B
+    out = fl_interface.compute(
+        C,
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = A_np @ A_np @ A_np @ A_np @ A_np @ A_np
+    assert np.allclose(np.array(out), np.array(expected))
