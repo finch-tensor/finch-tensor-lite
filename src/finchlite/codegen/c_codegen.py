@@ -483,19 +483,6 @@ op: Any
 symbol: str
 
 
-for op, symbol in [
-    (operator.add, "+"),
-    (operator.sub, "-"),
-    (operator.mul, "*"),
-    (operator.and_, "&"),
-    (operator.or_, "|"),
-    (operator.xor, "^"),
-]:
-    register_property(
-        op, "__call__", "c_function_call", register_n_ary_c_op_call(op, symbol)
-    )
-
-
 def register_binary_c_op_call(op, symbol):
     def property_func(op, ctx, a, b):
         return f"{ctx(a)} {symbol} {ctx(b)}"
@@ -504,37 +491,10 @@ def register_binary_c_op_call(op, symbol):
 
 
 for op, symbol in [
-    (operator.eq, "=="),
-    (operator.ne, "!="),
-    (operator.lt, "<"),
-    (operator.le, "<="),
-    (operator.gt, ">"),
-    (operator.ge, ">="),
-    (operator.lshift, "<<"),
-    (operator.rshift, ">>"),
-    (operator.floordiv, "/"),
-    (operator.truediv, "/"),
-    (operator.mod, "%"),
     (operator.pow, "**"),
 ]:
     register_property(
         op, "__call__", "c_function_call", register_binary_c_op_call(op, symbol)
-    )
-
-
-def register_unary_c_op_call(op, symbol):
-    def property_func(op, ctx, a):
-        return f"{symbol}{ctx(a)}"
-
-    return property_func
-
-
-for op, symbol in [
-    (operator.not_, "!"),
-    (operator.invert, "~"),
-]:
-    register_property(
-        op, "__call__", "c_function_call", register_unary_c_op_call(op, symbol)
     )
 
 
