@@ -12,6 +12,8 @@ from ..finch_assembly import AssemblyLibrary, TupleFType
 from ..finch_logic import LogicLoader, MockLogicLoader
 from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
+from .rep_operations import data_rep
+from .suitable_rep import SuitableRep
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -97,3 +99,58 @@ class DefaultLogicFormatter(LogicFormatter):
                 struct_formats=shape_type,
             ),
         )
+
+
+class SmartLogicFormatter(LogicFormatter):
+    def __init__(self, loader: LogicLoader | None = None):
+        super().__init__(loader)
+
+    def __call__(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+    ]:
+        bindings = bindings.copy()
+        suitable_rep = SuitableRep(
+            bindings={alias: data_rep(ftype) for alias, ftype in bindings.items()}
+        )
+        fill_values = prgm.infer_fill_value(
+            {var: val.fill_value for var, val in bindings.items()}
+        )
+
+        def formatter(node: lgc.LogicStatement):
+            match node:
+                case lgc.Plan(bodies):
+                    for body in bodies:
+                        formatter(body)
+                case lgc.Query(lhs, rhs):
+                    if lhs not in bindings:
+                        rep = suitable_rep(rhs)
+
+                        tns = self._rep_to_ftype(rep, fill_values[lhs])
+
+                        bindings[lhs] = tns
+                        suitable_rep.bindings[lhs] = rep
+                case lgc.Produces(_):
+                    pass
+                case _:
+                    raise ValueError(
+                        f"Unsupported logic statement for formatting: {node}"
+                    )
+
+        formatter(prgm)
+
+        logger.debug(prgm)
+
+        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        return lib, bindings, shape_vars
+
+    def get_output_tns_ftype(self, fill_value, shape_type):
+        pass
+
+    def _rep_to_ftype(self, rep, fill_value):
+        pass
