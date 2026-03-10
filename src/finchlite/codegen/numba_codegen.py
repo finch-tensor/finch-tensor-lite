@@ -1,5 +1,4 @@
 import logging
-import operator
 from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import Any
@@ -9,7 +8,12 @@ import numpy as np
 import numba
 
 from .. import finch_assembly as asm
-from ..algebra import query_property, register_property
+from ..algebra import (
+    NumbaOperator,
+    as_finch_operator,
+    query_property,
+    register_property,
+)
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
 from ..finch_assembly.struct import (  # type: ignore[import-untyped]
@@ -614,7 +618,11 @@ class NumbaContext(Context):
                 )
                 return None
             case asm.Call(asm.Literal(val), args):
-                return query_property(val, "numba_literal", "__attr__", self, *args)
+                finch_op = as_finch_operator(val)
+                if not isinstance(finch_op, NumbaOperator):
+                    raise TypeError(f"{finch_op} has no Numba representation.")
+                return finch_op.numba_literal(val, self, *args)
+
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_format != var_t:
                     raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
@@ -893,39 +901,3 @@ for t in (int, bool, float):
         "__attr__",
         lambda fmt, obj: obj,
     )
-
-
-register_property(
-    operator.add,
-    "numba_literal",
-    "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
-)
-
-register_property(
-    operator.mul,
-    "numba_literal",
-    "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
-)
-
-register_property(
-    operator.eq,
-    "numba_literal",
-    "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
-)
-
-register_property(
-    operator.lt,
-    "numba_literal",
-    "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
-)
-
-register_property(
-    operator.sub,
-    "numba_literal",
-    "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
-)

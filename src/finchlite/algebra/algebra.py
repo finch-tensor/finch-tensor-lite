@@ -178,6 +178,47 @@ def promote_type_stable(a: Any, b: Any) -> type:
     return type(a(False) + b(False))
 
 
+class COperator(ABC):
+    @property
+    @abstractmethod
+    def c_symbol(self) -> str:
+        pass
+
+    @abstractmethod
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        pass
+
+
+class CNAryOperator(COperator):
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        assert len(args) > 0
+
+        if len(args) == 1:
+            return f"{self.c_symbol}{ctx(args[0])}"
+        return f" {self.c_symbol} ".join(map(ctx, args))
+
+
+class CBinaryOperator(COperator):
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        a, b = args
+        return f"{ctx(a)} {self.c_symbol} {ctx(b)}"
+
+
+class CNUnaryOperator(COperator):
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        a, b = args
+        return f"{ctx(a)} {self.c_symbol} {ctx(b)}"
+
+
+class NumbaOperator:
+    def numba_literal(self, val: Any, ctx: Any, x: Any, y: Any) -> Any:
+        return f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})"
+
+    def numba_name(self) -> str:
+        return f"_operator.{type(self).__name__.lower()}"
+
+
+# Abstract Base Class for Algebraic Properties
 class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
@@ -266,9 +307,13 @@ class ComparisonFinchOperator(FinchOperator):
         return bool
 
 
-class Add(ReflexiveFinchOperator):
+class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
+
+    @property
+    def c_symbol(self) -> str:
+        return "+"
 
     def __call__(self, a: Any, b: Any):
         return operator.add(a, b)
@@ -286,9 +331,13 @@ class Add(ReflexiveFinchOperator):
         return type_(0)
 
 
-class Mul(ReflexiveFinchOperator):
+class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
+
+    @property
+    def c_symbol(self) -> str:
+        return "*"
 
     def __call__(self, a: Any, b: Any):
         return operator.mul(a, b)
@@ -309,7 +358,11 @@ class Mul(ReflexiveFinchOperator):
         return type_(1)
 
 
-class Sub(ReflexiveFinchOperator):
+class Sub(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "-"
+
     def __call__(self, a: Any, b: Any):
         return operator.sub(a, b)
 
@@ -321,7 +374,11 @@ class MatMul(ReflexiveFinchOperator):
         return operator.matmul(a, b)
 
 
-class TrueDiv(ReflexiveFinchOperator):
+class TrueDiv(ReflexiveFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "/"
+
     def __call__(self, a: Any, b: Any):
         return operator.truediv(a, b)
 
@@ -329,12 +386,20 @@ class TrueDiv(ReflexiveFinchOperator):
         return arg == 1
 
 
-class FloorDiv(ReflexiveFinchOperator):
+class FloorDiv(ReflexiveFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "/"
+
     def __call__(self, a: Any, b: Any):
         return operator.floordiv(a, b)
 
 
-class Mod(ReflexiveFinchOperator):
+class Mod(ReflexiveFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "%"
+
     def __call__(self, a: Any, b: Any):
         return operator.mod(a, b)
 
@@ -344,7 +409,9 @@ class DivMod(ReflexiveFinchOperator):
         return divmod(a, b)
 
 
-class Pow(ReflexiveFinchOperator):
+class Pow(ReflexiveFinchOperator, CBinaryOperator):
+    c_symbol = ""
+
     def __call__(self, a: Any, b: Any):
         return operator.pow(a, b)
 
@@ -355,7 +422,11 @@ class Pow(ReflexiveFinchOperator):
         return arg == 0
 
 
-class LShift(ReflexiveFinchOperator):
+class LShift(ReflexiveFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "<<"
+
     def __call__(self, a: Any, b: Any):
         return operator.lshift(a, b)
 
@@ -363,7 +434,11 @@ class LShift(ReflexiveFinchOperator):
         return arg == 0
 
 
-class RShift(ReflexiveFinchOperator):
+class RShift(ReflexiveFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return ">>"
+
     def __call__(self, a: Any, b: Any):
         return operator.rshift(a, b)
 
@@ -371,10 +446,14 @@ class RShift(ReflexiveFinchOperator):
         return arg == 0
 
 
-class And(ReflexiveFinchOperator):
+class And(ReflexiveFinchOperator, CNAryOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
+
+    @property
+    def c_symbol(self) -> str:
+        return "&"
 
     def __call__(self, a: Any, b: Any):
         return operator.and_(a, b)
@@ -392,9 +471,13 @@ class And(ReflexiveFinchOperator):
         return type_(True)
 
 
-class Xor(ReflexiveFinchOperator):
+class Xor(ReflexiveFinchOperator, CNAryOperator):
     is_associative = True
     is_commutative = True
+
+    @property
+    def c_symbol(self) -> str:
+        return "^"
 
     def __call__(self, a: Any, b: Any):
         return operator.xor(a, b)
@@ -406,10 +489,14 @@ class Xor(ReflexiveFinchOperator):
         return type_(False)
 
 
-class Or(ReflexiveFinchOperator):
+class Or(ReflexiveFinchOperator, CNAryOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
+
+    @property
+    def c_symbol(self) -> str:
+        return "|"
 
     def __call__(self, a: Any, b: Any):
         return operator.or_(a, b)
@@ -425,6 +512,12 @@ class Or(ReflexiveFinchOperator):
 
     def init_value(self, type_: type) -> Any:
         return type_(False)
+
+
+class Not(CNUnaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "!"
 
 
 class Abs(UnaryFinchOperator):
@@ -446,41 +539,69 @@ class Neg(UnaryFinchOperator):
         return operator.neg(a)
 
 
-class Invert(UnaryFinchOperator):
+class Invert(UnaryFinchOperator, CNUnaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "~"
+
     def __call__(self, a: Any):
         return operator.invert(a)
 
 
-class Eq(ComparisonFinchOperator):
+class Eq(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "=="
+
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
         return operator.eq(a, b)
 
 
-class Ne(ComparisonFinchOperator):
+class Ne(ComparisonFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "!="
+
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
         return operator.ne(a, b)
 
 
-class Gt(ComparisonFinchOperator):
+class Gt(ComparisonFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return ">"
+
     def __call__(self, a: Any, b: Any):
         return operator.gt(a, b)
 
 
-class Lt(ComparisonFinchOperator):
+class Lt(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "<"
+
     def __call__(self, a: Any, b: Any):
         return operator.lt(a, b)
 
 
-class Ge(ComparisonFinchOperator):
+class Ge(ComparisonFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return ">="
+
     def __call__(self, a: Any, b: Any):
         return operator.ge(a, b)
 
 
-class Le(ComparisonFinchOperator):
+class Le(ComparisonFinchOperator, CBinaryOperator):
+    @property
+    def c_symbol(self) -> str:
+        return "<="
+
     def __call__(self, a: Any, b: Any):
         return operator.le(a, b)
 
@@ -1126,7 +1247,7 @@ class Conjugate(FinchOperator):
         return x
 
 
-class MakeTuple(FinchOperator):
+class MakeTuple(FinchOperator, NumbaOperator):
     is_commutative = False
     is_associative = False
 
@@ -1137,6 +1258,9 @@ class MakeTuple(FinchOperator):
         from finchlite.finch_assembly.struct import TupleFType
 
         return TupleFType.from_tuple(args)
+
+    def numba_literal(self, val: Any, ctx: Any, *args: Any):
+        return f"({','.join([ctx(arg) for arg in args])},)"
 
 
 def repeat_operator(x):
