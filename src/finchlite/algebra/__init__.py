@@ -1,4 +1,5 @@
 from .algebra import (
+    COperator,
     InitWrite,
     as_finch_operator,
     cansplitpush,
@@ -29,9 +30,11 @@ from .tensor import (
 )
 
 __all__ = [
+    "COperator",
     "InitWrite",
     "Tensor",
     "TensorFType",
+    "as_finch_operator",
     "as_finch_operator",
     "cansplitpush",
     "conjugate",

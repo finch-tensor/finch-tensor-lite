@@ -15,7 +15,7 @@ from typing import Any, TypedDict
 import numpy as np
 
 from .. import finch_assembly as asm
-from ..algebra import query_property, register_property
+from ..algebra import COperator, as_finch_operator, query_property, register_property
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,
@@ -449,12 +449,10 @@ def c_function_call(op: Any, ctx, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
-    if hasattr(op, "c_function_call"):
-        return op.c_function_call(ctx, *args)
-    try:
-        return query_property(op, "__call__", "c_function_call", ctx, *args)
-    except NotImplementedError:
-        return f"{c_function_name(op, ctx, *args)}({', '.join(map(ctx, args))})"
+    finch_op = as_finch_operator(op)
+    if not isinstance(finch_op, COperator):
+        raise TypeError(f"{finch_op} has no C representation.")
+    return finch_op.c_function_call(ctx, *args)
 
 
 def c_getattr(fmt, ctx, obj, attr):

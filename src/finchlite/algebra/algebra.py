@@ -192,6 +192,7 @@ class COperator(ABC):
 class CNAryOperator(COperator):
     def c_function_call(self, ctx: Any, *args: Any) -> Any:
         assert len(args) > 0
+
         if len(args) == 1:
             return f"{self.c_symbol}{ctx(args[0])}"
         return f" {self.c_symbol} ".join(map(ctx, args))
