@@ -298,9 +298,7 @@ def merge_queries(plan: Plan) -> Plan:
 
     # Rebuild the plan as: [merged queries..., original Produces]
     if not new_queries:
-        raise ValueError(
-            f"Plan should not be empty after merging queries"
-        )
+        raise ValueError("Plan should not be empty after merging queries")
 
     new_bodies: list[LogicStatement] = []
     new_bodies.extend(new_queries)
