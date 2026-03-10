@@ -5,6 +5,7 @@ import builtins
 import operator
 import sys
 import threading
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
@@ -44,6 +45,8 @@ from ..finch_logic import (
     Reorder,
     Table,
 )
+from ..galley.TensorStats.stats_interpreter import StatsInterpreter
+from ..galley.TensorStats.tensor_stats import TensorStats
 from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
 
@@ -2036,3 +2039,21 @@ def einsum(prgm, *args, **kwargs):
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
     return ctx(prgm, bindings)[0]
+
+
+def get_lazy_tensor_stats(
+    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+) -> TensorStats:
+    trace = lazy_tensor.ctx.trace()
+    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+    last_stats: TensorStats | tuple[TensorStats, ...]
+    for stmt in trace:
+        last_stats = interpreter(stmt, bindings)
+
+    if last_stats is None:
+        raise ValueError("Trace was empty or no stats produced")
+    if isinstance(last_stats, tuple):
+        return last_stats[0]
+
+    return last_stats

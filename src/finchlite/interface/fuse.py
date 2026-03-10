@@ -53,9 +53,11 @@ Performance:
 import threading
 
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
+from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
+from finchlite.galley.TensorStats import DCStats
 
 from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.standardize import LogicStandardizer
@@ -119,6 +121,17 @@ COMPILE_NUMBA = LogicNormalizer(
                 )
             )
         )
+    )
+)
+
+INTERPRET_NOTATION_GALLEY = LogicNormalizer(
+    GalleyLogicalOptimizer(
+        DCStats,
+        LogicExecutor(
+            LogicStandardizer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
+        ),
     )
 )
 
