@@ -177,33 +177,29 @@ def push_aggregates_up(expr: LogicExpression) -> LogicExpression:
 def _inline_tables_in_expr(
     expr: LogicExpression,
     alias_to_query: dict[Alias, Query],
-    visiting: set[tuple[Alias, tuple[Field, ...]]] | None = None,
+    produced_aliases: set[Alias] | None = None,
 ) -> LogicExpression:
     """
     Recursively inline Table(Alias, ...) nodes using alias_to_query.
 
-    Whenever we see Table(Alias X, idxs), and X has a defining Query,
-    we:
+    Whenever we see Table(Alias X, idxs), and X has a defining Query
+    (and X is not in ``produced_aliases``), we:
       1. Take the RHS of that query.
       2. Compute its natural field order via rhs.fields().
       3. Build a mapping from those fields to idxs.
       4. Alpha-rename the RHS under that mapping.
       5. Recursively inline within the renamed RHS.
 
-    The `visiting` set is used to detect cycles in the alias
-    dependency graph; if we detect a cycle, we conservatively stop inlining
-    that particular occurrence and leave the Table(Alias, ...) as-is.
+    Aliases listed in produced_aliases are not inlined because they
+    will already be computed as separate queries; reusing them is more
+    efficient than reexpanding their definitions.
     """
-    if visiting is None:
-        visiting = set()
+    if produced_aliases is None:
+        produced_aliases = set()
 
     match expr:
         case Table(Alias() as alias, idxs):
-            if alias not in alias_to_query:
-                return expr
-
-            key = (alias, idxs)
-            if key in visiting:
+            if alias not in alias_to_query or alias in produced_aliases:
                 return expr
 
             rhs = alias_to_query[alias].rhs
@@ -225,29 +221,26 @@ def _inline_tables_in_expr(
                 if f not in orig_fields_set:
                     mapping[f] = Field(gensym("i"))
 
-            visiting.add(key)
-            try:
-                renamed_rhs = alpha_rename_expr(rhs, mapping)
-                return _inline_tables_in_expr(renamed_rhs, alias_to_query, visiting)
-            finally:
-                visiting.remove(key)
+            renamed_rhs = alpha_rename_expr(rhs, mapping)
+            return _inline_tables_in_expr(renamed_rhs, alias_to_query, produced_aliases)
 
         case MapJoin(op, args):
             new_args = tuple(
-                _inline_tables_in_expr(arg, alias_to_query, visiting) for arg in args
+                _inline_tables_in_expr(arg, alias_to_query, produced_aliases)
+                for arg in args
             )
             return MapJoin(op, new_args)
 
         case Aggregate(op, init, arg, idxs):
-            new_arg = _inline_tables_in_expr(arg, alias_to_query, visiting)
+            new_arg = _inline_tables_in_expr(arg, alias_to_query, produced_aliases)
             return Aggregate(op, init, new_arg, idxs)
 
         case Reorder(arg, idxs):
-            new_arg = _inline_tables_in_expr(arg, alias_to_query, visiting)
+            new_arg = _inline_tables_in_expr(arg, alias_to_query, produced_aliases)
             return Reorder(new_arg, idxs)
 
         case Relabel(arg, idxs):
-            new_arg = _inline_tables_in_expr(arg, alias_to_query, visiting)
+            new_arg = _inline_tables_in_expr(arg, alias_to_query, produced_aliases)
             return Relabel(new_arg, idxs)
 
         case _:
@@ -289,13 +282,18 @@ def merge_queries(plan: Plan) -> Plan:
             alias_to_query[body.lhs] = body
 
     produced_aliases: tuple[Alias, ...] = produces_stmt.args
+    produced_alias_set: set[Alias] = set(produced_aliases)
 
     new_queries: list[Query] = []
     for alias in produced_aliases:
         defining_query = alias_to_query.get(alias)
         if defining_query is None:
             continue
-        merged_rhs = _inline_tables_in_expr(defining_query.rhs, alias_to_query)
+        # Don't inline other produced aliases, resue them
+        other_produced = produced_alias_set - {alias}
+        merged_rhs = _inline_tables_in_expr(
+            defining_query.rhs, alias_to_query, other_produced
+        )
         new_queries.append(Query(alias, merged_rhs))
 
     # Rebuild the plan as: [merged queries..., original Produces]

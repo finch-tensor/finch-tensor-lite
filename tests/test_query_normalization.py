@@ -191,7 +191,7 @@ def test_merge_queries_produces_multiple_aliases():
 
     EXPECTED AFTER merge_queries:
       A1 = Table(A, i, j)
-      A2 = Table(A, j, i)   # inlined A1
+      A2 = Table(A1, j, i)   # A1 is a produced alias, so it is NOT inlined
       return A1, A2
     """
     i = Field("i")
@@ -211,7 +211,7 @@ def test_merge_queries_produces_multiple_aliases():
 
     assert out_q2.lhs == Alias("A2")
     assert isinstance(out_q2.rhs, Table)
-    assert out_q2.rhs.tns == A_lit
+    assert out_q2.rhs.tns == Alias("A1")
     assert out_q2.rhs.idxs == (j, i)
 
 
