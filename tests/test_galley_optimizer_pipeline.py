@@ -150,14 +150,12 @@ def test_galley_performance_optimization_chain_matmul():
     """
     Test Galley performing a real performance optimization based on
     input data. For a chain matmul A @ B @ C, the greedy optimizer chooses
-    reduction order by cost (flops). With asymmetric shapes, one order is
-    cheaper than the other; Galley picks the cheaper one.
+    reduction order by cost. With asymmetric shapes, one order is
+    cheaper than the other; Galley should pick the cheaper one.
 
     A(2,10) @ B(10,3) @ C(3,4) -> (2,4)
     - Reducing middle (j) first: 2*10*3 + 2*3*4 = 60 + 24 = 84 computations
     - Reducing k first: 10*3*4 + 2*10*4 = 120 + 80 = 200 computations
-
-    Galley's cost model favors the cheaper reduction order.
     """
     A = fl_interface.asarray(np.arange(2 * 10, dtype=float).reshape(2, 10))
     B = fl_interface.asarray(np.arange(10 * 3, dtype=float).reshape(10, 3))
@@ -287,4 +285,59 @@ def test_alias_matmul_longer_chain():
 
     expected = A_np @ A_np @ A_np @ A_np @ A_np @ A_np @ A_np @ A_np
     assert np.allclose(np.array(out), np.array(expected))
-    
+
+
+# --- TEST 16: sum(A * B) - elementwise multiply then full sum ---
+def test_sum_elementwise_mul():
+    """
+    out = sum(A * B) - Frobenius inner product.
+    Combines elementwise multiplication and sum.
+    """
+    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
+
+    out = fl_interface.compute(
+        fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B)),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.sum(np.array(A) * np.array(B))
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 17: sum(A * B, axis=1) - elementwise mul then sum over axis ---
+def test_sum_elementwise_mul_axis1():
+    """
+    out = sum(A * B, axis=1) - elementwise multiply then sum over columns.
+    """
+    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    B = fl_interface.asarray(np.array([[1.0, 2.0], [1.0, 2.0]]))
+
+    out = fl_interface.compute(
+        fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B), axis=1),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = np.sum(np.array(A) * np.array(B), axis=1)
+    assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 18: (A @ B) + (C @ D) - sum of two matmuls ---
+def test_matmul_plus_matmul():
+    """
+    out = (A @ B) + (C @ D) - sum of two matrix products.
+    Combines matmul and elementwise addition.
+    """
+    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    B = fl_interface.asarray(np.array([[1.0, 0.0], [0.0, 1.0]]))
+    C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
+    D = fl_interface.asarray(np.array([[1.0, 0.0], [0.0, 1.0]]))
+
+    out = fl_interface.compute(
+        (fl_interface.lazy(A) @ fl_interface.lazy(B))
+        + (fl_interface.lazy(C) @ fl_interface.lazy(D)),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = (np.array(A) @ np.array(B)) + (np.array(C) @ np.array(D))
+    assert np.allclose(np.array(out), np.array(expected))
