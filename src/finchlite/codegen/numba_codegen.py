@@ -9,7 +9,7 @@ import numpy as np
 import numba
 
 from .. import finch_assembly as asm
-from ..algebra import query_property, register_property
+from ..algebra import InitWrite, query_property, register_property, scansearch
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
 from ..finch_assembly.struct import (  # type: ignore[import-untyped]
@@ -26,7 +26,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {}
+numba_globals: dict[str, Any] = {"scansearch": numba.njit(scansearch._func)}
 
 
 def numba_type(t):
@@ -94,13 +94,6 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
-    from .numba_codegen import (
-        numba_globals,
-        numba_jitclass_type,
-        numba_structnames,
-        numba_structs,
-    )
-
     if ftype_ in numba_structs:
         return numba_structs[ftype_]
 
@@ -131,6 +124,7 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[ftype_] = new_struct
     numba_globals[new_struct.__name__] = new_struct
+    # logger.debug(f"Numba class:\njitclass({spec})\n{class_src}")
     return new_struct
 
 
@@ -553,10 +547,6 @@ class NumbaContext(Context):
     def full_name(val: Any) -> str:
         if hasattr(val, "numba_name"):
             return val.numba_name()
-        # NOTE: Once https://github.com/numba/numba/pull/10195 is backported
-        #       this path can be removed.
-        if isinstance(val, numba.types.ListType):
-            return f"ListType({repr(val.key)})"
         if hasattr(val, "name"):
             return val.name
         return f"{val.__module__}.{val.__name__}"
@@ -668,9 +658,12 @@ class NumbaContext(Context):
                 return dct.result_format.numba_storedict(self, dct, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
-                for body in bodies:
-                    ctx_2(body)
-                self.exec(ctx_2.emit())
+                if bodies == ():
+                    self.exec(f"{feed}pass")
+                else:
+                    for body in bodies:
+                        ctx_2(body)
+                    self.exec(ctx_2.emit())
                 return None
             case asm.ForLoop(asm.Variable(_, _) as var, start, end, body):
                 var_2 = self(var)
@@ -899,33 +892,48 @@ register_property(
     operator.add,
     "numba_literal",
     "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+    lambda val, ctx, x, y: f"({ctx(x)} + {ctx(y)})",
 )
 
 register_property(
     operator.mul,
     "numba_literal",
     "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+    lambda val, ctx, x, y: f"({ctx(x)} * {ctx(y)})",
 )
 
 register_property(
     operator.eq,
     "numba_literal",
     "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+    lambda val, ctx, x, y: f"({ctx(x)} == {ctx(y)})",
 )
 
 register_property(
     operator.lt,
     "numba_literal",
     "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+    lambda val, ctx, x, y: f"({ctx(x)} < {ctx(y)})",
 )
 
 register_property(
     operator.sub,
     "numba_literal",
     "__attr__",
-    lambda val, ctx, x, y: f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})",
+    lambda val, ctx, x, y: f"({ctx(x)} - {ctx(y)})",
+)
+
+for fn in [min, max]:
+    register_property(
+        fn,
+        "numba_literal",
+        "__attr__",
+        lambda fn, ctx, x, y: f"{fn.__name__}({ctx(x)}, {ctx(y)})",
+    )
+
+register_property(
+    InitWrite,
+    "numba_literal",
+    "__attr__",
+    lambda fn, ctx, x, y: ctx(y),
 )

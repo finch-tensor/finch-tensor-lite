@@ -87,6 +87,9 @@ class Literal(NotationExpression):
         return literal_repr(type(self).__name__, {"val": self.val})
 
 
+L = Literal
+
+
 @dataclass(eq=True, frozen=True)
 class Value(NotationExpression):
     """
@@ -694,6 +697,8 @@ class NotationPrinterContext(Context):
                     f"{feed}declare({self(tns)}, {self(init)}, {self(op)}, {shape_e})"
                 )
                 return None
+            case Cached(arg, ref):
+                return f"cached({self(arg)}, {self(ref)})"
             case Freeze(tns, op):
                 self.exec(f"{feed}freeze({self(tns)}, {self(op)})")
                 return None
@@ -755,7 +760,7 @@ class NotationPrinterContext(Context):
                         )
                     self(func)
                 return None
-            case _:
+            case other:
                 raise NotImplementedError(
-                    f"Unrecognized notation node type: {type(prgm)}"
+                    f"Unrecognized notation node type: {type(other)}"
                 )
