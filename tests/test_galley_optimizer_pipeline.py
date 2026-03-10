@@ -177,9 +177,9 @@ def test_galley_chain_matmul_10_2_2_10_10_2():
     - (A @ B) @ C: (10,2)@(2,10)@(10,2) -> contracts 2, then 10
     - A @ (B @ C): (10,2)@(2,10)@(10,2) -> contracts 10, then 2
     """
-    A = fl_interface.asarray(np.arange(10 * 2, dtype=float).reshape(10, 2))
-    B = fl_interface.asarray(np.arange(2 * 10, dtype=float).reshape(2, 10))
-    C = fl_interface.asarray(np.arange(10 * 2, dtype=float).reshape(10, 2))
+    A = fl_interface.asarray(np.arange(1000 * 2, dtype=float).reshape(1000, 2))
+    B = fl_interface.asarray(np.arange(2 * 1000, dtype=float).reshape(2, 1000))
+    C = fl_interface.asarray(np.arange(1000 * 2, dtype=float).reshape(1000, 2))
 
     out = fl_interface.compute(
         fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),

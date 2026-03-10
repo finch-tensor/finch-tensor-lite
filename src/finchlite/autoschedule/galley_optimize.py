@@ -2,11 +2,14 @@
 Galley logical optimizer: applies greedy query rewriting to logical plans
 """
 
-from ..finch_logic import LogicEvaluator, Plan, Produces, Query
+from ..finch_logic import LogicEvaluator, Plan, Query
 from ..galley.LogicalOptimizer.annotated_query import AnnotatedQuery
 from ..galley.LogicalOptimizer.greedy_optimizer import greedy_query
 from ..galley.LogicalOptimizer.logic_to_stats import insert_statistics
-from ..galley.LogicalOptimizer.query_normalization import preprocess_plan_for_galley
+from ..galley.LogicalOptimizer.query_normalization import (
+    postprocess_plan_after_galley,
+    preprocess_plan_for_galley,
+)
 
 
 def optimize_query(query, ST, stats_bindings):
@@ -23,8 +26,6 @@ def optimize_plan(plan, ST, bindings):
     # Preprocess the plan into the canonical form expected by AnnotatedQuery /
     # greedy_query.
     plan = preprocess_plan_for_galley(plan)
-    print("[PLAN HERE]")
-    print(plan)
     optimized_queries = []
     # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings = {var: ST(T) for var, T in bindings.items()}
@@ -42,25 +43,7 @@ def optimize_plan(plan, ST, bindings):
             # Produces(...)
             optimized_queries.append(body)
 
-    """
-    Works for simple a*b and a+b a*b+b*c etc, but not for anything more complicated.
-    Assume the alias are scrambled, make Produce point to the last alias.
-    Same code as last code chunk in greedy_optimizer.py.
-    Uncomment to get a+b, a*b tests working.
-    """
-    if optimized_queries:
-        last_body = optimized_queries[-1]
-        if isinstance(last_body, Produces):
-            n_returns = len(last_body.args)
-            query_lhss = [q.lhs for q in optimized_queries if isinstance(q, Query)]
-            if len(query_lhss) >= n_returns:
-                new_produces_args = tuple(query_lhss[-n_returns:])
-                optimized_queries[-1] = Produces(new_produces_args)
-
-    print("[OPTIMIZED QUERIES HERE]")
-    print(optimized_queries)
-
-    return Plan(tuple(optimized_queries))
+    return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
 class GalleyLogicalOptimizer(LogicEvaluator):
@@ -78,9 +61,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, Plan):
-            print("Input Program: \n", prgm)
             prgm = optimize_plan(prgm, self.ST, bindings)
-            print("Output Program: \n", prgm)
             if self.ctx is not None:
                 return self.ctx(prgm, bindings)
             return prgm

@@ -147,7 +147,7 @@ class AnnotatedQuery:
                     for i, _ in enumerate(lowest_roots, start=1)
                 ]
                 for i, node in enumerate(lowest_roots):
-                    if idx.name not in cache_point[node].index_order:
+                    if idx not in cache_point[node].index_order:
                         # If the lowest root doesn't contain the reduction index, we
                         # attempt to remove the reduction via a repeat_operator, i.e.
                         # ∑_i B_j = B_j*|Dom(i)|
@@ -522,7 +522,6 @@ class AnnotatedQuery:
         stats_cache = self.cache_point
 
         use_root = False
-
         match root_node:
             case MapJoin(Literal(op), args) as mj if is_distributive(op, reduce_op):
                 # If you're already reducing one index, then it may
@@ -542,9 +541,6 @@ class AnnotatedQuery:
                 ]
                 if len(relevant_args) == len(args):
                     node_to_replace = mj
-                    for node in PreOrderDFS(mj):
-                        if node != node_to_replace:
-                            nodes_to_remove.add(cast(LogicExpression, node))
                 else:
                     node_to_replace = relevant_args[0]
                     for arg in relevant_args[1:]:
@@ -562,9 +558,8 @@ class AnnotatedQuery:
                     args_with_idx = [
                         arg
                         for arg in args
-                        if self.original_idx[idx].name in stats_cache[arg].index_order
+                        if self.original_idx[idx] in stats_cache[arg].index_order
                     ]
-
                     if idx in self.connected_idxs[
                         reduce_idx
                     ] and relevant_args_set.issuperset(args_with_idx):
@@ -611,7 +606,6 @@ class AnnotatedQuery:
         )
 
         query = Query(Alias(gensym("A")), query_expr)
-
         return query, node_to_replace, nodes_to_remove, reduced_idxs
 
     def reduce_idx(self, reduce_idx: Field, do_condense: bool = False) -> Query:

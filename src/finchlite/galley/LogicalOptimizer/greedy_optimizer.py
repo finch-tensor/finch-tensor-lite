@@ -11,7 +11,6 @@ def greedy_query(input_aq: AnnotatedQuery) -> list[Query]:
         cheapest_cost = float("inf")
         for idx in reducible_idxs:
             cost = aq.get_cost_of_reduce_idx(idx)
-            print("[COST HERE]", cost, "for idx", idx)
             if cost < cheapest_cost:
                 cheapest_cost = cost
                 best_idx = idx
