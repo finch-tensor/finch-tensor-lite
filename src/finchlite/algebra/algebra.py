@@ -210,11 +210,7 @@ class CNUnaryOperator(COperator):
         return f"{ctx(a)} {self.c_symbol} {ctx(b)}"
 
 
-class NumbaOperator(ABC):
-    @abstractmethod
-    def numba_function_call(self, *args: Any) -> Any:
-        pass
-
+class NumbaOperator:
     def numba_literal(self, val: Any, ctx: Any, x: Any, y: Any) -> Any:
         return f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})"
 
@@ -311,7 +307,7 @@ class ComparisonFinchOperator(FinchOperator):
         return bool
 
 
-class Add(ReflexiveFinchOperator, CNAryOperator):
+class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
 
@@ -335,7 +331,7 @@ class Add(ReflexiveFinchOperator, CNAryOperator):
         return type_(0)
 
 
-class Mul(ReflexiveFinchOperator, CNAryOperator):
+class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
 
@@ -362,7 +358,7 @@ class Mul(ReflexiveFinchOperator, CNAryOperator):
         return type_(1)
 
 
-class Sub(ReflexiveFinchOperator, CNAryOperator):
+class Sub(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     @property
     def c_symbol(self) -> str:
         return "-"
@@ -552,7 +548,7 @@ class Invert(UnaryFinchOperator, CNUnaryOperator):
         return operator.invert(a)
 
 
-class Eq(ComparisonFinchOperator, CBinaryOperator):
+class Eq(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     @property
     def c_symbol(self) -> str:
         return "=="
@@ -583,7 +579,7 @@ class Gt(ComparisonFinchOperator, CBinaryOperator):
         return operator.gt(a, b)
 
 
-class Lt(ComparisonFinchOperator, CBinaryOperator):
+class Lt(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     @property
     def c_symbol(self) -> str:
         return "<"
@@ -1251,7 +1247,7 @@ class Conjugate(FinchOperator):
         return x
 
 
-class MakeTuple(FinchOperator):
+class MakeTuple(FinchOperator, NumbaOperator):
     is_commutative = False
     is_associative = False
 
@@ -1262,6 +1258,9 @@ class MakeTuple(FinchOperator):
         from finchlite.finch_assembly.struct import TupleFType
 
         return TupleFType.from_tuple(args)
+
+    def numba_literal(self, val: Any, ctx: Any, *args: Any):
+        return f"({','.join([ctx(arg) for arg in args])},)"
 
 
 def repeat_operator(x):

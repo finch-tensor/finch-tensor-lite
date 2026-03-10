@@ -434,7 +434,10 @@ def c_function_name(op: Any, ctx, *args: Any) -> str:
         NotImplementedError: If the C function name is not implemented for the
         given function and types.
     """
-    return query_property(op, "__call__", "c_function_name", ctx, *args)
+    finch_op = as_finch_operator(op)
+    if isinstance(finch_op, COperator):
+        return finch_op.c_symbol
+    raise TypeError(f"{finch_op} has no C representation.")
 
 
 def c_function_call(op: Any, ctx, *args: Any) -> str:
@@ -805,7 +808,6 @@ class CContext(Context):
                 c_setattr(obj.result_format, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
-                assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
             # case asm.Slot(var_n, var_t) as ref:
             #    return self(self.deref(ref))

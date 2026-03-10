@@ -1,6 +1,7 @@
 from .algebra import (
     COperator,
     InitWrite,
+    NumbaOperator,
     as_finch_operator,
     cansplitpush,
     conjugate,
@@ -32,6 +33,7 @@ from .tensor import (
 __all__ = [
     "COperator",
     "InitWrite",
+    "NumbaOperator",
     "Tensor",
     "TensorFType",
     "as_finch_operator",
