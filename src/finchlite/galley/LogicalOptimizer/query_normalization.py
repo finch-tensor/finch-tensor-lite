@@ -300,7 +300,9 @@ def merge_queries(plan: Plan) -> Plan:
 
     # Rebuild the plan as: [merged queries..., original Produces]
     if not new_queries:
-        return plan
+        raise ValueError(
+            f"Plan should not be empty after merging queries"
+        )
 
     new_bodies: list[LogicStatement] = []
     new_bodies.extend(new_queries)
@@ -357,16 +359,6 @@ def normalize_reorders_in_query(query: Query) -> Query:
     out_fields = rhs.fields()
     inner_rhs = strip_reorders(rhs)
     inner_fields = inner_rhs.fields()
-
-    # If stripping reorders changes the set of fields, then attempting to force
-    # the original field set back via a new Reorder could ask TensorStats to
-    # drop non-size-1 dimensions, throw error as this should not happen for
-    # correctly formed queries.
-    if set(inner_fields) != set(out_fields):
-        raise ValueError(
-            f"Stripping reorders changed field set: expected {set(out_fields)}, "
-            f"got {set(inner_fields)}"
-        )
 
     # If the inner expression already has the desired field order, we can avoid
     # inserting a redundant Reorder.
