@@ -341,3 +341,27 @@ def test_matmul_plus_matmul():
 
     expected = (np.array(A) @ np.array(B)) + (np.array(C) @ np.array(D))
     assert np.allclose(np.array(out), np.array(expected))
+
+
+# --- TEST 18: (A @ B) + (C @ D) - sum of two matmuls ---
+def test_multiple_compute():
+    """
+    out = (A @ B) + (C @ D) - sum of two matrix products.
+    Combines matmul and elementwise addition.
+    """
+    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    B = fl_interface.asarray(np.array([[1.0, 0.0], [0.0, 1.0]]))
+    C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
+    D = fl_interface.asarray(np.array([[1.0, 0.0], [0.0, 1.0]]))
+
+    out = fl_interface.compute(
+        (
+            fl_interface.lazy(A) @ fl_interface.lazy(B),
+            fl_interface.lazy(C) @ fl_interface.lazy(D),
+        ),
+        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+    )
+
+    expected = ((np.array(A) @ np.array(B)), (np.array(C) @ np.array(D)))
+    assert np.allclose(np.array(out[0]), np.array(expected[0]))
+    assert np.allclose(np.array(out[1]), np.array(expected[1]))
