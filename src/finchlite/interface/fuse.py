@@ -72,6 +72,7 @@ from ..finch_logic import (
     Query,
     Table,
 )
+from ..galley.LogicalOptimizer.greedy_optimizer import GalleyLogicOptimizer
 from ..symbolic import gensym
 from .lazy import lazy
 
@@ -86,6 +87,15 @@ OPTIMIZE_LOGIC = LogicNormalizer(
         )
     )
 )
+
+OPTIMIZE_LOGIC_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicOptimizer(
+            LogicStandardizer(LogicFormatter(LogicCompiler(NotationInterpreter())))
+        )
+    )
+)
+
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
