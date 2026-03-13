@@ -6,6 +6,7 @@ from .TensorStats import (
     TensorDef,
     TensorStats,
     UniformStats,
+    BlockedStats,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "TensorDef",
     "TensorStats",
     "UniformStats",
+    "BlockedStats",
 ]

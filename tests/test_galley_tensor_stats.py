@@ -30,6 +30,7 @@ from finchlite.galley.TensorStats import (
     DenseStats,
     TensorDef,
     UniformStats,
+    BlockedStats,
 )
 from finchlite.interface import lazy
 
@@ -152,6 +153,110 @@ def test_uniform_aggregate_and_issimilar():
     assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
     assert UniformStats.issimilar(us, us)
 
+# ------------------------------ BlockedStats -------------------------------------
+def test_blocked_stats_from_tensor():
+    data = np.eye(10)
+    arr = fl.asarray(data)
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    
+    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+    
+    assert bs.estimate_non_fill_values() == 10.0
+
+
+def test_blocked_stats_aggregate():
+    data = np.eye(10)
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(fl.asarray(data), indices, blocks_per_dim, DenseStats)
+    
+    reduce_indices = (Field("j"),)
+    agg_bs = BlockedStats.aggregate(op.add, 0.0, reduce_indices, bs)
+    
+    assert agg_bs.blocks.ndim == 1
+    assert len(agg_bs.blocks) == 2
+    assert agg_bs.estimate_non_fill_values() == 10.0
+
+def test_blocked_stats_mapjoin():
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    
+    data1 = np.zeros((10, 10))
+    data1[0:5, 0:5] = 1.0
+    bs1 = BlockedStats.from_tensor(fl.asarray(data1), indices, blocks_per_dim, UniformStats)
+    
+    data2 = np.zeros((10, 10))
+    data2[5:10, 5:10] = 1.0
+    bs2 = BlockedStats.from_tensor(fl.asarray(data2), indices, blocks_per_dim, UniformStats)
+    
+    result = BlockedStats.mapjoin(op.add, bs1, bs2)
+    
+    assert result.estimate_non_fill_values() == 50.0
+    assert result.blocks[0, 1].estimate_non_fill_values() == 0.0
+
+def test_blocked_stats_relabel():
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(fl.asarray(np.eye(10)), indices, blocks_per_dim, UniformStats)
+    
+    new_names = (Field("row"), Field("col"))
+    relabeled = BlockedStats.relabel(bs, new_names)
+    
+    assert relabeled.index_order == new_names
+    assert Field("row") in relabeled.blocks_per_dim
+    assert relabeled.estimate_non_fill_values() == 10.0
+
+def test_blocked_stats_reorder():
+    data = np.zeros((4, 10))
+    data[0:2, 0:5] = 1.0 
+    arr = fl.asarray(data)
+    
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+    
+    #Before reordering
+    assert bs.blocks[0, 0].get_dim_size(Field("i")) == 2.0
+    assert bs.blocks[0, 0].get_dim_size(Field("j")) == 5.0
+
+
+    new_indices = (Field("j"), Field("i"))
+    reordered_bs = BlockedStats.reorder(bs, new_indices)
+    
+
+    new_block = reordered_bs.blocks[0, 0]
+    
+    #After reordering
+    assert new_block.get_dim_size(Field("j")) == 5.0
+    assert new_block.get_dim_size(Field("i")) == 2.0
+    assert new_block.index_order == (Field("j"), Field("i"))
+
+def test_blocked_stats_issimilar():
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    data = np.eye(10)
+    arr = fl.asarray(data)
+
+   #Identical
+    bs1 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+    bs2 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+    assert BlockedStats.issimilar(bs1, bs2) is True
+
+    #Different data
+    data_diff = np.eye(10)
+    data_diff[0, 0] = 0.0 
+    bs_diff_data = BlockedStats.from_tensor(fl.asarray(data_diff), indices, blocks_per_dim, UniformStats)
+    assert BlockedStats.issimilar(bs1, bs_diff_data) is False
+
+    # Different blocks_per_dim
+    alt_blocks_per_dim = {Field("i"): 5, Field("j"): 5}
+    bs_diff_grid = BlockedStats.from_tensor(arr, indices, alt_blocks_per_dim, UniformStats)
+    assert BlockedStats.issimilar(bs1, bs_diff_grid) is False
+
+    # Different StatsImpl
+    bs_diff_impl = BlockedStats.from_tensor(arr, indices, blocks_per_dim, DenseStats)
+    assert BlockedStats.issimilar(bs1, bs_diff_impl) is False
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
 
