@@ -16,6 +16,7 @@ from .galley import (
     DenseStats,
     TensorDef,
     UniformStats,
+    BlockedStats,
 )
 from .interface import (
     EagerTensor,
@@ -178,6 +179,7 @@ __all__ = [
     "TensorDef",
     "TensorFType",
     "UniformStats",
+    "BlockedStats",
     "abs",
     "acos",
     "acosh",
