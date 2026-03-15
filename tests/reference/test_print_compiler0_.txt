@@ -1,0 +1,7 @@
+32767,65536,65536
+2.000000,3.000000
+struct C_Point
+struct C_CTuple_3
+struct C_Point,struct C_CTuple_3
+9.000000
+struct C_Point,struct C_CTuple_3,9.000000
