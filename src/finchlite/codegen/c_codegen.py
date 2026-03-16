@@ -470,16 +470,6 @@ def c_setattr(fmt, ctx, obj, attr, val):
     return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
 
 
-def register_n_ary_c_op_call(op, symbol):
-    def property_func(op, ctx, *args):
-        assert len(args) > 0
-        if len(args) == 1:
-            return f"{symbol}{ctx(args[0])}"
-        return f" {symbol} ".join(map(ctx, args))
-
-    return property_func
-
-
 op: Any
 symbol: str
 

@@ -56,6 +56,7 @@ import operator
 from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Hashable
 from typing import Any
+from functools import reduce
 
 import numpy as np
 
@@ -206,8 +207,7 @@ class CBinaryOperator(COperator):
 
 class CNUnaryOperator(COperator):
     def c_function_call(self, ctx: Any, *args: Any) -> Any:
-        a, b = args
-        return f"{ctx(a)} {self.c_symbol} {ctx(b)}"
+        return f"{self.c_symbol}{ctx(args[0])}"
 
 
 class NumbaOperator:
@@ -317,8 +317,8 @@ class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=Single
     def c_symbol(self) -> str:
         return "+"
 
-    def __call__(self, a: Any, b: Any):
-        return operator.add(a, b)
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.add, args)
 
     def is_identity(self, arg: Any) -> bool:
         return arg == 0
@@ -341,8 +341,8 @@ class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=Single
     def c_symbol(self) -> str:
         return "*"
 
-    def __call__(self, a: Any, b: Any):
-        return operator.mul(a, b)
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.mul, args)
 
     def is_identity(self, arg: Any) -> bool:
         return arg == 1
@@ -411,6 +411,15 @@ class DivMod(ReflexiveFinchOperator, metaclass=SingletonMeta):
         return divmod(a, b)
 
 
+class Pow(ReflexiveFinchOperator, COperator):
+    
+    @property
+    def c_symbol(self) -> str:
+        return "pow"
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        a, b = args
+        return f"pow({ctx(a)}, {ctx(b)})"
 class Pow(ReflexiveFinchOperator, CBinaryOperator, metaclass=SingletonMeta):
     c_symbol = ""
 
@@ -457,8 +466,8 @@ class And(ReflexiveFinchOperator, CNAryOperator, metaclass=SingletonMeta):
     def c_symbol(self) -> str:
         return "&"
 
-    def __call__(self, a: Any, b: Any):
-        return operator.and_(a, b)
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.and_, args)
 
     def is_identity(self, arg):
         return bool(arg)
@@ -481,8 +490,8 @@ class Xor(ReflexiveFinchOperator, CNAryOperator, metaclass=SingletonMeta):
     def c_symbol(self) -> str:
         return "^"
 
-    def __call__(self, a: Any, b: Any):
-        return operator.xor(a, b)
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.xor, args)
 
     def is_identity(self, arg):
         return arg == 0
@@ -500,8 +509,8 @@ class Or(ReflexiveFinchOperator, CNAryOperator, metaclass=SingletonMeta):
     def c_symbol(self) -> str:
         return "|"
 
-    def __call__(self, a: Any, b: Any):
-        return operator.or_(a, b)
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.or_, args)
 
     def is_identity(self, arg):
         return not bool(arg)
