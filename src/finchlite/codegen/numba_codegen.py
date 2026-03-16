@@ -898,18 +898,4 @@ for t in (int, bool, float):
         lambda fmt, obj: obj,
     )
 
-for fn in [min, max]:
-    register_property(
-        fn,
-        "numba_literal",
-        "__attr__",
-        lambda fn, ctx, x, y: f"{fn.__name__}({ctx(x)}, {ctx(y)})",
-    )
-
-register_property(
-    InitWrite,
-    "numba_literal",
-    "__attr__",
-    lambda fn, ctx, x, y: ctx(y),
-)
 

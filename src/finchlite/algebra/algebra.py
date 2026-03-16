@@ -410,9 +410,9 @@ class DivMod(ReflexiveFinchOperator, metaclass=SingletonMeta):
     def __call__(self, a: Any, b: Any):
         return divmod(a, b)
 
+   
 
-class Pow(ReflexiveFinchOperator, COperator):
-    
+class Pow(ReflexiveFinchOperator, COperator, metaclass=SingletonMeta):
     @property
     def c_symbol(self) -> str:
         return "pow"
@@ -420,8 +420,6 @@ class Pow(ReflexiveFinchOperator, COperator):
     def c_function_call(self, ctx: Any, *args: Any) -> Any:
         a, b = args
         return f"pow({ctx(a)}, {ctx(b)})"
-class Pow(ReflexiveFinchOperator, CBinaryOperator, metaclass=SingletonMeta):
-    c_symbol = ""
 
     def __call__(self, a: Any, b: Any):
         return operator.pow(a, b)
@@ -740,7 +738,7 @@ class Truth(UnaryBoolOperator, metaclass=SingletonMeta):
         return bool(a)
 
 
-class Min(FinchOperator, metaclass=SingletonMeta):
+class Min(FinchOperator, NumbaOperator, metaclass=SingletonMeta):
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -758,7 +756,7 @@ class Min(FinchOperator, metaclass=SingletonMeta):
         return type_max(type_)
 
 
-class Max(FinchOperator, metaclass=SingletonMeta):
+class Max(FinchOperator, NumbaOperator, metaclass=SingletonMeta):
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -1173,7 +1171,7 @@ def conjugate(x):
     return x
 
 
-class InitWrite(FinchOperator):
+class InitWrite(FinchOperator, NumbaOperator):
     """
     InitWrite may assert that its first argument is
     equal to z, and returns its second argument. This is useful when you want to
@@ -1196,6 +1194,9 @@ class InitWrite(FinchOperator):
 
     def return_type(self, x: Any, y: Any) -> type:
         return y
+    
+    def numba_literal(self, val: Any, ctx: Any, x: Any, y: Any) -> Any:
+        return ctx(y)
 
 
 class Overwrite(FinchOperator, metaclass=SingletonMeta):
@@ -1293,7 +1294,50 @@ def cansplitpush(x, y):
         and is_associative(x)
     )
 
+class Scansearch(FinchOperator, metaclass=SingletonMeta):
+    """
+    Scansearch is a search operator that performs a scan search on a sorted array.
 
+    It takes an array `arr`, a value `x`, and search bounds `lo` and `hi`, and returns
+    the index of the smallest element in `arr` that is greater than or equal to `x`.
+    If all elements in `arr` are less than `x`, it returns `hi`.
+    """
+
+    @staticmethod
+    def _func(
+        arr: np.ndarray, x: np.integer, lo: np.integer, hi: np.integer
+    ) -> np.integer:
+        dtype = np.array(lo).dtype.type
+        u = dtype(1)
+        d = dtype(1)
+        p = lo
+
+        # searching for binary search bounds
+        while p < hi and arr[p] < x:
+            d <<= 0x01
+            p += d
+        lo = p - d
+        hi = min(p, hi) + u  # type: ignore[call-overload]
+
+        # binary searching within those bounds
+        while lo < hi - u:
+            m = lo + ((hi - lo) >> 0x01)
+            if arr[m] < x:
+                lo = m
+            else:
+                hi = m
+
+        return hi
+
+    def __call__(self, *args, **kwargs):
+        return self._func(*args, **kwargs)
+
+    def return_type(self, arr, x, lo, hi) -> type:
+        return hi
+    
+    def numba_literal(self, val: Any, ctx: Any, arr: Any, x: Any, lo: Any, hi: Any) -> Any:
+        return f"scansearch({ctx(arr)}, {ctx(x)}, {ctx(lo)}, {ctx(hi)})"
+    
 _operator_map: dict[Any, FinchOperator] = {
     # Python Operators
     operator.add: Add(),
@@ -1375,6 +1419,7 @@ _operator_map: dict[Any, FinchOperator] = {
     np.sqrt: Sqrt(),
     np.square: Square(),
     np.sign: Sign(),
+    #Finch Functions
     conjugate: Conjugate(),
     promote_min: PromoteMin(),
     promote_max: PromoteMax(),
@@ -1382,6 +1427,8 @@ _operator_map: dict[Any, FinchOperator] = {
     first_arg: FirstArg(),
     identity: Identity(),
     make_tuple: MakeTuple(),
+    Scansearch: Scansearch(),
+
 }
 
 
@@ -1395,48 +1442,5 @@ def as_finch_operator(f: Any) -> FinchOperator:
     if f in _operator_map:
         return _operator_map[f]
     raise TypeError(f"No FinchOperator registered for {f}. ")
-
-
-class Scansearch(FinchOperator, metaclass=SingletonMeta):
-    """
-    Scansearch is a search operator that performs a scan search on a sorted array.
-
-    It takes an array `arr`, a value `x`, and search bounds `lo` and `hi`, and returns
-    the index of the smallest element in `arr` that is greater than or equal to `x`.
-    If all elements in `arr` are less than `x`, it returns `hi`.
-    """
-
-    @staticmethod
-    def _func(
-        arr: np.ndarray, x: np.integer, lo: np.integer, hi: np.integer
-    ) -> np.integer:
-        dtype = np.array(lo).dtype.type
-        u = dtype(1)
-        d = dtype(1)
-        p = lo
-
-        # searching for binary search bounds
-        while p < hi and arr[p] < x:
-            d <<= 0x01
-            p += d
-        lo = p - d
-        hi = min(p, hi) + u  # type: ignore[call-overload]
-
-        # binary searching within those bounds
-        while lo < hi - u:
-            m = lo + ((hi - lo) >> 0x01)
-            if arr[m] < x:
-                lo = m
-            else:
-                hi = m
-
-        return hi
-
-    def __call__(self, *args, **kwargs):
-        return self._func(*args, **kwargs)
-
-    def return_type(self, arr, x, lo, hi) -> type:
-        return hi
-
 
 scansearch = Scansearch()
