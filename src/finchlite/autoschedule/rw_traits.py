@@ -10,7 +10,7 @@ class SequentialWrite:
     """
 
 
-class RandomRead(SequentialRead):
+class RandomRead:
     """
     Supports O(1) access for any index / key.
     Falls back to sequential read as a last resort.
@@ -32,6 +32,6 @@ class Capabilities:
     def supports(self, trait) -> bool:
         if issubclass(trait, (SequentialRead, RandomRead)):
             return self.read is not None and issubclass(self.read, trait)
-        if issubclass(trait, SequentialWrite, RandomWrite):
+        if issubclass(trait, (SequentialWrite, RandomWrite)):
             return self.write is not None and issubclass(self.write, trait)
         return False

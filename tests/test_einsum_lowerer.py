@@ -5,7 +5,7 @@ import numpy as np
 import finchlite
 from finchlite.autoschedule.einsum import LogicEinsumLoader
 from finchlite.autoschedule.executor import LogicExecutor
-from finchlite.autoschedule.formatter import DefaultLogicFormatter
+from finchlite.autoschedule.formatter import BufferizedNDArrayFormatter
 from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.finch_einsum import MockEinsumLoader
 from finchlite.interface.fuse import compute
@@ -23,7 +23,7 @@ def rng():
 def ctx():
     return LogicExecutor(
         LogicStandardizer(
-            DefaultLogicFormatter(LogicEinsumLoader(ctx_load=MockEinsumLoader()))
+            BufferizedNDArrayFormatter(LogicEinsumLoader(ctx_load=MockEinsumLoader()))
         )
     )
 

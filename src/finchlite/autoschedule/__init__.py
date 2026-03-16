@@ -15,7 +15,7 @@ from ..finch_logic import (
 from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler, NotationGenerator
 from .executor import LogicExecutor
-from .formatter import DefaultLogicFormatter, LogicFormatter
+from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
 from .rep_operations import (
@@ -38,11 +38,12 @@ from .representation import (
 )
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
-from .suitable_rep import SuitableRep, toposort
+from .suitable_rep import SmartLogicFormatter, SuitableRep, toposort
 
 __all__ = [
     "Aggregate",
     "Alias",
+    "BufferizedNDArrayFormatter",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
     "DenseData",
@@ -69,6 +70,7 @@ __all__ = [
     "Relabel",
     "Reorder",
     "RepeatData",
+    "SmartLogicFormatter",
     "SparseData",
     "SuitableRep",
     "Table",
