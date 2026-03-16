@@ -1,22 +1,24 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from pprint import pprint
-from typing import Any
+from operator import add, sub
+from typing import Any, overload
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, register_property
+from ..algebra import TensorFType, register_property, scansearch
+from ..algebra.algebra import FinchOperator, SingletonMeta
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyStructFType,
+    AssemblyTransform,
 )
 from ..finch_notation import NotationLoader
-from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from ..symbolic import Context, FTyped, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
 from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer
@@ -39,7 +41,7 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
     @abstractmethod
-    def lower_increment(self, ctx, obj, val):
+    def lower_increment(self, ctx, obj, op, val):
         """
         Increment a tensor view with an operation and value.
         This updates the tensor at the specified index with the operation and value.
@@ -70,8 +72,8 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
 
-@dataclass(eq=True, frozen=True)
-class Extent:
+@dataclass(frozen=True)
+class Extent(FTyped):
     """
     A class to represent the extent of a loop variable.
     This is used to define the start and end values of a loop.
@@ -80,7 +82,7 @@ class Extent:
     start: Any
     end: Any
 
-    def loop(self, ctx, idx, body):
+    def loop_interpreter(self, ctx, idx, body):
         for idx_e in range(self.start, self.end):
             # Create a new scope for each iteration
             ctx_2 = ctx.scope(loop_state=HaltState())
@@ -94,6 +96,16 @@ class Extent:
         return ExtentFType(
             np.asarray(self.start).dtype.type, np.asarray(self.end).dtype.type
         )
+
+
+class ExtentOp(FinchOperator, metaclass=SingletonMeta):
+    __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
+
+    def __call__(self, start: Any, end: Any) -> Extent:
+        return Extent(start, end)
+
+    def return_type(self, start: Any, end: Any):
+        return ExtentFType(start, end)  # type: ignore[abstract]
 
 
 def dimension(tns, mode: int) -> Extent:
@@ -114,14 +126,6 @@ register_property(
 
 
 register_property(
-    Extent,
-    "__call__",
-    "return_type",
-    lambda op, x, y: ExtentFType(x, y),  # type: ignore[abstract]
-)
-
-
-register_property(
     dimension,
     "numba_literal",
     "__attr__",
@@ -129,51 +133,105 @@ register_property(
 )
 
 
-@dataclass(eq=True, frozen=True)
+register_property(
+    scansearch,
+    "numba_literal",
+    "__attr__",
+    lambda func, ctx, arr, x, lo, hi: (
+        f"scansearch({ctx(arr)}, {ctx(x)}, {ctx(lo)}, {ctx(hi)})"
+    ),
+)
+
+
+@dataclass(frozen=True)
 class ExtentFields:
     start: Any
     end: Any
 
 
-@dataclass(eq=True, frozen=True)
-class SingletonExtent:
-    idx: Any
-
-    def loop(self, ctx, idx, body):
-        # Create a new scope for each iteration
-        ctx_2 = ctx.scope(loop_state=HaltState())
-        # Assign the loop variable
-        ctx_2.bindings[idx.name] = idx.type_(self.idx)
-        # Execute the body of the loop
-        ctx_2(body)
-
-
-class FinchCompileError(Exception):
+class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
     """
     Exception raised during Finch compilation.
     This is used to indicate errors in the compilation process.
     """
 
     def __init__(self, node, message):
-        super().__init__(f"{message}:\n{pprint(node)}")
+        super().__init__(f"{message}:\n{node}")
         self.message = message
         self.node = node
 
 
-@dataclass(eq=True, frozen=True)
-class ExtentFType(AssemblyStructFType):
-    start: Any
-    end: Any
-
-    def __repr__(self):
-        return f"ExtentFType(start={qual_str(self.start)}, end={qual_str(self.end)})"
+@dataclass(frozen=True)
+class SymbolicExtent(FTyped):
+    start_sym: ntn.NotationExpression
+    end_sym: ntn.NotationExpression
 
     @classmethod
-    def stack(cls, start, end):
-        return ntn.Stack(
-            ExtentFields(start, end),
-            ExtentFType(start.result_format, end.result_format),
+    def from_notation(cls, node: ntn.NotationNode):
+        match node:
+            case ntn.Call(ntn.Literal(op), (start, end)) if op is ExtentOp():
+                return SymbolicExtent(start, end)
+            case _:
+                raise Exception(node)
+
+    def get_unit(self):
+        return ntn.Literal(np.intp(1))
+
+    def get_start(self):
+        return self.start_sym
+
+    def get_end(self):
+        return self.end_sym
+
+    @staticmethod
+    def point(idx):
+        return SymbolicExtent(
+            idx, ntn.Call(ntn.Literal(add), (idx, ntn.Literal(np.intp(1))))
         )
+
+    # TODO: Make it more robust
+    def is_sym_point(self):
+        return self.start_sym == self.end_sym
+
+    def get_measure(self):
+        return ntn.Call(ntn.Literal(sub), (self.end_sym, self.start_sym))
+
+    def bound_below(self, size) -> "SymbolicExtent":
+        return self._bound_ext(size, max)
+
+    def bound_above(self, size) -> "SymbolicExtent":
+        return self._bound_ext(size, min)
+
+    def _bound_ext(self, size, func) -> "SymbolicExtent":
+        return SymbolicExtent(
+            self.start_sym,
+            ntn.Cached(
+                self.end_sym,
+                ntn.Call(
+                    ntn.Literal(func),
+                    (self.end_sym, ntn.Call(ntn.Literal(add), (self.start_sym, size))),
+                ),
+            ),
+        )
+
+    @property
+    def ftype(self):
+        return ExtentFType(self.start_sym.result_format, self.end_sym.result_format)
+
+
+@dataclass(eq=True, frozen=True)
+class ExtentFType(AssemblyStructFType):
+    start_t: type
+    end_t: type
+
+    def __repr__(self):
+        return (
+            f"ExtentFType(start={qual_str(self.start_t)}, end={qual_str(self.end_t)})"
+        )
+
+    @classmethod
+    def stack(cls, ext: Extent):
+        return ntn.Stack(ExtentFields(ext.start, ext.end), ext.ftype)
 
     @property
     def struct_name(self):
@@ -181,29 +239,27 @@ class ExtentFType(AssemblyStructFType):
 
     @property
     def struct_fields(self):
-        return [("start", np.intp), ("end", np.intp)]
+        return [("start", self.start_t), ("end", self.end_t)]
 
-    def from_fields(self, start, stop) -> "Extent":
-        return Extent(start, stop)
+    def from_fields(self, start, end) -> "Extent":
+        if not (isinstance(start, self.start_t) and isinstance(end, self.end_t)):
+            raise Exception(
+                "Incorrect types for Extent fields: "
+                f"start={type(start)} vs {self.start_t}, "
+                f"end={type(end)} vs {self.end_t}"
+            )
+        return Extent(start, end)
 
     def __call__(self, *args):
         raise TypeError(f"{self.struct_name} is not callable")
 
-    def get_start(self, ext):
-        match ext:
-            case asm.Call(asm.Literal(op), (start, _)) if op is Extent:
-                return start
-            case _:
-                return asm.GetAttr(ext, asm.Literal("start"))
-
-    def get_end(self, ext):
-        match ext:
-            case asm.Call(asm.Literal(op), (_, end)) if op is Extent:
-                return end
-            case _:
-                return asm.GetAttr(ext, asm.Literal("end"))
-
-    def lower_loop(self, ctx, idx, ext, body):
+    def lower_loop(
+        self,
+        ctx: "AssemblyContext",
+        idx: ntn.Variable,
+        ext: SymbolicExtent,
+        body: ntn.NotationExpression,
+    ):
         """
         Lower a loop with the given index and body.
         This is used to compile the loop into assembly.
@@ -211,7 +267,7 @@ class ExtentFType(AssemblyStructFType):
         lower_looplets(ctx, idx, ext, body)
         return
 
-    def default_loop(self, ctx, idx, ext, body):
+    def default_loop(self, ctx, idx, ext: SymbolicExtent, body):
         def assert_lowered(node):
             match node:
                 case ntn.Access(_, _, (j, *_)):
@@ -231,56 +287,12 @@ class ExtentFType(AssemblyStructFType):
         ctx.exec(
             asm.ForLoop(
                 idx,
-                self.get_start(ext),
-                self.get_end(ext),
+                ext.get_start(),
+                ext.get_end(),
                 body_3,
             )
         )
         return
-
-
-@dataclass(eq=True, frozen=True)
-class SingletonExtentFields:
-    idx: Any
-
-
-@dataclass(eq=True, frozen=True)
-class SingletonExtentFType:
-    idx: Any
-
-    @classmethod
-    def stack(cls, idx):
-        return ntn.Stack(
-            SingletonExtentFields(idx),
-            SingletonExtentFType(idx.result_format),
-        )
-
-    def get_start(self, ext):
-        return asm.GetAttr(ext, "idx")
-
-    def get_end(self, ext):
-        return asm.GetAttr(ext, "idx")
-
-    def lower_loop(self, ctx, idx, ext, body):
-        lower_looplets(ctx, idx, ext, body)
-        return
-
-    def default_loop(self, ctx, idx, ext, body):
-        def assert_lowered(node):
-            match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
-                        raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
-                        )
-            return
-
-        map(assert_lowered, PostOrderDFS(body))
-
-        ctx_2 = ctx.scope()
-        ctx_2.bindings[idx.name] = self.get_start(ext)
-        ctx_2(body)
-        return ctx_2.emit()
 
 
 @dataclass(eq=True)
@@ -298,6 +310,7 @@ class NotationCompiler(NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
+        ctx_transforms: tuple[AssemblyTransform, ...] = (),
         ctx_lower: NotationLowerer | None = None,
     ):
         if ctx_load is None:
@@ -305,10 +318,13 @@ class NotationCompiler(NotationLoader):
         if ctx_lower is None:
             ctx_lower = AssemblyGenerator()
         self.ctx_load: AssemblyLoader = ctx_load
+        self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
 
     def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
+        for transform in self.ctx_transforms:
+            asm_code = transform(asm_code)
         logger.debug(asm_code)
         return self.ctx_load(asm_code)
 
@@ -419,6 +435,28 @@ class AssemblyContext(Context):
         assert self.access_modes[tns_var] == ntn.Read()
         del self.access_modes[tns_var]
 
+    # TODO: Move to .pyi file
+
+    @overload
+    def __call__(self, prgm: ntn.Module) -> asm.Module:
+        pass
+
+    @overload
+    def __call__(self, prgm: ntn.Literal) -> asm.Literal:
+        pass
+
+    @overload
+    def __call__(self, prgm: ntn.Variable) -> asm.Variable:
+        pass
+
+    @overload
+    def __call__(self, prgm: ntn.NotationExpression) -> asm.AssemblyExpression:
+        pass
+
+    @overload
+    def __call__(self, prgm: ntn.NotationStatement) -> None:
+        pass
+
     def __call__(self, prgm):
         """
         Lower Finch Notation to Finch Assembly. First we check for early
@@ -426,18 +464,18 @@ class AssemblyContext(Context):
         node.
         """
         match prgm:
-            case ntn.Literal(value):
+            case ntn.Literal(value) | asm.Literal(value):
                 return asm.Literal(value)
             case ntn.Value(expr, _):
                 return expr
             case ntn.Call(f, args):
                 f_e = self(f)
-                args_e = [self(arg) for arg in args]
+                args_e = tuple(self(arg) for arg in args)
                 return asm.Call(f_e, args_e)
             case ntn.Assign(var, val):
                 self.exec(asm.Assign(self(var), self(val)))
                 return None
-            case ntn.Variable(var_n, var_t):
+            case ntn.Variable(var_n, var_t) | asm.Variable(var_n, var_t):
                 return asm.Variable(var_n, var_t)
             case ntn.Slot(var_n, var_t):
                 if var_n in self.types:
@@ -480,29 +518,32 @@ class AssemblyContext(Context):
                 self._rm_tensor_from_accesses(var_n)
                 var_t.asm_repack(self, var_n, obj)
                 return None
-            case ntn.Unwrap(ntn.Access(tns, mode, _)):
+            case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
                 assert isinstance(mode, ntn.Read)
-                # assert len(idxs) == 0
+                assert idxs == ()
                 tns = self.resolve(tns)
                 return tns.result_format.lower_unwrap(self, tns)
-            case ntn.Increment(ntn.Access(tns, mode, _), val):
+            case ntn.Increment(ntn.Access(tns, mode, idxs), val):
                 assert isinstance(mode, ntn.Update)
-                # assert len(idxs) == 0
+                assert idxs == ()
                 tns = self.resolve(tns)
                 op = mode.op
-                val_e = self(val)
-                return tns.result_format.lower_increment(self, tns, op, val_e)
+                return tns.result_format.lower_increment(self, tns, op, val)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                ext.result_format.lower_loop(self, idx, self(ext), body)
+                ext.result_format.lower_loop(
+                    self, idx, SymbolicExtent.from_notation(ext), body
+                )
                 return None
             case ntn.Dimension(tns, ntn.Literal(r)):
                 assert isinstance(r, int)
                 tns = self.resolve(tns)
                 return tns.result_format.lower_dim(self, tns.obj, r)
+            case ntn.Cached(arg, _):
+                return self(arg)
             case ntn.Declare(tns, init, op, shape):
                 self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
@@ -559,6 +600,8 @@ class AssemblyContext(Context):
                 for func in funcs:
                     ctx(func)
                 return asm.Module(ctx.emit())
+            case other:
+                raise Exception(f"{other} not recognized.")
 
 
 def get_undeclared_slots(prgm):
@@ -598,7 +641,12 @@ def instantiate(ctx, prgm):
     return Rewrite(PostWalk(instantiate_node))(prgm)
 
 
-def lower_looplets(ctx, idx, ext, body):
+def lower_looplets(
+    ctx: "AssemblyContext",
+    idx: ntn.Variable,
+    ext: SymbolicExtent,
+    body: ntn.NotationExpression,
+):
     body = instantiate(ctx, body)
     ctx_2 = ctx.scope()
 
@@ -607,7 +655,7 @@ def lower_looplets(ctx, idx, ext, body):
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, None)
+                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, proto=None)
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
@@ -625,6 +673,9 @@ class LoopletPass(ABC):
         assert isinstance(other, LoopletPass)
         return self.priority < other.priority
 
+    def combine_with(self, other: "LoopletPass"):
+        return max(self, other)
+
 
 class DefaultPass(LoopletPass):
     @property
@@ -639,8 +690,8 @@ class DefaultPass(LoopletPass):
 
 
 class LoopletContext(Context):
-    def __init__(self, ctx, idx):
-        self.ctx = ctx  # AssemblyContext
+    def __init__(self, ctx: AssemblyContext, idx):
+        self.ctx: AssemblyContext = ctx
         self.idx = idx
 
     def freshen(self, *tags):
@@ -670,9 +721,10 @@ class LoopletContext(Context):
                         return tns.pass_request
             return DefaultPass()
 
+        # TODO: combine styles and result style
         return max(map(pass_request, PostOrderDFS(body)))
 
-    def __call__(self, ext, body):
+    def __call__(self, ext: SymbolicExtent, body):
         pass_ = self.select_pass(body)
         if pass_ is None:
             ctx_2 = self.ctx.scope()

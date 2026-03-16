@@ -26,6 +26,7 @@ from .nodes import (
     GetAttr,
     If,
     IfElse,
+    L,
     Length,
     Literal,
     Load,
@@ -45,6 +46,7 @@ from .nodes import (
     WhileLoop,
 )
 from .parser import parse_assembly
+from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import (
     AssemblyStructFType,
@@ -65,6 +67,7 @@ __all__ = [
     "AssemblyLibrary",
     "AssemblyLoader",
     "AssemblyNode",
+    "AssemblySimplify",
     "AssemblyStructFType",
     "AssemblyTransform",
     "AssemblyTypeChecker",
@@ -86,6 +89,7 @@ __all__ = [
     "If",
     "IfElse",
     "ImmutableStructFType",
+    "L",
     "Length",
     "Literal",
     "Load",

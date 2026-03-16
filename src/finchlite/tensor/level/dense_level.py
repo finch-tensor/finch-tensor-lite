@@ -6,8 +6,9 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...compile import LoopletContext
+from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
+from ...compile.lower import SymbolicExtent
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
 
 
@@ -148,16 +149,24 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
             "DenseLevelFType does not support level_lower_unwrap."
         )
 
-    def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
+    def level_unfurl(
+        self,
+        ctx: AssemblyContext,
+        stack: ntn.Stack,
+        ext: SymbolicExtent,
+        mode,
+        proto,
+        pos: asm.AssemblyExpression,
+    ):
         tns: FiberTensorFields = stack.obj
         ft_ftype: FiberTensorFType = stack.type
         assert isinstance(tns.lvl_fields, DenseLevelFields)
         lvl = tns.lvl_fields.lvl_asm
         next_lvl = tns.lvl_fields.next_lvl
 
-        def child_accessor(ctx: LoopletContext, idx):
+        def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             pos_2 = asm.Variable(
-                ctx.freshen(ctx.idx, f"_pos_{self.ndim - 1}"), self.position_type
+                ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(
                 asm.Assign(
@@ -170,7 +179,9 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                                 asm.Literal(operator.mul),
                                 (
                                     asm.GetAttr(lvl, asm.Literal("stride")),
-                                    asm.Variable(ctx.idx.name, ctx.idx.type_),
+                                    asm.Variable(
+                                        idx.name, idx.type_
+                                    ),  # TODO: lower with ctx.ctx
                                 ),
                             ),
                         ),
@@ -178,7 +189,9 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 )
             )
             return ntn.Stack(
-                FiberTensorFields(next_lvl, pos_2, tns.dirty_bit),
+                FiberTensorFields(
+                    next_lvl, pos_2, tns.dirty_bit, tns.visited_idxs + (idx,)
+                ),
                 FiberTensorFType(ft_ftype.lvl_t.lvl_t),  # type: ignore[abstract]
             )
 
@@ -211,10 +224,9 @@ class DenseLevel(Level):
 
     @property
     def stride(self) -> np.integer:
-        stride = self.lvl.stride
-        if self.lvl.ndim == 0:
-            return stride
-        return self.lvl.shape[0] * stride
+        if self.lvl.ndim == 0 or self.lvl.stride == 0:
+            return np.intp(1)
+        return self.lvl.shape[0] * self.lvl.stride
 
     @property
     def ftype(self) -> DenseLevelFType:

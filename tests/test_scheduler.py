@@ -618,7 +618,7 @@ def test_flatten_plans():
 
 def test_scheduler_e2e_matmul(file_regression):
     a = np.array([[1, 2], [3, 4]])
-    b = (np.array([[5, 6], [7, 8]]),)
+    b = np.array([[5, 6], [7, 8]])
     i, j, k = Field("i"), Field("j"), Field("k")
 
     plan = Plan(
