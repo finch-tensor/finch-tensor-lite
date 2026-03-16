@@ -333,7 +333,7 @@ class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=Single
         return type_(0)
 
 
-class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator  metaclass=SingletonMeta):
+class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=SingletonMeta):
     is_associative = True
     is_commutative = True
 
