@@ -8,14 +8,14 @@ from finchlite.finch_logic import Field
 import math
 import finchlite as fl
 class BlockedStats(TensorStats):
-    def __init__(self,blocks:np.ndarray,blocks_per_dim:Mapping[Field,int],tensordef: TensorDef, StatsImpl : type[TensorStats]):
+    def __init__(self,blocks:np.ndarray,blocks_per_dim:dict[Field,int],tensordef: TensorDef, StatsImpl : type[TensorStats]):
         self.blocks = blocks 
         self.blocks_per_dim = blocks_per_dim 
         self.tensordef = tensordef
         self.StatsImpl = StatsImpl
 
     @classmethod
-    def build_grid(cls, d: TensorDef, blocks_per_dim: Mapping[Field, int], StatsImpl: type[TensorStats], data: Any | None = None) -> np.ndarray:
+    def build_grid(cls, d: TensorDef, blocks_per_dim: dict[Field, int], StatsImpl: type[TensorStats], data : Any) -> np.ndarray:
         grid_dim = [blocks_per_dim[idx] for idx in d.index_order]
         blocks_grid = np.empty(grid_dim, dtype=object)
 
@@ -30,24 +30,16 @@ class BlockedStats(TensorStats):
                 block_dim_sizes[idx] = float(end - start)
                 slices.append(slice(start, end))
 
-            if data is not None:
-                block_data = data[tuple(slices)].copy()
-                wrapped_arr = fl.asarray(block_data)
-                local_stats = StatsImpl(wrapped_arr, d.index_order)
-                blocks_grid[coord] = local_stats
-            else:
-                local_def = TensorDef(d.index_order, block_dim_sizes, d.fill_value)
-                blocks_grid[coord] = StatsImpl.from_def(local_def)
+            block_data = data[tuple(slices)].copy()
+            wrapped_arr = fl.asarray(block_data)
+            local_stats = StatsImpl(wrapped_arr, d.index_order)
+            blocks_grid[coord] = local_stats
 
         return blocks_grid   
     
+
     @classmethod
-    def create_blocked_stats(cls, d : TensorDef, indices : tuple[Field,...], blocks_per_dim : Mapping[Field,int], StatsImpl : type[TensorStats])-> "BlockedStats":
-        grid = cls.build_grid(d,blocks_per_dim,StatsImpl,data=None)
-        return cls(grid, blocks_per_dim, d.copy(), StatsImpl)
-    
-    @classmethod
-    def from_tensor(cls, tensor : Any, fields : tuple[Field,...], blocks_per_dim = Mapping[Field,int], StatsImpl = type[TensorStats]) -> "BlockedStats" :
+    def from_tensor(cls, tensor : Any, fields : tuple[Field,...], blocks_per_dim = dict[Field,int], StatsImpl = type[TensorStats]) -> "BlockedStats" :
         d = TensorDef.from_tensor(tensor,fields)
         data = tensor.to_numpy() if hasattr (tensor,"to_numpy") else tensor
         grid = cls.build_grid(d, blocks_per_dim, StatsImpl, data=data)
@@ -58,31 +50,45 @@ class BlockedStats(TensorStats):
 
 
     @staticmethod
-    def mapjoin(op : Callable,*args:"BlockedStats") -> "BlockedStats" :
+    def mapjoin(op : Callable,*args: TensorStats) -> "BlockedStats" :
         "We assume that all the args have same sized blocks here"
-        def_args = [stat.tensordef for stat in args]
+
+        if not all(isinstance(arg,BlockedStats) for arg in args):
+            raise TypeError("BlockedStats arguments expected")
+        
+        b_args: list[BlockedStats] = [a for a in args if isinstance(a, BlockedStats)]
+        first_arg = b_args[0]
+        def_args = [stat.tensordef for stat in b_args]
         #For obtaining the tensordef stats for the main block
         new_def = TensorDef.mapjoin(op,*def_args)
-        new_blocks = np.empty_like(args[0].blocks)
-        InnerStats = args[0].StatsImpl
+        new_blocks = np.empty_like(first_arg.blocks)
+        InnerStats = first_arg.StatsImpl
 
         for coord in np.ndindex(new_blocks.shape):
             #Obtaining the blocks at the same position in the args
-            local_blocks = [arg.blocks[coord] for arg in args]
+            local_blocks = []
+            for arg in b_args:
+                block = arg.blocks[coord]
+                if isinstance(block,TensorStats):
+                    local_blocks.append(block)
+
             new_blocks[coord] = InnerStats.mapjoin(op,*local_blocks)
 
-        return BlockedStats(new_blocks,args[0].blocks_per_dim,new_def,InnerStats)
+        return BlockedStats(new_blocks,first_arg.blocks_per_dim,new_def,InnerStats)
     
     @staticmethod
     def aggregate(
         op: Callable[..., Any],
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
+        stats: TensorStats,
     ) -> "BlockedStats":
         
+        if not isinstance(stats,BlockedStats):
+            raise TypeError("BlockedStats expected for aggregate")
+        
+        
         new_def = TensorDef.aggregate(op,init,reduce_indices,stats.tensordef)
-        #axes we plan to reduce
         grid_reduce_axes = []
         for i,idx in enumerate(stats.index_order):
             if idx in reduce_indices:
@@ -127,8 +133,11 @@ class BlockedStats(TensorStats):
         return BlockedStats(final_grid,new_blocks_per_dim,new_def, stats.StatsImpl)
 
     @staticmethod
-    def relabel(stats: "BlockedStats", relabel_indices: tuple[Field, ...]) -> "BlockedStats":
+    def relabel(stats: TensorStats, relabel_indices: tuple[Field, ...]) -> "BlockedStats":
         new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
+
+        if not isinstance(stats,BlockedStats):
+            raise TypeError("BlockedStats expected for relabel")
         
         #One to one map of current to changed indices to change the blocks_per_dim data
         name_map = dict(zip(stats.index_order, relabel_indices))
@@ -136,13 +145,18 @@ class BlockedStats(TensorStats):
         
         new_blocks = np.empty_like(stats.blocks)
         for coord in np.ndindex(stats.blocks.shape):
+            block = stats.blocks[coord]
             #Relabling every block in the grid
-            new_blocks[coord] = stats.StatsImpl.relabel(stats.blocks[coord], relabel_indices)
+            if isinstance(block,TensorStats):
+                new_blocks[coord] = stats.StatsImpl.relabel(block, relabel_indices)
             
         return BlockedStats(new_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
 
     @staticmethod
-    def reorder(stats: "BlockedStats", reorder_indices: tuple[Field, ...]) -> "BlockedStats":
+    def reorder(stats: TensorStats, reorder_indices: tuple[Field, ...]) -> "BlockedStats":
+        if not isinstance(stats,BlockedStats):
+            raise TypeError("BlockedStats expected for reorder")
+        
         new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
         
         #Mapping existing axes to their new positions in the grid so we can use this to transpose
@@ -160,7 +174,9 @@ class BlockedStats(TensorStats):
         #Reordering the blocks inside
         final_blocks = np.empty_like(new_blocks)
         for coord in np.ndindex(new_blocks.shape):
-            final_blocks[coord] = stats.StatsImpl.reorder(new_blocks[coord], reorder_indices)
+            block = new_blocks[coord]
+            if isinstance(block,TensorStats):
+                final_blocks[coord] = stats.StatsImpl.reorder(block, reorder_indices)
         
 
         new_blocks_per_dim = {idx: stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices}
@@ -168,7 +184,7 @@ class BlockedStats(TensorStats):
         return BlockedStats(final_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
     
     @staticmethod
-    def issimilar(a: "BlockedStats", b: "BlockedStats") -> bool:
+    def issimilar(a: TensorStats, b: TensorStats) -> bool:
         if not (isinstance(a, BlockedStats) and isinstance(b, BlockedStats)):
             return False
         
@@ -182,7 +198,7 @@ class BlockedStats(TensorStats):
         return True
             
     @staticmethod
-    def copy_stats(stat: "BlockedStats") -> "BlockedStats":
+    def copy_stats(stat: TensorStats) -> "BlockedStats":
         if not isinstance(stat, BlockedStats):
             raise TypeError("copy_stats expected a BlockedStats instance")
         
