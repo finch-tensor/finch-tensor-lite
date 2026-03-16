@@ -17,6 +17,10 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 
 
 class LogicFormatter(LogicLoader):
+    pass
+
+
+class DefaultLogicFormatter(LogicFormatter):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -81,7 +85,7 @@ class LogicFormatter(LogicLoader):
         return lib, bindings, shape_vars
 
 
-class DefaultLogicFormatter(LogicFormatter):
+class BufferizedNDArrayFormatter(DefaultLogicFormatter):
     def __init__(
         self,
         loader: LogicLoader | None = None,
