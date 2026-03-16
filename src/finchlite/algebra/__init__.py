@@ -24,6 +24,7 @@ from .algebra import (
     register_property,
     repeat_operator,
     return_type,
+    scansearch,
 )
 from .tensor import (
     Tensor,
@@ -59,4 +60,5 @@ __all__ = [
     "register_property",
     "repeat_operator",
     "return_type",
+    "scansearch",
 ]
