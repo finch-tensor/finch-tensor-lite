@@ -3,10 +3,10 @@ Galley logical optimizer: applies greedy query rewriting to logical plans
 """
 
 from ..finch_logic import LogicEvaluator, Plan, Query
-from ..galley.LogicalOptimizer.annotated_query import AnnotatedQuery
-from ..galley.LogicalOptimizer.greedy_optimizer import greedy_query
-from ..galley.LogicalOptimizer.logic_to_stats import insert_statistics
-from ..galley.LogicalOptimizer.query_normalization import (
+from .galley.logical_optimizer.annotated_query import AnnotatedQuery
+from .galley.logical_optimizer.greedy_optimizer import greedy_query
+from .galley.logical_optimizer.logic_to_stats import insert_statistics
+from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
     preprocess_plan_for_galley,
 )

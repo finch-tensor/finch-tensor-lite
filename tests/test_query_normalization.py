@@ -1,5 +1,9 @@
 import operator as op
 
+from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
+    merge_queries,
+    preprocess_plan_for_galley,
+)
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -11,10 +15,6 @@ from finchlite.finch_logic import (
     Query,
     Reorder,
     Table,
-)
-from finchlite.galley.LogicalOptimizer.query_normalization import (
-    merge_queries,
-    preprocess_plan_for_galley,
 )
 
 

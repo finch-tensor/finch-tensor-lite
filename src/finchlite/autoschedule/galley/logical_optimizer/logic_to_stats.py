@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from ...finch_logic import (
+from ....finch_logic import (
     Aggregate,
     Alias,
     Literal,
@@ -12,7 +12,7 @@ from ...finch_logic import (
     Reorder,
     Table,
 )
-from ..TensorStats import TensorStats
+from ...tensor_stats import TensorStats
 
 
 def insert_statistics(

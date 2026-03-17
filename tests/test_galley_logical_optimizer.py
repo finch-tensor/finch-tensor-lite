@@ -7,6 +7,11 @@ import numpy as np
 
 import finchlite as fl
 from finchlite.algebra import as_finch_operator
+from finchlite.autoschedule.galley.logical_optimizer import (
+    AnnotatedQuery,
+    insert_statistics,
+)
+from finchlite.autoschedule.tensor_stats import DenseStats
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -16,11 +21,6 @@ from finchlite.finch_logic import (
     Query,
     Table,
 )
-from finchlite.galley.LogicalOptimizer import (
-    AnnotatedQuery,
-    insert_statistics,
-)
-from finchlite.galley.TensorStats import DenseStats
 
 A = fl.asarray(np.ones((2,)))
 A_mat = fl.asarray(np.ones((5, 5)))

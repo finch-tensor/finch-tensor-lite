@@ -7,20 +7,20 @@ import pytest
 import numpy as np
 
 import finchlite as fl
+from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
+from finchlite.autoschedule.tensor_stats import (
+    DC,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from finchlite.finch_logic import (
     Aggregate,
     Field,
     Literal,
     MapJoin,
     Table,
-)
-from finchlite.galley.LogicalOptimizer import insert_statistics
-from finchlite.galley.TensorStats import (
-    DC,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
 )
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────

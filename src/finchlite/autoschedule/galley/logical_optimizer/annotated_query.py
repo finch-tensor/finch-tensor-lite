@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
-from ...algebra import (
+from ....algebra import (
     InitWrite,
     cansplitpush,
     is_associative,
@@ -11,7 +11,7 @@ from ...algebra import (
     is_distributive,
     repeat_operator,
 )
-from ...finch_logic import (
+from ....finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -24,7 +24,7 @@ from ...finch_logic import (
     Reorder,
     Table,
 )
-from ...symbolic import (
+from ....symbolic import (
     Chain,
     PostWalk,
     PreOrderDFS,
@@ -33,7 +33,7 @@ from ...symbolic import (
     intree,
     isdescendant,
 )
-from ..TensorStats import TensorStats
+from ...tensor_stats import TensorStats
 from .logic_to_stats import insert_statistics
 
 

@@ -1,4 +1,4 @@
-from ...finch_logic import Query
+from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
 
 

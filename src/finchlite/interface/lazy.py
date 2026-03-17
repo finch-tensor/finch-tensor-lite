@@ -30,6 +30,7 @@ from ..algebra import (
 from ..algebra import (
     conjugate as conj,
 )
+from ..autoschedule.tensor_stats import StatsInterpreter, TensorStats
 from ..compile import BufferizedNDArray
 from ..finch_assembly import TupleFType
 from ..finch_logic import (
@@ -45,8 +46,6 @@ from ..finch_logic import (
     Reorder,
     Table,
 )
-from ..galley.TensorStats.stats_interpreter import StatsInterpreter
-from ..galley.TensorStats.tensor_stats import TensorStats
 from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
 
