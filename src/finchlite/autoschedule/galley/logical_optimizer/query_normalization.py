@@ -326,8 +326,6 @@ def normalize_reorders_in_query(query: Query) -> Query:
                 return node
 
     inner_rhs = Rewrite(PostWalk(strip_reorder))(query.rhs)
-    # Otherwise, insert a single outer Reorder to enforce the original output
-    # ordering while keeping the same field set.
     return Query(query.lhs, Reorder(inner_rhs, out_fields))
 
 
