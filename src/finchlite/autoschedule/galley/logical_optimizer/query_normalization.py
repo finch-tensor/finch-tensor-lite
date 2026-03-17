@@ -306,42 +306,6 @@ def merge_queries(plan: Plan) -> Plan:
     return Plan(tuple(new_bodies))
 
 
-def strip_reorders(expr: LogicExpression) -> LogicExpression:
-    """
-    Recursively remove Reorder nodes that are pure permutations.
-
-    A Reorder(arg, idxs) is considered a pure permutation if it preserves the
-    set of fields of arg (i.e., set(arg.fields()) == set(idxs)). Such nodes
-    can be safely removed without changing the logical dimensionality. Reorders
-    that add or drop dimensions are preserved to avoid changing semantics or
-    conflicting with tensor statistics.
-    """
-    match expr:
-        case Reorder(arg, idxs):
-            new_arg = strip_reorders(arg)
-            # Collapse consecutive Reorders: Reorder(Reorder(X, A), B) -> Reorder(X, B)
-            while isinstance(new_arg, Reorder):
-                new_arg = new_arg.arg
-            child_fields = new_arg.fields()
-            # Only strip Reorder nodes that are pure permutations of the same
-            # field set. If the Reorder adds or drops dimensions relative to
-            # its child, we must keep it.
-            if set(child_fields) == set(idxs):
-                return new_arg
-            return Reorder(new_arg, idxs)
-        case MapJoin(op, args):
-            new_args = tuple(strip_reorders(arg) for arg in args)
-            return MapJoin(op, new_args)
-        case Aggregate(op, init, arg, idxs):
-            new_arg = strip_reorders(arg)
-            return Aggregate(op, init, new_arg, idxs)
-        case Relabel(arg, idxs):
-            new_arg = strip_reorders(arg)
-            return Relabel(new_arg, idxs)
-        case _:
-            return expr
-
-
 def normalize_reorders_in_query(query: Query) -> Query:
     """
     Normalize Reorder usage in a single query.
@@ -353,14 +317,15 @@ def normalize_reorders_in_query(query: Query) -> Query:
     """
     rhs = query.rhs
     out_fields = rhs.fields()
-    inner_rhs = strip_reorders(rhs)
-    inner_fields = inner_rhs.fields()
 
-    # If the inner expression already has the desired field order, we can avoid
-    # inserting a redundant Reorder.
-    if inner_fields == out_fields:
-        return Query(query.lhs, inner_rhs)
+    def strip_reorder(node):
+        match node:
+            case Reorder(arg, _):
+                return arg
+            case _:
+                return node
 
+    inner_rhs = Rewrite(PostWalk(strip_reorder))(query.rhs)
     # Otherwise, insert a single outer Reorder to enforce the original output
     # ordering while keeping the same field set.
     return Query(query.lhs, Reorder(inner_rhs, out_fields))
