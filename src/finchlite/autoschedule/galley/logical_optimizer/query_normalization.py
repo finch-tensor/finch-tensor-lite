@@ -17,7 +17,7 @@ from ....finch_logic import (
     Reorder,
     Table,
 )
-from ....symbolic import Fixpoint, PostWalk, Rewrite, gensym
+from ....symbolic import Chain, Fixpoint, PostWalk, Rewrite, gensym
 
 """
 Query merging and reorder normalization for Galley.
@@ -313,7 +313,8 @@ def normalize_reorders_in_query(query: Query) -> Query:
     For a given Query(lhs, rhs):
       1. Record out_fields = rhs.fields().
       2. Strip all interior Reorder nodes from rhs.
-      3. Wrap the result in a single outer Reorder(inner_rhs, *out_fields).
+      3. Remove any aggregates that references idxs created by reorders
+      4. Wrap the result in a single outer Reorder(inner_rhs, *out_fields).
     """
     rhs = query.rhs
     out_fields = rhs.fields()
@@ -325,7 +326,19 @@ def normalize_reorders_in_query(query: Query) -> Query:
             case _:
                 return node
 
-    inner_rhs = Rewrite(PostWalk(strip_reorder))(query.rhs)
+    def remove_extra_aggregates(node):
+        match node:
+            case Aggregate(op, init, arg, idxs):
+                valid_idxs = [idx for idx in idxs if idx in arg.fields()]
+                if len(valid_idxs) > 0:
+                    return Aggregate(op, init, arg, tuple(valid_idxs))
+                return arg
+            case _:
+                return node
+
+    inner_rhs = Rewrite(PostWalk(Chain([strip_reorder, remove_extra_aggregates])))(
+        query.rhs
+    )
     return Query(query.lhs, Reorder(inner_rhs, out_fields))
 
 

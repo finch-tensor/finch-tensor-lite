@@ -36,7 +36,8 @@ def test_merge_queries_inlines_alias_tables_and_keeps_produced_aliases():
       return A2
 
     EXPECTED AFTER merge_queries:
-      A2 = Table(A, j, i)   # A1 inlined; direct ref to base tensor w/ reordered fields
+      A2 = Reorder(Table(A, j, i), j, i)   # A1 inlined; direct ref to
+                                               base tensor w/ reordered fields
       return A2
     """
     i = Field("i")
@@ -54,10 +55,10 @@ def test_merge_queries_inlines_alias_tables_and_keeps_produced_aliases():
 
     assert isinstance(out_query, Query)
     assert out_query.lhs == Alias("A2")
-    # The inlined query should refer directly to the base tensor with reordered fields.
-    assert isinstance(out_query.rhs, Table)
-    assert out_query.rhs.tns == A_lit
-    assert out_query.rhs.idxs == (j, i)
+    assert isinstance(out_query.rhs, Reorder)
+    assert isinstance(out_query.rhs.arg, Table)
+    assert out_query.rhs.arg.tns == A_lit
+    assert out_query.rhs.arg.idxs == (j, i)
 
     assert isinstance(out_produces, Produces)
     assert out_produces.args == (Alias("A2"),)
@@ -70,9 +71,7 @@ def test_normalize_reorders_produces_single_outer_reorder():
       (Aggregate reduces i; inner Reorder swaps Table to (j,i); outer asks for (j,))
 
     EXPECTED AFTER normalize_reorders_in_plan:
-      out = Aggregate(add, 0, Table(A, i, j), i) with fields (j,)
-      Interior Reorders stripped; Aggregate's natural (j,) matches output,
-      no outer Reorder.
+      out = Reorder(Aggregate(add, 0, Table(A, i, j), i), j)
     """
     i = Field("i")
     j = Field("j")
@@ -88,12 +87,10 @@ def test_normalize_reorders_produces_single_outer_reorder():
     norm_q, norm_produces = preprocessed.bodies
     assert isinstance(norm_q, Query)
 
-    # After stripping interior Reorders and collapsing consecutive ones, the
-    # Aggregate's natural field order (j,) already matches the output, so no
-    # outer Reorder is needed.
     rhs = norm_q.rhs
     assert rhs.fields() == original_rhs.fields()
-    assert not _contains_reorder(rhs)
+    assert isinstance(rhs, Reorder)
+    assert rhs.idxs == (j,)
 
     assert isinstance(norm_produces, Produces)
     assert norm_produces.args == (Alias("out"),)
@@ -108,10 +105,9 @@ def test_preprocess_plan_for_galley_produces_canonical_queries():
       return A2
 
     EXPECTED AFTER preprocess_plan_for_galley:
-      Single merged query for A2. A1 inlined; Reorder stripped.
-      A2 = Aggregate(add, 0, MapJoin(mul, [Table(A,i,j), Table(B,j,k)]), j)
-      with fields (i, k).
-      No interior Reorders.
+      Single merged query for A2. A1 inlined;
+      A2 = Reorder(Aggregate(add, 0, MapJoin(mul,
+                                      [Table(A,i,j), Table(B,j,k)]), j), i, k)
     """
     i = Field("i")
     j = Field("j")
@@ -141,11 +137,8 @@ def test_preprocess_plan_for_galley_produces_canonical_queries():
     assert isinstance(out_query, Query)
     assert out_query.lhs == Alias("A2")
 
-    # After merging and stripping Reorders, the Aggregate's natural field
-    # order (i, k) already matches the output, so no outer Reorder is needed.
     rhs = out_query.rhs
     assert rhs.fields() == q2.rhs.fields()
-    assert not _contains_reorder(rhs)
 
     assert isinstance(out_produces, Produces)
     assert out_produces.args == (Alias("A2"),)
@@ -160,7 +153,7 @@ def test_merge_queries_chain_of_three_aliases():
       return A3
 
     EXPECTED AFTER merge_queries:
-      A3 = Table(A, i, j)   # fully inlined: A3 → A2 → A1 → A
+      A3 = Reorder(Table(A, i, j), i, j)
       return A3
     """
     i = Field("i")
@@ -177,9 +170,10 @@ def test_merge_queries_chain_of_three_aliases():
     out_query, out_produces = preprocessed.bodies
 
     assert out_query.lhs == Alias("A3")
-    assert isinstance(out_query.rhs, Table)
-    assert out_query.rhs.tns == A_lit
-    assert out_query.rhs.idxs == (i, j)
+    assert isinstance(out_query.rhs, Reorder)
+    assert isinstance(out_query.rhs.arg, Table)
+    assert out_query.rhs.arg.tns == A_lit
+    assert out_query.rhs.arg.idxs == (i, j)
 
 
 def test_merge_queries_produces_multiple_aliases():
@@ -190,8 +184,9 @@ def test_merge_queries_produces_multiple_aliases():
       return A1, A2
 
     EXPECTED AFTER merge_queries:
-      A1 = Table(A, i, j)
-      A2 = Table(A1, j, i)   # A1 is a produced alias, so it is NOT inlined
+      A1 = Reorder(Table(A, i, j), i, j)
+      A2 = Reorder(Table(A1, j, i), j, i)   # A1 is a produced alias,
+                                              so it is NOT inlined
       return A1, A2
     """
     i = Field("i")
@@ -207,12 +202,16 @@ def test_merge_queries_produces_multiple_aliases():
     out_q1, out_q2, out_produces = preprocessed.bodies
 
     assert out_q1.lhs == Alias("A1")
-    assert out_q1.rhs == Table(A_lit, (i, j))
+    assert isinstance(out_q1.rhs, Reorder)
+    assert out_q1.rhs.idxs == (i, j)
+    assert out_q1.rhs.arg == Table(A_lit, (i, j))
 
     assert out_q2.lhs == Alias("A2")
-    assert isinstance(out_q2.rhs, Table)
-    assert out_q2.rhs.tns == Alias("A1")
+    assert isinstance(out_q2.rhs, Reorder)
     assert out_q2.rhs.idxs == (j, i)
+    assert isinstance(out_q2.rhs.arg, Table)
+    assert out_q2.rhs.arg.tns == Alias("A1")
+    assert out_q2.rhs.arg.idxs == (j, i)
 
 
 def test_normalize_reorders_strips_identity_reorder():
@@ -245,7 +244,7 @@ def test_normalize_reorders_nested_reorders_collapse():
       out = Reorder(Reorder(Table(A, i, j), j, i), i, j)   # swap then swap back
 
     EXPECTED AFTER normalize_reorders_in_plan:
-      out = Table(A, i, j)   # both Reorders stripped; no interior Reorder
+      out = Reorder(Table(A, i, j), i, j)
     """
     i = Field("i")
     j = Field("j")
@@ -260,7 +259,8 @@ def test_normalize_reorders_nested_reorders_collapse():
     norm_q, _ = preprocessed.bodies
 
     assert norm_q.rhs.fields() == (i, j)
-    assert not _contains_reorder(norm_q.rhs)
+    assert isinstance(norm_q.rhs, Reorder)
+    assert norm_q.rhs.idxs == (i, j)
 
 
 def test_normalize_reorders_aggregate_with_reorder_needs_outer():
@@ -270,7 +270,7 @@ def test_normalize_reorders_aggregate_with_reorder_needs_outer():
       Aggregate reduces j, natural output (i,). Reorder asks for (i,) - same.
 
     EXPECTED AFTER normalize_reorders_in_plan:
-      out = Aggregate(add, 0, Table(A, i, j), j)   # no Reorder needed
+      out = Reorder(Aggregate(add, 0, Table(A, i, j), j), i)
     """
     i = Field("i")
     j = Field("j")
@@ -285,7 +285,8 @@ def test_normalize_reorders_aggregate_with_reorder_needs_outer():
     norm_q, _ = preprocessed.bodies
 
     assert norm_q.rhs.fields() == (i,)
-    assert not _contains_reorder(norm_q.rhs)
+    assert isinstance(norm_q.rhs, Reorder)
+    assert norm_q.rhs.idxs == (i,)
 
 
 def test_preprocess_plan_chain_with_reorder_and_aggregate():
@@ -333,7 +334,7 @@ def test_preprocess_plan_single_table_no_change():
       return out
 
     EXPECTED AFTER preprocess_plan_for_galley:
-      out = Table(A, i, j)   # no Reorders, no merge needed
+      out = Reorder(Table(A, i, j), i, j)
     """
     i = Field("i")
     j = Field("j")
@@ -346,8 +347,9 @@ def test_preprocess_plan_single_table_no_change():
 
     assert len(preprocessed.bodies) == 2
     out_query, _ = preprocessed.bodies
-    assert out_query.rhs == Table(A_lit, (i, j))
-    assert not _contains_reorder(out_query.rhs)
+    assert isinstance(out_query.rhs, Reorder)
+    assert out_query.rhs.idxs == (i, j)
+    assert out_query.rhs.arg == Table(A_lit, (i, j))
 
 
 def test_preprocess_plan_A_at_B_at_C():
@@ -398,9 +400,9 @@ def test_preprocess_plan_A_at_B_at_C():
     # Single Aggregate with both reduction indices after push_aggregates_up.
     # Internal fields may get fresh names when inlining (e.g. j -> gensym), so
     # we only assert the count, not the exact names.
-    assert isinstance(out_query.rhs, Aggregate)
-    assert len(out_query.rhs.idxs) == 2
-    assert not _contains_reorder(out_query.rhs)
+    assert isinstance(out_query.rhs, Reorder)
+    assert isinstance(out_query.rhs.arg, Aggregate)
+    assert len(out_query.rhs.arg.idxs) == 2
 
 
 def test_merge_queries_inlines_mapjoin_aggregate_chain():
@@ -464,6 +466,9 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     assert out_produces.args == (Alias("A_4"),)
 
     rhs = out_query.rhs
+    assert isinstance(rhs, Reorder)
+    assert rhs.idxs == (i_16, i_18)
+    rhs = rhs.arg
     assert isinstance(rhs, Aggregate)
     assert rhs.idxs == (i_17,)
     assert isinstance(rhs.arg, MapJoin)

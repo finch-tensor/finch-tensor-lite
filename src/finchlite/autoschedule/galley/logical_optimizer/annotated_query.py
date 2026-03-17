@@ -52,7 +52,6 @@ class AnnotatedQuery:
     connected_idxs: OrderedDict[Field, set[Field]]
     bindings: OrderedDict[Alias, TensorStats]
     output_order: list[Field] | None = None
-    output_format: list[Any] | None = None
 
     def __init__(
         self,
@@ -87,8 +86,11 @@ class AnnotatedQuery:
         self.cache = cache
         output_name = q.lhs
         expr = q.rhs
-        output_format: list[Any] | None = None
-        output_order: list[Field] = list(q.rhs.fields())
+        if isinstance(expr, Reorder):
+            output_order = list(q.rhs.arg.fields())
+            expr = expr.arg
+        else:
+            output_order: list[Field] = list(q.rhs.fields())
         starting_reduce_idxs: list[Field] = []
         idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
@@ -224,7 +226,6 @@ class AnnotatedQuery:
         self.connected_components = connected_components
         self.connected_idxs = connected_idxs
         self.output_order = output_order
-        self.output_format = output_format
 
     def copy(self) -> "AnnotatedQuery":
         """
@@ -246,9 +247,6 @@ class AnnotatedQuery:
         )
         new.output_order = (
             None if self.output_order is None else list(self.output_order)
-        )
-        new.output_format = (
-            None if self.output_format is None else list(self.output_format)
         )
 
         return new

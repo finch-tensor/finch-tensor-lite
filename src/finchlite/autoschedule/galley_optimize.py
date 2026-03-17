@@ -26,6 +26,8 @@ def optimize_plan(plan, ST, bindings):
     # Preprocess the plan into the canonical form expected by AnnotatedQuery /
     # greedy_query.
     plan = preprocess_plan_for_galley(plan)
+    print("Preprocessed plan:")
+    print(plan)
     optimized_queries = []
     # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings = {var: ST(T) for var, T in bindings.items()}
@@ -61,6 +63,8 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, Plan):
+            print("Input plan:")
+            print(prgm)
             prgm = optimize_plan(prgm, self.ST, bindings)
             if self.ctx is not None:
                 return self.ctx(prgm, bindings)
