@@ -379,6 +379,7 @@ def preprocess_plan_for_galley(plan: Plan) -> Plan:
     return normalize_reorders_in_plan(merged)
 
 
+# TODO: Remove this when we get n-ary operators working.
 def split_mapjoin(node: LogicExpression) -> LogicExpression:
     match node:
         case MapJoin(Literal(mj_op), args) if is_associative(mj_op) and len(args) > 2:
