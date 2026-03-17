@@ -1,4 +1,11 @@
 from .algebra import Tensor, TensorFType
+from .autoschedule.tensor_stats import (
+    DC,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -9,13 +16,6 @@ from .compile import (
     Extent,
     ExtentFType,
     dimension,
-)
-from .galley import (
-    DC,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
 )
 from .interface import (
     EagerTensor,
