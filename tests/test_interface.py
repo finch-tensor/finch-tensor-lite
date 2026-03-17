@@ -496,17 +496,17 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
     ],
 )
 @pytest.mark.parametrize(
-    "ops, np_op",
+    "op, np_op",
     [
-        ((finchlite.prod, np.prod), np.prod),
-        ((finchlite.sum, np.sum), np.sum),
-        ((finchlite.any, np.any), np.any),
-        ((finchlite.all, np.all), np.all),
-        ((finchlite.min, np.min), np.min),
-        ((finchlite.max, np.max), np.max),
-        ((finchlite.mean, np.mean), np.mean),
-        ((finchlite.std, np.std), np.std),
-        ((finchlite.var, np.var), np.var),
+        (finchlite.prod, lambda x, axis: np.prod(x, axis=axis, dtype=x.dtype)),
+        (finchlite.sum, lambda x, axis: np.sum(x, axis=axis, dtype=x.dtype)),
+        (finchlite.any, np.any),
+        (finchlite.all, np.all),
+        (finchlite.min, np.min),
+        (finchlite.max, np.max),
+        (finchlite.mean, np.mean),
+        (finchlite.std, np.std),
+        (finchlite.var, np.var),
     ],
 )
 @pytest.mark.parametrize(
@@ -518,25 +518,27 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
         (0, 1),
     ],
 )
-def test_reduction_operations(a, a_wrap, ops, np_op, axis):
+def test_reduction_operations(a, a_wrap, op, np_op, axis):
     wa = a_wrap(a)
+
+    if a.dtype == np.bool_ and np_op in (np.mean, np.std, np.var):
+        pytest.skip("Boolean arrays do not support mean, std, var operations")
 
     expected = np_op(a, axis=axis)
 
-    for op in ops:
-        result = op(wa, axis=axis)
+    result = op(wa, axis=axis)
 
-        if isinstance(wa, finchlite.LazyTensor):
-            assert isinstance(result, finchlite.LazyTensor)
+    if isinstance(wa, finchlite.LazyTensor):
+        assert isinstance(result, finchlite.LazyTensor)
 
-            result = finchlite.compute(result)
+        result = finchlite.compute(result)
 
-        if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
-            expected.dtype, np.complexfloating
-        ):
-            finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
-        else:
-            finch_assert_equal(result, expected)
+    if np.issubdtype(expected.dtype, np.floating) or np.issubdtype(
+        expected.dtype, np.complexfloating
+    ):
+        finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
+    else:
+        finch_assert_equal(result, expected)
 
 
 @pytest.mark.usefixtures(
@@ -1399,4 +1401,59 @@ def test_flatten(array_shape, expected_shape, wrapper):
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 
+    finch_assert_equal(result, expected, strict=True)
+
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize(
+    "arr1,arr2",
+    [
+        (
+            np.array([[2, 0, 3], [1, 3, -3], [6, 0, 1]]),
+            np.array([[-4, 2, 1], [0, 0, -3], [4, 9, 11]]),
+        ),
+        (
+            np.full((5, 8), 9, dtype=np.float64),
+            np.ones((5, 8), dtype=np.float64),
+        ),
+        (
+            np.full((3, 4, 3), 4, dtype=np.int64),
+            np.full((3, 4, 3), 3, dtype=np.int64),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda x: x,
+        finchlite.lazy,
+    ],
+)
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda xp, x, y: xp.multiply(x, y),
+        lambda xp, x, y: xp.add(x, y),
+        lambda xp, x, _: xp.sum(x, axis=0),
+    ],
+)
+def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
+    # construct dense format
+    fmt = finchlite.element(
+        arr1.dtype.type(0), arr1.dtype, np.intp, finchlite.NumpyBufferFType
+    )
+    for _ in range(arr1.ndim):
+        fmt = finchlite.dense(fmt)
+    fmt = finchlite.fiber_tensor(fmt)
+
+    f_arr = finchlite.asarray(arr1, format=fmt)
+    tril_arr = finchlite.tril(f_arr)
+    f_arr_2 = finchlite.asarray(arr2, format=fmt)
+
+    wrap_arr = wrapper(tril_arr)
+    wrap_arr_2 = wrapper(f_arr_2)
+    plan = op(finchlite, wrap_arr, wrap_arr_2)
+    result = finchlite.compute(plan) if isinstance(plan, finchlite.LazyTensor) else plan
+
+    expected = op(np, np.tril(arr1), arr2)
     finch_assert_equal(result, expected, strict=True)

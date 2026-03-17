@@ -1,4 +1,12 @@
 from .algebra import Tensor, TensorFType
+from .autoschedule.tensor_stats import (
+    DC,
+    BlockedStats,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -9,14 +17,6 @@ from .compile import (
     Extent,
     ExtentFType,
     dimension,
-)
-from .galley import (
-    DC,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
-    BlockedStats,
 )
 from .interface import (
     EagerTensor,
@@ -135,26 +135,37 @@ from .symbolic import (
     ftype,
 )
 from .tensor import (
+    DenseLevel,
     DenseLevelFType,
+    ElementLevel,
     ElementLevelFType,
+    FiberTensor,
     FiberTensorFType,
+    SparseListLevel,
+    SparseListLevelFType,
     dense,
     element,
     fiber_tensor,
+    sparse_list,
+    tril,
 )
 
 __all__ = [
     "DC",
     "AssemblyContext",
+    "BlockedStats",
     "BufferizedNDArray",
     "DCStats",
+    "DenseLevel",
     "DenseLevelFType",
     "DenseStats",
     "EagerTensor",
+    "ElementLevel",
     "ElementLevelFType",
     "Extent",
     "ExtentFType",
     "FTyped",
+    "FiberTensor",
     "FiberTensorFType",
     "LazyTensor",
     "NumPyFType",
@@ -163,11 +174,12 @@ __all__ = [
     "NumpyBufferFType",
     "Reflector",
     "Scalar",
+    "SparseListLevel",
+    "SparseListLevelFType",
     "Tensor",
     "TensorDef",
     "TensorFType",
     "UniformStats",
-    "BlockedStats",
     "abs",
     "acos",
     "acosh",
@@ -267,6 +279,7 @@ __all__ = [
     "signbit",
     "sin",
     "sinh",
+    "sparse_list",
     "split_dims",
     "sqrt",
     "square",
@@ -278,6 +291,7 @@ __all__ = [
     "tan",
     "tanh",
     "tensordot",
+    "tril",
     "truediv",
     "trunc",
     "var",

@@ -53,7 +53,9 @@ Performance:
 import threading
 
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
+from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
+from finchlite.autoschedule.tensor_stats import DCStats
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -61,7 +63,7 @@ from ..autoschedule.compiler import LogicCompiler
 from ..autoschedule.standardize import LogicStandardizer
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
-from ..finch_assembly import AssemblyInterpreter
+from ..finch_assembly import AssemblyInterpreter, AssemblySimplify
 from ..finch_logic import (
     Alias,
     Field,
@@ -110,9 +112,28 @@ COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationCompiler(NumbaCompiler())))
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                        )
+                    )
+                )
             )
         )
+    )
+)
+
+# TODO: Make Galley a LogicLoader that gets passed a stats bindings dictionary
+# rather than the tensors themselves.
+INTERPRET_NOTATION_GALLEY = LogicNormalizer(
+    GalleyLogicalOptimizer(
+        DCStats,
+        LogicExecutor(
+            LogicStandardizer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
+        ),
     )
 )
 

@@ -1,10 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 import numpy as np
 
 from ... import finch_assembly as asm
+from ... import finch_notation as ntn
 from ...codegen import NumpyBufferFType
+from ...compile.lower import AssemblyContext
 from ...symbolic import FType, ftype
 from ..fiber_tensor import FiberTensorFields, Level, LevelFType
 
@@ -41,7 +43,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape=(), val=None):
+    def __call__(self, shape, *, val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
@@ -83,7 +85,8 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    def _get_buf_s(self, lvl_fields) -> asm.Slot:
+    @staticmethod
+    def _get_buf_s(lvl_fields) -> asm.Slot:
         assert isinstance(lvl_fields, ElementLevelFields)
         return lvl_fields.buf_s
 
@@ -109,17 +112,21 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         buf_s = self._get_buf_s(obj.lvl_fields)
         return asm.Load(buf_s, pos)
 
-    def level_lower_increment(self, ctx, obj: FiberTensorFields, op, val, pos):
+    def level_lower_increment(
+        self,
+        ctx: AssemblyContext,
+        obj: FiberTensorFields,
+        op: ntn.Literal,
+        val: ntn.NotationExpression,
+        pos: ntn.Variable,
+    ):
         buf_s = self._get_buf_s(obj.lvl_fields)
-        lowered_pos = asm.Variable(pos.name, pos.type)
+        pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
                 buf_s,
-                lowered_pos,
-                asm.Call(
-                    asm.Literal(op.val),
-                    (asm.Load(buf_s, lowered_pos), val),
-                ),
+                pos_e,
+                asm.Call(op_e, (asm.Load(buf_s, pos_e), val_e)),
             )
         )
 
@@ -174,7 +181,7 @@ class ElementLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    _format: ElementLevelFType
+    _format: ElementLevelFType = field(repr=False)
     _val: Any | None = None
 
     def __post_init__(self):
@@ -198,9 +205,6 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
-
-    def __repr__(self):
-        return f"ElementLevel(val={self._val})"
 
     def __str__(self):
         return f"ElementLevel(val={self._val})"

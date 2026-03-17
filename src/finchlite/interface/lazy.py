@@ -5,6 +5,7 @@ import builtins
 import operator
 import sys
 import threading
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
@@ -24,13 +25,12 @@ from ..algebra import (
     promote_max,
     promote_min,
     promote_type,
-    query_property,
-    register_property,
     return_type,
 )
 from ..algebra import (
     conjugate as conj,
 )
+from ..autoschedule.tensor_stats import StatsInterpreter, TensorStats
 from ..compile import BufferizedNDArray
 from ..finch_assembly import TupleFType
 from ..finch_logic import (
@@ -431,13 +431,6 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-register_property(
-    np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray.from_numpy(x)
-)
-register_property(BufferizedNDArray, "asarray", "__attr__", lambda x: x)
-register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
-
-
 def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.
@@ -451,9 +444,13 @@ def asarray(arg: Any, format: TensorFType | None = None) -> Any:
         The Tensor type result of the given object.
     """
     if format is None:
-        if hasattr(arg, "asarray"):
-            return arg.asarray()
-        return query_property(arg, "asarray", "__attr__")
+        from finchlite.interface.scalar import Scalar
+
+        if isinstance(arg, np.ndarray):
+            return BufferizedNDArray.from_numpy(arg)
+        if np.isscalar(arg) or arg is None:
+            return Scalar(arg)
+        return arg
 
     if isinstance(arg, np.ndarray):
         return format.from_numpy(arg)
@@ -1329,9 +1326,6 @@ class FillTensor(Tensor):
             tuple(type(dim) for dim in self.shape),
         )
 
-    def asarray(self):
-        return self
-
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
@@ -1477,9 +1471,6 @@ class ConcatTensor(Tensor):
         """Shape type of the tensor."""
         return self.ftype.shape_type
 
-    def asarray(self):
-        return self
-
 
 def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     """
@@ -1616,9 +1607,6 @@ class SplitDimsTensor(Tensor):
         """Shape type of the tensor."""
         return self.ftype.shape_type
 
-    def asarray(self):
-        return self
-
 
 @dataclass(frozen=True)
 class CombineDimsTensorFType(WrapperTensorFType):
@@ -1738,9 +1726,6 @@ class CombineDimsTensor(Tensor):
     def shape_type(self) -> tuple:
         """Shape type of the tensor."""
         return self.ftype.shape_type
-
-    def asarray(self):
-        return self
 
 
 def _compute(arg, ctx=None):
@@ -2053,3 +2038,21 @@ def einsum(prgm, *args, **kwargs):
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
     return ctx(prgm, bindings)[0]
+
+
+def get_lazy_tensor_stats(
+    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+) -> TensorStats:
+    trace = lazy_tensor.ctx.trace()
+    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+    last_stats: TensorStats | tuple[TensorStats, ...]
+    for stmt in trace:
+        last_stats = interpreter(stmt, bindings)
+
+    if last_stats is None:
+        raise ValueError("Trace was empty or no stats produced")
+    if isinstance(last_stats, tuple):
+        return last_stats[0]
+
+    return last_stats

@@ -4,7 +4,6 @@ from abc import ABC
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from ..algebra import register_property
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
@@ -223,9 +222,6 @@ class EagerTensor(OverrideTensor, ABC):
 
     def __ne__(self, other):
         return not_equal(self, other)
-
-
-register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
 
 def full(

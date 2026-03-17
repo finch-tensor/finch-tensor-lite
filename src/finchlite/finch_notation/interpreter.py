@@ -452,7 +452,8 @@ class NotationInterpreter(NotationLoader):
                 return None
             case ntn.Loop(idx, ext, body):
                 ext_e = self(ext)
-                ext_e.loop(self, idx, body)
+                # assert isinstance(ext_e, Extent)
+                ext_e.loop_interpreter(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 assert isinstance(tns, ntn.Slot)

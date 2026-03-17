@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import TensorFType, register_property
+from ..algebra import TensorFType
 from .eager import EagerTensor
 
 
@@ -42,6 +42,9 @@ class ScalarFType(TensorFType):
     def shape_type(self):
         return ()
 
+    def lower_unwrap(self, ctx, obj):
+        return obj.obj
+
 
 class Scalar(EagerTensor):
     def __init__(self, val: Any, fill_value: Any = None):
@@ -76,6 +79,5 @@ class Scalar(EagerTensor):
     def __getitem__(self, idx):
         return self.val
 
-
-register_property(object, "asarray", "__attr__", lambda x: Scalar(x))
-register_property(Scalar, "asarray", "__attr__", lambda x: x)
+    def __str__(self):
+        return str(self.val)
