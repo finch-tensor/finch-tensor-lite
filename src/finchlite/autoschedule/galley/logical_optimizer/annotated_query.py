@@ -86,11 +86,12 @@ class AnnotatedQuery:
         self.cache = cache
         output_name = q.lhs
         expr = q.rhs
+        output_order: list[Field] = []
         if isinstance(expr, Reorder):
-            output_order = list(q.rhs.arg.fields())
+            output_order = list(expr.idxs)
             expr = expr.arg
         else:
-            output_order: list[Field] = list(q.rhs.fields())
+            output_order = list(q.rhs.fields())
         starting_reduce_idxs: list[Field] = []
         idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
