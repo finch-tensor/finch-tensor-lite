@@ -66,12 +66,11 @@ class BlockedStats(TensorStats):
 
         for coord in np.ndindex(new_blocks.shape):
             #Obtaining the blocks at the same position in the args
-            local_blocks = []
+            local_blocks : list[TensorStats] = []
             for arg in b_args:
-                block = arg.blocks[coord]
+                block : Any = arg.blocks[coord]
                 if isinstance(block,TensorStats):
                     local_blocks.append(block)
-
             new_blocks[coord] = InnerStats.mapjoin(op,*local_blocks)
 
         return BlockedStats(new_blocks,first_arg.blocks_per_dim,new_def,InnerStats)
@@ -145,7 +144,7 @@ class BlockedStats(TensorStats):
         
         new_blocks = np.empty_like(stats.blocks)
         for coord in np.ndindex(stats.blocks.shape):
-            block = stats.blocks[coord]
+            block : Any = stats.blocks[coord]
             #Relabling every block in the grid
             if isinstance(block,TensorStats):
                 new_blocks[coord] = stats.StatsImpl.relabel(block, relabel_indices)
@@ -174,7 +173,7 @@ class BlockedStats(TensorStats):
         #Reordering the blocks inside
         final_blocks = np.empty_like(new_blocks)
         for coord in np.ndindex(new_blocks.shape):
-            block = new_blocks[coord]
+            block : Any  = new_blocks[coord]
             if isinstance(block,TensorStats):
                 final_blocks[coord] = stats.StatsImpl.reorder(block, reorder_indices)
         
