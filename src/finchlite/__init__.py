@@ -1,6 +1,7 @@
 from .algebra import Tensor, TensorFType
 from .autoschedule.tensor_stats import (
     DC,
+    BlockedStats,
     DCStats,
     DenseStats,
     TensorDef,
@@ -152,6 +153,7 @@ from .tensor import (
 __all__ = [
     "DC",
     "AssemblyContext",
+    "BlockedStats",
     "BufferizedNDArray",
     "DCStats",
     "DenseLevel",
