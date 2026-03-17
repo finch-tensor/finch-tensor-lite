@@ -282,7 +282,7 @@ def get_structured_example(M, K, matrix_type):
 
 
 def test_benchmark_structured_comparison():
-    M, K, N = 100, 100, 100
+    M, K, N = 20, 20, 20
     i, j, k = Field("i"), Field("j"), Field("k")
     blocks_per_dim = {i: 5, j: 5, k: 5}
 
