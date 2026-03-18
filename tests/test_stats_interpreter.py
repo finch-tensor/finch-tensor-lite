@@ -5,6 +5,11 @@ import pytest
 import numpy as np
 
 import finchlite as fl
+from finchlite.autoschedule.tensor_stats import DCStats
+from finchlite.autoschedule.tensor_stats.stats_interpreter import (
+    StatsInterpreter,
+    calculate_estimated_error,
+)
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -16,11 +21,6 @@ from finchlite.finch_logic import (
     Query,
     Reorder,
     Table,
-)
-from finchlite.galley.TensorStats import DCStats
-from finchlite.galley.TensorStats.stats_interpreter import (
-    StatsInterpreter,
-    calculate_estimated_error,
 )
 
 
