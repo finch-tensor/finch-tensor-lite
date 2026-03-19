@@ -9,6 +9,7 @@ import textwrap
 import pytest
 
 from finchlite.finch_fused import nodes as fzd
+from finchlite.finch_fused.cfg_builder import fused_build_cfg
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
@@ -161,3 +162,28 @@ def test_parse_reverse_parse_is_lossless_on_supported_subset():
         roundtrip_fn_ast,
         include_attributes=False,
     )
+
+
+def test_cfg_builder():
+    def simple_fn(fn, n):
+        total = 0
+        for i in range(n):
+            if i < n:  # noqa: SIM108
+                total = fn(total, i)
+            else:
+                total = total - 1
+        while total < n:
+            total = total + 1
+        return total
+
+    fused_fn = parse_fused_function(simple_fn)
+    cfg = fused_build_cfg(fused_fn, 0)
+    print(cfg)
+
+    # We won't assert on the exact structure of the CFG here, but we can at least
+    # check that it has the expected number of blocks. The exact number of blocks
+    # may depend on how the CFG builder handles certain constructs, so this is a
+    # somewhat loose check.
+    assert (
+        len(cfg.blocks) >= 5
+    )  # Entry block, for loop block, if block, while block, return block

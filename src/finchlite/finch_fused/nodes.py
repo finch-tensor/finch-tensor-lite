@@ -232,6 +232,13 @@ class Return(FusedTree, FusedStatement):
 
 
 @dataclass(eq=True, frozen=True)
+class Break(FusedTree, FusedStatement):
+    @property
+    def children(self):
+        return []
+
+
+@dataclass(eq=True, frozen=True)
 class Function(FusedTree):
     name: Literal
     params: tuple[Variable, ...]

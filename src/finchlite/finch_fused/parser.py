@@ -183,6 +183,8 @@ class _FusedFunctionParser:
             case ast.Attribute(value=value, attr=attr):
                 base = self._parse_expr(value)
                 return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
+            case ast.Break():
+                return fzd.Break()
             case _:
                 raise self._unsupported(
                     expr,
