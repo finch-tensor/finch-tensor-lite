@@ -325,7 +325,7 @@ def test_frontend_benchmark_chain10():
     rng = np.random.default_rng(42)
     expr = make_chain10_expr(chain10_shapes_benchmark, rng)
 
-    n = 2
+    n = 5
     t0 = time.perf_counter()
     for _ in range(n):
         fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
@@ -358,7 +358,7 @@ def test_frontend_benchmark_chain25():
         rng = np.random.default_rng(42)
         expr = make_chain25_expr(chain25_shapes_benchmark, rng)
 
-        n = 1  # Long chain - single run
+        n = 5  # Long chain - single run
         t0 = time.perf_counter()
         for _ in range(n):
             fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
@@ -424,7 +424,7 @@ def test_compile_vs_kernel_benchmark():
         )
     )
 
-    n = 2
+    n = 5
 
     # Compile time: optimize_plan with components
     t0 = time.perf_counter()
@@ -486,7 +486,7 @@ def test_compile_vs_kernel_benchmark_chain10():
         )
     )
 
-    n = 1  # Single run - plan is large, keep benchmark tractable
+    n = 5  # Single run - plan is large, keep benchmark tractable
 
     # Compile time
     t0 = time.perf_counter()
@@ -546,7 +546,7 @@ def test_compile_vs_kernel_benchmark_chain25():
             )
         )
 
-        n = 1  # Long chain - single run
+        n = 5  # Long chain - single run
 
         # Compile time
         t0 = time.perf_counter()
