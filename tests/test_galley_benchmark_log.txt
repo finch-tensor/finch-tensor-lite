@@ -1,0 +1,5 @@
+
+============================================================
+Galley benchmark results:
+  frontend components vs no-components: With components=6.3584s, Without=3.8616s
+============================================================

@@ -105,6 +105,7 @@ from .fuse import (
     INTERPRET_NOTATION,
     INTERPRET_NOTATION_GALLEY,
     OPTIMIZE_LOGIC,
+    INTERPRET_NOTATION_GALLEY_NO_COMPONENTS, # TESTING PIPELINE
     compute,
     fuse,
     fused,
@@ -122,6 +123,7 @@ __all__ = [
     "INTERPRET_NOTATION",
     "INTERPRET_NOTATION_GALLEY",
     "OPTIMIZE_LOGIC",
+    "INTERPRET_NOTATION_GALLEY_NO_COMPONENTS", # TESTING PIPELINE
     "EagerTensor",
     "LazyTensor",
     "NumPyFType",

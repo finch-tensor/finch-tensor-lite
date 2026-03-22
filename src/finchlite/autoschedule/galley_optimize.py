@@ -12,13 +12,13 @@ from .galley.logical_optimizer.query_normalization import (
 )
 
 
-def optimize_query(query, ST, stats_bindings):
+def optimize_query(query, ST, stats_bindings, use_components: bool = True):
     """Rewrite a single logical Query via greedy reduction over reducible indices."""
     annotated_query = AnnotatedQuery(ST, query, stats_bindings)
-    return greedy_query(annotated_query)
+    return greedy_query(annotated_query,  use_components=use_components)
 
 
-def optimize_plan(plan, ST, bindings):
+def optimize_plan(plan, ST, bindings, use_components: bool = True):
     """
     Optimize a full Plan: run the Galley greedy optimizer on each Query body,
     pass through non-Query bodies (Produces), and update stats bindings.
@@ -26,8 +26,8 @@ def optimize_plan(plan, ST, bindings):
     # Preprocess the plan into the canonical form expected by AnnotatedQuery /
     # greedy_query.
     plan = preprocess_plan_for_galley(plan)
-    print("Preprocessed plan:")
-    print(plan)
+    # print("Preprocessed plan:")
+    # print(plan)
     optimized_queries = []
     # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings = {var: ST(T) for var, T in bindings.items()}
@@ -35,7 +35,7 @@ def optimize_plan(plan, ST, bindings):
     for body in plan.bodies:
         # Only put Queries through the greedy optimizer
         if isinstance(body, Query):
-            new_queries = optimize_query(body, ST, stats_bindings)
+            new_queries = optimize_query(body, ST, stats_bindings, use_components=use_components)
             for new_query in new_queries:
                 insert_statistics(
                     ST, new_query, stats_bindings, replace=True, cache=cache_dict
@@ -54,9 +54,10 @@ class GalleyLogicalOptimizer(LogicEvaluator):
     then forwards to an optional downstream LogicEvaluator (ctx)
     """
 
-    def __init__(self, ST, ctx: LogicEvaluator | None = None, verbose: bool = False):
+    def __init__(self, ST, ctx: LogicEvaluator | None = None, verbose: bool = False, use_components: bool = True):
         self.ST = ST
         self.ctx = ctx
+        self.use_components = use_components
 
     def __call__(self, prgm, bindings=None):
         if bindings is None:
@@ -65,9 +66,9 @@ class GalleyLogicalOptimizer(LogicEvaluator):
         if isinstance(prgm, Plan):
             print("Input plan:")
             print(prgm)
-            prgm = optimize_plan(prgm, self.ST, bindings)
+            prgm = optimize_plan(prgm, self.ST, bindings, use_components=self.use_components)
             if self.ctx is not None:
                 return self.ctx(prgm, bindings)
             return prgm
-        print("This probabiy should not happen")
+        # print("This probabiy should not happen")
         raise ValueError(f"Unsupported program type: {type(prgm)}")
