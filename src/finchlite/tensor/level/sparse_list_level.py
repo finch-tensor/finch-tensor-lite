@@ -140,13 +140,20 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
             ),
         )
 
-    def level_asm_repack(self, ctx, lvl_fields):
-        # TODO
-        return super().level_asm_repack(ctx, lvl_fields)
+    def level_asm_repack(self, ctx, lvl_fields: SparseListLevelFields):
+        ctx.exec(asm.Repack(lvl_fields.ptr_s))
+        ctx.exec(asm.Repack(lvl_fields.idx_s))
+        return self.lvl_t.level_asm_repack(ctx, lvl_fields.next_lvl)
 
     def level_lower_dim(self, ctx, lvl_fields: SparseListLevelFields, r):
         if r == 0:
-            return asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension"))
+            return asm.Call(
+                asm.L(ffunc.sub),
+                (
+                    asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension")),
+                    asm.L(self.position_type(1)),
+                ),
+            )
         return self.lvl_t.level_lower_dim(ctx, lvl_fields.next_lvl, r - 1)
 
     def level_lower_declare(
@@ -155,6 +162,9 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
         return self.lvl_t.level_lower_declare(
             ctx, level_fields.next_lvl, init, op, shape, pos
         )
+
+    def level_lower_thaw(self, ctx, level_fields: SparseListLevelFields, op, pos):
+        return self.lvl_t.level_lower_thaw(ctx, level_fields.next_lvl, op, pos)
 
     def level_lower_freeze(self, ctx, tns: SparseListLevelFields, op, pos):
         p_t = self.position_type
@@ -176,10 +186,6 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
         ctx.exec(parse_assembly(expr, locals()))
         return self.lvl_t.level_lower_freeze(ctx, tns.next_lvl, op, pos)
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
-        # TODO: implement
-        return self.lvl_t.level_lower_thaw(ctx, tns, op, pos)
-
     def level_lower_increment(self, ctx, obj, val, pos):
         raise NotImplementedError(
             "SparseListLevelFType does not support level_lower_increment."
@@ -190,25 +196,32 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
             "SparseListLevelFType does not support level_lower_unwrap."
         )
 
-    def level_lower_assemble(self, ctx, tns, fill_value_type, pos_start, pos_stop):
-        resize_if_smaller = ...
-        fill_range = ...
+    def level_lower_assemble(self, ctx, level_fields: SparseListLevelFields, pos_stop):
         return asm.Block(
             (
-                asm.Call(asm.Literal(resize_if_smaller), (tns.ptr_s, pos_stop)),
-                asm.Call(
-                    asm.Literal(fill_range),
-                    (asm.Literal(fill_value_type(0)), pos_start, pos_stop),
+                asm.Assign(
+                    asm.Variable("status", self.p_t),
+                    asm.Call(
+                        asm.Literal(ffunc.resize_if_smaller),
+                        (
+                            level_fields.ptr_s,
+                            asm.Call(asm.L(ffunc.add), (pos_stop, asm.L(self.p_t(1)))),
+                            asm.Literal(self.fill_value),
+                        ),
+                    ),
                 ),
             )
         )
 
-    def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
+    def level_unfurl(
+        self, ctx, stack: asm.Stack, ext, mode: ntn.AccessMode, proto, pos
+    ):
         tns: FiberTensorFields = stack.obj
         ft_ftype: FiberTensorFType = stack.type
         assert isinstance(tns.lvl_fields, SparseListLevelFields)
         ptr_s = tns.lvl_fields.ptr_s
         idx_s = tns.lvl_fields.idx_s
+        lvl_asm = tns.lvl_fields.lvl_asm
         next_lvl = tns.lvl_fields.next_lvl
 
         q = asm.Variable(ctx.freshen("q"), self.position_type)
@@ -235,13 +248,33 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
             return parse_assembly(expr, tmp_locals)
 
         def seek_fn(ctx, ext):
-            code = """finch
-            if (idx_s[q] < {start})
-              q = scansearch(idx_s, {start}, q, q_stop - 1)
-            end
-            """.format(start=ctx.ctx(ext.get_start()))
-
-            return parse_assembly(code, tmp_locals)
+            start = ctx.ctx(ext.get_start())
+            return asm.Block(
+                (
+                    asm.If(
+                        asm.Call(asm.L(ffunc.lt), (asm.Load(idx_s, q), start)),
+                        asm.Block(
+                            (
+                                asm.Assign(
+                                    q,
+                                    asm.Call(
+                                        asm.L(ffunc.scansearch),
+                                        (
+                                            idx_s,
+                                            start,
+                                            q,
+                                            asm.Call(
+                                                asm.L(ffunc.sub),
+                                                (q_stop, asm.L(self.p_t(1))),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            )
+                        ),
+                    ),
+                )
+            )
 
         def chunk_tail_fn(ctx, idx):
             pos_2 = asm.Variable(
@@ -261,8 +294,17 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
             preamble=thunk_preamble,
             body=lambda ctx, ext: lplt.Sequence(
                 head=lambda ctx, idx: lplt.Stepper(
-                    preamble=lambda ctx: asm.Block(
-                        (asm.Assign(i_stop, asm.Load(idx_s, q)),)
+                    preamble=lambda ctx: asm.IfElse(
+                        asm.Call(asm.L(ffunc.lt), (q, q_stop)),
+                        asm.Block((asm.Assign(i_stop, asm.Load(idx_s, q)),)),
+                        asm.Block(
+                            (
+                                asm.Assign(
+                                    i_stop,
+                                    asm.GetAttr(lvl_asm, asm.Literal("dimension")),
+                                ),
+                            )
+                        ),
                     ),
                     stop=lambda ctx: ntn.Variable(i_stop.name, self.position_type),
                     chunk=lplt.Sequence(
@@ -271,7 +313,13 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                                 lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
                             ),
                         ),
-                        split=lambda ctx, ext: ext.get_end(),
+                        split=lambda ctx, ext: ntn.Call(
+                            ntn.L(ffunc.sub),
+                            (
+                                ntn.Variable(i_stop.name, self.position_type),
+                                ntn.L(self.p_t(1)),
+                            ),
+                        ),
                         tail=chunk_tail_fn,
                     ),
                     next=lambda ctx: asm.Block(
@@ -284,10 +332,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                     ),
                     seek=seek_fn,
                 ),
-                split=lambda ctx, idx: ntn.Call(
-                    ntn.L(ffunc.add),
-                    (ntn.Variable(i_last.name, self.position_type), ntn.L(self.p_t(1))),
-                ),
+                split=lambda ctx, idx: ntn.Variable(i_last.name, self.position_type),
                 tail=lambda ctx, idx: lplt.Run(
                     lambda ctx, idx: lplt.Leaf(
                         lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
