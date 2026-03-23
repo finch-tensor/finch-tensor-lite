@@ -850,7 +850,7 @@ class CContext(Context):
                 body_code = ctx_2.emit()
                 self.exec(
                     f"{feed}for ({var_t} {var_2} = {start}; "
-                    f"{var_2} < {end}; {var_2}++) {{\n"
+                    f"{var_2} <= {end}; {var_2}++) {{\n"
                     f"{body_code}"
                     f"\n{feed}}}"
                 )

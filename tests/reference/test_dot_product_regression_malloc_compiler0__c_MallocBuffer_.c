@@ -51,7 +51,7 @@ double dot_product(struct CMallocBufferStruct* a, struct CMallocBufferStruct* b)
     struct CMallocBufferStruct* b_ = b;
     double* b__data = (double*)b_->data;
     size_t b__length = b_->length;
-    for (int64_t i = (int64_t)0; i < a__length; i++) {
+    for (int64_t i = (int64_t)0; i <= a__length - (int64_t)1; i++) {
         c = c + (a__data)[i] * (b__data)[i];
     }
     a_->data = (void*)a__data;

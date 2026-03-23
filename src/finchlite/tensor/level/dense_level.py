@@ -123,7 +123,13 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
 
     def level_lower_dim(self, ctx, lvl_fields: DenseLevelFields, r):
         if r == 0:
-            return asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension"))
+            return asm.Call(
+                asm.L(ffunc.sub),
+                (
+                    asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension")),
+                    asm.L(self.position_type(1)),
+                ),
+            )
         return self.lvl_t.level_lower_dim(ctx, lvl_fields.next_lvl, r - 1)
 
     def level_lower_declare(

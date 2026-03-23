@@ -1,6 +1,7 @@
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
+    AccessMode,
     Assign,
     Block,
     Cached,
@@ -35,6 +36,7 @@ from .stages import NotationLoader, NotationTransform
 
 __all__ = [
     "Access",
+    "AccessMode",
     "Assign",
     "Block",
     "Cached",

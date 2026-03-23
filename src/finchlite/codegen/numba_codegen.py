@@ -680,7 +680,9 @@ class NumbaContext(Context):
                 ctx_2(body)
                 ctx_2.types[var.name] = var.result_format
                 body_code = ctx_2.emit()
-                self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}")
+                self.exec(
+                    f"{feed}for {var_2} in range({start}, {end} + 1):\n{body_code}"
+                )
                 return None
             case asm.BufferLoop(buf, var, body):
                 raise NotImplementedError
