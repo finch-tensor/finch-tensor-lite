@@ -1,3 +1,4 @@
+import operator
 from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
@@ -98,15 +99,23 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         ctx.exec(asm.Unpack(buf_s, buf))
         return ElementLevelFields(buf_s)
 
-    def level_asm_repack(self, ctx, lvl_fields):
-        buf_s = self._get_buf_s(lvl_fields)
-        ctx.exec(asm.Repack(buf_s))
+    def level_asm_repack(self, ctx, lvl_fields: ElementLevelFields):
+        ctx.exec(asm.Repack(lvl_fields.buf_s))
 
     def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
         buf_s = self._get_buf_s(lvl_fields)
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(buf_s, i_var, asm.Literal(init.val))
-        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf_s), body))
+        ctx.exec(
+            asm.ForLoop(
+                i_var,
+                asm.Literal(np.intp(0)),
+                asm.Call(
+                    asm.L(operator.sub), (asm.Length(buf_s), asm.Literal(np.intp(1)))
+                ),
+                body,
+            )
+        )
 
     def level_lower_unwrap(self, ctx, obj: FiberTensorFields, pos):
         buf_s = self._get_buf_s(obj.lvl_fields)

@@ -119,7 +119,12 @@ def test_codegen(compiler, buffer):
                 asm.Block(
                     (
                         asm.Unpack(a_slt, a_var),
-                        asm.Assign(length_var, asm.Length(a_slt)),
+                        asm.Assign(
+                            length_var,
+                            asm.Call(
+                                asm.L(operator.sub), (asm.Length(a_slt), asm.L(1))
+                            ),
+                        ),
                         asm.Resize(
                             a_slt,
                             asm.Call(
@@ -134,7 +139,14 @@ def test_codegen(compiler, buffer):
                             asm.Store(
                                 a_slt,
                                 asm.Call(
-                                    asm.Literal(operator.add), (i_var, length_var)
+                                    asm.Literal(operator.add),
+                                    (
+                                        i_var,
+                                        asm.Call(
+                                            asm.Literal(operator.add),
+                                            (length_var, asm.Literal(np.intp(1))),
+                                        ),
+                                    ),
                                 ),
                                 asm.Call(
                                     asm.Literal(operator.add),
@@ -312,23 +324,26 @@ def test_dot_product(compiler, buffer):
                 ),
                 asm.Block(
                     (
-                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Assign(c, asm.L(np.float64(0.0))),
                         asm.Unpack(ab_slt, ab_v),
                         asm.Unpack(bb_slt, bb_v),
                         asm.ForLoop(
                             i,
-                            asm.Literal(np.int64(0)),
-                            asm.Length(ab_slt),
+                            asm.L(np.int64(0)),
+                            asm.Call(
+                                asm.L(operator.sub),
+                                (asm.Length(ab_slt), asm.L(np.int64(1))),
+                            ),
                             asm.Block(
                                 (
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.L(operator.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.L(operator.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -394,7 +409,10 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
                         asm.ForLoop(
                             i,
                             asm.Literal(np.int64(0)),
-                            asm.Length(ab_slt),
+                            asm.Call(
+                                asm.L(operator.sub),
+                                (asm.Length(ab_slt), asm.L(np.int64(1))),
+                            ),
                             asm.Block(
                                 (
                                     asm.Assign(
@@ -463,7 +481,10 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
                         asm.ForLoop(
                             i,
                             asm.Literal(np.int64(0)),
-                            asm.Length(ab_slt),
+                            asm.Call(
+                                asm.L(operator.sub),
+                                (asm.Length(ab_slt), asm.L(np.int64(1))),
+                            ),
                             asm.Block(
                                 (
                                     asm.Assign(

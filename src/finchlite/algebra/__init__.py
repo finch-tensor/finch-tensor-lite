@@ -21,6 +21,7 @@ from .algebra import (
     query_property,
     register_property,
     repeat_operator,
+    resize_if_smaller,
     return_type,
     scansearch,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "query_property",
     "register_property",
     "repeat_operator",
+    "resize_if_smaller",
     "return_type",
     "scansearch",
 ]

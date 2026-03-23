@@ -16,6 +16,10 @@ class AssemblySimplify(AssemblyTransform):
             # overwrite(x, y) => y
             case asm.Call(asm.Literal(fn), (_, y)) if fn is overwrite:
                 return y
+            case asm.Call(asm.L(op), (arg,)) if op in (min, max):
+                return arg
+            case asm.Call(asm.L(op), (arg1, arg2)) if op in (min, max) and arg1 == arg2:
+                return arg1
             # op(..., arg, ...) where arg is anihilator => arg
             case asm.Call(asm.Literal(_) as op, args):
                 for arg in args:
