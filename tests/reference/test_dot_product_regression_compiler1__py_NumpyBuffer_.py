@@ -11,7 +11,7 @@ def dot_product(a: builtins.list, b: builtins.list) -> float64:
     a__arr = a_[0]
     b_ = b
     b__arr = b_[0]
-    for i in range(0, len(a__arr)):
+    for i in range(0, (len(a__arr) - 1) + 1):
         c = (c + (a__arr[i] * b__arr[i]))
     a_[0] = a__arr
     b_[0] = b__arr

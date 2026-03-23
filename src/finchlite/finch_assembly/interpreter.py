@@ -262,7 +262,7 @@ class AssemblyInterpreter(AssemblyLoader):
                     )
                 ctx_2 = self.scope(loop_state=HaltState())
                 var_e = start_e
-                while var_e < end_e:
+                while var_e <= end_e:
                     if ctx_2.should_halt():
                         break
                     ctx_3 = self.scope()

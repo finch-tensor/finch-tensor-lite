@@ -1066,6 +1066,9 @@ class InitWrite(FinchOperator):
     def return_type(self, x: Any, y: Any) -> type:
         return y
 
+    def __str__(self):
+        return "InitWrite"
+
 
 class Overwrite(FinchOperator, metaclass=SingletonMeta):
     """
@@ -1272,10 +1275,12 @@ class Scansearch(FinchOperator, metaclass=SingletonMeta):
     If all elements in `arr` are less than `x`, it returns `hi`.
     """
 
+    # TODO: Implement with Finch Assembly
     @staticmethod
     def _func(
         arr: np.ndarray, x: np.integer, lo: np.integer, hi: np.integer
     ) -> np.integer:
+        arr = arr[0]
         dtype = np.array(lo).dtype.type
         u = dtype(1)
         d = dtype(1)
@@ -1306,3 +1311,35 @@ class Scansearch(FinchOperator, metaclass=SingletonMeta):
 
 
 scansearch = Scansearch()
+
+
+class ResizeIfSmaller(FinchOperator, metaclass=SingletonMeta):
+    """
+    ResizeIfSmaller resizes an array to a new size if the new size is larger
+    than the current size.
+
+    It takes an array `arr` and a new size `new_size`, and returns a resized
+    version of `arr` if `new_size` is larger than the current size of `arr`.
+    If `new_size` is less than or equal to the current size of `arr`, it
+    returns `arr` unchanged.
+    """
+
+    # TODO: Implement with Finch Assembly
+    @staticmethod
+    def _func(
+        arr: np.ndarray, new_size: np.integer, fill_value: np.number
+    ) -> np.ndarray:
+        if new_size > arr.size:
+            new_arr = np.full(new_size, fill_value, arr.dtype)
+            new_arr[: arr.size] = arr
+            return new_arr
+        return arr
+
+    def __call__(self, *args, **kwargs):
+        return self._func(*args, **kwargs)
+
+    def return_type(self, arr, new_size, fill_value) -> type:
+        return arr
+
+
+resize_if_smaller = ResizeIfSmaller()

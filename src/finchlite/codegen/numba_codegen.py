@@ -673,7 +673,9 @@ class NumbaContext(Context):
                 ctx_2(body)
                 ctx_2.types[var.name] = var.result_format
                 body_code = ctx_2.emit()
-                self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}")
+                self.exec(
+                    f"{feed}for {var_2} in range({start}, {end} + 1):\n{body_code}"
+                )
                 return None
             case asm.BufferLoop(buf, var, body):
                 raise NotImplementedError
@@ -917,6 +919,20 @@ register_property(
 )
 
 register_property(
+    operator.le,
+    "numba_literal",
+    "__attr__",
+    lambda val, ctx, x, y: f"({ctx(x)} <= {ctx(y)})",
+)
+
+register_property(
+    operator.and_,
+    "numba_literal",
+    "__attr__",
+    lambda val, ctx, x, y: f"({ctx(x)} and {ctx(y)})",
+)
+
+register_property(
     operator.sub,
     "numba_literal",
     "__attr__",
@@ -928,7 +944,7 @@ for fn in [min, max]:
         fn,
         "numba_literal",
         "__attr__",
-        lambda fn, ctx, x, y: f"{fn.__name__}({ctx(x)}, {ctx(y)})",
+        lambda fn, ctx, *args: f"{fn.__name__}({', '.join(ctx(a) for a in args)})",
     )
 
 register_property(
