@@ -4,8 +4,8 @@ Output is written to test_galley_benchmark_log.txt in the tests directory.
 
 NOTE:
 Setting recursion limit to more than default. (careful)
-Only currently ruuning 1 time. Change n to get average.
-Changed 100 chain test to 25 chain test.
+Only currently ruuning 5 time. Change n to get average.
+Changed 100 chain test to 25 chain test. 100 too slow.
 
 ============================================================
 Galley chain10 frontend benchmark:
