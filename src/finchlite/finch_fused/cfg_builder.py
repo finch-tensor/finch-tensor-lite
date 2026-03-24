@@ -48,6 +48,8 @@ def fused_desugar(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
     def _number_stmt(stmt: FusedStatement) -> NumberedStatement:
         """Helper to wrap a statement in a NumberedStatement with a unique id."""
         nonlocal sid
+        if sid == -1:
+            return stmt
         s = NumberedStatement(stmt, sid)
         sid += 1
         return s

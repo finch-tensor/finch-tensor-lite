@@ -10,10 +10,12 @@ import pytest
 
 from finchlite.finch_fused import nodes as fzd
 from finchlite.finch_fused.cfg_builder import fused_build_cfg
+from finchlite.finch_fused.dataflow import insert_lazy_and_compute
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
 )
+from finchlite.interface import compute, lazy
 
 
 def test_parse_simple_function_with_control_flow_and_calls():
@@ -187,3 +189,36 @@ def test_cfg_builder():
     assert (
         len(cfg.blocks) >= 5
     )  # Entry block, for loop block, if block, while block, return block
+
+
+def test_lazy_and_compute_insertion():
+    def simple_fn(x):
+        total = 0
+        for i in range(x):
+            total = total + i
+        return total
+
+    fused_fn = parse_fused_function(simple_fn)
+    print("Original function:")
+    print(fused_fn)
+    transformed_fn = insert_lazy_and_compute(fused_fn)
+    print("Transformed function with lazy and compute calls inserted:")
+    print(transformed_fn)
+
+    # We won't assert on the exact structure of the transformed function, but we can
+    # check that it contains the expected number of lazy and compute calls.
+    def count_lazy_and_compute(node):
+        if isinstance(node, fzd.Call) and node.func in {
+            fzd.Literal(lazy),
+            fzd.Literal(compute),
+        }:
+            return 1
+        count = 0
+        for child in getattr(node, "children", []):
+            count += count_lazy_and_compute(child)
+        return count
+
+    lazy_compute_count = count_lazy_and_compute(transformed_fn)
+    assert (
+        lazy_compute_count >= 4
+    )  # At least one lazy and one compute for each loop body and after loop
