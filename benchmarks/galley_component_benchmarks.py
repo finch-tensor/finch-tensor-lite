@@ -15,6 +15,7 @@ galley_optimize.py	optimize_plan
 galley_optimize.py	GalleyLogicalOptimizer
 test_galley_benchmarks.py	INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
 
+NOTE: readd compile time benchmarks.
 """
 
 from __future__ import annotations
@@ -201,6 +202,24 @@ def make_three_chain25_expr(shape_fn, rng=None):
         terms.append(term)
     return terms[0] + terms[1] + terms[2]
 
+def make_five_chain10_expr(shape_fn, rng=None):
+    """Build expr = chain10_0 + chain10_1 + ... + chain10_4 (5 terms, each a 10-way matmul chain)."""
+    if rng is None:
+        rng = np.random.default_rng(42)
+
+    terms = []
+    for k in range(5):
+        chain = shape_fn(k, rng)
+        term = reduce(
+            lambda a, b: a @ b,
+            [fl_interface.lazy(m) for m in chain],
+        )
+        terms.append(term)
+
+    # Force a strictly binary + tree at the Python level.
+    # (May still get flattened by later lowering, but this minimizes n-ary + creation.)
+    return terms[0] + terms[1] + terms[2] + terms[3] + terms[4]
+
 def chain10_shapes_small(i, rng):
     """10 matrices: (4,5)@(5,6)@...@(13,8) -> (4,8)."""
     r = np.random.Generator(np.random.PCG64(42 + i * 1000))
@@ -325,6 +344,12 @@ def run_smoke_computes() -> None:
     e3c25 = make_three_chain25_expr(chain25_shapes_small, rng)
     _ = fl_interface.compute(e3c25, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
     _ = fl_interface.compute(e3c25, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
+    
+    # ERROR HERE:
+    # 10 chain, 5 terms
+    #e5c10 = make_five_chain10_expr(chain10_shapes_small, rng)
+    #_ = fl_interface.compute(e5c10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    #_ = fl_interface.compute(e5c10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
 
     with _recursion_limit_ctx(CHAIN_RECURSION_LIMIT):
         e25 = make_chain25_expr(chain25_shapes_small, rng)
@@ -405,6 +430,16 @@ def main() -> None:
     lines.append(f"  With components:   {components_with:.4f}s")
     lines.append(f"  Without components: {components_without:.4f}s")
     lines.append("=" * 60)
+    
+    #lines.append("Frontend benchmark: five terms × chain10...")
+    #expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
+    #components_with, components_without = time_frontend_compute(expr_5c10)
+    #lines.append("")
+    #lines.append("=" * 60)
+    #lines.append("Galley five terms × chain10 frontend benchmark:")
+    #lines.append(f"  With components:   {components_with:.4f}s")
+    #lines.append(f"  Without components: {components_without:.4f}s")
+    #lines.append("=" * 60)
 
     lines.append("Frontend benchmark: chain25...")
     expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
