@@ -89,9 +89,10 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, Plan):
-            print("Input plan:")
-            print(prgm)
-            # Start time
+            if self.verbose:
+                #print("Input plan:")
+                #print(prgm)
+                print("Filler")
             t0 = time.perf_counter()
             prgm = optimize_plan(
                 prgm, self.ST, bindings, use_components=self.use_components
