@@ -5,9 +5,11 @@ Galley logical optimizer: applies greedy query rewriting to logical plans
 from __future__ import annotations
 
 import time
+from collections import OrderedDict
 from typing import TypedDict
 
-from ..finch_logic import LogicEvaluator, Plan, Query
+from ..finch_logic import Alias, LogicEvaluator, Plan, Query
+from .tensor_stats import TensorStats
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.greedy_optimizer import greedy_query
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
@@ -35,8 +37,10 @@ def optimize_plan(plan, ST, bindings, use_components: bool = True):
     # print(plan)
     optimized_queries = []
     # Map alias -> tensor stats for cost/rewrite decisions
-    stats_bindings = {var: ST(T) for var, T in bindings.items()}
-    cache_dict = {}
+    stats_bindings: OrderedDict[Alias, TensorStats] = OrderedDict(
+        (var, ST(T)) for var, T in bindings.items()
+    )
+    cache_dict: dict[object, TensorStats] = {}
     for body in plan.bodies:
         # Only put Queries through the greedy optimizer
         if isinstance(body, Query):
