@@ -11,7 +11,6 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
         component_idx = 0
         while component_idx < len(aq.connected_components):
             component = aq.connected_components[component_idx]
-            print(f"Component " + str(aq.connected_components))
             reducible_idxs = aq.get_reducible_idxs_for_component(component)
             if not reducible_idxs:
                 component_idx += 1

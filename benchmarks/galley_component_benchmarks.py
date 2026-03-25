@@ -304,160 +304,112 @@ def make_sum_sum_benchmark_expr():
     )
 
 
-def run_smoke_computes() -> None:
-    """Quick compute smoke paths (no timing)."""
-    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
-    B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    D = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    E = fl_interface.asarray(np.array([[2.0, 0.0], [0.0, 2.0]]))
-    F = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
-    three = (
-        fl_interface.lazy(A) @ fl_interface.lazy(B)
-        + fl_interface.lazy(C) @ fl_interface.lazy(D)
-        + fl_interface.lazy(E) @ fl_interface.lazy(F)
-    )
-    _ = fl_interface.compute(three, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    _ = fl_interface.compute(three, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-
-    rng = np.random.default_rng(42)
-    e10 = make_chain10_expr(chain10_shapes_small, rng)
-    _ = fl_interface.compute(e10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    _ = fl_interface.compute(e10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-    
-    e3p = make_three_matmul_pairs_expr()
-    _ = fl_interface.compute(e3p, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    _ = fl_interface.compute(e3p, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-    
-    #ERROR HERE:
-    # 2 chain, 50 terms
-    #e50c2 = make_fifty_chain2_terms_expr(chain2_shapes_small, rng)
-    #_ = fl_interface.compute(e50c2, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    #_ = fl_interface.compute(e50c2, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-    
-    # 10 chain, 3 terms
-    e3c10 = make_three_chain10_expr(chain10_shapes_small, rng)
-    _ = fl_interface.compute(e3c10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    _ = fl_interface.compute(e3c10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-    
-    # 25 chain, 3 terms
-    e3c25 = make_three_chain25_expr(chain25_shapes_small, rng)
-    _ = fl_interface.compute(e3c25, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    _ = fl_interface.compute(e3c25, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-    
-    # ERROR HERE:
-    # 10 chain, 5 terms
-    #e5c10 = make_five_chain10_expr(chain10_shapes_small, rng)
-    #_ = fl_interface.compute(e5c10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    #_ = fl_interface.compute(e5c10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-
-    with _recursion_limit_ctx(CHAIN_RECURSION_LIMIT):
-        e25 = make_chain25_expr(chain25_shapes_small, rng)
-        _ = fl_interface.compute(e25, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-        _ = fl_interface.compute(e25, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-
-
 def main() -> None:
     lines: list[str] = []
 
-    lines.append("Smoke compute paths...")
-    run_smoke_computes()
-
-    lines.append("Frontend benchmark: sum+sum matmul...")
+    print("Frontend benchmark: sum+sum matmul...")
     expr_sum = make_sum_sum_benchmark_expr()
+    _, _ = time_frontend_compute(expr_sum)
     components_with, components_without = time_frontend_compute(expr_sum)
-    lines.append("")
-    lines.append("=" * 60)
-    lines.append("Galley benchmark results (sum+sum matmul)")
-    lines.append(
+    print("")
+    print("=" * 60)
+    print("Galley benchmark results (sum+sum matmul)")
+    print(
         f"  frontend components vs no-components: "
         f"With components={components_with:.4f}s, Without={components_without:.4f}s"
     )
-    lines.append("=" * 60)
+    print("=" * 60)
 
-    lines.append("Frontend benchmark: chain10...")
+    print("Frontend benchmark: chain10...")
     rng = np.random.default_rng(42)
     expr_c10 = make_chain10_expr(chain10_shapes_benchmark, rng)
+    _, _ = time_frontend_compute(expr_c10)
     components_with, components_without = time_frontend_compute(expr_c10)
-    lines.append("")
-    lines.append("=" * 60)
-    lines.append("Galley chain10 frontend benchmark:")
-    lines.append(f"  With components:   {components_with:.4f}s")
-    lines.append(f"  Without components: {components_without:.4f}s")
-    lines.append("=" * 60)
+    print("")
+    print("=" * 60)
+    print("Galley chain10 frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
     
-    lines.append("Frontend benchmark: three summed matmul pairs...")
+    print("Frontend benchmark: three summed matmul pairs...")
     expr_3p = make_three_matmul_pairs_expr()
+    _, _ = time_frontend_compute(expr_3p)
     components_with, components_without = time_frontend_compute(expr_3p)
-    lines.append("")
-    lines.append("=" * 60)
-    lines.append("Galley three matmul pairs frontend benchmark:")
-    lines.append(f"  With components:   {components_with:.4f}s")
-    lines.append(f"  Without components: {components_without:.4f}s")
-    lines.append("=" * 60)
+    print("")
+    print("=" * 60)
+    print("Galley three matmul pairs frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
     
     # ERROR HERE:
     # 2 chain, 50 terms
-    #lines.append("Frontend benchmark: fifty terms × chain2...")
-    #expr_50c2 = make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng)
-    #components_with, components_without = time_frontend_compute(expr_50c2)
-    #lines.append("")
-    #lines.append("=" * 60)
-    #lines.append("Galley fifty terms × chain2 frontend benchmark:")
-    #lines.append(f"  With components:   {components_with:.4f}s")
-    #lines.append(f"  Without components: {components_without:.4f}s")
-    #lines.append("=" * 60)
+    print("Frontend benchmark: fifty terms × chain2...")
+    expr_50c2 = make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng)
+    _, _ = time_frontend_compute(expr_50c2)
+    components_with, components_without = time_frontend_compute(expr_50c2)
+    print("")
+    print("=" * 60)
+    print("Galley fifty terms × chain2 frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
     
     # 10 chain, 3 terms
-    lines.append("Frontend benchmark: three terms × chain10...")
+    print("Frontend benchmark: three terms × chain10...")
     expr_3c10 = make_three_chain10_expr(chain10_shapes_benchmark, rng)
+    _, _ = time_frontend_compute(expr_3c10)
     components_with, components_without = time_frontend_compute(expr_3c10)
-    lines.append("")
-    lines.append("=" * 60)
-    lines.append("Galley three terms × chain10 frontend benchmark:")
-    lines.append(f"  With components:   {components_with:.4f}s")
-    lines.append(f"  Without components: {components_without:.4f}s")
-    lines.append("=" * 60)
+    print("")
+    print("=" * 60)
+    print("Galley three terms × chain10 frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
     
-    lines.append("Frontend benchmark: three terms × chain25...")
+    print("Frontend benchmark: three terms × chain25...")
     expr_3c25 = make_three_chain25_expr(chain25_shapes_benchmark, rng)
+    _, _ = time_frontend_compute(
+        expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
     components_with, components_without = time_frontend_compute(
         expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT
     )
-    lines.append("")
-    lines.append("=" * 60)
-    lines.append("Galley three terms × chain25 frontend benchmark:")
-    lines.append(f"  With components:   {components_with:.4f}s")
-    lines.append(f"  Without components: {components_without:.4f}s")
-    lines.append("=" * 60)
+    print("")
+    print("=" * 60)
+    print("Galley three terms × chain25 frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
     
-    #lines.append("Frontend benchmark: five terms × chain10...")
-    #expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
-    #components_with, components_without = time_frontend_compute(expr_5c10)
-    #lines.append("")
-    #lines.append("=" * 60)
-    #lines.append("Galley five terms × chain10 frontend benchmark:")
-    #lines.append(f"  With components:   {components_with:.4f}s")
-    #lines.append(f"  Without components: {components_without:.4f}s")
-    #lines.append("=" * 60)
+    print("Frontend benchmark: five terms × chain10...")
+    expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
+    _, _ = time_frontend_compute(expr_5c10)
+    components_with, components_without = time_frontend_compute(expr_5c10)
+    print("")
+    print("=" * 60)
+    print("Galley five terms × chain10 frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
 
-    lines.append("Frontend benchmark: chain25...")
+    print("Frontend benchmark: chain25...")
     expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
+    _,_ = time_frontend_compute(
+        expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT
+    )
     components_with, components_without = time_frontend_compute(
         expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT
     )
-    lines.append("")
-    lines.append("=" * 60)
-    lines.append("Galley chain25 frontend benchmark:")
-    lines.append(f"  With components:   {components_with:.4f}s")
-    lines.append(f"  Without components: {components_without:.4f}s")
-    lines.append("=" * 60)
+    print("")
+    print("=" * 60)
+    print("Galley chain25 frontend benchmark:")
+    print(f"  With components:   {components_with:.4f}s")
+    print(f"  Without components: {components_without:.4f}s")
+    print("=" * 60)
 
-    lines.append("")
-    lines.append("Done.")
-
-    for line in lines:
-        print(line)
+    print("")
+    print("Done.")
 
 
 if __name__ == "__main__":
