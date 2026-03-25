@@ -108,6 +108,98 @@ def make_chain10_expr(shape_fn, rng=None):
     )
     return term0 + term1
 
+def make_three_matmul_pairs_expr():
+    """Three summed matmul pairs: A@B + C@D + E@F (20×10 @ 10×8 → 20×8)."""
+    A = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
+    B = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float))
+    C = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
+    D = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float))
+    E = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
+    F = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float))
+    return (
+        fl_interface.lazy(A) @ fl_interface.lazy(B)
+        + fl_interface.lazy(C) @ fl_interface.lazy(D)
+        + fl_interface.lazy(E) @ fl_interface.lazy(F)
+    )
+    
+def make_fifty_matmul_pairs_expr():
+    """Fifty summed matmul pairs distinct data per pair."""
+    terms: list = []
+    for k in range(50):
+        off = float(k * 1_000)
+        A = fl_interface.asarray(
+            (np.arange(20 * 10).reshape(20, 10).astype(float) + off)
+        )
+        B = fl_interface.asarray(
+            (np.arange(10 * 8).reshape(10, 8).astype(float) + off)
+        )
+        terms.append(fl_interface.lazy(A) @ fl_interface.lazy(B))
+    return reduce(lambda a, b: a + b, terms)
+
+# 2 Chain, 50 terms
+
+def chain2_shapes_small(i, rng):
+    """Two matrices per term: (4,5)@(5,8) -> (4,8)."""
+    r = np.random.Generator(np.random.PCG64(42 + i * 1000))
+    return (
+        fl_interface.asarray(r.standard_normal((4, 5)).astype(float)),
+        fl_interface.asarray(r.standard_normal((5, 8)).astype(float)),
+    )
+
+
+def chain2_shapes_benchmark(i, rng):
+    """Two matrices per term: (8,10)@(10,16) -> (8,16)."""
+    r = np.random.Generator(np.random.PCG64(42 + i * 1000))
+    return (
+        fl_interface.asarray(r.standard_normal((8, 10)).astype(float)),
+        fl_interface.asarray(r.standard_normal((10, 16)).astype(float)),
+    )
+
+
+def make_fifty_chain2_terms_expr(shape_fn, rng=None):
+    """Fifty summed terms; each term is a 2-matrix matmul chain."""
+    if rng is None:
+        rng = np.random.default_rng(42)
+    terms = []
+    for k in range(50):
+        chain = shape_fn(k, rng)
+        t = reduce(
+            lambda a, b: a @ b,
+            [fl_interface.lazy(m) for m in chain],
+        )
+        terms.append(t)
+    return reduce(lambda a, b: a + b, terms)
+
+
+def make_three_chain10_expr(shape_fn, rng=None):
+    """Build expr = chain10_0 + chain10_1 + chain10_2 (3 terms, each a 10-way matmul chain)."""
+    if rng is None:
+        rng = np.random.default_rng(42)
+
+    terms = []
+    for k in range(3):
+        chain = shape_fn(k, rng)
+        term = reduce(
+            lambda a, b: a @ b,
+            [fl_interface.lazy(m) for m in chain],
+        )
+        terms.append(term)
+
+    return terms[0] + terms[1] + terms[2]
+
+def make_three_chain25_expr(shape_fn, rng=None):
+    """Build expr = chain25_0 + chain25_1 + chain25_2 (3 terms, each a 25-way matmul chain)."""
+    if rng is None:
+        rng = np.random.default_rng(42)
+    terms = []
+    for k in range(3):
+        chain = shape_fn(k, rng)
+        term = reduce(
+            lambda a, b: a @ b,
+            [fl_interface.lazy(m) for m in chain],
+        )
+        terms.append(term)
+    return terms[0] + terms[1] + terms[2]
 
 def chain10_shapes_small(i, rng):
     """10 matrices: (4,5)@(5,6)@...@(13,8) -> (4,8)."""
@@ -213,6 +305,26 @@ def run_smoke_computes() -> None:
     e10 = make_chain10_expr(chain10_shapes_small, rng)
     _ = fl_interface.compute(e10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
     _ = fl_interface.compute(e10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
+    
+    e3p = make_three_matmul_pairs_expr()
+    _ = fl_interface.compute(e3p, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    _ = fl_interface.compute(e3p, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
+    
+    #ERROR HERE:
+    # 2 chain, 50 terms
+    #e50c2 = make_fifty_chain2_terms_expr(chain2_shapes_small, rng)
+    #_ = fl_interface.compute(e50c2, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    #_ = fl_interface.compute(e50c2, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
+    
+    # 10 chain, 3 terms
+    e3c10 = make_three_chain10_expr(chain10_shapes_small, rng)
+    _ = fl_interface.compute(e3c10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    _ = fl_interface.compute(e3c10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
+    
+    # 25 chain, 3 terms
+    e3c25 = make_three_chain25_expr(chain25_shapes_small, rng)
+    _ = fl_interface.compute(e3c25, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    _ = fl_interface.compute(e3c25, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
 
     with _recursion_limit_ctx(CHAIN_RECURSION_LIMIT):
         e25 = make_chain25_expr(chain25_shapes_small, rng)
@@ -245,6 +357,51 @@ def main() -> None:
     lines.append("")
     lines.append("=" * 60)
     lines.append("Galley chain10 frontend benchmark:")
+    lines.append(f"  With components:   {components_with:.4f}s")
+    lines.append(f"  Without components: {components_without:.4f}s")
+    lines.append("=" * 60)
+    
+    lines.append("Frontend benchmark: three summed matmul pairs...")
+    expr_3p = make_three_matmul_pairs_expr()
+    components_with, components_without = time_frontend_compute(expr_3p)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley three matmul pairs frontend benchmark:")
+    lines.append(f"  With components:   {components_with:.4f}s")
+    lines.append(f"  Without components: {components_without:.4f}s")
+    lines.append("=" * 60)
+    
+    # ERROR HERE:
+    # 2 chain, 50 terms
+    #lines.append("Frontend benchmark: fifty terms × chain2...")
+    #expr_50c2 = make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng)
+    #components_with, components_without = time_frontend_compute(expr_50c2)
+    #lines.append("")
+    #lines.append("=" * 60)
+    #lines.append("Galley fifty terms × chain2 frontend benchmark:")
+    #lines.append(f"  With components:   {components_with:.4f}s")
+    #lines.append(f"  Without components: {components_without:.4f}s")
+    #lines.append("=" * 60)
+    
+    # 10 chain, 3 terms
+    lines.append("Frontend benchmark: three terms × chain10...")
+    expr_3c10 = make_three_chain10_expr(chain10_shapes_benchmark, rng)
+    components_with, components_without = time_frontend_compute(expr_3c10)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley three terms × chain10 frontend benchmark:")
+    lines.append(f"  With components:   {components_with:.4f}s")
+    lines.append(f"  Without components: {components_without:.4f}s")
+    lines.append("=" * 60)
+    
+    lines.append("Frontend benchmark: three terms × chain25...")
+    expr_3c25 = make_three_chain25_expr(chain25_shapes_benchmark, rng)
+    components_with, components_without = time_frontend_compute(
+        expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT
+    )
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley three terms × chain25 frontend benchmark:")
     lines.append(f"  With components:   {components_with:.4f}s")
     lines.append(f"  Without components: {components_without:.4f}s")
     lines.append("=" * 60)
