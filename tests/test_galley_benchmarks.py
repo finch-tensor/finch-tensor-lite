@@ -1,104 +1,164 @@
 """
-Benchmark tests comparing greedy_query runtime with and without components.
-Output is written to test_galley_benchmark_log.txt in the tests directory.
+Benchmark script comparing Galley with and without components.
+
+Run: python tests/test_galley_benchmarks.py
 
 NOTE:
-Setting recursion limit to more than default. (careful)
-Only currently ruuning 5 time. Change n to get average.
-Changed 100 chain test to 25 chain test. 100 too slow.
-
-============================================================
-Galley chain10 frontend benchmark:
-  With components:   31.0386s
-  Without components: 44.5000s
-============================================================
-
-============================================================
-Galley chain25 frontend benchmark:
-  With components:   27.7452s
-  Without components: 14.8611s
-============================================================
-
-Maybe non-frontend test is wrong somehow.
-Run more than 1 time to get average
+Setting recursion limit to more than default for deep chains.
+Iterations default to n=5 for averaging.
 
 
-NOTE: where paramteres were added: delete when done testing.
-greedy_optimizer.py	greedy_query	
-galley_optimize.py	optimize_query	
-galley_optimize.py	optimize_plan	
-galley_optimize.py	GalleyLogicalOptimizer	
-fuse.py	INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
-
-TODO: add A@B@C@D@E + ... (10 terms) benchmark after n-ary.
-
-
+NOTE: where parameters were added: delete when done testing.
+greedy_optimizer.py	greedy_query
+galley_optimize.py	optimize_query
+galley_optimize.py	optimize_plan
+galley_optimize.py	GalleyLogicalOptimizer
+test_galley_benchmarks.py	INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
 
 """
 
-import operator as op
+from __future__ import annotations
+
 import sys
 import time
-from collections import OrderedDict
+from contextlib import contextmanager
 from functools import reduce
-from pathlib import Path
-
-BENCHMARK_LOG_PATH = Path(__file__).parent / "test_galley_benchmark_log.txt"
-_benchmark_log: list[str] = []
-
-
-def write_log():
-    """Write _benchmark_log to the log file."""
-    with open(BENCHMARK_LOG_PATH, "w", encoding="utf-8") as f:
-        f.write("\n".join(_benchmark_log))
-
-
-import pytest
-import finchlite.interface as fl_interface
 
 import numpy as np
 
-import finchlite as fl
-from finchlite.algebra import as_finch_operator
-
-# Saved benchmark times, printed at end of test_frontend_benchmark_components_vs_no_components
-_benchmark_times = []
-from finchlite.autoschedule.galley.logical_optimizer import (
-    AnnotatedQuery,
-    greedy_query,
-    insert_statistics,
+import finchlite.interface as fl_interface
+from finchlite.autoschedule import (
+    DefaultLogicFormatter,
+    LogicExecutor,
+    LogicNormalizer,
+    LogicStandardizer,
 )
-from finchlite.autoschedule.galley_optimize import optimize_plan
+from finchlite.autoschedule.compiler import LogicCompiler
+from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.normalize import normalize_names
 from finchlite.autoschedule.tensor_stats import DenseStats
-from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicStandardizer
-from finchlite.autoschedule.compiler import LogicCompiler
-from finchlite.finch_logic import (
-    Alias,
-    Field,
-    Literal,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Table,
-)
+from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.finch_notation.interpreter import NotationInterpreter
 from finchlite.symbolic import gensym
 
-def test_frontend_with_components():
-    """Run sum(A@B, axis=0) + sum(C@D, axis=1) with components."""
-    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
-    B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    D = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0)
-        + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+DEFAULT_N = 5
+CHAIN_RECURSION_LIMIT = 4000
+
+# TESTING PIPELINES 
+INTERPRET_NOTATION_GALLEY_NO_COMPONENTS = LogicNormalizer(
+    GalleyLogicalOptimizer(
+        DenseStats,
+        LogicExecutor(
+            LogicStandardizer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
+        ),
+        use_components=False,
     )
-    expected = np.sum(np.array(A) @ np.array(B), axis=0) + np.sum(np.array(C) @ np.array(D), axis=1)
-    assert np.allclose(np.array(out), np.array(expected))
+)
+
+
+@contextmanager
+def _recursion_limit_ctx(limit: int | None):
+    if limit is None:
+        yield
+        return
+    old = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(limit)
+        yield
+    finally:
+        sys.setrecursionlimit(old)
+
+
+def time_frontend_compute(
+    expr, *, n: int = DEFAULT_N, recursion_limit: int | None = None
+) -> tuple[float, float]:
+    """
+    Time full `compute()` with and without Galley components.
+
+    Returns ``(components_with, components_without)`` — seconds per iteration.
+    """
+    with _recursion_limit_ctx(recursion_limit):
+        t0 = time.perf_counter()
+        for _ in range(n):
+            fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+        components_with = (time.perf_counter() - t0) / n
+
+        t0 = time.perf_counter()
+        for _ in range(n):
+            fl_interface.compute(expr, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
+        components_without = (time.perf_counter() - t0) / n
+    return components_with, components_without
+
+
+def benchmark_compile_kernel(
+    expr, *, n: int = DEFAULT_N, recursion_limit: int | None = None
+) -> tuple[float, float, float, float]:
+    """
+    Time Galley optimize_plan vs downstream (notation codegen), with/without components.
+
+    Uses ``GalleyLogicalOptimizer(..., profile=True)`` so timings match the real pipeline.
+
+    Returns (compile_with_components, compile_without_components,
+             kernel_with_components, kernel_without_components) seconds per iter.
+    """
+    with _recursion_limit_ctx(recursion_limit):
+        prgm = build_plan_from_expr(expr)
+        root, bindings = normalize_names(prgm, {})
+
+        downstream = LogicExecutor(
+            LogicStandardizer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
+        )
+
+        def avg_profiled(use_components: bool) -> tuple[float, float]:
+            opt = GalleyLogicalOptimizer(
+                DenseStats,
+                downstream,
+                use_components=use_components,
+                profile=True,
+            )
+            tot_optimize = 0.0
+            tot_downstream = 0.0
+            for _ in range(n):
+                _out, times = opt(root, bindings)
+                tot_optimize += times["optimize_plan_s"]
+                tot_downstream += times["downstream_s"]
+            return tot_optimize / n, tot_downstream / n
+
+        compile_with_components, kernel_with_components = avg_profiled(True)
+        compile_without_components, kernel_without_components = avg_profiled(False)
+
+    return (
+        compile_with_components,
+        compile_without_components,
+        kernel_with_components,
+        kernel_without_components,
+    )
+
+
+def build_plan_from_expr(expr):
+    """Replicate compute() plan building for benchmark use."""
+    args = (expr,) if not isinstance(expr, tuple) else expr
+    vars = tuple(Alias(gensym("A")) for _ in args)
+    ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
+    bodies = tuple(
+        Query(
+            var,
+            Table(
+                arg.data,
+                tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
+            ),
+        )
+        for arg, var in zip(args, vars, strict=True)
+    )
+    return Plan(ctx_2.trace() + bodies + (Produces(vars),))
+
+
+# --- Expression builders ---
+
 
 def make_chain10_expr(shape_fn, rng=None):
     """Build expr = (A@B@...@Z) + (A1@B1@...@Z1): 2 terms, each a 10-way matmul chain."""
@@ -118,7 +178,7 @@ def make_chain10_expr(shape_fn, rng=None):
 
 
 def chain10_shapes_small(i, rng):
-    """10 matrices: (4,5)@(5,6)@(6,7)@(7,8)@(8,9)@(9,10)@(10,11)@(11,12)@(12,13)@(13,8) -> (4,8)."""
+    """10 matrices: (4,5)@(5,6)@...@(13,8) -> (4,8)."""
     r = np.random.Generator(np.random.PCG64(42 + i * 1000))
     return (
         fl_interface.asarray(r.standard_normal((4, 5)).astype(float)),
@@ -149,24 +209,6 @@ def chain10_shapes_benchmark(i, rng):
         fl_interface.asarray(r.standard_normal((24, 26)).astype(float)),
         fl_interface.asarray(r.standard_normal((26, 16)).astype(float)),
     )
-
-
-def chain10_expected(shape_fn, rng=None):
-    """NumPy reference for chain10: (A@B@...@Z) + (A1@B1@...@Z1)."""
-    if rng is None:
-        rng = np.random.default_rng(42)
-    mats0 = [np.array(m) for m in shape_fn(0, rng)]
-    mats1 = [np.array(m) for m in shape_fn(1, rng)]
-    term0 = mats0[0]
-    for m in mats0[1:]:
-        term0 = term0 @ m
-    term1 = mats1[0]
-    for m in mats1[1:]:
-        term1 = term1 @ m
-    return term0 + term1
-
-
-# --- Chain25: (25-way matmul) + (25-way matmul) ---
 
 
 def make_chain25_expr(shape_fn, rng=None):
@@ -207,385 +249,168 @@ def chain25_shapes_benchmark(i, rng):
     )
 
 
-def chain25_expected(shape_fn, rng=None):
-    """NumPy reference for chain25: (A@B@...@Z) + (A1@B1@...)."""
-    if rng is None:
-        rng = np.random.default_rng(42)
-    mats0 = [np.array(m) for m in shape_fn(0, rng)]
-    mats1 = [np.array(m) for m in shape_fn(1, rng)]
-    term0 = mats0[0]
-    for m in mats0[1:]:
-        term0 = term0 @ m
-    term1 = mats1[0]
-    for m in mats1[1:]:
-        term1 = term1 @ m
-    return term0 + term1
-
-
-def test_frontend_chain25_with_components():
-    """Run (25-way chain) + (25-way chain) with components."""
-    old_limit = sys.getrecursionlimit()
-    try:
-        sys.setrecursionlimit(4000)  # Deep 25-matmul tree needs more stack
-        rng = np.random.default_rng(42)
-        expr = make_chain25_expr(chain25_shapes_small, rng)
-        out = fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-        expected = chain25_expected(chain25_shapes_small, rng)
-        assert np.allclose(np.array(out), np.array(expected))
-    finally:
-        sys.setrecursionlimit(old_limit)
-
-
-def test_frontend_chain25_without_components():
-    """Run (25-way chain) + (25-way chain) without components."""
-    old_limit = sys.getrecursionlimit()
-    try:
-        sys.setrecursionlimit(4000)
-        rng = np.random.default_rng(42)
-        expr = make_chain25_expr(chain25_shapes_small, rng)
-        out = fl_interface.compute(
-            expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
-        )
-        expected = chain25_expected(chain25_shapes_small, rng)
-        assert np.allclose(np.array(out), np.array(expected))
-    finally:
-        sys.setrecursionlimit(old_limit)
-
-
-def test_frontend_chain10_with_components():
-    """Run A@B@C@D@E + ... (10 terms) with components."""
-    rng = np.random.default_rng(42)
-    expr = make_chain10_expr(chain10_shapes_small, rng)
-    out = fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    expected = chain10_expected(chain10_shapes_small, rng)
-    assert np.allclose(np.array(out), np.array(expected))
-
-
-def test_frontend_chain10_without_components():
-    """Run (A@B@...@Z) + (A1@B1@...@Z1) without components."""
-    rng = np.random.default_rng(42)
-    expr = make_chain10_expr(chain10_shapes_small, rng)
-    out = fl_interface.compute(
-        expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
-    )
-    expected = chain10_expected(chain10_shapes_small, rng)
-    assert np.allclose(np.array(out), np.array(expected))
-
-
-def test_frontend_without_components():
-    """Same computation with use_components=False; result must match."""
-    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
-    B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    D = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
-    out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0)
-        + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY_NO_COMPONENTS,
-    )
-    expected = np.sum(np.array(A) @ np.array(B), axis=0) + np.sum(np.array(C) @ np.array(D), axis=1)
-    assert np.allclose(np.array(out), np.array(expected))
-    
-def test_frontend_benchmark_components_vs_no_components():
-    """Benchmark frontend with components vs without."""
+def make_sum_sum_benchmark_expr():
+    """Large sum(A@B)+sum(C@D) expression used for frontend timing."""
     A = fl_interface.asarray(np.arange(100 * 50).reshape(100, 50).astype(float))
     B = fl_interface.asarray(np.arange(50 * 20).reshape(50, 20).astype(float))
     C = fl_interface.asarray(np.arange(100 * 50).reshape(100, 50).astype(float))
     D = fl_interface.asarray(np.arange(50 * 20).reshape(50, 20).astype(float))
-    expr = (
+    return (
         fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=1)
         + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1)
     )
 
-    n = 5
-    # Benchmark WITH components
-    t0 = time.perf_counter()
-    for _ in range(n):
-        fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    t_with = (time.perf_counter() - t0) / n
 
-    # Benchmark WITHOUT components
-    t0 = time.perf_counter()
-    for _ in range(n):
-        fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-    t_without = (time.perf_counter() - t0) / n
-
-    _benchmark_times.append(("frontend components vs no-components", t_with, t_without))
-    _benchmark_log.append("")
-    _benchmark_log.append("=" * 60)
-    _benchmark_log.append("Galley benchmark results:")
-    for name, tw, two in _benchmark_times:
-        _benchmark_log.append(f"  {name}: With components={tw:.4f}s, Without={two:.4f}s")
-    _benchmark_log.append("=" * 60)
-    write_log()
-
-
-def test_frontend_benchmark_chain10():
-    """Benchmark frontend: A@B@C@D@E + ... (10 terms) with/without components."""
-    rng = np.random.default_rng(42)
-    expr = make_chain10_expr(chain10_shapes_benchmark, rng)
-
-    n = 5
-    t0 = time.perf_counter()
-    for _ in range(n):
-        fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-    t_with = (time.perf_counter() - t0) / n
-
-    t0 = time.perf_counter()
-    for _ in range(n):
-        fl_interface.compute(
-            expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
-        )
-    t_without = (time.perf_counter() - t0) / n
-
-    _benchmark_times.append(
-        ("frontend chain10 (2× 10-way matmul)", t_with, t_without)
-    )
-    _benchmark_log.append("")
-    _benchmark_log.append("=" * 60)
-    _benchmark_log.append("Galley chain10 frontend benchmark:")
-    _benchmark_log.append(f"  With components:   {t_with:.4f}s")
-    _benchmark_log.append(f"  Without components: {t_without:.4f}s")
-    _benchmark_log.append("=" * 60)
-    write_log()
-
-
-def test_frontend_benchmark_chain25():
-    """Benchmark frontend: (25-way chain) + (25-way chain) with/without components."""
-    old_limit = sys.getrecursionlimit()
-    try:
-        sys.setrecursionlimit(4000)
-        rng = np.random.default_rng(42)
-        expr = make_chain25_expr(chain25_shapes_benchmark, rng)
-
-        n = 5  # Long chain - single run
-        t0 = time.perf_counter()
-        for _ in range(n):
-            fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-        t_with = (time.perf_counter() - t0) / n
-
-        t0 = time.perf_counter()
-        for _ in range(n):
-            fl_interface.compute(
-                expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
-            )
-        t_without = (time.perf_counter() - t0) / n
-
-        _benchmark_times.append(
-            ("frontend chain25 (2× 25-way matmul)", t_with, t_without)
-        )
-        _benchmark_log.append("")
-        _benchmark_log.append("=" * 60)
-        _benchmark_log.append("Galley chain25 frontend benchmark:")
-        _benchmark_log.append(f"  With components:   {t_with:.4f}s")
-        _benchmark_log.append(f"  Without components: {t_without:.4f}s")
-        _benchmark_log.append("=" * 60)
-        write_log()
-    finally:
-        sys.setrecursionlimit(old_limit)
-
-
-def build_plan_from_expr(expr):
-    """Replicate compute() plan building for benchmark use."""
-    args = (expr,) if not isinstance(expr, tuple) else expr
-    vars = tuple(Alias(gensym("A")) for _ in args)
-    ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
-    bodies = tuple(
-        Query(
-            var,
-            Table(
-                arg.data,
-                tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
-            ),
-        )
-        for arg, var in zip(args, vars, strict=True)
-    )
-    return Plan(ctx_2.trace() + bodies + (Produces(vars),))
-
-
-def test_compile_vs_kernel_benchmark():
-    """Measure compile time (Galley optimization) and kernel time separately."""
-    # Use smaller matrices for faster benchmark
+def make_matmul_three_terms_compile_expr():
+    """Smaller A@B + C@D + E@F for compile/kernel benchmark."""
     A = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
     B = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float))
     C = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
     D = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float))
-    expr = (
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=1)
-        + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1)
+    E = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
+    F = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float))
+    return (
+        fl_interface.lazy(A) @ fl_interface.lazy(B)
+        + fl_interface.lazy(C) @ fl_interface.lazy(D)
+        + fl_interface.lazy(E) @ fl_interface.lazy(F)
     )
 
-    prgm = build_plan_from_expr(expr)
-    root, bindings = normalize_names(prgm, {})
 
-    downstream = LogicExecutor(
-        LogicStandardizer(
-            DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-        )
+def run_smoke_computes() -> None:
+    """Quick compute smoke paths (no timing)."""
+    A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
+    C = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
+    D = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
+    E = fl_interface.asarray(np.array([[2.0, 0.0], [0.0, 2.0]]))
+    F = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    three = (
+        fl_interface.lazy(A) @ fl_interface.lazy(B)
+        + fl_interface.lazy(C) @ fl_interface.lazy(D)
+        + fl_interface.lazy(E) @ fl_interface.lazy(F)
     )
+    _ = fl_interface.compute(three, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    _ = fl_interface.compute(three, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
 
-    n = 5
-
-    # Compile time: optimize_plan with components
-    t0 = time.perf_counter()
-    for _ in range(n):
-        opt_plan = optimize_plan(root, DenseStats, bindings, use_components=True)
-    t_compile_with = (time.perf_counter() - t0) / n
-
-    # Compile time: optimize_plan without components
-    t0 = time.perf_counter()
-    for _ in range(n):
-        opt_plan = optimize_plan(root, DenseStats, bindings, use_components=False)
-    t_compile_without = (time.perf_counter() - t0) / n
-
-    # Kernel time: run downstream on optimized plan (use components version)
-    opt_plan_with = optimize_plan(root, DenseStats, bindings, use_components=True)
-    downstream(opt_plan_with, bindings)  # warmup (JIT compile)
-    t0 = time.perf_counter()
-    for _ in range(n):
-        downstream(opt_plan_with, bindings)
-    t_kernel_with = (time.perf_counter() - t0) / n
-
-    # Kernel time: run downstream on optimized plan (no components version)
-    opt_plan_without = optimize_plan(root, DenseStats, bindings, use_components=False)
-    downstream(opt_plan_without, bindings)  # warmup (JIT compile)
-    t0 = time.perf_counter()
-    for _ in range(n):
-        downstream(opt_plan_without, bindings)
-    t_kernel_without = (time.perf_counter() - t0) / n
-
-    _benchmark_times.append(
-        ("compile (optimize_plan)", t_compile_with, t_compile_without)
-    )
-    _benchmark_times.append(
-        ("kernel (downstream execution)", t_kernel_with, t_kernel_without)
-    )
-    _benchmark_log.append("")
-    _benchmark_log.append("=" * 60)
-    _benchmark_log.append("Galley compile vs kernel benchmark:")
-    _benchmark_log.append(f"  Compile (with components):    {t_compile_with:.4f}s")
-    _benchmark_log.append(f"  Compile (without components):  {t_compile_without:.4f}s")
-    _benchmark_log.append(f"  Kernel (with components):     {t_kernel_with:.4f}s")
-    _benchmark_log.append(f"  Kernel (without components):   {t_kernel_without:.4f}s")
-    _benchmark_log.append("=" * 60)
-    write_log()
-
-
-def test_compile_vs_kernel_benchmark_chain10():
-    """Compile and kernel benchmarks for A@B@C@D@E + ... (10 terms)."""
     rng = np.random.default_rng(42)
-    # Use small shapes - 10-term plan is large, full benchmark shapes would be slow
-    expr = make_chain10_expr(chain10_shapes_small, rng)
+    e10 = make_chain10_expr(chain10_shapes_small, rng)
+    _ = fl_interface.compute(e10, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    _ = fl_interface.compute(e10, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
 
-    prgm = build_plan_from_expr(expr)
-    root, bindings = normalize_names(prgm, {})
+    with _recursion_limit_ctx(CHAIN_RECURSION_LIMIT):
+        e25 = make_chain25_expr(chain25_shapes_small, rng)
+        _ = fl_interface.compute(e25, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+        _ = fl_interface.compute(e25, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
 
-    downstream = LogicExecutor(
-        LogicStandardizer(
-            DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-        )
+
+def main() -> None:
+    lines: list[str] = []
+
+    lines.append("Smoke compute paths...")
+    run_smoke_computes()
+
+    lines.append("Frontend benchmark: sum+sum matmul...")
+    expr_sum = make_sum_sum_benchmark_expr()
+    components_with, components_without = time_frontend_compute(expr_sum)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley benchmark results (sum+sum matmul)")
+    lines.append(
+        f"  frontend components vs no-components: "
+        f"With components={components_with:.4f}s, Without={components_without:.4f}s"
     )
+    lines.append("=" * 60)
 
-    n = 5  # Single run - plan is large, keep benchmark tractable
+    lines.append("Frontend benchmark: chain10...")
+    rng = np.random.default_rng(42)
+    expr_c10 = make_chain10_expr(chain10_shapes_benchmark, rng)
+    components_with, components_without = time_frontend_compute(expr_c10)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley chain10 frontend benchmark:")
+    lines.append(f"  With components:   {components_with:.4f}s")
+    lines.append(f"  Without components: {components_without:.4f}s")
+    lines.append("=" * 60)
 
-    # Compile time
-    t0 = time.perf_counter()
-    for _ in range(n):
-        optimize_plan(root, DenseStats, bindings, use_components=True)
-    t_compile_with = (time.perf_counter() - t0) / n
-
-    t0 = time.perf_counter()
-    for _ in range(n):
-        optimize_plan(root, DenseStats, bindings, use_components=False)
-    t_compile_without = (time.perf_counter() - t0) / n
-
-    # Kernel time
-    opt_plan_with = optimize_plan(root, DenseStats, bindings, use_components=True)
-    downstream(opt_plan_with, bindings)  # warmup
-    t0 = time.perf_counter()
-    for _ in range(n):
-        downstream(opt_plan_with, bindings)
-    t_kernel_with = (time.perf_counter() - t0) / n
-
-    opt_plan_without = optimize_plan(root, DenseStats, bindings, use_components=False)
-    downstream(opt_plan_without, bindings)  # warmup
-    t0 = time.perf_counter()
-    for _ in range(n):
-        downstream(opt_plan_without, bindings)
-    t_kernel_without = (time.perf_counter() - t0) / n
-
-    _benchmark_times.append(
-        ("compile chain10 (2× 10-way matmul)", t_compile_with, t_compile_without)
+    lines.append("Frontend benchmark: chain25...")
+    expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
+    components_with, components_without = time_frontend_compute(
+        expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT
     )
-    _benchmark_times.append(
-        ("kernel chain10 (2× 10-way matmul)", t_kernel_with, t_kernel_without)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley chain25 frontend benchmark:")
+    lines.append(f"  With components:   {components_with:.4f}s")
+    lines.append(f"  Without components: {components_without:.4f}s")
+    lines.append("=" * 60)
+
+    lines.append("Compile vs kernel: matmul three terms...")
+    expr_mk = make_matmul_three_terms_compile_expr()
+    (
+        compile_with_components,
+        compile_without_components,
+        kernel_with_components,
+        kernel_without_components,
+    ) = benchmark_compile_kernel(expr_mk)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley compile vs kernel benchmark (matmul three terms):")
+    lines.append(f"  Compile (with components):    {compile_with_components:.4f}s")
+    lines.append(f"  Compile (without components):  {compile_without_components:.4f}s")
+    lines.append(f"  Kernel (with components):     {kernel_with_components:.4f}s")
+    lines.append(f"  Kernel (without components):   {kernel_without_components:.4f}s")
+    lines.append("=" * 60)
+
+    lines.append("Compile vs kernel: chain10...")
+    expr_c10_small = make_chain10_expr(chain10_shapes_small, rng)
+    (
+        compile_with_components,
+        compile_without_components,
+        kernel_with_components,
+        kernel_without_components,
+    ) = benchmark_compile_kernel(expr_c10_small)
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley chain10 compile vs kernel benchmark:")
+    lines.append(
+        f"  Compile (with):    {compile_with_components:.4f}s  "
+        f"(without): {compile_without_components:.4f}s"
     )
-    _benchmark_log.append("")
-    _benchmark_log.append("=" * 60)
-    _benchmark_log.append("Galley chain10 compile vs kernel benchmark:")
-    _benchmark_log.append(f"  Compile (with):    {t_compile_with:.4f}s  (without): {t_compile_without:.4f}s")
-    _benchmark_log.append(f"  Kernel (with):     {t_kernel_with:.4f}s  (without): {t_kernel_without:.4f}s")
-    _benchmark_log.append("=" * 60)
-    write_log()
+    lines.append(
+        f"  Kernel (with):     {kernel_with_components:.4f}s  "
+        f"(without): {kernel_without_components:.4f}s"
+    )
+    lines.append("=" * 60)
+
+    lines.append("Compile vs kernel: chain25...")
+    expr_c25_small = make_chain25_expr(chain25_shapes_small, rng)
+    (
+        compile_with_components,
+        compile_without_components,
+        kernel_with_components,
+        kernel_without_components,
+    ) = benchmark_compile_kernel(
+        expr_c25_small, recursion_limit=CHAIN_RECURSION_LIMIT
+    )
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("Galley chain25 compile vs kernel benchmark:")
+    lines.append(
+        f"  Compile (with):    {compile_with_components:.4f}s  "
+        f"(without): {compile_without_components:.4f}s"
+    )
+    lines.append(
+        f"  Kernel (with):     {kernel_with_components:.4f}s  "
+        f"(without): {kernel_without_components:.4f}s"
+    )
+    lines.append("=" * 60)
+
+    lines.append("")
+    lines.append("Done.")
+
+    for line in lines:
+        print(line)
 
 
-def test_compile_vs_kernel_benchmark_chain25():
-    """Compile and kernel benchmarks for (25-way chain) + (25-way chain)."""
-    old_limit = sys.getrecursionlimit()
-    try:
-        sys.setrecursionlimit(4000)
-        rng = np.random.default_rng(42)
-        expr = make_chain25_expr(chain25_shapes_small, rng)
-
-        prgm = build_plan_from_expr(expr)
-        root, bindings = normalize_names(prgm, {})
-
-        downstream = LogicExecutor(
-            LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-            )
-        )
-
-        n = 5  # Long chain - single run
-
-        # Compile time
-        t0 = time.perf_counter()
-        for _ in range(n):
-            optimize_plan(root, DenseStats, bindings, use_components=True)
-        t_compile_with = (time.perf_counter() - t0) / n
-
-        t0 = time.perf_counter()
-        for _ in range(n):
-            optimize_plan(root, DenseStats, bindings, use_components=False)
-        t_compile_without = (time.perf_counter() - t0) / n
-
-        # Kernel time
-        opt_plan_with = optimize_plan(root, DenseStats, bindings, use_components=True)
-        downstream(opt_plan_with, bindings)  # warmup
-        t0 = time.perf_counter()
-        for _ in range(n):
-            downstream(opt_plan_with, bindings)
-        t_kernel_with = (time.perf_counter() - t0) / n
-
-        opt_plan_without = optimize_plan(root, DenseStats, bindings, use_components=False)
-        downstream(opt_plan_without, bindings)  # warmup
-        t0 = time.perf_counter()
-        for _ in range(n):
-            downstream(opt_plan_without, bindings)
-        t_kernel_without = (time.perf_counter() - t0) / n
-
-        _benchmark_times.append(
-            ("compile chain25 (2× 25-way matmul)", t_compile_with, t_compile_without)
-        )
-        _benchmark_times.append(
-            ("kernel chain25 (2× 25-way matmul)", t_kernel_with, t_kernel_without)
-        )
-        _benchmark_log.append("")
-        _benchmark_log.append("=" * 60)
-        _benchmark_log.append("Galley chain25 compile vs kernel benchmark:")
-        _benchmark_log.append(f"  Compile (with):    {t_compile_with:.4f}s  (without): {t_compile_without:.4f}s")
-        _benchmark_log.append(f"  Kernel (with):     {t_kernel_with:.4f}s  (without): {t_kernel_without:.4f}s")
-        _benchmark_log.append("=" * 60)
-        write_log()
-    finally:
-        sys.setrecursionlimit(old_limit)
+if __name__ == "__main__":
+    main()
