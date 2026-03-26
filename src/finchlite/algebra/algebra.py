@@ -210,12 +210,13 @@ class CNUnaryOperator(COperator):
         return f"{self.c_symbol}{ctx(args[0])}"
 
 
-class NumbaOperator:
-    def numba_literal(self, val: Any, ctx: Any, x: Any, y: Any) -> Any:
-        return f"{ctx.full_name(val)}({ctx(x)}, {ctx(y)})"
+class NumbaOperator(ABC):
+    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return f"({f' {self.numba_name()} '.join(map(ctx, args))})"
 
+    
     def numba_name(self) -> str:
-        return f"_operator.{type(self).__name__.lower()}"
+        raise NotImplementedError(f"{type(self)} must implement numba_name")
 
 
 # Abstract Base Class for Algebraic Properties
@@ -331,6 +332,9 @@ class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=Single
 
     def init_value(self, type_: type) -> Any:
         return type_(0)
+    
+    def numba_name(self) -> str:
+        return "+"
 
 
 class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=SingletonMeta):
@@ -358,15 +362,21 @@ class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=Single
 
     def init_value(self, type_: type) -> Any:
         return type_(1)
+        
+    def numba_name(self) -> str:
+        return "*"
 
 
-class Sub(ReflexiveFinchOperator, CNAryOperator, NumbaOperator, metaclass=SingletonMeta):
+class Sub(ReflexiveFinchOperator, CBinaryOperator, NumbaOperator, metaclass=SingletonMeta):
     @property
     def c_symbol(self) -> str:
         return "-"
 
     def __call__(self, a: Any, b: Any):
         return operator.sub(a, b)
+    
+    def numba_name(self) -> str:
+        return "-"
 
 
 class MatMul(ReflexiveFinchOperator, metaclass=SingletonMeta):
@@ -561,6 +571,9 @@ class Eq(ComparisonFinchOperator, CBinaryOperator, NumbaOperator, metaclass=Sing
     @property
     def c_symbol(self) -> str:
         return "=="
+    
+    def numba_name(self) -> str:
+        return "=="
 
     is_commutative = True
 
@@ -591,6 +604,9 @@ class Gt(ComparisonFinchOperator, CBinaryOperator, metaclass=SingletonMeta):
 class Lt(ComparisonFinchOperator, CBinaryOperator, NumbaOperator, metaclass=SingletonMeta):
     @property
     def c_symbol(self) -> str:
+        return "<"
+    
+    def numba_name(self) -> str:
         return "<"
 
     def __call__(self, a: Any, b: Any):
@@ -754,6 +770,12 @@ class Min(FinchOperator, NumbaOperator, metaclass=SingletonMeta):
 
     def init_value(self, type_: type):
         return type_max(type_)
+    
+    def numba_name(self) -> str:
+        return "min"
+    
+    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return f"min({', '.join(map(ctx, args))})"
 
 
 class Max(FinchOperator, NumbaOperator, metaclass=SingletonMeta):
@@ -772,6 +794,12 @@ class Max(FinchOperator, NumbaOperator, metaclass=SingletonMeta):
 
     def init_value(self, type_: type):
         return type_min(type_)
+    
+    def numba_name(self) -> str:
+        return "max"
+
+    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return f"max({', '.join(map(ctx, args))})"
 
 
 class Remainder(BinaryFloatOperator, metaclass=SingletonMeta):
@@ -1195,8 +1223,8 @@ class InitWrite(FinchOperator, NumbaOperator):
     def return_type(self, x: Any, y: Any) -> type:
         return y
     
-    def numba_literal(self, val: Any, ctx: Any, x: Any, y: Any) -> Any:
-        return ctx(y)
+    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return ctx(args[1])
 
 
 class Overwrite(FinchOperator, metaclass=SingletonMeta):
@@ -1294,7 +1322,7 @@ def cansplitpush(x, y):
         and is_associative(x)
     )
 
-class Scansearch(FinchOperator, metaclass=SingletonMeta):
+class Scansearch(FinchOperator, NumbaOperator, metaclass=SingletonMeta):
     """
     Scansearch is a search operator that performs a scan search on a sorted array.
 
@@ -1335,8 +1363,15 @@ class Scansearch(FinchOperator, metaclass=SingletonMeta):
     def return_type(self, arr, x, lo, hi) -> type:
         return hi
     
-    def numba_literal(self, val: Any, ctx: Any, arr: Any, x: Any, lo: Any, hi: Any) -> Any:
+    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+        arr = args[0]
+        x = args[1]
+        lo = args[2]
+        hi = args[3]
         return f"scansearch({ctx(arr)}, {ctx(x)}, {ctx(lo)}, {ctx(hi)})"
+    
+
+scansearch = Scansearch()
     
 _operator_map: dict[Any, FinchOperator] = {
     # Python Operators
@@ -1427,7 +1462,7 @@ _operator_map: dict[Any, FinchOperator] = {
     first_arg: FirstArg(),
     identity: Identity(),
     make_tuple: MakeTuple(),
-    Scansearch: Scansearch(),
+    scansearch: Scansearch(),
 
 }
 
@@ -1443,4 +1478,3 @@ def as_finch_operator(f: Any) -> FinchOperator:
         return _operator_map[f]
     raise TypeError(f"No FinchOperator registered for {f}. ")
 
-scansearch = Scansearch()
