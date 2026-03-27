@@ -52,9 +52,11 @@ def test_database_from_tensor_and_getters():
 @pytest.mark.parametrize(
     "shape, nnz_indices, expected_nnz",
     [
-        ((2, 3), [(0, 0), (1, 1)], 2.0),
-        ((10, 10), [(i, i) for i in range(10)], 10.0),
+        ((4, 5), [(0, 0), (1, 2), (3, 4)], 3.0),
+        ((5, 5), [(0, 0), (0, 1), (0, 2)], 3.0),
+        ((3, 3, 3), [(0, 0, 0), (1, 1, 1), (2, 2, 2)], 3.0),
         ((5, 5, 5), [], 0.0),
+        ((2, 2), [(0, 0), (0, 1), (1, 0), (1, 1)], 4.0),
     ],
 )
 def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
