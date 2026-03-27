@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from ...algebra import is_annihilator
 from ...finch_logic import Field
@@ -50,12 +50,16 @@ class DatabaseStats(TensorStats):
         if not all(isinstance(s, DatabaseStats) for s in all_stats):
             raise TypeError("DatabaseStats expected for mapjoin")
 
-        a, b = all_stats[0], all_stats[1]
+        a = cast(DatabaseStats, all_stats[0])
+        b = cast(DatabaseStats, all_stats[1])
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
 
         shared = set(a.index_order) & set(b.index_order)
         only_a = set(a.index_order) - set(b.index_order)
         only_b = set(b.index_order) - set(a.index_order)
+
+        new_V: dict[Field, float] = {}
+        new_nnz: float = 0.0
 
         # Join case: A_ij * B_jk
         if shared and only_a and only_b and is_annihilator(op, a.tensordef.fill_value):
@@ -63,8 +67,6 @@ class DatabaseStats(TensorStats):
             b_shared = math.prod(b.V.get(j, 1.0) for j in shared)
             # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
             new_nnz = a.nnz * b.nnz / max(a_shared, b_shared)
-
-            new_V: dict[Field, float] = {}
             for idx in new_def.index_order:
                 n = new_def.dim_sizes[idx]
                 if idx in only_a:
@@ -81,8 +83,6 @@ class DatabaseStats(TensorStats):
         elif shared and not only_a and not only_b:
             # nnz(C) = nnz(A) + nnz(B)
             new_nnz = a.nnz + b.nnz
-
-            new_V: dict[Field, float] = {}
             for idx in new_def.index_order:
                 # V(C, i) = min(n_i, V(A, i) + V(B,i))
                 # V(C, j) = min(n_j, V(A, j) + V(B,j))
@@ -95,8 +95,6 @@ class DatabaseStats(TensorStats):
             i_dim = math.prod(new_def.dim_sizes[i] for i in only_a)
             # nnz(C) = nnz(A) * n_k + n_i * nnz(B)
             new_nnz = a.nnz * k_dim + b.nnz * i_dim
-
-            new_V: dict[Field, float] = {}
             for idx in new_def.index_order:
                 n = new_def.dim_sizes[idx]
                 if idx in only_a:
@@ -121,6 +119,7 @@ class DatabaseStats(TensorStats):
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for aggregate")
 
+        assert isinstance(stats, DatabaseStats)
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
         j_shared = math.prod(stats.V.get(j, 1.0) for j in reduce_indices)
         # nnz(C) = nnz(A) / V(A,j)

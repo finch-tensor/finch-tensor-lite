@@ -1,5 +1,6 @@
 from ...finch_logic import TensorStats
 from .blocked_stats import BlockedStats, BlockedStatsFactory
+from .database_stats import DatabaseStats
 from .dc_stats import DC, DCStats, DCStatsFactory
 from .dense_stat import DenseStats, DenseStatsFactory
 from .stats_interpreter import StatsInterpreter
@@ -12,6 +13,7 @@ __all__ = [
     "BaseTensorStats",
     "BlockedStats",
     "BlockedStatsFactory",
+    "DatabaseStats",
     "DCStats",
     "DCStatsFactory",
     "DenseStats",
