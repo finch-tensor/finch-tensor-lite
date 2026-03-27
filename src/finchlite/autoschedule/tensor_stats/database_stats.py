@@ -31,6 +31,16 @@ class DatabaseStats(TensorStats):
                 if d.from_indices == frozenset() and d.to_indices == frozenset({idx}):
                     self.V[idx] = d.value
 
+    @classmethod
+    def from_def(
+        cls, tensordef: TensorDef, nnz: float, V: dict[Field, float]
+    ) -> DatabaseStats:
+        obj = object.__new__(cls)
+        obj.tensordef = tensordef
+        obj.nnz = nnz
+        obj.V = V
+        return obj
+
     @staticmethod
     def mapjoin(op: Callable[..., Any], *all_stats: TensorStats) -> TensorStats:
         a, b = all_stats[0], all_stats[1]
@@ -111,23 +121,21 @@ class DatabaseStats(TensorStats):
     def relabel(
         stats: TensorStats, relabel_indices: tuple[Field, ...]
     ) -> DatabaseStats:
-        d = stats.tensordef
-        new_def = TensorDef.relabel(d, relabel_indices)
+        new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
         return DatabaseStats.from_def(new_def, stats.estimate_non_fill_values())
 
     @staticmethod
     def reorder(
         stats: TensorStats, reorder_indices: tuple[Field, ...]
     ) -> DatabaseStats:
-        d = stats.tensordef
-        new_def = TensorDef.reorder(d, reorder_indices)
+        new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
         return DatabaseStats.from_def(new_def, stats.estimate_non_fill_values())
 
     @staticmethod
     def copy_stats(stat: TensorStats) -> DatabaseStats:
         if not isinstance(stat, DatabaseStats):
             raise TypeError("copy_stats expected a DatabaseStats instance")
-        return DatabaseStats.from_def(stat.tensordef.copy(), stat.nnz)
+        return DatabaseStats.from_def(stat.tensordef.copy(), stat.nnz, stat.V.copy())
 
     def estimate_non_fill_values(self) -> float:
         return self.nnz
