@@ -133,15 +133,6 @@ register_property(
 )
 
 
-register_property(
-    scansearch,
-    "numba_literal",
-    "__attr__",
-    lambda func, ctx, arr, x, lo, hi: (
-        f"scansearch({ctx(arr)}, {ctx(x)}, {ctx(lo)}, {ctx(hi)})"
-    ),
-)
-
 
 @dataclass(frozen=True)
 class ExtentFields:
