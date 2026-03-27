@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import Any
 
@@ -44,6 +45,9 @@ class DatabaseStats(TensorStats):
 
     @staticmethod
     def mapjoin(op: Callable[..., Any], *all_stats: TensorStats) -> TensorStats:
+        if not all(isinstance(s, DatabaseStats) for s in all_stats):
+            raise TypeError("DatabaseStats expected for mapjoin")
+
         a, b = all_stats[0], all_stats[1]
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
 
@@ -53,22 +57,23 @@ class DatabaseStats(TensorStats):
 
         # Join case: A_ij * B_jk
         if shared and only_a and only_b and is_annihilator(op, a.tensordef.fill_value):
+            a_shared = math.prod(a.V.get(j, 1.0) for j in shared)
+            b_shared = math.prod(b.V.get(j, 1.0) for j in shared)
             # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
-            j = next(iter(shared))
-            new_nnz = a.nnz * b.nnz / max(a.V.get(j, 1.0), b.V.get(j, 1.0))
+            new_nnz = a.nnz * b.nnz / max(a_shared, b_shared)
 
             new_V: dict[Field, float] = {}
             for idx in new_def.index_order:
                 n = new_def.dim_sizes[idx]
                 if idx in only_a:
                     # V(C, i) = min(n_i, V(A,i), nnz(C))
-                    new_V[idx] = min(n, a.V.get(idx, n), new_nnz)
+                    new_V[idx] = min(n, a.V[idx], new_nnz)
                 elif idx in shared:
                     # V(C, j) = min(n_j, V(A,j), V(B,j))
-                    new_V[idx] = min(n, a.V.get(idx, n), b.V.get(idx, n))
+                    new_V[idx] = min(n, a.V[idx], b.V[idx])
                 elif idx in only_b:
                     # V(C, k) = min(n_k, V(B,k), nnz(C))
-                    new_V[idx] = min(n, b.V.get(idx, n), new_nnz)
+                    new_V[idx] = min(n, b.V[idx], new_nnz)
 
         # Elementwise case: A_ij + B_ij
         elif shared and not only_a and not only_b:
@@ -84,8 +89,8 @@ class DatabaseStats(TensorStats):
 
         # Broadcast case: A_ij + B_jk
         else:
-            k_dim = sum(new_def.dim_sizes[k] for k in only_b)
-            i_dim = sum(new_def.dim_sizes[i] for i in only_a)
+            k_dim = math.prod(new_def.dim_sizes[k] for k in only_b)
+            i_dim = math.prod(new_def.dim_sizes[i] for i in only_a)
             # nnz(C) = nnz(A) * n_k + n_i * nnz(B)
             new_nnz = a.nnz * k_dim + b.nnz * i_dim
 
@@ -110,7 +115,21 @@ class DatabaseStats(TensorStats):
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: TensorStats,
-    ) -> TensorStats: ...
+    ) -> TensorStats:
+        if not isinstance(stats, DatabaseStats):
+            raise TypeError("DatabaseStats expected for aggregate")
+
+        new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
+        j_shared = math.prod(stats.V.get(j, 1.0) for j in reduce_indices)
+        # nnz(C) = nnz(A) / V(A,j)
+        new_nnz = stats.nnz / j_shared
+
+        new_V: dict[Field, float] = {}
+        for idx in new_def.index_order:
+            # V(C,i) = V(A,i)
+            new_V[idx] = stats.V[idx]
+
+        return DatabaseStats.from_def(new_def, new_nnz, new_V)
 
     @staticmethod
     def issimilar(a: TensorStats, b: TensorStats) -> bool:
