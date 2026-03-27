@@ -210,7 +210,8 @@ class CNUnaryOperator(COperator):
         return f"{self.c_symbol}{ctx(args[0])}"
 
 
-class NumbaOperator(ABC):
+class NumbaOperator():
+
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
         return f"({f' {self.numba_name()} '.join(map(ctx, args))})"
 
