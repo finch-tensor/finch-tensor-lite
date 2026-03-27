@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from ...algebra import is_annihilator
 from ...finch_logic import Field
 from .dc_stats import DCStats
 from .tensor_def import TensorDef
@@ -50,8 +51,8 @@ class DatabaseStats(TensorStats):
         only_a = set(a.index_order) - set(b.index_order)
         only_b = set(b.index_order) - set(a.index_order)
 
-        # Join case: A_ij + B_jk
-        if shared and only_a and only_b:
+        # Join case: A_ij * B_jk
+        if shared and only_a and only_b and is_annihilator(op, a.tensordef.fill_value):
             # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
             j = next(iter(shared))
             new_nnz = a.nnz * b.nnz / max(a.V.get(j, 1.0), b.V.get(j, 1.0))
@@ -122,14 +123,26 @@ class DatabaseStats(TensorStats):
         stats: TensorStats, relabel_indices: tuple[Field, ...]
     ) -> DatabaseStats:
         new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
-        return DatabaseStats.from_def(new_def, stats.estimate_non_fill_values())
+        if isinstance(stats, DatabaseStats):
+            V = stats.V
+            nnz = stats.nnz
+        else:
+            V = {}
+            nnz = stats.estimate_non_fill_values()
+        return DatabaseStats.from_def(new_def, nnz, V)
 
     @staticmethod
     def reorder(
         stats: TensorStats, reorder_indices: tuple[Field, ...]
     ) -> DatabaseStats:
         new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
-        return DatabaseStats.from_def(new_def, stats.estimate_non_fill_values())
+        if isinstance(stats, DatabaseStats):
+            V = stats.V
+            nnz = stats.nnz
+        else:
+            V = {}
+            nnz = stats.estimate_non_fill_values()
+        return DatabaseStats.from_def(new_def, nnz, V)
 
     @staticmethod
     def copy_stats(stat: TensorStats) -> DatabaseStats:
