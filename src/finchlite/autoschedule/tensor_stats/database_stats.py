@@ -32,7 +32,66 @@ class DatabaseStats(TensorStats):
                     self.V[idx] = d.value
 
     @staticmethod
-    def mapjoin(op: Callable[..., Any], *all_stats: TensorStats) -> TensorStats: ...
+    def mapjoin(op: Callable[..., Any], *all_stats: TensorStats) -> TensorStats:
+        a, b = all_stats[0], all_stats[1]
+        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
+
+        shared = set(a.index_order) & set(b.index_order)
+        only_a = set(a.index_order) - set(b.index_order)
+        only_b = set(b.index_order) - set(a.index_order)
+
+        # Join case: A_ij + B_jk
+        if shared and only_a and only_b:
+            # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
+            j = next(iter(shared))
+            new_nnz = a.nnz * b.nnz / max(a.V.get(j, 1.0), b.V.get(j, 1.0))
+
+            new_V: dict[Field, float] = {}
+            for idx in new_def.index_order:
+                n = new_def.dim_sizes[idx]
+                if idx in only_a:
+                    # V(C, i) = min(n_i, V(A,i), nnz(C))
+                    new_V[idx] = min(n, a.V.get(idx, n), new_nnz)
+                elif idx in shared:
+                    # V(C, j) = min(n_j, V(A,j), V(B,j))
+                    new_V[idx] = min(n, a.V.get(idx, n), b.V.get(idx, n))
+                elif idx in only_b:
+                    # V(C, k) = min(n_k, V(B,k), nnz(C))
+                    new_V[idx] = min(n, b.V.get(idx, n), new_nnz)
+
+        # Elementwise case: A_ij + B_ij
+        elif shared and not only_a and not only_b:
+            # nnz(C) = nnz(A) + nnz(B)
+            new_nnz = a.nnz + b.nnz
+
+            new_V: dict[Field, float] = {}
+            for idx in new_def.index_order:
+                # V(C, i) = min(n_i, V(A, i) + V(B,i))
+                # V(C, j) = min(n_j, V(A, j) + V(B,j))
+                n = new_def.dim_sizes[idx]
+                new_V[idx] = min(n, a.V[idx] + b.V[idx])
+
+        # Broadcast case: A_ij + B_jk
+        else:
+            k_dim = sum(new_def.dim_sizes[k] for k in only_b)
+            i_dim = sum(new_def.dim_sizes[i] for i in only_a)
+            # nnz(C) = nnz(A) * n_k + n_i * nnz(B)
+            new_nnz = a.nnz * k_dim + b.nnz * i_dim
+
+            new_V: dict[Field, float] = {}
+            for idx in new_def.index_order:
+                n = new_def.dim_sizes[idx]
+                if idx in only_a:
+                    # V(C, i) = min(n_i, V(A, i) + n_i)
+                    new_V[idx] = min(n, a.V[idx] + n)
+                elif idx in shared:
+                    # V(C, j) = min(n_j, V(A, j) + V(B,j))
+                    new_V[idx] = min(n, a.V[idx] + b.V[idx])
+                else:
+                    # V(C, k) = min(n_k, n_k + V(B,k))
+                    new_V[idx] = min(n, b.V[idx] + n)
+
+        return DatabaseStats.from_def(new_def, new_nnz, new_V)
 
     @staticmethod
     def aggregate(
