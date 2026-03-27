@@ -22,12 +22,14 @@ class DatabaseStats(TensorStats):
             val = val.val
 
         dc = DCStats(tensor, fields)
+
+        self.nnz = 0.0
         for d in dc.dcs:
             if d.from_indices == frozenset() and d.to_indices == frozenset(fields):
                 self.nnz = d.value
                 break
 
-        self.V: dict[Field, float] = {}
+        self.V: dict[Field, float] = dict.fromkeys(fields, 0.0)
         for idx in fields:
             for d in dc.dcs:
                 if d.from_indices == frozenset() and d.to_indices == frozenset({idx}):
@@ -135,7 +137,11 @@ class DatabaseStats(TensorStats):
     def issimilar(a: TensorStats, b: TensorStats) -> bool:
         if not (isinstance(a, DatabaseStats) and isinstance(b, DatabaseStats)):
             return False
-        return a.fill_value == b.fill_value and a.dim_sizes == b.dim_sizes
+        return (
+            a.fill_value == b.fill_value
+            and a.dim_sizes == b.dim_sizes
+            and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
+        )
 
     @staticmethod
     def relabel(
@@ -143,7 +149,7 @@ class DatabaseStats(TensorStats):
     ) -> DatabaseStats:
         new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
         if isinstance(stats, DatabaseStats):
-            V = stats.V
+            V = stats.V.copy()
             nnz = stats.nnz
         else:
             V = {}
@@ -156,7 +162,7 @@ class DatabaseStats(TensorStats):
     ) -> DatabaseStats:
         new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
         if isinstance(stats, DatabaseStats):
-            V = stats.V
+            V = stats.V.copy()
             nnz = stats.nnz
         else:
             V = {}
