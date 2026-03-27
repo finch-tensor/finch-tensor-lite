@@ -1,3 +1,6 @@
+from collections import OrderedDict
+from typing import Any
+
 from finchlite.algebra.tensor import Tensor
 from finchlite.autoschedule.galley.logical_optimizer.logic_to_stats import insert_statistics
 from finchlite.finch_logic.nodes import TableValue
@@ -68,11 +71,30 @@ class LogicExecutor(LogicEvaluator):
             stmt = prgm
         else:
             raise ValueError(f"Invalid prgm type: {type(prgm)}")
+        if not isinstance(stmt, lgc.Plan):
+            stmt = lgc.Plan((stmt,))
+
         stmt, bindings = extract_tensors(stmt, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
         actual_impl = StatsImpl or self.StatsImpl
-        stats_bindings = {var: actual_impl(T) for var, T in bindings.items()}
-        insert_statistics(StatsImpl, stmt, stats_bindings, replace=True, cache={})
+        stats_bindings = OrderedDict()
+
+        for var, T in bindings.items():
+            shape = T.shape
+            fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
+            stats_bindings[var] = actual_impl(T, fields)
+
+        cache_dict: dict[Any, TensorStats] = {}
+        for body in stmt.bodies:
+            if isinstance(body, (lgc.Query, lgc.Table, lgc.MapJoin, lgc.Aggregate, lgc.Reorder)):
+                insert_statistics(
+                        actual_impl, 
+                        body, 
+                        stats_bindings, 
+                        replace=True, 
+                        cache=cache_dict
+                    )
+            
         mod, binding_ftypes, binding_idxs = self.ctx(stmt, binding_ftypes,stats_bindings)
 
         bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))
