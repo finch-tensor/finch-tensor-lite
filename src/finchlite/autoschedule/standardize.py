@@ -33,6 +33,7 @@ from ..symbolic import (
     gensym,
 )
 from .normalize import normalize_names
+from finchlite.autoschedule.tensor_stats import TensorStats
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -317,6 +318,11 @@ class LogicStandardizer(LogicLoader):
             ctx = MockLogicLoader()
         self.ctx: LogicLoader = ctx
 
-    def __call__(self, prgm: LogicStatement, bindings: dict[Alias, TensorFType]):
+    def __call__(self, 
+                 prgm: LogicStatement, 
+                 bindings: dict[Alias, TensorFType],
+                 stats : dict[Alias, "TensorStats"] | None = None
+
+                 ):
         prgm, bindings = standardize(prgm, bindings)
         return self.ctx(prgm, bindings)

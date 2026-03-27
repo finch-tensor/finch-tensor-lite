@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import numpy as np
 
+from .numeric_stats import NumericStats
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
@@ -34,7 +35,7 @@ class DC:
     value: float
 
 
-class DCStats(TensorStats):
+class DCStats(NumericStats):
     """
     Structural statistics derived from a tensor using degree constraint (DCs).
 

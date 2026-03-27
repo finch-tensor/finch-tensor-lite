@@ -5,13 +5,14 @@ from typing import Any
 import numpy as np
 
 import finchlite as fl
+from .numeric_stats import NumericStats
 from finchlite.finch_logic import Field
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
 
-class BlockedStats(TensorStats):
+class BlockedStats(NumericStats):
     def __init__(
         self,
         blocks: np.ndarray,

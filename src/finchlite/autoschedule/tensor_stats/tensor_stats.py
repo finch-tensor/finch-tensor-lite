@@ -21,13 +21,6 @@ class TensorStats(ABC):
         """
         ...
 
-    @abstractmethod
-    def estimate_non_fill_values(arg: "TensorStats") -> float:
-        """
-        Return an estimate on the number of non-fill values.
-        """
-        ...
-
     @staticmethod
     @abstractmethod
     def mapjoin(op: Callable, *args: "TensorStats") -> "TensorStats":

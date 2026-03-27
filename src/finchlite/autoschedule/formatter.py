@@ -12,6 +12,8 @@ from ..finch_assembly import AssemblyLibrary, TupleFType
 from ..finch_logic import LogicLoader, MockLogicLoader
 from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
+from finchlite.autoschedule.tensor_stats import TensorStats
+
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -38,6 +40,7 @@ class LogicFormatter(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
+        stats : dict[lgc.Alias, "TensorStats"] | None = None
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

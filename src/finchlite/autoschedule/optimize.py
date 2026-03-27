@@ -39,6 +39,7 @@ from .standardize import (
     isolate_aggregates,
     push_fields,
 )
+from finchlite.autoschedule.tensor_stats import TensorStats
 
 
 def with_unique_lhs(
@@ -418,7 +419,7 @@ class DefaultLogicOptimizer(LogicLoader):
         self.ctx = ctx
 
     def __call__(
-        self, prgm: LogicStatement, bindings: dict[Alias, TensorFType]
+        self, prgm: LogicStatement, bindings: dict[Alias, TensorFType], stats : dict[Alias, "TensorStats"] | None = None
     ) -> tuple[
         AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
     ]:

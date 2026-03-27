@@ -1,34 +1,26 @@
 from collections.abc import Callable
 from typing import Any, Self
 
-from .numeric_stats import NumericStats
 from finchlite.finch_logic import Field
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
+class DummyStats(TensorStats):
 
-class DenseStats(NumericStats):
     @classmethod
-    def from_def(cls, d: TensorDef) -> Self:
+    def from_def(cls,d:TensorDef)->Self:
         ds = object.__new__(cls)
         ds.tensordef = d.copy()
-        return ds
+        return ds 
+    
 
     @staticmethod
     def copy_stats(stat: TensorStats) -> TensorStats:
-        """
-        Deep copy of a DenseStats object.
-        """
-        if not isinstance(stat, DenseStats):
-            raise TypeError("copy_stats expected a DenseStats instance")
-        return DenseStats.from_def(stat.tensordef.copy())
+        if not isinstance(stat, DummyStats):
+            raise TypeError("copy_stats expected a DummyStats instance")
+        return DummyStats.from_def(stat.tensordef.copy())
 
-    def estimate_non_fill_values(self) -> float:
-        total = 1.0
-        for size in self.dim_sizes.values():
-            total *= size
-        return total
 
     @staticmethod
     def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
@@ -39,10 +31,9 @@ class DenseStats(NumericStats):
         new_def = TensorDef.mapjoin(op, *def_args)
 
         if not same_axes:
-            # Additional check needed for the case when dimesions do not match
             new_def.fill_value = 0.0
 
-        return DenseStats.from_def(new_def)
+        return DummyStats.from_def(new_def)
 
     @staticmethod
     def aggregate(
@@ -50,33 +41,35 @@ class DenseStats(NumericStats):
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",
-    ) -> "DenseStats":
+    ) -> "DummyStats":
         d = stats.tensordef
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
-        return DenseStats.from_def(new_def)
+        return DummyStats.from_def(new_def)
 
     @staticmethod
     def issimilar(a: TensorStats, b: TensorStats) -> bool:
         return (
-            isinstance(a, DenseStats)
-            and isinstance(b, DenseStats)
+            isinstance(a, DummyStats)
+            and isinstance(b, DummyStats)
             and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
+            and a.tensordef.index_order == b.tensordef.index_order
         )
 
     @staticmethod
     def relabel(
         stats: "TensorStats", relabel_indices: tuple[Field, ...]
-    ) -> "DenseStats":
+    ) -> "DummyStats":
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
-        return DenseStats.from_def(new_def)
+        return DummyStats.from_def(new_def)
 
     @staticmethod
     def reorder(
         stats: "TensorStats", reorder_indices: tuple[Field, ...]
-    ) -> "DenseStats":
+    ) -> "DummyStats":
 
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
-        return DenseStats.from_def(new_def)
+        return DummyStats.from_def(new_def)
+
+

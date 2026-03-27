@@ -6,6 +6,8 @@ from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
 from finchlite.finch_logic import LogicStatement
 from finchlite.finch_logic.stages import LogicLoader
+from finchlite.autoschedule.tensor_stats import TensorStats
+
 
 from .stages import LogicEinsumLowerer
 
@@ -95,7 +97,7 @@ class LogicEinsumLoader(LogicLoader):
         self.ctx_load: EinsumLoader = ctx_load
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType], stats : dict[lgc.Alias, "TensorStats"] | None = None
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

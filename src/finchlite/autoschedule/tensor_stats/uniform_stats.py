@@ -5,13 +5,14 @@ from typing import Any, Self
 import numpy as np
 
 from finchlite.algebra.algebra import is_annihilator, is_identity
+from .numeric_stats import NumericStats
 from finchlite.finch_logic import Field
 
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
 
-class UniformStats(TensorStats):
+class UniformStats(NumericStats):
     nnz: float
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):
