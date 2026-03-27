@@ -1,4 +1,5 @@
 from .blocked_stats import BlockedStats
+from .database_stats import DatabaseStats
 from .dc_stats import DC, DCStats
 from .dense_stat import DenseStats
 from .stats_interpreter import StatsInterpreter
@@ -10,6 +11,7 @@ __all__ = [
     "DC",
     "BlockedStats",
     "DCStats",
+    "DatabaseStats",
     "DenseStats",
     "StatsInterpreter",
     "TensorDef",
