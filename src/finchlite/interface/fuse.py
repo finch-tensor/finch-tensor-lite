@@ -55,7 +55,7 @@ import threading
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.autoschedule.tensor_stats import DCStats
+from finchlite.autoschedule.tensor_stats import DenseStats
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -128,7 +128,7 @@ COMPILE_NUMBA = LogicNormalizer(
 # rather than the tensors themselves.
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DCStats,
+        DenseStats,
         LogicExecutor(
             LogicStandardizer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
