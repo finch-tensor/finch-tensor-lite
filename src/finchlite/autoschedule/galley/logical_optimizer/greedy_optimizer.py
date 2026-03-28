@@ -1,5 +1,4 @@
 from functools import reduce
-
 from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
 from finchlite.finch_logic import Field
@@ -32,8 +31,9 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
         )
         query = aq.reduce_idx(best_idx)
         queries.append(query)
-        # connected_components are recomputed in reduce_idx; stay on the same
-        # component index until it has no reducible indices left.
+        # connected_components are recomputed in reduce_idx. 
+        # Stay on the same component index until 
+        # it has no reducible indices left.
 
     remaining_q = aq.get_remaining_query()
     if remaining_q is not None:

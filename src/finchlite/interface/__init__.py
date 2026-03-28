@@ -122,7 +122,6 @@ __all__ = [
     "INTERPRET_NOTATION",
     "INTERPRET_NOTATION_GALLEY",
     "OPTIMIZE_LOGIC",
-    "INTERPRET_NOTATION_GALLEY_NO_COMPONENTS", # TESTING PIPELINE
     "EagerTensor",
     "LazyTensor",
     "NumPyFType",
