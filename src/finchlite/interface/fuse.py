@@ -137,20 +137,6 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     )
 )
 
-# TESTING PIPELINES
-# For benchmarking tests only
-INTERPRET_NOTATION_GALLEY_NO_COMPONENTS = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStats,
-        LogicExecutor(
-            LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-            )
-        ),
-        use_components=False,
-    )
-)
-
 
 def set_default_scheduler(
     *,
