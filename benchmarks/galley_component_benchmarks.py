@@ -39,7 +39,7 @@ from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.tensor_stats import DenseStats
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
-DEFAULT_N = 1
+DEFAULT_N = 5
 CHAIN_RECURSION_LIMIT = 4000
 
 # TESTING PIPELINES

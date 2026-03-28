@@ -180,7 +180,9 @@ def main() -> None:
     print("Compile benchmark: fifty terms × chain2...", flush=True)
     expr_50c2 = make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_50c2)
-    print(_format_block("Galley compile profile (fifty terms × chain2)", w, wo), flush=True)
+    print(
+        _format_block("Galley compile profile (fifty terms × chain2)", w, wo), flush=True
+    )
 
     print("Compile benchmark: three terms × chain10...", flush=True)
     expr_3c10 = make_three_chain10_expr(chain10_shapes_benchmark, rng)
@@ -193,7 +195,9 @@ def main() -> None:
     print("Compile benchmark: three terms × chain25...", flush=True)
     expr_3c25 = make_three_chain25_expr(chain25_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
-    print(_format_block("Galley compile profile (three terms × chain25)", w, wo), flush=True)
+    print(
+        _format_block("Galley compile profile (three terms × chain25)", w, wo), flush=True
+    )
 
     print("Compile benchmark: five terms × chain10...", flush=True)
     expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
