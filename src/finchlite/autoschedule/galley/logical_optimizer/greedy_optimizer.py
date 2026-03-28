@@ -20,7 +20,7 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
             )
             query = aq.reduce_idx(best_idx)
             queries.append(query)
-            # components are recomputed in reduce_idx 
+            # components are recomputed in reduce_idx
             # stay in same component until empty
     # NOT USING COMPONENTS:
     else:
