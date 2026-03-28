@@ -2,7 +2,7 @@ from functools import reduce
 
 from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
-
+from finchlite.finch_logic import Field
 
 def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[Query]:
     aq = input_aq
@@ -13,7 +13,7 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
         components = aq.connected_components
         if not use_components:
             # merges all the components into one list
-            component = reduce(lambda a, b: a + b, components, [])
+            component = reduce(lambda a, b: a + b, components, list[Field]())
         else:
             if component_idx >= len(components):
                 break
