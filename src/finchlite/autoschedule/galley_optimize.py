@@ -9,7 +9,6 @@ from collections import OrderedDict
 from typing import TypedDict
 
 from ..finch_logic import Alias, LogicEvaluator, Plan, Query
-from .tensor_stats import TensorStats
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.greedy_optimizer import greedy_query
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
@@ -17,12 +16,13 @@ from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
     preprocess_plan_for_galley,
 )
+from .tensor_stats import TensorStats
 
 
 def optimize_query(query, ST, stats_bindings, use_components: bool = True):
     """Rewrite a single logical Query via greedy reduction over reducible indices."""
     annotated_query = AnnotatedQuery(ST, query, stats_bindings)
-    return greedy_query(annotated_query,  use_components=use_components)
+    return greedy_query(annotated_query, use_components=use_components)
 
 
 def optimize_plan(plan, ST, bindings, use_components: bool = True):
@@ -44,7 +44,9 @@ def optimize_plan(plan, ST, bindings, use_components: bool = True):
     for body in plan.bodies:
         # Only put Queries through the greedy optimizer
         if isinstance(body, Query):
-            new_queries = optimize_query(body, ST, stats_bindings, use_components=use_components)
+            new_queries = optimize_query(
+                body, ST, stats_bindings, use_components=use_components
+            )
             for new_query in new_queries:
                 insert_statistics(
                     ST, new_query, stats_bindings, replace=True, cache=cache_dict
@@ -90,8 +92,8 @@ class GalleyLogicalOptimizer(LogicEvaluator):
 
         if isinstance(prgm, Plan):
             if self.verbose:
-                #print("Input plan:")
-                #print(prgm)
+                # print("Input plan:")
+                # print(prgm)
                 print("Filler")
             t0 = time.perf_counter()
             prgm = optimize_plan(

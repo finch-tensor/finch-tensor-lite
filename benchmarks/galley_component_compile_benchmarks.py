@@ -4,7 +4,7 @@ with and without components (`GalleyLogicalOptimizer` profile: optimize_plan_s,
 downstream_s).
 
 optimize_plan_s: time to optimize the plan in Galley
-downstream_s: time to execute the plan in the downstream pipeline (e.g remaider of the pipeline)
+downstream_s: time in the downstream pipeline after optimize (e.g. rest of compile)
 Does not take into account time to make a plan before optimize is called.
 
 Uses the same expressions and ordering as galley_component_benchmarks.main().
@@ -17,25 +17,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from finchlite.autoschedule import (
-    DefaultLogicFormatter,
-    LogicExecutor,
-    LogicNormalizer,
-    LogicStandardizer,
-)
-from finchlite.autoschedule.compiler import LogicCompiler
-from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer, GalleyProfileTimes
-from finchlite.autoschedule.tensor_stats import DenseStats
-from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
-from finchlite.finch_notation.interpreter import NotationInterpreter
-from finchlite.symbolic import gensym
-
 from galley_component_benchmarks import (
     CHAIN_RECURSION_LIMIT,
     DEFAULT_N,
     _recursion_limit_ctx,
-    chain10_shapes_benchmark,
     chain2_shapes_benchmark,
+    chain10_shapes_benchmark,
     chain25_shapes_benchmark,
     make_chain10_expr,
     make_chain25_expr,
@@ -46,6 +33,22 @@ from galley_component_benchmarks import (
     make_three_chain25_expr,
     make_three_matmul_pairs_expr,
 )
+
+from finchlite.autoschedule import (
+    DefaultLogicFormatter,
+    LogicExecutor,
+    LogicNormalizer,
+    LogicStandardizer,
+)
+from finchlite.autoschedule.compiler import LogicCompiler
+from finchlite.autoschedule.galley_optimize import (
+    GalleyLogicalOptimizer,
+    GalleyProfileTimes,
+)
+from finchlite.autoschedule.tensor_stats import DenseStats
+from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finchlite.finch_notation.interpreter import NotationInterpreter
+from finchlite.symbolic import gensym
 
 GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(
     GalleyLogicalOptimizer(
@@ -82,9 +85,7 @@ def plan_from_expr(arg):
         map(
             lambda a, var: Query(
                 var,
-                Table(
-                    a.data, tuple(Field(gensym("i")) for _ in range(len(a.shape)))
-                ),
+                Table(a.data, tuple(Field(gensym("i")) for _ in range(len(a.shape)))),
             ),
             args,
             vars_,
@@ -102,7 +103,7 @@ def time_compile_profile(
     """
     Average `optimize_plan_s` and `downstream_s` per iteration for pipelines
     with and without Galley components.
-    
+
     t is the structure that holds optimize_plan_s and downstream_s
     """
     with _recursion_limit_ctx(recursion_limit):
@@ -133,7 +134,9 @@ def time_compile_profile(
     return with_times, without_times
 
 
-def _format_block(title: str, with_t: GalleyProfileTimes, without_t: GalleyProfileTimes) -> str:
+def _format_block(
+    title: str, with_t: GalleyProfileTimes, without_t: GalleyProfileTimes
+) -> str:
     lines = [
         "",
         "=" * 60,
@@ -155,64 +158,49 @@ def _format_block(title: str, with_t: GalleyProfileTimes, without_t: GalleyProfi
 
 def main() -> None:
     rng = np.random.default_rng(42)
-    blocks: list[str] = []
 
-    progress = "Compile benchmark: sum+sum matmul..."
+    print("Compile benchmark: sum+sum matmul...", flush=True)
     expr_sum = make_sum_sum_benchmark_expr()
     w, wo = time_compile_profile(expr_sum)
-    blocks.append(progress + "\n" + _format_block("Galley compile profile (sum+sum matmul)", w, wo))
+    print(_format_block("Galley compile profile (sum+sum matmul)", w, wo), flush=True)
 
-    progress = "Compile benchmark: chain10..."
+    print("Compile benchmark: chain10...", flush=True)
     expr_c10 = make_chain10_expr(chain10_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_c10)
-    blocks.append(progress + "\n" + _format_block("Galley compile profile (chain10)", w, wo))
+    print(_format_block("Galley compile profile (chain10)", w, wo), flush=True)
 
-    progress = "Compile benchmark: three summed matmul pairs..."
+    print("Compile benchmark: three summed matmul pairs...", flush=True)
     expr_3p = make_three_matmul_pairs_expr()
     w, wo = time_compile_profile(expr_3p)
-    blocks.append(
-        progress + "\n" + _format_block("Galley compile profile (three matmul pairs)", w, wo)
-    )
+    print(_format_block("Galley compile profile (three matmul pairs)", w, wo), flush=True)
 
-    progress = "Compile benchmark: fifty terms × chain2..."
+    print("Compile benchmark: fifty terms × chain2...", flush=True)
     expr_50c2 = make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_50c2)
-    blocks.append(
-        progress + "\n" + _format_block("Galley compile profile (fifty terms × chain2)", w, wo)
-    )
+    print(_format_block("Galley compile profile (fifty terms × chain2)", w, wo), flush=True)
 
-    progress = "Compile benchmark: three terms × chain10..."
+    print("Compile benchmark: three terms × chain10...", flush=True)
     expr_3c10 = make_three_chain10_expr(chain10_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_3c10)
-    blocks.append(
-        progress + "\n" + _format_block("Galley compile profile (three terms × chain10)", w, wo)
-    )
+    print(_format_block("Galley compile profile (three terms × chain10)", w, wo), flush=True)
 
-    progress = "Compile benchmark: three terms × chain25..."
+    print("Compile benchmark: three terms × chain25...", flush=True)
     expr_3c25 = make_three_chain25_expr(chain25_shapes_benchmark, rng)
-    w, wo = time_compile_profile(
-        expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT
-    )
-    blocks.append(
-        progress + "\n" + _format_block("Galley compile profile (three terms × chain25)", w, wo)
-    )
+    w, wo = time_compile_profile(expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
+    print(_format_block("Galley compile profile (three terms × chain25)", w, wo), flush=True)
 
-    progress = "Compile benchmark: five terms × chain10..."
+    print("Compile benchmark: five terms × chain10...", flush=True)
     expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_5c10)
-    blocks.append(
-        progress + "\n" + _format_block("Galley compile profile (five terms × chain10)", w, wo)
-    )
+    print(_format_block("Galley compile profile (five terms × chain10)", w, wo), flush=True)
 
-    progress = "Compile benchmark: chain25..."
+    print("Compile benchmark: chain25...", flush=True)
     expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
     w, wo = time_compile_profile(expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT)
-    blocks.append(progress + "\n" + _format_block("Galley compile profile (chain25)", w, wo))
+    print(_format_block("Galley compile profile (chain25)", w, wo), flush=True)
 
-    for block in blocks:
-        print(block)
-    print("")
-    print("Done.")
+    print("", flush=True)
+    print("Done.", flush=True)
 
 
 if __name__ == "__main__":

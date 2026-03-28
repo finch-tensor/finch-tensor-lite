@@ -42,7 +42,7 @@ from finchlite.finch_notation.interpreter import NotationInterpreter
 DEFAULT_N = 1
 CHAIN_RECURSION_LIMIT = 4000
 
-# TESTING PIPELINES 
+# TESTING PIPELINES
 INTERPRET_NOTATION_GALLEY_NO_COMPONENTS = LogicNormalizer(
     GalleyLogicalOptimizer(
         DenseStats,
@@ -94,7 +94,7 @@ def time_frontend_compute(
 
 
 def make_chain10_expr(shape_fn, rng=None):
-    """Build expr = (A@B@...@Z) + (A1@B1@...@Z1): 2 terms, each a 10-way matmul chain."""
+    """Two terms: each is a 10-way matmul chain (A@B@...@Z) + (A1@B1@...@Z1)."""
     if rng is None:
         rng = np.random.default_rng(42)
     chain0 = shape_fn(0, rng)
@@ -109,6 +109,7 @@ def make_chain10_expr(shape_fn, rng=None):
     )
     return term0 + term1
 
+
 def make_three_matmul_pairs_expr():
     """Three summed matmul pairs: A@B + C@D + E@F (20×10 @ 10×8 → 20×8)."""
     A = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float))
@@ -122,22 +123,21 @@ def make_three_matmul_pairs_expr():
         + fl_interface.lazy(C) @ fl_interface.lazy(D)
         + fl_interface.lazy(E) @ fl_interface.lazy(F)
     )
-    
+
+
 def make_fifty_matmul_pairs_expr():
     """Fifty summed matmul pairs distinct data per pair."""
     terms: list = []
     for k in range(50):
         off = float(k * 1_000)
-        A = fl_interface.asarray(
-            (np.arange(20 * 10).reshape(20, 10).astype(float) + off)
-        )
-        B = fl_interface.asarray(
-            (np.arange(10 * 8).reshape(10, 8).astype(float) + off)
-        )
+        A = fl_interface.asarray(np.arange(20 * 10).reshape(20, 10).astype(float) + off)
+        B = fl_interface.asarray(np.arange(10 * 8).reshape(10, 8).astype(float) + off)
         terms.append(fl_interface.lazy(A) @ fl_interface.lazy(B))
     return reduce(lambda a, b: a + b, terms)
 
+
 # 2 Chain, 50 terms
+
 
 def chain2_shapes_small(i, rng):
     """Two matrices per term: (4,5)@(5,8) -> (4,8)."""
@@ -173,7 +173,7 @@ def make_fifty_chain2_terms_expr(shape_fn, rng=None):
 
 
 def make_three_chain10_expr(shape_fn, rng=None):
-    """Build expr = chain10_0 + chain10_1 + chain10_2 (3 terms, each a 10-way matmul chain)."""
+    """Three summed chain10 terms: chain10_0 + chain10_1 + chain10_2."""
     if rng is None:
         rng = np.random.default_rng(42)
 
@@ -187,9 +187,10 @@ def make_three_chain10_expr(shape_fn, rng=None):
         terms.append(term)
 
     return terms[0] + terms[1] + terms[2]
+
 
 def make_three_chain25_expr(shape_fn, rng=None):
-    """Build expr = chain25_0 + chain25_1 + chain25_2 (3 terms, each a 25-way matmul chain)."""
+    """Three summed chain25 terms: chain25_0 + chain25_1 + chain25_2."""
     if rng is None:
         rng = np.random.default_rng(42)
     terms = []
@@ -202,8 +203,9 @@ def make_three_chain25_expr(shape_fn, rng=None):
         terms.append(term)
     return terms[0] + terms[1] + terms[2]
 
+
 def make_five_chain10_expr(shape_fn, rng=None):
-    """Build expr = chain10_0 + chain10_1 + ... + chain10_4 (5 terms, each a 10-way matmul chain)."""
+    """Five summed chain10 terms: chain10_0 through chain10_4."""
     if rng is None:
         rng = np.random.default_rng(42)
 
@@ -219,6 +221,7 @@ def make_five_chain10_expr(shape_fn, rng=None):
     # Force a strictly binary + tree at the Python level.
     # (May still get flattened by later lowering, but this minimizes n-ary + creation.)
     return terms[0] + terms[1] + terms[2] + terms[3] + terms[4]
+
 
 def chain10_shapes_small(i, rng):
     """10 matrices: (4,5)@(5,6)@...@(13,8) -> (4,8)."""
@@ -277,8 +280,9 @@ def chain25_shapes_small(i, rng):
     mats = [
         fl_interface.asarray(r.standard_normal((4, 5)).astype(float)),
     ]
-    for _ in range(23):
-        mats.append(fl_interface.asarray(r.standard_normal((5, 5)).astype(float)))
+    mats.extend(
+        fl_interface.asarray(r.standard_normal((5, 5)).astype(float)) for _ in range(23)
+    )
     mats.append(fl_interface.asarray(r.standard_normal((5, 8)).astype(float)))
     return tuple(mats)
 
@@ -287,8 +291,7 @@ def chain25_shapes_benchmark(i, rng):
     """25 matrices for benchmarks: (8,8) throughout -> (8,8)."""
     r = np.random.Generator(np.random.PCG64(42 + i * 1000))
     return tuple(
-        fl_interface.asarray(r.standard_normal((8, 8)).astype(float))
-        for _ in range(25)
+        fl_interface.asarray(r.standard_normal((8, 8)).astype(float)) for _ in range(25)
     )
 
 
@@ -298,15 +301,12 @@ def make_sum_sum_benchmark_expr():
     B = fl_interface.asarray(np.arange(50 * 20).reshape(50, 20).astype(float))
     C = fl_interface.asarray(np.arange(100 * 50).reshape(100, 50).astype(float))
     D = fl_interface.asarray(np.arange(50 * 20).reshape(50, 20).astype(float))
-    return (
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=1)
-        + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1)
-    )
+    return fl_interface.sum(
+        fl_interface.lazy(A) @ fl_interface.lazy(B), axis=1
+    ) + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1)
 
 
 def main() -> None:
-    lines: list[str] = []
-
     print("Frontend benchmark: sum+sum matmul...")
     expr_sum = make_sum_sum_benchmark_expr()
     _, _ = time_frontend_compute(expr_sum)
@@ -331,7 +331,7 @@ def main() -> None:
     print(f"  With components:   {components_with:.4f}s")
     print(f"  Without components: {components_without:.4f}s")
     print("=" * 60)
-    
+
     print("Frontend benchmark: three summed matmul pairs...")
     expr_3p = make_three_matmul_pairs_expr()
     _, _ = time_frontend_compute(expr_3p)
@@ -342,7 +342,7 @@ def main() -> None:
     print(f"  With components:   {components_with:.4f}s")
     print(f"  Without components: {components_without:.4f}s")
     print("=" * 60)
-    
+
     # ERROR HERE:
     # 2 chain, 50 terms
     print("Frontend benchmark: fifty terms × chain2...")
@@ -355,7 +355,7 @@ def main() -> None:
     print(f"  With components:   {components_with:.4f}s")
     print(f"  Without components: {components_without:.4f}s")
     print("=" * 60)
-    
+
     # 10 chain, 3 terms
     print("Frontend benchmark: three terms × chain10...")
     expr_3c10 = make_three_chain10_expr(chain10_shapes_benchmark, rng)
@@ -367,11 +367,10 @@ def main() -> None:
     print(f"  With components:   {components_with:.4f}s")
     print(f"  Without components: {components_without:.4f}s")
     print("=" * 60)
-    
+
     print("Frontend benchmark: three terms × chain25...")
     expr_3c25 = make_three_chain25_expr(chain25_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(
-        expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
+    _, _ = time_frontend_compute(expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
     components_with, components_without = time_frontend_compute(
         expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT
     )
@@ -381,7 +380,7 @@ def main() -> None:
     print(f"  With components:   {components_with:.4f}s")
     print(f"  Without components: {components_without:.4f}s")
     print("=" * 60)
-    
+
     print("Frontend benchmark: five terms × chain10...")
     expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
     _, _ = time_frontend_compute(expr_5c10)
@@ -395,9 +394,7 @@ def main() -> None:
 
     print("Frontend benchmark: chain25...")
     expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
-    _,_ = time_frontend_compute(
-        expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT
-    )
+    _, _ = time_frontend_compute(expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT)
     components_with, components_without = time_frontend_compute(
         expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT
     )
