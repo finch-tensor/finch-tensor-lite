@@ -1,39 +1,36 @@
 from functools import reduce
-from ....finch_logic import Query
+
+from ....finch_logic import Field, Query
 from .annotated_query import AnnotatedQuery
-from finchlite.finch_logic import Field
+
 
 def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[Query]:
     aq = input_aq
     queries: list[Query] = []
 
-    component_idx = 0
-    while True:
-        components = aq.connected_components
+    # Usign branch and bound compoent code to avoid indexes
+    while aq.get_reducible_idxs():
         if not use_components:
-            # merges all the components into one list
-            component = reduce(lambda a, b: a + b, components, list[Field]())
+            component = reduce(
+                lambda a, b: a + b, aq.connected_components, list[Field]()
+            )
+            reducible_idxs = aq.get_reducible_idxs_for_component(component)
+            if not reducible_idxs:
+                break
         else:
-            if component_idx >= len(components):
+            if not aq.connected_components:
                 break
-            component = components[component_idx]
-
-        reducible_idxs = aq.get_reducible_idxs_for_component(component)
-        if not reducible_idxs:
-            if use_components:
-                component_idx += 1
-            else:
-                break
-            continue
+            component = aq.connected_components[0]
+            reducible_idxs = aq.get_reducible_idxs_for_component(component)
+            if not reducible_idxs:
+                aq.connected_components = aq.connected_components[1:]
+                continue
 
         best_idx = min(
             reducible_idxs, key=lambda idx: aq.get_cost_of_reduce_idx(idx)
         )
         query = aq.reduce_idx(best_idx)
         queries.append(query)
-        # connected_components are recomputed in reduce_idx. 
-        # Stay on the same component index until 
-        # it has no reducible indices left.
 
     remaining_q = aq.get_remaining_query()
     if remaining_q is not None:
