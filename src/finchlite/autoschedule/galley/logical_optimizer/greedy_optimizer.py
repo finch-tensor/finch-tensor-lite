@@ -15,16 +15,9 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
                 lambda a, b: a + b, aq.connected_components, list[Field]()
             )
             reducible_idxs = aq.get_reducible_idxs_for_component(component)
-            if not reducible_idxs:
-                break
         else:
-            if not aq.connected_components:
-                break
             component = aq.connected_components[0]
             reducible_idxs = aq.get_reducible_idxs_for_component(component)
-            if not reducible_idxs:
-                aq.connected_components = aq.connected_components[1:]
-                continue
 
         best_idx = min(
             reducible_idxs, key=lambda idx: aq.get_cost_of_reduce_idx(idx)
