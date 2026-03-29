@@ -11,6 +11,7 @@ from .nodes import (
     FusedStatement,
     FusedTree,
     If,
+    Literal,
     Module,
     Return,
     While,
@@ -131,8 +132,9 @@ class FusedCFGBuilder:
             case Block(bodies):
                 for body in bodies:
                     self(body, break_block, return_block)
-            case If(_, body, else_body):
+            case If(cond, body, else_body):
                 before_block = self.current_block
+                self.emit(cond)
 
                 # create blocks for if, else, and after
                 if_block = self.cfg.new_block()
@@ -155,8 +157,9 @@ class FusedCFGBuilder:
 
                 # continue building after the if-else
                 self.current_block = after_block
-            case While(_, body):
+            case While(cond, body):
                 before_block = self.current_block
+                self.emit(cond)
 
                 # create blocks for the loop body and the code after the loop
                 body_block = self.cfg.new_block()
@@ -174,8 +177,10 @@ class FusedCFGBuilder:
                 self.current_block.add_successor(body_block)
                 self.current_block.add_successor(after_block)
                 self.current_block = after_block
-            case For(_, _, body):
+            case For(iter_var, iter, body):
                 before_block = self.current_block
+                self.emit(Assign(iter_var, Literal(None))) # initialize loop variable
+                self.emit(iter)
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
 

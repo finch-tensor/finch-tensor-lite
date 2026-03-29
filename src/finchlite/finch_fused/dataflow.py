@@ -26,12 +26,11 @@ class LivenessAnalysis(DataFlowAnalysis):
         def _var_gatherer(node: FusedNode) -> FusedNode:
             match node:
                 case Variable() as var:
-                    var_set.add(var.name)
+                    var_set.add(var)
                     return node
                 case node:
                     return node
         Rewrite(PostWalk(_var_gatherer))(stmt)
-        print("Variables in statement:", stmt,  var_set)
         return var_set
 
     def stmt_str(self, stmt: FusedNode) -> str:
@@ -47,13 +46,20 @@ class LivenessAnalysis(DataFlowAnalysis):
         # liveness
         new_state = state.copy()
         for stmt in reversed(stmts):
-            if isinstance(stmt, Assign) and stmt.lhs in new_state:
-                del new_state[stmt.lhs]
-                for var in self.get_variables_in_stmt(stmt.rhs):
-                    new_state[var] = True
-            else:
-                for var in self.get_variables_in_stmt(stmt):
-                    new_state[var] = True
+            match stmt:
+                case NumberedStatement(Assign(lhs, rhs), sid):
+                    if lhs in new_state:
+                        del new_state[lhs]
+                    for var in self.get_variables_in_stmt(rhs):
+                        new_state[var] = True
+                case Assign(lhs, rhs):
+                    if lhs in new_state:
+                        del new_state[lhs]
+                    for var in self.get_variables_in_stmt(rhs):
+                        new_state[var] = True
+                case stmt:
+                    for var in self.get_variables_in_stmt(stmt):
+                        new_state[var] = True
         return new_state
 
     def join(self, state_1: dict, state_2: dict) -> dict:

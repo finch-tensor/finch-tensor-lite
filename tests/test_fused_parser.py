@@ -208,8 +208,11 @@ def test_liveness_analysis():
     # We won't assert on the exact liveness sets here, but we can at least check
     # that the analysis produces some output and that it includes expected variables.
     for block in cfg.blocks.values():
-        live_vars = liveness.input_states[block.id]
-        print(f"Block {block} live variables: {live_vars}")
+        input_live_vars = liveness.input_states[block.id]
+        output_live_vars = liveness.output_states[block.id]
+        print(f"Block {block}")
+        print(f"input live variables: {input_live_vars}")
+        print(f"output live variables: {output_live_vars}")
 
 
 def test_lazy_and_compute_insertion():
