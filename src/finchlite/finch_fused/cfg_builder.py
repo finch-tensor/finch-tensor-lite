@@ -9,6 +9,7 @@ from .nodes import (
     Function,
     FusedNode,
     FusedStatement,
+    FusedTree,
     If,
     Module,
     Return,
@@ -17,7 +18,7 @@ from .nodes import (
 
 
 @dataclass(eq=True, frozen=True)
-class NumberedStatement(FusedStatement):
+class NumberedStatement(FusedTree, FusedStatement):
     """
     Wrapper for AssemblyStatement that assigns a unique id to each statement
     for easier tracking in the CFG.
@@ -32,6 +33,10 @@ class NumberedStatement(FusedStatement):
 
     def __str__(self) -> str:
         return str(self.stmt)
+
+    @property
+    def children(self):
+        return (self.stmt, self.sid)
 
 
 def fused_desugar(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
