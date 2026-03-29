@@ -270,6 +270,13 @@ class AnnotatedQuery:
             idx for idx in self.reduce_idxs if len(self.parent_idxs.get(idx, [])) == 0
         ]
 
+    def get_reducible_idxs_for_component(
+        self, component: list[Field]
+    ) -> list[Field]:
+        """Reducible indices that belong to ``component``."""
+        comp_set = set(component)
+        return [idx for idx in self.get_reducible_idxs() if idx in comp_set]
+
     @staticmethod
     def get_idx_connected_components(
         parent_idxs: Mapping[Field, Iterable[Field]],

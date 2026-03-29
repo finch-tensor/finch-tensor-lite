@@ -125,12 +125,16 @@ def branch_and_bound(
     # --- Return result if we found a full order for the component ---
     component_set = frozenset(component)
     if component_set in optimal_orders:
-        return (optimal_orders[component_set], optimal_subquery_costs)
-    else:
-        # No complete order; debug output
         print(f"Component: {component}")
         print(f"Optimal Orders: {list(optimal_orders.keys())}")
         print(f"Reducible Idxs: {input_aq.get_reducible_idxs()}")
+        return (optimal_orders[component_set], optimal_subquery_costs)
+    else:
+        # No complete order; debug output
+        # TODO: rasie error
+        #print(f"Component: {component}")
+        #print(f"Optimal Orders: {list(optimal_orders.keys())}")
+        #print(f"Reducible Idxs: {input_aq.get_reducible_idxs()}")
         return None
 
 
@@ -152,10 +156,10 @@ def pruned_query_to_plan(
     # same as julia code
     while cur_aq.get_reducible_idxs():
         component = cur_aq.connected_components[0]
-        reducible_in_comp = cur_aq.get_reducible_idxs_for_component(component)
-        if not reducible_in_comp:
-            cur_aq.connected_components = cur_aq.connected_components[1:]
-            continue
+        #reducible_in_comp = cur_aq.get_reducible_idxs_for_component(component)
+        #if not reducible_in_comp:
+        #    cur_aq.connected_components = cur_aq.connected_components[1:]
+        #    continue
 
         # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
         greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())

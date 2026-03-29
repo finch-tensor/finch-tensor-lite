@@ -75,3 +75,5 @@ def test_branch_and_bound_beats_greedy_on_four_index_chain():
     assert exact_cost < greedy_cost, (
         f"Expected exact ({exact_cost}) < greedy ({greedy_cost})"
     )
+    
+print(test_branch_and_bound_beats_greedy_on_four_index_chain())
