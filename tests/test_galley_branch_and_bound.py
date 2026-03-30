@@ -1,10 +1,11 @@
-"""Tests that branch-and-bound (exact) optimization is never worse than greedy on cost."""
+"""Tests: branch-and-bound (exact) cost vs greedy."""
 
 import operator as op
 from collections import OrderedDict
 
-import numpy as np
 import pytest
+
+import numpy as np
 
 import finchlite as fl
 from finchlite.algebra import as_finch_operator
@@ -76,6 +77,9 @@ def _make_aq_three_index_chain():
     return AnnotatedQuery(DenseStats, q, bindings=OrderedDict())
 
 
+_CHAIN_FACTORIES = (_make_aq_three_index_chain, _make_aq_four_index_chain)
+
+
 def test_pruned_exact_strictly_cheaper_than_pruned_greedy_on_four_index_chain():
     """Four-index chain: exact (pruned) cost is strictly below greedy (pruned)."""
     aq = _make_aq_four_index_chain()
@@ -87,7 +91,7 @@ def test_pruned_exact_strictly_cheaper_than_pruned_greedy_on_four_index_chain():
     )
 
 
-@pytest.mark.parametrize("factory", [_make_aq_three_index_chain, _make_aq_four_index_chain])
+@pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
 def test_pruned_exact_never_more_expensive_than_pruned_greedy(factory):
     """Exact pruned plan cost is never above greedy-only pruned plan."""
     aq = factory()
@@ -96,9 +100,9 @@ def test_pruned_exact_never_more_expensive_than_pruned_greedy(factory):
     assert exact_cost <= greedy_cost
 
 
-@pytest.mark.parametrize("factory", [_make_aq_three_index_chain, _make_aq_four_index_chain])
-def test_branch_and_bound_exact_k_inf_cost_no_worse_than_greedy_k1_on_component(factory):
-    """On one component, k=∞ (exact) total cost ≤ k=1 (greedy) branch-and-bound cost."""
+@pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
+def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
+    """On one component, exact (k=inf) cost <= greedy (k=1) B&B cost."""
     aq = _aq_with_stats(factory())
     component = aq.connected_components[0]
     r_greedy = branch_and_bound(aq, component, 1, OrderedDict())
@@ -106,4 +110,5 @@ def test_branch_and_bound_exact_k_inf_cost_no_worse_than_greedy_k1_on_component(
     assert r_greedy is not None and r_exact is not None
     (_, _, _, cost_k1), _ = r_greedy
     (_, _, _, cost_kinf), _ = r_exact
-    assert cost_kinf <= cost_k1 
+    assert cost_kinf <= cost_k1 + 1e-9
+

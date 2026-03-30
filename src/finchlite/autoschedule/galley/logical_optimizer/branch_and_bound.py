@@ -37,7 +37,7 @@ def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
 def branch_and_bound(
     input_aq: AnnotatedQuery,
     component: list,
-    k: int | float,
+    k: float,
     max_subquery_costs: OrderedDict,
 ) -> tuple | None:
     """
@@ -90,7 +90,13 @@ def branch_and_bound(
                 )
                 # Keep this candidate only if it is at least as good as cheapest
                 if total_cost <= cheapest_cost:
-                    best_idx_ext[new_vars] = (aq, idx, old_order, old_queries, total_cost)
+                    best_idx_ext[new_vars] = (
+                        aq,
+                        idx,
+                        old_order,
+                        old_queries,
+                        total_cost,
+                    )
 
         if len(best_idx_ext) == 0:
             break
@@ -156,16 +162,20 @@ def pruned_query_to_plan(
     # same as julia code
     while cur_aq.get_reducible_idxs():
         component = cur_aq.connected_components[0]
-        #reducible_in_comp = cur_aq.get_reducible_idxs_for_component(component)
-        #if not reducible_in_comp:
-        #    cur_aq.connected_components = cur_aq.connected_components[1:]
-        #    continue
 
         # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
         greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
         if greedy_result is None:
             break
-        (greedy_order, greedy_queries, greedy_aq, greedy_cost), greedy_subquery_costs = greedy_result
+        (
+            (
+                greedy_order,
+                greedy_queries,
+                greedy_aq,
+                greedy_cost,
+            ),
+            greedy_subquery_costs,
+        ) = greedy_result
 
         # --- Large components or use_greedy: use greedy order directly ---
         if len(component) >= 10 or use_greedy:
