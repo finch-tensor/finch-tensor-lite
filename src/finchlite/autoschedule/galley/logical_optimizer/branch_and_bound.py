@@ -23,6 +23,14 @@ def _aq_with_stats(aq: AnnotatedQuery) -> AnnotatedQuery:
     return c
 
 
+def _reducible_idxs_for_component(
+    aq: AnnotatedQuery,
+    component: list,
+) -> list:
+    """Make sure it is a list, precommit throws error."""
+    return [idx for idx in aq.get_reducible_idxs() if idx in comp_set]
+
+
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
     """
     Return (cost, reduced_vars) for reducing idx in aq.
@@ -62,9 +70,7 @@ def branch_and_bound(
         # --- Extend each current state by trying every possible next reduction ---
         for vars_key, pc in prev_new_optimal_orders.items():
             old_order, old_queries, aq, prev_cost = pc
-            reducible_in_comp = [
-                idx for idx in aq.get_reducible_idxs_for_component(component)
-            ]
+            reducible_in_comp = _reducible_idxs_for_component(aq, component)
             for idx in reducible_in_comp:
                 # Cost of this reduction and which vars it eliminates
                 cost, reduced_vars = _cost_of_reduce(idx, aq)
