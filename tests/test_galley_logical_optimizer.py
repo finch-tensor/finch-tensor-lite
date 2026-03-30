@@ -1036,14 +1036,18 @@ def test_greedy_query_multi_component():
     aq.output_name = Alias("out")
     aq.reduce_idxs = [fi, fj]
     aq.point_expr = point_expr
-    aq.idx_lowest_root = OrderedDict({
-        fi: Table(Literal(A), (fi,)),
-        fj: Table(Literal(B), (fj,)),
-    })
-    aq.idx_op = OrderedDict({
-        fi: as_finch_operator(op.add),
-        fj: as_finch_operator(op.add),
-    })
+    aq.idx_lowest_root = OrderedDict(
+        {
+            fi: Table(Literal(A), (fi,)),
+            fj: Table(Literal(B), (fj,)),
+        }
+    )
+    aq.idx_op = OrderedDict(
+        {
+            fi: as_finch_operator(op.add),
+            fj: as_finch_operator(op.add),
+        }
+    )
     aq.idx_init = OrderedDict({fi: 0, fj: 0})
     aq.parent_idxs = OrderedDict({fi: [], fj: []})
     aq.original_idx = OrderedDict({fi: fi, fj: fj})

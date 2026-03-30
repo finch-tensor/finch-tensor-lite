@@ -17,7 +17,7 @@ from ....finch_logic import (
     Reorder,
     Table,
 )
-from ....symbolic import Chain, Fixpoint, PreWalk, PostWalk, Rewrite, gensym
+from ....symbolic import Chain, Fixpoint, PostWalk, PreWalk, Rewrite, gensym
 
 """
 Query merging and reorder normalization for Galley.

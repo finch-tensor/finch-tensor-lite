@@ -182,7 +182,7 @@ def main() -> None:
     w, wo = time_compile_profile(expr_50c2)
     print(
         _format_block("Galley compile profile (fifty terms × chain2)", w, wo),
-        flush=True
+        flush=True,
     )
 
     print("Compile benchmark: three terms × chain10...", flush=True)
@@ -198,7 +198,7 @@ def main() -> None:
     w, wo = time_compile_profile(expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
     print(
         _format_block("Galley compile profile (three terms × chain25)", w, wo),
-        flush=True
+        flush=True,
     )
 
     print("Compile benchmark: five terms × chain10...", flush=True)
