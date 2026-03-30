@@ -109,9 +109,10 @@ def branch_and_bound(
             break
 
         # --- Keep only top-k by cost (greedy k=1 keeps single best per state) ---
-        num_to_keep = min(k, len(best_idx_ext))
         if k == float("inf"):
             num_to_keep = len(best_idx_ext)
+        else:
+            num_to_keep = int(min(k, len(best_idx_ext)))
 
         sorted_items = sorted(best_idx_ext.items(), key=lambda x: x[1][4])
         top_k_idx_ext = OrderedDict(sorted_items[:num_to_keep])
