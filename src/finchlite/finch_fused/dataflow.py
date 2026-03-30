@@ -84,6 +84,9 @@ def _get_stmt_bounds(stmts : list[FusedNode]) -> tuple[int, int]:
 def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
+            case NumberedStatement(Return(ret_vars), sid) if sid == compute_sid:
+                computes = tuple(Assign(var, Call(Literal(compute), (var,))) for var in ret_vars)
+                return Block(computes + (node,))
             case NumberedStatement(stmt, sid) if sid == compute_sid:
                 computes = tuple(Assign(var, Call(Literal(compute), (var,))) for var in vars)
                 match stmt:
@@ -98,10 +101,10 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> Fused
     return Rewrite(PostWalk(_visitor))(prgm)
 
 
-def _insert_lazy(prgm: FusedNode, compute_sid, vars: list[Variable]) -> FusedNode:
+def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: list[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
-            case NumberedStatement(stmt, sid) if sid == compute_sid:
+            case NumberedStatement(stmt, sid) if sid == lazy_sid and not isinstance(stmt, (Return, Break)):
                 lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
                 return Block(lazies + (stmt, ))
             case node:
