@@ -370,5 +370,5 @@ class FusedPrinterContext(Context):
                         self.exec("")
                     self(fn)
                 return None
-            case _:
-                raise ValueError(f"Unknown expression type: {type(prgm)}")
+            case prgm:
+                self.exec(f"{self.feed}{str(prgm)}")

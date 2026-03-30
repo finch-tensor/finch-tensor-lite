@@ -91,11 +91,11 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> Fused
                 computes = tuple(Assign(var, Call(Literal(compute), (var,))) for var in vars)
                 match stmt:
                     case Return():
-                        return Block(computes + (stmt,))
+                        return Block(computes + (node,))
                     case Break():
-                        return Block(computes + (stmt,))
+                        return Block(computes + (node,))
                     case stmt:
-                        return Block((stmt,) + computes)
+                        return Block((node,) + computes)
             case node:
                 return node
     return Rewrite(PostWalk(_visitor))(prgm)
@@ -106,7 +106,7 @@ def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: list[Variable]) -> FusedN
         match node:
             case NumberedStatement(stmt, sid) if sid == lazy_sid and not isinstance(stmt, (Return, Break)):
                 lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
-                return Block(lazies + (stmt, ))
+                return Block(lazies + (node, ))
             case node:
                 return node
     return Rewrite(PostWalk(_visitor))(prgm)
@@ -127,11 +127,11 @@ def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     print("Liveness analysis results:")
     print(liveness)
     for block in cfg.blocks.values():
-        live_inputs = liveness.input_states[block.id]
-        live_outputs = liveness.output_states[block.id]
+        live_outputs = liveness.input_states[block.id]
+        live_inputs = liveness.output_states[block.id]
         min_id, max_id = _get_stmt_bounds(block.statements)
-        print("insert lazy for live inputs", live_outputs, " at block", block, "with min stmt id", min_id)
-        print("insert compute for live outputs", live_inputs, " at block", block, "with max stmt id", max_id)
-        numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_outputs)    
-        numbered_prgm = _insert_compute(numbered_prgm, max_id, live_inputs)
+        print("insert lazy for live inputs", live_inputs, " at block", block, "with min stmt id", min_id)
+        print("insert compute for live outputs", live_outputs, " at block", block, "with max stmt id", max_id)
+        numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)    
+        numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs)
     return Rewrite(PostWalk(_unwrap_numbered_stmt))(numbered_prgm)
