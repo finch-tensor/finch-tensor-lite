@@ -19,9 +19,7 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
             component = aq.connected_components[0]
             reducible_idxs = aq.get_reducible_idxs_for_component(component)
 
-        best_idx = min(
-            reducible_idxs, key=lambda idx: aq.get_cost_of_reduce_idx(idx)
-        )
+        best_idx = min(reducible_idxs, key=lambda idx: aq.get_cost_of_reduce_idx(idx))
         query = aq.reduce_idx(best_idx)
         queries.append(query)
 
