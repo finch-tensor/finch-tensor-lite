@@ -1,19 +1,18 @@
-"""Tests comparing branch_and_bound with greedy: case where exact beats greedy."""
+"""Tests that branch-and-bound (exact) optimization is never worse than greedy on cost."""
 
 import operator as op
 from collections import OrderedDict
 
 import numpy as np
+import pytest
 
 import finchlite as fl
 from finchlite.algebra import as_finch_operator
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
-    pruned_query_to_plan,
     _aq_with_stats,
-)
-from finchlite.autoschedule.galley.logical_optimizer.greedy_optimizer import (
-    greedy_query,
+    branch_and_bound,
+    pruned_query_to_plan,
 )
 from finchlite.autoschedule.tensor_stats import DenseStats
 from finchlite.finch_logic import (
@@ -31,7 +30,7 @@ def _make_aq_four_index_chain():
     """
     AnnotatedQuery for sum_{i,j,k,l} A[i,j]*B[j,k]*C[k,l].
     Chain with 4 indices. Dims: A 3x10, B 10x5, C 5x2.
-    Exact search finds a cheaper order than greedy.
+    Exact search can find a cheaper order than greedy.
     """
     A = fl.asarray(np.ones((3, 10)))
     B = fl.asarray(np.ones((10, 5)))
@@ -55,25 +54,56 @@ def _make_aq_four_index_chain():
     return AnnotatedQuery(DenseStats, q, bindings=OrderedDict())
 
 
-def test_branch_and_bound_beats_greedy_on_four_index_chain():
-    """
-    Four-index chain sum_{i,j,k,l} A[i,j]*B[j,k]*C[k,l] where exact search
-    finds a cheaper order than greedy_query.
-    """
-    # Use greedy_query (from greedy_optimizer)
-    greedy_queries = greedy_query(_aq_with_stats(_make_aq_four_index_chain()))
-    _, greedy_cost = pruned_query_to_plan(_make_aq_four_index_chain(), use_greedy=True)
+def _make_aq_three_index_chain():
+    """sum_{i,j,k} A[i,j]*B[j,k] — smaller chain."""
+    A = fl.asarray(np.ones((4, 8)))
+    B = fl.asarray(np.ones((8, 6)))
+    q = Query(
+        Alias("out"),
+        Aggregate(
+            Literal(as_finch_operator(op.add)),
+            Literal(0),
+            MapJoin(
+                Literal(as_finch_operator(op.mul)),
+                (
+                    Table(Literal(A), (Field("i"), Field("j"))),
+                    Table(Literal(B), (Field("j"), Field("k"))),
+                ),
+            ),
+            (Field("i"), Field("j"), Field("k")),
+        ),
+    )
+    return AnnotatedQuery(DenseStats, q, bindings=OrderedDict())
 
-    # Exact search (pruned with use_greedy=False uses branch_and_bound exact for small components)
-    _, exact_cost = pruned_query_to_plan(_make_aq_four_index_chain(), use_greedy=False)
 
-    print(f"Greedy cost: {greedy_cost}")
-    print(f"Exact cost:  {exact_cost}")
-
-    assert len(greedy_queries) >= 2  #check if greedy produces a plan
+def test_pruned_exact_strictly_cheaper_than_pruned_greedy_on_four_index_chain():
+    """Four-index chain: exact (pruned) cost is strictly below greedy (pruned)."""
+    aq = _make_aq_four_index_chain()
+    _, greedy_cost = pruned_query_to_plan(aq, use_greedy=True)
+    _, exact_cost = pruned_query_to_plan(aq, use_greedy=False)
     assert exact_cost <= greedy_cost
     assert exact_cost < greedy_cost, (
         f"Expected exact ({exact_cost}) < greedy ({greedy_cost})"
     )
-    
-print(test_branch_and_bound_beats_greedy_on_four_index_chain())
+
+
+@pytest.mark.parametrize("factory", [_make_aq_three_index_chain, _make_aq_four_index_chain])
+def test_pruned_exact_never_more_expensive_than_pruned_greedy(factory):
+    """Exact pruned plan cost is never above greedy-only pruned plan."""
+    aq = factory()
+    _, greedy_cost = pruned_query_to_plan(aq, use_greedy=True)
+    _, exact_cost = pruned_query_to_plan(aq, use_greedy=False)
+    assert exact_cost <= greedy_cost
+
+
+@pytest.mark.parametrize("factory", [_make_aq_three_index_chain, _make_aq_four_index_chain])
+def test_branch_and_bound_exact_k_inf_cost_no_worse_than_greedy_k1_on_component(factory):
+    """On one component, k=∞ (exact) total cost ≤ k=1 (greedy) branch-and-bound cost."""
+    aq = _aq_with_stats(factory())
+    component = aq.connected_components[0]
+    r_greedy = branch_and_bound(aq, component, 1, OrderedDict())
+    r_exact = branch_and_bound(aq, component, float("inf"), OrderedDict())
+    assert r_greedy is not None and r_exact is not None
+    (_, _, _, cost_k1), _ = r_greedy
+    (_, _, _, cost_kinf), _ = r_exact
+    assert cost_kinf <= cost_k1 
