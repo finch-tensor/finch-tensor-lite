@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+import operator
 
 from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
 from .nodes import (
     Assign,
     Block,
     Break,
+    Call,
     For,
     Function,
     FusedNode,
@@ -14,6 +16,7 @@ from .nodes import (
     Literal,
     Module,
     Return,
+    Variable,
     While,
 )
 
@@ -83,7 +86,17 @@ def fused_desugar(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
             case While(cond, body):
                 return While(cond, go(body))
             case For(target, iter, body):
-                return For(target, iter, go(body))
+                
+                iter_var = Variable(f"{target.name}_iter")
+                iter_init = Assign(iter_var, iter)
+                init = Assign(target, Call(Literal(next), (iter_var,)))
+                cond = Call(Literal(operator.ne), (target, Literal(None)))
+                inc = Assign(target, Call(Literal(next), (iter_var,)))
+                body_block = go(body)
+                loop_body = Block(
+                    (*body_block.body, inc)
+                )
+                return go(Block((iter_init, init, While(cond, loop_body))))
             case node:
                 if isinstance(node, (Assign, Return, Break)):
                     return _number_stmt(node)
@@ -179,8 +192,6 @@ class FusedCFGBuilder:
                 self.current_block = after_block
             case For(iter_var, iter, body):
                 before_block = self.current_block
-                self.emit(Assign(iter_var, Literal(None))) # initialize loop variable
-                self.emit(iter)
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
 
@@ -190,6 +201,7 @@ class FusedCFGBuilder:
 
                 # fill in the loop body
                 self.current_block = body_block
+                self.emit(iter)
                 self(body, after_block, return_block)
 
                 # connect the end of loop body back to the beginning to form the loop
@@ -225,7 +237,7 @@ class FusedCFGBuilder:
         return self.cfg
 
 
-def fused_build_cfg(node: FusedNode, sid: int) -> ControlFlowGraph:
+def fused_build_cfg(node: FusedNode) -> ControlFlowGraph:
     """
     Build control-flow graph for a FinchAssembly node.
     Args:
@@ -236,9 +248,5 @@ def fused_build_cfg(node: FusedNode, sid: int) -> ControlFlowGraph:
     Returns:
         ControlFlowGraph: The constructed control-flow graph.
     """
-
-    # desugar the input name and number additional statements for CFG construction
-    desugared_node, sid = fused_desugar(node, sid)
-
     ctx = FusedCFGBuilder()
-    return ctx.build(desugared_node)
+    return ctx.build(node)

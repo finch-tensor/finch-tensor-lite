@@ -179,8 +179,8 @@ def test_cfg_builder():
         return total
 
     fused_fn = parse_fused_function(simple_fn)
-    cfg = fused_build_cfg(fused_fn, 0)
-    print(cfg)
+    numbered_fn, _ = fused_desugar(fused_fn, 0)
+    cfg = fused_build_cfg(numbered_fn)
 
     # We won't assert on the exact structure of the CFG here, but we can at least
     # check that it has the expected number of blocks. The exact number of blocks
@@ -200,7 +200,8 @@ def test_liveness_analysis():
 
     fused_fn = parse_fused_function(simple_fn)
 
-    cfg = fused_build_cfg(fused_fn, 0)
+    numbered_fn, _ = fused_desugar(fused_fn, 0)
+    cfg = fused_build_cfg(numbered_fn)
     print(cfg)
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
