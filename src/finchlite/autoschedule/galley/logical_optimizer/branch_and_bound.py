@@ -28,6 +28,7 @@ def _reducible_idxs_for_component(
     component: list,
 ) -> list:
     """Make sure it is a list, precommit throws error."""
+    comp_set = set(component)
     return [idx for idx in aq.get_reducible_idxs() if idx in comp_set]
 
 
