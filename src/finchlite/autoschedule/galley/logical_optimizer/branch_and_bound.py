@@ -38,7 +38,7 @@ def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
     Used to score each candidate reduction and to know which indices
     get eliminated (reduced_vars) for the branch-and-bound state key.
     """
-    query, _, _, reduced_idxs = aq.get_reduce_query(idx)
+    _, _, _, reduced_idxs = aq.get_reduce_query(idx)
     cost = aq.get_cost_of_reduce_idx(idx)
     return cost, list(reduced_idxs)
 
@@ -48,11 +48,16 @@ def branch_and_bound(
     component: list,
     k: float,
     max_subquery_costs: OrderedDict,
-) -> tuple | None:
+) -> tuple:
     """
     Branch-and-bound search for optimal reduction order within a component.
-    Returns (order, queries, aq, cost) and optimal_subquery_costs;
-    or None if no complete order found.
+
+    Returns ``((order, queries, aq, cost), optimal_subquery_costs)``.
+
+    Raises
+    ------
+    RuntimeError
+        If no complete elimination order exists for ``component``.
     """
     # --- Initialize ---
     # optimal_orders[vars_key] = (order, queries, aq, cost) for each state.
@@ -138,18 +143,13 @@ def branch_and_bound(
 
     # --- Return result if we found a full order for the component ---
     component_set = frozenset(component)
-    if component_set in optimal_orders:
-        print(f"Component: {component}")
-        print(f"Optimal Orders: {list(optimal_orders.keys())}")
-        print(f"Reducible Idxs: {input_aq.get_reducible_idxs()}")
-        return (optimal_orders[component_set], optimal_subquery_costs)
-    else:
-        # No complete order; debug output
-        # TODO: rasie error
-        #print(f"Component: {component}")
-        #print(f"Optimal Orders: {list(optimal_orders.keys())}")
-        #print(f"Reducible Idxs: {input_aq.get_reducible_idxs()}")
-        return None
+    if component_set not in optimal_orders:
+        raise RuntimeError(
+            "branch_and_bound: no complete reduction order for component "
+            f"{component!r}; reducible idxs on input: "
+            f"{input_aq.get_reducible_idxs()!r}"
+        )
+    return (optimal_orders[component_set], optimal_subquery_costs)
 
 
 def pruned_query_to_plan(
@@ -166,22 +166,15 @@ def pruned_query_to_plan(
     cur_aq = _aq_with_stats(input_aq)
 
     # --- Process components until no more reducible indices ---
-    # Do this instead of for comp in components because components are recomputed in reduce_idx
-    # same as julia code
+    # Do this instead of for comp in components because components 
+    # are recomputed in reduce_idx same as julia code
     while cur_aq.get_reducible_idxs():
         component = cur_aq.connected_components[0]
 
         # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
         greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
-        if greedy_result is None:
-            break
         (
-            (
-                greedy_order,
-                greedy_queries,
-                greedy_aq,
-                greedy_cost,
-            ),
+            (greedy_order, _, _, greedy_cost),
             greedy_subquery_costs,
         ) = greedy_result
 
@@ -195,25 +188,14 @@ def pruned_query_to_plan(
             continue
 
         # --- Exact search with pruning: greedy_subquery_costs bounds the search ---
-        exact_result = branch_and_bound(
+        (exact_order, _, _, exact_cost), _ = branch_and_bound(
             cur_aq, component, float("inf"), greedy_subquery_costs
         )
-        if exact_result is not None:
-            # Use exact order
-            (exact_order, exact_queries, exact_aq, exact_cost), _ = exact_result
-            elimination_order.extend(exact_order)
-            for idx in exact_order:
-                reduce_query = cur_aq.reduce_idx(idx)
-                queries.append(reduce_query)
-            total_cost += exact_cost
-        else:
-            # Fallback to greedy if exact search fails
-            print("WARNING: Pruned Optimizer Failed. Falling Back to Greedy Plan.")
-            elimination_order.extend(greedy_order)
-            for idx in greedy_order:
-                reduce_query = cur_aq.reduce_idx(idx)
-                queries.append(reduce_query)
-            total_cost += greedy_cost
+        elimination_order.extend(exact_order)
+        for idx in exact_order:
+            reduce_query = cur_aq.reduce_idx(idx)
+            queries.append(reduce_query)
+        total_cost += exact_cost
 
     # --- Append remaining (non-reducible) query and fix output name ---
     remaining_q = cur_aq.get_remaining_query()
@@ -237,10 +219,9 @@ def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
 
     # --- Run exact branch-and-bound on each component, collect order ---
     for component in input_aq.connected_components:
-        result = branch_and_bound(cur_aq, component, float("inf"), OrderedDict())
-        if result is None:
-            continue
-        (exact_order, _, _, exact_cost), _ = result
+        (exact_order, _, _, exact_cost), _ = branch_and_bound(
+            cur_aq, component, float("inf"), OrderedDict()
+        )
         elimination_order.extend(exact_order)
         total_cost += exact_cost
 

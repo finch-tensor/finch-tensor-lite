@@ -100,9 +100,9 @@ def test_pruned_exact_never_more_expensive_than_pruned_greedy(factory):
     assert exact_cost <= greedy_cost
 
 
-@pytest.mark.parametrize("factory", [_make_aq_three_index_chain, _make_aq_four_index_chain])
-def test_branch_and_bound_exact_k_inf_cost_no_worse_than_greedy_k1_on_component(factory):
-    """On one component, k=∞ (exact) total cost ≤ k=1 (greedy) branch-and-bound cost."""
+@pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
+def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
+    """On one component, exact (k=inf) cost <= greedy (k=1) B&B cost."""
     aq = _aq_with_stats(factory())
     component = aq.connected_components[0]
     r_greedy = branch_and_bound(aq, component, 1, OrderedDict())
