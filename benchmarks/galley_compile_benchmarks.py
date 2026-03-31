@@ -1,27 +1,21 @@
 """
-Benchmark script comparing Galley with and without components.
+Compile-path benchmark: Galley `optimize_plan` vs downstream pipeline timing
+with and without components (`GalleyLogicalOptimizer` profile: optimize_plan_s,
+downstream_s).
 
-Run: python tests/test_galley_benchmarks.py
+optimize_plan_s: time to optimize the plan in Galley
+downstream_s: time in the downstream pipeline after optimize (e.g. rest of compile)
+Does not take into account time to make a plan before optimize is called.
 
-NOTE:
-Setting recursion limit to more than default for deep chains.
-Iterations default to n=5 for averaging.
+Uses the same expressions and ordering as galley_component_benchmarks.main().
 
+Maybe remove downstream timing and change file to compile only
 
-NOTE: where parameters were added: delete when done testing.
-greedy_optimizer.py	greedy_query
-galley_optimize.py	optimize_query
-galley_optimize.py	optimize_plan
-galley_optimize.py	GalleyLogicalOptimizer
-test_galley_benchmarks.py	INTERPRET_NOTATION_GALLEY_NO_COMPONENTS
-
-NOTE: readd compile time benchmarks.
 """
 
 from __future__ import annotations
 
 import sys
-import time
 from contextlib import contextmanager
 from functools import reduce
 
@@ -35,23 +29,45 @@ from finchlite.autoschedule import (
     LogicStandardizer,
 )
 from finchlite.autoschedule.compiler import LogicCompiler
-from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
+from finchlite.autoschedule.galley_optimize import (
+    GalleyLogicalOptimizer,
+    GalleyProfileTimes,
+)
 from finchlite.autoschedule.tensor_stats import DenseStats
-from finchlite.finch_notation.interpreter import NotationInterpreter
+from finchlite.compile.lower import NotationCompiler
+from finchlite.finch_assembly.interpreter import AssemblyInterpreter
+from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finchlite.symbolic import gensym
 
-DEFAULT_N = 5
 CHAIN_RECURSION_LIMIT = 4000
+DEFAULT_N = 5
 
-# TESTING PIPELINES
-INTERPRET_NOTATION_GALLEY_NO_COMPONENTS = LogicNormalizer(
+GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(
     GalleyLogicalOptimizer(
         DenseStats,
         LogicExecutor(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                DefaultLogicFormatter(
+                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                )
+            )
+        ),
+        profile=True,
+    )
+)
+
+GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(
+    GalleyLogicalOptimizer(
+        DenseStats,
+        LogicExecutor(
+            LogicStandardizer(
+                DefaultLogicFormatter(
+                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                )
             )
         ),
         use_components=False,
+        profile=True,
     )
 )
 
@@ -67,27 +83,6 @@ def _recursion_limit_ctx(limit: int | None):
         yield
     finally:
         sys.setrecursionlimit(old)
-
-
-def time_frontend_compute(
-    expr, *, n: int = DEFAULT_N, recursion_limit: int | None = None
-) -> tuple[float, float]:
-    """
-    Time full `compute()` with and without Galley components.
-
-    Returns ``(components_with, components_without)`` — seconds per iteration.
-    """
-    with _recursion_limit_ctx(recursion_limit):
-        t0 = time.perf_counter()
-        for _ in range(n):
-            fl_interface.compute(expr, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
-        components_with = (time.perf_counter() - t0) / n
-
-        t0 = time.perf_counter()
-        for _ in range(n):
-            fl_interface.compute(expr, ctx=INTERPRET_NOTATION_GALLEY_NO_COMPONENTS)
-        components_without = (time.perf_counter() - t0) / n
-    return components_with, components_without
 
 
 # --- Expression builders ---
@@ -306,107 +301,146 @@ def make_sum_sum_benchmark_expr():
     ) + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1)
 
 
+def plan_from_expr(arg):
+    """Build the same `Plan` as `finchlite.interface.fuse.compute`."""
+    args = arg if isinstance(arg, tuple) else (arg,)
+    vars_ = tuple(Alias(gensym("A")) for _ in args)
+    ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
+    bodies = tuple(
+        map(
+            lambda a, var: Query(
+                var,
+                Table(a.data, tuple(Field(gensym("i")) for _ in range(len(a.shape)))),
+            ),
+            args,
+            vars_,
+        )
+    )
+    return Plan(ctx_2.trace() + bodies + (Produces(vars_),))
+
+
+def time_compile_profile(
+    expr,
+    *,
+    n: int = DEFAULT_N,
+    recursion_limit: int | None = None,
+) -> tuple[GalleyProfileTimes, GalleyProfileTimes]:
+    """
+    Average `optimize_plan_s` and `downstream_s` per iteration for pipelines
+    with and without Galley components.
+
+    t is the structure that holds optimize_plan_s and downstream_s
+    """
+    with _recursion_limit_ctx(recursion_limit):
+        for _ in range(2):
+            _, _ = GALLEY_COMPILE_PROFILE_WITH(plan_from_expr(expr))
+            _, _ = GALLEY_COMPILE_PROFILE_WITHOUT(plan_from_expr(expr))
+
+        opt_w = down_w = 0.0
+        for _ in range(n):
+            _, t = GALLEY_COMPILE_PROFILE_WITH(plan_from_expr(expr))
+            opt_w += t["optimize_plan_s"]
+            down_w += t["downstream_s"]
+        with_times: GalleyProfileTimes = {
+            "optimize_plan_s": opt_w / n,
+            "downstream_s": down_w / n,
+        }
+
+        opt_wo = down_wo = 0.0
+        for _ in range(n):
+            _, t = GALLEY_COMPILE_PROFILE_WITHOUT(plan_from_expr(expr))
+            opt_wo += t["optimize_plan_s"]
+            down_wo += t["downstream_s"]
+        without_times: GalleyProfileTimes = {
+            "optimize_plan_s": opt_wo / n,
+            "downstream_s": down_wo / n,
+        }
+
+    return with_times, without_times
+
+
+def _format_block(
+    title: str, with_t: GalleyProfileTimes, without_t: GalleyProfileTimes
+) -> str:
+    lines = [
+        "",
+        "=" * 60,
+        title,
+        "  With components:",
+        (
+            f"    optimize_plan_s={with_t['optimize_plan_s']:.6f}s  "
+            f"downstream_s={with_t['downstream_s']:.6f}s"
+        ),
+        "  Without components:",
+        (
+            f"    optimize_plan_s={without_t['optimize_plan_s']:.6f}s  "
+            f"downstream_s={without_t['downstream_s']:.6f}s"
+        ),
+        "=" * 60,
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
-    print("Frontend benchmark: sum+sum matmul...")
-    expr_sum = make_sum_sum_benchmark_expr()
-    _, _ = time_frontend_compute(expr_sum)
-    components_with, components_without = time_frontend_compute(expr_sum)
-    print("")
-    print("=" * 60)
-    print("Galley benchmark results (sum+sum matmul)")
-    print(
-        f"  frontend components vs no-components: "
-        f"With components={components_with:.4f}s, Without={components_without:.4f}s"
-    )
-    print("=" * 60)
-
-    print("Frontend benchmark: chain10...")
     rng = np.random.default_rng(42)
+
+    print("Compile benchmark: sum+sum matmul...", flush=True)
+    expr_sum = make_sum_sum_benchmark_expr()
+    w, wo = time_compile_profile(expr_sum)
+    print(_format_block("Galley compile profile (sum+sum matmul)", w, wo), flush=True)
+
+    print("Compile benchmark: chain10...", flush=True)
     expr_c10 = make_chain10_expr(chain10_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(expr_c10)
-    components_with, components_without = time_frontend_compute(expr_c10)
-    print("")
-    print("=" * 60)
-    print("Galley chain10 frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
+    w, wo = time_compile_profile(expr_c10)
+    print(_format_block("Galley compile profile (chain10)", w, wo), flush=True)
 
-    print("Frontend benchmark: three summed matmul pairs...")
+    print("Compile benchmark: three summed matmul pairs...", flush=True)
     expr_3p = make_three_matmul_pairs_expr()
-    _, _ = time_frontend_compute(expr_3p)
-    components_with, components_without = time_frontend_compute(expr_3p)
-    print("")
-    print("=" * 60)
-    print("Galley three matmul pairs frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
+    w, wo = time_compile_profile(expr_3p)
+    print(
+        _format_block("Galley compile profile (three matmul pairs)", w, wo),
+        flush=True,
+    )
 
-    # ERROR HERE:
-    # 2 chain, 50 terms
-    print("Frontend benchmark: fifty terms × chain2...")
+    print("Compile benchmark: fifty terms × chain2...", flush=True)
     expr_50c2 = make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(expr_50c2)
-    components_with, components_without = time_frontend_compute(expr_50c2)
-    print("")
-    print("=" * 60)
-    print("Galley fifty terms × chain2 frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
+    w, wo = time_compile_profile(expr_50c2)
+    print(
+        _format_block("Galley compile profile (fifty terms × chain2)", w, wo),
+        flush=True,
+    )
 
-    # 10 chain, 3 terms
-    print("Frontend benchmark: three terms × chain10...")
+    print("Compile benchmark: three terms × chain10...", flush=True)
     expr_3c10 = make_three_chain10_expr(chain10_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(expr_3c10)
-    components_with, components_without = time_frontend_compute(expr_3c10)
-    print("")
-    print("=" * 60)
-    print("Galley three terms × chain10 frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
+    w, wo = time_compile_profile(expr_3c10)
+    print(
+        _format_block("Galley compile profile (three terms × chain10)", w, wo),
+        flush=True,
+    )
 
-    print("Frontend benchmark: three terms × chain25...")
+    print("Compile benchmark: three terms × chain25...", flush=True)
     expr_3c25 = make_three_chain25_expr(chain25_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
-    components_with, components_without = time_frontend_compute(
-        expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT
+    w, wo = time_compile_profile(expr_3c25, recursion_limit=CHAIN_RECURSION_LIMIT)
+    print(
+        _format_block("Galley compile profile (three terms × chain25)", w, wo),
+        flush=True,
     )
-    print("")
-    print("=" * 60)
-    print("Galley three terms × chain25 frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
 
-    print("Frontend benchmark: five terms × chain10...")
+    print("Compile benchmark: five terms × chain10...", flush=True)
     expr_5c10 = make_five_chain10_expr(chain10_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(expr_5c10)
-    components_with, components_without = time_frontend_compute(expr_5c10)
-    print("")
-    print("=" * 60)
-    print("Galley five terms × chain10 frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
-
-    print("Frontend benchmark: chain25...")
-    expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
-    _, _ = time_frontend_compute(expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT)
-    components_with, components_without = time_frontend_compute(
-        expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT
+    w, wo = time_compile_profile(expr_5c10)
+    print(
+        _format_block("Galley compile profile (five terms × chain10)", w, wo),
+        flush=True,
     )
-    print("")
-    print("=" * 60)
-    print("Galley chain25 frontend benchmark:")
-    print(f"  With components:   {components_with:.4f}s")
-    print(f"  Without components: {components_without:.4f}s")
-    print("=" * 60)
 
-    print("")
-    print("Done.")
+    print("Compile benchmark: chain25...", flush=True)
+    expr_c25 = make_chain25_expr(chain25_shapes_benchmark, rng)
+    w, wo = time_compile_profile(expr_c25, recursion_limit=CHAIN_RECURSION_LIMIT)
+    print(_format_block("Galley compile profile (chain25)", w, wo), flush=True)
+
+    print("", flush=True)
+    print("Done.", flush=True)
 
 
 if __name__ == "__main__":
