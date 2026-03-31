@@ -75,7 +75,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import gensym
-from .lazy import lazy, LazyTensor
+from .lazy import LazyTensor, lazy
 
 _DEFAULT_SCHEDULER = threading.local()
 
@@ -193,7 +193,8 @@ def compute(arg, ctx=None):
                 lambda arg, var: Query(
                     var,
                     Table(
-                        arg.data, tuple(Field(gensym("i")) for _ in range(len(arg.shape)))
+                        arg.data,
+                        tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
                     ),
                 ),
                 lazy_args,
