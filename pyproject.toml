@@ -1,3 +1,5 @@
+# AI modified: 2026-03-31T17:44:29Z 37a5861efcbfe649fde7b7a8c093f143cb1ec674
+# AI modified: 2026-03-31T17:45:32Z 37a5861efcbfe649fde7b7a8c093f143cb1ec674
 [project]
 name = "finch-tensor-lite"
 description = ""
@@ -21,6 +23,9 @@ test = [
     "mypy==1.15.*",
     "pytest-mypy==1.*",
     "pytest-regressions~=2.8.1",
+    "hypothesis (>=6.151.9,<7.0.0)",
+    "ndindex (>=1.10.1,<2.0.0)",
+    "pytest-json-report (>=1.5.0,<2.0.0)",
 ]
 
 [build-system]
@@ -59,4 +64,8 @@ section-order = [
 
 [tool.mypy]
 ignore_missing_imports = true
-exclude = ["tests/reference", "src/finchlite/codegen/stc"]
+exclude = [
+    "tests/reference",
+    "src/finchlite/codegen/stc",
+    "(^|/)array-api-tests/",
+]
