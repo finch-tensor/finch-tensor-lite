@@ -83,17 +83,6 @@ class LogicExecutor(LogicEvaluator):
             shape = T.shape
             fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
             stats_bindings[var] = actual_impl(T, fields)
-
-        cache_dict: dict[Any, TensorStats] = {}
-        for body in stmt.bodies:
-            if isinstance(body, (lgc.Query, lgc.Table, lgc.MapJoin, lgc.Aggregate, lgc.Reorder)):
-                insert_statistics(
-                        actual_impl, 
-                        body, 
-                        stats_bindings, 
-                        replace=True, 
-                        cache=cache_dict
-                    )
             
         mod, binding_ftypes, binding_idxs = self.ctx(stmt, binding_ftypes,stats_bindings)
 
