@@ -248,7 +248,6 @@ class TensorDef:
 
     @staticmethod
     def reorder(stats: "TensorDef", reorder_indices: tuple[Field, ...]) -> "TensorDef":
-        print(f"Reordering {stats.index_order} to {reorder_indices}")
         for old_idx in stats.index_order:
             if old_idx not in set(reorder_indices) and stats.get_dim_size(old_idx) != 1:
                 raise ValueError(
