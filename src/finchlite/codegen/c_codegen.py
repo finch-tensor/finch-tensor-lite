@@ -14,8 +14,10 @@ from typing import Any, TypedDict
 
 import numpy as np
 
+from finchlite.algebra.algebra import FinchOperator
+
 from .. import finch_assembly as asm
-from ..algebra import COperator, as_finch_operator, query_property, register_property
+from ..algebra import COperator, query_property, register_property
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,
@@ -418,7 +420,7 @@ class CCompiler(asm.AssemblyLoader):
         return CLibrary(lib, kernels)
 
 
-def c_function_name(op: Any, ctx, *args: Any) -> str:
+def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
     """Returns the C function name corresponding to the given Python function
     and argument types.
 
@@ -434,13 +436,12 @@ def c_function_name(op: Any, ctx, *args: Any) -> str:
         NotImplementedError: If the C function name is not implemented for the
         given function and types.
     """
-    finch_op = as_finch_operator(op)
-    if isinstance(finch_op, COperator):
-        return finch_op.c_symbol
-    raise TypeError(f"{finch_op} has no C representation.")
+    if isinstance(op, COperator):
+        return op.c_symbol
+    raise TypeError(f"{op} has no C representation.")
 
 
-def c_function_call(op: Any, ctx, *args: Any) -> str:
+def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
     """Returns a call to the C function corresponding to the given Python
     function and argument types.
 
@@ -452,10 +453,9 @@ def c_function_call(op: Any, ctx, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
-    finch_op = as_finch_operator(op)
-    if not isinstance(finch_op, COperator):
-        raise TypeError(f"{finch_op} has no C representation.")
-    return finch_op.c_function_call(ctx, *args)
+    if not isinstance(op, COperator):
+        raise TypeError(f"{op} has no C representation.")
+    return op.c_function_call(ctx, *args)
 
 
 def c_getattr(fmt, ctx, obj, attr):
