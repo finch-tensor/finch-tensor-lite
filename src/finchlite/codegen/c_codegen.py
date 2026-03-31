@@ -15,7 +15,7 @@ from typing import Any, TypedDict
 import numpy as np
 
 from .. import finch_assembly as asm
-from ..algebra import query_property, register_property
+from ..algebra import COperator, as_finch_operator, query_property, register_property
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,
@@ -434,7 +434,10 @@ def c_function_name(op: Any, ctx, *args: Any) -> str:
         NotImplementedError: If the C function name is not implemented for the
         given function and types.
     """
-    return query_property(op, "__call__", "c_function_name", ctx, *args)
+    finch_op = as_finch_operator(op)
+    if isinstance(finch_op, COperator):
+        return finch_op.c_symbol
+    raise TypeError(f"{finch_op} has no C representation.")
 
 
 def c_function_call(op: Any, ctx, *args: Any) -> str:
@@ -449,12 +452,10 @@ def c_function_call(op: Any, ctx, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
-    if hasattr(op, "c_function_call"):
-        return op.c_function_call(ctx, *args)
-    try:
-        return query_property(op, "__call__", "c_function_call", ctx, *args)
-    except NotImplementedError:
-        return f"{c_function_name(op, ctx, *args)}({', '.join(map(ctx, args))})"
+    finch_op = as_finch_operator(op)
+    if not isinstance(finch_op, COperator):
+        raise TypeError(f"{finch_op} has no C representation.")
+    return finch_op.c_function_call(ctx, *args)
 
 
 def c_getattr(fmt, ctx, obj, attr):
@@ -469,31 +470,8 @@ def c_setattr(fmt, ctx, obj, attr, val):
     return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
 
 
-def register_n_ary_c_op_call(op, symbol):
-    def property_func(op, ctx, *args):
-        assert len(args) > 0
-        if len(args) == 1:
-            return f"{symbol}{ctx(args[0])}"
-        return f" {symbol} ".join(map(ctx, args))
-
-    return property_func
-
-
 op: Any
 symbol: str
-
-
-for op, symbol in [
-    (operator.add, "+"),
-    (operator.sub, "-"),
-    (operator.mul, "*"),
-    (operator.and_, "&"),
-    (operator.or_, "|"),
-    (operator.xor, "^"),
-]:
-    register_property(
-        op, "__call__", "c_function_call", register_n_ary_c_op_call(op, symbol)
-    )
 
 
 def register_binary_c_op_call(op, symbol):
@@ -504,37 +482,10 @@ def register_binary_c_op_call(op, symbol):
 
 
 for op, symbol in [
-    (operator.eq, "=="),
-    (operator.ne, "!="),
-    (operator.lt, "<"),
-    (operator.le, "<="),
-    (operator.gt, ">"),
-    (operator.ge, ">="),
-    (operator.lshift, "<<"),
-    (operator.rshift, ">>"),
-    (operator.floordiv, "/"),
-    (operator.truediv, "/"),
-    (operator.mod, "%"),
     (operator.pow, "**"),
 ]:
     register_property(
         op, "__call__", "c_function_call", register_binary_c_op_call(op, symbol)
-    )
-
-
-def register_unary_c_op_call(op, symbol):
-    def property_func(op, ctx, a):
-        return f"{symbol}{ctx(a)}"
-
-    return property_func
-
-
-for op, symbol in [
-    (operator.not_, "!"),
-    (operator.invert, "~"),
-]:
-    register_property(
-        op, "__call__", "c_function_call", register_unary_c_op_call(op, symbol)
     )
 
 
@@ -847,7 +798,6 @@ class CContext(Context):
                 c_setattr(obj.result_format, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
-                assert isinstance(f, asm.Literal)
                 return c_function_call(f.val, self, *args)
             # case asm.Slot(var_n, var_t) as ref:
             #    return self(self.deref(ref))
