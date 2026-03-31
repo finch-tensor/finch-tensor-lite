@@ -284,7 +284,7 @@ class AnnotatedQuery:
         list[Field]
             Field objects in the component that are reducible (zero parents).
         """
-        return list(set(component).intersection(self.get_reducible_idxs()))
+        return sorted(set(component).intersection(self.get_reducible_idxs()))
 
     @staticmethod
     def get_idx_connected_components(
