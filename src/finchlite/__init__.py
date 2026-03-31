@@ -1,4 +1,12 @@
 from .algebra import Tensor, TensorFType
+from .autoschedule.tensor_stats import (
+    DC,
+    BlockedStats,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -9,13 +17,6 @@ from .compile import (
     Extent,
     ExtentFType,
     dimension,
-)
-from .galley import (
-    DC,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
 )
 from .interface import (
     EagerTensor,
@@ -152,6 +153,7 @@ from .tensor import (
 __all__ = [
     "DC",
     "AssemblyContext",
+    "BlockedStats",
     "BufferizedNDArray",
     "DCStats",
     "DenseLevel",

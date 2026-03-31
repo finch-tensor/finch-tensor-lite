@@ -1,3 +1,4 @@
+from .blocked_stats import BlockedStats
 from .dc_stats import DC, DCStats
 from .dense_stat import DenseStats
 from .stats_interpreter import StatsInterpreter
@@ -7,6 +8,7 @@ from .uniform_stats import UniformStats
 
 __all__ = [
     "DC",
+    "BlockedStats",
     "DCStats",
     "DenseStats",
     "StatsInterpreter",

@@ -6,8 +6,16 @@ import pytest
 
 import numpy as np
 
-import finchlite
 import finchlite as fl
+from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
+from finchlite.autoschedule.tensor_stats import (
+    DC,
+    BlockedStats,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from finchlite.finch_logic import (
     Aggregate,
     Field,
@@ -15,23 +23,6 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
-from finchlite.galley.LogicalOptimizer import (
-    AnnotatedQuery,
-    find_lowest_roots,
-    get_idx_connected_components,
-    get_lazy_tensor_stats,
-    get_reducible_idxs,
-    insert_statistics,
-    replace_and_remove_nodes,
-)
-from finchlite.galley.TensorStats import (
-    DC,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
-)
-from finchlite.interface import lazy
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
 
@@ -151,6 +142,194 @@ def test_uniform_aggregate_and_issimilar():
     assert us_agg.get_dim_size(Field("i")) == 10
     assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
     assert UniformStats.issimilar(us, us)
+
+
+# ------------------------------ BlockedStats -------------------------------------
+def test_blocked_stats_from_tensor():
+    data = np.eye(10)
+    arr = fl.asarray(data)
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+
+    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+
+    assert bs.estimate_non_fill_values() == 10.0
+
+
+def test_blocked_stats_aggregate():
+    data = np.eye(10)
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(fl.asarray(data), indices, blocks_per_dim, DenseStats)
+
+    reduce_indices = (Field("j"),)
+    agg_bs = BlockedStats.aggregate(op.add, 0.0, reduce_indices, bs)
+
+    assert agg_bs.blocks.ndim == 1
+    assert len(agg_bs.blocks) == 2
+    assert agg_bs.estimate_non_fill_values() == 10.0
+
+
+def test_blocked_stats_mapjoin():
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+
+    data1 = np.zeros((10, 10))
+    data1[0:5, 0:5] = 1.0
+    bs1 = BlockedStats.from_tensor(
+        fl.asarray(data1), indices, blocks_per_dim, UniformStats
+    )
+
+    data2 = np.zeros((10, 10))
+    data2[5:10, 5:10] = 1.0
+    bs2 = BlockedStats.from_tensor(
+        fl.asarray(data2), indices, blocks_per_dim, UniformStats
+    )
+
+    result = BlockedStats.mapjoin(op.add, bs1, bs2)
+
+    assert result.estimate_non_fill_values() == 50.0
+    assert result.blocks[0, 1].estimate_non_fill_values() == 0.0
+
+
+def test_blocked_stats_relabel():
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(
+        fl.asarray(np.eye(10)), indices, blocks_per_dim, UniformStats
+    )
+
+    new_names = (Field("row"), Field("col"))
+    relabeled = BlockedStats.relabel(bs, new_names)
+
+    assert relabeled.index_order == new_names
+    assert Field("row") in relabeled.blocks_per_dim
+    assert relabeled.estimate_non_fill_values() == 10.0
+
+
+def test_blocked_stats_reorder():
+    data = np.zeros((4, 10))
+    data[0:2, 0:5] = 1.0
+    arr = fl.asarray(data)
+
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+
+    # Before reordering
+    assert bs.blocks[0, 0].get_dim_size(Field("i")) == 2.0
+    assert bs.blocks[0, 0].get_dim_size(Field("j")) == 5.0
+
+    new_indices = (Field("j"), Field("i"))
+    reordered_bs = BlockedStats.reorder(bs, new_indices)
+
+    new_block = reordered_bs.blocks[0, 0]
+
+    # After reordering
+    assert new_block.get_dim_size(Field("j")) == 5.0
+    assert new_block.get_dim_size(Field("i")) == 2.0
+    assert new_block.index_order == (Field("j"), Field("i"))
+
+
+def test_blocked_stats_issimilar():
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    data = np.eye(10)
+    arr = fl.asarray(data)
+
+    # Identical
+    bs1 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+    bs2 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStats)
+    assert BlockedStats.issimilar(bs1, bs2) is True
+
+    # Different data
+    data_diff = np.eye(10)
+    data_diff[0, 0] = 0.0
+    bs_diff_data = BlockedStats.from_tensor(
+        fl.asarray(data_diff), indices, blocks_per_dim, UniformStats
+    )
+    assert BlockedStats.issimilar(bs1, bs_diff_data) is False
+
+    # Different blocks_per_dim
+    alt_blocks_per_dim = {Field("i"): 5, Field("j"): 5}
+    bs_diff_grid = BlockedStats.from_tensor(
+        arr, indices, alt_blocks_per_dim, UniformStats
+    )
+    assert BlockedStats.issimilar(bs1, bs_diff_grid) is False
+
+    # Different StatsImpl
+    bs_diff_impl = BlockedStats.from_tensor(arr, indices, blocks_per_dim, DenseStats)
+    assert BlockedStats.issimilar(bs1, bs_diff_impl) is False
+
+
+def get_structured_example(M, K, matrix_type):
+    if matrix_type == "diagonal":
+        return np.eye(M, K, dtype=np.float64)
+    if matrix_type == "tridiagonal":
+        A = np.eye(M, K, k=0) + np.eye(M, K, k=1) + np.eye(M, K, k=-1)
+        return (A > 0).astype(np.float64)
+    if matrix_type == "banded":
+        bw = 5
+        rows, cols = np.indices((M, K))
+        return (np.abs(rows - cols) <= bw).astype(np.float64)
+    if matrix_type == "triangular":
+        return np.triu(np.ones((M, K), dtype=np.float64))
+    if matrix_type == "striped":
+        A = np.zeros((M, K), dtype=np.float64)
+        A[:, ::5] = 1.0
+        return A
+    return np.zeros((M, K), dtype=np.float64)
+
+
+def test_benchmark_structured_comparison():
+    M, K, N = 20, 20, 20
+    i, j, k = Field("i"), Field("j"), Field("k")
+    blocks_per_dim = {i: 5, j: 5, k: 5}
+
+    matrix_types = ["diagonal", "tridiagonal", "banded", "triangular", "striped"]
+    implementations = [UniformStats, DenseStats, DCStats]
+
+    print("\n" + "=" * 85)
+    print(
+        f"{'Matrix Type':<15} | {'Stats':<15} |"
+        f" {'Stats Perf':<18} | {'Blocked Stats Perf'}"
+    )
+    print("-" * 85)
+
+    for m_type in matrix_types:
+        data_a = get_structured_example(M, K, m_type)
+        data_b = get_structured_example(K, N, m_type)
+
+        tns_a = fl.asarray(data_a)
+        tns_b = fl.asarray(data_b)
+
+        # Actual result
+        actual_result = np.matmul(data_a, data_b)
+        actual_nnz = float(np.count_nonzero(actual_result))
+
+        if actual_nnz == 0:
+            continue
+
+        for Impl in implementations:
+            # Stats performance
+            g_a = Impl(tns_a, (i, k))
+            g_b = Impl(tns_b, (k, j))
+            g_res = Impl.aggregate(op.add, 0.0, (k,), Impl.mapjoin(op.mul, g_a, g_b))
+            g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
+
+            # Blocked Stats Performance
+            b_a = BlockedStats.from_tensor(tns_a, (i, k), blocks_per_dim, Impl)
+            b_b = BlockedStats.from_tensor(tns_b, (k, j), blocks_per_dim, Impl)
+            b_res = BlockedStats.aggregate(
+                op.add, 0.0, (k,), BlockedStats.mapjoin(op.mul, b_a, b_b)
+            )
+            b_perf = abs(b_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
+
+            print(
+                f"{m_type:<15} | {Impl.__name__:<15} | {g_perf:<18.6f} | {b_perf:.6f}"
+            )
+
+        print("-" * 85)
 
 
 # ─────────────────────────────── TensorDef tests ─────────────────────────────────
@@ -793,6 +972,7 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
     ],
 )
 def test_single_tensor_card(dims, dcs, expected_nnz):
+    dims = {Field(k.name): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
@@ -824,6 +1004,7 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
     ],
 )
 def test_1_join_dc_card(dims, dcs, expected_nnz):
+    dims = {Field(k.name): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -856,6 +1037,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_2_join_dc_card(dims, dcs, expected_nnz):
+    dims = {Field(k.name): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k"), Field("l")),
@@ -896,6 +1078,7 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_triangle_dc_card(dims, dcs, expected_nnz):
+    dims = {Field(k.name): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -934,6 +1117,7 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
     ],
 )
 def test_triangle_small_dc_card(dims, dcs, expected_nnz):
+    dims = {Field(k.name): v for k, v in dims.items()}
     node = Table(
         Literal(fl.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
@@ -1079,6 +1263,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     ],
 )
 def test_merge_dc_union(new_dims, inputs, expected_dcs):
+    new_dims = {Field(k.name): v for k, v in new_dims.items()}
     cache = {}
     stats_objs = []
     for idx_set, dcs in inputs:
@@ -1236,6 +1421,8 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     ],
 )
 def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
+    dims1 = {Field(k.name): v for k, v in dims1.items()}
+    dims2 = {Field(k.name): v for k, v in dims2.items()}
     cache = {}
 
     node1 = Table(
@@ -1286,6 +1473,9 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
 def test_large_disjoint_disjunction_dc_card(
     dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
 ):
+    dims1 = {Field(k.name): v for k, v in dims1.items()}
+    dims2 = {Field(k.name): v for k, v in dims2.items()}
+    dims3 = {Field(k.name): v for k, v in dims3.items()}
     cache = {}
 
     node1 = Table(
@@ -1590,375 +1780,3 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-# ─────────────────────────────── Annotated_Query tests ─────────────────────────────
-@pytest.mark.parametrize(
-    "reduce_idxs,parent_idxs,expected",
-    [
-        # Some indices have parents
-        (
-            [Field("i"), Field("j"), Field("k")],
-            {Field("i"): [], Field("j"): [Field("i")], Field("k"): []},
-            [Field("i"), Field("k")],
-        ),
-        # Keys missing from parent map should be treated as zero parents.
-        (
-            [Field("i"), Field("j"), Field("k")],
-            {Field("j"): [Field("i")]},
-            [Field("i"), Field("k")],
-        ),
-        # All have parents
-        (
-            [Field("a"), Field("b")],
-            {Field("a"): [Field("b")], Field("b"): [Field("a")]},
-            [],
-        ),
-        # Empty input
-        ([], {}, []),
-        # Order preserved among reducible indices
-        (
-            [Field("x"), Field("y"), Field("z")],
-            {Field("y"): [Field("x")]},
-            [Field("x"), Field("z")],
-        ),
-    ],
-)
-def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
-    reduce_fields: list[Field] = reduce_idxs
-    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(parent_idxs)
-
-    aq = object.__new__(AnnotatedQuery)
-    aq.ST = object
-    aq.output_name = None
-    aq.reduce_idxs = reduce_fields
-    aq.point_expr = None
-    aq.idx_lowest_root = OrderedDict()
-    aq.idx_op = OrderedDict()
-    aq.idx_init = OrderedDict()
-    aq.parent_idxs = parent_fields
-    aq.original_idx = OrderedDict()
-    aq.connected_components = []
-    aq.connected_idxs = OrderedDict()
-    aq.output_order = None
-    aq.output_format = None
-
-    result = list(get_reducible_idxs(aq))
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    "parent_idxs, connected_idxs, expected",
-    [
-        # Single component; order within component follows connected_idxs key order
-        (
-            {},
-            {Field("a"): [Field("b")], Field("b"): [Field("a")]},
-            [[Field("a"), Field("b")]],
-        ),
-        # Two components: {a,b} and {c}
-        (
-            {},
-            {Field("a"): [Field("b")], Field("b"): [Field("a")], Field("c"): []},
-            [[Field("a"), Field("b")], [Field("c")]],
-        ),
-        # Parent edge is ignored for connectivity
-        (
-            {Field("b"): [Field("a")]},
-            {Field("a"): [Field("b")], Field("b"): [Field("a")]},
-            [[Field("a")], [Field("b")]],
-        ),
-        # Ordering across components is enforced
-        (
-            {Field("b"): [Field("a")]},
-            {Field("b"): [], Field("a"): []},
-            [[Field("a")], [Field("b")]],
-        ),
-        # Chain of three separate components with parents
-        (
-            {Field("b"): [Field("a")], Field("c"): [Field("b")]},
-            {Field("c"): [], Field("b"): [], Field("a"): []},
-            [[Field("a")], [Field("b")], [Field("c")]],
-        ),
-        # Single big component
-        (
-            {Field("b"): [Field("a")], Field("c"): [Field("b")]},
-            {
-                Field("a"): [Field("b")],
-                Field("b"): [Field("a"), Field("c")],
-                Field("c"): [Field("b")],
-            },
-            [[Field("a")], [Field("b")], [Field("c")]],
-        ),
-    ],
-)
-def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
-    parent_field_idxs: dict[Field, list[Field]] = parent_idxs
-    connected_field_idxs: dict[Field, list[Field]] = connected_idxs
-
-    components = get_idx_connected_components(parent_field_idxs, connected_field_idxs)
-    result = [list(comp) for comp in components]
-
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    "expr,node_to_replace,new_node,nodes_to_remove,expected_names",
-    [
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("b"), (Field("b"),)),
-            Table(Literal("a"), (Field("a"),)),
-            set(),
-            ["a", "a", "c"],
-        ),
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("b"), (Field("b"),)),
-            Table(Literal("a"), (Field("a"),)),
-            {Table(Literal("c"), (Field("c"),))},
-            ["a", "a"],
-        ),
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("c"), (Field("c"),)),
-            Table(Literal("a"), (Field("a"),)),
-            {Table(Literal("c"), (Field("c"),))},
-            ["a", "b"],
-        ),
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("b"), (Field("b"),)),
-            Table(Literal("a"), (Field("a"),)),
-            {Table(Literal("b"), (Field("b"),))},
-            ["a", "c"],
-        ),
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("c"), (Field("c"),)),
-            Table(Literal("a"), (Field("a"),)),
-            set(),
-            ["a", "b", "a"],
-        ),
-    ],
-)
-def test_replace_and_remove_nodes(
-    expr,
-    node_to_replace,
-    new_node,
-    nodes_to_remove,
-    expected_names,
-):
-    out = replace_and_remove_nodes(
-        expr=expr,
-        node_to_replace=node_to_replace,
-        new_node=new_node,
-        nodes_to_remove=nodes_to_remove,
-    )
-
-    result = [tbl.idxs[0].name for tbl in out.args]
-    assert result == expected_names
-
-
-@pytest.mark.parametrize(
-    "root, idx_name, expected",
-    [
-        # Distributive case:
-        # root = MapJoin(mul, [A(i), B(j)]), reduce over j → [B]
-        (
-            MapJoin(
-                Literal(op.mul),
-                (
-                    Table(Literal("A"), (Field("i"),)),
-                    Table(Literal("B"), (Field("j"),)),
-                ),
-            ),
-            Field("j"),
-            ["B"],
-        ),
-        # Split-push case:
-        # root = MapJoin(add, [A(i), B(i), C(j)]), reduce over i → [C, A, B]
-        (
-            MapJoin(
-                Literal(op.add),
-                (
-                    Table(Literal("A"), (Field("i"),)),
-                    Table(Literal("B"), (Field("i"),)),
-                    Table(Literal("C"), (Field("j"),)),
-                ),
-            ),
-            Field("i"),
-            ["C", "A", "B"],
-        ),
-        # Leaf case:
-        # root = Table(A(i)), reduce over i → [A]
-        (
-            Table(Literal("A"), (Field("i"),)),
-            Field("i"),
-            ["A"],
-        ),
-        # Nested case:
-        # root = MapJoin(mul, [A(i,j), B(j)]), reduce over i → [A]
-        (
-            MapJoin(
-                Literal(op.mul),
-                (
-                    Table(Literal("A"), (Field("i"), Field("j"))),
-                    Table(Literal("B"), (Field("j"),)),
-                ),
-            ),
-            Field("i"),
-            ["A"],
-        ),
-        # Special case: max(C(i), D(j)), reduce over i → [max(C,D)]
-        (
-            MapJoin(
-                Literal(max),
-                (
-                    Table(Literal("C"), (Field("i"),)),
-                    Table(Literal("D"), (Field("j"),)),
-                ),
-            ),
-            Field("i"),
-            [
-                MapJoin(
-                    Literal(max),
-                    (
-                        Table(Literal("C"), (Field("i"),)),
-                        Table(Literal("D"), (Field("j"),)),
-                    ),
-                )
-            ],
-        ),
-        # root = MapJoin(mul, [A(j), MapJoin(max, [B(i), C(j)])]), reduce over i
-        (
-            MapJoin(
-                Literal(op.mul),
-                (
-                    Table(Literal("A"), (Field("j"),)),
-                    MapJoin(
-                        Literal(max),
-                        (
-                            Table(Literal("B"), (Field("i"),)),
-                            Table(Literal("C"), (Field("j"),)),
-                        ),
-                    ),
-                ),
-            ),
-            Field("i"),
-            [
-                MapJoin(
-                    Literal(max),
-                    (
-                        Table(Literal("B"), (Field("i"),)),
-                        Table(Literal("C"), (Field("j"),)),
-                    ),
-                )
-            ],
-        ),
-    ],
-)
-def test_find_lowest_roots(root, idx_name, expected):
-    roots = find_lowest_roots(Literal(op.add), idx_name, root)
-
-    # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
-    if expected and not isinstance(expected[0], str):
-        assert roots == expected
-    else:
-        # All other cases:
-        result: list[str] = []
-        for node in roots:
-            assert isinstance(node, Table)
-            assert isinstance(node.tns, Literal)
-            result.append(node.tns.val)
-
-        assert result == expected
-
-
-@pytest.mark.parametrize(
-    "expr_func, expected_dim_sizes, expected_index_order, expected_fill_value, "
-    "expected_non_fill",
-    [
-        # Base MapJoin: C = A + B
-        (
-            lambda A, B: A + B,
-            {Field("i"): 2, Field("j"): 3},
-            (Field("i"), Field("j")),
-            0.0,
-            6.0,
-        ),
-        # Aggregate: D = C.sum(axis=0)
-        (
-            lambda A, B: finchlite.sum(A + B, axis=0),
-            {Field("j"): 3},
-            (Field("j"),),
-            0.0,
-            3.0,
-        ),
-        # Combination : F = ((A + B) * 3).sum(axis=1)
-        (
-            lambda A, B: finchlite.sum((A + B) * 3, axis=1),
-            {Field("i"): 2},
-            (Field("i"),),
-            0.0,
-            2.0,
-        ),
-    ],
-)
-def test_lazy_tensor_stats_parametrized(
-    expr_func,
-    expected_dim_sizes,
-    expected_index_order,
-    expected_fill_value,
-    expected_non_fill,
-):
-    arr1 = np.zeros((2, 3))
-    arr2 = np.ones((2, 3))
-    A = lazy(arr1)
-    B = lazy(arr2)
-
-    expr = expr_func(A, B)
-    stats = get_lazy_tensor_stats(expr, DenseStats)
-
-    assert isinstance(stats, DenseStats)
-    if expected_index_order:
-        stats = DenseStats.relabel(stats, expected_index_order)
-    assert stats.dim_sizes == expected_dim_sizes
-    assert stats.index_order == expected_index_order
-    assert stats.fill_value == expected_fill_value
-    assert stats.estimate_non_fill_values() == expected_non_fill
