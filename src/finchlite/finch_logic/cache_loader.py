@@ -38,6 +38,7 @@ class LogicCacheLRU(LogicLoader):
 
                 if len(stats)== len(saved_stats_dict):
                     if all(stats[alias].issimilar(stats[alias], saved_stats_dict[alias]) for alias in stats):
+                        #keeping the most used stats kernel combo at the last as it is MRU
                         kernels.move_to_end(saved_stats)
                         return result
         
