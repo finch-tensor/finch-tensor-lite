@@ -270,6 +270,25 @@ class AnnotatedQuery:
             idx for idx in self.reduce_idxs if len(self.parent_idxs.get(idx, [])) == 0
         ]
 
+    def get_reducible_idxs_for_component(self, component: list[Field]) -> list[Field]:
+        """
+        Indices in this component that have no parents (reducible now).
+
+        Parameters
+        ----------
+        component : list[Field]
+            A connected component of reduction indices.
+
+        Returns
+        -------
+        list[Field]
+            Field objects in the component that are reducible (zero parents).
+        """
+        return sorted(
+            set(component).intersection(self.get_reducible_idxs()),
+            key=lambda field: field.name,
+        )
+
     @staticmethod
     def get_idx_connected_components(
         parent_idxs: Mapping[Field, Iterable[Field]],
