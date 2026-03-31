@@ -131,9 +131,7 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
         DenseStats,
         LogicExecutor(
             LogicStandardizer(
-                DefaultLogicFormatter(
-                    LogicCompiler(NotationInterpreter())
-                )
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
         ),
     )
