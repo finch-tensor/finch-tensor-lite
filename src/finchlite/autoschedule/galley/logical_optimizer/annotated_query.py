@@ -284,11 +284,7 @@ class AnnotatedQuery:
         list[Field]
             Field objects in the component that are reducible (zero parents).
         """
-        return [
-            idx
-            for idx in component
-            if idx in self.reduce_idxs and len(self.parent_idxs.get(idx, [])) == 0
-        ]
+        return list(set(component).intersection(self.get_reducible_idxs()))
 
     @staticmethod
     def get_idx_connected_components(
