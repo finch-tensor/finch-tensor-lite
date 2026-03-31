@@ -184,7 +184,7 @@ def compute(arg, ctx=None):
         else:
             lazy_args.append(arg_i)
             lazy_arg_idxs.append(i)
-    
+
     if lazy_args:
         vars = tuple(Alias(gensym("A")) for _ in lazy_args)
         ctx_2 = lazy_args[0].ctx.join(*[x.ctx for x in lazy_args[1:]])
@@ -202,8 +202,8 @@ def compute(arg, ctx=None):
         )
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
-        for i in lazy_arg_idxs:
-            outputs[i] = res[0][i]
+        for idx, i in enumerate(lazy_arg_idxs):
+            outputs[i] = res[0][idx]
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
