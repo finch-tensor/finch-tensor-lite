@@ -267,6 +267,7 @@ def parse_function(fn: Callable[..., Any]) -> fzd.Function:
 class _FusedToPythonAST:
     def __init__(self):
         self._bool_fns = tuple(_REV_BOOL_OPS)
+        self._extra_globals: dict[str, Any] = {}
 
     def parse_function(self, function: fzd.Function) -> ast.FunctionDef:
         if not isinstance(function.name.val, str):
@@ -418,12 +419,30 @@ class _FusedToPythonAST:
                     ctx=ast.Load(),
                 )
 
+            if name is not None and name.isidentifier():
+                self._extra_globals[name] = value
+                return ast.Name(id=name, ctx=ast.Load())
+
         raise ValueError(f"Literal cannot be represented in Python AST: {value!r}")
 
 
 def fused_function_to_python_ast(function: fzd.Function) -> ast.FunctionDef:
     node = _FusedToPythonAST().parse_function(function)
     return ast.fix_missing_locations(node)
+
+
+def fused_function_to_python_function(function: fzd.Function) -> Callable:
+    converter = _FusedToPythonAST()
+    func_def = ast.fix_missing_locations(converter.parse_function(function))
+    module_node = ast.Module(body=[func_def], type_ignores=[])
+    code = compile(module_node, "<fused>", "exec")
+    globals_dict: dict[str, Any] = {
+        "__builtins__": builtins,
+        "operator": operator,
+        **converter._extra_globals,
+    }
+    exec(code, globals_dict)  # noqa: S102
+    return globals_dict[function.name.val]
 
 
 def fused_module_to_python_ast(module: fzd.Module) -> ast.Module:

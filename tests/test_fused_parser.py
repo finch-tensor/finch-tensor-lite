@@ -6,6 +6,8 @@ import inspect
 import operator
 import textwrap
 
+import numpy as np
+
 import pytest
 
 from finchlite.finch_fused import nodes as fzd
@@ -13,9 +15,10 @@ from finchlite.finch_fused.cfg_builder import fused_build_cfg, fused_desugar
 from finchlite.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
+    fused_function_to_python_function,
     parse_fused_function,
 )
-from finchlite.interface import compute, lazy
+from finchlite.interface import compute, lazy, asarray, sum
 
 
 def test_parse_simple_function_with_control_flow_and_calls():
@@ -216,19 +219,23 @@ def test_liveness_analysis():
         print(f"output live variables: {output_live_vars}")
 
 
+def simple_fn(A, B, C):
+    D = A @ B
+    E = A + C
+    while sum(D).to_numpy() < 100:
+        D =  D + E
+    return D
+
 def test_lazy_and_compute_insertion():
-    def simple_fn(A, B, C):
-        D = A @ B
-        E = A + C
-        while D.sum() < 100:
-            D =  D + E
-        return D
 
     fused_fn = parse_fused_function(simple_fn)
-    print("Original function:")
-    print(fused_fn)
     transformed_fn = insert_lazy_and_compute(fused_fn)
-    print("Transformed function with lazy and compute calls inserted:")
-    print(transformed_fn)
+    A = asarray(np.array([[1, 2], [3, 4]]))
+    B = asarray(np.array([[1, 2], [3, 4]]))
+    C = asarray(np.array([[1, 2], [3, 4]]))
 
+    expected_result = simple_fn(A, B, C)
+    opt_simple_fn = fused_function_to_python_function(transformed_fn)
+    result = opt_simple_fn(A, B, C)
+    assert (result == expected_result).all()
  
