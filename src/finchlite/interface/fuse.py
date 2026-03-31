@@ -202,8 +202,8 @@ def compute(arg, ctx=None):
         )
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
-        for idx, i in enumerate(lazy_arg_idxs):
-            outputs[i] = res[0][idx]
+        for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
+            outputs[out_idx] = res[lazy_idx]
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 

@@ -1457,3 +1457,13 @@ def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
 
     expected = op(np, np.tril(arr1), arr2)
     finch_assert_equal(result, expected, strict=True)
+
+def test_eager_compute():
+    # Test that compute on an eager tensor returns the same tensor
+    x = np.array([[1, 2], [3, 4]])
+    eager_tensor = TestEagerTensor(x)
+    lazy_tensor = finchlite.add(finchlite.lazy(eager_tensor), finchlite.lazy(eager_tensor))  # This should return an eager tensor
+    eager_result, lazy_result = finchlite.compute((eager_tensor, lazy_tensor))
+    assert eager_result is eager_tensor, "Compute on eager tensor should return the same tensor"
+    finch_assert_equal(eager_result, x)
+    finch_assert_equal(lazy_result, (2 * eager_tensor))
