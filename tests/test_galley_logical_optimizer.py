@@ -9,6 +9,7 @@ import finchlite as fl
 from finchlite.algebra import as_finch_operator
 from finchlite.autoschedule.galley.logical_optimizer import (
     AnnotatedQuery,
+    greedy_query,
     insert_statistics,
 )
 from finchlite.autoschedule.tensor_stats import DenseStats
@@ -75,6 +76,59 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.bindings = OrderedDict()
 
     result = [field.name for field in AnnotatedQuery.get_reducible_idxs(aq)]
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "reduce_idxs,parent_idxs,component,expected",
+    [
+        # Component {i,k} with i,k reducible; j has parent i
+        (["i", "j", "k"], {"j": ["i"]}, ["i", "j", "k"], ["i", "k"]),
+        # Component {i,j} - only i reducible (j has parent i)
+        (["i", "j", "k"], {"j": ["i"]}, ["i", "j"], ["i"]),
+        # Component {k} - k reducible, k not in component {i,j}
+        (["i", "j", "k"], {"j": ["i"]}, ["k"], ["k"]),
+        # Two components: {a,b} and {c}; in {a,b} only a reducible
+        (["a", "b", "c"], {"b": ["a"]}, ["a", "b"], ["a"]),
+        (["a", "b", "c"], {"b": ["a"]}, ["c"], ["c"]),
+        # Empty component
+        (["a", "b"], {"b": ["a"]}, [], []),
+    ],
+)
+def test_get_reducible_idxs_for_component(
+    reduce_idxs, parent_idxs, component, expected
+):
+    names = set(reduce_idxs) | set(parent_idxs.keys())
+    for parents in parent_idxs.values():
+        names.update(parents)
+
+    fields: dict[str, Field] = {x: Field(x) for x in names}
+    reduce_fields: list[Field] = [fields[name] for name in reduce_idxs]
+    component_fields: list[Field] = [fields[name] for name in component]
+    parent_fields: OrderedDict[Field, list[Field]] = OrderedDict(
+        (fields[key], [fields[p] for p in parents])
+        for key, parents in parent_idxs.items()
+    )
+
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = object
+    aq.output_name = None
+    aq.reduce_idxs = reduce_fields
+    aq.point_expr = None
+    aq.idx_lowest_root = OrderedDict()
+    aq.idx_op = OrderedDict()
+    aq.idx_init = OrderedDict()
+    aq.parent_idxs = parent_fields
+    aq.original_idx = OrderedDict()
+    aq.connected_components = []
+    aq.connected_idxs = OrderedDict()
+    aq.output_order = None
+    aq.output_format = None
+    aq.bindings = OrderedDict()
+
+    result = [
+        field.name for field in aq.get_reducible_idxs_for_component(component_fields)
+    ]
     assert result == expected
 
 
@@ -965,3 +1019,66 @@ def test_annotated_queries(query, reduce_field, expected):
     aq = AnnotatedQuery(DenseStats, query, bindings=OrderedDict())
     query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected
+
+
+def test_greedy_query_multi_component():
+    """Two independent summations sum_i A[i] + sum_j B[j] produce two components."""
+    fi, fj = Field("i"), Field("j")
+    point_expr = MapJoin(
+        Literal(as_finch_operator(op.add)),
+        (
+            Table(Literal(A), (fi,)),
+            Table(Literal(B), (fj,)),
+        ),
+    )
+    aq = object.__new__(AnnotatedQuery)
+    aq.ST = DenseStats
+    aq.output_name = Alias("out")
+    aq.reduce_idxs = [fi, fj]
+    aq.point_expr = point_expr
+    aq.idx_lowest_root = OrderedDict(
+        {
+            fi: Table(Literal(A), (fi,)),
+            fj: Table(Literal(B), (fj,)),
+        }
+    )
+    aq.idx_op = OrderedDict(
+        {
+            fi: as_finch_operator(op.add),
+            fj: as_finch_operator(op.add),
+        }
+    )
+    aq.idx_init = OrderedDict({fi: 0, fj: 0})
+    aq.parent_idxs = OrderedDict({fi: [], fj: []})
+    aq.original_idx = OrderedDict({fi: fi, fj: fj})
+    aq.connected_components = [[fi], [fj]]
+    aq.connected_idxs = OrderedDict({fi: set(), fj: set()})
+    aq.output_order = None
+    aq.output_format = None
+    aq.bindings = OrderedDict()
+    aq.cache_point = {}
+
+    insert_statistics(
+        aq.ST, aq.point_expr, aq.bindings, replace=False, cache=aq.cache_point
+    )
+
+    for stat in aq.cache_point.values():
+        dims = stat.dim_sizes
+        for k in list(dims.keys()):
+            if isinstance(k, str):
+                dims[Field(k)] = dims[k]
+
+    # Two independent components: {i} and {j}
+    assert len(aq.connected_components) == 2
+    comp_names = [[f.name for f in c] for c in aq.connected_components]
+    assert comp_names == [["i"], ["j"]] or comp_names == [["j"], ["i"]]
+
+    queries = greedy_query(aq)
+    # Expect: 2 reduction queries (one per index) + 1 remaining query
+    assert len(queries) == 3
+    # First two should be aggregates, last is the final combination
+    assert isinstance(queries[0].rhs, Aggregate)
+    assert isinstance(queries[1].rhs, Aggregate)
+    # Component order is respected: we fully reduce first component before second
+    assert queries[0].rhs.idxs in ((Field("i"),), (Field("j"),))
+    assert queries[1].rhs.idxs in ((Field("i"),), (Field("j"),))
