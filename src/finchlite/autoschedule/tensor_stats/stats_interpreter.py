@@ -23,7 +23,7 @@ from ...finch_logic import (
     Table,
 )
 from .tensor_stats import TensorStats
-
+from .numeric_stats import NumericStats
 
 class StatsInterpreter:
     def __init__(self, StatsImpl: type[TensorStats], verbose=False):
@@ -152,7 +152,10 @@ def calculate_estimated_error(
     errors = []
     for actual_tns, stats_obj in zip(actual_result, stats_result, strict=True):
         actual_nnz = float(np.count_nonzero(actual_tns.to_numpy()))
-        est_nnz = float(stats_obj.estimate_non_fill_values())
+        if isinstance(stats_obj,NumericStats):
+            est_nnz = float(stats_obj.estimate_non_fill_values())
+        else :
+            raise TypeError("Stats Class must be inherit from NumericStats") 
 
         if actual_nnz == 0.0:
             rel_err = 0.0 if est_nnz == 0.0 else float("inf")

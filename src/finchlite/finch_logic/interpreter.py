@@ -25,7 +25,6 @@ from .nodes import (
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 
-
 def make_tensor(shape, fill_value, *, dtype=None):
     if dtype is None:
         dtype = type(fill_value)
