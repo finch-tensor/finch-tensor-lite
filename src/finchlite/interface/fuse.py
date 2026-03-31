@@ -131,7 +131,9 @@ INTERPRET_ASSEMBLY_GALLEY = LogicNormalizer(
         DenseStats,
         LogicExecutor(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
+                DefaultLogicFormatter(
+                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                )
             )
         ),
     )
