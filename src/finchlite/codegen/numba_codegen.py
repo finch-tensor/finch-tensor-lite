@@ -8,15 +8,13 @@ import numpy as np
 import numba
 
 from .. import finch_assembly as asm
-
 from ..algebra import (
     NumbaOperator,
     as_finch_operator,
     query_property,
     register_property,
-    InitWrite, scansearch
+    scansearch,
 )
-
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
 from ..finch_assembly.struct import (  # type: ignore[import-untyped]
@@ -897,5 +895,3 @@ for t in (int, bool, float):
         "__attr__",
         lambda fmt, obj: obj,
     )
-
-
