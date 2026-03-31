@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, register_property, scansearch
+from ..algebra import TensorFType, register_property
 from ..algebra.algebra import FinchOperator, SingletonMeta
 from ..finch_assembly import (
     AssemblyInterpreter,
@@ -131,7 +131,6 @@ register_property(
     "__attr__",
     lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
 )
-
 
 
 @dataclass(frozen=True)
