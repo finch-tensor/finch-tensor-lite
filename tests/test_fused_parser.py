@@ -18,7 +18,7 @@ from finchlite.finch_fused.parser import (
     fused_function_to_python_function,
     parse_fused_function,
 )
-from finchlite.interface import compute, lazy, asarray, sum
+from finchlite.interface import compute, lazy, asarray, sum, matmul, add
 
 
 def test_parse_simple_function_with_control_flow_and_calls():
@@ -219,17 +219,17 @@ def test_liveness_analysis():
         print(f"output live variables: {output_live_vars}")
 
 
-def simple_fn(A, B, C):
-    D = A @ B
-    E = A + C
-    while sum(D).to_numpy() < 100:
-        D =  D + E
-    return D
 
 def test_lazy_and_compute_insertion():
-
+    def simple_fn(A, B, C):
+        D = matmul(A, B)
+        E = add(A, C)
+        while sum(D).to_numpy() < 100:
+            D =  add(D, E)
+        return D
     fused_fn = parse_fused_function(simple_fn)
     transformed_fn = insert_lazy_and_compute(fused_fn)
+    print(transformed_fn)
     A = asarray(np.array([[1, 2], [3, 4]]))
     B = asarray(np.array([[1, 2], [3, 4]]))
     C = asarray(np.array([[1, 2], [3, 4]]))
