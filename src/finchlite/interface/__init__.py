@@ -101,8 +101,8 @@ from .eager import (
 from .fuse import (
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
-    INTERPRET_ASSEMBLY_GALLEY,
     INTERPRET_LOGIC,
+    INTERPRET_NOTATION_GALLEY,
     INTERPRET_NOTATION,
     OPTIMIZE_LOGIC,
     compute,
@@ -118,9 +118,9 @@ from .scalar import Scalar, ScalarFType
 __all__ = [
     "COMPILE_NUMBA",
     "INTERPRET_ASSEMBLY",
-    "INTERPRET_ASSEMBLY_GALLEY",
     "INTERPRET_LOGIC",
     "INTERPRET_NOTATION",
+    "INTERPRET_NOTATION_GALLEY",
     "OPTIMIZE_LOGIC",
     "EagerTensor",
     "LazyTensor",

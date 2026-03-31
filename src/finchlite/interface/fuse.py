@@ -126,13 +126,13 @@ COMPILE_NUMBA = LogicNormalizer(
 
 # TODO: Make Galley a LogicLoader that gets passed a stats bindings dictionary
 # rather than the tensors themselves.
-INTERPRET_ASSEMBLY_GALLEY = LogicNormalizer(
+INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     GalleyLogicalOptimizer(
         DenseStats,
         LogicExecutor(
             LogicStandardizer(
                 DefaultLogicFormatter(
-                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                    LogicCompiler(NotationInterpreter())
                 )
             )
         ),
