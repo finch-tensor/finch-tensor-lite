@@ -1,5 +1,8 @@
+# AI modified: 2026-04-01T19:39:16Z 2fa6b7eac82c18165781c1b5599ca0bb63fd0d5e
+
 import _operator  # noqa: F401
-from operator import add, mul
+
+from finchlite.algebra import ffunc
 
 import pytest
 
@@ -49,14 +52,14 @@ def test_matrix_multiplication(a, b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                        Literal(ffunc.mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                            Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                     ),
                     (i, j),
                 ),
@@ -121,13 +124,13 @@ def test_materialize():
             Query(
                 Alias("C"),
                 MapJoin(
-                    Literal(add), (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j)))
+                    Literal(ffunc.add), (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j)))
                 ),
             ),
             Query(
                 Alias("D"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j)))
+                    Literal(ffunc.mul), (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j)))
                 ),
             ),
             Query(Alias("C"), Table(Alias("B"), (i, j))),

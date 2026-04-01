@@ -1,4 +1,7 @@
-from operator import add, mul
+
+# AI modified: 2026-04-01T19:39:16Z 2fa6b7eac82c18165781c1b5599ca0bb63fd0d5e
+
+from finchlite.algebra import ffunc
 
 import numpy as np
 
@@ -70,11 +73,11 @@ def test_propagate_map_queries_backward():
             Query(Alias("A0"), Alias("A1")),
             Table(Alias("A0"), (Field("i0"), Field("i1"))),
             MapJoin(
-                Literal(mul),
+                Literal(ffunc.mul),
                 (
                     Table(Literal(10), (Field("i2"),)),
                     Aggregate(
-                        Literal(add),
+                        Literal(ffunc.add),
                         Literal(0),
                         Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
                         (Field("i3"),),
@@ -83,17 +86,17 @@ def test_propagate_map_queries_backward():
                 ),
             ),
             Aggregate(
-                Literal(add),
+                Literal(ffunc.add),
                 Literal(10),
-                Aggregate(Literal(add), Literal(0), Alias("A2"), (Field("i5"),)),
+                Aggregate(Literal(ffunc.add), Literal(0), Alias("A2"), (Field("i5"),)),
                 (Field("i6"),),
             ),
             Aggregate(
-                Literal(add),
+                Literal(ffunc.add),
                 Literal(0),
                 Reorder(
                     Aggregate(
-                        Literal(add),
+                        Literal(ffunc.add),
                         Literal(0),
                         Table(
                             Alias("A3"),
@@ -163,10 +166,10 @@ def test_isolate_aggregates():
             Query(
                 Alias("A0"),
                 Aggregate(
-                    Literal("+"),
+                    Literal(ffunc.add),
                     Literal(0),
                     Aggregate(
-                        Literal("*"),
+                        Literal(ffunc.mul),
                         Literal(1),
                         Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                         (Field("i2"),),
@@ -626,13 +629,13 @@ def test_scheduler_e2e_matmul(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                        Literal(ffunc.mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
                 ),
             ),
             Query(
                 Alias("C"),
                 Aggregate(
-                    Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             Produces((Alias("C"),)),
