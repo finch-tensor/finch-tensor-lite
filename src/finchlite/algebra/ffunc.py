@@ -330,7 +330,7 @@ class Abs(UnaryFinchOperator):
         return operator.abs(a)
 
 
-abs = abs()
+abs = Abs()
 
 
 class Pos(UnaryFinchOperator):
