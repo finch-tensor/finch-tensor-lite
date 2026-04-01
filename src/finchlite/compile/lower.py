@@ -1,8 +1,8 @@
 # AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
+# AI modified: 2026-04-01T22:47:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from operator import add, sub
 from typing import Any, overload
 
 import numpy as np
@@ -183,7 +183,7 @@ class SymbolicExtent(FTyped):
     @staticmethod
     def point(idx):
         return SymbolicExtent(
-            idx, ntn.Call(ntn.Literal(add), (idx, ntn.Literal(np.intp(1))))
+            idx, ntn.Call(ntn.Literal(ffunc.add), (idx, ntn.Literal(np.intp(1))))
         )
 
     # TODO: Make it more robust
@@ -191,7 +191,7 @@ class SymbolicExtent(FTyped):
         return self.start_sym == self.end_sym
 
     def get_measure(self):
-        return ntn.Call(ntn.Literal(sub), (self.end_sym, self.start_sym))
+        return ntn.Call(ntn.Literal(ffunc.sub), (self.end_sym, self.start_sym))
 
     def bound_below(self, size) -> "SymbolicExtent":
         return self._bound_ext(size, ffunc.max)
@@ -206,7 +206,10 @@ class SymbolicExtent(FTyped):
                 self.end_sym,
                 ntn.Call(
                     ntn.Literal(func),
-                    (self.end_sym, ntn.Call(ntn.Literal(add), (self.start_sym, size))),
+                    (
+                        self.end_sym,
+                        ntn.Call(ntn.Literal(ffunc.add), (self.start_sym, size)),
+                    ),
                 ),
             ),
         )

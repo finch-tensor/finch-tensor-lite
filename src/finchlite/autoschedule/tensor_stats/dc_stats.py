@@ -1,4 +1,6 @@
 # AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
+# AI modified: 2026-04-01T20:20:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
+# AI modified: 2026-04-01T22:47:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 import math
 from collections import Counter
 from collections.abc import Callable, Iterable
@@ -1477,8 +1479,9 @@ class DCStats(TensorStats):
             - If mixed, and the join-like arguments cover all output indices, prefer
                 join merge; otherwise perform union merge over all arguments.
         """
+        if not isinstance(op, FinchOperator):
+            raise AssertionError("MapJoin requires a Finch operator.")
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
-        assert isinstance(op, FinchOperator)
         join_like_args: list[TensorStats] = []
         union_like_args: list[TensorStats] = []
         for stats in all_stats:

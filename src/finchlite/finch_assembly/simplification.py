@@ -1,6 +1,7 @@
 # AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # AI modified: 2026-04-01T17:28:42Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
+# AI modified: 2026-04-01T20:20:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 from .. import finch_assembly as asm
 from ..algebra import ffunc, is_annihilator, is_identity
 from ..algebra.algebra import FinchOperator
@@ -22,7 +23,6 @@ class AssemblySimplify(AssemblyTransform):
                 return y
             # op(..., arg, ...) where arg is anihilator => arg
             case asm.Call(asm.Literal(_) as op, args):
-                assert isinstance(op.val, FinchOperator)
                 for arg in args:
                     match arg:
                         case asm.Literal(val) if isinstance(
@@ -49,7 +49,6 @@ class AssemblySimplify(AssemblyTransform):
             ) if s1 == s2 and idx1 == idx2:
                 if op == ffunc.init_write(arg.val):
                     return asm.Block(())
-                assert isinstance(op, FinchOperator)
                 if is_identity(op, arg.val):
                     return asm.Block(())
             # loop(...) {} is removed
