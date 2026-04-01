@@ -1,4 +1,4 @@
-import operator
+from ..algebra import operator
 from dataclasses import dataclass
 
 import numpy as np

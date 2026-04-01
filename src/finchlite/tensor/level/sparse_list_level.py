@@ -1,4 +1,3 @@
-import operator
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -10,6 +9,7 @@ from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
+from ..algebra import operator
 
 
 class SparseListLevelFields(NamedTuple):

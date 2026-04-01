@@ -9,13 +9,12 @@ The extension is not yet available on VS Code marketplace. You can find
 installation file here: https://github.com/finch-tensor/vscode-finch-assembly/releases
 """
 
-import operator
 
 import numpy as np
 
 from lark import Lark, Token, Tree
 
-from ..algebra import scansearch
+from ..algebra import operator
 from . import nodes as asm
 
 assembly_parser = Lark(

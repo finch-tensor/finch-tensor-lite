@@ -275,7 +275,7 @@ class Produces(EinsumTree, EinsumStatement):
 
 
 infix_strs = {
-    overwrite: "",
+    operator.overwrite: "",
     operator.add: "+",
     operator.sub: "-",
     operator.mul: "*",
@@ -288,8 +288,8 @@ infix_strs = {
     operator.floordiv: "//",
     operator.mod: "%",
     operator.pow: "**",
-    promote_max: "max",
-    promote_min: "min",
+    operator.promote_max: "max",
+    operator.promote_min: "min",
 }
 
 

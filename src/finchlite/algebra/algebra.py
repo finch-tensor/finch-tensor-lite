@@ -52,10 +52,8 @@ property of the `fill_value` attribute by defining a `fill_value` in the class
 itself.
 """
 
-
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Hashable
-from functools import reduce
 from typing import Any
 
 import numpy as np
@@ -189,6 +187,7 @@ class COperator(ABC):
     def c_function_call(self, ctx: Any, *args: Any) -> Any:
         pass
 
+
 class NumbaOperator:
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
         return f"({f' {self.numba_name()} '.join(map(ctx, args))})"
@@ -258,6 +257,7 @@ def return_type(op: FinchOperator, *args: Any) -> Any:
 
 def init_value(op: FinchOperator, arg: Any) -> Any:
     return op.init_value(arg)
+
 
 def fixpoint_type(op: FinchOperator, z: Any, t: type) -> type:
     """
@@ -351,4 +351,3 @@ def cansplitpush(x: FinchOperator, y: FinchOperator):
         and is_commutative(x)
         and is_associative(x)
     )
-

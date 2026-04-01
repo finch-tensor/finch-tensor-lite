@@ -1,4 +1,3 @@
-import operator
 from dataclasses import dataclass
 from typing import Any
 
@@ -6,7 +5,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import InitWrite, Tensor, overwrite
+from ..algebra import Tensor, operator
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..finch_assembly import AssemblyStructFType, TupleFType
 from ..symbolic import fisinstance, ftype
@@ -505,7 +504,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         )
         if obj.tns.dirty_bit and op.val is overwrite:
             increment_call = asm.Call(
-                asm.Literal(InitWrite(tns.type.fill_value)),
+                asm.Literal(operator.init_write(tns.type.fill_value)),
                 (asm.Load(obj.tns.buf_s, pos_e), increment_call),
             )
 

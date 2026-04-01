@@ -1,5 +1,4 @@
 import math
-import operator
 from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -10,7 +9,7 @@ import numpy as np
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import Tensor, is_annihilator
+from ...algebra import operator, Tensor, is_annihilator
 from ...compile import BufferizedNDArray, dimension
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
@@ -236,7 +235,7 @@ class DCStats(TensorStats):
                             ntn.Assign(
                                 dim_dc_variables[i],
                                 ntn.Call(
-                                    ntn.Literal(max),
+                                    ntn.Literal(operator.max),
                                     (
                                         dim_dc_variables[i],
                                         ntn.Unwrap(
@@ -633,7 +632,7 @@ class DCStats(TensorStats):
                                         ntn.Assign(
                                             d_j_i,
                                             ntn.Call(
-                                                ntn.Literal(max),
+                                                ntn.Literal(operator.max),
                                                 (
                                                     d_j_i,
                                                     ntn.Unwrap(

@@ -1,4 +1,3 @@
-import operator
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -10,7 +9,7 @@ from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
-
+from ..algebra import operator
 
 class DenseLevelFields(NamedTuple):
     lvl_asm: asm.AssemblyExpression  # assembly expression of the current level

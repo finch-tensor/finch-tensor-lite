@@ -1,4 +1,4 @@
-import operator
+from finchlite import operator
 
 import numpy as np
 

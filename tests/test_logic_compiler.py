@@ -1,5 +1,3 @@
-import operator
-
 import numpy as np
 
 import finchlite.finch_logic as logic
@@ -22,6 +20,7 @@ from finchlite.finch_logic import (
 from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal, reset_name_counts
+from finchlite.algebra import operator
 
 
 def test_logic_compiler(file_regression):

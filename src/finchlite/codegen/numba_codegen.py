@@ -10,7 +10,6 @@ import numba
 from .. import finch_assembly as asm
 from ..algebra import (
     NumbaOperator,
-    as_finch_operator,
     query_property,
     register_property,
     scansearch,
@@ -608,11 +607,11 @@ class NumbaContext(Context):
                     val_code,
                 )
                 return None
-            case asm.Call(asm.Literal(val), args):
-                finch_op = as_finch_operator(val)
-                if not isinstance(finch_op, NumbaOperator):
-                    raise TypeError(f"{finch_op} has no Numba representation.")
-                return finch_op.numba_literal(val, self, *args)
+            case asm.Call(asm.Literal(op), args):
+                assert isinstance(op, NumbaOperator)
+                if not isinstance(op, NumbaOperator):
+                    raise TypeError(f"{op} has no Numba representation.")
+                return op.numba_literal(val, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_format != var_t:

@@ -1,5 +1,4 @@
-import _operator  # noqa: F401
-import operator
+from finchlite import operator
 
 import pytest
 
