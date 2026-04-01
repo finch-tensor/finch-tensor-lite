@@ -470,6 +470,9 @@ def lazy(arr) -> LazyTensor:
     Returns:
     - LazyTensor: A lazy representation of the input array.
     """
+    if not isinstance(arr, Tensor):
+        return arr
+    
     if isinstance(arr, LazyTensor):
         return arr
     arr = asarray(arr)
