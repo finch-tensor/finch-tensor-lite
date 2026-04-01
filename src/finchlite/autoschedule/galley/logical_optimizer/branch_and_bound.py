@@ -166,7 +166,7 @@ def pruned_query_to_plan(
     cur_aq = _aq_with_stats(input_aq)
 
     # --- Process components until no more reducible indices ---
-    # Do this instead of for comp in components because components 
+    # Do this instead of for comp in components because components
     # are recomputed in reduce_idx same as julia code
     while cur_aq.get_reducible_idxs():
         component = cur_aq.connected_components[0]

@@ -19,12 +19,13 @@ from functools import reduce
 
 import numpy as np
 
-import finchlite as fl
-import finchlite.interface as fl_interface
 from galley_compile_benchmarks import (
     _recursion_limit_ctx,
     plan_from_expr,
 )
+
+import finchlite as fl
+import finchlite.interface as fl_interface
 from finchlite.algebra import as_finch_operator
 from finchlite.autoschedule import (
     DefaultLogicFormatter,
@@ -209,7 +210,9 @@ def _four_index_chain_aq() -> AnnotatedQuery:
 
 
 def _three_index_chain_aq() -> AnnotatedQuery:
-    return AnnotatedQuery(DenseStats, _three_index_chain_query(), bindings=OrderedDict())
+    return AnnotatedQuery(
+        DenseStats, _three_index_chain_query(), bindings=OrderedDict()
+    )
 
 
 def _skewed_four_matrix_aq() -> AnnotatedQuery:

@@ -110,4 +110,4 @@ def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
     assert r_greedy is not None and r_exact is not None
     (_, _, _, cost_k1), _ = r_greedy
     (_, _, _, cost_kinf), _ = r_exact
-    assert cost_kinf <= cost_k1 
+    assert cost_kinf <= cost_k1
