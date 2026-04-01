@@ -1,5 +1,6 @@
 # AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
+# AI modified: 2026-04-01T17:55:00Z 1234567890abcdef1234567890abcdef
 """
 Finch performs extensive rewriting and defining of functions.  The Finch
 compiler is designed to inspect objects and functions defined by other
@@ -227,6 +228,11 @@ class FinchOperator(ABC):
         if self.is_idempotent:
             return None
         raise AttributeError(f"{type(self)} has no repeat_operator")
+
+    def __qual_str__(self) -> str:
+        """Return qualified string for printing/display purposes."""
+        # Display as just the lowercase name
+        return repr(self)
 
 
 def is_associative(op: FinchOperator) -> bool:

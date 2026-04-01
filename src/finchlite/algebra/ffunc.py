@@ -1,6 +1,8 @@
 # AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # AI modified: 2026-04-01T17:28:42Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
+# AI modified: 2026-04-01T18:10:00Z 09431a5eedd67043b459fb6eafbfc5fd936fcf19
+# AI modified: 2026-04-01T18:25:00Z 09431a5eedd67043b459fb6eafbfc5fd936fcf19
 # functions ported from ops.py
 import builtins
 import operator
@@ -58,6 +60,9 @@ class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.add"
+
     @property
     def c_symbol(self) -> str:
         return "+"
@@ -87,6 +92,9 @@ add = Add()
 class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.mul"
 
     @property
     def c_symbol(self) -> str:
@@ -118,6 +126,8 @@ mul = Mul()
 
 
 class Sub(ReflexiveFinchOperator, CBinaryOperator, NumbaOperator):
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.sub"
     @property
     def c_symbol(self) -> str:
         return "-"
@@ -135,6 +145,9 @@ sub = Sub()
 class MatMul(ReflexiveFinchOperator):
     is_associative = True
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.matmul"
+
     def __call__(self, a: Any, b: Any):
         return operator.matmul(a, b)
 
@@ -146,6 +159,9 @@ class TrueDiv(ReflexiveFinchOperator, CBinaryOperator):
     @property
     def c_symbol(self) -> str:
         return "/"
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.truediv"
 
     def __call__(self, a: Any, b: Any):
         return operator.truediv(a, b)
@@ -162,6 +178,9 @@ class FloorDiv(ReflexiveFinchOperator, CBinaryOperator):
     def c_symbol(self) -> str:
         return "/"
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.floordiv"
+
     def __call__(self, a: Any, b: Any):
         return operator.floordiv(a, b)
 
@@ -174,6 +193,9 @@ class Mod(ReflexiveFinchOperator, CBinaryOperator):
     def c_symbol(self) -> str:
         return "%"
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.mod"
+
     def __call__(self, a: Any, b: Any):
         return operator.mod(a, b)
 
@@ -184,6 +206,9 @@ mod = Mod()
 class DivMod(ReflexiveFinchOperator):
     def __call__(self, a: Any, b: Any):
         return divmod(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.divmod"
 
 
 divmod = DivMod()
@@ -207,6 +232,9 @@ class Pow(ReflexiveFinchOperator, COperator):
     def is_annihilator(self, arg):
         return arg == 0
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.pow"
+
 
 pow = Pow()
 
@@ -221,6 +249,9 @@ class LShift(ReflexiveFinchOperator, CBinaryOperator):
 
     def is_identity(self, arg):
         return arg == 0
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.lshift"
 
 
 lshift = LShift()
@@ -237,6 +268,9 @@ class RShift(ReflexiveFinchOperator, CBinaryOperator):
     def is_identity(self, arg):
         return arg == 0
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.rshift"
+
 
 rshift = RShift()
 
@@ -245,6 +279,9 @@ class And(ReflexiveFinchOperator, CNAryOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.and_"
 
     @property
     def c_symbol(self) -> str:
@@ -273,6 +310,9 @@ class Xor(ReflexiveFinchOperator, CNAryOperator):
     is_associative = True
     is_commutative = True
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.xor"
+
     @property
     def c_symbol(self) -> str:
         return "^"
@@ -294,6 +334,9 @@ class Or(ReflexiveFinchOperator, CNAryOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.or_"
 
     @property
     def c_symbol(self) -> str:
@@ -323,12 +366,18 @@ class Not(CNUnaryOperator):
     def c_symbol(self) -> str:
         return "!"
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.not_"
+
 
 not_ = Not()
 
 
 class Abs(UnaryFinchOperator):
     is_idempotent = True
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.abs"
 
     def __call__(self, a: Any):
         return operator.abs(a)
@@ -339,6 +388,9 @@ abs = Abs()
 
 class Pos(UnaryFinchOperator):
     is_idempotent = True
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.pos"
 
     def __call__(self, a: Any):
         return operator.pos(a)
@@ -351,6 +403,9 @@ class Neg(UnaryFinchOperator):
     def __call__(self, a: Any):
         return operator.neg(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.neg"
+
 
 neg = Neg()
 
@@ -362,6 +417,9 @@ class Invert(UnaryFinchOperator, CNUnaryOperator):
 
     def __call__(self, a: Any):
         return operator.invert(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.invert"
 
 
 invert = Invert()
@@ -380,6 +438,9 @@ class Eq(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     def __call__(self, a: Any, b: Any):
         return operator.eq(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.eq"
+
 
 eq = Eq()
 
@@ -394,6 +455,9 @@ class Ne(ComparisonFinchOperator, CBinaryOperator):
     def __call__(self, a: Any, b: Any):
         return operator.ne(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.ne"
+
 
 ne = Ne()
 
@@ -405,6 +469,9 @@ class Gt(ComparisonFinchOperator, CBinaryOperator):
 
     def __call__(self, a: Any, b: Any):
         return operator.gt(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.gt"
 
 
 gt = Gt()
@@ -421,6 +488,9 @@ class Lt(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     def __call__(self, a: Any, b: Any):
         return operator.lt(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.lt"
+
 
 lt = Lt()
 
@@ -433,6 +503,9 @@ class Ge(ComparisonFinchOperator, CBinaryOperator):
     def __call__(self, a: Any, b: Any):
         return operator.ge(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.ge"
+
 
 ge = Ge()
 
@@ -444,6 +517,9 @@ class Le(ComparisonFinchOperator, CBinaryOperator):
 
     def __call__(self, a: Any, b: Any):
         return operator.le(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.le"
 
 
 le = Le()
@@ -492,6 +568,9 @@ class Divide(BinaryFloatOperator):
     def is_identity(self, val) -> bool:
         return val == 1
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.divide"
+
 
 divide = Divide()
 
@@ -512,6 +591,9 @@ class LogAddExp(BinaryFloatOperator):
 
     def init_value(self, type_: type) -> Any:
         return -np.inf
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.logaddexp"
 
 
 logaddexp = LogAddExp()
@@ -535,6 +617,9 @@ class LogicalAnd(LogicalBinaryOperator):
     def init_value(self, type_: type) -> Any:
         return True
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.logical_and"
+
 
 logical_and = LogicalAnd()
 
@@ -557,6 +642,9 @@ class LogicalOr(LogicalBinaryOperator):
     def init_value(self, type_: type) -> Any:
         return False
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.logical_or"
+
 
 logical_or = LogicalOr()
 
@@ -573,6 +661,9 @@ class LogicalXor(LogicalBinaryOperator):
     def init_value(self, type_: type) -> Any:
         return False
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.logical_xor"
+
 
 logical_xor = LogicalXor()
 
@@ -581,6 +672,9 @@ class LogicalNot(UnaryBoolOperator):
     def __call__(self, a):
         return np.logical_not(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.logical_not"
+
 
 logical_not = LogicalNot()
 
@@ -588,6 +682,9 @@ logical_not = LogicalNot()
 class Truth(UnaryBoolOperator):
     def __call__(self, a: Any):
         return bool(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.truth"
 
 
 truth = Truth()
@@ -616,6 +713,9 @@ class Min(FinchOperator, NumbaOperator):
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
         return f"min({', '.join(map(ctx, args))})"
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.min"
+
 
 min = Min()
 
@@ -643,6 +743,9 @@ class Max(FinchOperator, NumbaOperator):
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
         return f"max({', '.join(map(ctx, args))})"
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.max"
+
 
 max = Max()
 
@@ -650,6 +753,9 @@ max = Max()
 class Remainder(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.remainder(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.remainder"
 
 
 remainder = Remainder()
@@ -661,6 +767,9 @@ class Hypot(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.hypot(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.hypot"
+
 
 hypot = Hypot()
 
@@ -668,6 +777,9 @@ hypot = Hypot()
 class Atan2(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.atan2(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.atan2"
 
 
 atan2 = Atan2()
@@ -677,6 +789,9 @@ class Copysign(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.copysign(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.copysign"
+
 
 copysign = Copysign()
 
@@ -684,6 +799,9 @@ copysign = Copysign()
 class Nextafter(BinaryFloatOperator):
     def __call__(self, a, b):
         return np.nextafter(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.nextafter"
 
 
 nextafter = Nextafter()
@@ -693,6 +811,9 @@ class IsFinite(UnaryBoolOperator):
     def __call__(self, a):
         return np.isfinite(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.isfinite"
+
 
 isfinite = IsFinite()
 
@@ -701,6 +822,9 @@ class IsInf(UnaryBoolOperator):
     def __call__(self, a):
         return np.isinf(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.isinf"
+
 
 isinf = IsInf()
 
@@ -708,6 +832,9 @@ isinf = IsInf()
 class IsNan(UnaryBoolOperator):
     def __call__(self, a):
         return np.isnan(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.isnan"
 
 
 isnan = IsNan()
@@ -720,6 +847,9 @@ class Real(UnaryOperator):
     def return_type(self, a: Any) -> type:
         return float
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.real"
+
 
 real = Real()
 
@@ -730,6 +860,9 @@ class Imag(UnaryOperator):
 
     def return_type(self, a: Any) -> type:
         return float
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.imag"
 
 
 imag = Imag()
@@ -742,6 +875,9 @@ class Clip(FinchOperator):
     def return_type(self, a: Any, b: Any, c: Any) -> type:
         return float
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.clip"
+
 
 clip = Clip()
 
@@ -751,6 +887,9 @@ class Equal(BinaryBoolOperator):
 
     def __call__(self, a: Any, b: Any):
         return np.equal(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.equal"
 
 
 equal = Equal()
@@ -762,6 +901,9 @@ class NotEqual(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.not_equal(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.not_equal"
+
 
 not_equal = NotEqual()
 
@@ -769,6 +911,9 @@ not_equal = NotEqual()
 class Less(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.less(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.less"
 
 
 less = Less()
@@ -778,6 +923,9 @@ class LessEqual(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.less_equal(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.less_equal"
+
 
 less_equal = LessEqual()
 
@@ -785,6 +933,9 @@ less_equal = LessEqual()
 class Greater(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater(a, b)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.greater"
 
 
 greater = Greater()
@@ -794,6 +945,9 @@ class GreaterEqual(BinaryBoolOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater_equal(a, b)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.greater_equal"
+
 
 greater_equal = GreaterEqual()
 
@@ -801,6 +955,9 @@ greater_equal = GreaterEqual()
 class Reciprocal(UnaryOperator):
     def __call__(self, a: Any):
         return np.reciprocal(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.reciprocal"
 
 
 reciprocal = Reciprocal()
@@ -810,6 +967,9 @@ class Sin(UnaryOperator):
     def __call__(self, a: Any):
         return np.sin(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.sin"
+
 
 sin = Sin()
 
@@ -817,6 +977,9 @@ sin = Sin()
 class Cos(UnaryOperator):
     def __call__(self, a: Any):
         return np.cos(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.cos"
 
 
 cos = Cos()
@@ -826,6 +989,9 @@ class Tan(UnaryOperator):
     def __call__(self, a: Any):
         return np.tan(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.tan"
+
 
 tan = Tan()
 
@@ -833,6 +999,9 @@ tan = Tan()
 class Sinh(UnaryOperator):
     def __call__(self, a: Any):
         return np.sinh(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.sinh"
 
 
 sinh = Sinh()
@@ -842,6 +1011,9 @@ class Cosh(UnaryOperator):
     def __call__(self, a: Any):
         return np.cosh(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.cosh"
+
 
 cosh = Cosh()
 
@@ -849,6 +1021,9 @@ cosh = Cosh()
 class Tanh(UnaryOperator):
     def __call__(self, a: Any):
         return np.tanh(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.tanh"
 
 
 tanh = Tanh()
@@ -858,6 +1033,9 @@ class Atan(UnaryOperator):
     def __call__(self, a: Any):
         return np.atan(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.atan"
+
 
 atan = Atan()
 
@@ -865,6 +1043,9 @@ atan = Atan()
 class Asinh(UnaryOperator):
     def __call__(self, a: Any):
         return np.asinh(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.asinh"
 
 
 asinh = Asinh()
@@ -874,6 +1055,9 @@ class Asin(UnaryOperator):
     def __call__(self, a: Any):
         return np.asin(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.asin"
+
 
 asin = Asin()
 
@@ -881,6 +1065,9 @@ asin = Asin()
 class Acos(UnaryOperator):
     def __call__(self, a: Any):
         return np.acos(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.acos"
 
 
 acos = Acos()
@@ -890,6 +1077,9 @@ class Acosh(UnaryOperator):
     def __call__(self, a: Any):
         return np.acosh(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.acosh"
+
 
 acosh = Acosh()
 
@@ -897,6 +1087,9 @@ acosh = Acosh()
 class Atanh(UnaryOperator):
     def __call__(self, a: Any):
         return np.atanh(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.atanh"
 
 
 atanh = Atanh()
@@ -916,6 +1109,9 @@ class Round(UnaryOperator):
     def __call__(self, a: Any):
         return np.round(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.round"
+
 
 round = Round()
 
@@ -925,6 +1121,9 @@ class Floor(UnaryOperator):
 
     def __call__(self, a: Any):
         return np.floor(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.floor"
 
 
 floor = Floor()
@@ -936,6 +1135,9 @@ class Ceil(UnaryOperator):
     def __call__(self, a: Any):
         return np.ceil(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.ceil"
+
 
 ceil = Ceil()
 
@@ -946,6 +1148,9 @@ class Trunc(UnaryOperator):
     def __call__(self, a: Any):
         return np.trunc(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.trunc"
+
 
 trunc = Trunc()
 
@@ -953,6 +1158,9 @@ trunc = Trunc()
 class Exp(UnaryOperator):
     def __call__(self, a: Any):
         return np.exp(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.exp"
 
 
 exp = Exp()
@@ -962,6 +1170,9 @@ class Expm1(UnaryOperator):
     def __call__(self, a: Any):
         return np.expm1(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.expm1"
+
 
 expm1 = Expm1()
 
@@ -969,6 +1180,9 @@ expm1 = Expm1()
 class Log(UnaryOperator):
     def __call__(self, a: Any):
         return np.log(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.log"
 
 
 log = Log()
@@ -978,6 +1192,9 @@ class Log1p(UnaryOperator):
     def __call__(self, a: Any):
         return np.log1p(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.log1p"
+
 
 log1p = Log1p()
 
@@ -985,6 +1202,9 @@ log1p = Log1p()
 class Log2(UnaryOperator):
     def __call__(self, a: Any):
         return np.log2(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.log2"
 
 
 log2 = Log2()
@@ -994,6 +1214,9 @@ class Log10(UnaryOperator):
     def __call__(self, a: Any):
         return np.log10(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.log10"
+
 
 log10 = Log10()
 
@@ -1001,6 +1224,9 @@ log10 = Log10()
 class Signbit(UnaryBoolOperator):
     def __call__(self, a: Any):
         return np.signbit(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.signbit"
 
 
 signbit = Signbit()
@@ -1010,6 +1236,9 @@ class Sqrt(UnaryOperator):
     def __call__(self, a: Any):
         return np.sqrt(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.sqrt"
+
 
 sqrt = Sqrt()
 
@@ -1018,6 +1247,9 @@ class Square(UnaryOperator):
     def __call__(self, a: Any):
         return np.square(a)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.square"
+
 
 square = Square()
 
@@ -1025,6 +1257,9 @@ square = Square()
 class Sign(UnaryOperator):
     def __call__(self, a: Any):
         return np.sign(a)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.sign"
 
 
 sign = Sign()
@@ -1045,6 +1280,9 @@ class PromoteMin(FinchOperator):
     def init_value(self, arg):
         return type_max(arg)
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.promote_min"
+
 
 promote_min = PromoteMin()
 
@@ -1063,6 +1301,9 @@ class PromoteMax(FinchOperator):
 
     def init_value(self, arg):
         return type_min(arg)
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.promote_max"
 
 
 promote_max = PromoteMax()
@@ -1095,6 +1336,9 @@ class _InitWrite(FinchOperator, NumbaOperator):
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
         return ctx(args[1])
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc._initwrite"
+
 
 def init_write(value):
     return _InitWrite(value)
@@ -1111,6 +1355,9 @@ class Overwrite(FinchOperator):
     def return_type(self, x: Any, y: Any) -> type:
         return y
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.overwrite"
+
 
 overwrite = Overwrite()
 
@@ -1125,6 +1372,9 @@ class FirstArg(FinchOperator):
 
     def return_type(self, *args) -> type:
         return args[0]
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.first_arg"
 
 
 first_arg = FirstArg()
@@ -1143,6 +1393,9 @@ class Identity(FinchOperator):
     def return_type(self, x: Any) -> type:
         return x
 
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.identity"
+
 
 identity = Identity()
 
@@ -1157,6 +1410,9 @@ class Conjugate(FinchOperator):
 
     def return_type(self, x: Any) -> type:
         return x
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.conjugate"
 
 
 conjugate = Conjugate()
@@ -1176,6 +1432,9 @@ class MakeTuple(FinchOperator, NumbaOperator):
 
     def numba_literal(self, val: Any, ctx: Any, *args: Any):
         return f"({','.join([ctx(arg) for arg in args])},)"
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.make_tuple"
 
 
 make_tuple = MakeTuple()
@@ -1228,6 +1487,9 @@ class Scansearch(FinchOperator, NumbaOperator):
         lo = args[2]
         hi = args[3]
         return f"scansearch({ctx(arr)}, {ctx(x)}, {ctx(lo)}, {ctx(hi)})"
+
+    def __repr__(self) -> str:
+        return "finchlite.ffunc.scansearch"
 
 
 scansearch = Scansearch()
