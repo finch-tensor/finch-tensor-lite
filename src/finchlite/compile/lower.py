@@ -9,7 +9,7 @@ import numpy as np
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import TensorFType, register_property
-from ..algebra.algebra import FinchOperator, SingletonMeta
+from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -98,7 +98,7 @@ class Extent(FTyped):
         )
 
 
-class ExtentOp(FinchOperator, metaclass=SingletonMeta):
+class ExtentOp(FinchOperator):
     __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
 
     def __call__(self, start: Any, end: Any) -> Extent:
@@ -106,6 +106,9 @@ class ExtentOp(FinchOperator, metaclass=SingletonMeta):
 
     def return_type(self, start: Any, end: Any):
         return ExtentFType(start, end)  # type: ignore[abstract]
+
+
+extent_op = ExtentOp()
 
 
 def dimension(tns, mode: int) -> Extent:
@@ -159,7 +162,7 @@ class SymbolicExtent(FTyped):
     @classmethod
     def from_notation(cls, node: ntn.NotationNode):
         match node:
-            case ntn.Call(ntn.Literal(op), (start, end)) if op is ExtentOp():
+            case ntn.Call(ntn.Literal(op), (start, end)) if op is extent_op:
                 return SymbolicExtent(start, end)
             case _:
                 raise Exception(node)

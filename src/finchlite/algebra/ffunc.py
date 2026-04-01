@@ -897,6 +897,14 @@ class Atanh(UnaryOperator):
 
 atanh = Atanh()
 
+# Backward-compatible aliases.
+arcsin = asin
+arccos = acos
+arctan = atan
+arcsinh = asinh
+arccosh = acosh
+arctanh = atanh
+
 
 class Round(UnaryOperator):
     is_idempotent = True
@@ -1232,6 +1240,12 @@ __all__ = [
     "atan",
     "atan2",
     "atanh",
+    "arccos",
+    "arccosh",
+    "arcsin",
+    "arcsinh",
+    "arctan",
+    "arctanh",
     "ceil",
     "clip",
     "conjugate",

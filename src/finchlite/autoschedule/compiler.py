@@ -14,7 +14,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
 from ..algebra import ffunc
-from ..compile.lower import ExtentOp
+from ..compile.lower import extent_op
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, compute_shape_vars
 from ..finch_notation import NotationInterpreter
@@ -172,7 +172,7 @@ class NotationContext:
                 for idx in reversed(loop_idxs):
                     t = loops[idx].type_
                     ext = ntn.Call(
-                        ntn.Literal(ExtentOp()),
+                        ntn.Literal(extent_op),
                         (ntn.Literal(t(0)), shapes.get(idx) or shapes[remap_idxs[idx]]),
                     )
                     if idx in remap_idxs:
@@ -235,7 +235,7 @@ class NotationContext:
                 for idx in reversed(idxs_1):
                     t = loops[idx].type_
                     ext = ntn.Call(
-                        ntn.Literal(ExtentOp()),
+                        ntn.Literal(extent_op),
                         (ntn.Literal(t(0)), shapes[idx]),
                     )
                     body = ntn.Loop(

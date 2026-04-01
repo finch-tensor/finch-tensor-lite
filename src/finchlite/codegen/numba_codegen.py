@@ -611,7 +611,7 @@ class NumbaContext(Context):
                 assert isinstance(op, NumbaOperator)
                 if not isinstance(op, NumbaOperator):
                     raise TypeError(f"{op} has no Numba representation.")
-                return op.numba_literal(val, self, *args)
+                return op.numba_literal(op, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_format != var_t:
