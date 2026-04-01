@@ -41,14 +41,16 @@ class NumberedStatement(FusedTree, FusedStatement):
 
 def number_statements(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
     """
-    Recursively traverse the AST and wrap each statement in a NumberedStatement with a unique id.
+    Recursively traverse the AST and wrap each statement in a NumberedStatement
+      with a unique id.
 
     Args:
         node: The root node of the AST to number.
         sid: The starting statement id for numbering. Defaults to 0.
 
     Returns:
-        A tuple containing the new AST with numbered statements and the next available statement id.
+        A tuple containing the new AST with numbered statements and the next
+        available statement id.
     """
 
     def go(node: FusedNode) -> FusedNode:
@@ -209,7 +211,7 @@ class FusedCFGBuilder:
                 self.current_block.add_successor(body_block)
                 self.current_block.add_successor(after_block)
                 self.current_block = after_block
-            case For(iter_var, iter, body):
+            case For(_, iter, body):
                 before_block = self.current_block
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()

@@ -372,3 +372,4 @@ class FusedPrinterContext(Context):
                 return None
             case prgm:
                 self.exec(f"{self.feed}{str(prgm)}")
+                return None

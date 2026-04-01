@@ -224,7 +224,7 @@ def test_lazy_and_compute_insertion():
     def simple_fn(A, B, C, n_iter):
         D = matmul(A, B)
         E = add(A, C)
-        for i in range(n_iter):
+        for _i in range(n_iter):
             D = add(D, E)
         return D
 
@@ -232,7 +232,7 @@ def test_lazy_and_compute_insertion():
     def opt_simple_fn(A, B, C, n_iter):
         D = matmul(A, B)
         E = add(A, C)
-        for i in range(n_iter):
+        for _i in range(n_iter):
             D = add(D, E)
         return D
 
