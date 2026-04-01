@@ -1,3 +1,4 @@
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 import math
 from collections import Counter
 from collections.abc import Callable, Iterable
@@ -10,6 +11,7 @@ from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
 from ...algebra import Tensor, ffunc, is_annihilator
+from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
@@ -1476,6 +1478,7 @@ class DCStats(TensorStats):
                 join merge; otherwise perform union merge over all arguments.
         """
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
+        assert isinstance(op, FinchOperator)
         join_like_args: list[TensorStats] = []
         union_like_args: list[TensorStats] = []
         for stats in all_stats:

@@ -1,16 +1,19 @@
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
+# AI modified: 2026-04-01T17:28:42Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 from collections import OrderedDict
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
 from ....algebra import (
-    InitWrite,
     cansplitpush,
+    ffunc,
     is_associative,
     is_commutative,
     is_distributive,
     repeat_operator,
 )
+from ....algebra.algebra import FinchOperator
 from ....finch_logic import (
     Aggregate,
     Alias,
@@ -109,7 +112,7 @@ class AnnotatedQuery:
                         top_counter += 1
 
                         if op.val is None:
-                            idx_op[idx] = InitWrite(cache[arg].fill_value)
+                            idx_op[idx] = ffunc.init_write(cache[arg].fill_value)
                             idx_init[idx] = cache[arg].fill_value
                         else:
                             idx_op[idx] = op.val
@@ -154,6 +157,7 @@ class AnnotatedQuery:
                         # If the lowest root doesn't contain the reduction index, we
                         # attempt to remove the reduction via a repeat_operator, i.e.
                         # ∑_i B_j = B_j*|Dom(i)|
+                        assert isinstance(agg_op, FinchOperator)
                         f = repeat_operator(agg_op)
                         if f is None:
                             continue
@@ -200,6 +204,7 @@ class AnnotatedQuery:
                     connected_idxs[idx1].add(idx2)
                 mergeable_agg_op = (
                     idx1_op == idx2_op
+                    and isinstance(idx1_op, FinchOperator)
                     and is_associative(idx1_op)
                     and is_commutative(idx1_op)
                 )
@@ -480,10 +485,17 @@ class AnnotatedQuery:
                 args_with = [arg for arg in args if idx in arg.fields()]
                 args_without = [arg for arg in args if idx not in arg.fields()]
 
-                if len(args_with) == 1 and is_distributive(mj_op, op.val):
+                if (
+                    len(args_with) == 1
+                    and isinstance(mj_op, FinchOperator)
+                    and isinstance(op.val, FinchOperator)
+                    and is_distributive(mj_op, op.val)
+                ):
                     return AnnotatedQuery.find_lowest_roots(op, idx, args_with[0])
 
-                if cansplitpush(op.val, mj_op):
+                if isinstance(op.val, FinchOperator) and isinstance(
+                    mj_op, FinchOperator
+                ) and cansplitpush(op.val, mj_op):
                     roots_without: list[LogicExpression] = list(args_without)
                     roots_with: list[LogicExpression] = []
                     for arg in args_with:
@@ -541,7 +553,11 @@ class AnnotatedQuery:
 
         use_root = False
         match root_node:
-            case MapJoin(Literal(op), args) as mj if is_distributive(op, reduce_op):
+            case MapJoin(Literal(op), args) as mj if isinstance(
+                op, FinchOperator
+            ) and isinstance(reduce_op, FinchOperator) and is_distributive(
+                op, reduce_op
+            ):
                 # If you're already reducing one index, then it may
                 # make sense to reduce others as well.
                 # E.g. when you reduce one vertex of a triangle, you should

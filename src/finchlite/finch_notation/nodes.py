@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 from dataclasses import dataclass
 from typing import Any
 
@@ -255,7 +256,7 @@ class Update(AccessMode, NotationTree):
     mode allows reading and modifying the value of a tensor.  Increment
     operations are allowed in this mode, and will use the update operation `op`
     to increment `ref` with `val` as `ref = op(ref, val)`.  To overwrite the
-    value of a tensor, use the ops `algebra.overwrite` or `algebra.InitWrite`.
+    value of a tensor, use the ops `algebra.overwrite` or `algebra.init_write`.
     Attributes:
         op: The operation used to update the value of the tensor.
     """

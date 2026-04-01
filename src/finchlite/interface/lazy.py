@@ -1,3 +1,4 @@
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 from __future__ import annotations
 
 import bisect
@@ -15,6 +16,7 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from .. import finch_einsum as ein
 from ..algebra import (
+    FinchOperator,
     Tensor,
     TensorFType,
     ffunc,
@@ -701,6 +703,7 @@ def reduce(
         ``dtype`` parameter above.
     """
     x = lazy(x)
+    assert isinstance(op, FinchOperator)
     if init is None:
         init = init_value(op, x.element_type)
     if axis is None:
@@ -790,6 +793,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
+    assert isinstance(f, FinchOperator)
     args = tuple(lazy(a) for a in args)
     shape = _broadcast_shape(*(arg.shape for arg in args))
     ndim = len(shape)

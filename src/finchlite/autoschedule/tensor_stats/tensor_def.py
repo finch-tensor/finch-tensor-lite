@@ -1,3 +1,4 @@
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 import math
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
@@ -15,6 +16,7 @@ from finchlite.finch_logic import (
 )
 
 from ...algebra import is_idempotent, is_identity, repeat_operator
+from ...algebra.algebra import FinchOperator
 
 
 class TensorDef:
@@ -181,6 +183,7 @@ class TensorDef:
         """
         red_set = set(reduce_indices) & set(d.index_order)
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
+        assert isinstance(op, FinchOperator)
 
         if init is None:
             if is_identity(op, d.fill_value) or is_idempotent(op):

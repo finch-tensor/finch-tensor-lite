@@ -1,10 +1,11 @@
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 import math
 from collections.abc import Callable
 from typing import Any, Self
 
 import numpy as np
 
-from finchlite.algebra.algebra import is_annihilator, is_identity
+from finchlite.algebra.algebra import FinchOperator, is_annihilator, is_identity
 from finchlite.finch_logic import Field
 
 from .tensor_def import TensorDef
@@ -60,6 +61,7 @@ class UniformStats(TensorStats):
 
     @staticmethod
     def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
+        assert isinstance(op, FinchOperator)
         def_args = [stat.tensordef for stat in args]
         new_def = TensorDef.mapjoin(op, *def_args)
         new_vol = UniformStats._get_volume(new_def)
@@ -100,6 +102,7 @@ class UniformStats(TensorStats):
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",
     ) -> "UniformStats":
+        assert isinstance(op, FinchOperator)
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
         res_vol = UniformStats._get_volume(new_def)
         red_set = set(reduce_indices) & set(stats.tensordef.index_order)

@@ -1,3 +1,5 @@
+# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
+# AI modified: 2026-04-01T17:28:42Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # functions ported from ops.py
 import operator
 from functools import reduce
@@ -1064,9 +1066,9 @@ class PromoteMax(FinchOperator):
 promote_max = PromoteMax()
 
 
-class InitWrite(FinchOperator, NumbaOperator):
+class _InitWrite(FinchOperator, NumbaOperator):
     """
-    InitWrite may assert that its first argument is
+    init_write may assert that its first argument is
     equal to z, and returns its second argument. This is useful when you want to
     communicate to the compiler that the tensor has already been initialized to
     a specific value.
@@ -1076,7 +1078,7 @@ class InitWrite(FinchOperator, NumbaOperator):
         self.value = value
 
     def __eq__(self, other):
-        return isinstance(other, InitWrite) and self.value == other.value
+        return isinstance(other, _InitWrite) and self.value == other.value
 
     def __hash__(self):
         return hash((self.value,))
@@ -1093,7 +1095,7 @@ class InitWrite(FinchOperator, NumbaOperator):
 
 
 def init_write(value):
-    return InitWrite(value)
+    return _InitWrite(value)
 
 
 class Overwrite(FinchOperator):
