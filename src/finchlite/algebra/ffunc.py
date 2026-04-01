@@ -1326,8 +1326,3 @@ __all__ = [
     "truth",
     "xor",
 ]
-
-
-for _name, _obj in list(globals().items()):
-    if isinstance(_obj, FinchOperator):
-        _obj.__qualname__ = _name

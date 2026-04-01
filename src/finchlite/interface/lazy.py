@@ -25,9 +25,7 @@ from ..algebra import (
     promote_type,
     return_type,
 )
-from ..algebra import (
-    conjugate as conj,
-)
+from ..algebra import ffunc
 from ..autoschedule.tensor_stats import StatsInterpreter, TensorStats
 from ..compile import BufferizedNDArray
 from ..finch_assembly import TupleFType
@@ -1142,7 +1140,7 @@ def conjugate(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the complex conjugate of `x`.
     """
-    return elementwise(conj, lazy(x))
+    return elementwise(ffunc.conjugate, lazy(x))
 
 
 def tensordot(

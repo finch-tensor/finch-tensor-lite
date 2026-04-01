@@ -12,7 +12,7 @@ from ..algebra import (
     NumbaOperator,
     query_property,
     register_property,
-    scansearch,
+    ffunc,
 )
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
@@ -30,7 +30,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {"scansearch": numba.njit(scansearch._func)}
+numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffunc.scansearch._func)}
 
 
 def numba_type(t):
