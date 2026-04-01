@@ -55,7 +55,7 @@ import threading
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.autoschedule.tensor_stats import DCStats
+from finchlite.autoschedule.tensor_stats import DenseStats
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -128,7 +128,7 @@ COMPILE_NUMBA = LogicNormalizer(
 # rather than the tensors themselves.
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DCStats,
+        DenseStats,
         LogicExecutor(
             LogicStandardizer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
@@ -184,7 +184,7 @@ def compute(arg, ctx=None):
         else:
             lazy_args.append(arg_i)
             lazy_arg_idxs.append(i)
-    
+
     if lazy_args:
         vars = tuple(Alias(gensym("A")) for _ in lazy_args)
         ctx_2 = lazy_args[0].ctx.join(*[x.ctx for x in lazy_args[1:]])
@@ -193,7 +193,8 @@ def compute(arg, ctx=None):
                 lambda arg, var: Query(
                     var,
                     Table(
-                        arg.data, tuple(Field(gensym("i")) for _ in range(len(arg.shape)))
+                        arg.data,
+                        tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
                     ),
                 ),
                 lazy_args,
@@ -202,8 +203,8 @@ def compute(arg, ctx=None):
         )
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
-        for i in lazy_arg_idxs:
-            outputs[i] = res[0][i]
+        for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
+            outputs[out_idx] = res[lazy_idx]
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
