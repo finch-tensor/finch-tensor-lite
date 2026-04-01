@@ -117,10 +117,10 @@ def test_propagate_map_queries_backward():
             Plan(()),
             Relabel(Alias("A1"), (Field("i0"), Field("i1"))),
             Aggregate(
-                Literal(add),
+                Literal(ffunc.add),
                 Literal(0),
                 MapJoin(
-                    Literal(mul),
+                    Literal(ffunc.mul),
                     (
                         Table(Literal(10), (Field("i2"),)),
                         Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
@@ -130,11 +130,11 @@ def test_propagate_map_queries_backward():
                 (Field("i3"),),
             ),
             Aggregate(
-                Literal(add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
+                Literal(ffunc.add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
             ),
             Reorder(
                 Aggregate(
-                    Literal(add),
+                    Literal(ffunc.add),
                     Literal(0),
                     Reorder(
                         Table(
@@ -526,11 +526,11 @@ def test_set_loop_order():
     plan = Query(
         Alias("C"),
         Aggregate(
-            Literal(add),
+            Literal(ffunc.add),
             Literal(0),
             Reorder(
                 MapJoin(
-                    Literal(mul),
+                    Literal(ffunc.mul),
                     (
                         Reorder(
                             Table(Alias("A"), (Field("i0"), Field("i1"))),
@@ -551,12 +551,12 @@ def test_set_loop_order():
     expected = Query(
         Alias("C"),
         Aggregate(
-            Literal(add),
+            Literal(ffunc.add),
             Literal(0),
             Reorder(
                 Reorder(
                     MapJoin(
-                        Literal(mul),
+                        Literal(ffunc.mul),
                         (
                             Reorder(
                                 Table(Alias("A"), (Field("i0"), Field("i1"))),
@@ -667,21 +667,21 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j)))
                 ),
             ),
             # matmul
             Query(
                 Alias("C"),
                 Aggregate(
-                    Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                    Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             # elemwise
             Query(
                 Alias("RES"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i)))
+                    Literal(ffunc.mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i)))
                 ),
             ),
             Produces((Alias("RES"),)),

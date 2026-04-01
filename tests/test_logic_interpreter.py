@@ -87,14 +87,14 @@ def test_plan_repr():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                     ),
                     (i, j),
                 ),
@@ -102,7 +102,8 @@ def test_plan_repr():
             Produces((Alias("C"),)),
         )
     )
-    assert p == eval(repr(p))
+    import finchlite
+    assert p == eval(repr(p), {'finchlite': finchlite, 'Literal': Literal, 'Alias': Alias, 'Field': Field, 'Query': Query, 'Table': Table, 'MapJoin': MapJoin, 'Reorder': Reorder, 'Aggregate': Aggregate, 'Plan': Plan, 'Produces': Produces})
 
 
 def test_materialize():
