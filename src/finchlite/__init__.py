@@ -1,4 +1,4 @@
-from .algebra import Tensor, TensorFType
+from .algebra import Tensor, TensorFType, ffunc
 from .autoschedule.tensor_stats import (
     DC,
     BlockedStats,
@@ -201,6 +201,7 @@ __all__ = [
     "broadcast_arrays",
     "broadcast_to",
     "ceil",
+    "ffunc",
     "clip",
     "combine_dims",
     "compute",

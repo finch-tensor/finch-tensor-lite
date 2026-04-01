@@ -1,4 +1,4 @@
-from . import operator
+from . import ffunc
 from .algebra import (
     COperator,
     InitWrite,
@@ -51,7 +51,7 @@ __all__ = [
     "is_idempotent",
     "is_identity",
     "make_tuple",
-    "operator",
+    "ffunc",
     "overwrite",
     "promote_max",
     "promote_min",

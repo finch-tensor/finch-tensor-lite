@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import operator
 from collections.abc import Iterable
 from typing import Any
 
@@ -14,7 +13,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import make_tuple, overwrite
+from ..algebra import ffunc
 from ..compile.lower import ExtentOp
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, compute_shape_vars
@@ -166,7 +165,7 @@ class NotationContext:
                 rhs = ctx(arg, loops)
                 lhs_access = ntn.Access(
                     self.slots[lhs],
-                    ntn.Update(ntn.Literal(overwrite)),
+                    ntn.Update(ntn.Literal(ffunc.overwrite)),
                     tuple(loops[idx] for idx in new_idxs),
                 )
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
@@ -179,7 +178,7 @@ class NotationContext:
                     if idx in remap_idxs:
                         body = ntn.If(
                             ntn.Call(
-                                ntn.Literal(operator.eq),
+                                ntn.Literal(ffunc.eq),
                                 (loops[idx], loops[remap_idxs[idx]]),
                             ),
                             body,
@@ -195,13 +194,13 @@ class NotationContext:
                         ntn.Declare(
                             self.slots[lhs],
                             ntn.Literal(self.bindings[lhs].fill_value),
-                            ntn.Literal(overwrite),
+                            ntn.Literal(ffunc.overwrite),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(overwrite),
+                            ntn.Literal(ffunc.overwrite),
                         ),
                     )
                 )
@@ -270,7 +269,7 @@ class NotationContext:
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
-                                ntn.Literal(make_tuple),
+                                ntn.Literal(ffunc.make_tuple),
                                 tuple(self.args[var] for var in vars),
                             )
                         ),

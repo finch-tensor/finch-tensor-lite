@@ -9,7 +9,7 @@ from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
-from ..algebra import operator
+from ...algebra import ffunc
 
 
 class SparseListLevelFields(NamedTuple):
@@ -278,14 +278,14 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                         (
                             asm.Assign(
                                 q,
-                                asm.Call(asm.L(operator.add), (q, asm.L(self.p_t(1)))),
+                                asm.Call(asm.L(ffunc.add), (q, asm.L(self.p_t(1)))),
                             ),
                         )
                     ),
                     seek=seek_fn,
                 ),
                 split=lambda ctx, idx: ntn.Call(
-                    ntn.L(operator.add),
+                    ntn.L(ffunc.add),
                     (ntn.Variable(i_last.name, self.position_type), ntn.L(self.p_t(1))),
                 ),
                 tail=lambda ctx, idx: lplt.Run(

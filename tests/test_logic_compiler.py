@@ -20,7 +20,7 @@ from finchlite.finch_logic import (
 from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal, reset_name_counts
-from finchlite.algebra import operator
+from finchlite import ffunc
 
 
 def test_logic_compiler(file_regression):
@@ -29,11 +29,11 @@ def test_logic_compiler(file_regression):
             Query(
                 lhs=Alias(name="A2"),
                 rhs=Aggregate(
-                    op=logic.Literal(val=operator.add),
+                    op=logic.Literal(val=ffunc.add),
                     init=logic.Literal(val=0),
                     arg=Reorder(
                         arg=MapJoin(
-                            op=logic.Literal(val=operator.mul),
+                            op=logic.Literal(val=ffunc.mul),
                             args=(
                                 Table(
                                     Alias(name="A0"),

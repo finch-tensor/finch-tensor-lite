@@ -1,16 +1,12 @@
-import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self, cast
 
 from finchlite.algebra import (
-    overwrite,
-    promote_max,
-    promote_min,
+    ffunc
 )
 from finchlite.symbolic import Context, Term, TermTree
 from finchlite.util.print import qual_str
-
 
 class EinsumNode(Term):
     @classmethod
@@ -156,12 +152,12 @@ class Call(EinsumExpression, EinsumTree):
 
     Attributes:
         op: The function to apply e.g.,
-            operator.add, operator.mul, operator.subtract, operator.div, etc...
+            ffunc.add, ffunc.mul, ffunc.subtract, ffunc.div, etc...
             Must be a callable.
         args: The arguments to the operation.
     """
 
-    op: Literal  # the function to apply e.g., operator.add
+    op: Literal  # the function to apply e.g., ffunc.add
     args: tuple[EinsumExpression, ...]  # Subtrees
     # input_fields: tuple[tuple[Field, ...], ...]
     # Children: The args
@@ -275,30 +271,30 @@ class Produces(EinsumTree, EinsumStatement):
 
 
 infix_strs = {
-    operator.overwrite: "",
-    operator.add: "+",
-    operator.sub: "-",
-    operator.mul: "*",
-    operator.truediv: "/",
-    operator.mod: "%",
-    operator.pow: "**",
-    operator.and_: "&",
-    operator.or_: "|",
-    operator.xor: "^",
-    operator.floordiv: "//",
-    operator.mod: "%",
-    operator.pow: "**",
-    operator.promote_max: "max",
-    operator.promote_min: "min",
+    ffunc.overwrite: "",
+    ffunc.add: "+",
+    ffunc.sub: "-",
+    ffunc.mul: "*",
+    ffunc.truediv: "/",
+    ffunc.mod: "%",
+    ffunc.pow: "**",
+    ffunc.and_: "&",
+    ffunc.or_: "|",
+    ffunc.xor: "^",
+    ffunc.floordiv: "//",
+    ffunc.mod: "%",
+    ffunc.pow: "**",
+    ffunc.promote_max: "max",
+    ffunc.promote_min: "min",
 }
 
 
 unary_strs = {
-    operator.add: "+",
-    operator.pos: "+",
-    operator.sub: "-",
-    operator.neg: "-",
-    operator.invert: "~",
+    ffunc.add: "+",
+    ffunc.pos: "+",
+    ffunc.sub: "-",
+    ffunc.neg: "-",
+    ffunc.invert: "~",
 }
 
 

@@ -460,7 +460,7 @@ class AnnotatedQuery:
         Parameters
         ----------
         op : Literal
-            The reduction operator node (e.g., Literal(operator.add))
+            The reduction operator node (e.g., Literal(ffunc.add))
             that we are trying to push down.
         idx : Field
             The index (dimension) being reduced over.

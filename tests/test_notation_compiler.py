@@ -1,5 +1,3 @@
-from finchlite import operator
-
 import pytest
 
 import numpy as np
@@ -14,6 +12,7 @@ from finchlite.compile import (
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
+from finchlite import ffunc
 
 from .conftest import finch_assert_equal
 
@@ -83,7 +82,7 @@ def test_matrix_multiplication(a, b):
                         ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
                         ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                            C_, ntn.Literal(0.0), ntn.Literal(ffunc.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
@@ -111,7 +110,7 @@ def test_matrix_multiplication(a, b):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.mul),
+                                                    ntn.Literal(ffunc.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
@@ -119,7 +118,7 @@ def test_matrix_multiplication(a, b):
                                                 ntn.Access(
                                                     C_,
                                                     ntn.Update(
-                                                        ntn.Literal(operator.add)
+                                                        ntn.Literal(ffunc.add)
                                                     ),
                                                     (i, j),
                                                 ),
@@ -130,7 +129,7 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
@@ -207,7 +206,7 @@ def test_matrix_multiplication_regression(file_regression):
                         ntn.Declare(
                             C_,
                             ntn.Literal(0.0),
-                            ntn.Literal(operator.add),
+                            ntn.Literal(ffunc.add),
                             (m, n),
                         ),
                         ntn.Loop(
@@ -236,7 +235,7 @@ def test_matrix_multiplication_regression(file_regression):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.mul),
+                                                    ntn.Literal(ffunc.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
@@ -244,7 +243,7 @@ def test_matrix_multiplication_regression(file_regression):
                                                 ntn.Access(
                                                     C_,
                                                     ntn.Update(
-                                                        ntn.Literal(operator.add)
+                                                        ntn.Literal(ffunc.add)
                                                     ),
                                                     (i, j),
                                                 ),
@@ -255,7 +254,7 @@ def test_matrix_multiplication_regression(file_regression):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )

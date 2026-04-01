@@ -1,6 +1,5 @@
 import ctypes
 import logging
-import operator
 import shutil
 import subprocess
 import tempfile
@@ -15,6 +14,7 @@ from typing import Any, TypedDict
 import numpy as np
 
 from finchlite.algebra.algebra import FinchOperator
+from finchlite.algebra import ffunc
 
 from .. import finch_assembly as asm
 from ..algebra import COperator, query_property, register_property
@@ -470,25 +470,6 @@ def c_setattr(fmt, ctx, obj, attr, val):
     return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
 
 
-op: Any
-symbol: str
-
-
-def register_binary_c_op_call(op, symbol):
-    def property_func(op, ctx, a, b):
-        return f"{ctx(a)} {symbol} {ctx(b)}"
-
-    return property_func
-
-
-for op, symbol in [
-    (operator.pow, "**"),
-]:
-    register_property(
-        op, "__call__", "c_function_call", register_binary_c_op_call(op, symbol)
-    )
-
-
 def c_literal(ctx, val):
     """
     Returns the C literal corresponding to the given Python value.
@@ -880,7 +861,7 @@ class CContext(Context):
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(
-                    asm.Literal(operator.sub), (asm.Length(buf), asm.Literal(1))
+                    asm.Literal(ffunc.sub), (asm.Length(buf), asm.Literal(1))
                 )
                 body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))

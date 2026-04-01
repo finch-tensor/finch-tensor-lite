@@ -1,4 +1,4 @@
-from ..algebra import operator
+from ..algebra import ffunc
 from dataclasses import dataclass
 
 import numpy as np
@@ -94,7 +94,7 @@ def assembly_desugar(
 
     def _as_not_expr(cond):
         """Helper to make an expression representing the 'not' of a condition."""
-        return Call(Literal(operator.not_), (cond,))
+        return Call(Literal(ffunc.not_), (cond,))
 
     def _number_stmt(stmt: AssemblyStatement) -> NumberedStatement:
         """Helper to wrap a statement in a NumberedStatement with a unique id."""
@@ -150,14 +150,14 @@ def assembly_desugar(
                 fic_var = Variable(fic_var_name, np.int64)
 
                 init = Assign(fic_var, start)
-                cond = Call(Literal(operator.lt), (fic_var, end))
+                cond = Call(Literal(ffunc.lt), (fic_var, end))
 
                 body_block = go(body)
 
                 inc = Assign(
                     fic_var,
                     Call(
-                        Literal(operator.add),
+                        Literal(ffunc.add),
                         (fic_var, Literal(np.int64(1))),
                     ),
                 )
@@ -173,14 +173,14 @@ def assembly_desugar(
                 fic_var = Variable(fic_var_name, np.int64)
 
                 init = Assign(fic_var, Literal(np.int64(0)))
-                cond = Call(Literal(operator.lt), (fic_var, Length(buf)))
+                cond = Call(Literal(ffunc.lt), (fic_var, Length(buf)))
 
                 body_block = go(body)
 
                 inc = Assign(
                     fic_var,
                     Call(
-                        Literal(operator.add),
+                        Literal(ffunc.add),
                         (fic_var, Literal(np.int64(1))),
                     ),
                 )

@@ -9,7 +9,7 @@ from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
-from ..algebra import operator
+from ...algebra import ffunc
 
 class DenseLevelFields(NamedTuple):
     lvl_asm: asm.AssemblyExpression  # assembly expression of the current level
@@ -171,11 +171,11 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 asm.Assign(
                     pos_2,
                     asm.Call(
-                        asm.Literal(operator.add),
+                        asm.Literal(ffunc.add),
                         (
                             pos,
                             asm.Call(
-                                asm.Literal(operator.mul),
+                                asm.Literal(ffunc.mul),
                                 (
                                     asm.GetAttr(lvl, asm.Literal("stride")),
                                     asm.Variable(

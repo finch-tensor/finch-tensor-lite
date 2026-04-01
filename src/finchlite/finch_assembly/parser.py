@@ -14,7 +14,7 @@ import numpy as np
 
 from lark import Lark, Token, Tree
 
-from ..algebra import operator
+from ..algebra import ffunc
 from . import nodes as asm
 
 assembly_parser = Lark(
@@ -58,14 +58,14 @@ assembly_parser = Lark(
 )
 
 _OPS = {
-    "+": operator.add,
-    "-": operator.sub,
-    "*": operator.mul,
-    "/": operator.truediv,
-    "<": operator.lt,
-    "<=": operator.le,
-    ">": operator.gt,
-    ">=": operator.ge,
+    "+": ffunc.add,
+    "-": ffunc.sub,
+    "*": ffunc.mul,
+    "/": ffunc.truediv,
+    "<": ffunc.lt,
+    "<=": ffunc.le,
+    ">": ffunc.gt,
+    ">=": ffunc.ge,
 }
 
 
