@@ -5,11 +5,11 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...algebra import ffunc
 from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
-from ...algebra import ffunc
 
 
 class SparseListLevelFields(NamedTuple):

@@ -388,9 +388,7 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
-    roots = AnnotatedQuery.find_lowest_roots(
-        Literal(ffunc.add), Field(idx_name), root
-    )
+    roots = AnnotatedQuery.find_lowest_roots(Literal(ffunc.add), Field(idx_name), root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if expected and not isinstance(expected[0], str):

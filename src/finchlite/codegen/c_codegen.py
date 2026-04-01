@@ -13,8 +13,8 @@ from typing import Any, TypedDict
 
 import numpy as np
 
-from finchlite.algebra.algebra import FinchOperator
 from finchlite.algebra import ffunc
+from finchlite.algebra.algebra import FinchOperator
 
 from .. import finch_assembly as asm
 from ..algebra import COperator, query_property, register_property

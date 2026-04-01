@@ -9,7 +9,7 @@ import numpy as np
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import ffunc, Tensor, is_annihilator
+from ...algebra import Tensor, ffunc, is_annihilator
 from ...compile import BufferizedNDArray, dimension
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
@@ -502,9 +502,7 @@ class DCStats(TensorStats):
                                                         ntn.Access(
                                                             xi_,
                                                             ntn.Update(
-                                                                ntn.Literal(
-                                                                    ffunc.add
-                                                                )
+                                                                ntn.Literal(ffunc.add)
                                                             ),
                                                             (i,),
                                                         ),
@@ -528,9 +526,7 @@ class DCStats(TensorStats):
                                                         ntn.Access(
                                                             yj_,
                                                             ntn.Update(
-                                                                ntn.Literal(
-                                                                    ffunc.add
-                                                                )
+                                                                ntn.Literal(ffunc.add)
                                                             ),
                                                             (j,),
                                                         ),

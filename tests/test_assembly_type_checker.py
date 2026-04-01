@@ -5,12 +5,12 @@ import pytest
 import numpy as np
 
 import finchlite.finch_assembly as asm
+from finchlite import ffunc
 from finchlite.codegen import NumpyBuffer
 from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.finch_assembly import assembly_check_types
 from finchlite.finch_assembly.struct import TupleFType
 from finchlite.symbolic import FType, ftype
-from finchlite import ffunc
 
 
 def test_lit_basic():

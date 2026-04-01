@@ -1,7 +1,5 @@
 import math
 
-import numpy as np
-
 from finchlite.algebra import (
     cansplitpush,
     ffunc,
@@ -11,7 +9,7 @@ from finchlite.algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
-    repeat_operator
+    repeat_operator,
 )
 
 

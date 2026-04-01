@@ -11,7 +11,7 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite import dense, element, fiber_tensor, ftype
+from finchlite import dense, element, ffunc, fiber_tensor, ftype
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
@@ -34,7 +34,6 @@ from finchlite.codegen.numba_codegen import (
     serialize_to_numba,
 )
 from finchlite.compile import BufferizedNDArrayFType
-from finchlite import ffunc
 
 from .conftest import finch_assert_equal
 
@@ -133,9 +132,7 @@ def test_codegen(compiler, buffer):
                             length_var,
                             asm.Store(
                                 a_slt,
-                                asm.Call(
-                                    asm.Literal(ffunc.add), (i_var, length_var)
-                                ),
+                                asm.Call(asm.Literal(ffunc.add), (i_var, length_var)),
                                 asm.Call(
                                     asm.Literal(ffunc.add),
                                     (asm.Load(a_slt, i_var), asm.Literal(1)),

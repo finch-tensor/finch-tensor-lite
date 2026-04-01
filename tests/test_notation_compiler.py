@@ -4,7 +4,7 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_notation as ntn
-from finchlite import ftype
+from finchlite import ffunc, ftype
 from finchlite.compile import (
     BufferizedNDArray,
     ExtentOp,
@@ -12,7 +12,6 @@ from finchlite.compile import (
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
-from finchlite import ffunc
 
 from .conftest import finch_assert_equal
 
@@ -117,9 +116,7 @@ def test_matrix_multiplication(a, b):
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(ffunc.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffunc.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -242,9 +239,7 @@ def test_matrix_multiplication_regression(file_regression):
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(ffunc.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffunc.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,

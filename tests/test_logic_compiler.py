@@ -1,7 +1,7 @@
 import numpy as np
 
 import finchlite.finch_logic as logic
-from finchlite import ftype
+from finchlite import ffunc, ftype
 from finchlite.autoschedule import NotationGenerator
 from finchlite.compile.bufferized_ndarray import (
     BufferizedNDArray,
@@ -20,7 +20,6 @@ from finchlite.finch_logic import (
 from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal, reset_name_counts
-from finchlite import ffunc
 
 
 def test_logic_compiler(file_regression):

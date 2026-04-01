@@ -5,6 +5,7 @@ import numpy as np
 
 import finchlite  # noqa: F401
 import finchlite.finch_notation as ntn
+from finchlite import ffunc
 from finchlite.compile import dimension
 from finchlite.finch_notation import (  # noqa: F401
     Access,
@@ -27,7 +28,6 @@ from finchlite.finch_notation import (  # noqa: F401
     Update,
     Variable,
 )
-from finchlite import ffunc
 
 from .conftest import finch_assert_equal
 
@@ -120,9 +120,7 @@ def test_matrix_multiplication(a, b):
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(ffunc.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffunc.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,

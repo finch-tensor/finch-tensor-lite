@@ -5,11 +5,12 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...algebra import ffunc
 from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
-from ...algebra import ffunc
+
 
 class DenseLevelFields(NamedTuple):
     lvl_asm: asm.AssemblyExpression  # assembly expression of the current level

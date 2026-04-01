@@ -1,10 +1,9 @@
-from finchlite import ffunc
-
 import numpy as np
 
 import finchlite.finch_assembly as asm
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
+from finchlite import ffunc
 from finchlite.codegen.numpy_buffer import NumpyBuffer
 from finchlite.compile import dimension
 
@@ -84,9 +83,7 @@ def create_ntn_simple_node():
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(ffunc.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffunc.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -122,9 +119,7 @@ def create_log_simple_node():
             log.Query(log.Alias("B"), log.Table(log.Literal(b), (k, j))),
             log.Query(
                 log.Alias("AB"),
-                log.MapJoin(
-                    log.Literal(ffunc.mul), (log.Alias("A"), log.Alias("B"))
-                ),
+                log.MapJoin(log.Literal(ffunc.mul), (log.Alias("A"), log.Alias("B"))),
             ),
             # matmul
             log.Query(
@@ -136,9 +131,7 @@ def create_log_simple_node():
             # elemwise
             log.Query(
                 log.Alias("RES"),
-                log.MapJoin(
-                    log.Literal(ffunc.mul), (log.Alias("C"), log.Alias("S"))
-                ),
+                log.MapJoin(log.Literal(ffunc.mul), (log.Alias("C"), log.Alias("S"))),
             ),
             log.Produces((log.Alias("RES"),)),
         )

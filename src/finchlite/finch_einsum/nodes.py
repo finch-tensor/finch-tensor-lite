@@ -2,11 +2,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self, cast
 
-from finchlite.algebra import (
-    ffunc
-)
+from finchlite.algebra import ffunc
 from finchlite.symbolic import Context, Term, TermTree
 from finchlite.util.print import qual_str
+
 
 class EinsumNode(Term):
     @classmethod

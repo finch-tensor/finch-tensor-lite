@@ -1,3 +1,4 @@
+from finchlite import ffunc
 from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
     merge_queries,
     preprocess_plan_for_galley,
@@ -14,7 +15,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite import ffunc
 
 
 def _contains_reorder(expr) -> bool:

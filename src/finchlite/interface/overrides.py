@@ -5,8 +5,8 @@ import numpy as np
 
 import finchlite
 
-from ..algebra.tensor import Tensor
 from ..algebra import ffunc
+from ..algebra.tensor import Tensor
 
 element_wise_ufunc_map = {
     np.add: ffunc.add,

@@ -1,7 +1,6 @@
 import numpy as np
 
 from finchlite import ffunc
-
 from finchlite.finch_assembly import (
     Assign,
     Block,
@@ -151,9 +150,7 @@ def test_if_statement():
                             i1,
                             Load(
                                 lvl_idx,
-                                Call(
-                                    Literal(ffunc.sub), (q_stop, Literal(np.intp(1)))
-                                ),
+                                Call(Literal(ffunc.sub), (q_stop, Literal(np.intp(1)))),
                             ),
                         ),
                     )

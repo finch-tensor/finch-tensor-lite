@@ -9,7 +9,6 @@ The extension is not yet available on VS Code marketplace. You can find
 installation file here: https://github.com/finch-tensor/vscode-finch-assembly/releases
 """
 
-
 import numpy as np
 
 from lark import Lark, Token, Tree

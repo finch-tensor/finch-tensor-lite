@@ -9,7 +9,7 @@ from finchlite.finch_einsum.stages import (
 )
 from finchlite.symbolic.ftype import fisinstance
 
-from ..algebra import promote_max, promote_min, ffunc
+from ..algebra import ffunc
 from . import nodes as ein
 
 nary_ops = {

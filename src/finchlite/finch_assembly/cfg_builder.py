@@ -1,8 +1,8 @@
-from ..algebra import ffunc
 from dataclasses import dataclass
 
 import numpy as np
 
+from ..algebra import ffunc
 from ..symbolic import (
     BasicBlock,
     ControlFlowGraph,

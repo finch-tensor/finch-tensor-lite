@@ -5,6 +5,7 @@ import pytest
 import numpy  # noqa: F401, ICN001
 import numpy as np
 
+from finchlite import ffunc
 from finchlite import finch_assembly as asm
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import (  # noqa: F401
@@ -22,7 +23,6 @@ from finchlite.finch_assembly import (  # noqa: F401
     Variable,
 )
 from finchlite.symbolic import ftype
-from finchlite import ffunc
 
 from .conftest import finch_assert_allclose
 

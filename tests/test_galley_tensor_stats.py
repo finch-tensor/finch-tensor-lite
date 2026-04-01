@@ -314,7 +314,9 @@ def test_benchmark_structured_comparison():
             # Stats performance
             g_a = Impl(tns_a, (i, k))
             g_b = Impl(tns_b, (k, j))
-            g_res = Impl.aggregate(ffunc.add, 0.0, (k,), Impl.mapjoin(ffunc.mul, g_a, g_b))
+            g_res = Impl.aggregate(
+                ffunc.add, 0.0, (k,), Impl.mapjoin(ffunc.mul, g_a, g_b)
+            )
             g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
             # Blocked Stats Performance
