@@ -3,6 +3,7 @@ from ..symbolic.rewriters import PostWalk, Rewrite, Chain
 from ..interface import lazy, compute
 from .cfg_builder import (
     NumberedStatement,
+    number_statements,
     fused_build_cfg,
     fused_desugar,
 )
@@ -137,8 +138,9 @@ def _unnest_block(node: FusedNode) -> FusedNode:
 
 def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     # desugar the input name and number additional statements for CFG construction
-    numbered_prgm, sid = fused_desugar(prgm, 0)
-    cfg = fused_build_cfg(numbered_prgm)
+    numbered_prgm, _ = number_statements(prgm)
+    desuraged_prgm = fused_desugar(numbered_prgm)
+    cfg = fused_build_cfg(desuraged_prgm)
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
     print("Liveness analysis results:")

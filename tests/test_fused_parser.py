@@ -19,6 +19,7 @@ from finchlite.finch_fused.parser import (
     parse_fused_function,
 )
 from finchlite.interface import compute, lazy, asarray, sum, matmul, add
+from tests.conftest import finch_assert_allclose
 
 
 def test_parse_simple_function_with_control_flow_and_calls():
@@ -221,10 +222,10 @@ def test_liveness_analysis():
 
 
 def test_lazy_and_compute_insertion():
-    def simple_fn(A, B, C):
+    def simple_fn(A, B, C, n_iter):
         D = matmul(A, B)
         E = add(A, C)
-        while sum(D).to_numpy() < 100:
+        for i in range(sum(n_iter).to_numpy()):
             D =  add(D, E)
         return D
     fused_fn = parse_fused_function(simple_fn)
@@ -233,9 +234,9 @@ def test_lazy_and_compute_insertion():
     A = asarray(np.array([[1, 2], [3, 4]]))
     B = asarray(np.array([[1, 2], [3, 4]]))
     C = asarray(np.array([[1, 2], [3, 4]]))
+    n_iter = asarray(np.array([[1, 2], [3, 4]]))
 
-    expected_result = simple_fn(A, B, C)
+    expected_result = simple_fn(A, B, C, n_iter)
     opt_simple_fn = fused_function_to_python_function(transformed_fn)
-    result = opt_simple_fn(A, B, C)
-    assert (result == expected_result).all()
- 
+    result = opt_simple_fn(A, B, C, n_iter)
+    finch_assert_allclose(result, expected_result)
