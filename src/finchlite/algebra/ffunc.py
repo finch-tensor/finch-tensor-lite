@@ -1239,17 +1239,17 @@ __all__ = [
     "acosh",
     "add",
     "and_",
-    "asin",
-    "asinh",
-    "atan",
-    "atan2",
-    "atanh",
     "arccos",
     "arccosh",
     "arcsin",
     "arcsinh",
     "arctan",
     "arctanh",
+    "asin",
+    "asinh",
+    "atan",
+    "atan2",
+    "atanh",
     "ceil",
     "clip",
     "conjugate",
@@ -1330,4 +1330,4 @@ __all__ = [
 
 for _name, _obj in list(globals().items()):
     if isinstance(_obj, FinchOperator):
-        setattr(_obj, "__qualname__", _name)
+        _obj.__qualname__ = _name

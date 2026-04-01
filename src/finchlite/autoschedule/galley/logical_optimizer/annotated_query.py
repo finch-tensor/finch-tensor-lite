@@ -493,9 +493,11 @@ class AnnotatedQuery:
                 ):
                     return AnnotatedQuery.find_lowest_roots(op, idx, args_with[0])
 
-                if isinstance(op.val, FinchOperator) and isinstance(
-                    mj_op, FinchOperator
-                ) and cansplitpush(op.val, mj_op):
+                if (
+                    isinstance(op.val, FinchOperator)
+                    and isinstance(mj_op, FinchOperator)
+                    and cansplitpush(op.val, mj_op)
+                ):
                     roots_without: list[LogicExpression] = list(args_without)
                     roots_with: list[LogicExpression] = []
                     for arg in args_with:
@@ -553,10 +555,10 @@ class AnnotatedQuery:
 
         use_root = False
         match root_node:
-            case MapJoin(Literal(op), args) as mj if isinstance(
-                op, FinchOperator
-            ) and isinstance(reduce_op, FinchOperator) and is_distributive(
-                op, reduce_op
+            case MapJoin(Literal(op), args) as mj if (
+                isinstance(op, FinchOperator)
+                and isinstance(reduce_op, FinchOperator)
+                and is_distributive(op, reduce_op)
             ):
                 # If you're already reducing one index, then it may
                 # make sense to reduce others as well.

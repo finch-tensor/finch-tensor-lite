@@ -1,5 +1,4 @@
 from . import ffunc
-from .ffunc import *
 from .algebra import (
     COperator,
     FinchOperator,
