@@ -1,6 +1,6 @@
 def compute(x: int64, y: int64) -> int64:
     temp: int64 = x
-    temp: int64 = add(x, y)
+    temp: int64 = finchlite.ffunc.add(x, y)
     return temp
 
 def main() -> int64:
@@ -8,31 +8,31 @@ def main() -> int64:
     b: int64 = a
     c: int64 = a
     d: int64 = 5
-    if gt(c, 5):
-        a: int64 = add(a, d)
+    if finchlite.ffunc.gt(c, 5):
+        a: int64 = finchlite.ffunc.add(a, d)
         b: int64 = a
     result: int64 = 0
     for i in range(0, 5):
         temp: int64 = i
-        result: int64 = add(result, i)
-        if eq(mod(i, 2), 0):
-            result: int64 = mul(result, 2)
-    if gt(result, 20):
+        result: int64 = finchlite.ffunc.add(result, i)
+        if finchlite.ffunc.eq(finchlite.ffunc.mod(i, 2), 0):
+            result: int64 = finchlite.ffunc.mul(result, 2)
+    if finchlite.ffunc.gt(result, 20):
         c: int64 = result
-        result: int64 = add(c, b)
+        result: int64 = finchlite.ffunc.add(c, b)
     else:
         c: int64 = b
-        result: int64 = mul(c, 3)
+        result: int64 = finchlite.ffunc.mul(c, 3)
     for i in range(0, 3):
         a: int64 = i
         for j in range(0, 2):
             b: int64 = j
-            result: int64 = add(result, add(a, j))
+            result: int64 = finchlite.ffunc.add(result, finchlite.ffunc.add(a, j))
     d: int64 = result
-    if lt(d, 100):
+    if finchlite.ffunc.lt(d, 100):
         c: int64 = d
-        if gt(c, 50):
-            result: int64 = mul(d, 2)
+        if finchlite.ffunc.gt(c, 50):
+            result: int64 = finchlite.ffunc.mul(d, 2)
         else:
             result: int64 = d
     else:

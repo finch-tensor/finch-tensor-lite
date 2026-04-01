@@ -5,14 +5,14 @@ def matmul(C: ndarray, A: ndarray, B: ndarray) -> ndarray:
     A_: ndarray = unpack(A)
     B_: ndarray = unpack(B)
     C_: ndarray = unpack(C)
-    declare(C_, 0.0, add, ['m', 'n'])
+    declare(C_, 0.0, finchlite.ffunc.add, ['m', 'n'])
     loop(i, m):
         loop(j, n):
             loop(k, p):
                 a_ik: float64 = unwrap(read(A_, ['i', 'k']))
                 b_kj: float64 = unwrap(read(B_, ['k', 'j']))
-                c_ij: float64 = mul(a_ik, b_kj)
-                increment(update(C_, ['i', 'j'], add), c_ij)
-    freeze(C_, add)
+                c_ij: float64 = finchlite.ffunc.mul(a_ik, b_kj)
+                increment(update(C_, ['i', 'j'], finchlite.ffunc.add), c_ij)
+    freeze(C_, finchlite.ffunc.add)
     repack(C_, C)
     return C
