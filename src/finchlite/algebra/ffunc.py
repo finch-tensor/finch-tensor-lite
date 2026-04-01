@@ -1,6 +1,8 @@
 # AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 # AI modified: 2026-04-01T17:28:42Z 0de216cc18e91710a9b1a0328f5b181137d8901b
+# AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
 # functions ported from ops.py
+import builtins
 import operator
 from functools import reduce
 from typing import Any
@@ -597,10 +599,10 @@ class Min(FinchOperator, NumbaOperator):
     is_idempotent = True
 
     def __call__(self, a, b):
-        return min(a, b)
+        return builtins.min(a, b)
 
     def return_type(self, a: Any, b: Any) -> type:
-        return type(min(a(True), b(True)))
+        return type(builtins.min(a(True), b(True)))
 
     def is_identity(self, val) -> bool:
         return val == np.inf
@@ -624,10 +626,10 @@ class Max(FinchOperator, NumbaOperator):
     is_idempotent = True
 
     def __call__(self, a, b):
-        return max(a, b)
+        return builtins.max(a, b)
 
     def return_type(self, a: Any, b: Any) -> type:
-        return type(max(a(True), b(True)))
+        return type(builtins.max(a(True), b(True)))
 
     def is_identity(self, val) -> bool:
         return val == -np.inf
@@ -1035,7 +1037,7 @@ class PromoteMin(FinchOperator):
 
     def __call__(self, a: Any, b: Any):
         cast = promote_type(type(a), type(b))
-        return cast(min(a, b))
+        return cast(builtins.min(a, b))
 
     def return_type(self, a: Any, b: Any) -> type:
         return promote_type(a, b)
@@ -1054,7 +1056,7 @@ class PromoteMax(FinchOperator):
 
     def __call__(self, a: Any, b: Any):
         cast = promote_type(type(a), type(b))
-        return max(cast(a), cast(b))
+        return builtins.max(cast(a), cast(b))
 
     def return_type(self, a: Any, b: Any) -> type:
         return promote_type(a, b)
@@ -1324,3 +1326,8 @@ __all__ = [
     "truth",
     "xor",
 ]
+
+
+for _name, _obj in list(globals().items()):
+    if isinstance(_obj, FinchOperator):
+        setattr(_obj, "__qualname__", _name)

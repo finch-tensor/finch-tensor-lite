@@ -1,3 +1,4 @@
+# AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, register_property
+from ..algebra import TensorFType, ffunc, register_property
 from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
@@ -101,6 +102,9 @@ class Extent(FTyped):
 class ExtentOp(FinchOperator):
     __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
 
+    def __init__(self) -> None:
+        self.__qualname__ = "ExtentOp"
+
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)
 
@@ -162,7 +166,7 @@ class SymbolicExtent(FTyped):
     @classmethod
     def from_notation(cls, node: ntn.NotationNode):
         match node:
-            case ntn.Call(ntn.Literal(op), (start, end)) if op is extent_op:
+            case ntn.Call(ntn.Literal(op), (start, end)) if isinstance(op, ExtentOp):
                 return SymbolicExtent(start, end)
             case _:
                 raise Exception(node)
@@ -190,10 +194,10 @@ class SymbolicExtent(FTyped):
         return ntn.Call(ntn.Literal(sub), (self.end_sym, self.start_sym))
 
     def bound_below(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, max)
+        return self._bound_ext(size, ffunc.max)
 
     def bound_above(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, min)
+        return self._bound_ext(size, ffunc.min)
 
     def _bound_ext(self, size, func) -> "SymbolicExtent":
         return SymbolicExtent(
