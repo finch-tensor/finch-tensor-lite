@@ -68,7 +68,7 @@ class _FusedFunctionParser:
         self.locals: set[str] = set()
 
     def parse(self) -> fzd.Function:
-        if self.fn_def.decorator_list:
+        if len(self.fn_def.decorator_list) > 1:  # The @jit decorator is in this list
             raise self._unsupported(
                 self.fn_def,
                 "Decorated functions are not supported in finch_fused parser draft.",

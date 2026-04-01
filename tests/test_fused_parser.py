@@ -6,19 +6,19 @@ import inspect
 import operator
 import textwrap
 
-import numpy as np
-
 import pytest
 
+import numpy as np
+
+from finchlite.finch_fused import jit
 from finchlite.finch_fused import nodes as fzd
 from finchlite.finch_fused.cfg_builder import fused_build_cfg, fused_desugar
-from finchlite.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
+from finchlite.finch_fused.dataflow import LivenessAnalysis
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
-    fused_function_to_python_function,
     parse_fused_function,
 )
-from finchlite.interface import compute, lazy, asarray, sum, matmul, add
+from finchlite.interface import add, asarray, matmul
 from tests.conftest import finch_assert_allclose
 
 
@@ -220,23 +220,28 @@ def test_liveness_analysis():
         print(f"output live variables: {output_live_vars}")
 
 
-
 def test_lazy_and_compute_insertion():
     def simple_fn(A, B, C, n_iter):
         D = matmul(A, B)
         E = add(A, C)
-        for i in range(sum(n_iter).to_numpy()):
-            D =  add(D, E)
+        for i in range(n_iter):
+            D = add(D, E)
         return D
-    fused_fn = parse_fused_function(simple_fn)
-    transformed_fn = insert_lazy_and_compute(fused_fn)
-    print(transformed_fn)
+
+    @jit
+    def opt_simple_fn(A, B, C, n_iter):
+        D = matmul(A, B)
+        E = add(A, C)
+        for i in range(n_iter):
+            D = add(D, E)
+        return D
+
     A = asarray(np.array([[1, 2], [3, 4]]))
     B = asarray(np.array([[1, 2], [3, 4]]))
     C = asarray(np.array([[1, 2], [3, 4]]))
-    n_iter = asarray(np.array([[1, 2], [3, 4]]))
+    n_iter = 5
 
     expected_result = simple_fn(A, B, C, n_iter)
-    opt_simple_fn = fused_function_to_python_function(transformed_fn)
+    print(opt_simple_fn)
     result = opt_simple_fn(A, B, C, n_iter)
     finch_assert_allclose(result, expected_result)

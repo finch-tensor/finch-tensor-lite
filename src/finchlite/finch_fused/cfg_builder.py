@@ -1,22 +1,18 @@
 from dataclasses import dataclass
-import operator
 
 from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
 from .nodes import (
     Assign,
     Block,
     Break,
-    Call,
     For,
     Function,
     FusedNode,
     FusedStatement,
     FusedTree,
     If,
-    Literal,
     Module,
     Return,
-    Variable,
     While,
 )
 
@@ -86,6 +82,7 @@ def number_statements(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
 
     return go(node), sid
 
+
 def fused_desugar(node: FusedNode) -> tuple[FusedNode, int]:
     """
     Lower surface syntax to a core AST shape before CFG construction.
@@ -95,7 +92,6 @@ def fused_desugar(node: FusedNode) -> tuple[FusedNode, int]:
         `def f(x): x_1 = x; return x_1 + 1` so that the parameter `x` gets a statement
         id and can be referenced in the CFG)
     """
-
 
     def go(node: FusedNode) -> FusedNode:
         """Recursively desugar the AST."""

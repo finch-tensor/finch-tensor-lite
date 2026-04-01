@@ -472,7 +472,7 @@ def lazy(arr) -> LazyTensor:
     """
     if not isinstance(arr, Tensor):
         return arr
-    
+
     if isinstance(arr, LazyTensor):
         return arr
     arr = asarray(arr)

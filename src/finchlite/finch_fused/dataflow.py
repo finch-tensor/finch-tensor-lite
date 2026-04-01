@@ -1,32 +1,28 @@
+from ..interface import compute, lazy
 from ..symbolic.dataflow import DataFlowAnalysis
-from ..symbolic.rewriters import PostWalk, Rewrite, Chain
-from ..interface import lazy, compute
+from ..symbolic.rewriters import Chain, PostWalk, Rewrite
 from .cfg_builder import (
     NumberedStatement,
-    number_statements,
     fused_build_cfg,
     fused_desugar,
+    number_statements,
 )
 from .nodes import (
     Assign,
     Block,
     Break,
     Call,
-    For,
-    Function,
     FusedNode,
-    If,
     Literal,
     Return,
     Variable,
-    While,
 )
 
 
 class LivenessAnalysis(DataFlowAnalysis):
-
     def get_variables_in_stmt(self, stmt: FusedNode) -> set[Variable]:
         var_set = set()
+
         def _var_gatherer(node: FusedNode) -> FusedNode:
             match node:
                 case Variable() as var:
@@ -34,6 +30,7 @@ class LivenessAnalysis(DataFlowAnalysis):
                     return node
                 case node:
                     return node
+
         Rewrite(PostWalk(_var_gatherer))(stmt)
         return var_set
 
@@ -42,7 +39,7 @@ class LivenessAnalysis(DataFlowAnalysis):
         return f"Live vars: {{{str_state}}} | Stmt: {stmt}"
 
     def transfer(self, stmts, state: dict) -> dict:
-        # Walk through the statements in reverse to compute 
+        # Walk through the statements in reverse to compute
         # liveness
         new_state = state.copy()
         for stmt in reversed(stmts):
@@ -68,12 +65,13 @@ class LivenessAnalysis(DataFlowAnalysis):
     def direction(self) -> str:
         return "backward"
 
+
 # Find the first and last statement in the block to determine
 # where to insert lazy and compute calls
-def _get_stmt_bounds(stmts : list[FusedNode]) -> tuple[int, int]:
+def _get_stmt_bounds(stmts: list[FusedNode]) -> tuple[int, int]:
     if not stmts:
         return -1, -1
-    
+
     top_id = -1
     bot_id = -1
     for stmt in stmts:
@@ -89,10 +87,14 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> Fused
         match node:
             # In the case of returns, we should just compute the retuned values
             case NumberedStatement(Return(ret_vars), sid) if sid == compute_sid:
-                computes = tuple(Assign(var, Call(Literal(compute), (var,))) for var in ret_vars)
+                computes = tuple(
+                    Assign(var, Call(Literal(compute), (var,))) for var in ret_vars
+                )
                 return Block(computes + (node,))
             case NumberedStatement(stmt, sid) if sid == compute_sid:
-                computes = tuple(Assign(var, Call(Literal(compute), (var,))) for var in vars)
+                computes = tuple(
+                    Assign(var, Call(Literal(compute), (var,))) for var in vars
+                )
                 match stmt:
                     case Return():
                         return Block(computes + (node,))
@@ -102,18 +104,23 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> Fused
                         return Block((node,) + computes)
             case node:
                 return node
+
     return Rewrite(PostWalk(_visitor))(prgm)
 
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: list[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
-            case NumberedStatement(stmt, sid) if sid == lazy_sid and not isinstance(stmt, (Return, Break)):
+            case NumberedStatement(stmt, sid) if sid == lazy_sid and not isinstance(
+                stmt, (Return, Break)
+            ):
                 lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
-                return Block(lazies + (node, ))
+                return Block(lazies + (node,))
             case node:
                 return node
+
     return Rewrite(PostWalk(_visitor))(prgm)
+
 
 def _unwrap_numbered_stmt(node: FusedNode) -> FusedNode:
     match node:
@@ -121,6 +128,7 @@ def _unwrap_numbered_stmt(node: FusedNode) -> FusedNode:
             return stmt
         case node:
             return node
+
 
 def _unnest_block(node: FusedNode) -> FusedNode:
     match node:
@@ -136,6 +144,7 @@ def _unnest_block(node: FusedNode) -> FusedNode:
         case node:
             return node
 
+
 def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     # desugar the input name and number additional statements for CFG construction
     numbered_prgm, _ = number_statements(prgm)
@@ -146,11 +155,31 @@ def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     print("Liveness analysis results:")
     print(liveness)
     for block in cfg.blocks.values():
-        live_outputs = liveness.input_states[block.id] # Backwards analysis, so live outputs are the input state of the block
-        live_inputs = liveness.output_states[block.id] # Backwards analysis, so live inputs are the output state of the block
+        live_outputs = liveness.input_states[
+            block.id
+        ]  # Backwards analysis, so live outputs are the input state of the block
+        live_inputs = liveness.output_states[
+            block.id
+        ]  # Backwards analysis, so live inputs are the output state of the block
         min_id, max_id = _get_stmt_bounds(block.statements)
-        print("insert lazy for live inputs", live_inputs, " at block", block, "with min stmt id", min_id)
-        print("insert compute for live outputs", live_outputs, " at block", block, "with max stmt id", max_id)
-        numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)    
+        print(
+            "insert lazy for live inputs",
+            live_inputs,
+            " at block",
+            block,
+            "with min stmt id",
+            min_id,
+        )
+        print(
+            "insert compute for live outputs",
+            live_outputs,
+            " at block",
+            block,
+            "with max stmt id",
+            max_id,
+        )
+        numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)
         numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs)
-    return Rewrite(PostWalk(Chain([_unwrap_numbered_stmt, _unnest_block])))(numbered_prgm)
+    return Rewrite(PostWalk(Chain([_unwrap_numbered_stmt, _unnest_block])))(
+        numbered_prgm
+    )
