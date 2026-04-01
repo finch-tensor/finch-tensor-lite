@@ -1,7 +1,5 @@
 from typing import Any
 
-import numpy as np
-
 from lark import Lark, Tree
 
 from ..algebra import ffunc
@@ -9,8 +7,8 @@ from ..symbolic import Namespace
 from . import nodes as ein
 
 nary_ops = {
-    "+": ,
-    "add": ffunc.ffunc.addadd,
+    "+": ffunc.add,
+    "add": ffunc.add,
     "-": ffunc.sub,
     "sub": ffunc.sub,
     "subtract": ffunc.sub,
@@ -299,7 +297,7 @@ def parse_einop(expr: str) -> ein.EinsumNode:
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
             arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
-            op = ein.Literal(overwrite)
+            op = ein.Literal(ffunc.overwrite)
             return ein.Einsum(
                 op,
                 ein.Alias(tns.value),  # type: ignore[union-attr]
@@ -428,7 +426,7 @@ def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[ein.Alias, Any]]:
     for j in all_idxs:
         spc.freshen(j)
     if output_idxs == all_idxs:
-        op = ein.Literal(overwrite)
+        op = ein.Literal(ffunc.overwrite)
     else:
         op = ein.Literal(ffunc.add)
     out_tns = ein.Alias(spc.freshen("B"))

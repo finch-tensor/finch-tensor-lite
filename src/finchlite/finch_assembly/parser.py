@@ -136,7 +136,7 @@ def parse_assembly(
                 return asm.Call(asm.Literal(np.resize), (ctx(arr), ctx(size)))
             case Tree("scansearch", [arr, x, lo, hi]):
                 return asm.Call(
-                    asm.Literal(scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
+                    asm.Literal(ffunc.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
                 )
             case Tree("assign", [lhs, expr]):
                 return asm.Assign(ctx(lhs), ctx(expr))

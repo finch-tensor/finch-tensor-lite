@@ -1,5 +1,7 @@
 # functions ported from ops.py
 import operator
+from functools import reduce
+from typing import Any
 
 import numpy as np
 
@@ -66,7 +68,7 @@ class Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
         return np.isinf(arg)
 
     def repeat_operator(self):
-        return _operator_map[operator.mul]
+        return mul
 
     def init_value(self, type_: type) -> Any:
         return type_(0)
@@ -93,7 +95,7 @@ class Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
         return arg == 1
 
     def repeat_operator(self):
-        return _operator_map[operator.pow]
+        return pow
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (Add, Sub))
@@ -260,7 +262,7 @@ class And(ReflexiveFinchOperator, CNAryOperator):
         return type_(True)
 
 
-bitwise_and = And()
+and_ = And()
 
 
 class Xor(ReflexiveFinchOperator, CNAryOperator):
@@ -281,7 +283,7 @@ class Xor(ReflexiveFinchOperator, CNAryOperator):
         return type_(False)
 
 
-bitwise_xor = Xor()
+xor = Xor()
 
 
 class Or(ReflexiveFinchOperator, CNAryOperator):
@@ -309,7 +311,7 @@ class Or(ReflexiveFinchOperator, CNAryOperator):
         return type_(False)
 
 
-bitwise_or = Or()
+or_ = Or()
 
 
 class Not(CNUnaryOperator):
@@ -318,7 +320,7 @@ class Not(CNUnaryOperator):
         return "!"
 
 
-bitwise_not = Not()
+not_ = Not()
 
 
 class Abs(UnaryFinchOperator):
@@ -1016,41 +1018,6 @@ class Sign(UnaryOperator):
 sign = Sign()
 
 
-def make_tuple(*args):
-    return tuple(args)
-
-
-def identity(x):
-    """
-    Returns the input value unchanged.
-    """
-    return x
-
-
-def first_arg(*args):
-    """
-    Returns the first argument passed to it.
-    """
-    return args[0] if args else None
-
-
-def overwrite(x, y):
-    """
-    overwrite(x, y) returns y always.
-    """
-    return y
-
-
-def promote_min(a, b):
-    cast = promote_type(a, b)
-    return cast(min(a, b))
-
-
-def promote_max(a, b):
-    cast = promote_type(a, b)
-    return max(cast(a), cast(b))
-
-
 class PromoteMin(FinchOperator):
     is_associative = True
     is_commutative = True
@@ -1087,26 +1054,6 @@ class PromoteMax(FinchOperator):
 
 
 promote_max = PromoteMax()
-
-
-def conjugate(x):
-    """
-    Computes the complex conjugate of the input number
-
-    Parameters
-    ----------
-    x: Any
-        The input number to compute the complex conjugate of.
-
-    Returns
-    ----------
-    Any
-        The complex conjugate of the input number. If the input is not a complex number,
-        it returns the input unchanged.
-    """
-    if hasattr(x, "conjugate"):
-        return x.conjugate()
-    return x
 
 
 class InitWrite(FinchOperator, NumbaOperator):

@@ -502,7 +502,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             op_e,
             (asm.Load(obj.tns.buf_s, pos_e), val_e),
         )
-        if obj.tns.dirty_bit and op.val is overwrite:
+        if obj.tns.dirty_bit and op.val is ffunc.overwrite:
             increment_call = asm.Call(
                 asm.Literal(ffunc.init_write(tns.type.fill_value)),
                 (asm.Load(obj.tns.buf_s, pos_e), increment_call),
