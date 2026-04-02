@@ -5,7 +5,7 @@ import builtins
 import sys
 import threading
 from collections import OrderedDict
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
@@ -652,7 +652,7 @@ def squeeze(
 
 
 def reduce(
-    op: Callable,
+    op: FinchOperator,
     x,
     /,
     *,
@@ -766,7 +766,7 @@ def _broadcast_shape(*args: tuple) -> tuple:
     return shape
 
 
-def elementwise(f: Callable, *args) -> LazyTensor:
+def elementwise(f: FinchOperator, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
 
@@ -789,7 +789,6 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    assert isinstance(f, FinchOperator)
     args = tuple(lazy(a) for a in args)
     shape = _broadcast_shape(*(arg.shape for arg in args))
     ndim = len(shape)

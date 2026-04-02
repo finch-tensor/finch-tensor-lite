@@ -97,7 +97,7 @@ class AnnotatedQuery:
         idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
         top_counter = 1
-        idx_op: OrderedDict[Field, Any] = OrderedDict()
+        idx_op: OrderedDict[Field, FinchOperator] = OrderedDict()
         idx_init: OrderedDict[Field, Any] = OrderedDict()
 
         def aggregate_annotation_rule(node: LogicNode) -> LogicNode:
@@ -139,7 +139,7 @@ class AnnotatedQuery:
             stats_point = cache_point[point_expr]
             idx_dim_size = stats_point.dim_sizes[idx]
             lowest_roots = AnnotatedQuery.find_lowest_roots(
-                Literal(agg_op), idx, idx_starting_root[idx]
+                agg_op, idx, idx_starting_root[idx]
             )
             original_idx[idx] = idx
             if len(lowest_roots) == 1:
@@ -155,7 +155,6 @@ class AnnotatedQuery:
                         # If the lowest root doesn't contain the reduction index, we
                         # attempt to remove the reduction via a repeat_operator, i.e.
                         # ∑_i B_j = B_j*|Dom(i)|
-                        assert isinstance(agg_op, FinchOperator)
                         f = repeat_operator(agg_op)
                         if f is None:
                             continue
@@ -202,7 +201,6 @@ class AnnotatedQuery:
                     connected_idxs[idx1].add(idx2)
                 mergeable_agg_op = (
                     idx1_op == idx2_op
-                    and isinstance(idx1_op, FinchOperator)
                     and is_associative(idx1_op)
                     and is_commutative(idx1_op)
                 )
@@ -454,7 +452,7 @@ class AnnotatedQuery:
 
     @staticmethod
     def find_lowest_roots(
-        op: Literal, idx: Field, root: LogicExpression
+        op: FinchOperator, idx: Field, root: LogicExpression
     ) -> list[LogicExpression]:
         """
         Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
@@ -479,23 +477,14 @@ class AnnotatedQuery:
             `op` can be safely pushed down.
         """
         match root:
-            case MapJoin(Literal(mj_op), args) as mj:
+            case MapJoin(Literal(FinchOperator() as mj_op), args) as mj:
                 args_with = [arg for arg in args if idx in arg.fields()]
                 args_without = [arg for arg in args if idx not in arg.fields()]
 
-                if (
-                    len(args_with) == 1
-                    and isinstance(mj_op, FinchOperator)
-                    and isinstance(op.val, FinchOperator)
-                    and is_distributive(mj_op, op.val)
-                ):
+                if len(args_with) == 1 and is_distributive(mj_op, op):
                     return AnnotatedQuery.find_lowest_roots(op, idx, args_with[0])
 
-                if (
-                    isinstance(op.val, FinchOperator)
-                    and isinstance(mj_op, FinchOperator)
-                    and cansplitpush(op.val, mj_op)
-                ):
+                if cansplitpush(op, mj_op):
                     roots_without: list[LogicExpression] = list(args_without)
                     roots_with: list[LogicExpression] = []
                     for arg in args_with:
@@ -553,10 +542,8 @@ class AnnotatedQuery:
 
         use_root = False
         match root_node:
-            case MapJoin(Literal(op), args) as mj if (
-                isinstance(op, FinchOperator)
-                and isinstance(reduce_op, FinchOperator)
-                and is_distributive(op, reduce_op)
+            case MapJoin(Literal(FinchOperator() as op), args) as mj if is_distributive(
+                op, reduce_op
             ):
                 # If you're already reducing one index, then it may
                 # make sense to reduce others as well.

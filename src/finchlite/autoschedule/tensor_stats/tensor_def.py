@@ -1,6 +1,6 @@
 import math
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from functools import reduce
 from typing import Any
 
@@ -123,7 +123,7 @@ class TensorDef:
         return float(prod)
 
     @staticmethod
-    def mapjoin(op: Callable, *args: "TensorDef") -> "TensorDef":
+    def mapjoin(op: FinchOperator, *args: "TensorDef") -> "TensorDef":
         """
         Merge multiple TensorDef objects into a single tensor definition.
 
@@ -154,7 +154,7 @@ class TensorDef:
 
     @staticmethod
     def aggregate(
-        op: Callable,
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         d: "TensorDef",
@@ -182,7 +182,6 @@ class TensorDef:
         """
         red_set = set(reduce_indices) & set(d.index_order)
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
-        assert isinstance(op, FinchOperator)
 
         if init is None:
             if is_identity(op, d.fill_value) or is_idempotent(op):

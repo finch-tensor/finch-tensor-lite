@@ -1,6 +1,6 @@
-from collections.abc import Callable
 from typing import Any, Self
 
+from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
 from .tensor_def import TensorDef
@@ -30,7 +30,7 @@ class DenseStats(TensorStats):
         return total
 
     @staticmethod
-    def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
+    def mapjoin(op: FinchOperator, *args: TensorStats) -> TensorStats:
         axes_set = [set(s.index_order) for s in args]
         same_axes = all(axes_set[0] == axes for axes in axes_set)
 
@@ -45,7 +45,7 @@ class DenseStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",

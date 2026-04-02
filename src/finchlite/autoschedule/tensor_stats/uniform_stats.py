@@ -1,5 +1,4 @@
 import math
-from collections.abc import Callable
 from typing import Any, Self
 
 import numpy as np
@@ -59,8 +58,7 @@ class UniformStats(TensorStats):
         return self.nnz
 
     @staticmethod
-    def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
-        assert isinstance(op, FinchOperator)
+    def mapjoin(op: FinchOperator, *args: TensorStats) -> TensorStats:
         def_args = [stat.tensordef for stat in args]
         new_def = TensorDef.mapjoin(op, *def_args)
         new_vol = UniformStats._get_volume(new_def)
@@ -96,12 +94,11 @@ class UniformStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",
     ) -> "UniformStats":
-        assert isinstance(op, FinchOperator)
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
         res_vol = UniformStats._get_volume(new_def)
         red_set = set(reduce_indices) & set(stats.tensordef.index_order)

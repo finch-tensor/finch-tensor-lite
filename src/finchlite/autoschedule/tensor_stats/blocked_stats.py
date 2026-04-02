@@ -1,5 +1,4 @@
 import math
-from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -7,6 +6,7 @@ import numpy as np
 import finchlite as fl
 from finchlite.finch_logic import Field
 
+from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
@@ -76,7 +76,7 @@ class BlockedStats(TensorStats):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
 
     @staticmethod
-    def mapjoin(op: Callable, *args: TensorStats) -> "BlockedStats":
+    def mapjoin(op: FinchOperator, *args: TensorStats) -> "BlockedStats":
         "We assume that all the args have same sized blocks here"
 
         if not all(isinstance(arg, BlockedStats) for arg in args):
@@ -103,7 +103,7 @@ class BlockedStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: TensorStats,

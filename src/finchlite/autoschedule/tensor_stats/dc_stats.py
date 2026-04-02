@@ -1,6 +1,6 @@
 import math
 from collections import Counter
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -1457,7 +1457,7 @@ class DCStats(TensorStats):
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
-    def mapjoin(op: Callable[..., Any], *all_stats: "TensorStats") -> "TensorStats":
+    def mapjoin(op: FinchOperator, *all_stats: "TensorStats") -> "TensorStats":
         """
         Merge DC statistics for an elementwise operation.
 
@@ -1476,8 +1476,6 @@ class DCStats(TensorStats):
             - If mixed, and the join-like arguments cover all output indices, prefer
                 join merge; otherwise perform union merge over all arguments.
         """
-        if not isinstance(op, FinchOperator):
-            raise AssertionError("MapJoin requires a Finch operator.")
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
         join_like_args: list[TensorStats] = []
         union_like_args: list[TensorStats] = []
@@ -1504,7 +1502,7 @@ class DCStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",

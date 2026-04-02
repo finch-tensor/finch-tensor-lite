@@ -388,7 +388,7 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
-    roots = AnnotatedQuery.find_lowest_roots(Literal(ffunc.add), Field(idx_name), root)
+    roots = AnnotatedQuery.find_lowest_roots(ffunc.add, Field(idx_name), root)
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if expected and not isinstance(expected[0], str):
@@ -954,7 +954,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
                     Literal(ffunc.add),
                     Literal(0),
                     MapJoin(
-                        Literal(max),
+                        Literal(ffunc.max),
                         (
                             Table(Literal(A_mat), (Field("i"), Field("j"))),
                             Table(Literal(A_mat), (Field("j"), Field("k"))),
@@ -969,7 +969,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
                 Literal(ffunc.add),
                 Literal(0),
                 MapJoin(
-                    Literal(max),
+                    Literal(ffunc.max),
                     (
                         Table(Literal(A_mat), (Field("i"), Field("j"))),
                         Table(Literal(A_mat), (Field("j"), Field("k"))),
@@ -987,7 +987,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
                     Literal(ffunc.add),
                     Literal(0),
                     MapJoin(
-                        Literal(max),
+                        Literal(ffunc.max),
                         (
                             Aggregate(
                                 Literal(ffunc.add),
