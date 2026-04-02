@@ -9,11 +9,37 @@ def jit(f, /, ctx=None):
     function to be compiled and optimized for performance when called.
 
     Parameters:
-    - f: The function to be marked for JIT compilation.
+    - f: The function to be marked for JIT compilation. This function can use
+        basic python control flow and operations (e.g. while, for, if). However,
+        it shouldn't use more complex features like generators, classes, or recursion.
+    - ctx: The scheduler to use for computation. Defaults to the result of
+        `get_default_scheduler()`.
 
     Returns:
     - A transformed function that inserts lazy and compute statements to do tracing
        and optimization.
+
+
+    Example usage:
+    @jit
+    def my_function(A, B, C):
+        D = A @ B
+        while some_condition(D):
+            D = D + C
+        return D
+    
+    In this example, `my_function` will be transformed to include lazy and compute
+    statements, allowing it to be optimized and executed efficiently when called.
+    def opt_my_function(A, B, C):
+        A, B = lazy(A), lazy(B)
+        D = A @ B
+        D = compute(D)
+        while some_condition(D):
+            C = lazy(C)
+            D = D + C
+            D = compute(D)
+        D = compute(D)
+        return D
     """
     if ctx is None:
         ctx = get_default_scheduler()
