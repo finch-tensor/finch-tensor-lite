@@ -1,3 +1,4 @@
+# AI modified: 2026-04-02T22:35:07.606Z 96d960a
 # AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 """
 Galley logical optimizer: applies greedy query rewriting to logical plans
@@ -11,7 +12,7 @@ from collections import OrderedDict
 from typing import TypedDict
 
 from ..finch_logic import Alias, LogicEvaluator, Plan, Query
-from ..util.logging import LOG_LOGIC_POST_OPT
+from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.greedy_optimizer import greedy_query
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
@@ -21,7 +22,7 @@ from .galley.logical_optimizer.query_normalization import (
 )
 from .tensor_stats import TensorStats
 
-logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
 
 def optimize_query(query, ST, stats_bindings, use_components: bool = True):

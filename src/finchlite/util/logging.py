@@ -1,3 +1,4 @@
+# AI modified: 2026-04-02T22:35:07.606Z 96d960a
 """
 Finch logging module.
 
@@ -14,6 +15,7 @@ build a path to a log record.
          ├──> post-opt
     ├──> notation
     ├──> assembly
+    ├──> galley
     └──> codegen
          ├──> c-backend
          └──> numba-backend
@@ -54,6 +56,7 @@ LOG_LOGIC_PRE_OPT = _make_dict("root.logic.pre-opt")
 LOG_LOGIC_POST_OPT = _make_dict("root.logic.post-opt")
 LOG_NOTATION = _make_dict("root.notation")
 LOG_ASSEMBLY = _make_dict("root.assembly")
+LOG_GALLEY = _make_dict("root.galley")
 LOG_BACKEND_C = _make_dict("root.codegen.c-backend")
 LOG_BACKEND_NUMBA = _make_dict("root.codegen.numba-backend")
 
@@ -64,6 +67,7 @@ _abbr_mapping = {
     "l": "logic",
     "n": "notation",
     "a": "assembly",
+    "g": "galley",
     "c": "codegen",
     "cb": "c-backend",
     "nb": "numba-backend",

@@ -194,6 +194,7 @@ a comma (`,`).
 | Logic IR after optimization | `root.logic.post-opt` | `r.l.post` |
 | Notation IR | `root.notation` | `r.n` |
 | Assembly IR | `root.assembly` | `r.a` |
+| Galley optimizer | `root.galley` | `r.g` |
 | All codegen | `root.codegen` | `r.c` |
 | C backend | `root.codegen.c-backend` | `r.c.cb` |
 | Numba backend | `root.codegen.numba-backend` | `r.c.nb` |
@@ -208,22 +209,5 @@ handler = get_logger_handler("r.l.post,r.c.nb")
 logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
 ```
 
-#### Using `FINCH_LOG` environment variable (shell)
-
-You can also enable logging without changing your source code by configuring logging
-in a small bootstrap script or by using `logging.config`. For quick ad-hoc debugging
-from the shell you can set up a one-liner:
-
-```bash
-python -c "
-import logging
-from finchlite.util.logging import get_logger_handler, FORMAT
-logging.basicConfig(level=logging.DEBUG, handlers=[get_logger_handler('root')], format=FORMAT)
-import finchlite
-# ... your code here
-"
-```
-
 ---
-
 
