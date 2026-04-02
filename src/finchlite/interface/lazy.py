@@ -1937,6 +1937,8 @@ def isinf(x) -> LazyTensor:
 def isnan(x) -> LazyTensor:
     return elementwise(np.isnan, lazy(x))
 
+def iscomplexobj(x) -> LazyTensor:
+    return elementwise(np.iscomplexobj, lazy(x))
 
 def logical_and(x1, x2) -> LazyTensor:
     return elementwise(np.logical_and, lazy(x1), lazy(x2))

@@ -182,7 +182,7 @@ class EagerTensor(OverrideTensor, ABC):
     def __index__(self) -> int:
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to index.")
-        return operator.index(self.val)
+        return operator.index(self[()])
 
     def __log__(self):
         return log(self)
@@ -973,6 +973,11 @@ def isnan(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.isnan(x)
     return compute(lazy.isnan(x))
+
+def iscomplexobj(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.iscomplexobj(x)
+    return compute(lazy.iscomplexobj(x))
 
 
 def logical_and(x1, x2):
