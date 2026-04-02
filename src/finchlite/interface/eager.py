@@ -182,7 +182,7 @@ class EagerTensor(OverrideTensor, ABC):
     def __index__(self) -> int:
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to index.")
-        return operator.index(self[()])
+        return operator.index(self.__int__())
 
     def __log__(self):
         return log(self)
