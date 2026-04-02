@@ -21,22 +21,22 @@ from .nodes import (
     Variable,
 )
 
+def get_variables_in_stmt(stmt: FusedNode) -> set[Variable]:
+    var_set = set()
+
+    def _var_gatherer(node: FusedNode) -> FusedNode:
+        match node:
+            case Variable() as var:
+                var_set.add(var)
+                return node
+            case node:
+                return node
+
+    Rewrite(PostWalk(_var_gatherer))(stmt)
+    return var_set
+
 
 class LivenessAnalysis(DataFlowAnalysis):
-    def get_variables_in_stmt(self, stmt: FusedNode) -> set[Variable]:
-        var_set = set()
-
-        def _var_gatherer(node: FusedNode) -> FusedNode:
-            match node:
-                case Variable() as var:
-                    var_set.add(var)
-                    return node
-                case node:
-                    return node
-
-        Rewrite(PostWalk(_var_gatherer))(stmt)
-        return var_set
-
     def stmt_str(self, stmt: FusedNode, state: dict) -> str:
         str_state = ", ".join(f"{var}" for var in state)
         return f"Live vars: {{{str_state}}} | Stmt: {stmt}"
@@ -50,15 +50,15 @@ class LivenessAnalysis(DataFlowAnalysis):
                 case NumberedStatement(Assign(lhs, rhs), _):
                     if lhs in new_state:
                         del new_state[lhs]
-                    for var in self.get_variables_in_stmt(rhs):
+                    for var in get_variables_in_stmt(rhs):
                         new_state[var] = True
                 case Assign(lhs, rhs):
                     if lhs in new_state:
                         del new_state[lhs]
-                    for var in self.get_variables_in_stmt(rhs):
+                    for var in get_variables_in_stmt(rhs):
                         new_state[var] = True
                 case stmt:
-                    for var in self.get_variables_in_stmt(stmt):
+                    for var in get_variables_in_stmt(stmt):
                         new_state[var] = True
         return new_state
 
@@ -88,12 +88,25 @@ def _get_stmt_bounds(stmts: list[FusedNode]) -> tuple[int, int]:
 def _insert_compute(prgm: FusedNode, compute_sid, vars: set[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
-            # In the case of returns, we should just compute the retuned values
-            case NumberedStatement(Return(ret_vars), sid) if sid == compute_sid:
-                computes = tuple(
-                    Assign(var, Call(Literal(compute), (var,))) for var in ret_vars
-                )
-                return Block(computes + (node,))
+            # In the case of returns, we need to assign the expressions,
+            # compute them, and then return the computed variables.
+            case NumberedStatement(Return(ret_expr), sid) if sid == compute_sid:
+                for expr in ret_expr:
+                    for var in get_variables_in_stmt(expr):
+                        vars.add(var)
+                lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
+                exprs_to_compute = tuple()
+                return_vars = tuple()
+                for i, expr in enumerate(ret_expr):
+                    if isinstance(expr, Variable) and expr in vars:
+                        return_vars += (expr,)
+                    else:
+                        new_var = Variable("tmp_" + str(i))
+                        exprs_to_compute += (Assign(new_var, expr),)
+                        return_vars += (new_var,)
+                for var in return_vars:
+                    exprs_to_compute += (Assign(var, Call(Literal(compute), (var,))),)
+                return Block(lazies + exprs_to_compute + (Return(return_vars),))
             case NumberedStatement(stmt, sid) if sid == compute_sid:
                 computes = tuple(
                     Assign(var, Call(Literal(compute), (var,))) for var in vars
@@ -155,8 +168,6 @@ def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     cfg = fused_build_cfg(desugared_prgm)
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
-    print("Liveness analysis results:")
-    print(liveness)
     for block in cfg.blocks.values():
         live_outputs = set(liveness.input_states[
             block.id
@@ -165,22 +176,6 @@ def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
             block.id
         ].keys())  # Backwards analysis, so live inputs are the output state of the block
         min_id, max_id = _get_stmt_bounds(block.statements)
-        print(
-            "insert lazy for live inputs",
-            live_inputs,
-            " at block",
-            block,
-            "with min stmt id",
-            min_id,
-        )
-        print(
-            "insert compute for live outputs",
-            live_outputs,
-            " at block",
-            block,
-            "with max stmt id",
-            max_id,
-        )
         numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)
         numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs)
     return Rewrite(PostWalk(Chain([_unwrap_numbered_stmt, _unnest_block])))(

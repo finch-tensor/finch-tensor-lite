@@ -196,53 +196,235 @@ def test_cfg_builder():
     )  # Entry block, for loop block, if block, while block, return block
 
 
-def test_liveness_analysis():
-    def simple_fn(n):
-        total = 0
-        for i in range(n):
-            total = total + i
-        return total
-
-    fused_fn = parse_fused_function(simple_fn)
+def _build_liveness(fn):
+    """Helper: parse, number, desugar, build CFG, run liveness."""
+    fused_fn = parse_fused_function(fn)
     numbered_fn, _ = number_statements(fused_fn)
     desugared_fn = fused_desugar(numbered_fn)
     cfg = fused_build_cfg(desugared_fn)
-    print(cfg)
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
+    return liveness, cfg
 
-    # We won't assert on the exact liveness sets here, but we can at least check
-    # that the analysis produces some output and that it includes expected variables.
+
+def _all_live_names(liveness, cfg):
+    """Union of all live variable names across all blocks (in and out)."""
+    names = set()
     for block in cfg.blocks.values():
-        input_live_vars = liveness.input_states[block.id]
-        output_live_vars = liveness.output_states[block.id]
-        print(f"Block {block}")
-        print(f"input live variables: {input_live_vars}")
-        print(f"output live variables: {output_live_vars}")
+        names |= {v.name for v in liveness.output_states[block.id]}
+        names |= {v.name for v in liveness.input_states[block.id]}
+    return names
 
 
-def test_lazy_and_compute_insertion():
-    def simple_fn(A, B, C, n_iter):
+def test_liveness_straight_line():
+    """Parameters must appear live at the function entry block."""
+
+    def fn(a, b):
+        c = add(a, b)
+        return c
+
+    liveness, cfg = _build_liveness(fn)
+
+    # After desugaring, the function body is a single block.
+    # live-IN (output_states) of that block = {a, b}, since both are used.
+    # c is defined and consumed in the same block so it never crosses a block
+    # boundary and does not appear in any block-boundary state.
+    all_live_in = set()
+    for block in cfg.blocks.values():
+        all_live_in |= {v.name for v in liveness.output_states[block.id]}
+
+    assert "a" in all_live_in
+    assert "b" in all_live_in
+    assert "c" not in all_live_in
+
+
+def test_liveness_dead_variable():
+    """A variable assigned but never used afterwards must not be live after."""
+
+    def fn(a, b):
+        unused = add(a, b)  # noqa: F841
+        c = matmul(a, b)
+        return c
+
+    liveness, cfg = _build_liveness(fn)
+
+    exit_block = list(cfg.blocks.values())[-1]
+    live_at_exit = {v.name for v in liveness.input_states[exit_block.id]}
+    assert "unused" not in live_at_exit
+
+
+def test_liveness_loop_carried():
+    """Loop-carried variables must be live at the top of the loop body."""
+
+    def fn(n):
+        total = 0
+        for _i in range(n):
+            total = total + 1
+        return total
+
+    liveness, cfg = _build_liveness(fn)
+    names = _all_live_names(liveness, cfg)
+
+    assert "total" in names
+    assert "n" in names
+
+
+def test_liveness_multi_loop_carried():
+    """Multiple loop-carried variables must all be live inside the loop."""
+
+    def fn(A, B, C, n):
         D = matmul(A, B)
         E = add(A, C)
-        for _i in range(n_iter):
+        for _i in range(n):
             D = add(D, E)
         return D
+
+    liveness, cfg = _build_liveness(fn)
+    names = _all_live_names(liveness, cfg)
+
+    assert "D" in names
+    assert "E" in names
+    assert "n" in names
+
+
+def test_liveness_if_branch_merges():
+    """Variables used in either branch must be live before the if."""
+
+    def fn(cond, a, b):
+        if cond:  # noqa: SIM108
+            result = add(a, b)
+        else:
+            result = matmul(a, b)
+        return result
+
+    liveness, cfg = _build_liveness(fn)
+    names = _all_live_names(liveness, cfg)
+
+    assert "a" in names
+    assert "b" in names
+    assert "result" in names
+
+def test_jit_straight_line():
+    """A jit function with no loops should produce the same result as eager."""
+
+    def simple_fn(A, B):
+        C = matmul(A, B)
+        return C
 
     @jit
-    def opt_simple_fn(A, B, C, n_iter):
-        D = matmul(A, B)
-        E = add(A, C)
-        for _i in range(n_iter):
-            D = add(D, E)
-        return D
+    def opt_fn(A, B):
+        C = matmul(A, B)
+        return C
 
     A = asarray(np.array([[1, 2], [3, 4]]))
-    B = asarray(np.array([[1, 2], [3, 4]]))
-    C = asarray(np.array([[1, 2], [3, 4]]))
-    n_iter = 5
+    B = asarray(np.array([[5, 6], [7, 8]]))
 
-    expected_result = simple_fn(A, B, C, n_iter)
-    print(opt_simple_fn)
-    result = opt_simple_fn(A, B, C, n_iter)
-    finch_assert_allclose(result, expected_result)
+    finch_assert_allclose(opt_fn(A, B), simple_fn(A, B))
+
+def test_jit_return_expr():
+    """A jit function with no loops should produce the same result as eager."""
+
+    def simple_fn(A, B):
+        return matmul(A, B), matmul(A, B)
+
+    @jit
+    def opt_fn(A, B):
+        return matmul(A, B), matmul(A, B)
+
+    A = asarray(np.array([[1, 2], [3, 4]]))
+    B = asarray(np.array([[5, 6], [7, 8]]))
+
+    finch_assert_allclose(opt_fn(A, B), simple_fn(A, B))
+
+
+def test_jit_two_independent_ops():
+    """Two independent tensor ops whose results are both used."""
+
+    def simple_fn(A, B, C):
+        D = matmul(A, B)
+        E = add(A, C)
+        F = add(D, E)
+        return F
+
+    @jit
+    def opt_fn(A, B, C):
+        D = matmul(A, B)
+        E = add(A, C)
+        F = add(D, E)
+        return F
+
+    A = asarray(np.array([[1, 2], [3, 4]]))
+    B = asarray(np.array([[1, 0], [0, 1]]))
+    C = asarray(np.array([[1, 1], [1, 1]]))
+
+    finch_assert_allclose(opt_fn(A, B, C), simple_fn(A, B, C))
+
+
+def test_jit_scalar_loop():
+    """A loop with a scalar iteration count and tensor accumulation."""
+
+    def simple_fn(A, n):
+        B = A
+        for _i in range(n):
+            B = add(B, A)
+        return B
+
+    @jit
+    def opt_fn(A, n):
+        B = A
+        for _i in range(n):
+            B = add(B, A)
+        return B
+
+    A = asarray(np.array([[1, 0], [0, 1]], dtype=float))
+
+    finch_assert_allclose(opt_fn(A, 3), simple_fn(A, 3))
+
+
+def test_jit_if_branch():
+    """A jit function with an if/else over tensor ops."""
+
+    def simple_fn(A, B, use_matmul):
+        if use_matmul:  # noqa: SIM108
+            result = matmul(A, B)
+        else:
+            result = add(A, B)
+        return result
+
+    @jit
+    def opt_fn(A, B, use_matmul):
+        if use_matmul:  # noqa: SIM108
+            result = matmul(A, B)
+        else:
+            result = add(A, B)
+        return result
+
+    A = asarray(np.array([[1, 2], [3, 4]]))
+    B = asarray(np.array([[1, 0], [0, 1]]))
+
+    finch_assert_allclose(opt_fn(A, B, True), simple_fn(A, B, True))
+    finch_assert_allclose(opt_fn(A, B, False), simple_fn(A, B, False))
+
+def test_jit_while():
+    """A jit function with a while loop."""
+
+    def simple_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = add(C, B)
+            n = n - 1
+        return C
+
+    @jit
+    def opt_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = add(C, B)
+            n = n - 1
+        return C
+
+    A = asarray(np.array([[1, 2], [3, 4]]))
+    B = asarray(np.array([[1, 0], [0, 1]]))
+    n = 3
+
+    finch_assert_allclose(opt_fn(A, B, n), simple_fn(A, B, n))
