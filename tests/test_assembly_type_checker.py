@@ -77,11 +77,11 @@ def test_call_basic():
         == np.float64
     )
     assert (
-        checker(asm.Call(asm.Literal(np.sin), (asm.Literal(np.float64(3.0)),)))
+        checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal(np.float64(3.0)),)))
         == np.float64
     )
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Call(asm.Literal(np.sin), (asm.Literal("string"),)))
+        checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal("string"),)))
 
 
 def test_load_basic():

@@ -1,4 +1,3 @@
-# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 from __future__ import annotations
 
 import bisect
@@ -25,7 +24,6 @@ from ..algebra import (
     promote_type,
     return_type,
 )
-from ..algebra import ffunc
 from ..autoschedule.tensor_stats import StatsInterpreter, TensorStats
 from ..compile import BufferizedNDArray
 from ..finch_assembly import TupleFType

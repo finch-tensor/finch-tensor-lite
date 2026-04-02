@@ -1,11 +1,7 @@
-
-# AI modified: 2026-04-01T19:39:16Z 2fa6b7eac82c18165781c1b5599ca0bb63fd0d5e
-
-from finchlite.algebra import ffunc
-
 import numpy as np
 
 import finchlite
+from finchlite.algebra import ffunc
 from finchlite.autoschedule import (
     normalize_names,
 )
@@ -187,7 +183,7 @@ def test_isolate_aggregates():
                     Query(
                         Alias(f"#A#{_sg.counter}"),
                         Aggregate(
-                            Literal("*"),
+                            Literal(ffunc.mul),
                             Literal(1),
                             Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                             (Field("i2"),),
@@ -196,7 +192,7 @@ def test_isolate_aggregates():
                     Query(
                         Alias("A0"),
                         Aggregate(
-                            Literal("+"),
+                            Literal(ffunc.add),
                             Literal(0),
                             Table(
                                 Alias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))
@@ -629,13 +625,14 @@ def test_scheduler_e2e_matmul(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                        Literal(ffunc.mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Aggregate(
-                        Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                    Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             Produces((Alias("C"),)),
@@ -667,7 +664,8 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j))),
                 ),
             ),
             # matmul
@@ -681,7 +679,8 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("RES"),
                 MapJoin(
-                    Literal(ffunc.mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i))),
                 ),
             ),
             Produces((Alias("RES"),)),

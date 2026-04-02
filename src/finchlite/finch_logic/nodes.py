@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
-from ..algebra import fixpoint_type, promote_type, return_type, ffunc
+from ..algebra import ffunc, fixpoint_type, promote_type, return_type
 from ..symbolic import (
     Context,
     FType,

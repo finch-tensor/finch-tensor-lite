@@ -5,7 +5,7 @@ import pytest
 import numpy  # noqa: F401, ICN001
 import numpy as np
 
-import finchlite # noqa: F401, ICN001
+import finchlite  # noqa: F401, ICN001
 from finchlite import ffunc
 from finchlite import finch_assembly as asm
 from finchlite.codegen import NumpyBuffer

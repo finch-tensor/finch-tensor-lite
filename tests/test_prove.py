@@ -1,8 +1,4 @@
-
-# AI modified: 2026-04-01T19:39:16Z 2fa6b7eac82c18165781c1b5599ca0bb63fd0d5e
-
 from finchlite.algebra import ffunc
-
 from finchlite.finch_notation.nodes import Call
 from finchlite.finch_notation.nodes import Literal as L
 from finchlite.finch_notation.proves import (
@@ -22,9 +18,6 @@ from finchlite.finch_notation.proves import (
     rule_le,
 )
 
-# NOTE: These test cases were AI generated based on proves.py.
-
-
 
 def test_rule_all_literals():
     # Simple case: add(1, 2) => 3
@@ -36,7 +29,6 @@ def test_rule_all_literals():
     expr = Call(L(ffunc.add), (L(1), Call(L(ffunc.max), (L(2), L(3)))))
     result = rule_all_literals(expr)
     assert result is None
-
 
 
 def test_rule_idempotent_unique():
@@ -54,7 +46,6 @@ def test_rule_idempotent_unique():
     assert result is None
 
 
-
 def test_rule_associative_flatten():
     # max(a, max(b, c)) => max(a, b, c)
     a, b, c = L("a"), L("b"), L("c")
@@ -66,7 +57,6 @@ def test_rule_associative_flatten():
     expr = Call(L(ffunc.max), (a, b))
     result = rule_associative_flatten(expr)
     assert result is None
-
 
 
 def test_rule_equal_same():
@@ -83,14 +73,12 @@ def test_rule_equal_same():
     assert result is None
 
 
-
 def test_rule_ge():
     # ge(a, b) => eq(a, max(a, b))
     a, b = L("a"), L("b")
     expr = Call(L(ffunc.ge), (a, b))
     result = rule_ge(expr)
     assert result == Call(L(ffunc.eq), (a, Call(L(ffunc.max), (a, b))))
-
 
 
 def test_rule_le():
@@ -101,13 +89,14 @@ def test_rule_le():
     assert result == Call(L(ffunc.eq), (Call(L(ffunc.max), (a, b)), b))
 
 
-
 def test_rule_add_with_max():
     # add(a, max(b, c)) => max(add(a, b), add(a, c))
     a, b, c = L("a"), L("b"), L("c")
     expr = Call(L(ffunc.add), (a, Call(L(ffunc.max), (b, c))))
     result = rule_add_with_max(expr)
-    assert result == Call(L(ffunc.max), (Call(L(ffunc.add), (a, b)), Call(L(ffunc.add), (a, c))))
+    assert result == Call(
+        L(ffunc.max), (Call(L(ffunc.add), (a, b)), Call(L(ffunc.add), (a, c)))
+    )
 
     # Should not match when no max
     expr = Call(L(ffunc.add), (a, b))
@@ -115,19 +104,19 @@ def test_rule_add_with_max():
     assert result is None
 
 
-
 def test_rule_add_with_min():
     # add(a, min(b, c)) => min(add(a, b), add(a, c))
     a, b, c = L("a"), L("b"), L("c")
     expr = Call(L(ffunc.add), (a, Call(L(ffunc.min), (b, c))))
     result = rule_add_with_min(expr)
-    assert result == Call(L(ffunc.min), (Call(L(ffunc.add), (a, b)), Call(L(ffunc.add), (a, c))))
+    assert result == Call(
+        L(ffunc.min), (Call(L(ffunc.add), (a, b)), Call(L(ffunc.add), (a, c)))
+    )
 
     # Should not match when no min
     expr = Call(L(ffunc.add), (a, b))
     result = rule_add_with_min(expr)
     assert result is None
-
 
 
 def test_rule_disjoint_nested_max_min():
@@ -186,7 +175,18 @@ def test_rule_disjoint_flat_pair_max_min():
     # Should create nested structure with intersection and differences
     assert result == Call(
         L(ffunc.max),
-        (Call(L(ffunc.min), (a, Call(L(ffunc.max), (Call(L(ffunc.min), (b,)), Call(L(ffunc.min), (c,)))))),),
+        (
+            Call(
+                L(ffunc.min),
+                (
+                    a,
+                    Call(
+                        L(ffunc.max),
+                        (Call(L(ffunc.min), (b,)), Call(L(ffunc.min), (c,))),
+                    ),
+                ),
+            ),
+        ),
     )
 
     # Should not match when disjoint
@@ -204,7 +204,18 @@ def test_rule_disjoint_flat_pair_min_max():
     # Should create nested structure with intersection and differences
     assert result == Call(
         L(ffunc.min),
-        (Call(L(ffunc.max), (a, Call(L(ffunc.min), (Call(L(ffunc.max), (b,)), Call(L(ffunc.max), (c,)))))),),
+        (
+            Call(
+                L(ffunc.max),
+                (
+                    a,
+                    Call(
+                        L(ffunc.min),
+                        (Call(L(ffunc.max), (b,)), Call(L(ffunc.max), (c,))),
+                    ),
+                ),
+            ),
+        ),
     )
 
     # Should not match when disjoint

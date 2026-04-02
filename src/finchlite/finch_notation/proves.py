@@ -1,5 +1,3 @@
-# AI modified: 2026-04-01T20:00:00Z abc1234567890
-
 from collections.abc import Callable
 from collections.abc import Sequence as Seq
 from functools import partial
@@ -96,7 +94,8 @@ def rule_add_with(ex, func):
         ):
             before, call_args, after = found
             return Call(
-                L(func), tuple(Call(L(ffunc.add), (*before, ca, *after)) for ca in call_args)
+                L(func),
+                tuple(Call(L(ffunc.add), (*before, ca, *after)) for ca in call_args),
             )
 
 
@@ -134,8 +133,12 @@ def rule_disjoint_nested(ex, func1, func2):
             return None
 
 
-rule_disjoint_nested_max_min = partial(rule_disjoint_nested, func1=ffunc.max, func2=ffunc.min)
-rule_disjoint_nested_min_max = partial(rule_disjoint_nested, func1=ffunc.min, func2=ffunc.max)
+rule_disjoint_nested_max_min = partial(
+    rule_disjoint_nested, func1=ffunc.max, func2=ffunc.min
+)
+rule_disjoint_nested_min_max = partial(
+    rule_disjoint_nested, func1=ffunc.min, func2=ffunc.max
+)
 
 
 def rule_disjoint_flat_single(ex, func1, func2):
@@ -186,8 +189,12 @@ def rule_disjoint_flat_pair(ex, func1, func2):
             return None
 
 
-rule_disjoint_flat_pair_max_min = partial(rule_disjoint_flat_pair, func1=ffunc.max, func2=ffunc.min)
-rule_disjoint_flat_pair_min_max = partial(rule_disjoint_flat_pair, func1=ffunc.min, func2=ffunc.max)
+rule_disjoint_flat_pair_max_min = partial(
+    rule_disjoint_flat_pair, func1=ffunc.max, func2=ffunc.min
+)
+rule_disjoint_flat_pair_min_max = partial(
+    rule_disjoint_flat_pair, func1=ffunc.min, func2=ffunc.max
+)
 
 
 def prove_rules():

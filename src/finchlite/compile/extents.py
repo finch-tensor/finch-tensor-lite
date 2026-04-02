@@ -1,4 +1,3 @@
-# AI modified: 2026-04-01T22:45:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 from enum import Enum
 
 from .. import finch_notation as ntn
@@ -16,6 +15,8 @@ class _CombineStyle(Enum):
 def _combine_extents(
     ext_1: SymbolicExtent, ext_2: SymbolicExtent, style: _CombineStyle
 ) -> SymbolicExtent:
+    start_fn: ffunc.FinchOperator
+    end_fn: ffunc.FinchOperator
     if style == _CombineStyle.UNION:
         start_fn, end_fn = ffunc.min, ffunc.max
     else:

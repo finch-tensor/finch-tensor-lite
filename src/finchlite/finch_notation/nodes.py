@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-
-# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 from dataclasses import dataclass
 from typing import Any
 

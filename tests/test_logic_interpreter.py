@@ -1,8 +1,4 @@
-# AI modified: 2026-04-01T19:39:16Z 2fa6b7eac82c18165781c1b5599ca0bb63fd0d5e
-
 import _operator  # noqa: F401
-
-from finchlite.algebra import ffunc
 
 import pytest
 
@@ -10,6 +6,7 @@ import numpy as np
 from numpy import array  # noqa: F401
 
 import finchlite as fl
+from finchlite.algebra import ffunc
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -52,14 +49,18 @@ def test_matrix_multiplication(a, b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                        Literal(ffunc.mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                            Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add),
+                        Literal(0),
+                        Table(Alias("AB"), (i, k, j)),
+                        (k,),
                     ),
                     (i, j),
                 ),
@@ -87,14 +88,18 @@ def test_plan_repr():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add),
+                        Literal(0),
+                        Table(Alias("AB"), (i, k, j)),
+                        (k,),
                     ),
                     (i, j),
                 ),
@@ -103,7 +108,23 @@ def test_plan_repr():
         )
     )
     import finchlite
-    assert p == eval(repr(p), {'finchlite': finchlite, 'Literal': Literal, 'Alias': Alias, 'Field': Field, 'Query': Query, 'Table': Table, 'MapJoin': MapJoin, 'Reorder': Reorder, 'Aggregate': Aggregate, 'Plan': Plan, 'Produces': Produces})
+
+    assert p == eval(
+        repr(p),
+        {
+            "finchlite": finchlite,
+            "Literal": Literal,
+            "Alias": Alias,
+            "Field": Field,
+            "Query": Query,
+            "Table": Table,
+            "MapJoin": MapJoin,
+            "Reorder": Reorder,
+            "Aggregate": Aggregate,
+            "Plan": Plan,
+            "Produces": Produces,
+        },
+    )
 
 
 def test_materialize():
@@ -125,13 +146,15 @@ def test_materialize():
             Query(
                 Alias("C"),
                 MapJoin(
-                    Literal(ffunc.add), (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j)))
+                    Literal(ffunc.add),
+                    (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j))),
                 ),
             ),
             Query(
                 Alias("D"),
                 MapJoin(
-                    Literal(ffunc.mul), (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j))),
                 ),
             ),
             Query(Alias("C"), Table(Alias("B"), (i, j))),

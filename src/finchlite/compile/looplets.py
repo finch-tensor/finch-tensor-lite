@@ -1,4 +1,3 @@
-# AI modified: 2026-04-01T22:45:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -235,7 +234,9 @@ class StepperPass(LoopletPass):
         )(body)
         ctx_truncated_body(ext_3, truncated_body)
 
-        if not prove(ntn.Call(ntn.L(ffunc.ge), (ext_3.get_measure(), ext_3.get_unit()))):
+        if not prove(
+            ntn.Call(ntn.L(ffunc.ge), (ext_3.get_measure(), ext_3.get_unit()))
+        ):
             truncated_body = asm.If(
                 asm.Call(
                     asm.L(ffunc.ge),

@@ -1,4 +1,3 @@
-# AI modified: 2026-04-01T22:40:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 import logging
 from abc import ABC, abstractmethod
 from textwrap import dedent
@@ -11,9 +10,9 @@ import numba
 from .. import finch_assembly as asm
 from ..algebra import (
     NumbaOperator,
+    ffunc,
     query_property,
     register_property,
-    ffunc,
 )
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType

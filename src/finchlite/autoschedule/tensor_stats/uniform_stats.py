@@ -1,4 +1,3 @@
-# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
 import math
 from collections.abc import Callable
 from typing import Any, Self

@@ -1,5 +1,3 @@
-# AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
-# AI modified: 2026-04-01T22:47:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -102,8 +100,8 @@ class Extent(FTyped):
 class ExtentOp(FinchOperator):
     __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
 
-    def __init__(self) -> None:
-        self.__qualname__ = "ExtentOp"
+    def __repr__(self):
+        return "ExtentOp"  # TODO: The base class should take care of it.
 
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)

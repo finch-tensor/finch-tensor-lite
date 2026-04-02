@@ -1,8 +1,3 @@
-# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
-# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
-# AI modified: 2026-04-01T17:55:00Z 1234567890abcdef1234567890abcdef
-# AI modified: 2026-04-01T20:20:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
-# AI modified: 2026-04-01T22:47:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 """
 Finch performs extensive rewriting and defining of functions.  The Finch
 compiler is designed to inspect objects and functions defined by other

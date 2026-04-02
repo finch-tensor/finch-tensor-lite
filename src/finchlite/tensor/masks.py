@@ -1,5 +1,3 @@
-# AI modified: 2026-04-01T22:45:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
-# AI modified: 2026-04-01T22:47:00Z 030ebecac4aaec44f270f75a2733cfccd5d72f0b
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
@@ -10,10 +8,10 @@ from finchlite.tensor.fiber_tensor import FiberTensor, FiberTensorFields
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
+from ..algebra import ffunc
 from ..compile import looplets as lplt
 from ..interface import Scalar
 from ..tensor import Level, LevelFType
-from ..algebra import ffunc
 
 
 @dataclass(unsafe_hash=True)

@@ -1,9 +1,3 @@
-# AI modified: 2026-04-01T17:18:51Z 0de216cc18e91710a9b1a0328f5b181137d8901b
-# AI modified: 2026-04-01T17:28:42Z 0de216cc18e91710a9b1a0328f5b181137d8901b
-# AI modified: 2026-04-01T17:34:47Z d369513eef4124a0bcb300a625b553c445a8a73e
-# AI modified: 2026-04-01T18:10:00Z 09431a5eedd67043b459fb6eafbfc5fd936fcf19
-# AI modified: 2026-04-01T18:25:00Z 09431a5eedd67043b459fb6eafbfc5fd936fcf19
-# functions ported from ops.py
 import builtins
 import operator
 from functools import reduce
@@ -128,6 +122,7 @@ mul = Mul()
 class Sub(ReflexiveFinchOperator, CBinaryOperator, NumbaOperator):
     def __repr__(self) -> str:
         return "finchlite.ffunc.sub"
+
     @property
     def c_symbol(self) -> str:
         return "-"
@@ -1463,7 +1458,7 @@ class Scansearch(FinchOperator, NumbaOperator):
             d <<= 0x01
             p += d
         lo = p - d
-        hi = min(p, hi) + u  # type: ignore[call-overload]
+        hi = builtins.min(p, hi) + u  # type: ignore[call-overload]
 
         # binary searching within those bounds
         while lo < hi - u:
