@@ -3,10 +3,10 @@ from .lower import (
     AssemblyContext,
     Extent,
     ExtentFType,
-    make_extent,
     LoopletContext,
     NotationCompiler,
     dimension,
+    make_extent,
 )
 
 __all__ = [
@@ -15,8 +15,8 @@ __all__ = [
     "BufferizedNDArrayFType",
     "Extent",
     "ExtentFType",
-    "make_extent",
     "LoopletContext",
     "NotationCompiler",
     "dimension",
+    "make_extent",
 ]

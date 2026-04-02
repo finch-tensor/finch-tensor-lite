@@ -6,6 +6,7 @@ import numpy as np
 from numpy import array  # noqa: F401
 
 import finchlite as fl
+import finchlite.finch_logic as lgc
 from finchlite.algebra import ffunc
 from finchlite.finch_logic import (
     Aggregate,
@@ -20,7 +21,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-import finchlite.finch_logic as lgc
 
 from .conftest import finch_assert_equal
 
@@ -108,12 +108,8 @@ def test_plan_repr():
             Produces((Alias("C"),)),
         )
     )
-    import finchlite
 
-    assert p == eval(
-        repr(p),
-        {**vars(lgc), **vars(ffunc), **globals()}
-    )
+    assert p == eval(repr(p), {**vars(lgc), **vars(ffunc), **globals()})
 
 
 def test_materialize():

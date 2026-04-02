@@ -7,8 +7,8 @@ import finchlite.finch_notation as ntn
 from finchlite import ffunc, ftype
 from finchlite.compile import (
     BufferizedNDArray,
-    make_extent,
     NotationCompiler,
+    make_extent,
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
