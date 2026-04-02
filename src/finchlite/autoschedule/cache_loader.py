@@ -3,8 +3,7 @@ from typing import Any
 
 from finchlite.algebra.tensor import TensorFType
 
-from .nodes import Alias, LogicStatement
-from .stages import LogicLoader
+from finchlite.finch_logic import Alias, LogicStatement, LogicLoader
 
 
 class LogicCacheFirst(LogicLoader):

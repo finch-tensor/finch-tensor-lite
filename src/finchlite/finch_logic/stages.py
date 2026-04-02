@@ -9,7 +9,7 @@ from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
 
-# from finchlite.autoschedule.tensor_stats import TensorStats
+from .tensor_stats import AbstractStats
 
 
 class LogicEvaluator(Stage):
