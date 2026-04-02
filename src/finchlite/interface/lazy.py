@@ -456,8 +456,10 @@ def asarray(arg: Any, format: TensorFType | None = None) -> Any:
         return format.from_numpy(arg)
     return format(arg)
 
+
 def _is_convertible_to_array(arg: Any) -> bool:
     return isinstance(arg, np.ndarray) or np.isscalar(arg) or arg is None
+
 
 def lazy(arr) -> LazyTensor:
     """

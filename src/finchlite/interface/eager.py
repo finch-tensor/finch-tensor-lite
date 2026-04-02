@@ -1,9 +1,9 @@
 import builtins
+import operator
 import sys
 from abc import ABC
 from collections.abc import Callable, Sequence
 from typing import Any
-import operator
 
 from . import lazy
 from .fuse import compute
@@ -178,7 +178,7 @@ class EagerTensor(OverrideTensor, ABC):
             raise ValueError("Cannot convert non-scalar tensor to bool.")
         # dispatch to the scalar value's `__bool__` method
         return bool(self[()])
-    
+
     def __index__(self) -> int:
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to index.")

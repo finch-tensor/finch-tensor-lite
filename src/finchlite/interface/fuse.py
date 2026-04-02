@@ -204,7 +204,9 @@ def compute(arg, ctx=None):
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
         for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
-            if len(res[lazy_idx].shape) == 0: # if the result is a scalar, extract the value
+            if (
+                len(res[lazy_idx].shape) == 0
+            ):  # if the result is a scalar, extract the value
                 outputs[out_idx] = res[lazy_idx][()]
             else:
                 outputs[out_idx] = res[lazy_idx]
