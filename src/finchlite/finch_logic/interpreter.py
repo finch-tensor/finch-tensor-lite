@@ -5,6 +5,7 @@ import numpy as np
 import finchlite
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+
 from ..algebra import fixpoint_type, return_type
 from ..symbolic import fisinstance
 from . import nodes as lgc
@@ -24,6 +25,7 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+
 
 def make_tensor(shape, fill_value, *, dtype=None):
     if dtype is None:
@@ -207,9 +209,10 @@ class MockLogicLoader(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicStatement, 
+        self,
+        prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats : dict[lgc.Alias, "TensorStats"] | None = None
+        stats: dict[lgc.Alias, "TensorStats"] | None = None,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],

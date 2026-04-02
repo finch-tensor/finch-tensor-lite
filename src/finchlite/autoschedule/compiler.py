@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
@@ -20,7 +21,6 @@ from ..finch_logic import LogicLoader, compute_shape_vars
 from ..finch_notation import NotationInterpreter
 from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
-from finchlite.autoschedule.tensor_stats import TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
@@ -350,7 +350,10 @@ class LogicCompiler(LogicLoader):
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType], stats : dict[lgc.Alias, "TensorStats"] | None = None
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats] | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

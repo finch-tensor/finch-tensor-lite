@@ -1,9 +1,9 @@
 from typing import Any, Self
 
-from .numeric_stats import NumericStats
 from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
+from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 

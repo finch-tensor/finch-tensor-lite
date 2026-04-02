@@ -35,8 +35,9 @@ from ....symbolic import (
     isdescendant,
 )
 from ...tensor_stats import TensorStats
-from .logic_to_stats import insert_statistics
 from ...tensor_stats.numeric_stats import NumericStats
+from .logic_to_stats import insert_statistics
+
 
 @dataclass
 class AnnotatedQuery:
@@ -787,13 +788,14 @@ class AnnotatedQuery:
             case Aggregate() as agg:
                 mat_stats = stats_cache[agg]
                 comp_stats = stats_cache[agg.arg]
-                if isinstance(mat_stats,NumericStats) and isinstance(comp_stats,NumericStats):
+                if isinstance(mat_stats, NumericStats) and isinstance(
+                    comp_stats, NumericStats
+                ):
                     return (
                         10 * mat_stats.estimate_non_fill_values()
                         + comp_stats.estimate_non_fill_values()
                     )
-                else :
-                    raise TypeError("Stats Class must be inherit from NumericStats") 
+                raise TypeError("Stats Class must be inherit from NumericStats")
         raise ValueError(
             "The root of the reduction query should always be an Aggregate node."
         )

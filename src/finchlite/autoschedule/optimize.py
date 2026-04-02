@@ -4,6 +4,7 @@ from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_logic.nodes import LogicExpression
 from finchlite.finch_logic.stages import LogicLoader
@@ -39,7 +40,6 @@ from .standardize import (
     isolate_aggregates,
     push_fields,
 )
-from finchlite.autoschedule.tensor_stats import TensorStats
 
 
 def with_unique_lhs(
@@ -419,7 +419,10 @@ class DefaultLogicOptimizer(LogicLoader):
         self.ctx = ctx
 
     def __call__(
-        self, prgm: LogicStatement, bindings: dict[Alias, TensorFType], stats : dict[Alias, "TensorStats"] | None = None
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"] | None = None,
     ) -> tuple[
         AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
     ]:

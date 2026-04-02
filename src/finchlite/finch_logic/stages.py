@@ -8,14 +8,14 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
-#from finchlite.autoschedule.tensor_stats import TensorStats
+
+# from finchlite.autoschedule.tensor_stats import TensorStats
+
 
 class LogicEvaluator(Stage):
     @abstractmethod
     def __call__(
-        self,
-        term: lgc.LogicNode,
-        bindings: dict[lgc.Alias, Tensor] | None = None
+        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
     ) -> lgc.TableValue | tuple[Tensor, ...]:
         """
         Evaluate the given logic.
@@ -25,9 +25,10 @@ class LogicEvaluator(Stage):
 class LogicLoader(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicStatement, 
-        bindings: dict[lgc.Alias, TensorFType], 
-        stats : dict[lgc.Alias, Any] | None = None
+        self,
+        term: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, Any] | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -58,8 +59,8 @@ class OptLogicLoader(LogicLoader):
     def __call__(
         self,
         term: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType], 
-        stats : dict[lgc.Alias, Any] | None = None
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, Any] | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

@@ -6,21 +6,19 @@ from finchlite.finch_logic import Field
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
-class DummyStats(TensorStats):
 
+class DummyStats(TensorStats):
     @classmethod
-    def from_def(cls,d:TensorDef)->Self:
+    def from_def(cls, d: TensorDef) -> Self:
         ds = object.__new__(cls)
         ds.tensordef = d.copy()
-        return ds 
-    
+        return ds
 
     @staticmethod
     def copy_stats(stat: TensorStats) -> TensorStats:
         if not isinstance(stat, DummyStats):
             raise TypeError("copy_stats expected a DummyStats instance")
         return DummyStats.from_def(stat.tensordef.copy())
-
 
     @staticmethod
     def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
@@ -71,5 +69,3 @@ class DummyStats(TensorStats):
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
         return DummyStats.from_def(new_def)
-
-

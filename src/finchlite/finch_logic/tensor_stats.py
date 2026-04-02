@@ -5,8 +5,6 @@ from typing import Any
 from finchlite.finch_logic import Field
 
 
-
-
 class TensorStats(ABC):
     tensordef: TensorDef
 

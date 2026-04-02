@@ -1,7 +1,7 @@
-
 """
 To do : Have n-ary operator for mapjoin
 """
+
 import math
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
@@ -140,9 +140,9 @@ class TensorDef:
         Returns:
             TensorDef: A new TensorDef representing the merged tensor.
         """
-        if isinstance(op,BinaryFloatOperator) or isinstance(op,BinaryBoolOperator):
+        if isinstance(op, BinaryFloatOperator) or isinstance(op, BinaryBoolOperator):
             new_fill_value = reduce(op, (s.fill_value for s in args))
-        else :
+        else:
             new_fill_value = op(*(s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),

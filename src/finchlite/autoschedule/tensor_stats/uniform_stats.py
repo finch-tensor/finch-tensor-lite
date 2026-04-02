@@ -3,14 +3,13 @@ from typing import Any, Self
 
 import numpy as np
 
-from finchlite.algebra.algebra import is_annihilator, is_identity
-from .numeric_stats import NumericStats
 from finchlite.algebra.algebra import FinchOperator, is_annihilator, is_identity
 from finchlite.finch_logic import Field
 
+from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
-from .numeric_stats import NumericStats
+
 
 class UniformStats(NumericStats):
     nnz: float
@@ -73,10 +72,10 @@ class UniformStats(NumericStats):
 
         for s in args:
             vol = UniformStats._get_volume(s.tensordef)
-            if isinstance(s,NumericStats):
+            if isinstance(s, NumericStats):
                 p = s.estimate_non_fill_values() / vol if vol > 0 else 0.0
-            else :
-                raise TypeError("Stats Class must be inherit from NumericStats") 
+            else:
+                raise TypeError("Stats Class must be inherit from NumericStats")
 
             if is_annihilator(op, s.tensordef.fill_value):
                 join_probs.append(p)
@@ -109,9 +108,9 @@ class UniformStats(NumericStats):
         red_set = set(reduce_indices) & set(stats.tensordef.index_order)
         k = math.prod(int(stats.tensordef.dim_sizes[x]) for x in red_set)
         old_vol = UniformStats._get_volume(stats.tensordef)
-        if isinstance(stats,NumericStats):
+        if isinstance(stats, NumericStats):
             p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
-        else :
+        else:
             raise TypeError("Stats Class must be inherit from NumericStats")
         if is_annihilator(op, stats.tensordef.fill_value):
             res_p = math.pow(p_old, k)
@@ -140,10 +139,9 @@ class UniformStats(NumericStats):
 
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
-        if isinstance(stats,NumericStats):
+        if isinstance(stats, NumericStats):
             return UniformStats.from_def(new_def, stats.estimate_non_fill_values())
-        else :
-            raise TypeError("Stats Class must be inherit from NumericStats") 
+        raise TypeError("Stats Class must be inherit from NumericStats")
 
     @staticmethod
     def reorder(
@@ -154,5 +152,4 @@ class UniformStats(NumericStats):
         new_def = TensorDef.reorder(d, reorder_indices)
         if isinstance(stats, NumericStats):
             return UniformStats.from_def(new_def, stats.estimate_non_fill_values())
-        else :
-            raise TypeError("Stats Class must be inherit from NumericStats")
+        raise TypeError("Stats Class must be inherit from NumericStats")

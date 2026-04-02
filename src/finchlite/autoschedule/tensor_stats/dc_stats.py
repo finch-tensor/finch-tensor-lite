@@ -6,13 +6,13 @@ from typing import Any, cast
 
 import numpy as np
 
-from .numeric_stats import NumericStats
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
 from ...algebra import Tensor, ffunc, is_annihilator
 from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
+from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 

@@ -1,5 +1,7 @@
 from abc import abstractmethod
+
 from .tensor_stats import TensorStats
+
 
 class NumericStats(TensorStats):
     @abstractmethod
