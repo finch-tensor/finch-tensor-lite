@@ -1,3 +1,4 @@
+<!-- AI modified: 2026-04-02T20:45:17.606Z 9540fe6 -->
 # Finch Tensor: Contributing Guide
 
 Thank you for your interest in contributing! Please read the following guidelines
