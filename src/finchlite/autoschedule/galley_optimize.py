@@ -34,6 +34,8 @@ def optimize_query(
             "use_exact_branch_and_bound=True requires use_components=True "
             "(BnB requires components)."
         )
+    print("Query to optimize:")
+    print(query)
     annotated_query = AnnotatedQuery(ST, query, stats_bindings)
     if use_exact_branch_and_bound:
         new_queries, _ = pruned_query_to_plan(annotated_query, use_greedy=False)

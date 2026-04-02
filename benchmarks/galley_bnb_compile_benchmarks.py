@@ -55,7 +55,7 @@ from finchlite.finch_logic import (
     Table,
 )
 
-DEFAULT_N = 5
+DEFAULT_N = 1
 
 _DOWNSTREAM = LogicExecutor(
     LogicStandardizer(
@@ -106,7 +106,7 @@ def _chain_expr_from_shapes(shapes: list[tuple[int, int]]):
         lambda a, b: a @ b,
         [fl_interface.lazy(m) for m in mats],
     )
-    return fl_interface.sum(chain)
+    return chain
 
 
 def _skewed_four_matrix_expr():
@@ -120,6 +120,18 @@ def _tapered_four_matrix_expr():
         [(1, 1000), (1000, 100), (100, 10), (10, 1)],
     )
 
+base_n = 3
+_BNB_GOOD_MATRIX_SHAPES: list[tuple[int, int]] = [
+    (base_n**2, base_n**5),
+    (base_n**5, base_n**3),
+    (base_n**3, 1),
+    (1, base_n**3),
+    (base_n**3, base_n**5),
+    (base_n**5, base_n**2),
+]
+
+def bnb_good_example():
+    return _chain_expr_from_shapes(_BNB_GOOD_MATRIX_SHAPES)
 
 # Four-matrix chain tuned so greedy cost is far above exact in both ratio (~1.2×)
 # and absolute model cost (large gap vs the smaller skewed 4-matrix case above).
@@ -200,7 +212,7 @@ def _query_from_matmul_chain_shapes(
             Literal(as_finch_operator(op.add)),
             Literal(0),
             MapJoin(Literal(as_finch_operator(op.mul)), tuple(tables)),
-            tuple(fields),
+            tuple(fields[1:-1]),
         ),
     )
 
@@ -243,6 +255,18 @@ def _heavy_skew_four_matrix_aq() -> AnnotatedQuery:
         _query_from_matmul_chain_shapes(
             _HEAVY_SKEW_FOUR_MATRIX_SHAPES,
             index_names="ijklm",
+        ),
+        bindings=OrderedDict(),
+    )
+
+
+
+def bnb_good_aq() -> AnnotatedQuery:
+    return AnnotatedQuery(
+        DenseStats,
+        _query_from_matmul_chain_shapes(
+            _BNB_GOOD_MATRIX_SHAPES,
+            index_names="ijklmnq",
         ),
         bindings=OrderedDict(),
     )
@@ -320,6 +344,26 @@ def _format_bnb_block(
 
 
 def main() -> None:
+
+    expr = bnb_good_example()
+    exact_t, greedy_t = time_galley_bnb_compile_profile(expr, n=DEFAULT_N)
+    aq_e = bnb_good_aq()
+    aq_g = bnb_good_aq()
+    queries_exact, cost_exact = pruned_query_to_plan(aq_e, use_greedy=False)
+    queries_greedy, cost_greedy = pruned_query_to_plan(aq_g, use_greedy=True)
+    print(
+        _format_bnb_block(
+            "bnb-good example",
+            exact_t,
+            greedy_t,
+            cost_exact,
+            cost_greedy,
+            len(queries_exact),
+            len(queries_greedy),
+        ),
+        flush=True,
+    )
+
     expr = _four_index_chain_expr()
     exact_t, greedy_t = time_galley_bnb_compile_profile(expr, n=DEFAULT_N)
     aq_e = _four_index_chain_aq()
