@@ -2,8 +2,7 @@ from collections import OrderedDict
 from typing import Any
 
 from finchlite.algebra.tensor import TensorFType
-
-from finchlite.finch_logic import Alias, LogicStatement, LogicLoader
+from finchlite.finch_logic import Alias, LogicLoader, LogicStatement
 
 
 class LogicCacheFirst(LogicLoader):

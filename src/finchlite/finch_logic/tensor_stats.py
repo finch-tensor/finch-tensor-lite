@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable
 from typing import Any
 
 from .nodes import Field
@@ -64,7 +64,7 @@ class AbstractStats(ABC):
 
     @property
     @abstractmethod
-    def idxs(self) -> tuple[Field, ...]:...
+    def idxs(self) -> tuple[Field, ...]: ...
 
     @property
     @abstractmethod
