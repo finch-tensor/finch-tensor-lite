@@ -81,6 +81,6 @@ class Scalar(EagerTensor):
 
     def __str__(self):
         return str(self.val)
-    
+
     def to_numpy(self):
         return self.val

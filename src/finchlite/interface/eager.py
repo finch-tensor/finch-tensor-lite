@@ -974,6 +974,7 @@ def isnan(x):
         return lazy.isnan(x)
     return compute(lazy.isnan(x))
 
+
 def iscomplexobj(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.iscomplexobj(x)
