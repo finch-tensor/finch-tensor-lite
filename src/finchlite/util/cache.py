@@ -1,7 +1,8 @@
-# AI modified: 2025-01-01T00:00:00Z parent=154b5aeaa66d01a2373296ba9af9705a3db73ed9
-# AI modified: 2025-01-01T00:00:00Z parent=06953a764918de34b3a35c1b698198c3b74c5890
+# AI modified: 2024-12-31T23:58:00Z parent=154b5aeaa66d01a2373296ba9af9705a3db73ed9
+# AI modified: 2024-12-31T23:59:00Z parent=06953a764918de34b3a35c1b698198c3b74c5890
+# AI modified: 2025-01-01T00:00:00Z parent=4f5a2e5021678965ce8d830bb9edecac1dd3fea9
+# AI modified: 2025-01-01T00:01:00Z parent=4f5a2e5021678965ce8d830bb9edecac1dd3fea9
 import atexit
-import functools
 import shutil
 import tempfile
 import uuid
@@ -13,12 +14,10 @@ from .config import config, get_version
 
 finch_uuid = UUID("ef66f312-ff6e-4b8a-bb8c-9a843f3ecdf4")
 cache_timestamp_filename = ".finch_code_mtime_ns"
-_checked_cache_roots: set[Path] = set()
 # util/cache.py lives in src/finchlite/util/, so parent.parent is src/finchlite.
 _finch_source_root = Path(__file__).resolve().parent.parent
 
 
-@functools.cache
 def _latest_finch_code_mtime_ns() -> int:
     latest_mtime = 0
     for path in _finch_source_root.rglob("*"):
@@ -31,9 +30,13 @@ def _latest_finch_code_mtime_ns() -> int:
     return latest_mtime
 
 
-def _clear_cache_root(cache_root: Path) -> None:
+_session_finch_code_mtime_ns = _latest_finch_code_mtime_ns()
+_cache_checked = False
+
+
+def _clear_cache_root(cache_root: Path, *, keep_timestamp: bool = True) -> None:
     for path in cache_root.iterdir():
-        if path.name == cache_timestamp_filename:
+        if keep_timestamp and path.name == cache_timestamp_filename:
             continue
         if path.is_dir():
             shutil.rmtree(path)
@@ -41,14 +44,28 @@ def _clear_cache_root(cache_root: Path) -> None:
             path.unlink()
 
 
+def clear_cache() -> None:
+    """Clear Finch's persistent cache for the current Finch version.
+
+    This removes all cached files for the active Finch version under
+    ``<data_path>/cache/<version>``. If the cache directory does not exist,
+    this function does nothing.
+    """
+
+    cache_root = Path(config.get("data_path")) / "cache" / get_version()
+    if cache_root.exists():
+        _clear_cache_root(cache_root, keep_timestamp=False)
+
+
 def _ensure_cache_fresh(cache_root: Path) -> None:
-    if cache_root in _checked_cache_roots:
+    global _cache_checked
+    if _cache_checked:
         return
-    _checked_cache_roots.add(cache_root)
+    _cache_checked = True
 
     cache_root.mkdir(parents=True, exist_ok=True)
     timestamp_file = cache_root / cache_timestamp_filename
-    current_mtime = _latest_finch_code_mtime_ns()
+    current_mtime = _session_finch_code_mtime_ns
     should_clear = False
 
     if timestamp_file.exists():
