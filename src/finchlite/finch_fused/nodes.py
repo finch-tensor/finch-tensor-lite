@@ -365,10 +365,10 @@ class FusedPrinterContext(Context):
                 self.exec(body_ctx.emit())
                 return None
             case Module(functions):
-                for i, fn in enumerate(functions):
+                for i, func in enumerate(functions):
                     if i > 0:
                         self.exec("")
-                    self(fn)
+                    self(func)
                 return None
             case prgm:
                 self.exec(f"{self.feed}{str(prgm)}")

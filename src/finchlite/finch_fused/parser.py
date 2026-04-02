@@ -117,6 +117,7 @@ class _FusedFunctionParser:
             case ast.Return(value=None):
                 return fzd.Return(())
             case ast.Return(value=value):
+                assert value is not None
                 match value:
                     case ast.Tuple(elts=elts):
                         return fzd.Return(tuple(self._parse_expr(elt) for elt in elts))
@@ -184,7 +185,7 @@ class _FusedFunctionParser:
                 base = self._parse_expr(value)
                 return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
             case ast.Break():
-                return fzd.Break()
+                return fzd.Break()  # type: ignore[return-value]
             case _:
                 raise self._unsupported(
                     expr,
@@ -203,8 +204,9 @@ class _FusedFunctionParser:
     def _parse_op(
         self, op: ast.operator | ast.unaryop | ast.boolop | ast.cmpop
     ) -> fzd.Literal:
+        op_type: Any = type(op)
         for table in (_BIN_OPS, _UNARY_OPS, _BOOL_OPS, _CMP_OPS):
-            fn = table.get(type(op))
+            fn = table.get(op_type)
             if fn is not None:
                 return fzd.Literal(fn)
         raise self._unsupported(op, f"Unsupported operator type: {type(op).__name__}")
@@ -215,7 +217,7 @@ class _FusedFunctionParser:
             self._parse_op(cmp.ops[0]),
             self._parse_expr(cmp.comparators[0]),
         )
-        expr = first
+        expr: fzd.FusedExpression = first
         for i in range(1, len(cmp.ops)):
             next_cmp = fzd.Compare(
                 self._parse_expr(cmp.comparators[i - 1]),
@@ -265,7 +267,7 @@ def parse_function(fn: Callable[..., Any]) -> fzd.Function:
 
 
 class _FusedToPythonAST:
-    def __init__(self):
+    def __init__(self) -> None:
         self._bool_fns = tuple(_REV_BOOL_OPS)
         self._extra_globals: dict[str, Any] = {}
 

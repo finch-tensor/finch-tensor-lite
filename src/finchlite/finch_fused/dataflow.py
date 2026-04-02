@@ -1,3 +1,5 @@
+from typing import cast
+
 from ..interface import compute, lazy
 from ..symbolic.dataflow import DataFlowAnalysis
 from ..symbolic.rewriters import Chain, PostWalk, Rewrite
@@ -13,6 +15,7 @@ from .nodes import (
     Break,
     Call,
     FusedNode,
+    FusedStatement,
     Literal,
     Return,
     Variable,
@@ -82,7 +85,7 @@ def _get_stmt_bounds(stmts: list[FusedNode]) -> tuple[int, int]:
     return top_id, bot_id
 
 
-def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> FusedNode:
+def _insert_compute(prgm: FusedNode, compute_sid, vars: set[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
             # In the case of returns, we should just compute the retuned values
@@ -108,7 +111,7 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: list[Variable]) -> Fused
     return Rewrite(PostWalk(_visitor))(prgm)
 
 
-def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: list[Variable]) -> FusedNode:
+def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
             case NumberedStatement(stmt, sid) if sid == lazy_sid and not isinstance(
@@ -133,13 +136,13 @@ def _unwrap_numbered_stmt(node: FusedNode) -> FusedNode:
 def _unnest_block(node: FusedNode) -> FusedNode:
     match node:
         case Block(bodies):
-            new_bodies: list[FusedNode] = []
+            new_bodies: list[FusedStatement] = []
             for b in bodies:
                 b2 = _unnest_block(b)
                 if isinstance(b2, Block):
                     new_bodies.extend(b2.body)
                 else:
-                    new_bodies.append(b2)
+                    new_bodies.append(cast(FusedStatement, b2))
             return Block(tuple(new_bodies))
         case node:
             return node
@@ -148,19 +151,19 @@ def _unnest_block(node: FusedNode) -> FusedNode:
 def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     # desugar the input name and number additional statements for CFG construction
     numbered_prgm, _ = number_statements(prgm)
-    desuraged_prgm = fused_desugar(numbered_prgm)
-    cfg = fused_build_cfg(desuraged_prgm)
+    desugared_prgm = fused_desugar(numbered_prgm)
+    cfg = fused_build_cfg(desugared_prgm)
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
     print("Liveness analysis results:")
     print(liveness)
     for block in cfg.blocks.values():
-        live_outputs = liveness.input_states[
+        live_outputs = set(liveness.input_states[
             block.id
-        ]  # Backwards analysis, so live outputs are the input state of the block
-        live_inputs = liveness.output_states[
+        ].keys())  # Backwards analysis, so live outputs are the input state of the block
+        live_inputs = set(liveness.output_states[
             block.id
-        ]  # Backwards analysis, so live inputs are the output state of the block
+        ].keys())  # Backwards analysis, so live inputs are the output state of the block
         min_id, max_id = _get_stmt_bounds(block.statements)
         print(
             "insert lazy for live inputs",

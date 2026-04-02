@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import cast
 
 from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
 from .nodes import (
@@ -56,9 +57,9 @@ def number_statements(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
     def go(node: FusedNode) -> FusedNode:
         match node:
             case Module(funcs):
-                return Module(tuple(go(f) for f in funcs))
+                return Module(cast(tuple[Function, ...], tuple(go(f) for f in funcs)))
             case Function(name, args, body):
-                return Function(name, args, go(body))
+                return Function(name, args, cast(Block, go(body)))
             case Block(bodies):
                 new_bodies: list[FusedStatement] = []
                 for b in bodies:
@@ -66,14 +67,15 @@ def number_statements(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
                     if isinstance(b2, Block):
                         new_bodies.extend(b2.body)
                     else:
-                        new_bodies.append(b2)
+                        new_bodies.append(cast(FusedStatement, b2))
                 return Block(tuple(new_bodies))
             case If(cond, body, else_body):
-                return If(cond, go(body), go(else_body))
+                new_else = cast(Block, go(else_body)) if else_body is not None else None
+                return If(cond, cast(Block, go(body)), new_else)
             case While(cond, body):
-                return While(cond, go(body))
+                return While(cond, cast(Block, go(body)))
             case For(target, iter, body):
-                return For(target, iter, go(body))
+                return For(target, iter, cast(Block, go(body)))
             case node:
                 if isinstance(node, (Assign, Return, Break)):
                     nonlocal sid
@@ -85,7 +87,7 @@ def number_statements(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
     return go(node), sid
 
 
-def fused_desugar(node: FusedNode) -> tuple[FusedNode, int]:
+def fused_desugar(node: FusedNode) -> FusedNode:
     """
     Lower surface syntax to a core AST shape before CFG construction.
 
@@ -99,9 +101,9 @@ def fused_desugar(node: FusedNode) -> tuple[FusedNode, int]:
         """Recursively desugar the AST."""
         match node:
             case Module(funcs):
-                return Module(tuple(go(f) for f in funcs))
+                return Module(cast(tuple[Function, ...], tuple(go(f) for f in funcs)))
             case Function(name, args, body):
-                body_2 = go(body)
+                body_2 = cast(Block, go(body))
 
                 # Make argument definitions explicit so they get statement ids.
                 func_prologue = tuple((Assign(arg, arg)) for arg in args)
@@ -110,14 +112,15 @@ def fused_desugar(node: FusedNode) -> tuple[FusedNode, int]:
                 new_bodies: list[FusedStatement] = []
                 for b in bodies:
                     b2 = go(b)
-                    new_bodies.append(b2)
+                    new_bodies.append(cast(FusedStatement, b2))
                 return Block(tuple(new_bodies))
             case If(cond, body, else_body):
-                return If(cond, go(body), go(else_body))
+                new_else = cast(Block, go(else_body)) if else_body is not None else None
+                return If(cond, cast(Block, go(body)), new_else)
             case While(cond, body):
-                return While(cond, go(body))
+                return While(cond, cast(Block, go(body)))
             case For(target, iter, body):
-                return For(target, iter, go(body))
+                return For(target, iter, cast(Block, go(body)))
             case node:
                 return node
 
@@ -127,7 +130,7 @@ def fused_desugar(node: FusedNode) -> tuple[FusedNode, int]:
 class FusedCFGBuilder:
     """Incrementally builds control-flow graph for Finch Fused IR."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cfg: ControlFlowGraph = ControlFlowGraph()
         self.current_block: BasicBlock = self.cfg.entry_block
 
@@ -186,7 +189,8 @@ class FusedCFGBuilder:
 
                 # fill in the else block
                 self.current_block = else_block
-                self(else_body, break_block, return_block)
+                if else_body is not None:
+                    self(else_body, break_block, return_block)
                 self.current_block.add_successor(after_block)
 
                 # continue building after the if-else
@@ -232,7 +236,7 @@ class FusedCFGBuilder:
 
             case Function(func_name, _, body):
                 # set block names to the function name
-                self.cfg.block_name = func_name
+                self.cfg.block_name = str(func_name.val)
 
                 # create entry/exit block for the function
                 func_entry_block = self.cfg.new_block()
@@ -263,9 +267,6 @@ def fused_build_cfg(node: FusedNode) -> ControlFlowGraph:
     Build control-flow graph for a FinchAssembly node.
     Args:
         node: Root FinchAssembly node to build CFG for.
-        sid: Starting statement id for numbering additional
-            statements during CFG desugaring.
-        namespace: Namespace for variable name management.
     Returns:
         ControlFlowGraph: The constructed control-flow graph.
     """

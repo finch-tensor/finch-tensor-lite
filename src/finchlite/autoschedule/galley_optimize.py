@@ -107,10 +107,10 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             else:
                 out = prgm
                 t_down = 0.0
-            times: GalleyProfileTimes = {
+            times = GalleyProfileTimes({
                 "optimize_plan_s": t_opt,
                 "downstream_s": t_down,
-            }
+            })
             #  End time
             if self.profile:
                 return out, times

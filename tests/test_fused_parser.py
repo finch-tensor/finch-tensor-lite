@@ -12,7 +12,7 @@ import numpy as np
 
 from finchlite.finch_fused import jit
 from finchlite.finch_fused import nodes as fzd
-from finchlite.finch_fused.cfg_builder import fused_build_cfg, fused_desugar
+from finchlite.finch_fused.cfg_builder import fused_build_cfg, fused_desugar, number_statements
 from finchlite.finch_fused.dataflow import LivenessAnalysis
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
@@ -183,8 +183,9 @@ def test_cfg_builder():
         return total
 
     fused_fn = parse_fused_function(simple_fn)
-    numbered_fn, _ = fused_desugar(fused_fn, 0)
-    cfg = fused_build_cfg(numbered_fn)
+    numbered_fn, _ = number_statements(fused_fn)
+    desugared_fn = fused_desugar(numbered_fn)
+    cfg = fused_build_cfg(desugared_fn)
 
     # We won't assert on the exact structure of the CFG here, but we can at least
     # check that it has the expected number of blocks. The exact number of blocks
@@ -203,9 +204,9 @@ def test_liveness_analysis():
         return total
 
     fused_fn = parse_fused_function(simple_fn)
-
-    numbered_fn, _ = fused_desugar(fused_fn, 0)
-    cfg = fused_build_cfg(numbered_fn)
+    numbered_fn, _ = number_statements(fused_fn)
+    desugared_fn = fused_desugar(numbered_fn)
+    cfg = fused_build_cfg(desugared_fn)
     print(cfg)
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
