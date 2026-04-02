@@ -291,13 +291,14 @@ class _FusedToPythonAST:
         if len(body) == 0:
             body = [ast.Pass()]
 
-        return ast.FunctionDef(
+        return ast.FunctionDef( # type: ignore
             name=function.name.val,
             args=args,
             body=body,
             decorator_list=[],
             returns=None,
             type_comment=None,
+            type_params=[],
         )
 
     def parse_module(self, module: fzd.Module) -> ast.Module:
