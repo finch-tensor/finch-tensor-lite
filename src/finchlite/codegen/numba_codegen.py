@@ -608,7 +608,6 @@ class NumbaContext(Context):
                 )
                 return None
             case asm.Call(asm.Literal(op), args):
-                assert isinstance(op, NumbaOperator)
                 if not isinstance(op, NumbaOperator):
                     raise TypeError(f"{op} has no Numba representation.")
                 return op.numba_literal(op, self, *args)
