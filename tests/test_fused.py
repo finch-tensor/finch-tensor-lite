@@ -380,6 +380,26 @@ def test_jit_scalar_loop():
 
     finch_assert_allclose(opt_fn(A, 3), simple_fn(A, 3))
 
+def test_jit_dependent_loop():
+    """A loop with an iterator that depends on a computation."""
+
+    def simple_fn(A, n):
+        B = A 
+        for _i in range(sum(B)):
+            B = add(B, A)
+        return B
+
+    @jit
+    def opt_fn(A, n):
+        B = A 
+        for _i in range(sum(B)):
+            B = add(B, A)
+        return B
+
+    A = asarray(np.array([[1, 0], [0, 1]], dtype=int))
+
+    finch_assert_allclose(opt_fn(A, 3), simple_fn(A, 3))
+
 
 def test_jit_if_branch():
     """A jit function with an if/else over tensor ops."""
