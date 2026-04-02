@@ -1,3 +1,4 @@
+# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
@@ -75,26 +76,24 @@ reduction_ops = {
 
 
 class EinsumInterpreter(EinsumEvaluator):
-    def __init__(self, xp=np, verbose=False):
+    def __init__(self, xp=np):
         self.xp = xp
-        self.verbose = verbose
 
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(
-            xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
+            xp=self.xp, bindings=bindings.copy()
         )
         return machine(node)
 
 
 class PointwiseEinsumMachine:
-    def __init__(self, xp, bindings, loops, verbose):
+    def __init__(self, xp, bindings, loops):
         self.xp = xp
         self.bindings = bindings
         self.loops = loops
-        self.verbose = verbose
 
     def __call__(self, node):
         xp = self.xp
@@ -127,10 +126,9 @@ class PointwiseEinsumMachine:
 
 
 class EinsumMachine:
-    def __init__(self, xp, bindings, verbose):
+    def __init__(self, xp, bindings):
         self.xp = xp
         self.bindings = bindings
-        self.verbose = verbose
 
     def __call__(self, node):
         xp = self.xp
@@ -149,7 +147,7 @@ class EinsumMachine:
                 loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
                 ctx = PointwiseEinsumMachine(
-                    self.xp, self.bindings, loops, self.verbose
+                    self.xp, self.bindings, loops
                 )
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)

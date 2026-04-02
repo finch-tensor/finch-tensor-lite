@@ -1,3 +1,4 @@
+# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic.nodes import TableValue
 
@@ -36,11 +37,10 @@ def extract_tensors(
 
 
 class LogicExecutor(LogicEvaluator):
-    def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
+    def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
-        self.verbose: bool = verbose
 
     def __call__(
         self, prgm: LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
