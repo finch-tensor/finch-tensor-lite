@@ -97,11 +97,9 @@ class Extent(FTyped):
         )
 
 
-class ExtentOp(FinchOperator):
-    __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
-
+class MakeExtent(FinchOperator):
     def __repr__(self):
-        return "ExtentOp"  # TODO: The base class should take care of it.
+        return "make_extent"
 
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)
@@ -110,7 +108,7 @@ class ExtentOp(FinchOperator):
         return ExtentFType(start, end)  # type: ignore[abstract]
 
 
-extent_op = ExtentOp()
+make_extent = MakeExtent()
 
 
 def dimension(tns, mode: int) -> Extent:
@@ -164,7 +162,7 @@ class SymbolicExtent(FTyped):
     @classmethod
     def from_notation(cls, node: ntn.NotationNode):
         match node:
-            case ntn.Call(ntn.Literal(op), (start, end)) if isinstance(op, ExtentOp):
+            case ntn.Call(ntn.Literal(op), (start, end)) if isinstance(op, MakeExtent):
                 return SymbolicExtent(start, end)
             case _:
                 raise Exception(node)
