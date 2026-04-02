@@ -12,7 +12,11 @@ import numpy as np
 
 from finchlite.finch_fused import jit
 from finchlite.finch_fused import nodes as fzd
-from finchlite.finch_fused.cfg_builder import fused_build_cfg, fused_desugar, number_statements
+from finchlite.finch_fused.cfg_builder import (
+    fused_build_cfg,
+    fused_desugar,
+    number_statements,
+)
 from finchlite.finch_fused.dataflow import LivenessAnalysis
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
@@ -221,7 +225,7 @@ def test_liveness_straight_line():
 
     def fn(a, b):
         c = add(a, b)
-        return c
+        return c  # noqa: RET504
 
     liveness, cfg = _build_liveness(fn)
 
@@ -244,7 +248,7 @@ def test_liveness_dead_variable():
     def fn(a, b):
         unused = add(a, b)  # noqa: F841
         c = matmul(a, b)
-        return c
+        return c  # noqa: RET504
 
     liveness, cfg = _build_liveness(fn)
 
@@ -304,22 +308,24 @@ def test_liveness_if_branch_merges():
     assert "b" in names
     assert "result" in names
 
+
 def test_jit_straight_line():
     """A jit function with no loops should produce the same result as eager."""
 
     def simple_fn(A, B):
         C = matmul(A, B)
-        return C
+        return C  # noqa: RET504
 
     @jit
     def opt_fn(A, B):
         C = matmul(A, B)
-        return C
+        return C  # noqa: RET504
 
     A = asarray(np.array([[1, 2], [3, 4]]))
     B = asarray(np.array([[5, 6], [7, 8]]))
 
     finch_assert_allclose(opt_fn(A, B), simple_fn(A, B))
+
 
 def test_jit_return_expr():
     """A jit function with no loops should produce the same result as eager."""
@@ -344,14 +350,14 @@ def test_jit_two_independent_ops():
         D = matmul(A, B)
         E = add(A, C)
         F = add(D, E)
-        return F
+        return F  # noqa: RET504
 
     @jit
     def opt_fn(A, B, C):
         D = matmul(A, B)
         E = add(A, C)
         F = add(D, E)
-        return F
+        return F  # noqa: RET504
 
     A = asarray(np.array([[1, 2], [3, 4]]))
     B = asarray(np.array([[1, 0], [0, 1]]))
@@ -380,18 +386,19 @@ def test_jit_scalar_loop():
 
     finch_assert_allclose(opt_fn(A, 3), simple_fn(A, 3))
 
+
 def test_jit_dependent_loop():
     """A loop with an iterator that depends on a computation."""
 
     def simple_fn(A, n):
-        B = A 
+        B = A
         for _i in range(sum(B)):
             B = add(B, A)
         return B
 
     @jit
     def opt_fn(A, n):
-        B = A 
+        B = A
         for _i in range(sum(B)):
             B = add(B, A)
         return B
@@ -424,6 +431,7 @@ def test_jit_if_branch():
 
     finch_assert_allclose(opt_fn(A, B, True), simple_fn(A, B, True))
     finch_assert_allclose(opt_fn(A, B, False), simple_fn(A, B, False))
+
 
 def test_jit_while():
     """A jit function with a while loop."""

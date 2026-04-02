@@ -21,6 +21,7 @@ from .nodes import (
     Variable,
 )
 
+
 def get_variables_in_stmt(stmt: FusedNode) -> set[Variable]:
     var_set = set()
 
@@ -95,8 +96,8 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: set[Variable]) -> FusedN
                     for var in get_variables_in_stmt(expr):
                         vars.add(var)
                 lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
-                exprs_to_compute = tuple()
-                return_vars = tuple()
+                exprs_to_compute = ()
+                return_vars = ()
                 for i, expr in enumerate(ret_expr):
                     if isinstance(expr, Variable) and expr in vars:
                         return_vars += (expr,)
@@ -169,12 +170,12 @@ def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     liveness = LivenessAnalysis(cfg)
     liveness.analyze()
     for block in cfg.blocks.values():
-        live_outputs = set(liveness.input_states[
-            block.id
-        ].keys())  # Backwards analysis, so live outputs are the input state of the block
-        live_inputs = set(liveness.output_states[
-            block.id
-        ].keys())  # Backwards analysis, so live inputs are the output state of the block
+        live_outputs = set(
+            liveness.input_states[block.id].keys()
+        )  # Backwards analysis, so live outputs are the input state of the block
+        live_inputs = set(
+            liveness.output_states[block.id].keys()
+        )  # Backwards analysis, so live inputs are the output state of the block
         min_id, max_id = _get_stmt_bounds(block.statements)
         numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)
         numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs)

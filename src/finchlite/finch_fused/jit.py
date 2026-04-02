@@ -27,7 +27,7 @@ def jit(f, /, ctx=None):
         while some_condition(D):
             D = D + C
         return D
-    
+
     In this example, `my_function` will be transformed to include lazy and compute
     statements, allowing it to be optimized and executed efficiently when called.
     def opt_my_function(A, B, C):
