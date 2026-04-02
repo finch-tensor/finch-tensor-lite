@@ -298,7 +298,6 @@ class _FusedToPythonAST:
             decorator_list=[],
             returns=None,
             type_comment=None,
-            type_params=[],
         )
 
     def parse_module(self, module: fzd.Module) -> ast.Module:
