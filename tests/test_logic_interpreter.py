@@ -20,6 +20,7 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
+import finchlite.finch_logic as lgc
 
 from .conftest import finch_assert_equal
 
@@ -111,19 +112,7 @@ def test_plan_repr():
 
     assert p == eval(
         repr(p),
-        {
-            "finchlite": finchlite,
-            "Literal": Literal,
-            "Alias": Alias,
-            "Field": Field,
-            "Query": Query,
-            "Table": Table,
-            "MapJoin": MapJoin,
-            "Reorder": Reorder,
-            "Aggregate": Aggregate,
-            "Plan": Plan,
-            "Produces": Produces,
-        },
+        {**vars(lgc), **vars(ffunc), **globals()}
     )
 
 

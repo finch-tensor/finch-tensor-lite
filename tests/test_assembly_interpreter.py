@@ -171,7 +171,7 @@ def test_if_statement():
     result = mod.if_else()
     assert result == 30
 
-    assert root == eval(repr(root))
+    assert root == eval(repr(root), {**vars(asm), **vars(ffunc), **globals()})
 
 
 def test_simple_struct():

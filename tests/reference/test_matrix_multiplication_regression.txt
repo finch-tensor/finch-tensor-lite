@@ -20,18 +20,18 @@ def matmul(C: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64, A: Bufferized
     for i in range(0, length(slot(C__buf_slot, np_buf_t(float64)))):
         store(slot(C__buf_slot, np_buf_t(float64)), i, 0.0)
     for i in range(0, m):
-        i__pos: int64 = finchlite.ffunc.add(0, finchlite.ffunc.mul(A__stride_0, i))
-        i__pos_2: int64 = finchlite.ffunc.add(0, finchlite.ffunc.mul(C__stride_0, i))
+        i__pos: int64 = add(0, mul(A__stride_0, i))
+        i__pos_2: int64 = add(0, mul(C__stride_0, i))
         for k in range(0, p):
-            k__pos: int64 = finchlite.ffunc.add(i__pos, finchlite.ffunc.mul(A__stride_1, k))
-            k__pos_2: int64 = finchlite.ffunc.add(0, finchlite.ffunc.mul(B__stride_0, k))
+            k__pos: int64 = add(i__pos, mul(A__stride_1, k))
+            k__pos_2: int64 = add(0, mul(B__stride_0, k))
             for j in range(0, n):
-                j__pos: int64 = finchlite.ffunc.add(k__pos_2, finchlite.ffunc.mul(B__stride_1, j))
-                j__pos_2: int64 = finchlite.ffunc.add(i__pos_2, finchlite.ffunc.mul(C__stride_1, j))
+                j__pos: int64 = add(k__pos_2, mul(B__stride_1, j))
+                j__pos_2: int64 = add(i__pos_2, mul(C__stride_1, j))
                 a_ik: float64 = load(slot(A__buf_slot, np_buf_t(float64)), k__pos)
                 b_kj: float64 = load(slot(B__buf_slot, np_buf_t(float64)), j__pos)
-                c_ij: float64 = finchlite.ffunc.mul(a_ik, b_kj)
-                store(slot(C__buf_slot, np_buf_t(float64)), j__pos_2, finchlite.ffunc.add(load(slot(C__buf_slot, np_buf_t(float64)), j__pos_2), c_ij))
+                c_ij: float64 = mul(a_ik, b_kj)
+                store(slot(C__buf_slot, np_buf_t(float64)), j__pos_2, add(load(slot(C__buf_slot, np_buf_t(float64)), j__pos_2), c_ij))
     repack(C__buf_slot)
     matmul_return: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = C
     return matmul_return

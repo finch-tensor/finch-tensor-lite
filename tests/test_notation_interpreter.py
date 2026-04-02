@@ -148,7 +148,7 @@ def test_matrix_multiplication(a, b):
 
     finch_assert_equal(result, expected)
 
-    assert prgm == eval(repr(prgm))
+    assert prgm == eval(repr(prgm), {**vars(ntn), **vars(ffunc), **globals()})
 
 
 @pytest.mark.parametrize(
