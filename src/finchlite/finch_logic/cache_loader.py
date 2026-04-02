@@ -44,14 +44,13 @@ class LogicCacheLRU(LogicLoader):
             for saved_stats, result in kernels.items():
                 saved_stats_dict = dict(saved_stats)
 
-                if len(stats) == len(saved_stats_dict):
-                    if all(
-                        stats[alias].issimilar(stats[alias], saved_stats_dict[alias])
-                        for alias in stats
-                    ):
-                        # keeping the most used stats kernel combo at the last as it is MRU
-                        kernels.move_to_end(saved_stats)
-                        return result
+                if len(stats) == len(saved_stats_dict) and all(
+                    stats[alias].issimilar(stats[alias], saved_stats_dict[alias])
+                    for alias in stats
+                ):
+                    # Keep the most used stats/kernel combo as MRU.
+                    kernels.move_to_end(saved_stats)
+                    return result
 
         result = self.ctx(prgm, bindings, stats)
         new_stats_key = tuple(stats.items()) if stats else ()

@@ -4,6 +4,8 @@ from typing import Any
 
 from finchlite.finch_logic import Field
 
+from .tensor_def import TensorDef
+
 
 class TensorStats(ABC):
     tensordef: TensorDef

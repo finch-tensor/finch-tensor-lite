@@ -39,7 +39,6 @@ def extract_tensors(
                 bindings[var] = tns
                 return lgc.Table(var, idxs)
 
-    # Making sure this is applied to the entire of LogicStatement -> extract tensor basically is that we extract tensors from the tree representation and make sure to put it in the bindings to pass them ahead
     root = Rewrite(PostWalk(rule_0))(root)
     return root, bindings
 
@@ -67,7 +66,6 @@ class LogicExecutor(LogicEvaluator):
     ):
         if bindings is None:
             bindings = {}
-        # LogicEvaluator needs term to be a LogicStatement strictly so we convert and expr to a statement
         if isinstance(prgm, lgc.LogicExpression):
             var = lgc.Alias("result")
             stmt: lgc.LogicStatement = lgc.Plan(
