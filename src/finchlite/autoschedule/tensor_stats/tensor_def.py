@@ -4,7 +4,7 @@ To do : Have n-ary operator for mapjoin
 """
 import math
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from functools import reduce
 from typing import Any
 
@@ -20,6 +20,7 @@ from finchlite.finch_logic import (
 )
 
 from ...algebra import is_idempotent, is_identity, repeat_operator
+from ...algebra.algebra import FinchOperator
 
 
 class TensorDef:
@@ -127,7 +128,7 @@ class TensorDef:
         return float(prod)
 
     @staticmethod
-    def mapjoin(op: Callable, *args: "TensorDef") -> "TensorDef":
+    def mapjoin(op: FinchOperator, *args: "TensorDef") -> "TensorDef":
         """
         Merge multiple TensorDef objects into a single tensor definition.
 
@@ -161,7 +162,7 @@ class TensorDef:
 
     @staticmethod
     def aggregate(
-        op: Callable,
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         d: "TensorDef",

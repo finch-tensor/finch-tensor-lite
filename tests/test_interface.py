@@ -1,4 +1,3 @@
-import operator
 import warnings
 
 import pytest
@@ -6,6 +5,7 @@ import pytest
 import numpy as np
 
 import finchlite
+from finchlite import ffunc
 
 from .conftest import finch_assert_allclose, finch_assert_equal
 
@@ -51,7 +51,7 @@ def random_array(shape, dtype=np.complex128, rng: np.random.Generator | None = N
 def test_matrix_multiplication(a, b):
     result = finchlite.fuse(
         lambda a, b: finchlite.reduce(
-            operator.add, finchlite.multiply(finchlite.expand_dims(a, 2), b), axis=1
+            ffunc.add, finchlite.multiply(finchlite.expand_dims(a, 2), b), axis=1
         ),
         a,
         b,
@@ -171,23 +171,23 @@ class TestEagerTensor(finchlite.EagerTensor):
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((operator.add, finchlite.add, np.add), np.add),
-        ((operator.sub, finchlite.subtract, np.subtract), np.subtract),
-        ((operator.mul, finchlite.multiply, np.multiply), np.multiply),
-        ((operator.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
-        ((operator.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
-        ((operator.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
+        ((ffunc.add, finchlite.add, np.add), np.add),
+        ((ffunc.sub, finchlite.subtract, np.subtract), np.subtract),
+        ((ffunc.mul, finchlite.multiply, np.multiply), np.multiply),
+        ((ffunc.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
+        ((ffunc.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
+        ((ffunc.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         (
-            (operator.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
+            (ffunc.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
             np.bitwise_left_shift,
         ),
         (
-            (operator.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
+            (ffunc.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
         (
             (
-                operator.truediv,
+                ffunc.truediv,
                 finchlite.truediv,
                 np.true_divide,
                 finchlite.divide,
@@ -195,14 +195,14 @@ class TestEagerTensor(finchlite.EagerTensor):
             ),
             np.true_divide,
         ),
-        ((operator.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
-        ((operator.mod, finchlite.mod, np.mod), np.mod),
-        ((operator.pow, finchlite.power, np.power), np.power),
+        ((ffunc.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
+        ((ffunc.mod, finchlite.mod, np.mod), np.mod),
+        ((ffunc.pow, finchlite.power, np.power), np.power),
         (
-            (operator.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
+            (ffunc.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
             np.mod,
         ),
-        ((operator.pow, finchlite.pow, np.pow), np.pow),
+        ((ffunc.pow, finchlite.pow, np.pow), np.pow),
         ((finchlite.hypot, np.hypot), np.hypot),
         ((finchlite.atan2, np.atan2), np.atan2),
         ((finchlite.logaddexp, np.logaddexp), np.logaddexp),
@@ -211,13 +211,13 @@ class TestEagerTensor(finchlite.EagerTensor):
         ((finchlite.logical_and, np.logical_and), np.logical_and),
         ((finchlite.logical_or, np.logical_or), np.logical_or),
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
-        ((operator.eq, finchlite.equal, np.equal), np.equal),
-        ((operator.ne, finchlite.not_equal, np.not_equal), np.not_equal),
-        ((operator.lt, finchlite.less, np.less), np.less),
-        ((operator.le, finchlite.less_equal, np.less_equal), np.less_equal),
-        ((operator.gt, finchlite.greater, np.greater), np.greater),
+        ((ffunc.eq, finchlite.equal, np.equal), np.equal),
+        ((ffunc.ne, finchlite.not_equal, np.not_equal), np.not_equal),
+        ((ffunc.lt, finchlite.less, np.less), np.less),
+        ((ffunc.le, finchlite.less_equal, np.less_equal), np.less_equal),
+        ((ffunc.gt, finchlite.greater, np.greater), np.greater),
         (
-            (operator.ge, finchlite.greater_equal, np.greater_equal),
+            (ffunc.ge, finchlite.greater_equal, np.greater_equal),
             np.greater_equal,
         ),
     ],
@@ -271,11 +271,11 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((operator.abs, finchlite.abs, np.abs), np.abs),
-        ((operator.pos, finchlite.positive, np.positive), np.positive),
-        ((operator.neg, finchlite.negative, np.negative), np.negative),
+        ((ffunc.abs, finchlite.abs, np.abs), np.abs),
+        ((ffunc.pos, finchlite.positive, np.positive), np.positive),
+        ((ffunc.neg, finchlite.negative, np.negative), np.negative),
         (
-            (operator.invert, finchlite.bitwise_inverse, np.bitwise_invert),
+            (ffunc.invert, finchlite.bitwise_inverse, np.bitwise_invert),
             np.bitwise_invert,
         ),
         ((finchlite.reciprocal, np.reciprocal), np.reciprocal),

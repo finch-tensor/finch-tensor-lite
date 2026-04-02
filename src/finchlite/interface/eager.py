@@ -1,9 +1,10 @@
 import builtins
 import sys
 from abc import ABC
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
+from ..algebra import FinchOperator
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
@@ -282,7 +283,7 @@ def squeeze(
 
 
 def reduce(
-    op: Callable,
+    op: FinchOperator,
     x,
     /,
     *,
@@ -348,7 +349,7 @@ def prod(
     return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
 
 
-def elementwise(f: Callable, *args):
+def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
     return compute(lazy.elementwise(f, *args))
