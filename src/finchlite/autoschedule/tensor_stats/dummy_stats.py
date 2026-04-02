@@ -1,8 +1,8 @@
-from collections.abc import Callable
 from typing import Any, Self
 
 from finchlite.finch_logic import Field
 
+from ..algebra import FinchOperator
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
@@ -21,7 +21,7 @@ class DummyStats(TensorStats):
         return DummyStats.from_def(stat.tensordef.copy())
 
     @staticmethod
-    def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
+    def mapjoin(op: FinchOperator, *args: TensorStats) -> TensorStats:
         axes_set = [set(s.index_order) for s in args]
         same_axes = all(axes_set[0] == axes for axes in axes_set)
 
@@ -35,7 +35,7 @@ class DummyStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",

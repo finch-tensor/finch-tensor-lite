@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import Any
 
 from finchlite.algebra.tensor import TensorFType
 
@@ -9,7 +10,7 @@ from .stages import LogicLoader
 class LogicCacheFirst(LogicLoader):
     def __init__(self, ctx: LogicLoader):
         self.ctx = ctx
-        self.cache = {}
+        self.cache: dict[tuple[Any, Any], Any] = {}
 
     def __call__(
         self, prgm: LogicStatement, bindings: dict[Alias, TensorFType], stats=None
@@ -26,7 +27,7 @@ class LogicCacheLRU(LogicLoader):
     def __init__(self, ctx: LogicLoader, max_depth: int = 10):
         self.ctx = ctx
         self.max_depth = max_depth
-        self.cache = {}
+        self.cache: dict[tuple[Any, Any], Any] = {}
 
     def __call__(
         self, prgm: LogicStatement, bindings: dict[Alias, TensorFType], stats=None
