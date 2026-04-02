@@ -1,4 +1,3 @@
-import operator
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -6,6 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...algebra import ffunc
 from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
@@ -172,11 +172,11 @@ class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
                 asm.Assign(
                     pos_2,
                     asm.Call(
-                        asm.Literal(operator.add),
+                        asm.Literal(ffunc.add),
                         (
                             pos,
                             asm.Call(
-                                asm.Literal(operator.mul),
+                                asm.Literal(ffunc.mul),
                                 (
                                     asm.GetAttr(lvl, asm.Literal("stride")),
                                     asm.Variable(

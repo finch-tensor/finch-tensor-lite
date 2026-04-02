@@ -1,5 +1,3 @@
-import operator
-
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
@@ -11,68 +9,68 @@ from finchlite.finch_einsum.stages import (
 )
 from finchlite.symbolic.ftype import fisinstance
 
-from ..algebra import overwrite, promote_max, promote_min
+from ..algebra import ffunc
 from . import nodes as ein
 
 nary_ops = {
-    operator.add: "add",
-    operator.mul: "multiply",
-    operator.sub: "subtract",
-    operator.truediv: "divide",
-    operator.floordiv: "floor_divide",
-    operator.mod: "remainder",
-    operator.pow: "power",
-    operator.eq: "equal",
-    operator.ne: "not_equal",
-    operator.lt: "less",
-    operator.le: "less_equal",
-    operator.gt: "greater",
-    operator.ge: "greater_equal",
-    operator.and_: "bitwise_and",
-    operator.or_: "bitwise_or",
-    operator.xor: "bitwise_xor",
-    operator.lshift: "bitwise_left_shift",
-    operator.rshift: "bitwise_right_shift",
-    np.logical_and: "logical_and",
-    np.logical_or: "logical_or",
-    np.logical_not: "logical_not",
-    promote_min: "minimum",
-    promote_max: "maximum",
+    ffunc.add: "add",
+    ffunc.mul: "multiply",
+    ffunc.sub: "subtract",
+    ffunc.truediv: "divide",
+    ffunc.floordiv: "floor_divide",
+    ffunc.mod: "remainder",
+    ffunc.pow: "power",
+    ffunc.eq: "equal",
+    ffunc.ne: "not_equal",
+    ffunc.lt: "less",
+    ffunc.le: "less_equal",
+    ffunc.gt: "greater",
+    ffunc.ge: "greater_equal",
+    ffunc.and_: "bitwise_and",
+    ffunc.or_: "bitwise_or",
+    ffunc.xor: "bitwise_xor",
+    ffunc.lshift: "bitwise_left_shift",
+    ffunc.rshift: "bitwise_right_shift",
+    ffunc.logical_and: "logical_and",
+    ffunc.logical_or: "logical_or",
+    ffunc.logical_not: "logical_not",
+    ffunc.promote_min: "minimum",
+    ffunc.promote_max: "maximum",
 }
 unary_ops = {
-    operator.pos: "positive",
-    operator.neg: "negative",
-    operator.invert: "bitwise_invert",
-    operator.abs: "absolute",
-    np.sqrt: "sqrt",
-    np.exp: "exp",
-    np.log: "log",
-    np.log1p: "log1p",
-    np.log10: "log10",
-    np.log2: "log2",
-    np.sin: "sin",
-    np.cos: "cos",
-    np.tan: "tan",
-    np.sinh: "sinh",
-    np.cosh: "cosh",
-    np.tanh: "tanh",
-    np.arcsin: "arcsin",
-    np.arccos: "arccos",
-    np.arctan: "arctan",
-    np.arcsinh: "arcsinh",
-    np.arccosh: "arccosh",
-    np.arctanh: "arctanh",
+    ffunc.pos: "positive",
+    ffunc.neg: "negative",
+    ffunc.invert: "bitwise_invert",
+    ffunc.abs: "absolute",
+    ffunc.sqrt: "sqrt",
+    ffunc.exp: "exp",
+    ffunc.log: "log",
+    ffunc.log1p: "log1p",
+    ffunc.log10: "log10",
+    ffunc.log2: "log2",
+    ffunc.sin: "sin",
+    ffunc.cos: "cos",
+    ffunc.tan: "tan",
+    ffunc.sinh: "sinh",
+    ffunc.cosh: "cosh",
+    ffunc.tanh: "tanh",
+    ffunc.arcsin: "arcsin",
+    ffunc.arccos: "arccos",
+    ffunc.arctan: "arctan",
+    ffunc.arcsinh: "arcsinh",
+    ffunc.arccosh: "arccosh",
+    ffunc.arctanh: "arctanh",
 }
 
 reduction_ops = {
-    operator.add: "sum",
-    operator.mul: "prod",
-    operator.and_: "all",
-    operator.or_: "any",
-    promote_min: "min",
-    promote_max: "max",
-    np.logical_and: "all",
-    np.logical_or: "any",
+    ffunc.add: "sum",
+    ffunc.mul: "prod",
+    ffunc.and_: "all",
+    ffunc.or_: "any",
+    ffunc.promote_min: "min",
+    ffunc.promote_max: "max",
+    ffunc.logical_and: "all",
+    ffunc.logical_or: "any",
 }
 
 
@@ -155,7 +153,7 @@ class EinsumMachine:
                 )
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
-                if op != overwrite:
+                if op != ffunc.overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
                 else:

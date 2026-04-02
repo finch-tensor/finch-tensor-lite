@@ -1,5 +1,4 @@
 import math
-import operator as op
 from collections import OrderedDict
 
 import pytest
@@ -7,6 +6,7 @@ import pytest
 import numpy as np
 
 import finchlite as fl
+from finchlite import ffunc
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.autoschedule.tensor_stats import (
     DC,
@@ -95,7 +95,7 @@ def test_uniform_mapjoin_mul_and_add():
     )
 
     # P(a)*P(b) = 0.5 * 0.5 = 0.25 -> 0.25 * 100 = 25 nnz
-    node_mul = MapJoin(Literal(op.mul), (ta, tb))
+    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
     us_mul = insert_statistics(
         ST=UniformStats,
         node=node_mul,
@@ -107,7 +107,7 @@ def test_uniform_mapjoin_mul_and_add():
     assert us_mul.fill_value == 0.0
 
     # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
-    node_add = MapJoin(Literal(op.add), (ta, tb))
+    node_add = MapJoin(Literal(ffunc.add), (ta, tb))
     us_add = insert_statistics(
         ST=UniformStats,
         node=node_add,
@@ -126,7 +126,7 @@ def test_uniform_aggregate_and_issimilar():
         ST=UniformStats, node=table, bindings=OrderedDict(), replace=False, cache={}
     )
     node_sum = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=None,
         arg=table,
         idxs=(Field("j"),),
@@ -163,7 +163,7 @@ def test_blocked_stats_aggregate():
     bs = BlockedStats.from_tensor(fl.asarray(data), indices, blocks_per_dim, DenseStats)
 
     reduce_indices = (Field("j"),)
-    agg_bs = BlockedStats.aggregate(op.add, 0.0, reduce_indices, bs)
+    agg_bs = BlockedStats.aggregate(ffunc.add, 0.0, reduce_indices, bs)
 
     assert agg_bs.blocks.ndim == 1
     assert len(agg_bs.blocks) == 2
@@ -186,7 +186,7 @@ def test_blocked_stats_mapjoin():
         fl.asarray(data2), indices, blocks_per_dim, UniformStats
     )
 
-    result = BlockedStats.mapjoin(op.add, bs1, bs2)
+    result = BlockedStats.mapjoin(ffunc.add, bs1, bs2)
 
     assert result.estimate_non_fill_values() == 50.0
     assert result.blocks[0, 1].estimate_non_fill_values() == 0.0
@@ -314,14 +314,16 @@ def test_benchmark_structured_comparison():
             # Stats performance
             g_a = Impl(tns_a, (i, k))
             g_b = Impl(tns_b, (k, j))
-            g_res = Impl.aggregate(op.add, 0.0, (k,), Impl.mapjoin(op.mul, g_a, g_b))
+            g_res = Impl.aggregate(
+                ffunc.add, 0.0, (k,), Impl.mapjoin(ffunc.mul, g_a, g_b)
+            )
             g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
             # Blocked Stats Performance
             b_a = BlockedStats.from_tensor(tns_a, (i, k), blocks_per_dim, Impl)
             b_b = BlockedStats.from_tensor(tns_b, (k, j), blocks_per_dim, Impl)
             b_res = BlockedStats.aggregate(
-                op.add, 0.0, (k,), BlockedStats.mapjoin(op.mul, b_a, b_b)
+                ffunc.add, 0.0, (k,), BlockedStats.mapjoin(ffunc.mul, b_a, b_b)
             )
             b_perf = abs(b_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
@@ -390,7 +392,7 @@ def test_add_dummy_idx():
                 ((Field("i"), Field("j")), {Field("i"): 10.0, Field("j"): 5.0}, 2.0),
                 ((Field("i"), Field("k")), {Field("i"): 20.0, Field("k"): 7.0}, 3.0),
             ],
-            op.add,
+            ffunc.add,
             (Field("i"), Field("j"), Field("k")),
             {Field("i"): 10.0, Field("j"): 5.0, Field("k"): 7.0},
             5.0,
@@ -401,7 +403,7 @@ def test_add_dummy_idx():
                 ((Field("i"),), {Field("i"): 6.0}, 2.0),
                 ((Field("i"),), {Field("i"): 9.0}, 4.0),
             ],
-            max,
+            ffunc.max,
             (Field("i"),),
             {Field("i"): 6.0},
             4.0,
@@ -442,7 +444,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
     [
         # addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
         (
-            op.add,
+            ffunc.add,
             (Field("i"), Field("j"), Field("k")),
             {Field("i"): 10.0, Field("j"): 5.0, Field("k"): 3.0},
             0.5,
@@ -453,7 +455,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
         (
-            op.add,
+            ffunc.add,
             (Field("a"), Field("b"), Field("c"), Field("d")),
             {Field("a"): 2.0, Field("b"): 4.0, Field("c"): 8.0, Field("d"): 16.0},
             7.0,
@@ -464,7 +466,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # addition: no-op when reduce set is empty (n = 1) → fill unchanged
         (
-            op.add,
+            ffunc.add,
             (Field("x"), Field("y")),
             {Field("x"): 3.0, Field("y"): 9.0},
             1.0,
@@ -475,7 +477,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # addition: missing axis in reduce set → nothing reduced → fill unchanged
         (
-            op.add,
+            ffunc.add,
             (Field("i"), Field("j")),
             {Field("i"): 5.0, Field("j"): 6.0},
             0.0,
@@ -486,7 +488,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
         (
-            op.mul,
+            ffunc.mul,
             (Field("i"), Field("j")),
             {Field("i"): 2.0, Field("j"): 3.0},
             2.0,
@@ -497,7 +499,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # idempotent op: reduce entire axis → empty shape
         (
-            min,
+            ffunc.min,
             (Field("i"),),
             {Field("i"): 4.0},
             7.0,
@@ -590,7 +592,7 @@ def test_mapjoin_mul_and_add():
     cache[ta].fill_value = 1
     cache[tb].fill_value = 1
     cache[ta2].fill_value = 2
-    node_mul = MapJoin(Literal(op.mul), (ta, tb))
+    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
     dsm = insert_statistics(
         ST=DenseStats, node=node_mul, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -601,7 +603,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("k")) == 4.0
     assert dsm.fill_value == 0.0
 
-    node_add = MapJoin(Literal(op.add), (ta, ta2))
+    node_add = MapJoin(Literal(ffunc.add), (ta, ta2))
     ds_sum = insert_statistics(
         ST=DenseStats, node=node_add, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -622,7 +624,7 @@ def test_aggregate_and_issimilar():
     )
 
     node_add = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=None,
         arg=table,
         idxs=(Field("j"),),
@@ -1322,7 +1324,7 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2.tensordef = TensorDef(frozenset({Field("i")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(op.add), (node1, node2))
+    parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -1363,7 +1365,7 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(op.add), (node1, node2))
+    parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -1400,7 +1402,7 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2.tensordef = TensorDef(frozenset({Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(op.add), (node1, node2))
+    parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -1445,7 +1447,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(op.add), (node1, node2))
+    parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
     )
@@ -1506,9 +1508,9 @@ def test_large_disjoint_disjunction_dc_card(
     s3.tensordef = TensorDef(frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1)
     s3.dcs = set(dcs3)
 
-    map = MapJoin(Literal(op.mul), (node1, node2))
+    map = MapJoin(Literal(ffunc.mul), (node1, node2))
 
-    parent = MapJoin(Literal(op.mul), (map, node3))
+    parent = MapJoin(Literal(ffunc.mul), (map, node3))
 
     reduce_stats = insert_statistics(
         ST=DCStats, node=parent, bindings=OrderedDict(), replace=False, cache=cache
@@ -1564,8 +1566,8 @@ def test_mixture_disjoint_disjunction_dc_card(
     s3.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0)
     s3.dcs = set(dcs3)
 
-    map = MapJoin(Literal(op.mul), (node1, node2))
-    parent = MapJoin(Literal(op.mul), (map, node3))
+    map = MapJoin(Literal(ffunc.mul), (node1, node2))
+    parent = MapJoin(Literal(ffunc.mul), (map, node3))
 
     reduce_stats = insert_statistics(
         ST=DCStats,
@@ -1614,7 +1616,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
     stat.dcs = set(dcs)
 
     reduce_node = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=Literal(0),
         idxs=(Field("i"), Field("j"), Field("k")),
         arg=node,
@@ -1660,7 +1662,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=Literal(0),
         idxs=(Field("i"), Field("j")),
         arg=node,
@@ -1706,7 +1708,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=Literal(0),
         idxs=(Field("i"),),
         arg=node,
@@ -1770,7 +1772,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
 
     reduce_fields = tuple(reduce_indices)
     reduce_node = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=Literal(0),
         idxs=reduce_fields,
         arg=node,
