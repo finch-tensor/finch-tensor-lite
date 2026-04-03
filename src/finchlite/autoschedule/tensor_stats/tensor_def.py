@@ -9,8 +9,6 @@ from functools import reduce
 from typing import Any
 
 import numpy as np
-
-from finchlite.algebra.algebra import BinaryBoolOperator, BinaryFloatOperator
 from finchlite.finch_logic import (
     Alias,
     Field,
@@ -141,10 +139,7 @@ class TensorDef:
         Returns:
             TensorDef: A new TensorDef representing the merged tensor.
         """
-        if isinstance(op,BinaryFloatOperator) or isinstance(op,BinaryBoolOperator):
-            new_fill_value = reduce(op, (s.fill_value for s in args))
-        else :
-            new_fill_value = op(*(s.fill_value for s in args))
+        new_fill_value = reduce(op, (s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),
             tuple(
