@@ -1934,7 +1934,7 @@ def isnan(x) -> LazyTensor:
 
 
 def iscomplexobj(x) -> LazyTensor:
-    return elementwise(np.iscomplexobj, lazy(x))
+    return elementwise(ffunc.iscomplexobj, lazy(x))
 
 
 def logical_and(x1, x2) -> LazyTensor:
