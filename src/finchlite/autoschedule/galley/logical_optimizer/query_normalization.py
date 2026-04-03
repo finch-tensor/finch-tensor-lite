@@ -360,7 +360,7 @@ def normalize_reorders_in_plan(plan: Plan) -> Plan:
 def merge_mapjoin_rule(node: LogicNode) -> LogicNode:
     match node:
         case MapJoin(Literal(op1), args) if is_associative(op1):
-            new_args = []
+            new_args: list[LogicExpression] = []
             for arg in args:
                 if isinstance(arg, MapJoin) and arg.op.val == op1:
                     new_args.extend(arg.args)
