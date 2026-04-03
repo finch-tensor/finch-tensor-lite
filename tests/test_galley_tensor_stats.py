@@ -15,10 +15,8 @@ from finchlite.autoschedule.tensor_stats import (
     BlockedStatsFactory,
     DCStats,
     DCStatsFactory,
-    DenseStats,
     DenseStatsFactory,
     TensorDef,
-    UniformStats,
     UniformStatsFactory,
 )
 from finchlite.finch_logic import (
@@ -93,10 +91,18 @@ def test_uniform_mapjoin_mul_and_add():
 
     cache = {}
     insert_statistics(
-        stats_factory=UniformStatsFactory(), node=ta, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=UniformStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     insert_statistics(
-        stats_factory=UniformStatsFactory(), node=tb, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=UniformStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     # P(a)*P(b) = 0.5 * 0.5 = 0.25 -> 0.25 * 100 = 25 nnz
@@ -128,7 +134,11 @@ def test_uniform_aggregate_and_issimilar():
     data = np.eye(10)
     table = Table(Literal(fl.asarray(data)), (Field("i"), Field("j")))
     us = insert_statistics(
-        stats_factory=UniformStatsFactory(), node=table, bindings=OrderedDict(), replace=False, cache={}
+        stats_factory=UniformStatsFactory(),
+        node=table,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
     )
     node_sum = Aggregate(
         op=Literal(ffunc.add),
@@ -137,7 +147,11 @@ def test_uniform_aggregate_and_issimilar():
         idxs=(Field("j"),),
     )
     us_agg = insert_statistics(
-        stats_factory=UniformStatsFactory(), node=node_sum, bindings=OrderedDict(), replace=False, cache={}
+        stats_factory=UniformStatsFactory(),
+        node=node_sum,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
     )
     # p=0.1 in our example as only diagonal elements are non zero so 10/100 = 0.1
     expected_prob = 1 - math.pow(1.0 - 0.1, 10)
@@ -227,18 +241,16 @@ def test_blocked_stats_reorder():
 
     indices = (Field("i"), Field("j"))
     blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(
-        arr, indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
 
     # Before reordering
     assert bs.blocks[0, 0].get_dim_size(Field("i")) == 2.0
     assert bs.blocks[0, 0].get_dim_size(Field("j")) == 5.0
 
     new_indices = (Field("j"), Field("i"))
-    reordered_bs = BlockedStatsFactory(
-        blocks_per_dim, UniformStatsFactory()
-    ).reorder(bs, new_indices)
+    reordered_bs = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
+        bs, new_indices
+    )
 
     new_block = reordered_bs.blocks[0, 0]
 
@@ -352,9 +364,7 @@ def test_benchmark_structured_comparison():
             )
             b_perf = abs(b_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
-            print(
-                f"{m_type:<15} | {impl_name:<15} | {g_perf:<18.6f} | {b_perf:.6f}"
-            )
+            print(f"{m_type:<15} | {impl_name:<15} | {g_perf:<18.6f} | {b_perf:.6f}")
 
         print("-" * 85)
 
@@ -606,20 +616,36 @@ def test_mapjoin_mul_and_add():
 
     cache = {}
     insert_statistics(
-        stats_factory=DenseStatsFactory(), node=ta, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DenseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     insert_statistics(
-        stats_factory=DenseStatsFactory(), node=tb, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DenseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     insert_statistics(
-        stats_factory=DenseStatsFactory(), node=ta2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DenseStatsFactory(),
+        node=ta2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     cache[ta].fill_value = 1
     cache[tb].fill_value = 1
     cache[ta2].fill_value = 2
     node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
     dsm = insert_statistics(
-        stats_factory=DenseStatsFactory(), node=node_mul, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DenseStatsFactory(),
+        node=node_mul,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert dsm.index_order == (Field("i"), Field("j"), Field("k"))
@@ -630,7 +656,11 @@ def test_mapjoin_mul_and_add():
 
     node_add = MapJoin(Literal(ffunc.add), (ta, ta2))
     ds_sum = insert_statistics(
-        stats_factory=DenseStatsFactory(), node=node_add, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DenseStatsFactory(),
+        node=node_add,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert ds_sum.index_order == (Field("i"), Field("j"))
@@ -645,7 +675,11 @@ def test_aggregate_and_issimilar():
         (Field("i"), Field("j")),
     )
     dsa = insert_statistics(
-        stats_factory=DenseStatsFactory(), node=table, bindings=OrderedDict(), replace=False, cache={}
+        stats_factory=DenseStatsFactory(),
+        node=table,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
     )
 
     node_add = Aggregate(
@@ -656,7 +690,11 @@ def test_aggregate_and_issimilar():
     )
 
     ds_agg = insert_statistics(
-        stats_factory=DenseStatsFactory(), node=node_add, bindings=OrderedDict(), replace=False, cache={}
+        stats_factory=DenseStatsFactory(),
+        node=node_add,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
     )
 
     assert ds_agg.index_order == (Field("i"),)
@@ -1337,25 +1375,36 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
 
     node1 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s1 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node1, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node1,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s2 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s2.tensordef = TensorDef(frozenset({Field("i")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=parent, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=parent,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
 
 
 @pytest.mark.parametrize(
@@ -1377,7 +1426,11 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
     s1 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node1, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node1,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
     s1.dcs = set(dcs1)
@@ -1386,14 +1439,22 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
     s2 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s2.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=parent, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=parent,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1416,21 +1477,33 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
 
     node1 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
     s1 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node1, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node1,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
     s2 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s2.tensordef = TensorDef(frozenset({Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=parent, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=parent,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1458,7 +1531,11 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         (Field("i"), Field("j")),
     )
     s1 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node1, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node1,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
     s1.dcs = set(dcs1)
@@ -1468,14 +1545,22 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         (Field("j"), Field("k")),
     )
     s2 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 0)
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffunc.add), (node1, node2))
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=parent, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=parent,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1510,7 +1595,11 @@ def test_large_disjoint_disjunction_dc_card(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
     s1 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node1, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node1,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 1)
     s1.dcs = set(dcs1)
@@ -1519,7 +1608,11 @@ def test_large_disjoint_disjunction_dc_card(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
     )
     s2 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 1)
     s2.dcs = set(dcs2)
@@ -1529,7 +1622,11 @@ def test_large_disjoint_disjunction_dc_card(
         (Field("i"), Field("j"), Field("k")),
     )
     s3 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node3, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node3,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s3.tensordef = TensorDef(frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1)
     s3.dcs = set(dcs3)
@@ -1539,7 +1636,11 @@ def test_large_disjoint_disjunction_dc_card(
     parent = MapJoin(Literal(ffunc.mul), (map, node3))
 
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=parent, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=parent,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1568,7 +1669,11 @@ def test_mixture_disjoint_disjunction_dc_card(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
     s1 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node1, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node1,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s1.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims1, 1)
     s1.dcs = set(dcs1)
@@ -1577,7 +1682,11 @@ def test_mixture_disjoint_disjunction_dc_card(
         Literal(fl.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
     )
     s2 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node2, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node2,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s2.tensordef = TensorDef(frozenset([Field("j"), Field("k")]), dims2, 1)
     s2.dcs = set(dcs2)
@@ -1587,7 +1696,11 @@ def test_mixture_disjoint_disjunction_dc_card(
         (Field("i"), Field("j"), Field("k")),
     )
     s3 = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node3, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node3,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     s3.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0)
     s3.dcs = set(dcs3)
@@ -1634,7 +1747,11 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         (Field("i"), Field("j"), Field("k")),
     )
     stat = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     stat.tensordef = TensorDef(
         frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
@@ -1648,7 +1765,11 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         arg=node,
     )
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=reduce_node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1682,7 +1803,11 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         (Field("i"), Field("j"), Field("k")),
     )
     st = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
@@ -1694,7 +1819,11 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         arg=node,
     )
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=reduce_node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1728,7 +1857,11 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         (Field("i"), Field("j"), Field("k")),
     )
     st = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
@@ -1740,7 +1873,11 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         arg=node,
     )
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=reduce_node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
@@ -1791,7 +1928,11 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         (Field("i"), Field("j"), Field("k")),
     )
     st = insert_statistics(
-        stats_factory=DCStatsFactory(), node=node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
     st.dcs = set(dcs)
@@ -1804,7 +1945,11 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         arg=node,
     )
     reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(), node=reduce_node, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DCStatsFactory(),
+        node=reduce_node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
