@@ -210,6 +210,14 @@ def test_database_issimilar():
     )
     assert DatabaseStats.issimilar(stats, stats)
 
+    other = DatabaseStats.from_def(stats.tensordef, stats.nnz + 1.0, dict(stats.V))
+    assert not DatabaseStats.issimilar(stats, other)
+
+    i, j = Field("i"), Field("j")
+    bad_V = {i: stats.V[i] + 1.0, j: stats.V[j]}
+    other_v = DatabaseStats.from_def(stats.tensordef, stats.nnz, bad_V)
+    assert not DatabaseStats.issimilar(stats, other_v)
+
 
 def test_database_copy_stats():
     data = np.eye(10)
@@ -242,6 +250,10 @@ def test_database_relabel():
     relabeled = DatabaseStats.relabel(stats, (Field("row"), Field("col")))
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
+    assert relabeled.V[Field("row")] == stats.V[Field("i")]
+    assert relabeled.V[Field("col")] == stats.V[Field("j")]
+    assert Field("i") not in relabeled.V
+    assert Field("j") not in relabeled.V
 
 
 def test_database_reorder():
