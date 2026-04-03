@@ -70,3 +70,8 @@ class TensorStats(ABC):
     @property
     @abstractmethod
     def fill_value(self) -> Any: ...
+
+T = TypeVar("T", bound=TensorStats)
+class StatsFactory[T](ABC):
+    @abstractmethod
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> T: ...
