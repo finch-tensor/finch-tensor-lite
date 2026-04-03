@@ -6,15 +6,15 @@ from typing import overload
 
 import numpy as np
 
-from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import LogicInterpreter
-from finchlite.finch_logic.nodes import LogicExpression, LogicStatement
-
+from ...algebra import TensorFType
 from ...finch_logic import (
     Aggregate,
     Alias,
     Literal,
+    LogicExpression,
+    LogicInterpreter,
     LogicNode,
+    LogicStatement,
     MapJoin,
     Plan,
     Produces,
@@ -23,9 +23,10 @@ from ...finch_logic import (
     Reorder,
     Table,
 )
+from ...util.logging import LOG_LOGIC_PRE_OPT
 from .tensor_stats import TensorStats
 
-logger = logging.getLogger(__name__)
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
 
 class StatsInterpreter:
