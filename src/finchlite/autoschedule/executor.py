@@ -9,7 +9,7 @@ from .. import finch_logic as lgc
 from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
 from .formatter import DefaultLogicFormatter
-from ..autoschedule.tensor_stats import TensorStats,DenseStats
+from ..autoschedule.tensor_stats import TensorStats
 
 def extract_tensors(
     root: lgc.LogicStatement,
@@ -45,14 +45,10 @@ def extract_tensors(
 
 
 class LogicExecutor(LogicEvaluator):
-    def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False, StatsImpl : type["TensorStats"] | None = None):
+    def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
-        self.verbose: bool = verbose
-        if StatsImpl is None:
-            StatsImpl = DenseStats #probably have dummy stats here
-        self.StatsImpl = StatsImpl
 
     def __call__(
         self, prgm: LogicNode, 

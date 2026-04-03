@@ -1,4 +1,3 @@
-import operator
 from collections import namedtuple
 
 import pytest
@@ -6,6 +5,7 @@ import pytest
 import numpy as np
 
 import finchlite.finch_assembly as asm
+from finchlite import ffunc
 from finchlite.codegen import NumpyBuffer
 from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.finch_assembly import assembly_check_types
@@ -67,7 +67,7 @@ def test_call_basic():
     assert (
         checker(
             asm.Call(
-                asm.Literal(operator.add),
+                asm.Literal(ffunc.add),
                 (
                     asm.Literal(np.float64(2.0)),
                     asm.Literal(np.float64(3.0)),
@@ -77,11 +77,11 @@ def test_call_basic():
         == np.float64
     )
     assert (
-        checker(asm.Call(asm.Literal(np.sin), (asm.Literal(np.float64(3.0)),)))
+        checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal(np.float64(3.0)),)))
         == np.float64
     )
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Call(asm.Literal(np.sin), (asm.Literal("string"),)))
+        checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal("string"),)))
 
 
 def test_load_basic():
@@ -316,7 +316,7 @@ def test_whileloop_basic():
         checker(
             asm.WhileLoop(
                 asm.Call(
-                    asm.Literal(operator.and_),
+                    asm.Literal(ffunc.and_),
                     (
                         asm.Literal(True),
                         asm.Literal(0),
@@ -344,7 +344,7 @@ def test_if_basic():
         checker(
             asm.If(
                 asm.Call(
-                    asm.Literal(operator.and_),
+                    asm.Literal(ffunc.and_),
                     (
                         asm.Literal(True),
                         asm.Literal(0),
@@ -372,7 +372,7 @@ def test_ifelse_basic():
         checker(
             asm.IfElse(
                 asm.Call(
-                    asm.Literal(operator.and_),
+                    asm.Literal(ffunc.and_),
                     (
                         asm.Literal(True),
                         asm.Literal(0),
@@ -406,7 +406,7 @@ def test_function_basic():
         ),
         asm.Return(
             asm.Call(
-                asm.Literal(operator.add),
+                asm.Literal(ffunc.add),
                 (
                     asm.Variable("x", np.int64),
                     asm.Variable("y", np.int64),
@@ -424,7 +424,7 @@ def test_function_basic():
             ),
             asm.Return(
                 asm.Call(
-                    asm.Literal(operator.add),
+                    asm.Literal(ffunc.add),
                     (
                         asm.Variable("x", np.int64),
                         asm.Variable("y", np.int64),
@@ -444,7 +444,7 @@ def test_function_basic():
                 (
                     asm.Return(
                         asm.Call(
-                            asm.Literal(operator.sub),
+                            asm.Literal(ffunc.sub),
                             (
                                 asm.Variable("x", np.int64),
                                 asm.Variable("y", np.int64),
@@ -540,11 +540,11 @@ def test_dot_product(a, b):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffunc.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -581,7 +581,7 @@ def test_if_statement():
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(operator.eq),
+                                asm.Literal(ffunc.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -589,7 +589,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -598,7 +598,7 @@ def test_if_statement():
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(operator.lt),
+                                asm.Literal(ffunc.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -606,7 +606,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.sub),
+                                            asm.Literal(ffunc.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -617,7 +617,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffunc.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -653,7 +653,7 @@ def test_simple_struct():
                         asm.Assign(
                             res_var,
                             asm.Call(
-                                asm.Literal(operator.mul),
+                                asm.Literal(ffunc.mul),
                                 (
                                     asm.GetAttr(p_var, asm.Literal("x")),
                                     asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -663,11 +663,11 @@ def test_simple_struct():
                         asm.Assign(
                             res_var,
                             asm.Call(
-                                asm.Literal(operator.add),
+                                asm.Literal(ffunc.add),
                                 (
                                     res_var,
                                     asm.Call(
-                                        asm.Literal(operator.mul),
+                                        asm.Literal(ffunc.mul),
                                         (
                                             asm.GetAttr(p_var, asm.Literal("y")),
                                             asm.GetAttr(
