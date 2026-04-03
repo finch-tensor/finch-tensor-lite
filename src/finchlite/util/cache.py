@@ -3,6 +3,7 @@
 # AI modified: 2025-01-01T00:00:00Z parent=4f5a2e5021678965ce8d830bb9edecac1dd3fea9
 # AI modified: 2025-01-01T00:01:00Z parent=4f5a2e5021678965ce8d830bb9edecac1dd3fea9
 # AI modified: 2026-04-02T22:59:00Z parent=197d5a907823d2a53fcd3b68b674f3f4d4f50b5d
+# AI modified: 2026-04-03T15:30:00Z parent=36276c257318d74488f81fa8107d2f2d0a8b804c
 import atexit
 import shutil
 import tempfile
@@ -11,12 +12,13 @@ from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
 
+import finchlite
+
 from .config import config, get_version
 
 finch_uuid = UUID("ef66f312-ff6e-4b8a-bb8c-9a843f3ecdf4")
 cache_timestamp_filename = ".finch_code_mtime_ns"
-# util/cache.py lives in src/finchlite/util/, so parent.parent is src/finchlite.
-_finch_source_root = Path(__file__).resolve().parent.parent
+_finch_source_root = Path(finchlite.__path__[0])
 
 
 def _latest_finch_code_mtime_ns() -> int:
