@@ -2,6 +2,7 @@
 # AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 # AI modified: 2026-04-03T01:35:32Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 # AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T19:13:17Z 78911eec
 from collections import OrderedDict
 
 from finchlite.algebra.tensor import Tensor
@@ -56,13 +57,11 @@ class LogicExecutor(LogicEvaluator):
     def __init__(
         self,
         ctx: LogicLoader | None = None,
-        stats_factory: StatsFactory | None = None,
+        stats_factory: StatsFactory = DenseStatsFactory(),
     ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
-        if stats_factory is None:
-            stats_factory = DenseStatsFactory()  # probably have dummy stats here
         self.stats_factory = stats_factory
 
     def __call__(

@@ -1,5 +1,7 @@
 # AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
 # AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T19:09:59Z 78911eec
+# AI modified: 2026-04-03T19:13:17Z 78911eec
 from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
@@ -425,8 +427,8 @@ class DefaultLogicOptimizer(LogicLoader):
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, "TensorStats"] | None = None,
-        stats_factory: StatsFactory | None = None,
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
     ]:

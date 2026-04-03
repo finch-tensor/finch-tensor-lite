@@ -1,4 +1,6 @@
 # AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
+# AI modified: 2026-04-03T19:09:59Z 78911eec
+# AI modified: 2026-04-03T19:13:17Z 78911eec
 from functools import reduce
 from typing import overload
 
@@ -322,8 +324,8 @@ class LogicStandardizer(LogicLoader):
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, "TensorStats"] | None = None,
-        stats_factory: StatsFactory | None = None,
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ):
         prgm, bindings = standardize(prgm, bindings)
         return self.ctx(

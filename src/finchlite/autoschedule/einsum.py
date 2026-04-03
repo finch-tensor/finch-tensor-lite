@@ -1,4 +1,6 @@
 # AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
+# AI modified: 2026-04-03T19:09:59Z 78911eec
+# AI modified: 2026-04-03T19:13:17Z 78911eec
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
 from finchlite.algebra import ffunc, init_value
@@ -102,8 +104,8 @@ class LogicEinsumLoader(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, "TensorStats"] | None = None,
-        stats_factory: StatsFactory | None = None,
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

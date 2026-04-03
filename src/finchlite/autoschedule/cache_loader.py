@@ -1,11 +1,19 @@
 # AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
 # AI modified: 2026-04-03T02:16:03Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 # AI modified: 2026-04-03T02:16:03Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T19:09:59Z 78911eec
+# AI modified: 2026-04-03T19:13:17Z 78911eec
 from collections import OrderedDict
 from typing import Any
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import Alias, LogicLoader, LogicStatement, StatsFactory
+from finchlite.finch_logic import (
+    Alias,
+    LogicLoader,
+    LogicStatement,
+    StatsFactory,
+    TensorStats,
+)
 
 
 class LogicCacheFirst(LogicLoader):
@@ -17,8 +25,8 @@ class LogicCacheFirst(LogicLoader):
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats=None,
-        stats_factory: StatsFactory | None = None,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ):
         key = (prgm, tuple(bindings.items()))
 
@@ -38,8 +46,8 @@ class LogicCacheLRU(LogicLoader):
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats=None,
-        stats_factory: StatsFactory | None = None,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ):
 
         prgm_key = (prgm, tuple(bindings.items()))
@@ -51,8 +59,6 @@ class LogicCacheLRU(LogicLoader):
         ]  # getting all the kernels for the prgm and bindings
 
         if stats:
-            if stats_factory is None:
-                raise ValueError("stats_factory is required when stats are provided")
             for saved_stats, result in kernels.items():
                 saved_stats_dict = dict(saved_stats)
 
