@@ -96,7 +96,7 @@ def test_database_mapjoin_join():
         ST=DatabaseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
     )
 
-    node_mul = MapJoin(Literal(op.mul), (ta, tb))
+    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
     stats = insert_statistics(
         ST=DatabaseStats,
         node=node_mul,
@@ -125,7 +125,7 @@ def test_database_mapjoin_elementwise():
         ST=DatabaseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
     )
 
-    node_add = MapJoin(Literal(op.add), (ta, tb))
+    node_add = MapJoin(Literal(ffunc.add), (ta, tb))
     stats = insert_statistics(
         ST=DatabaseStats,
         node=node_add,
@@ -159,7 +159,7 @@ def test_database_mapjoin_broadcast():
         ST=DatabaseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
     )
 
-    node_add = MapJoin(Literal(op.add), (ta, tb))
+    node_add = MapJoin(Literal(ffunc.add), (ta, tb))
     stats = insert_statistics(
         ST=DatabaseStats,
         node=node_add,
@@ -179,7 +179,7 @@ def test_database_aggregate():
     table = Table(Literal(fl.asarray(data)), (i, j))
 
     node_sum = Aggregate(
-        op=Literal(op.add),
+        op=Literal(ffunc.add),
         init=None,
         arg=table,
         idxs=(j,),
