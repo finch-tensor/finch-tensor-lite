@@ -1,6 +1,7 @@
 # AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 # AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 # AI modified: 2026-04-03T01:35:32Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 from collections import OrderedDict
 
 from finchlite.algebra.tensor import Tensor
@@ -90,7 +91,10 @@ class LogicExecutor(LogicEvaluator):
             stats_bindings[var] = self.stats_factory(T, fields)
 
         mod, binding_ftypes, binding_idxs = self.ctx(
-            stmt, binding_ftypes, stats_bindings
+            stmt,
+            binding_ftypes,
+            stats_bindings,
+            stats_factory=self.stats_factory,
         )
 
         bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))

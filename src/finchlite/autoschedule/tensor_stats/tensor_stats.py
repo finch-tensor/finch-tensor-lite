@@ -1,11 +1,13 @@
 # AI modified: 2026-04-03T00:24:22Z 7e517b16f3803378be07f55bd66f95bd09981f0c
 # AI modified: 2026-04-03T00:55:25Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 # AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T02:16:03Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T02:34:01Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Iterable, Mapping
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, TypeVar
 
 from finchlite.finch_logic import Field, StatsFactory, TensorStats
 
@@ -23,12 +25,15 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> TS:
         return self.stats_cls(tensor, fields)
 
+    @abstractmethod
     def copy_stats(self, stat: TS) -> TS:
-        return self.stats_cls.copy_stats(stat)
+        ...
 
+    @abstractmethod
     def mapjoin(self, op: FinchOperator, *args: TS) -> TS:
-        return self.stats_cls.mapjoin(op, *args)
+        ...
 
+    @abstractmethod
     def aggregate(
         self,
         op: FinchOperator,
@@ -36,16 +41,19 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         reduce_indices: tuple[Field, ...],
         stats: TS,
     ) -> TS:
-        return self.stats_cls.aggregate(op, init, reduce_indices, stats)
+        ...
 
+    @abstractmethod
     def issimilar(self, a: TS, b: TS) -> bool:
-        return self.stats_cls.issimilar(a, b)
+        ...
 
+    @abstractmethod
     def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS:
-        return self.stats_cls.relabel(stats, relabel_indices)
+        ...
 
+    @abstractmethod
     def reorder(self, stats: TS, reorder_indices: tuple[Field, ...]) -> TS:
-        return self.stats_cls.reorder(stats, reorder_indices)
+        ...
 
 
 class BaseTensorStats(TensorStats):
@@ -53,63 +61,6 @@ class BaseTensorStats(TensorStats):
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):
         self.tensordef = TensorDef.from_tensor(tensor, fields)
-
-    @classmethod
-    def factory(cls) -> StatsFactory[Self]:
-        return BaseTensorStatsFactory(cls)
-
-    @classmethod
-    @abstractmethod
-    def copy_stats(cls, stat: Self) -> Self:
-        """
-        Return a copy of a TensorStats object.
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def mapjoin(cls, op: FinchOperator, *args: Self) -> Self:
-        """
-        Return a new statistic representing the tensor resulting
-        from calling op on args... in an elementwise fashion
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def aggregate(
-        cls,
-        op: FinchOperator,
-        init: Any | None,
-        reduce_indices: tuple[Field, ...],
-        stats: Self,
-    ) -> Self:
-        """
-        Return a new statistic representing the tensor resulting
-        from aggregating arg over fields with the op aggregation function
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def issimilar(cls, a: Self, b: Self) -> bool:
-        """
-        Returns whether two statistics objects represent similarly distributed tensors,
-        and only returns true if the tensors have the same dimensions and fill value
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def relabel(cls, stats: Self, relabel_indices: tuple[Field, ...]) -> Self:
-        """ """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def reorder(cls, stats: Self, reorder_indices: tuple[Field, ...]) -> Self:
-        """ """
-        ...
 
     @property
     def dim_sizes(self) -> Mapping[Field, float]:

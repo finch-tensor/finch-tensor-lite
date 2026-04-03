@@ -1,3 +1,6 @@
+# AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T02:16:03Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T02:34:01Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 from __future__ import annotations
 
 from typing import Any, Self
@@ -6,24 +9,19 @@ from finchlite.finch_logic import Field
 
 from ..algebra import FinchOperator
 from .tensor_def import TensorDef
-from .tensor_stats import BaseTensorStats
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
-class DummyStats(BaseTensorStats):
-    @classmethod
-    def from_def(cls, d: TensorDef) -> Self:
-        ds = object.__new__(cls)
-        ds.tensordef = d.copy()
-        return ds
+class DummyStatsFactory(BaseTensorStatsFactory["DummyStats"]):
+    def __init__(self):
+        super().__init__(DummyStats)
 
-    @classmethod
-    def copy_stats(cls, stat: DummyStats) -> DummyStats:
+    def copy_stats(self, stat: DummyStats) -> DummyStats:
         if not isinstance(stat, DummyStats):
             raise TypeError("copy_stats expected a DummyStats instance")
-        return cls.from_def(stat.tensordef.copy())
+        return DummyStats.from_def(stat.tensordef.copy())
 
-    @classmethod
-    def mapjoin(cls, op: FinchOperator, *args: DummyStats) -> DummyStats:
+    def mapjoin(self, op: FinchOperator, *args: DummyStats) -> DummyStats:
         axes_set = [set(s.index_order) for s in args]
         same_axes = all(axes_set[0] == axes for axes in axes_set)
 
@@ -33,11 +31,10 @@ class DummyStats(BaseTensorStats):
         if not same_axes:
             new_def.fill_value = 0.0
 
-        return cls.from_def(new_def)
+        return DummyStats.from_def(new_def)
 
-    @classmethod
     def aggregate(
-        cls,
+        self,
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
@@ -45,10 +42,9 @@ class DummyStats(BaseTensorStats):
     ) -> DummyStats:
         d = stats.tensordef
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
-        return cls.from_def(new_def)
+        return DummyStats.from_def(new_def)
 
-    @classmethod
-    def issimilar(cls, a: DummyStats, b: DummyStats) -> bool:
+    def issimilar(self, a: DummyStats, b: DummyStats) -> bool:
         return (
             isinstance(a, DummyStats)
             and isinstance(b, DummyStats)
@@ -56,19 +52,20 @@ class DummyStats(BaseTensorStats):
             and a.tensordef.index_order == b.tensordef.index_order
         )
 
-    @classmethod
-    def relabel(
-        cls, stats: DummyStats, relabel_indices: tuple[Field, ...]
-    ) -> DummyStats:
+    def relabel(self, stats: DummyStats, relabel_indices: tuple[Field, ...]) -> DummyStats:
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
-        return cls.from_def(new_def)
+        return DummyStats.from_def(new_def)
 
-    @classmethod
-    def reorder(
-        cls, stats: DummyStats, reorder_indices: tuple[Field, ...]
-    ) -> DummyStats:
-
+    def reorder(self, stats: DummyStats, reorder_indices: tuple[Field, ...]) -> DummyStats:
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
-        return cls.from_def(new_def)
+        return DummyStats.from_def(new_def)
+
+
+class DummyStats(BaseTensorStats):
+    @classmethod
+    def from_def(cls, d: TensorDef) -> Self:
+        ds = object.__new__(cls)
+        ds.tensordef = d.copy()
+        return ds

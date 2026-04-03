@@ -1,8 +1,9 @@
+# AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
 from functools import reduce
 from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import LogicExpression, LogicNode, TensorStats
+from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
 
 from ..algebra import ffunc
 from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
@@ -322,6 +323,12 @@ class LogicStandardizer(LogicLoader):
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"] | None = None,
+        stats_factory: StatsFactory | None = None,
     ):
         prgm, bindings = standardize(prgm, bindings)
-        return self.ctx(prgm, bindings)
+        return self.ctx(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )

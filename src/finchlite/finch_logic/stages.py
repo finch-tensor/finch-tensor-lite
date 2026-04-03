@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -8,7 +9,7 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
-from .tensor_stats import TensorStats
+from .tensor_stats import StatsFactory, TensorStats
 
 
 class LogicEvaluator(Stage):
@@ -28,6 +29,7 @@ class LogicLoader(ABC):
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats] | None = None,
+        stats_factory: StatsFactory | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -60,6 +62,7 @@ class OptLogicLoader(LogicLoader):
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, Any] | None = None,
+        stats_factory: StatsFactory | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -67,7 +70,7 @@ class OptLogicLoader(LogicLoader):
     ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
-        return self.ctx(term, bindings)
+        return self.ctx(term, bindings, stats, stats_factory)
 
 
 def compute_shape_vars(

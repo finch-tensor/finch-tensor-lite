@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
 import logging
 from abc import abstractmethod
 from typing import Any
@@ -9,7 +10,7 @@ from ..algebra import TensorFType
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import AssemblyLibrary, TupleFType
-from ..finch_logic import LogicLoader, MockLogicLoader, TensorStats
+from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
 from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
 
@@ -39,6 +40,7 @@ class LogicFormatter(LogicLoader):
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, "TensorStats"] | None = None,
+        stats_factory: StatsFactory | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -78,7 +80,12 @@ class LogicFormatter(LogicLoader):
 
         logger.debug(prgm)
 
-        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        lib, bindings, shape_vars = self.loader(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )
         return lib, bindings, shape_vars
 
 

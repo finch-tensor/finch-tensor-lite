@@ -1,3 +1,7 @@
+# AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T02:16:03Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+# AI modified: 2026-04-03T02:34:01Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 from __future__ import annotations
 
 import math
@@ -10,6 +14,106 @@ from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
+from .tensor_stats import BaseTensorStatsFactory
+
+
+class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
+    def __init__(self):
+        super().__init__(UniformStats)
+
+    def copy_stats(self, stat: UniformStats) -> UniformStats:
+        if not isinstance(stat, UniformStats):
+            raise TypeError("copy_stats expected a UniformStats instance")
+        return UniformStats.from_def(stat.tensordef.copy(), stat.nnz)
+
+    def mapjoin(self, op: FinchOperator, *args: UniformStats) -> UniformStats:
+        def_args = [stat.tensordef for stat in args]
+        new_def = TensorDef.mapjoin(op, *def_args)
+        new_vol = UniformStats._get_volume(new_def)
+
+        if new_vol == 0.0:
+            return UniformStats.from_def(new_def, 0.0)
+
+        join_probs: list[float] = []
+        union_probs: list[float] = []
+
+        for s in args:
+            vol = UniformStats._get_volume(s.tensordef)
+            if isinstance(s, NumericStats):
+                p = s.estimate_non_fill_values() / vol if vol > 0 else 0.0
+            else:
+                raise TypeError("Stats Class must be inherit from NumericStats")
+
+            if is_annihilator(op, s.tensordef.fill_value):
+                join_probs.append(p)
+            else:
+                union_probs.append(p)
+
+        res_p = 1.0
+        if join_probs:
+            for p in join_probs:
+                res_p *= p
+        elif union_probs:
+            inv_p = 1.0
+            for p in union_probs:
+                inv_p *= 1 - p
+            res_p = 1 - inv_p
+        else:
+            res_p = 1.0
+
+        return UniformStats.from_def(new_def, res_p * new_vol)
+
+    def aggregate(
+        self,
+        op: FinchOperator,
+        init: Any | None,
+        reduce_indices: tuple[Field, ...],
+        stats: UniformStats,
+    ) -> UniformStats:
+        new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
+        res_vol = UniformStats._get_volume(new_def)
+        red_set = set(reduce_indices) & set(stats.tensordef.index_order)
+        k = math.prod(int(stats.tensordef.dim_sizes[x]) for x in red_set)
+        old_vol = UniformStats._get_volume(stats.tensordef)
+        if isinstance(stats, NumericStats):
+            p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
+        else:
+            raise TypeError("Stats Class must be inherit from NumericStats")
+        if is_annihilator(op, stats.tensordef.fill_value):
+            res_p = math.pow(p_old, k)
+        elif is_identity(op, stats.tensordef.fill_value):
+            res_p = 1 - math.pow((1 - p_old), k)
+        else:
+            res_p = 1.0
+
+        return UniformStats.from_def(new_def, res_p * res_vol)
+
+    def issimilar(self, a: UniformStats, b: UniformStats) -> bool:
+        return (
+            isinstance(a, UniformStats)
+            and isinstance(b, UniformStats)
+            and a.dim_sizes == b.dim_sizes
+            and a.fill_value == b.fill_value
+            and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
+        )
+
+    def relabel(
+        self, stats: UniformStats, relabel_indices: tuple[Field, ...]
+    ) -> UniformStats:
+        d = stats.tensordef
+        new_def = TensorDef.relabel(d, relabel_indices)
+        if isinstance(stats, NumericStats):
+            return UniformStats.from_def(new_def, stats.estimate_non_fill_values())
+        raise TypeError("Stats Class must be inherit from NumericStats")
+
+    def reorder(
+        self, stats: UniformStats, reorder_indices: tuple[Field, ...]
+    ) -> UniformStats:
+        d = stats.tensordef
+        new_def = TensorDef.reorder(d, reorder_indices)
+        if isinstance(stats, NumericStats):
+            return UniformStats.from_def(new_def, stats.estimate_non_fill_values())
+        raise TypeError("Stats Class must be inherit from NumericStats")
 
 
 class UniformStats(NumericStats):
@@ -47,111 +151,5 @@ class UniformStats(NumericStats):
             vol *= size
         return vol
 
-    @classmethod
-    def copy_stats(cls, stat: UniformStats) -> UniformStats:
-        """
-        Deep copy of a UniformStats object.
-        """
-        if not isinstance(stat, UniformStats):
-            raise TypeError("copy_stats expected a UniformStats instance")
-        return cls.from_def(stat.tensordef.copy(), stat.nnz)
-
     def estimate_non_fill_values(self) -> float:
         return self.nnz
-
-    @classmethod
-    def mapjoin(cls, op: FinchOperator, *args: UniformStats) -> UniformStats:
-        def_args = [stat.tensordef for stat in args]
-        new_def = TensorDef.mapjoin(op, *def_args)
-        new_vol = UniformStats._get_volume(new_def)
-
-        if new_vol == 0.0:
-            return cls.from_def(new_def, 0.0)
-
-        join_probs: list[float] = []
-        union_probs: list[float] = []
-
-        for s in args:
-            vol = UniformStats._get_volume(s.tensordef)
-            if isinstance(s, NumericStats):
-                p = s.estimate_non_fill_values() / vol if vol > 0 else 0.0
-            else:
-                raise TypeError("Stats Class must be inherit from NumericStats")
-
-            if is_annihilator(op, s.tensordef.fill_value):
-                join_probs.append(p)
-            else:
-                union_probs.append(p)
-
-        res_p = 1.0
-        if join_probs:
-            for p in join_probs:
-                res_p *= p
-        elif union_probs:
-            inv_p = 1.0
-            for p in union_probs:
-                inv_p *= 1 - p
-            res_p = 1 - inv_p
-        else:
-            res_p = 1.0
-
-        return cls.from_def(new_def, res_p * new_vol)
-
-    @classmethod
-    def aggregate(
-        cls,
-        op: FinchOperator,
-        init: Any | None,
-        reduce_indices: tuple[Field, ...],
-        stats: UniformStats,
-    ) -> UniformStats:
-        new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
-        res_vol = UniformStats._get_volume(new_def)
-        red_set = set(reduce_indices) & set(stats.tensordef.index_order)
-        k = math.prod(int(stats.tensordef.dim_sizes[x]) for x in red_set)
-        old_vol = UniformStats._get_volume(stats.tensordef)
-        if isinstance(stats, NumericStats):
-            p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
-        else:
-            raise TypeError("Stats Class must be inherit from NumericStats")
-        if is_annihilator(op, stats.tensordef.fill_value):
-            res_p = math.pow(p_old, k)
-        elif is_identity(op, stats.tensordef.fill_value):
-            res_p = 1 - math.pow((1 - p_old), k)
-        else:
-            res_p = 1.0
-
-        return cls.from_def(new_def, res_p * res_vol)
-
-    @classmethod
-    def issimilar(cls, a: UniformStats, b: UniformStats) -> bool:
-        return (
-            isinstance(a, UniformStats)
-            and isinstance(b, UniformStats)
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-            # should I add a case for nnz ?
-            and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
-        )
-
-    @classmethod
-    def relabel(
-        cls, stats: UniformStats, relabel_indices: tuple[Field, ...]
-    ) -> UniformStats:
-
-        d = stats.tensordef
-        new_def = TensorDef.relabel(d, relabel_indices)
-        if isinstance(stats, NumericStats):
-            return cls.from_def(new_def, stats.estimate_non_fill_values())
-        raise TypeError("Stats Class must be inherit from NumericStats")
-
-    @classmethod
-    def reorder(
-        cls, stats: UniformStats, reorder_indices: tuple[Field, ...]
-    ) -> UniformStats:
-
-        d = stats.tensordef
-        new_def = TensorDef.reorder(d, reorder_indices)
-        if isinstance(stats, NumericStats):
-            return cls.from_def(new_def, stats.estimate_non_fill_values())
-        raise TypeError("Stats Class must be inherit from NumericStats")

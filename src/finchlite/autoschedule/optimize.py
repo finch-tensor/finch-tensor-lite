@@ -1,3 +1,5 @@
+# AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
+# AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
@@ -17,12 +19,12 @@ from ..finch_logic import (
     Literal,
     LogicNode,
     LogicStatement,
-    MapJoin,
     Plan,
     Produces,
     Query,
     Relabel,
     Reorder,
+    StatsFactory,
     Table,
     TensorStats,
 )
@@ -423,8 +425,14 @@ class DefaultLogicOptimizer(LogicLoader):
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"] | None = None,
+        stats_factory: StatsFactory | None = None,
     ) -> tuple[
         AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
     ]:
         prgm, bindings = optimize(prgm, bindings)
-        return self.ctx(prgm, bindings)
+        return self.ctx(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )

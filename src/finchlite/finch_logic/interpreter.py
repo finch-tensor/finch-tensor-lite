@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
 from itertools import product
 
 import numpy as np
@@ -25,7 +26,7 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
-from .tensor_stats import TensorStats
+from .tensor_stats import StatsFactory, TensorStats
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
@@ -214,6 +215,7 @@ class MockLogicLoader(LogicLoader):
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats] | None = None,
+        stats_factory: StatsFactory | None = None,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],

@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
 from __future__ import annotations
 
 import logging
@@ -16,7 +17,7 @@ from .. import finch_notation as ntn
 from ..algebra import ffunc
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import LogicLoader, TensorStats, compute_shape_vars
+from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
 from ..finch_notation import NotationInterpreter
 from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
@@ -353,6 +354,7 @@ class LogicCompiler(LogicLoader):
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats] | None = None,
+        stats_factory: StatsFactory | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
