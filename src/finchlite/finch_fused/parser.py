@@ -291,7 +291,7 @@ class _FusedToPythonAST:
         if len(body) == 0:
             body = [ast.Pass()]
 
-        return ast.FunctionDef( # type: ignore
+        return ast.FunctionDef(  # type: ignore # noqa: PGH003
             name=function.name.val,
             args=args,
             body=body,

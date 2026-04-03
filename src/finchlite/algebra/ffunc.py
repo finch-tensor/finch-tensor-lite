@@ -830,7 +830,7 @@ class _IsNan(UnaryBoolOperator):
 
     def __repr__(self) -> str:
         return "isnan"
-    
+
 
 isnan = _IsNan()
 
