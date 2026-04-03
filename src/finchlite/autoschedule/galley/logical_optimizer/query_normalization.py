@@ -358,7 +358,6 @@ def normalize_reorders_in_plan(plan: Plan) -> Plan:
 
 
 def merge_mapjoin_rule(node: LogicNode) -> LogicNode:
-    print("node:", node)
     match node:
         case MapJoin(Literal(op1), args) if is_associative(op1):
             new_args = []
