@@ -3,7 +3,7 @@ from .dc_stats import DC, DCStats
 from .dense_stat import DenseStats
 from .stats_interpreter import StatsInterpreter
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
+from .tensor_stats import BaseTensorStats
 from .uniform_stats import UniformStats
 
 __all__ = [
@@ -13,6 +13,6 @@ __all__ = [
     "DenseStats",
     "StatsInterpreter",
     "TensorDef",
-    "TensorStats",
+    "BaseTensorStats",
     "UniformStats",
 ]

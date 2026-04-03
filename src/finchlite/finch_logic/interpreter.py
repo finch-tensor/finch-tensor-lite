@@ -25,7 +25,7 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
-from .tensor_stats import AbstractStats
+from .tensor_stats import TensorStats
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
@@ -213,7 +213,7 @@ class MockLogicLoader(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, AbstractStats] | None = None,
+        stats: dict[lgc.Alias, TensorStats] | None = None,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],

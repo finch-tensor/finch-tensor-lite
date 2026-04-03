@@ -8,6 +8,7 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
+from .tensor_stats import TensorStats
 
 
 class LogicEvaluator(Stage):
@@ -26,7 +27,7 @@ class LogicLoader(ABC):
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, Any] | None = None,
+        stats: dict[lgc.Alias, TensorStats] | None = None,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

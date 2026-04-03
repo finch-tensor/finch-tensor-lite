@@ -1,22 +1,23 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from typing import Any
+from ..algebra import FinchOperator
 
 from .nodes import Field
 
 
-class AbstractStats(ABC):
+
+class TensorStats(ABC):
     @staticmethod
     @abstractmethod
-    def copy_stats(stat: "AbstractStats") -> "AbstractStats":
+    def copy_stats(stat: "TensorStats") -> "TensorStats":
         """
-        Return a copy of a AbstractStats object.
+        Return a copy of a TensorStats object.
         """
         ...
 
     @staticmethod
     @abstractmethod
-    def mapjoin(op: Callable, *args: "AbstractStats") -> "AbstractStats":
+    def mapjoin(op: FinchOperator, *args: "TensorStats") -> "TensorStats":
         """
         Return a new statistic representing the tensor resulting
         from calling op on args... in an elementwise fashion
@@ -26,11 +27,11 @@ class AbstractStats(ABC):
     @staticmethod
     @abstractmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "AbstractStats",
-    ) -> "AbstractStats":
+        stats: "TensorStats",
+    ) -> "TensorStats":
         """
         Return a new statistic representing the tensor resulting
         from aggregating arg over fields with the op aggregation function
@@ -39,7 +40,7 @@ class AbstractStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def issimilar(a: "AbstractStats", b: "AbstractStats") -> bool:
+    def issimilar(a: "TensorStats", b: "TensorStats") -> bool:
         """
         Returns whether two statistics objects represent similarly distributed tensors,
         and only returns true if the tensors have the same dimensions and fill value
@@ -49,16 +50,16 @@ class AbstractStats(ABC):
     @staticmethod
     @abstractmethod
     def relabel(
-        stats: "AbstractStats", relabel_indices: tuple[Field, ...]
-    ) -> "AbstractStats":
+        stats: "TensorStats", relabel_indices: tuple[Field, ...]
+    ) -> "TensorStats":
         """ """
         ...
 
     @staticmethod
     @abstractmethod
     def reorder(
-        stats: "AbstractStats", reorder_indices: tuple[Field, ...]
-    ) -> "AbstractStats":
+        stats: "TensorStats", reorder_indices: tuple[Field, ...]
+    ) -> "TensorStats":
         """ """
         ...
 

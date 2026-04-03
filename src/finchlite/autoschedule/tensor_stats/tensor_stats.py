@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from finchlite.finch_logic import Field
+from finchlite.finch_logic import Field, TensorStats
 
 from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 
 
-class TensorStats(ABC):
+class BaseTensorStats(TensorStats):
     tensordef: TensorDef
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):

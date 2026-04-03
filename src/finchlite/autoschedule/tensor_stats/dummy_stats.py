@@ -7,7 +7,7 @@ from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
 
 
-class DummyStats(TensorStats):
+class DummyStats(BaseTensorStats):
     @classmethod
     def from_def(cls, d: TensorDef) -> Self:
         ds = object.__new__(cls)

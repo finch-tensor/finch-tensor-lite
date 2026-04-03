@@ -30,10 +30,10 @@ from .stages import (
     LogicTransform,
     compute_shape_vars,
 )
-from .tensor_stats import AbstractStats
+from .tensor_stats import TensorStats
 
 __all__ = [
-    "AbstractStats",
+    "TensorStats",
     "Aggregate",
     "Alias",
     "Field",
