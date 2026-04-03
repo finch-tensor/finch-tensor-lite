@@ -7,7 +7,6 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
@@ -17,7 +16,7 @@ from .. import finch_notation as ntn
 from ..algebra import ffunc
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import LogicLoader, compute_shape_vars
+from ..finch_logic import LogicLoader, TensorStats, compute_shape_vars
 from ..finch_notation import NotationInterpreter
 from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer

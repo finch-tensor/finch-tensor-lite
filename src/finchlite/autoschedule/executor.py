@@ -4,8 +4,8 @@ from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
-from ..autoschedule.tensor_stats import DenseStats, TensorStats
-from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode
+from ..autoschedule.tensor_stats import DenseStats
+from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode, TensorStats
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
 from .formatter import DefaultLogicFormatter
 

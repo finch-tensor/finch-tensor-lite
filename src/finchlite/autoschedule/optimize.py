@@ -4,7 +4,6 @@ from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
-from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_logic.nodes import LogicExpression
 from finchlite.finch_logic.stages import LogicLoader
@@ -25,6 +24,7 @@ from ..finch_logic import (
     Relabel,
     Reorder,
     Table,
+    TensorStats,
 )
 from ..symbolic import (
     Fixpoint,

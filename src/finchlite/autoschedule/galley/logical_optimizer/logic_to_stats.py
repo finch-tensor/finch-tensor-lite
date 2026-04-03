@@ -11,8 +11,8 @@ from ....finch_logic import (
     Query,
     Reorder,
     Table,
+    TensorStats,
 )
-from ...tensor_stats import TensorStats
 
 
 def insert_statistics(

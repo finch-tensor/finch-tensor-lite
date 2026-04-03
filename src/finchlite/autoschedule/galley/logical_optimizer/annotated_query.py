@@ -24,6 +24,7 @@ from ....finch_logic import (
     Query,
     Reorder,
     Table,
+    TensorStats,
 )
 from ....symbolic import (
     Chain,
@@ -34,7 +35,6 @@ from ....symbolic import (
     intree,
     isdescendant,
 )
-from ...tensor_stats import TensorStats
 from ...tensor_stats.numeric_stats import NumericStats
 from .logic_to_stats import insert_statistics
 

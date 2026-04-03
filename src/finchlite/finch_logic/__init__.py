@@ -33,7 +33,6 @@ from .stages import (
 from .tensor_stats import TensorStats
 
 __all__ = [
-    "TensorStats",
     "Aggregate",
     "Alias",
     "Field",
@@ -58,6 +57,7 @@ __all__ = [
     "Table",
     "TableValue",
     "TableValueFType",
+    "TensorStats",
     "Value",
     "compute_shape_vars",
 ]

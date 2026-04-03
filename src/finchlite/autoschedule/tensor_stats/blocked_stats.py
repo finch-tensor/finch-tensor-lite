@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from typing import Any
 
@@ -9,13 +11,15 @@ from finchlite.finch_logic import Field
 from ...algebra import FinchOperator
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
+
+
 class BlockedStats(NumericStats):
     def __init__(
         self,
         blocks: np.ndarray,
         blocks_per_dim: dict[Field, int],
         tensordef: TensorDef,
-        StatsImpl: type[BlockedStats],
+        StatsImpl: type[NumericStats],
     ):
         self.blocks = blocks
         self.blocks_per_dim = blocks_per_dim
@@ -27,7 +31,7 @@ class BlockedStats(NumericStats):
         cls,
         d: TensorDef,
         blocks_per_dim: dict[Field, int],
-        StatsImpl: type[BlockedStats],
+        StatsImpl: type[NumericStats],
         data: Any,
     ) -> np.ndarray:
         grid_dim = [blocks_per_dim[idx] for idx in d.index_order]
@@ -63,8 +67,8 @@ class BlockedStats(NumericStats):
         tensor: Any,
         fields: tuple[Field, ...],
         blocks_per_dim=dict[Field, int],
-        StatsImpl=type[BlockedStats],
-    ) -> "BlockedStats":
+        StatsImpl=type[NumericStats],
+    ) -> BlockedStats:
         d = TensorDef.from_tensor(tensor, fields)
         data = tensor.to_numpy() if hasattr(tensor, "to_numpy") else tensor
         grid = cls.build_grid(d, blocks_per_dim, StatsImpl, data=data)
@@ -73,8 +77,8 @@ class BlockedStats(NumericStats):
     def estimate_non_fill_values(self):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
 
-    @staticmethod
-    def mapjoin(op: FinchOperator, *args: BlockedStats) -> "BlockedStats":
+    @classmethod
+    def mapjoin(cls, op: FinchOperator, *args: BlockedStats) -> BlockedStats:
         "We assume that all the args have same sized blocks here"
 
         if not all(isinstance(arg, BlockedStats) for arg in args):
@@ -97,15 +101,16 @@ class BlockedStats(NumericStats):
                     local_blocks.append(block)
             new_blocks[coord] = InnerStats.mapjoin(op, *local_blocks)
 
-        return BlockedStats(new_blocks, first_arg.blocks_per_dim, new_def, InnerStats)
+        return cls(new_blocks, first_arg.blocks_per_dim, new_def, InnerStats)
 
-    @staticmethod
+    @classmethod
     def aggregate(
+        cls,
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: BlockedStats,
-    ) -> "BlockedStats":
+    ) -> BlockedStats:
 
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for aggregate")
@@ -156,12 +161,12 @@ class BlockedStats(NumericStats):
             k: v for k, v in stats.blocks_per_dim.items() if k not in reduce_indices
         }
 
-        return BlockedStats(final_grid, new_blocks_per_dim, new_def, stats.StatsImpl)
+        return cls(final_grid, new_blocks_per_dim, new_def, stats.StatsImpl)
 
-    @staticmethod
+    @classmethod
     def relabel(
-        stats: BlockedStats, relabel_indices: tuple[Field, ...]
-    ) -> "BlockedStats":
+        cls, stats: BlockedStats, relabel_indices: tuple[Field, ...]
+    ) -> BlockedStats:
         new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
 
         if not isinstance(stats, BlockedStats):
@@ -178,12 +183,12 @@ class BlockedStats(NumericStats):
             if isinstance(block, BlockedStats):
                 new_blocks[coord] = stats.StatsImpl.relabel(block, relabel_indices)
 
-        return BlockedStats(new_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
+        return cls(new_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
 
-    @staticmethod
+    @classmethod
     def reorder(
-        stats: BlockedStats, reorder_indices: tuple[Field, ...]
-    ) -> "BlockedStats":
+        cls, stats: BlockedStats, reorder_indices: tuple[Field, ...]
+    ) -> BlockedStats:
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for reorder")
 
@@ -215,10 +220,10 @@ class BlockedStats(NumericStats):
             idx: stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices
         }
 
-        return BlockedStats(final_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
+        return cls(final_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
 
-    @staticmethod
-    def issimilar(a: BlockedStats, b: BlockedStats) -> bool:
+    @classmethod
+    def issimilar(cls, a: BlockedStats, b: BlockedStats) -> bool:
         if not (isinstance(a, BlockedStats) and isinstance(b, BlockedStats)):
             return False
 
@@ -231,8 +236,8 @@ class BlockedStats(NumericStats):
                 return False
         return True
 
-    @staticmethod
-    def copy_stats(stat: BlockedStats) -> "BlockedStats":
+    @classmethod
+    def copy_stats(cls, stat: BlockedStats) -> BlockedStats:
         if not isinstance(stat, BlockedStats):
             raise TypeError("copy_stats expected a BlockedStats instance")
 
@@ -242,7 +247,7 @@ class BlockedStats(NumericStats):
         for i in range(stat.blocks.size):
             new_blocks.flat[i] = stat.StatsImpl.copy_stats(stat.blocks.flat[i])
 
-        return BlockedStats(
+        return cls(
             new_blocks,
             stat.blocks_per_dim.copy(),
             stat.tensordef.copy(),

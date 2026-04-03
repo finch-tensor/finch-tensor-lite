@@ -1,3 +1,6 @@
+# AI modified: 2026-04-03T00:24:22Z 7e517b16f3803378be07f55bd66f95bd09981f0c
+from __future__ import annotations
+
 import math
 from collections import Counter
 from collections.abc import Iterable
@@ -14,6 +17,7 @@ from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
+
 
 @dataclass(frozen=True)
 class DC:
@@ -51,7 +55,7 @@ class DCStats(NumericStats):
         self.dcs = self._structure_to_dcs(tensor, fields)
 
     @staticmethod
-    def from_def(tensordef: TensorDef, dcs: set[DC]) -> "DCStats":
+    def from_def(tensordef: TensorDef, dcs: set[DC]) -> DCStats:
         """
         Build DCStats directly from a TensorDef and an existing DC set.
         """
@@ -60,15 +64,15 @@ class DCStats(NumericStats):
         self.dcs = set(dcs)
         return self
 
-    @staticmethod
-    def copy_stats(stat: DCStats) -> DCStats:
+    @classmethod
+    def copy_stats(cls, stat: DCStats) -> DCStats:
         """
         Deep copy of a DCStats object: copies the TensorDef and the DC set.
         """
         if not isinstance(stat, DCStats):
             raise TypeError("copy_stats expected a DCStats instance")
 
-        return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
+        return cls.from_def(stat.tensordef.copy(), set(stat.dcs))
 
     def _structure_to_dcs(self, arr: Tensor, fields: Iterable[Field]) -> set[DC]:
         """
@@ -1377,7 +1381,7 @@ class DCStats(NumericStats):
         }
 
     @staticmethod
-    def _merge_dc_join(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+    def _merge_dc_join(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:
         """
         Merge DCs for join-like operators
 
@@ -1406,7 +1410,7 @@ class DCStats(NumericStats):
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
-    def _merge_dc_union(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+    def _merge_dc_union(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:
         """
         Merge DCs for union-like operators.
 
@@ -1455,8 +1459,8 @@ class DCStats(NumericStats):
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
         return DCStats.from_def(new_def, new_stats)
 
-    @staticmethod
-    def mapjoin(op: FinchOperator, *all_stats: "DCStats") -> "DCStats":
+    @classmethod
+    def mapjoin(cls, op: FinchOperator, *all_stats: DCStats) -> DCStats:
         """
         Merge DC statistics for an elementwise operation.
 
@@ -1499,13 +1503,14 @@ class DCStats(NumericStats):
             return DCStats._merge_dc_join(new_def, join_like_dc)
         return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
 
-    @staticmethod
+    @classmethod
     def aggregate(
+        cls,
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "DCStats",
-    ) -> "DCStats":
+        stats: DCStats,
+    ) -> DCStats:
         """
         Reduce DC statistics over specified indices.
 
@@ -1526,10 +1531,10 @@ class DCStats(NumericStats):
             new_def = TensorDef.aggregate(op, init, fields, stats.tensordef)
 
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
+        return cls.from_def(new_def, dcs)
 
-    @staticmethod
-    def issimilar(*args, **kwargs):
+    @classmethod
+    def issimilar(cls, *args, **kwargs):
         pass
 
     def estimate_non_fill_values(self) -> float:
@@ -1578,8 +1583,8 @@ class DCStats(NumericStats):
                 min_weight = min(min_weight, weight)
         return min_weight
 
-    @staticmethod
-    def relabel(stats: "DCStats", relabel_indices: tuple[Field, ...]) -> "DCStats":
+    @classmethod
+    def relabel(cls, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
         """
         new_axes = set(relabel_indices)
         new_dims = {m: stats.get_dim_size(m) for m in new_axes}
@@ -1588,10 +1593,10 @@ class DCStats(NumericStats):
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
+        return cls.from_def(new_def, dcs)
 
-    @staticmethod
-    def reorder(stats: "DCStats", reorder_indices: tuple[Field, ...]) -> "DCStats":
+    @classmethod
+    def reorder(cls, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
         """
         new_axes = set(reorder_indices)
         for old_idx in stats.index_order:
@@ -1612,4 +1617,4 @@ class DCStats(NumericStats):
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
+        return cls.from_def(new_def, dcs)

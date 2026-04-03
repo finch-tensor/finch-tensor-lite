@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import math
-from typing import Any, Self
+from typing import Any
 
 import numpy as np
 
@@ -8,7 +10,6 @@ from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
 
 
 class UniformStats(NumericStats):
@@ -30,7 +31,7 @@ class UniformStats(NumericStats):
             self.nnz = float(self._get_volume(self.tensordef))
 
     @classmethod
-    def from_def(cls, d: TensorDef, nnz: float | None = None) -> Self:
+    def from_def(cls, d: TensorDef, nnz: float | None = None) -> UniformStats:
         us = object.__new__(cls)
         us.tensordef = d.copy()
         if nnz is None:
@@ -46,26 +47,26 @@ class UniformStats(NumericStats):
             vol *= size
         return vol
 
-    @staticmethod
-    def copy_stats(stat: TensorStats) -> TensorStats:
+    @classmethod
+    def copy_stats(cls, stat: UniformStats) -> UniformStats:
         """
         Deep copy of a UniformStats object.
         """
         if not isinstance(stat, UniformStats):
             raise TypeError("copy_stats expected a UniformStats instance")
-        return UniformStats.from_def(stat.tensordef.copy(), stat.nnz)
+        return cls.from_def(stat.tensordef.copy(), stat.nnz)
 
     def estimate_non_fill_values(self) -> float:
         return self.nnz
 
-    @staticmethod
-    def mapjoin(op: FinchOperator, *args: TensorStats) -> TensorStats:
+    @classmethod
+    def mapjoin(cls, op: FinchOperator, *args: UniformStats) -> UniformStats:
         def_args = [stat.tensordef for stat in args]
         new_def = TensorDef.mapjoin(op, *def_args)
         new_vol = UniformStats._get_volume(new_def)
 
         if new_vol == 0.0:
-            return UniformStats.from_def(new_def, 0.0)
+            return cls.from_def(new_def, 0.0)
 
         join_probs: list[float] = []
         union_probs: list[float] = []
@@ -94,15 +95,16 @@ class UniformStats(NumericStats):
         else:
             res_p = 1.0
 
-        return UniformStats.from_def(new_def, res_p * new_vol)
+        return cls.from_def(new_def, res_p * new_vol)
 
-    @staticmethod
+    @classmethod
     def aggregate(
+        cls,
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
-    ) -> "UniformStats":
+        stats: UniformStats,
+    ) -> UniformStats:
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
         res_vol = UniformStats._get_volume(new_def)
         red_set = set(reduce_indices) & set(stats.tensordef.index_order)
@@ -119,10 +121,10 @@ class UniformStats(NumericStats):
         else:
             res_p = 1.0
 
-        return UniformStats.from_def(new_def, res_p * res_vol)
+        return cls.from_def(new_def, res_p * res_vol)
 
-    @staticmethod
-    def issimilar(a: TensorStats, b: TensorStats) -> bool:
+    @classmethod
+    def issimilar(cls, a: UniformStats, b: UniformStats) -> bool:
         return (
             isinstance(a, UniformStats)
             and isinstance(b, UniformStats)
@@ -132,24 +134,24 @@ class UniformStats(NumericStats):
             and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
         )
 
-    @staticmethod
+    @classmethod
     def relabel(
-        stats: "TensorStats", relabel_indices: tuple[Field, ...]
-    ) -> "UniformStats":
+        cls, stats: UniformStats, relabel_indices: tuple[Field, ...]
+    ) -> UniformStats:
 
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
         if isinstance(stats, NumericStats):
-            return UniformStats.from_def(new_def, stats.estimate_non_fill_values())
+            return cls.from_def(new_def, stats.estimate_non_fill_values())
         raise TypeError("Stats Class must be inherit from NumericStats")
 
-    @staticmethod
+    @classmethod
     def reorder(
-        stats: "TensorStats", reorder_indices: tuple[Field, ...]
-    ) -> "UniformStats":
+        cls, stats: UniformStats, reorder_indices: tuple[Field, ...]
+    ) -> UniformStats:
 
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
         if isinstance(stats, NumericStats):
-            return UniformStats.from_def(new_def, stats.estimate_non_fill_values())
+            return cls.from_def(new_def, stats.estimate_non_fill_values())
         raise TypeError("Stats Class must be inherit from NumericStats")

@@ -2,8 +2,7 @@ from functools import reduce
 from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.autoschedule.tensor_stats import TensorStats
-from finchlite.finch_logic.nodes import LogicExpression, LogicNode
+from finchlite.finch_logic import LogicExpression, LogicNode, TensorStats
 
 from ..algebra import ffunc
 from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence

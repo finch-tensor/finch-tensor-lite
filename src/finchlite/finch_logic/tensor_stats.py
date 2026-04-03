@@ -1,33 +1,36 @@
+# AI modified: 2026-04-03T00:24:22Z 7e517b16f3803378be07f55bd66f95bd09981f0c
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Self
+
 from ..algebra import FinchOperator
-
 from .nodes import Field
-from typing import Self
-
 
 
 class TensorStats(ABC):
-    @staticmethod
     @abstractmethod
-    def copy_stats(stat: Self) -> Self:
+    def __init__(self, tensor: Any, fields: tuple[Field, ...]): ...
+
+    @classmethod
+    @abstractmethod
+    def copy_stats(cls, stat: Self) -> Self:
         """
         Return a copy of a TensorStats object.
         """
         ...
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def mapjoin(op: FinchOperator, *args: Self) -> Self:
+    def mapjoin(cls, op: FinchOperator, *args: Self) -> Self:
         """
         Return a new statistic representing the tensor resulting
         from calling op on args... in an elementwise fashion
         """
         ...
 
-    @staticmethod
+    @classmethod
     @abstractmethod
     def aggregate(
+        cls,
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
@@ -39,28 +42,24 @@ class TensorStats(ABC):
         """
         ...
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def issimilar(a: Self, b: Self) -> bool:
+    def issimilar(cls, a: Self, b: Self) -> bool:
         """
         Returns whether two statistics objects represent similarly distributed tensors,
         and only returns true if the tensors have the same dimensions and fill value
         """
         ...
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def relabel(
-        stats: Self, relabel_indices: tuple[Field, ...]
-    ) -> Self:
+    def relabel(cls, stats: Self, relabel_indices: tuple[Field, ...]) -> Self:
         """ """
         ...
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def reorder(
-        stats: Self, reorder_indices: tuple[Field, ...]
-    ) -> Self:
+    def reorder(cls, stats: Self, reorder_indices: tuple[Field, ...]) -> Self:
         """ """
         ...
 

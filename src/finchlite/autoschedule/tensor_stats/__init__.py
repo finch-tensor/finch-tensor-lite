@@ -8,11 +8,11 @@ from .uniform_stats import UniformStats
 
 __all__ = [
     "DC",
+    "BaseTensorStats",
     "BlockedStats",
     "DCStats",
     "DenseStats",
     "StatsInterpreter",
     "TensorDef",
-    "BaseTensorStats",
     "UniformStats",
 ]

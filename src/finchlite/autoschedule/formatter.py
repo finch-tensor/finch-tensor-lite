@@ -4,14 +4,12 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.autoschedule.tensor_stats import TensorStats
-
 from .. import finch_logic as lgc
 from ..algebra import TensorFType
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import AssemblyLibrary, TupleFType
-from ..finch_logic import LogicLoader, MockLogicLoader
+from ..finch_logic import LogicLoader, MockLogicLoader, TensorStats
 from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
 
