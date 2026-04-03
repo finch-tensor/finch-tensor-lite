@@ -14,7 +14,6 @@ from finchlite.finch_logic import Field, StatsFactory, TensorStats
 from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 
-
 TS = TypeVar("TS", bound="BaseTensorStats")
 
 
@@ -26,12 +25,10 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         return self.stats_cls(tensor, fields)
 
     @abstractmethod
-    def copy_stats(self, stat: TS) -> TS:
-        ...
+    def copy_stats(self, stat: TS) -> TS: ...
 
     @abstractmethod
-    def mapjoin(self, op: FinchOperator, *args: TS) -> TS:
-        ...
+    def mapjoin(self, op: FinchOperator, *args: TS) -> TS: ...
 
     @abstractmethod
     def aggregate(
@@ -40,20 +37,16 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: TS,
-    ) -> TS:
-        ...
+    ) -> TS: ...
 
     @abstractmethod
-    def issimilar(self, a: TS, b: TS) -> bool:
-        ...
+    def issimilar(self, a: TS, b: TS) -> bool: ...
 
     @abstractmethod
-    def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS:
-        ...
+    def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS: ...
 
     @abstractmethod
-    def reorder(self, stats: TS, reorder_indices: tuple[Field, ...]) -> TS:
-        ...
+    def reorder(self, stats: TS, reorder_indices: tuple[Field, ...]) -> TS: ...
 
 
 class BaseTensorStats(TensorStats):

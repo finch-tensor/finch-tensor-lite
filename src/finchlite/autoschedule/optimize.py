@@ -19,6 +19,7 @@ from ..finch_logic import (
     Literal,
     LogicNode,
     LogicStatement,
+    MapJoin,
     Plan,
     Produces,
     Query,

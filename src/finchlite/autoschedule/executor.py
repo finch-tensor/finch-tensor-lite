@@ -9,7 +9,12 @@ from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
 from ..autoschedule.tensor_stats import DenseStatsFactory
-from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory, TensorStats
+from ..finch_logic import (
+    LogicEvaluator,
+    LogicLoader,
+    LogicNode,
+    StatsFactory,
+)
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
 from .formatter import DefaultLogicFormatter
 

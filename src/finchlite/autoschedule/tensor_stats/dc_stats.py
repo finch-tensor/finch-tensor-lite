@@ -1571,4 +1571,3 @@ class DCStats(NumericStats):
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
         return min_weight
-

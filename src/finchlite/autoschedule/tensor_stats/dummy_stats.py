@@ -52,12 +52,16 @@ class DummyStatsFactory(BaseTensorStatsFactory["DummyStats"]):
             and a.tensordef.index_order == b.tensordef.index_order
         )
 
-    def relabel(self, stats: DummyStats, relabel_indices: tuple[Field, ...]) -> DummyStats:
+    def relabel(
+        self, stats: DummyStats, relabel_indices: tuple[Field, ...]
+    ) -> DummyStats:
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
         return DummyStats.from_def(new_def)
 
-    def reorder(self, stats: DummyStats, reorder_indices: tuple[Field, ...]) -> DummyStats:
+    def reorder(
+        self, stats: DummyStats, reorder_indices: tuple[Field, ...]
+    ) -> DummyStats:
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
         return DummyStats.from_def(new_def)

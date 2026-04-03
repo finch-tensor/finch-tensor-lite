@@ -55,12 +55,16 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
             and a.fill_value == b.fill_value
         )
 
-    def relabel(self, stats: DenseStats, relabel_indices: tuple[Field, ...]) -> DenseStats:
+    def relabel(
+        self, stats: DenseStats, relabel_indices: tuple[Field, ...]
+    ) -> DenseStats:
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
         return DenseStats.from_def(new_def)
 
-    def reorder(self, stats: DenseStats, reorder_indices: tuple[Field, ...]) -> DenseStats:
+    def reorder(
+        self, stats: DenseStats, reorder_indices: tuple[Field, ...]
+    ) -> DenseStats:
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
         return DenseStats.from_def(new_def)

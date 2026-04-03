@@ -72,7 +72,9 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
                     local_blocks.append(block)
             new_blocks[coord] = inner_factory.mapjoin(op, *local_blocks)
 
-        return BlockedStats(new_blocks, first_arg.blocks_per_dim, new_def, inner_factory)
+        return BlockedStats(
+            new_blocks, first_arg.blocks_per_dim, new_def, inner_factory
+        )
 
     def aggregate(
         self,
@@ -97,7 +99,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         new_blocks = np.empty(new_grid_shape, dtype=object)
 
         for out_coord in np.ndindex(*new_grid_shape):
-            lane_slices = []
+            lane_slices: list[slice | int] = []
             for i, val in enumerate(out_coord):
                 if i in grid_reduce_axes:
                     lane_slices.append(slice(None))
@@ -108,7 +110,9 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
 
             lane_accumulator = None
             for b in blocks_in_lane:
-                local_reduced = stats.stats_factory.aggregate(op, init, reduce_indices, b)
+                local_reduced = stats.stats_factory.aggregate(
+                    op, init, reduce_indices, b
+                )
 
                 if lane_accumulator is None:
                     lane_accumulator = local_reduced
@@ -160,7 +164,9 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             if isinstance(block, NumericStats):
                 new_blocks[coord] = stats.stats_factory.relabel(block, relabel_indices)
 
-        return BlockedStats(new_blocks, new_blocks_per_dim, new_def, stats.stats_factory)
+        return BlockedStats(
+            new_blocks, new_blocks_per_dim, new_def, stats.stats_factory
+        )
 
     def reorder(
         self, stats: BlockedStats, reorder_indices: tuple[Field, ...]
@@ -187,7 +193,9 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         for coord in np.ndindex(new_blocks.shape):
             block: Any = new_blocks[coord]
             if isinstance(block, NumericStats):
-                final_blocks[coord] = stats.stats_factory.reorder(block, reorder_indices)
+                final_blocks[coord] = stats.stats_factory.reorder(
+                    block, reorder_indices
+                )
 
         new_blocks_per_dim = {
             idx: stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices
@@ -264,4 +272,3 @@ class BlockedStats(NumericStats):
 
     def estimate_non_fill_values(self):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
-
