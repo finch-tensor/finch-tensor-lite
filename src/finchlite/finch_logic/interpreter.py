@@ -1,4 +1,3 @@
-# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 import logging
 from itertools import product
 
@@ -45,9 +44,7 @@ class LogicInterpreter(LogicEvaluator):
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        machine = LogicMachine(
-            make_tensor=self.make_tensor, bindings=bindings
-        )
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
         return machine(node)
 
 

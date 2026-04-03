@@ -1,5 +1,3 @@
-# AI modified: 2026-04-02T22:35:07.606Z 96d960a
-# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 """
 Galley logical optimizer: applies greedy query rewriting to logical plans
 """

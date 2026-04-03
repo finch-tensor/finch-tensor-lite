@@ -1,4 +1,3 @@
-# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic.nodes import TableValue
 

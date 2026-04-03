@@ -1,4 +1,3 @@
-# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
@@ -83,9 +82,7 @@ class EinsumInterpreter(EinsumEvaluator):
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
-        machine = EinsumMachine(
-            xp=self.xp, bindings=bindings.copy()
-        )
+        machine = EinsumMachine(xp=self.xp, bindings=bindings.copy())
         return machine(node)
 
 
@@ -146,9 +143,7 @@ class EinsumMachine:
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
-                ctx = PointwiseEinsumMachine(
-                    self.xp, self.bindings, loops
-                )
+                ctx = PointwiseEinsumMachine(self.xp, self.bindings, loops)
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
                 if op != ffunc.overwrite:

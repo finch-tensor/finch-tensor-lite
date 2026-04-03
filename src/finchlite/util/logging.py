@@ -1,4 +1,3 @@
-# AI modified: 2026-04-02T22:35:07.606Z 96d960a
 """
 Finch logging module.
 

@@ -208,6 +208,3 @@ from finchlite.util.logging import get_logger_handler, FORMAT
 handler = get_logger_handler("r.l.post,r.c.nb")
 logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
 ```
-
----
-

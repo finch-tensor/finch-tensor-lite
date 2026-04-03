@@ -1,4 +1,3 @@
-# AI modified: 2026-04-02T20:45:17.606Z 9540fe6
 from __future__ import annotations
 
 import logging
@@ -36,9 +35,7 @@ class StatsInterpreter:
     def __call__(
         self, node: LogicNode, bindings: OrderedDict[Alias, TensorStats]
     ) -> TensorStats | tuple[TensorStats, ...]:
-        machine = StatsMachine(
-            StatsImpl=self.ST, bindings=bindings
-        )
+        machine = StatsMachine(StatsImpl=self.ST, bindings=bindings)
         return machine(node)
 
 
