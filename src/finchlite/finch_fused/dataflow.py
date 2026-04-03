@@ -1,8 +1,8 @@
 from typing import cast
 
 from ..interface import compute, lazy
+from ..symbolic import Chain, Namespace, PostWalk, Rewrite
 from ..symbolic.dataflow import DataFlowAnalysis
-from ..symbolic.rewriters import Chain, PostWalk, Rewrite
 from .cfg_builder import (
     NumberedStatement,
     fused_build_cfg,
@@ -86,7 +86,9 @@ def _get_stmt_bounds(stmts: list[FusedNode]) -> tuple[int, int]:
     return top_id, bot_id
 
 
-def _insert_compute(prgm: FusedNode, compute_sid, vars: set[Variable]) -> FusedNode:
+def _insert_compute(
+    prgm: FusedNode, compute_sid, vars: set[Variable], nspc: Namespace
+) -> FusedNode:
     def _visitor(node):
         match node:
             # In the case of returns, we need to assign the expressions,
@@ -102,7 +104,7 @@ def _insert_compute(prgm: FusedNode, compute_sid, vars: set[Variable]) -> FusedN
                     if isinstance(expr, Variable) and expr in vars:
                         return_vars += (expr,)
                     else:
-                        new_var = Variable("tmp_" + str(i))
+                        new_var = Variable(nspc.freshen("ret_" + str(i)))
                         exprs_to_compute += (Assign(new_var, expr),)
                         return_vars += (new_var,)
                 for var in return_vars:
@@ -164,6 +166,7 @@ def _unnest_block(node: FusedNode) -> FusedNode:
 
 def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
     # desugar the input name and number additional statements for CFG construction
+    nspc = Namespace(prgm)
     numbered_prgm, _ = number_statements(prgm)
     desugared_prgm = fused_desugar(numbered_prgm)
     cfg = fused_build_cfg(desugared_prgm)
@@ -178,7 +181,7 @@ def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
         )  # Backwards analysis, so live inputs are the output state of the block
         min_id, max_id = _get_stmt_bounds(block.statements)
         numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)
-        numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs)
+        numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs, nspc)
     return Rewrite(PostWalk(Chain([_unwrap_numbered_stmt, _unnest_block])))(
         numbered_prgm
     )
