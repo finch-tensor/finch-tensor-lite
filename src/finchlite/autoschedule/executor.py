@@ -1,11 +1,14 @@
+# AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:35:32Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from collections import OrderedDict
 
 from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
-from ..autoschedule.tensor_stats import DenseStats
-from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode, TensorStats
+from ..autoschedule.tensor_stats import DenseStatsFactory
+from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory, TensorStats
 from ..symbolic import Namespace, PostWalk, Rewrite, ftype
 from .formatter import DefaultLogicFormatter
 
@@ -48,21 +51,20 @@ class LogicExecutor(LogicEvaluator):
         self,
         ctx: LogicLoader | None = None,
         verbose: bool = False,
-        StatsImpl: type["TensorStats"] | None = None,
+        stats_factory: StatsFactory | None = None,
     ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
         self.verbose: bool = verbose
-        if StatsImpl is None:
-            StatsImpl = DenseStats  # probably have dummy stats here
-        self.StatsImpl = StatsImpl
+        if stats_factory is None:
+            stats_factory = DenseStatsFactory()  # probably have dummy stats here
+        self.stats_factory = stats_factory
 
     def __call__(
         self,
         prgm: LogicNode,
         bindings: dict[lgc.Alias, Tensor] | None = None,
-        StatsImpl: type["TensorStats"] | None = None,
     ):
         if bindings is None:
             bindings = {}
@@ -80,13 +82,12 @@ class LogicExecutor(LogicEvaluator):
 
         stmt, bindings = extract_tensors(stmt, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
-        actual_impl = StatsImpl or self.StatsImpl
         stats_bindings = OrderedDict()
 
         for var, T in bindings.items():
             shape = T.shape
             fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
-            stats_bindings[var] = actual_impl(T, fields)
+            stats_bindings[var] = self.stats_factory(T, fields)
 
         mod, binding_ftypes, binding_idxs = self.ctx(
             stmt, binding_ftypes, stats_bindings

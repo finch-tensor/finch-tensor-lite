@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T01:35:32Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from __future__ import annotations
 
 from typing import Any, Self
@@ -7,6 +8,12 @@ from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
+from .tensor_stats import BaseTensorStatsFactory
+
+
+class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
+    def __init__(self):
+        super().__init__(DenseStats)
 
 
 class DenseStats(NumericStats):

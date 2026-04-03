@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T00:55:25Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from .interpreter import (
     LogicInterpreter,
     MockLogicKernel,
@@ -30,7 +31,7 @@ from .stages import (
     LogicTransform,
     compute_shape_vars,
 )
-from .tensor_stats import TensorStats
+from .tensor_stats import StatsFactory, TensorStats
 
 __all__ = [
     "Aggregate",
@@ -57,6 +58,7 @@ __all__ = [
     "Table",
     "TableValue",
     "TableValueFType",
+    "StatsFactory",
     "TensorStats",
     "Value",
     "compute_shape_vars",

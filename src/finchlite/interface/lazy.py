@@ -1,3 +1,6 @@
+# AI modified: 2026-04-03T00:55:25Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from __future__ import annotations
 
 import bisect
@@ -38,6 +41,7 @@ from ..finch_logic import (
     Plan,
     Query,
     Reorder,
+    StatsFactory,
     Table,
     TensorStats,
 )
@@ -2037,10 +2041,11 @@ def einsum(prgm, *args, **kwargs):
 
 
 def get_lazy_tensor_stats(
-    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+    lazy_tensor: LazyTensor,
+    stats_factory: StatsFactory,
 ) -> TensorStats:
     trace = lazy_tensor.ctx.trace()
-    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    interpreter = StatsInterpreter(stats_factory=stats_factory)
     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
     last_stats: TensorStats | tuple[TensorStats, ...]
     for stmt in trace:

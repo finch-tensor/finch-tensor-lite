@@ -1,3 +1,6 @@
+# AI modified: 2026-04-03T00:55:25Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -6,7 +9,7 @@ from typing import overload
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import LogicInterpreter
+from finchlite.finch_logic import LogicInterpreter, StatsFactory
 from finchlite.finch_logic.nodes import LogicExpression, LogicStatement
 
 from ...finch_logic import (
@@ -27,22 +30,33 @@ from .tensor_stats import TensorStats
 
 
 class StatsInterpreter:
-    def __init__(self, StatsImpl: type[TensorStats], verbose=False):
-        self.ST = StatsImpl
+    def __init__(
+        self,
+        stats_factory: StatsFactory,
+        verbose=False,
+    ):
+        self.stats_factory = stats_factory
         self.verbose = verbose
 
     def __call__(
         self, node: LogicNode, bindings: OrderedDict[Alias, TensorStats]
     ) -> TensorStats | tuple[TensorStats, ...]:
         machine = StatsMachine(
-            StatsImpl=self.ST, bindings=bindings, verbose=self.verbose
+            stats_factory=self.stats_factory,
+            bindings=bindings,
+            verbose=self.verbose,
         )
         return machine(node)
 
 
 class StatsMachine:
-    def __init__(self, StatsImpl: type[TensorStats], bindings=None, verbose=False):
-        self.ST = StatsImpl
+    def __init__(
+        self,
+        stats_factory: StatsFactory,
+        bindings=None,
+        verbose=False,
+    ):
+        self.stats_factory = stats_factory
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
@@ -83,14 +97,14 @@ class StatsMachine:
 
             case Table(tns, idxs):
                 if isinstance(tns, Literal):
-                    tensor = self.ST(tns.val, idxs)
+                    tensor = self.stats_factory(tns.val, idxs)
                 elif isinstance(tns, Alias):
                     base_stats = self.bindings.get(tns)
                     if base_stats is None:
                         raise ValueError(f"No TensorStats bound to alias {node.tns}")
 
                     new_indices = tuple(f for f in node.idxs)
-                    tensor = self.ST.relabel(base_stats, new_indices)
+                    tensor = self.stats_factory.relabel(base_stats, new_indices)
                 return tensor
 
             case MapJoin():
@@ -100,7 +114,7 @@ class StatsMachine:
                 for arg in node.args:
                     res = self(arg)
                     child_stats_list.append(res)
-                return self.ST.mapjoin(node.op.val, *child_stats_list)
+                return self.stats_factory.mapjoin(node.op.val, *child_stats_list)
 
             case Aggregate():
                 if not isinstance(node.op, Literal):
@@ -109,7 +123,7 @@ class StatsMachine:
                 init = node.init.val if isinstance(node.init, Literal) else None
                 arg2 = self(node.arg)
                 reduce_indices = node.idxs
-                return self.ST.aggregate(op, init, reduce_indices, arg2)
+                return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
 
             case Reorder():
                 return self(node.arg)
@@ -117,7 +131,7 @@ class StatsMachine:
             case Relabel():
                 base_stats = self(node.arg)
                 new_indices = tuple(f for f in node.idxs)
-                return self.ST.relabel(base_stats, new_indices)
+                return self.stats_factory.relabel(base_stats, new_indices)
 
             case Produces(args):
                 return tuple(self(arg) for arg in args)
@@ -128,7 +142,7 @@ class StatsMachine:
 
 def calculate_estimated_error(
     node: LogicNode,
-    StatsImpl: type[TensorStats],
+    stats_factory: StatsFactory,
     logic_bindings: OrderedDict[Alias, TensorFType],
     stats_bindings: OrderedDict[Alias, TensorStats],
 ) -> tuple[float, ...]:
@@ -144,7 +158,7 @@ def calculate_estimated_error(
     if not isinstance(actual_result, tuple):
         actual_result = (actual_result,)
 
-    stats_interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    stats_interpreter = StatsInterpreter(stats_factory=stats_factory)
     stats_result = stats_interpreter(node, stats_bindings)
 
     if not isinstance(stats_result, tuple):

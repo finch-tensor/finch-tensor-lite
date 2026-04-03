@@ -1,3 +1,6 @@
+# AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:35:32Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 """
 This module provides functionality for array fusion and computation using lazy
 evaluation.
@@ -55,7 +58,7 @@ import threading
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.autoschedule.tensor_stats import DenseStats
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -128,7 +131,7 @@ COMPILE_NUMBA = LogicNormalizer(
 # rather than the tensors themselves.
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DenseStats,
+        DenseStatsFactory(),
         LogicExecutor(
             LogicStandardizer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))

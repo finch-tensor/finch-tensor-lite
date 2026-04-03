@@ -1,3 +1,6 @@
+# AI modified: 2026-04-03T00:55:25Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:08:06Z 38d789f35f1c9ba5c8ed00178371222826773dbe
+# AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from collections import OrderedDict
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
@@ -23,6 +26,7 @@ from ....finch_logic import (
     Plan,
     Query,
     Reorder,
+    StatsFactory,
     Table,
     TensorStats,
 )
@@ -41,7 +45,7 @@ from .logic_to_stats import insert_statistics
 
 @dataclass
 class AnnotatedQuery:
-    ST: type[TensorStats]
+    stats_factory: StatsFactory
     output_name: Alias
     reduce_idxs: list[Field]
     point_expr: LogicNode
@@ -57,7 +61,7 @@ class AnnotatedQuery:
 
     def __init__(
         self,
-        ST: type[TensorStats],
+        stats_factory: StatsFactory,
         q: Query,
         bindings: OrderedDict[Alias, TensorStats] | None = None,
     ):
@@ -67,8 +71,8 @@ class AnnotatedQuery:
 
         Parameters
         ----------
-        ST : type[TensorStats]
-            Concrete `TensorStats` implementation used to hold statistics.
+        stats_factory : StatsFactory
+            Concrete stats factory used to create statistics.
         q : Query
             Logical query of the form `Query(name, rhs)` whose `rhs` may contain
             `Aggregate` nodes.
@@ -79,12 +83,18 @@ class AnnotatedQuery:
             "Annotated Queries can only be built from queries of the form: "
             "Query(lhs, rhs)"
         )
-        self.ST = ST
+        self.stats_factory = stats_factory
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
         cache: dict[object, TensorStats] = {}
-        insert_statistics(ST, q, bindings=bindings, replace=False, cache=cache)
+        insert_statistics(
+            self.stats_factory,
+            q,
+            bindings=bindings,
+            replace=False,
+            cache=cache,
+        )
         self.cache = cache
         output_name = q.lhs
         expr = q.rhs
@@ -126,7 +136,11 @@ class AnnotatedQuery:
         point_expr = Rewrite(PostWalk(Chain([aggregate_annotation_rule])))(expr)
         cache_point: dict[object, TensorStats] = {}
         insert_statistics(
-            ST, point_expr, bindings=bindings, replace=False, cache=cache_point
+            self.stats_factory,
+            point_expr,
+            bindings=bindings,
+            replace=False,
+            cache=cache_point,
         )
         self.cache_point = cache_point
 
@@ -163,9 +177,9 @@ class AnnotatedQuery:
                             Literal(idx_dim_size),
                             (),
                         )
-                        cache_point[dim_val] = ST(idx_dim_size, ())
+                        cache_point[dim_val] = self.stats_factory(idx_dim_size, ())
                         new_node = MapJoin(Literal(f), (node, dim_val))
-                        cache_point[new_node] = ST.mapjoin(
+                        cache_point[new_node] = self.stats_factory.mapjoin(
                             f, cache_point[node], cache_point[dim_val]
                         )
                         point_expr = cast(
@@ -235,7 +249,7 @@ class AnnotatedQuery:
         Make a structured copy of an AnnotatedQuery.
         """
         new = object.__new__(AnnotatedQuery)
-        new.ST = self.ST
+        new.stats_factory = self.stats_factory
         new.output_name = self.output_name
         new.point_expr = self.point_expr
         new.reduce_idxs = list(self.reduce_idxs)
@@ -569,7 +583,7 @@ class AnnotatedQuery:
                         for node in PreOrderDFS(arg):
                             nodes_to_remove.add(cast(LogicExpression, node))
                 query_expr = MapJoin(Literal(op), tuple(relevant_args))
-                stats_cache[query_expr] = self.ST.mapjoin(
+                stats_cache[query_expr] = self.stats_factory.mapjoin(
                     op, *[stats_cache[arg] for arg in relevant_args]
                 )
                 relevant_args_set = set(relevant_args)
@@ -620,7 +634,7 @@ class AnnotatedQuery:
             tuple(final_idxs_to_be_reduced),
         )
 
-        stats_cache[query_expr] = self.ST.aggregate(
+        stats_cache[query_expr] = self.stats_factory.aggregate(
             agg_op,
             agg_init,
             tuple(final_idxs_to_be_reduced),
@@ -666,7 +680,11 @@ class AnnotatedQuery:
         alias_expr = Alias(query.lhs.name)
         stats_cache = self.cache_point
         insert_statistics(
-            self.ST, query, self.bindings, replace=False, cache=stats_cache
+            self.stats_factory,
+            query,
+            self.bindings,
+            replace=False,
+            cache=stats_cache,
         )
         alias_idxs = list(self.bindings[alias_expr].index_order)
 
@@ -720,7 +738,7 @@ class AnnotatedQuery:
         )
 
         insert_statistics(
-            self.ST,
+            self.stats_factory,
             new_point_expr,
             self.bindings,
             replace=True,
@@ -748,7 +766,11 @@ class AnnotatedQuery:
         """
         expr = self.point_expr
         insert_statistics(
-            self.ST, expr, bindings=self.bindings, replace=True, cache=self.cache_point
+            self.stats_factory,
+            expr,
+            bindings=self.bindings,
+            replace=True,
+            cache=self.cache_point,
         )
         match expr:
             case Table(Alias(_), _):
@@ -756,7 +778,7 @@ class AnnotatedQuery:
         query = Query(self.output_name, cast(LogicExpression, expr))
         remaining_cache: dict[object, TensorStats] = {}
         insert_statistics(
-            self.ST,
+            self.stats_factory,
             query.rhs,
             bindings=self.bindings,
             replace=True,
@@ -782,7 +804,11 @@ class AnnotatedQuery:
         query, _, _, _ = self.get_reduce_query(reduce_idx)
         stats_cache = self.cache_point
         insert_statistics(
-            self.ST, query.rhs, self.bindings, replace=False, cache=stats_cache
+            self.stats_factory,
+            query.rhs,
+            self.bindings,
+            replace=False,
+            cache=stats_cache,
         )
         match query.rhs:
             case Aggregate() as agg:
