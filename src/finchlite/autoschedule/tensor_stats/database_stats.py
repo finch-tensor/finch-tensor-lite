@@ -46,68 +46,131 @@ class DatabaseStats(TensorStats):
         return obj
 
     @staticmethod
+    def merge_join(new_def: TensorDef, all_stats: list[DatabaseStats]) -> DatabaseStats:
+
+        if len(all_stats) == 1:
+            return DatabaseStats.from_def(
+                new_def, all_stats[0].nnz, dict(all_stats[0].V)
+            )
+
+        cur_nnz = all_stats[0].nnz
+        cur_V: dict[Field, float] = dict(all_stats[0].V)
+        cur_indices: set[Field] = set(all_stats[0].index_order)
+
+        # Join case: A_ij * B_jk
+        for i in all_stats[1:]:
+            shared = cur_indices & set(i.index_order)
+            only_cur = cur_indices - set(i.index_order)
+            only_i = set(i.index_order) - cur_indices
+
+            cur_shared = math.prod(cur_V.get(j, 1.0) for j in shared)
+            i_shared = math.prod(i.V.get(j, 1.0) for j in shared)
+            # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
+            new_nnz = cur_nnz * i.nnz / max(cur_shared, i_shared)
+
+            new_V: dict[Field, float] = {}
+            for idx in set(i.index_order).union(cur_indices):
+                n = new_def.dim_sizes[idx]
+                if idx in only_cur:
+                    # V(C, i) = min(n_i, V(A,i), nnz(C))
+                    new_V[idx] = min(n, cur_V[idx], new_nnz)
+                elif idx in shared:
+                    # V(C, j) = min(n_j, V(A,j), V(B,j))
+                    new_V[idx] = min(n, cur_V[idx], i.V[idx])
+                elif idx in only_i:
+                    # V(C, k) = min(n_k, V(B,k), nnz(C))
+                    new_V[idx] = min(n, i.V[idx], new_nnz)
+
+            cur_nnz = new_nnz
+            cur_V = new_V
+            cur_indices = set(i.index_order).union(cur_indices)
+
+        return DatabaseStats.from_def(new_def, new_nnz, new_V)
+
+    @staticmethod
+    def merge_union(
+        new_def: TensorDef, all_stats: list[DatabaseStats]
+    ) -> DatabaseStats:
+
+        if len(all_stats) == 1:
+            return DatabaseStats.from_def(
+                new_def, all_stats[0].nnz, dict(all_stats[0].V)
+            )
+
+        cur_nnz = all_stats[0].nnz
+        cur_V: dict[Field, float] = dict(all_stats[0].V)
+        cur_indices: set[Field] = set(all_stats[0].index_order)
+
+        for i in all_stats[1:]:
+            shared = cur_indices & set(i.index_order)
+            only_cur = cur_indices - set(i.index_order)
+            only_i = set(i.index_order) - cur_indices
+            new_V: dict[Field, float] = {}
+            # Elementwise case: A_ij + B_ij
+            if shared and not only_cur and not only_i:
+                # nnz(C) = nnz(A) + nnz(B)
+                new_nnz = cur_nnz + i.nnz
+                for idx in set(i.index_order).union(cur_indices):
+                    # V(C, i) = min(n_i, V(A, i) + V(B,i))
+                    # V(C, j) = min(n_j, V(A, j) + V(B,j))
+                    n = new_def.dim_sizes[idx]
+                    new_V[idx] = min(n, cur_V[idx] + i.V[idx])
+
+            # Broadcast case: A_ij + B_jk
+            else:
+                cur_dim = math.prod(new_def.dim_sizes[k] for k in only_cur)
+                new_dim = math.prod(new_def.dim_sizes[k] for k in only_i)
+
+                # nnz(C) = nnz(A) * n_k + n_i * nnz(B)
+                new_nnz = cur_nnz * new_dim + i.nnz * cur_dim
+
+                for idx in set(i.index_order).union(cur_indices):
+                    n = new_def.dim_sizes[idx]
+                    if idx in only_cur:
+                        # V(C, i) = min(n_i, V(A, i) + n_i)
+                        new_V[idx] = min(n, cur_V[idx] + n)
+                    elif idx in shared:
+                        # V(C, j) = min(n_j, V(A, j) + V(B,j))
+                        new_V[idx] = min(n, cur_V[idx] + i.V[idx])
+                    else:
+                        # V(C, k) = min(n_k, n_k + V(B,k))
+                        new_V[idx] = min(n, n + i.V[idx])
+
+            cur_nnz = new_nnz
+            cur_V = new_V
+            cur_indices = set(i.index_order).union(cur_indices)
+
+        return DatabaseStats.from_def(new_def, cur_nnz, new_V)
+
+    @staticmethod
     def mapjoin(op: Callable[..., Any], *all_stats: TensorStats) -> TensorStats:
         if not all(isinstance(s, DatabaseStats) for s in all_stats):
             raise TypeError("DatabaseStats expected for mapjoin")
 
-        a = cast(DatabaseStats, all_stats[0])
-        b = cast(DatabaseStats, all_stats[1])
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
+        join_like: list[DatabaseStats] = []
+        union_like: list[DatabaseStats] = []
 
-        shared = set(a.index_order) & set(b.index_order)
-        only_a = set(a.index_order) - set(b.index_order)
-        only_b = set(b.index_order) - set(a.index_order)
+        for stats in all_stats:
+            if len(stats.tensordef.index_order) == 0:
+                continue
+            s = cast(DatabaseStats, stats)
+            if is_annihilator(op, stats.tensordef.fill_value):
+                join_like.append(s)
+            else:
+                union_like.append(s)
 
-        new_V: dict[Field, float] = {}
-        new_nnz: float = 0.0
+        if len(union_like) == 0 and len(join_like) == 0:
+            return DatabaseStats.from_def(new_def, 0.0, {})
+        if len(union_like) == 0:
+            return DatabaseStats.merge_join(new_def, join_like)
+        if len(join_like) == 0:
+            return DatabaseStats.merge_union(new_def, union_like)
 
-        # Join case: A_ij * B_jk
-        if shared and only_a and only_b and is_annihilator(op, a.tensordef.fill_value):
-            a_shared = math.prod(a.V.get(j, 1.0) for j in shared)
-            b_shared = math.prod(b.V.get(j, 1.0) for j in shared)
-            # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
-            new_nnz = a.nnz * b.nnz / max(a_shared, b_shared)
-            for idx in new_def.index_order:
-                n = new_def.dim_sizes[idx]
-                if idx in only_a:
-                    # V(C, i) = min(n_i, V(A,i), nnz(C))
-                    new_V[idx] = min(n, a.V[idx], new_nnz)
-                elif idx in shared:
-                    # V(C, j) = min(n_j, V(A,j), V(B,j))
-                    new_V[idx] = min(n, a.V[idx], b.V[idx])
-                elif idx in only_b:
-                    # V(C, k) = min(n_k, V(B,k), nnz(C))
-                    new_V[idx] = min(n, b.V[idx], new_nnz)
-
-        # Elementwise case: A_ij + B_ij
-        elif shared and not only_a and not only_b:
-            # nnz(C) = nnz(A) + nnz(B)
-            new_nnz = a.nnz + b.nnz
-            for idx in new_def.index_order:
-                # V(C, i) = min(n_i, V(A, i) + V(B,i))
-                # V(C, j) = min(n_j, V(A, j) + V(B,j))
-                n = new_def.dim_sizes[idx]
-                new_V[idx] = min(n, a.V[idx] + b.V[idx])
-
-        # Broadcast case: A_ij + B_jk
-        else:
-            k_dim = math.prod(new_def.dim_sizes[k] for k in only_b)
-            i_dim = math.prod(new_def.dim_sizes[i] for i in only_a)
-            # nnz(C) = nnz(A) * n_k + n_i * nnz(B)
-            new_nnz = a.nnz * k_dim + b.nnz * i_dim
-            for idx in new_def.index_order:
-                n = new_def.dim_sizes[idx]
-                if idx in only_a:
-                    # V(C, i) = min(n_i, V(A, i) + n_i)
-                    new_V[idx] = min(n, a.V[idx] + n)
-                elif idx in shared:
-                    # V(C, j) = min(n_j, V(A, j) + V(B,j))
-                    new_V[idx] = min(n, a.V[idx] + b.V[idx])
-                else:
-                    # V(C, k) = min(n_k, n_k + V(B,k))
-                    new_V[idx] = min(n, b.V[idx] + n)
-
-        return DatabaseStats.from_def(new_def, new_nnz, new_V)
+        join_cover = set().union(*(set(s.index_order) for s in join_like))
+        if join_cover == set(new_def.index_order):
+            return DatabaseStats.merge_join(new_def, join_like)
+        return DatabaseStats.merge_union(new_def, join_like + union_like)
 
     @staticmethod
     def aggregate(
@@ -119,7 +182,6 @@ class DatabaseStats(TensorStats):
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for aggregate")
 
-        assert isinstance(stats, DatabaseStats)
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
         j_shared = math.prod(stats.V.get(j, 1.0) for j in reduce_indices)
         # nnz(C) = nnz(A) / V(A,j)
@@ -140,33 +202,30 @@ class DatabaseStats(TensorStats):
             a.fill_value == b.fill_value
             and a.dim_sizes == b.dim_sizes
             and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
+            and a.V.keys() == b.V.keys()
+            and all(math.isclose(a.V[k], b.V[k], rel_tol=1e-9) for k in a.V)
         )
 
     @staticmethod
     def relabel(
         stats: TensorStats, relabel_indices: tuple[Field, ...]
     ) -> DatabaseStats:
+        if not isinstance(stats, DatabaseStats):
+            raise TypeError("DatabaseStats expected for relabel")
         new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
-        if isinstance(stats, DatabaseStats):
-            V = stats.V.copy()
-            nnz = stats.nnz
-        else:
-            V = {}
-            nnz = stats.estimate_non_fill_values()
-        return DatabaseStats.from_def(new_def, nnz, V)
+        V = {}
+        for old, new in zip(stats.index_order, relabel_indices, strict=True):
+            V[new] = stats.V[old]
+        return DatabaseStats.from_def(new_def, stats.nnz, V)
 
     @staticmethod
     def reorder(
         stats: TensorStats, reorder_indices: tuple[Field, ...]
     ) -> DatabaseStats:
+        if not isinstance(stats, DatabaseStats):
+            raise TypeError("DatabaseStats expected for reorder")
         new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
-        if isinstance(stats, DatabaseStats):
-            V = stats.V.copy()
-            nnz = stats.nnz
-        else:
-            V = {}
-            nnz = stats.estimate_non_fill_values()
-        return DatabaseStats.from_def(new_def, nnz, V)
+        return DatabaseStats.from_def(new_def, stats.nnz, stats.V.copy())
 
     @staticmethod
     def copy_stats(stat: TensorStats) -> DatabaseStats:
