@@ -1,5 +1,3 @@
-# AI modified: 2026-04-03T00:55:25Z 38d789f35f1c9ba5c8ed00178371222826773dbe
-# AI modified: 2026-04-03T01:35:32Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from ...finch_logic import TensorStats
 from .blocked_stats import BlockedStats, BlockedStatsFactory
 from .dc_stats import DC, DCStats, DCStatsFactory

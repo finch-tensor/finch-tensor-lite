@@ -1,6 +1,3 @@
-# AI modified: 2026-04-03T01:49:31Z b3e812faf69fcf291b314f9e088ed51c02e3f98e
-# AI modified: 2026-04-03T19:09:59Z 78911eec
-# AI modified: 2026-04-03T19:13:17Z 78911eec
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
