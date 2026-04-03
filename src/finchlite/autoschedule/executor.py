@@ -107,7 +107,6 @@ class LogicExecutor(LogicEvaluator):
         for var, tns in bindings.items():
             for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
                 if idx is not None:
-                    # Assigning shape for each dimension
                     binding_shapes[idx] = dim
 
         for var, tns_ftype in binding_ftypes.items():
