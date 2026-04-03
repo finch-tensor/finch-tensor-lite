@@ -61,7 +61,7 @@ class OptLogicLoader(LogicLoader):
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, Any] | None = None,
+        stats: dict[lgc.Alias, TensorStats] | None = None,
         stats_factory: StatsFactory | None = None,
     ) -> tuple[
         AssemblyLibrary,
