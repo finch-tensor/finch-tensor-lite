@@ -3,7 +3,7 @@ from collections import namedtuple
 from functools import lru_cache
 from typing import Any
 
-from ..algebra import make_tuple, register_property
+from ..algebra import register_property
 from ..symbolic import FType, fisinstance, ftype
 
 
@@ -188,15 +188,3 @@ def tupleformat(x):
 
 
 register_property(tuple, "ftype", "__attr__", tupleformat)
-
-
-def tuple_return_type(fmt, *args):
-    return TupleFType("tuple", args)
-
-
-register_property(
-    make_tuple,
-    "__call__",
-    "return_type",
-    tuple_return_type,
-)

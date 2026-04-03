@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from finchlite.finch_logic import Field
 
+from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 
 
@@ -30,7 +31,7 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def mapjoin(op: Callable, *args: "TensorStats") -> "TensorStats":
+    def mapjoin(op: FinchOperator, *args: "TensorStats") -> "TensorStats":
         """
         Return a new statistic representing the tensor resulting
         from calling op on args... in an elementwise fashion
@@ -40,7 +41,7 @@ class TensorStats(ABC):
     @staticmethod
     @abstractmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",

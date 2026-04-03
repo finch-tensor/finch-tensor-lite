@@ -1,7 +1,6 @@
 import math
-import operator
 from collections import Counter
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -10,7 +9,8 @@ import numpy as np
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import Tensor, is_annihilator
+from ...algebra import Tensor, ffunc, is_annihilator
+from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .tensor_def import TensorDef
 from .tensor_stats import TensorStats
@@ -149,18 +149,18 @@ class DCStats(TensorStats):
                 ntn.Declare(
                     dim_array_slots[i],
                     ntn.Literal(0),
-                    ntn.Literal(operator.add),
+                    ntn.Literal(ffunc.add),
                     (dim_size_variables[i],),
                 )
             )
             inc_expr = ntn.Increment(
                 ntn.Access(
                     dim_array_slots[i],
-                    ntn.Update(ntn.Literal(operator.add)),
+                    ntn.Update(ntn.Literal(ffunc.add)),
                     (dim_loop_variables[i],),
                 ),
                 ntn.Call(
-                    ntn.Literal(operator.ne),
+                    ntn.Literal(ffunc.ne),
                     (
                         A_access,
                         ntn.Literal(self.tensordef.fill_value),
@@ -175,11 +175,11 @@ class DCStats(TensorStats):
                 ntn.Assign(
                     A_nnz_variable,
                     ntn.Call(
-                        ntn.Literal(operator.add),
+                        ntn.Literal(ffunc.add),
                         (
                             A_nnz_variable,
                             ntn.Call(
-                                ntn.Literal(operator.ne),
+                                ntn.Literal(ffunc.ne),
                                 (
                                     A_access,
                                     ntn.Literal(self.tensordef.fill_value),
@@ -200,7 +200,7 @@ class DCStats(TensorStats):
         dim_array_repacks = []
         for i in range(ndims):
             dim_array_freezes.append(
-                ntn.Freeze(dim_array_slots[i], ntn.Literal(operator.add))
+                ntn.Freeze(dim_array_slots[i], ntn.Literal(ffunc.add))
             )
             dc_compute_loops.append(
                 ntn.Loop(
@@ -210,7 +210,7 @@ class DCStats(TensorStats):
                         (
                             ntn.If(
                                 ntn.Call(
-                                    ntn.Literal(operator.ne),
+                                    ntn.Literal(ffunc.ne),
                                     (
                                         ntn.Unwrap(
                                             ntn.Access(
@@ -225,7 +225,7 @@ class DCStats(TensorStats):
                                 ntn.Assign(
                                     dim_proj_variables[i],
                                     ntn.Call(
-                                        ntn.Literal(operator.add),
+                                        ntn.Literal(ffunc.add),
                                         (
                                             dim_proj_variables[i],
                                             ntn.Literal(np.int64(1)),
@@ -236,7 +236,7 @@ class DCStats(TensorStats):
                             ntn.Assign(
                                 dim_dc_variables[i],
                                 ntn.Call(
-                                    ntn.Literal(max),
+                                    ntn.Literal(ffunc.max),
                                     (
                                         dim_dc_variables[i],
                                         ntn.Unwrap(
@@ -348,11 +348,11 @@ class DCStats(TensorStats):
                                 ntn.Assign(
                                     d,
                                     ntn.Call(
-                                        ntn.Literal(operator.add),
+                                        ntn.Literal(ffunc.add),
                                         (
                                             d,
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (
                                                     ntn.Unwrap(
                                                         ntn.Access(A_, ntn.Read(), (i,))
@@ -435,11 +435,11 @@ class DCStats(TensorStats):
                                     ntn.Assign(
                                         dij,
                                         ntn.Call(
-                                            ntn.Literal(operator.add),
+                                            ntn.Literal(ffunc.add),
                                             (
                                                 dij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.ne),
+                                                    ntn.Literal(ffunc.ne),
                                                     (
                                                         ntn.Unwrap(
                                                             ntn.Access(
@@ -480,13 +480,13 @@ class DCStats(TensorStats):
                             ntn.Declare(
                                 xi_,
                                 ntn.Literal(np.int64(0)),
-                                ntn.Literal(operator.add),
+                                ntn.Literal(ffunc.add),
                                 (ni,),
                             ),
                             ntn.Declare(
                                 yj_,
                                 ntn.Literal(np.int64(0)),
-                                ntn.Literal(operator.add),
+                                ntn.Literal(ffunc.add),
                                 (nj,),
                             ),
                             ntn.Loop(
@@ -503,14 +503,12 @@ class DCStats(TensorStats):
                                                         ntn.Access(
                                                             xi_,
                                                             ntn.Update(
-                                                                ntn.Literal(
-                                                                    operator.add
-                                                                )
+                                                                ntn.Literal(ffunc.add)
                                                             ),
                                                             (i,),
                                                         ),
                                                         ntn.Call(
-                                                            ntn.Literal(operator.ne),
+                                                            ntn.Literal(ffunc.ne),
                                                             (
                                                                 ntn.Unwrap(
                                                                     ntn.Access(
@@ -529,14 +527,12 @@ class DCStats(TensorStats):
                                                         ntn.Access(
                                                             yj_,
                                                             ntn.Update(
-                                                                ntn.Literal(
-                                                                    operator.add
-                                                                )
+                                                                ntn.Literal(ffunc.add)
                                                             ),
                                                             (j,),
                                                         ),
                                                         ntn.Call(
-                                                            ntn.Literal(operator.ne),
+                                                            ntn.Literal(ffunc.ne),
                                                             (
                                                                 ntn.Unwrap(
                                                                     ntn.Access(
@@ -559,7 +555,7 @@ class DCStats(TensorStats):
                             ),
                             ntn.Assign(d_i, ntn.Literal(np.int64(0))),
                             ntn.Assign(d_i_j, ntn.Literal(np.int64(0))),
-                            ntn.Freeze(xi_, ntn.Literal(operator.add)),
+                            ntn.Freeze(xi_, ntn.Literal(ffunc.add)),
                             ntn.Loop(
                                 i,
                                 ni,
@@ -567,7 +563,7 @@ class DCStats(TensorStats):
                                     (
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (
                                                     ntn.Unwrap(
                                                         ntn.Access(
@@ -580,7 +576,7 @@ class DCStats(TensorStats):
                                             ntn.Assign(
                                                 d_i,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_i, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -602,7 +598,7 @@ class DCStats(TensorStats):
                                     )
                                 ),
                             ),
-                            ntn.Freeze(yj_, ntn.Literal(operator.add)),
+                            ntn.Freeze(yj_, ntn.Literal(ffunc.add)),
                             ntn.Assign(d_j, ntn.Literal(np.int64(0))),
                             ntn.Assign(d_j_i, ntn.Literal(np.int64(0))),
                             ntn.Loop(
@@ -612,7 +608,7 @@ class DCStats(TensorStats):
                                     (
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (
                                                     ntn.Unwrap(
                                                         ntn.Access(
@@ -625,7 +621,7 @@ class DCStats(TensorStats):
                                             ntn.Assign(
                                                 d_j,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_j, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -633,7 +629,7 @@ class DCStats(TensorStats):
                                         ntn.Assign(
                                             d_j_i,
                                             ntn.Call(
-                                                ntn.Literal(max),
+                                                ntn.Literal(ffunc.max),
                                                 (
                                                     d_j_i,
                                                     ntn.Unwrap(
@@ -742,7 +738,7 @@ class DCStats(TensorStats):
                                         ntn.Assign(
                                             dijk,
                                             ntn.Call(
-                                                ntn.Literal(operator.add),
+                                                ntn.Literal(ffunc.add),
                                                 (
                                                     dijk,
                                                     ntn.Unwrap(
@@ -796,7 +792,7 @@ class DCStats(TensorStats):
                                                 ntn.Assign(
                                                     xi,
                                                     ntn.Call(
-                                                        ntn.Literal(operator.add),
+                                                        ntn.Literal(ffunc.add),
                                                         (
                                                             xi,
                                                             ntn.Unwrap(
@@ -813,13 +809,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (xi, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_i,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_i, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -848,7 +844,7 @@ class DCStats(TensorStats):
                                                 ntn.Assign(
                                                     yj,
                                                     ntn.Call(
-                                                        ntn.Literal(operator.add),
+                                                        ntn.Literal(ffunc.add),
                                                         (
                                                             yj,
                                                             ntn.Unwrap(
@@ -865,13 +861,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (yj, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_j,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_j, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -900,7 +896,7 @@ class DCStats(TensorStats):
                                                 ntn.Assign(
                                                     zk,
                                                     ntn.Call(
-                                                        ntn.Literal(operator.add),
+                                                        ntn.Literal(ffunc.add),
                                                         (
                                                             zk,
                                                             ntn.Unwrap(
@@ -917,13 +913,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (zk, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_k,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_k, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1041,7 +1037,7 @@ class DCStats(TensorStats):
                                             ntn.Assign(
                                                 dijkw,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (
                                                         dijkw,
                                                         ntn.Unwrap(
@@ -1105,7 +1101,7 @@ class DCStats(TensorStats):
                                                     ntn.Assign(
                                                         xi,
                                                         ntn.Call(
-                                                            ntn.Literal(operator.add),
+                                                            ntn.Literal(ffunc.add),
                                                             (
                                                                 xi,
                                                                 ntn.Unwrap(
@@ -1123,13 +1119,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (xi, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_i,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_i, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1161,7 +1157,7 @@ class DCStats(TensorStats):
                                                     ntn.Assign(
                                                         yj,
                                                         ntn.Call(
-                                                            ntn.Literal(operator.add),
+                                                            ntn.Literal(ffunc.add),
                                                             (
                                                                 yj,
                                                                 ntn.Unwrap(
@@ -1179,13 +1175,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (yj, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_j,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_j, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1217,7 +1213,7 @@ class DCStats(TensorStats):
                                                     ntn.Assign(
                                                         zk,
                                                         ntn.Call(
-                                                            ntn.Literal(operator.add),
+                                                            ntn.Literal(ffunc.add),
                                                             (
                                                                 zk,
                                                                 ntn.Unwrap(
@@ -1235,13 +1231,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (zk, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_k,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_k, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1273,7 +1269,7 @@ class DCStats(TensorStats):
                                                     ntn.Assign(
                                                         uw,
                                                         ntn.Call(
-                                                            ntn.Literal(operator.add),
+                                                            ntn.Literal(ffunc.add),
                                                             (
                                                                 uw,
                                                                 ntn.Unwrap(
@@ -1291,13 +1287,13 @@ class DCStats(TensorStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(operator.ne),
+                                                ntn.Literal(ffunc.ne),
                                                 (uw, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_w,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.add),
+                                                    ntn.Literal(ffunc.add),
                                                     (d_w, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1461,12 +1457,12 @@ class DCStats(TensorStats):
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
-    def mapjoin(op: Callable[..., Any], *all_stats: "TensorStats") -> "TensorStats":
+    def mapjoin(op: FinchOperator, *all_stats: "TensorStats") -> "TensorStats":
         """
         Merge DC statistics for an elementwise operation.
 
         Args:
-            op: The elementwise operator (e.g., operator.add, operator.mul).
+            op: The elementwise operator (e.g., ffunc.add, ffunc.mul).
             all_stats: Input statistics objects to be merged. Must be DCStats at runtime
 
         Returns:
@@ -1506,7 +1502,7 @@ class DCStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: "TensorStats",

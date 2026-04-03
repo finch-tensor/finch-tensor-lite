@@ -36,11 +36,10 @@ def extract_tensors(
 
 
 class LogicExecutor(LogicEvaluator):
-    def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
+    def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
-        self.verbose: bool = verbose
 
     def __call__(
         self, prgm: LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None

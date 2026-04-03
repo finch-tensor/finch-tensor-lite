@@ -1,4 +1,4 @@
-from .algebra import Tensor, TensorFType
+from .algebra import Tensor, TensorFType, ffunc
 from .autoschedule.tensor_stats import (
     DC,
     BlockedStats,
@@ -222,6 +222,7 @@ __all__ = [
     "expand_dims",
     "expm1",
     "extent",
+    "ffunc",
     "fiber_tensor",
     "fill_value",
     "fisinstance",

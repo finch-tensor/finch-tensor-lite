@@ -1,5 +1,4 @@
 import _operator  # noqa: F401
-from operator import add, mul
 
 import pytest
 
@@ -7,6 +6,8 @@ import numpy as np
 from numpy import array  # noqa: F401
 
 import finchlite as fl
+import finchlite.finch_logic as lgc
+from finchlite.algebra import ffunc
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -49,14 +50,18 @@ def test_matrix_multiplication(a, b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add),
+                        Literal(0),
+                        Table(Alias("AB"), (i, k, j)),
+                        (k,),
                     ),
                     (i, j),
                 ),
@@ -84,14 +89,18 @@ def test_plan_repr():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add),
+                        Literal(0),
+                        Table(Alias("AB"), (i, k, j)),
+                        (k,),
                     ),
                     (i, j),
                 ),
@@ -99,7 +108,8 @@ def test_plan_repr():
             Produces((Alias("C"),)),
         )
     )
-    assert p == eval(repr(p))
+
+    assert p == eval(repr(p), {**vars(lgc), **vars(ffunc), **globals()})
 
 
 def test_materialize():
@@ -121,13 +131,15 @@ def test_materialize():
             Query(
                 Alias("C"),
                 MapJoin(
-                    Literal(add), (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j)))
+                    Literal(ffunc.add),
+                    (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j))),
                 ),
             ),
             Query(
                 Alias("D"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j))),
                 ),
             ),
             Query(Alias("C"), Table(Alias("B"), (i, j))),

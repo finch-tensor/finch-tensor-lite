@@ -1,5 +1,4 @@
 import ctypes
-import operator
 import re
 import subprocess
 import sys
@@ -12,7 +11,7 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite import dense, element, fiber_tensor, ftype
+from finchlite import dense, element, ffunc, fiber_tensor, ftype
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
@@ -123,7 +122,7 @@ def test_codegen(compiler, buffer):
                         asm.Resize(
                             a_slt,
                             asm.Call(
-                                asm.Literal(operator.mul),
+                                asm.Literal(ffunc.mul),
                                 (asm.Length(a_slt), asm.Literal(2)),
                             ),
                         ),
@@ -133,11 +132,9 @@ def test_codegen(compiler, buffer):
                             length_var,
                             asm.Store(
                                 a_slt,
+                                asm.Call(asm.Literal(ffunc.add), (i_var, length_var)),
                                 asm.Call(
-                                    asm.Literal(operator.add), (i_var, length_var)
-                                ),
-                                asm.Call(
-                                    asm.Literal(operator.add),
+                                    asm.Literal(ffunc.add),
                                     (asm.Load(a_slt, i_var), asm.Literal(1)),
                                 ),
                             ),
@@ -202,11 +199,11 @@ def test_dot_product_malloc(compiler, buffer):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffunc.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -324,11 +321,11 @@ def test_dot_product(compiler, buffer):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffunc.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -400,11 +397,11 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffunc.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -469,11 +466,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffunc.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -517,7 +514,7 @@ def test_if_statement(compiler):
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(operator.eq),
+                                asm.Literal(ffunc.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -525,7 +522,7 @@ def test_if_statement(compiler):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffunc.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -534,7 +531,7 @@ def test_if_statement(compiler):
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(operator.lt),
+                                asm.Literal(ffunc.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -542,7 +539,7 @@ def test_if_statement(compiler):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.sub),
+                                            asm.Literal(ffunc.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -553,7 +550,7 @@ def test_if_statement(compiler):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffunc.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -604,7 +601,7 @@ def test_simple_struct(compiler):
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.mul),
+                                    asm.Literal(ffunc.mul),
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
                                         asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -614,11 +611,11 @@ def test_simple_struct(compiler):
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.add),
+                                    asm.Literal(ffunc.add),
                                     (
                                         res_var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffunc.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
                                                 asm.GetAttr(

@@ -59,4 +59,4 @@ section-order = [
 
 [tool.mypy]
 ignore_missing_imports = true
-exclude = ["tests/reference", "src/finchlite/codegen/stc"]
+exclude = ["tests/reference", "src/finchlite/codegen/stc", "(^|/)benchmarks/"]

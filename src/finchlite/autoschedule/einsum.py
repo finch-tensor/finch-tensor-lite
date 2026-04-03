@@ -1,6 +1,6 @@
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
-from finchlite.algebra import init_value, overwrite
+from finchlite.algebra import ffunc, init_value
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
@@ -25,11 +25,13 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 idxs=einidxs,
                 arg=generate_einsum_expr(arg),
             )
-            if operation != overwrite and init != init_value(operation, type(init)):
+            if operation != ffunc.overwrite and init != init_value(
+                operation, type(init)
+            ):
                 return ein.Plan(
                     (
                         ein.Einsum(
-                            op=ein.Literal(overwrite),
+                            op=ein.Literal(ffunc.overwrite),
                             tns=ein.Alias(name),
                             idxs=einidxs,
                             arg=ein.Literal(init),
@@ -42,7 +44,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             assert isinstance(rhs, lgc.LogicExpression)
             einarg = generate_einsum_expr(rhs)
             return ein.Einsum(
-                op=ein.Literal(overwrite),
+                op=ein.Literal(ffunc.overwrite),
                 tns=ein.Alias(name),
                 idxs=tuple(ein.Index(field.name) for field in rhs.fields()),
                 arg=einarg,
