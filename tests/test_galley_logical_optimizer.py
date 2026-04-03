@@ -1,3 +1,4 @@
+# AI modified: 2026-04-03T03:21:00Z dd7060efad3b5cc696e54194b0e6321a0206aa2c
 from collections import OrderedDict
 
 import pytest
@@ -11,7 +12,7 @@ from finchlite.autoschedule.galley.logical_optimizer import (
     greedy_query,
     insert_statistics,
 )
-from finchlite.autoschedule.tensor_stats import DenseStats
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -59,7 +60,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     )
 
     aq = object.__new__(AnnotatedQuery)
-    aq.ST = object
+    aq.stats_factory = object
     aq.output_name = None
     aq.reduce_idxs = reduce_fields
     aq.point_expr = None
@@ -110,7 +111,7 @@ def test_get_reducible_idxs_for_component(
     )
 
     aq = object.__new__(AnnotatedQuery)
-    aq.ST = object
+    aq.stats_factory = object
     aq.output_name = None
     aq.reduce_idxs = reduce_fields
     aq.point_expr = None
@@ -528,7 +529,7 @@ def test_find_lowest_roots(root, idx_name, expected):
 )
 def test_get_reduce_query(expr, reduce_field, expected):
     aq = object.__new__(AnnotatedQuery)
-    aq.ST = DenseStats
+    aq.stats_factory = DenseStatsFactory()
     aq.output_name = None
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
@@ -545,7 +546,11 @@ def test_get_reduce_query(expr, reduce_field, expected):
     aq.cache_point = {}
 
     insert_statistics(
-        aq.ST, aq.point_expr, aq.bindings, replace=False, cache=aq.cache_point
+        aq.stats_factory,
+        aq.point_expr,
+        aq.bindings,
+        replace=False,
+        cache=aq.cache_point,
     )
 
     for stat in aq.cache_point.values():
@@ -691,7 +696,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
 )
 def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq = object.__new__(AnnotatedQuery)
-    aq.ST = DenseStats
+    aq.stats_factory = DenseStatsFactory()
     aq.output_name = None
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
@@ -708,7 +713,11 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq.cache_point = {}
 
     insert_statistics(
-        aq.ST, aq.point_expr, aq.bindings, replace=False, cache=aq.cache_point
+        aq.stats_factory,
+        aq.point_expr,
+        aq.bindings,
+        replace=False,
+        cache=aq.cache_point,
     )
 
     for stat in aq.cache_point.values():
@@ -847,7 +856,7 @@ def rename_aliases(expr):
     ],
 )
 def test_get_remaining_query(input_query, elimination_order, expected):
-    aq = AnnotatedQuery(DenseStats, input_query, bindings=OrderedDict())
+    aq = AnnotatedQuery(DenseStatsFactory(), input_query, bindings=OrderedDict())
     for field in elimination_order:
         aq.reduce_idx(field)
     query = aq.get_remaining_query()
@@ -1013,7 +1022,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
     ],
 )
 def test_annotated_queries(query, reduce_field, expected):
-    aq = AnnotatedQuery(DenseStats, query, bindings=OrderedDict())
+    aq = AnnotatedQuery(DenseStatsFactory(), query, bindings=OrderedDict())
     query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected
 
@@ -1029,7 +1038,7 @@ def test_greedy_query_multi_component():
         ),
     )
     aq = object.__new__(AnnotatedQuery)
-    aq.ST = DenseStats
+    aq.stats_factory = DenseStatsFactory()
     aq.output_name = Alias("out")
     aq.reduce_idxs = [fi, fj]
     aq.point_expr = point_expr
@@ -1056,7 +1065,11 @@ def test_greedy_query_multi_component():
     aq.cache_point = {}
 
     insert_statistics(
-        aq.ST, aq.point_expr, aq.bindings, replace=False, cache=aq.cache_point
+        aq.stats_factory,
+        aq.point_expr,
+        aq.bindings,
+        replace=False,
+        cache=aq.cache_point,
     )
 
     for stat in aq.cache_point.values():
