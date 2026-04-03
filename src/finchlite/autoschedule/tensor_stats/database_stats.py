@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
 from typing import Any, cast
 
 from ...algebra import is_annihilator
+from ...algebra.algebra import FinchOperator
 from ...finch_logic import Field
 from .dc_stats import DCStats
 from .tensor_def import TensorDef
@@ -143,7 +143,7 @@ class DatabaseStats(TensorStats):
         return DatabaseStats.from_def(new_def, cur_nnz, new_V)
 
     @staticmethod
-    def mapjoin(op: Callable[..., Any], *all_stats: TensorStats) -> TensorStats:
+    def mapjoin(op: FinchOperator, *all_stats: TensorStats) -> TensorStats:
         if not all(isinstance(s, DatabaseStats) for s in all_stats):
             raise TypeError("DatabaseStats expected for mapjoin")
 
@@ -174,7 +174,7 @@ class DatabaseStats(TensorStats):
 
     @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: TensorStats,
