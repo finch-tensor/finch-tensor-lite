@@ -21,6 +21,8 @@ import numpy as np
 
 from galley_compile_benchmarks import (
     _recursion_limit_ctx,
+    chain10_shapes_benchmark,
+    make_five_chain10_expr,
     plan_from_expr,
 )
 
@@ -272,6 +274,48 @@ def bnb_good_aq() -> AnnotatedQuery:
     )
 
 
+def _five_chain10_expr():
+    """Five summed 10-matrix chains (same as ``make_five_chain10_expr`` benchmark)."""
+    rng = np.random.default_rng(42)
+    return make_five_chain10_expr(chain10_shapes_benchmark, rng)
+
+
+def _query_five_chain10_matmul() -> Query:
+    """
+    Logical query for five 10-way matmul chains summed; outer dims ``i``, ``j`` shared.
+    Shapes match ``chain10_shapes_benchmark`` per chain.
+    """
+    rng = np.random.default_rng(42)
+    chain_exprs = []
+    for k in range(5):
+        chain_shapes = [tuple(m.shape) for m in chain10_shapes_benchmark(k, rng)]
+        fields = [Field("i")] + [Field(f"c{k}_t{t}") for t in range(9)] + [Field("j")]
+        tables = []
+        for t, (r, c) in enumerate(chain_shapes):
+            arr = fl.asarray(np.ones((r, c)))
+            tables.append(Table(Literal(arr), (fields[t], fields[t + 1])))
+        chain_exprs.append(
+            Aggregate(
+                Literal(as_finch_operator(op.add)),
+                Literal(0),
+                MapJoin(Literal(as_finch_operator(op.mul)), tuple(tables)),
+                tuple(fields[1:-1]),
+            )
+        )
+    return Query(
+        Alias("out"),
+        MapJoin(Literal(as_finch_operator(op.add)), tuple(chain_exprs)),
+    )
+
+
+def _five_chain10_matmul_aq() -> AnnotatedQuery:
+    return AnnotatedQuery(
+        DenseStats,
+        _query_five_chain10_matmul(),
+        bindings=OrderedDict(),
+    )
+
+
 def time_galley_bnb_compile_profile(
     expr,
     *,
@@ -449,6 +493,25 @@ def main() -> None:
     print(
         _format_bnb_block(
             "heavy skew 4-matrix chain",
+            exact_t,
+            greedy_t,
+            cost_exact,
+            cost_greedy,
+            len(queries_exact),
+            len(queries_greedy),
+        ),
+        flush=True,
+    )
+
+    expr = _five_chain10_expr()
+    exact_t, greedy_t = time_galley_bnb_compile_profile(expr, n=DEFAULT_N)
+    aq_e = _five_chain10_matmul_aq()
+    aq_g = _five_chain10_matmul_aq()
+    queries_exact, cost_exact = pruned_query_to_plan(aq_e, use_greedy=False)
+    queries_greedy, cost_greedy = pruned_query_to_plan(aq_g, use_greedy=True)
+    print(
+        _format_bnb_block(
+            "five chain10 terms",
             exact_t,
             greedy_t,
             cost_exact,
