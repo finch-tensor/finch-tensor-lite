@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from collections import Counter
 from collections.abc import Iterable
@@ -12,8 +14,9 @@ from ... import finch_notation as ntn
 from ...algebra import Tensor, ffunc, is_annihilator
 from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
+from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
+from .tensor_stats import BaseTensorStatsFactory
 
 
 @dataclass(frozen=True)
@@ -34,7 +37,80 @@ class DC:
     value: float
 
 
-class DCStats(TensorStats):
+class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
+    def __init__(self):
+        super().__init__(DCStats)
+
+    def copy_stats(self, stat: DCStats) -> DCStats:
+        if not isinstance(stat, DCStats):
+            raise TypeError("copy_stats expected a DCStats instance")
+        return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
+
+    def mapjoin(self, op: FinchOperator, *all_stats: DCStats) -> DCStats:
+        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
+        join_like_args: list[DCStats] = []
+        union_like_args: list[DCStats] = []
+        for stats in all_stats:
+            if len(stats.tensordef.index_order) == 0:
+                continue
+            if is_annihilator(op, stats.tensordef.fill_value):
+                join_like_args.append(stats)
+            else:
+                union_like_args.append(stats)
+        join_like_dc: list[DCStats] = cast(list["DCStats"], join_like_args)
+        union_like_dc: list[DCStats] = cast(list["DCStats"], union_like_args)
+
+        if len(union_like_args) == 0 and len(join_like_args) == 0:
+            return DCStats.from_def(new_def, set())
+        if len(union_like_args) == 0:
+            return DCStats._merge_dc_join(new_def, join_like_dc)
+        if len(join_like_args) == 0:
+            return DCStats._merge_dc_union(new_def, union_like_dc)
+        join_cover = set().union(*(s.tensordef.index_order for s in join_like_dc))
+        if join_cover == set(new_def.index_order):
+            return DCStats._merge_dc_join(new_def, join_like_dc)
+        return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
+
+    def aggregate(
+        self,
+        op: FinchOperator,
+        init: Any | None,
+        reduce_indices: tuple[Field, ...],
+        stats: DCStats,
+    ) -> DCStats:
+        fields = reduce_indices
+        if len(fields) == 0:
+            new_def = stats.tensordef.copy()
+        else:
+            new_def = TensorDef.aggregate(op, init, fields, stats.tensordef)
+
+        dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        return DCStats.from_def(new_def, dcs)
+
+    def issimilar(self, a: DCStats, b: DCStats) -> bool:
+        return (
+            isinstance(a, DCStats)
+            and isinstance(b, DCStats)
+            and a.tensordef.index_order == b.tensordef.index_order
+            and a.dim_sizes == b.dim_sizes
+            and a.fill_value == b.fill_value
+            and a.dcs == b.dcs
+        )
+
+    def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
+        d = stats.tensordef
+        new_def = TensorDef.relabel(d, relabel_indices)
+        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        return DCStats.from_def(new_def, dcs)
+
+    def reorder(self, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
+        d = stats.tensordef
+        new_def = TensorDef.reorder(d, reorder_indices)
+        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        return DCStats.from_def(new_def, dcs)
+
+
+class DCStats(NumericStats):
     """
     Structural statistics derived from a tensor using degree constraint (DCs).
 
@@ -52,7 +128,7 @@ class DCStats(TensorStats):
         self.dcs = self._structure_to_dcs(tensor, fields)
 
     @staticmethod
-    def from_def(tensordef: TensorDef, dcs: set[DC]) -> "DCStats":
+    def from_def(tensordef: TensorDef, dcs: set[DC]) -> DCStats:
         """
         Build DCStats directly from a TensorDef and an existing DC set.
         """
@@ -60,16 +136,6 @@ class DCStats(TensorStats):
         self.tensordef = tensordef.copy()
         self.dcs = set(dcs)
         return self
-
-    @staticmethod
-    def copy_stats(stat: TensorStats) -> TensorStats:
-        """
-        Deep copy of a DCStats object: copies the TensorDef and the DC set.
-        """
-        if not isinstance(stat, DCStats):
-            raise TypeError("copy_stats expected a DCStats instance")
-
-        return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
 
     def _structure_to_dcs(self, arr: Tensor, fields: Iterable[Field]) -> set[DC]:
         """
@@ -1378,7 +1444,7 @@ class DCStats(TensorStats):
         }
 
     @staticmethod
-    def _merge_dc_join(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+    def _merge_dc_join(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:
         """
         Merge DCs for join-like operators
 
@@ -1407,7 +1473,7 @@ class DCStats(TensorStats):
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
-    def _merge_dc_union(new_def: "TensorDef", all_stats: list["DCStats"]) -> "DCStats":
+    def _merge_dc_union(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:
         """
         Merge DCs for union-like operators.
 
@@ -1456,83 +1522,6 @@ class DCStats(TensorStats):
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
         return DCStats.from_def(new_def, new_stats)
 
-    @staticmethod
-    def mapjoin(op: FinchOperator, *all_stats: "TensorStats") -> "TensorStats":
-        """
-        Merge DC statistics for an elementwise operation.
-
-        Args:
-            op: The elementwise operator (e.g., ffunc.add, ffunc.mul).
-            all_stats: Input statistics objects to be merged. Must be DCStats at runtime
-
-        Returns:
-            A DCStats instance whose TensorDef is the union of input dims and whose DC
-            set reflects the operator semantics:
-            - If every informative argument is *join-like* (its fill is an annihilator
-                for `op`), merge with join rules (take minima over matching DC keys).
-            - If every informative argument is *union-like* (fill not an annihilator),
-                merge with union rules (infer/extend DCs to missing dims, sum compatible
-                DCs, clamp by dense capacity).
-            - If mixed, and the join-like arguments cover all output indices, prefer
-                join merge; otherwise perform union merge over all arguments.
-        """
-        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
-        join_like_args: list[TensorStats] = []
-        union_like_args: list[TensorStats] = []
-        for stats in all_stats:
-            if len(stats.tensordef.index_order) == 0:
-                continue
-            if is_annihilator(op, stats.tensordef.fill_value):
-                join_like_args.append(stats)
-            else:
-                union_like_args.append(stats)
-        join_like_dc: list[DCStats] = cast(list["DCStats"], join_like_args)
-        union_like_dc: list[DCStats] = cast(list["DCStats"], union_like_args)
-
-        if len(union_like_args) == 0 and len(join_like_args) == 0:
-            return DCStats.from_def(new_def, set())
-        if len(union_like_args) == 0:
-            return DCStats._merge_dc_join(new_def, join_like_dc)
-        if len(join_like_args) == 0:
-            return DCStats._merge_dc_union(new_def, union_like_dc)
-        join_cover = set().union(*(s.tensordef.index_order for s in join_like_dc))
-        if join_cover == set(new_def.index_order):
-            return DCStats._merge_dc_join(new_def, join_like_dc)
-        return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
-
-    @staticmethod
-    def aggregate(
-        op: FinchOperator,
-        init: Any | None,
-        reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
-    ) -> "TensorStats":
-        """
-        Reduce DC statistics over specified indices.
-
-        Args:
-            op (Callable[..., Any]): Reduction operator.
-            init (Any | None): Optional initial value forwarded to TensorDef.aggregate.
-            reduce_indices (Iterable[str]): Indices to eliminate during the reduction.
-            stats (TensorStats): Input statistics (expected: DCStats).
-
-        Returns:
-            DCStats: Statistics with a reduced TensorDef (over `reduce_indices`) and the
-            same DC set carried over from the input.
-        """
-        fields = reduce_indices
-        if len(fields) == 0:
-            new_def = stats.tensordef.copy()
-        else:
-            new_def = TensorDef.aggregate(op, init, fields, stats.tensordef)
-
-        dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
-
-    @staticmethod
-    def issimilar(*args, **kwargs):
-        pass
-
     def estimate_non_fill_values(self) -> float:
         """
         Estimate the number of non-fill values using DCs.
@@ -1578,39 +1567,3 @@ class DCStats(TensorStats):
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
         return min_weight
-
-    @staticmethod
-    def relabel(stats: "TensorStats", relabel_indices: tuple[Field, ...]) -> "DCStats":
-        """
-        new_axes = set(relabel_indices)
-        new_dims = {m: stats.get_dim_size(m) for m in new_axes}
-        new_fill = stats.fill_value
-        """
-        d = stats.tensordef
-        new_def = TensorDef.relabel(d, relabel_indices)
-        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
-
-    @staticmethod
-    def reorder(stats: "TensorStats", reorder_indices: tuple[Field, ...]) -> "DCStats":
-        """
-        new_axes = set(reorder_indices)
-        for old_idx in stats.index_order:
-            if old_idx not in new_axes and stats.get_dim_size(old_idx) != 1:
-                raise ValueError(
-                    f"Trying to drop dimension '{old_idx}' of size"
-                    f" {stats.get_dim_size(old_idx)}."
-                    " Only size 1 dimensions can be dropped."
-                )
-
-        new_dims = {}
-        for idx in reorder_indices:
-            if idx in stats.index_order:
-                new_dims[idx] = stats.get_dim_size(idx)
-            else:
-                new_dims[idx] = 1
-        """
-        d = stats.tensordef
-        new_def = TensorDef.reorder(d, reorder_indices)
-        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)

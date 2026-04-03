@@ -4,7 +4,7 @@ import numpy as np
 
 import finchlite as fl
 from finchlite.algebra import ffunc
-from finchlite.autoschedule.tensor_stats import DCStats
+from finchlite.autoschedule.tensor_stats import DCStatsFactory
 from finchlite.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
     calculate_estimated_error,
@@ -65,7 +65,7 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
         )
     )
 
-    interpreter = StatsInterpreter(StatsImpl=DCStats)
+    interpreter = StatsInterpreter(stats_factory=DCStatsFactory())
     result_stats = interpreter(p, {})[0]
 
     expected_rows = shape_a[0]
@@ -112,7 +112,10 @@ def test_stats_matmul_error():
     )
 
     errors = calculate_estimated_error(
-        node=p, StatsImpl=DCStats, logic_bindings={}, stats_bindings={}
+        node=p,
+        stats_factory=DCStatsFactory(),
+        logic_bindings={},
+        stats_bindings={},
     )
 
     assert errors[0] == 0.0
