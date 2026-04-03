@@ -56,13 +56,11 @@ class LogicExecutor(LogicEvaluator):
     def __init__(
         self,
         ctx: LogicLoader | None = None,
-        verbose: bool = False,
         stats_factory: StatsFactory | None = None,
     ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         self.ctx: LogicLoader = ctx
-        self.verbose: bool = verbose
         if stats_factory is None:
             stats_factory = DenseStatsFactory()  # probably have dummy stats here
         self.stats_factory = stats_factory

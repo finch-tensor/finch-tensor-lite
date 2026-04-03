@@ -3,40 +3,44 @@
 # AI modified: 2026-04-03T01:33:01Z 38d789f35f1c9ba5c8ed00178371222826773dbe
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 from typing import overload
 
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import LogicInterpreter, StatsFactory
-from finchlite.finch_logic.nodes import LogicExpression, LogicStatement
 
 from ...finch_logic import (
     Aggregate,
     Alias,
     Literal,
+    LogicExpression,
+    LogicInterpreter,
     LogicNode,
+    LogicStatement,
     MapJoin,
     Plan,
     Produces,
     Query,
     Relabel,
     Reorder,
+    StatsFactory,
     Table,
 )
+from ...util.logging import LOG_LOGIC_PRE_OPT
 from .numeric_stats import NumericStats
 from .tensor_stats import TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
 
 class StatsInterpreter:
     def __init__(
         self,
         stats_factory: StatsFactory,
-        verbose=False,
     ):
         self.stats_factory = stats_factory
-        self.verbose = verbose
 
     def __call__(
         self, node: LogicNode, bindings: OrderedDict[Alias, TensorStats]
@@ -44,7 +48,6 @@ class StatsInterpreter:
         machine = StatsMachine(
             stats_factory=self.stats_factory,
             bindings=bindings,
-            verbose=self.verbose,
         )
         return machine(node)
 
@@ -54,13 +57,11 @@ class StatsMachine:
         self,
         stats_factory: StatsFactory,
         bindings=None,
-        verbose=False,
     ):
         self.stats_factory = stats_factory
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
-        self.verbose = verbose
 
     @overload
     def __call__(self, node: LogicExpression) -> TensorStats: ...
@@ -75,8 +76,7 @@ class StatsMachine:
     def __call__(self, node: LogicNode) -> TensorStats | tuple[TensorStats, ...]: ...
 
     def __call__(self, node) -> TensorStats | tuple[TensorStats, ...]:
-        if self.verbose:
-            print(f"Evaluating: {node}")
+        logger.debug("Evaluating: %s", node)
         match node:
             case Plan():
                 last_result: TensorStats | tuple[TensorStats, ...] = ()

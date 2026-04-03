@@ -1,4 +1,5 @@
 # AI modified: 2026-04-03T01:53:09Z 6877aca3b7b141666a6b9c061af7f26a4f65c0dd
+import logging
 from itertools import product
 
 import numpy as np
@@ -9,6 +10,7 @@ from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
 from ..algebra import fixpoint_type, return_type
 from ..symbolic import fisinstance
+from ..util.logging import LOG_LOGIC_PRE_OPT
 from . import nodes as lgc
 from .nodes import (
     Aggregate,
@@ -28,6 +30,8 @@ from .nodes import (
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 from .tensor_stats import StatsFactory, TensorStats
 
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
+
 
 def make_tensor(shape, fill_value, *, dtype=None):
     if dtype is None:
@@ -36,30 +40,25 @@ def make_tensor(shape, fill_value, *, dtype=None):
 
 
 class LogicInterpreter(LogicEvaluator):
-    def __init__(self, *, make_tensor=make_tensor, verbose=False):
-        self.verbose = verbose
+    def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        machine = LogicMachine(
-            make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
-        )
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
         return machine(node)
 
 
 class LogicMachine:
-    def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
-        self.verbose = verbose
+    def __init__(self, *, make_tensor=np.full, bindings=None):
         if bindings is None:
             bindings = {}
         self.bindings = bindings
         self.make_tensor = make_tensor
 
     def __call__(self, node):
-        if self.verbose:
-            print(f"Evaluating: {node}")
+        logger.debug("Evaluating: %s", node)
         match node:
             case Literal(val):
                 return val

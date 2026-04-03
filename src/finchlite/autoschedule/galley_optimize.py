@@ -7,6 +7,7 @@ Galley logical optimizer: applies greedy query rewriting to logical plans
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import OrderedDict
 from typing import TypedDict
@@ -20,6 +21,7 @@ from ..finch_logic import (
     StatsFactory,
     TensorStats,
 )
+from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.greedy_optimizer import greedy_query
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
@@ -27,6 +29,8 @@ from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
     preprocess_plan_for_galley,
 )
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
 
 def optimize_query(query, stats_factory, stats_bindings, use_components: bool = True):
@@ -102,13 +106,11 @@ class GalleyLogicalOptimizer(LogicEvaluator):
         self,
         stats_factory: StatsFactory,
         ctx: LogicEvaluator | None = None,
-        verbose: bool = False,
         use_components: bool = True,
         profile: bool = False,
     ):
         self.stats_factory = stats_factory
         self.ctx = ctx
-        self.verbose = verbose
         self.use_components = use_components
         self.profile = profile
 
@@ -117,10 +119,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, Plan):
-            if self.verbose:
-                # print("Input plan:")
-                # print(prgm)
-                print("Filler")
+            logger.debug("Optimizing plan: %s", prgm)
             t0 = time.perf_counter()
             prgm = optimize_plan(
                 prgm,
