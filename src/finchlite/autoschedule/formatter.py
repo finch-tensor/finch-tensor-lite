@@ -9,11 +9,9 @@ from ..algebra import TensorFType
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import AssemblyLibrary, TupleFType
-from ..finch_logic import LogicLoader, MockLogicLoader
+from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
 from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
-from finchlite.autoschedule.tensor_stats import TensorStats
-
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -40,7 +38,8 @@ class LogicFormatter(LogicLoader):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats : dict[lgc.Alias, "TensorStats"] | None = None
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -80,7 +79,12 @@ class LogicFormatter(LogicLoader):
 
         logger.debug(prgm)
 
-        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        lib, bindings, shape_vars = self.loader(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )
         return lib, bindings, shape_vars
 
 

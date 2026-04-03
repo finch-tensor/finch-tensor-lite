@@ -6,6 +6,7 @@ import numpy as np
 import finchlite
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+
 from ..algebra import fixpoint_type, return_type
 from ..symbolic import fisinstance
 from ..util.logging import LOG_LOGIC_PRE_OPT
@@ -26,6 +27,7 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
@@ -206,9 +208,11 @@ class MockLogicLoader(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicStatement, 
+        self,
+        prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats : dict[lgc.Alias, "TensorStats"] | None = None
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],

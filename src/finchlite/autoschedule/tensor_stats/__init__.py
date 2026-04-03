@@ -1,18 +1,24 @@
-from .blocked_stats import BlockedStats
-from .dc_stats import DC, DCStats
-from .dense_stat import DenseStats
+from ...finch_logic import TensorStats
+from .blocked_stats import BlockedStats, BlockedStatsFactory
+from .dc_stats import DC, DCStats, DCStatsFactory
+from .dense_stat import DenseStats, DenseStatsFactory
 from .stats_interpreter import StatsInterpreter
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
-from .uniform_stats import UniformStats
+from .tensor_stats import BaseTensorStats
+from .uniform_stats import UniformStats, UniformStatsFactory
 
 __all__ = [
     "DC",
+    "BaseTensorStats",
     "BlockedStats",
+    "BlockedStatsFactory",
     "DCStats",
+    "DCStatsFactory",
     "DenseStats",
+    "DenseStatsFactory",
     "StatsInterpreter",
     "TensorDef",
     "TensorStats",
     "UniformStats",
+    "UniformStatsFactory",
 ]

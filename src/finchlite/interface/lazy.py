@@ -24,7 +24,7 @@ from ..algebra import (
     promote_type,
     return_type,
 )
-from ..autoschedule.tensor_stats import StatsInterpreter, TensorStats
+from ..autoschedule.tensor_stats import StatsInterpreter
 from ..compile import BufferizedNDArray
 from ..finch_assembly import TupleFType
 from ..finch_logic import (
@@ -38,7 +38,9 @@ from ..finch_logic import (
     Plan,
     Query,
     Reorder,
+    StatsFactory,
     Table,
+    TensorStats,
 )
 from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
@@ -2036,10 +2038,11 @@ def einsum(prgm, *args, **kwargs):
 
 
 def get_lazy_tensor_stats(
-    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+    lazy_tensor: LazyTensor,
+    stats_factory: StatsFactory,
 ) -> TensorStats:
     trace = lazy_tensor.ctx.trace()
-    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    interpreter = StatsInterpreter(stats_factory=stats_factory)
     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
     last_stats: TensorStats | tuple[TensorStats, ...]
     for stmt in trace:

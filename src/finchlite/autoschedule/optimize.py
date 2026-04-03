@@ -23,7 +23,9 @@ from ..finch_logic import (
     Query,
     Relabel,
     Reorder,
+    StatsFactory,
     Table,
+    TensorStats,
 )
 from ..symbolic import (
     Fixpoint,
@@ -39,7 +41,6 @@ from .standardize import (
     isolate_aggregates,
     push_fields,
 )
-from finchlite.autoschedule.tensor_stats import TensorStats
 
 
 def with_unique_lhs(
@@ -419,9 +420,18 @@ class DefaultLogicOptimizer(LogicLoader):
         self.ctx = ctx
 
     def __call__(
-        self, prgm: LogicStatement, bindings: dict[Alias, TensorFType], stats : dict[Alias, "TensorStats"] | None = None
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
     ]:
         prgm, bindings = optimize(prgm, bindings)
-        return self.ctx(prgm, bindings)
+        return self.ctx(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )
