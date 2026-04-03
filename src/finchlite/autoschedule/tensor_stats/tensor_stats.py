@@ -7,6 +7,8 @@ from finchlite.finch_logic import Field, TensorStats
 from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 
+from typing import Self
+
 
 class BaseTensorStats(TensorStats):
     tensordef: TensorDef
@@ -16,7 +18,7 @@ class BaseTensorStats(TensorStats):
 
     @staticmethod
     @abstractmethod
-    def copy_stats(stat: "TensorStats") -> "TensorStats":
+    def copy_stats(stat: Self) -> Self:
         """
         Return a copy of a TensorStats object.
         """
@@ -24,7 +26,7 @@ class BaseTensorStats(TensorStats):
 
     @staticmethod
     @abstractmethod
-    def mapjoin(op: FinchOperator, *args: "TensorStats") -> "TensorStats":
+    def mapjoin(op: FinchOperator, *args: Self) -> Self:
         """
         Return a new statistic representing the tensor resulting
         from calling op on args... in an elementwise fashion
@@ -37,8 +39,8 @@ class BaseTensorStats(TensorStats):
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
-    ) -> "TensorStats":
+        stats: Self,
+    ) -> Self:
         """
         Return a new statistic representing the tensor resulting
         from aggregating arg over fields with the op aggregation function
@@ -47,7 +49,7 @@ class BaseTensorStats(TensorStats):
 
     @staticmethod
     @abstractmethod
-    def issimilar(a: "TensorStats", b: "TensorStats") -> bool:
+    def issimilar(a: Self, b: Self) -> bool:
         """
         Returns whether two statistics objects represent similarly distributed tensors,
         and only returns true if the tensors have the same dimensions and fill value
@@ -57,16 +59,16 @@ class BaseTensorStats(TensorStats):
     @staticmethod
     @abstractmethod
     def relabel(
-        stats: "TensorStats", relabel_indices: tuple[Field, ...]
-    ) -> "TensorStats":
+        stats: Self, relabel_indices: tuple[Field, ...]
+    ) -> Self:
         """ """
         ...
 
     @staticmethod
     @abstractmethod
     def reorder(
-        stats: "TensorStats", reorder_indices: tuple[Field, ...]
-    ) -> "TensorStats":
+        stats: Self, reorder_indices: tuple[Field, ...]
+    ) -> Self:
         """ """
         ...
 

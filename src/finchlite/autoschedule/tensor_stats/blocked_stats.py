@@ -9,16 +9,13 @@ from finchlite.finch_logic import Field
 from ...algebra import FinchOperator
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
-
-
 class BlockedStats(NumericStats):
     def __init__(
         self,
         blocks: np.ndarray,
         blocks_per_dim: dict[Field, int],
         tensordef: TensorDef,
-        StatsImpl: type[TensorStats],
+        StatsImpl: type[BlockedStats],
     ):
         self.blocks = blocks
         self.blocks_per_dim = blocks_per_dim
@@ -30,7 +27,7 @@ class BlockedStats(NumericStats):
         cls,
         d: TensorDef,
         blocks_per_dim: dict[Field, int],
-        StatsImpl: type[TensorStats],
+        StatsImpl: type[BlockedStats],
         data: Any,
     ) -> np.ndarray:
         grid_dim = [blocks_per_dim[idx] for idx in d.index_order]
@@ -66,7 +63,7 @@ class BlockedStats(NumericStats):
         tensor: Any,
         fields: tuple[Field, ...],
         blocks_per_dim=dict[Field, int],
-        StatsImpl=type[TensorStats],
+        StatsImpl=type[BlockedStats],
     ) -> "BlockedStats":
         d = TensorDef.from_tensor(tensor, fields)
         data = tensor.to_numpy() if hasattr(tensor, "to_numpy") else tensor
@@ -77,7 +74,7 @@ class BlockedStats(NumericStats):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
 
     @staticmethod
-    def mapjoin(op: FinchOperator, *args: TensorStats) -> "BlockedStats":
+    def mapjoin(op: FinchOperator, *args: BlockedStats) -> "BlockedStats":
         "We assume that all the args have same sized blocks here"
 
         if not all(isinstance(arg, BlockedStats) for arg in args):
@@ -93,10 +90,10 @@ class BlockedStats(NumericStats):
 
         for coord in np.ndindex(new_blocks.shape):
             # Obtaining the blocks at the same position in the args
-            local_blocks: list[TensorStats] = []
+            local_blocks: list[BlockedStats] = []
             for arg in b_args:
                 block: Any = arg.blocks[coord]
-                if isinstance(block, TensorStats):
+                if isinstance(block, BlockedStats):
                     local_blocks.append(block)
             new_blocks[coord] = InnerStats.mapjoin(op, *local_blocks)
 
@@ -107,7 +104,7 @@ class BlockedStats(NumericStats):
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: TensorStats,
+        stats: BlockedStats,
     ) -> "BlockedStats":
 
         if not isinstance(stats, BlockedStats):
@@ -163,7 +160,7 @@ class BlockedStats(NumericStats):
 
     @staticmethod
     def relabel(
-        stats: TensorStats, relabel_indices: tuple[Field, ...]
+        stats: BlockedStats, relabel_indices: tuple[Field, ...]
     ) -> "BlockedStats":
         new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
 
@@ -178,14 +175,14 @@ class BlockedStats(NumericStats):
         for coord in np.ndindex(stats.blocks.shape):
             block: Any = stats.blocks[coord]
             # Relabling every block in the grid
-            if isinstance(block, TensorStats):
+            if isinstance(block, BlockedStats):
                 new_blocks[coord] = stats.StatsImpl.relabel(block, relabel_indices)
 
         return BlockedStats(new_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
 
     @staticmethod
     def reorder(
-        stats: TensorStats, reorder_indices: tuple[Field, ...]
+        stats: BlockedStats, reorder_indices: tuple[Field, ...]
     ) -> "BlockedStats":
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for reorder")
@@ -211,7 +208,7 @@ class BlockedStats(NumericStats):
         final_blocks = np.empty_like(new_blocks)
         for coord in np.ndindex(new_blocks.shape):
             block: Any = new_blocks[coord]
-            if isinstance(block, TensorStats):
+            if isinstance(block, BlockedStats):
                 final_blocks[coord] = stats.StatsImpl.reorder(block, reorder_indices)
 
         new_blocks_per_dim = {
@@ -221,7 +218,7 @@ class BlockedStats(NumericStats):
         return BlockedStats(final_blocks, new_blocks_per_dim, new_def, stats.StatsImpl)
 
     @staticmethod
-    def issimilar(a: TensorStats, b: TensorStats) -> bool:
+    def issimilar(a: BlockedStats, b: BlockedStats) -> bool:
         if not (isinstance(a, BlockedStats) and isinstance(b, BlockedStats)):
             return False
 
@@ -235,7 +232,7 @@ class BlockedStats(NumericStats):
         return True
 
     @staticmethod
-    def copy_stats(stat: TensorStats) -> "BlockedStats":
+    def copy_stats(stat: BlockedStats) -> "BlockedStats":
         if not isinstance(stat, BlockedStats):
             raise TypeError("copy_stats expected a BlockedStats instance")
 

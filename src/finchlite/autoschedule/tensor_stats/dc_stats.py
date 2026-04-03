@@ -14,8 +14,6 @@ from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
-
 
 @dataclass(frozen=True)
 class DC:
@@ -63,7 +61,7 @@ class DCStats(NumericStats):
         return self
 
     @staticmethod
-    def copy_stats(stat: TensorStats) -> TensorStats:
+    def copy_stats(stat: DCStats) -> DCStats:
         """
         Deep copy of a DCStats object: copies the TensorDef and the DC set.
         """
@@ -1458,7 +1456,7 @@ class DCStats(NumericStats):
         return DCStats.from_def(new_def, new_stats)
 
     @staticmethod
-    def mapjoin(op: FinchOperator, *all_stats: "TensorStats") -> "TensorStats":
+    def mapjoin(op: FinchOperator, *all_stats: "DCStats") -> "DCStats":
         """
         Merge DC statistics for an elementwise operation.
 
@@ -1478,8 +1476,8 @@ class DCStats(NumericStats):
                 join merge; otherwise perform union merge over all arguments.
         """
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
-        join_like_args: list[TensorStats] = []
-        union_like_args: list[TensorStats] = []
+        join_like_args: list[DCStats] = []
+        union_like_args: list[DCStats] = []
         for stats in all_stats:
             if len(stats.tensordef.index_order) == 0:
                 continue
@@ -1506,8 +1504,8 @@ class DCStats(NumericStats):
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
-    ) -> "TensorStats":
+        stats: "DCStats",
+    ) -> "DCStats":
         """
         Reduce DC statistics over specified indices.
 
@@ -1515,7 +1513,7 @@ class DCStats(NumericStats):
             op (Callable[..., Any]): Reduction operator.
             init (Any | None): Optional initial value forwarded to TensorDef.aggregate.
             reduce_indices (Iterable[str]): Indices to eliminate during the reduction.
-            stats (TensorStats): Input statistics (expected: DCStats).
+            stats (DCStats): Input statistics (expected: DCStats).
 
         Returns:
             DCStats: Statistics with a reduced TensorDef (over `reduce_indices`) and the
@@ -1581,7 +1579,7 @@ class DCStats(NumericStats):
         return min_weight
 
     @staticmethod
-    def relabel(stats: "TensorStats", relabel_indices: tuple[Field, ...]) -> "DCStats":
+    def relabel(stats: "DCStats", relabel_indices: tuple[Field, ...]) -> "DCStats":
         """
         new_axes = set(relabel_indices)
         new_dims = {m: stats.get_dim_size(m) for m in new_axes}
@@ -1593,7 +1591,7 @@ class DCStats(NumericStats):
         return DCStats.from_def(new_def, dcs)
 
     @staticmethod
-    def reorder(stats: "TensorStats", reorder_indices: tuple[Field, ...]) -> "DCStats":
+    def reorder(stats: "DCStats", reorder_indices: tuple[Field, ...]) -> "DCStats":
         """
         new_axes = set(reorder_indices)
         for old_idx in stats.index_order:

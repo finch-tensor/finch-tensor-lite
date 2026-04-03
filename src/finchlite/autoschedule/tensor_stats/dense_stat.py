@@ -5,7 +5,7 @@ from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
+from .tensor_stats import DenseStats
 
 
 class DenseStats(NumericStats):
@@ -16,7 +16,7 @@ class DenseStats(NumericStats):
         return ds
 
     @staticmethod
-    def copy_stats(stat: TensorStats) -> TensorStats:
+    def copy_stats(stat: DenseStats) -> DenseStats:
         """
         Deep copy of a DenseStats object.
         """
@@ -31,7 +31,7 @@ class DenseStats(NumericStats):
         return total
 
     @staticmethod
-    def mapjoin(op: FinchOperator, *args: TensorStats) -> TensorStats:
+    def mapjoin(op: FinchOperator, *args: DenseStats) -> DenseStats:
         axes_set = [set(s.index_order) for s in args]
         same_axes = all(axes_set[0] == axes for axes in axes_set)
 
@@ -49,14 +49,14 @@ class DenseStats(NumericStats):
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
+        stats: "DenseStats",
     ) -> "DenseStats":
         d = stats.tensordef
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
         return DenseStats.from_def(new_def)
 
     @staticmethod
-    def issimilar(a: TensorStats, b: TensorStats) -> bool:
+    def issimilar(a: DenseStats, b: DenseStats) -> bool:
         return (
             isinstance(a, DenseStats)
             and isinstance(b, DenseStats)
@@ -66,7 +66,7 @@ class DenseStats(NumericStats):
 
     @staticmethod
     def relabel(
-        stats: "TensorStats", relabel_indices: tuple[Field, ...]
+        stats: "DenseStats", relabel_indices: tuple[Field, ...]
     ) -> "DenseStats":
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
@@ -74,7 +74,7 @@ class DenseStats(NumericStats):
 
     @staticmethod
     def reorder(
-        stats: "TensorStats", reorder_indices: tuple[Field, ...]
+        stats: "DenseStats", reorder_indices: tuple[Field, ...]
     ) -> "DenseStats":
 
         d = stats.tensordef

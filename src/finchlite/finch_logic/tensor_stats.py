@@ -3,13 +3,14 @@ from typing import Any
 from ..algebra import FinchOperator
 
 from .nodes import Field
+from typing import Self
 
 
 
 class TensorStats(ABC):
     @staticmethod
     @abstractmethod
-    def copy_stats(stat: "TensorStats") -> "TensorStats":
+    def copy_stats(stat: Self) -> Self:
         """
         Return a copy of a TensorStats object.
         """
@@ -17,7 +18,7 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def mapjoin(op: FinchOperator, *args: "TensorStats") -> "TensorStats":
+    def mapjoin(op: FinchOperator, *args: Self) -> Self:
         """
         Return a new statistic representing the tensor resulting
         from calling op on args... in an elementwise fashion
@@ -30,8 +31,8 @@ class TensorStats(ABC):
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
-    ) -> "TensorStats":
+        stats: Self,
+    ) -> Self:
         """
         Return a new statistic representing the tensor resulting
         from aggregating arg over fields with the op aggregation function
@@ -40,7 +41,7 @@ class TensorStats(ABC):
 
     @staticmethod
     @abstractmethod
-    def issimilar(a: "TensorStats", b: "TensorStats") -> bool:
+    def issimilar(a: Self, b: Self) -> bool:
         """
         Returns whether two statistics objects represent similarly distributed tensors,
         and only returns true if the tensors have the same dimensions and fill value
@@ -50,16 +51,16 @@ class TensorStats(ABC):
     @staticmethod
     @abstractmethod
     def relabel(
-        stats: "TensorStats", relabel_indices: tuple[Field, ...]
-    ) -> "TensorStats":
+        stats: Self, relabel_indices: tuple[Field, ...]
+    ) -> Self:
         """ """
         ...
 
     @staticmethod
     @abstractmethod
     def reorder(
-        stats: "TensorStats", reorder_indices: tuple[Field, ...]
-    ) -> "TensorStats":
+        stats: Self, reorder_indices: tuple[Field, ...]
+    ) -> Self:
         """ """
         ...
 
