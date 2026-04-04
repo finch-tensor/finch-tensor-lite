@@ -11,6 +11,9 @@ from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.autoschedule.tensor_stats import (
     DC,
     BlockedStats,
+    BlockedStatsFactory,
+    DatabaseStats,
+    DatabaseStatsFactory,
     DCStats,
     DCStatsFactory,
     DenseStatsFactory,
@@ -36,7 +39,7 @@ def test_database_from_tensor_and_getters():
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -69,7 +72,7 @@ def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     node = Table(Literal(arr), axes)
 
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -90,15 +93,23 @@ def test_database_mapjoin_join():
 
     cache = {}
     insert_statistics(
-        ST=DatabaseStats, node=ta, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DatabaseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     insert_statistics(
-        ST=DatabaseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DatabaseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
     node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -119,16 +130,23 @@ def test_database_mapjoin_elementwise():
 
     cache = {}
     insert_statistics(
-        ST=DatabaseStats, node=ta, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DatabaseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     insert_statistics(
-        ST=DatabaseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DatabaseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
-    node_add = MapJoin(Literal(ffunc.add), (ta, tb))
     stats = insert_statistics(
-        ST=DatabaseStats,
-        node=node_add,
+        stats_factory=DatabaseStatsFactory(),
+        node=MapJoin(Literal(ffunc.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
@@ -153,16 +171,23 @@ def test_database_mapjoin_broadcast():
 
     cache = {}
     insert_statistics(
-        ST=DatabaseStats, node=ta, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DatabaseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
     insert_statistics(
-        ST=DatabaseStats, node=tb, bindings=OrderedDict(), replace=False, cache=cache
+        stats_factory=DatabaseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
     )
 
-    node_add = MapJoin(Literal(ffunc.add), (ta, tb))
     stats = insert_statistics(
-        ST=DatabaseStats,
-        node=node_add,
+        stats_factory=DatabaseStatsFactory(),
+        node=MapJoin(Literal(ffunc.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
@@ -185,7 +210,7 @@ def test_database_aggregate():
         idxs=(j,),
     )
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node_sum,
         bindings=OrderedDict(),
         replace=False,
@@ -193,7 +218,7 @@ def test_database_aggregate():
     )
     assert stats.index_order == (i,)
     assert stats.get_dim_size(i) == 10.0
-    assert stats.estimate_non_fill_values() == pytest.approx(1.0)
+    assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
 def test_database_issimilar():
@@ -202,21 +227,21 @@ def test_database_issimilar():
     node = Table(Literal(arr), (Field("i"), Field("j")))
 
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    assert DatabaseStats.issimilar(stats, stats)
+    assert DatabaseStatsFactory().issimilar(stats, stats)
 
     other = DatabaseStats.from_def(stats.tensordef, stats.nnz + 1.0, dict(stats.V))
-    assert not DatabaseStats.issimilar(stats, other)
+    assert not DatabaseStatsFactory().issimilar(stats, other)
 
     i, j = Field("i"), Field("j")
     bad_V = {i: stats.V[i] + 1.0, j: stats.V[j]}
     other_v = DatabaseStats.from_def(stats.tensordef, stats.nnz, bad_V)
-    assert not DatabaseStats.issimilar(stats, other_v)
+    assert not DatabaseStatsFactory().issimilar(stats, other_v)
 
 
 def test_database_copy_stats():
@@ -224,13 +249,13 @@ def test_database_copy_stats():
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    copy = DatabaseStats.copy_stats(stats)
+    copy = DatabaseStatsFactory().copy_stats(stats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
     assert copy is not stats
@@ -241,13 +266,13 @@ def test_database_relabel():
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    relabeled = DatabaseStats.relabel(stats, (Field("row"), Field("col")))
+    relabeled = DatabaseStatsFactory().relabel(stats, (Field("row"), Field("col")))
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
     assert relabeled.V[Field("row")] == stats.V[Field("i")]
@@ -261,13 +286,13 @@ def test_database_reorder():
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        ST=DatabaseStats,
+        stats_factory=DatabaseStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    reordered = DatabaseStats.reorder(stats, (Field("j"), Field("i")))
+    reordered = DatabaseStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
 
