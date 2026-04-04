@@ -63,10 +63,13 @@ class DatabaseStats(TensorStats):
             only_cur = cur_indices - set(i.index_order)
             only_i = set(i.index_order) - cur_indices
 
-            cur_shared = math.prod(cur_V.get(j, 1.0) for j in shared)
-            i_shared = math.prod(i.V.get(j, 1.0) for j in shared)
+            cur_shared = max((cur_V.get(j, 1.0) for j in shared), default=1.0)
+            i_shared = max((i.V.get(j, 1.0) for j in shared), default=1.0)
             # nnz(C) = nnz(A) * nnz(B) / (max(nnz(\sum_k B_jk), nnz(\sum_i A_ij))
-            new_nnz = cur_nnz * i.nnz / max(cur_shared, i_shared)
+            if max(cur_shared, i_shared) == 0.0:
+                new_nnz = 0.0
+            else:
+                new_nnz = cur_nnz * i.nnz / max(cur_shared, i_shared)
 
             new_V: dict[Field, float] = {}
             for idx in set(i.index_order).union(cur_indices):
@@ -127,14 +130,14 @@ class DatabaseStats(TensorStats):
                 for idx in set(i.index_order).union(cur_indices):
                     n = new_def.dim_sizes[idx]
                     if idx in only_cur:
-                        # V(C, i) = min(n_i, V(A, i) + n_i)
-                        new_V[idx] = min(n, cur_V[idx] + n)
+                        # V(C, i) = n
+                        new_V[idx] = n
                     elif idx in shared:
                         # V(C, j) = min(n_j, V(A, j) + V(B,j))
                         new_V[idx] = min(n, cur_V[idx] + i.V[idx])
                     else:
-                        # V(C, k) = min(n_k, n_k + V(B,k))
-                        new_V[idx] = min(n, n + i.V[idx])
+                        # V(C, k) = n
+                        new_V[idx] = n
 
             cur_nnz = new_nnz
             cur_V = new_V
@@ -183,9 +186,14 @@ class DatabaseStats(TensorStats):
             raise TypeError("DatabaseStats expected for aggregate")
 
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
-        j_shared = math.prod(stats.V.get(j, 1.0) for j in reduce_indices)
-        # nnz(C) = nnz(A) / V(A,j)
-        new_nnz = stats.nnz / j_shared
+        new_nnz = min(
+            stats.nnz,
+            math.prod(
+                stats.V.get(j, 1.0)
+                for j in stats.index_order
+                if j not in reduce_indices
+            ),
+        )
 
         new_V: dict[Field, float] = {}
         for idx in new_def.index_order:
