@@ -10,10 +10,9 @@ import numba
 from .. import finch_assembly as asm
 from ..algebra import (
     NumbaOperator,
-    as_finch_operator,
+    ffunc,
     query_property,
     register_property,
-    scansearch,
 )
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
@@ -31,7 +30,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {"scansearch": numba.njit(scansearch._func)}
+numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffunc.scansearch._func)}
 
 
 def numba_type(t):
@@ -608,11 +607,10 @@ class NumbaContext(Context):
                     val_code,
                 )
                 return None
-            case asm.Call(asm.Literal(val), args):
-                finch_op = as_finch_operator(val)
-                if not isinstance(finch_op, NumbaOperator):
-                    raise TypeError(f"{finch_op} has no Numba representation.")
-                return finch_op.numba_literal(val, self, *args)
+            case asm.Call(asm.Literal(op), args):
+                if not isinstance(op, NumbaOperator):
+                    raise TypeError(f"{op} has no Numba representation.")
+                return op.numba_literal(op, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_format != var_t:

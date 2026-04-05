@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import bisect
 import builtins
-import operator
 import sys
 import threading
 from collections import OrderedDict
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any
@@ -16,21 +15,16 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from .. import finch_einsum as ein
 from ..algebra import (
+    FinchOperator,
     Tensor,
     TensorFType,
-    first_arg,
+    ffunc,
     fixpoint_type,
-    identity,
     init_value,
-    promote_max,
-    promote_min,
     promote_type,
     return_type,
 )
-from ..algebra import (
-    conjugate as conj,
-)
-from ..autoschedule.tensor_stats import StatsInterpreter, TensorStats
+from ..autoschedule.tensor_stats import StatsInterpreter
 from ..compile import BufferizedNDArray
 from ..finch_assembly import TupleFType
 from ..finch_logic import (
@@ -44,7 +38,9 @@ from ..finch_logic import (
     Plan,
     Query,
     Reorder,
+    StatsFactory,
     Table,
+    TensorStats,
 )
 from ..symbolic import ftype, gensym
 from .overrides import OverrideTensor
@@ -658,7 +654,7 @@ def squeeze(
 
 
 def reduce(
-    op: Callable,
+    op: FinchOperator,
     x,
     /,
     *,
@@ -705,6 +701,7 @@ def reduce(
         ``dtype`` parameter above.
     """
     x = lazy(x)
+    assert isinstance(op, FinchOperator)
     if init is None:
         init = init_value(op, x.element_type)
     if axis is None:
@@ -771,7 +768,7 @@ def _broadcast_shape(*args: tuple) -> tuple:
     return shape
 
 
-def elementwise(f: Callable, *args) -> LazyTensor:
+def elementwise(f: FinchOperator, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
 
@@ -781,7 +778,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     as the number of tensors passed to `elementwise`.
 
     The function will automatically handle broadcasting of the input tensors to
-    ensure they have compatible shapes.  For example, `elementwise(operator.add,
+    ensure they have compatible shapes.  For example, `elementwise(ffunc.add,
     x, y)` is equivalent to `x + y`.
 
     Parameters:
@@ -820,19 +817,19 @@ def elementwise(f: Callable, *args) -> LazyTensor:
 
 
 def round(x) -> LazyTensor:
-    return elementwise(np.round, lazy(x))
+    return elementwise(ffunc.round, lazy(x))
 
 
 def floor(x) -> LazyTensor:
-    return elementwise(np.floor, lazy(x))
+    return elementwise(ffunc.floor, lazy(x))
 
 
 def ceil(x) -> LazyTensor:
-    return elementwise(np.ceil, lazy(x))
+    return elementwise(ffunc.ceil, lazy(x))
 
 
 def trunc(x) -> LazyTensor:
-    return elementwise(np.trunc, lazy(x))
+    return elementwise(ffunc.trunc, lazy(x))
 
 
 def sum(
@@ -844,7 +841,7 @@ def sum(
     keepdims: bool = False,
 ):
     x = lazy(x)
-    return reduce(operator.add, x, axis=axis, dtype=dtype, keepdims=keepdims)
+    return reduce(ffunc.add, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
 def prod(
@@ -856,7 +853,7 @@ def prod(
     keepdims: bool = False,
 ):
     x = lazy(x)
-    return reduce(operator.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
+    return reduce(ffunc.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
 def any(
@@ -872,8 +869,8 @@ def any(
     """
     x = lazy(x)
     return reduce(
-        operator.or_,
-        elementwise(operator.truth, x),
+        ffunc.or_,
+        elementwise(ffunc.truth, x),
         axis=axis,
         keepdims=keepdims,
         init=init,
@@ -893,8 +890,8 @@ def all(
     """
     x = lazy(x)
     return reduce(
-        operator.and_,
-        elementwise(operator.truth, x),
+        ffunc.and_,
+        elementwise(ffunc.truth, x),
         axis=axis,
         keepdims=keepdims,
         init=init,
@@ -902,11 +899,11 @@ def all(
 
 
 def real(x) -> LazyTensor:
-    return elementwise(np.real, lazy(x))
+    return elementwise(ffunc.real, lazy(x))
 
 
 def imag(x) -> LazyTensor:
-    return elementwise(np.imag, lazy(x))
+    return elementwise(ffunc.imag, lazy(x))
 
 
 def min(
@@ -921,7 +918,7 @@ def min(
     Return the minimum of input array ``arr`` along given axis.
     """
     x = lazy(x)
-    return reduce(promote_min, x, axis=axis, keepdims=keepdims, init=init)
+    return reduce(ffunc.promote_min, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def max(
@@ -936,55 +933,55 @@ def max(
     Return the maximum of input array ``arr`` along given axis.
     """
     x = lazy(x)
-    return reduce(promote_max, x, axis=axis, keepdims=keepdims, init=init)
+    return reduce(ffunc.promote_max, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def clip(x, /, *, min=None, max=None) -> LazyTensor:
-    return elementwise(np.clip, lazy(x), lazy(min), lazy(max))
+    return elementwise(ffunc.clip, lazy(x), lazy(min), lazy(max))
 
 
 def sqrt(x) -> LazyTensor:
-    return elementwise(np.sqrt, lazy(x))
+    return elementwise(ffunc.sqrt, lazy(x))
 
 
 def square(x) -> LazyTensor:
-    return elementwise(np.square, lazy(x))
+    return elementwise(ffunc.square, lazy(x))
 
 
 def sign(x) -> LazyTensor:
-    return elementwise(np.sign, lazy(x))
+    return elementwise(ffunc.sign, lazy(x))
 
 
 def add(x1, x2) -> LazyTensor:
-    return elementwise(operator.add, lazy(x1), lazy(x2))
+    return elementwise(ffunc.add, lazy(x1), lazy(x2))
 
 
 def reciprocal(x) -> LazyTensor:
-    return elementwise(np.reciprocal, lazy(x))
+    return elementwise(ffunc.reciprocal, lazy(x))
 
 
 def subtract(x1, x2) -> LazyTensor:
-    return elementwise(operator.sub, lazy(x1), lazy(x2))
+    return elementwise(ffunc.sub, lazy(x1), lazy(x2))
 
 
 def multiply(x1, x2) -> LazyTensor:
-    return elementwise(operator.mul, lazy(x1), lazy(x2))
+    return elementwise(ffunc.mul, lazy(x1), lazy(x2))
 
 
 def divide(x1, x2) -> LazyTensor:
-    return elementwise(np.divide, lazy(x1), lazy(x2))
+    return elementwise(ffunc.truediv, lazy(x1), lazy(x2))
 
 
 def abs(x) -> LazyTensor:
-    return elementwise(operator.abs, lazy(x))
+    return elementwise(ffunc.abs, lazy(x))
 
 
 def positive(x) -> LazyTensor:
-    return elementwise(operator.pos, lazy(x))
+    return elementwise(ffunc.pos, lazy(x))
 
 
 def negative(x) -> LazyTensor:
-    return elementwise(operator.neg, lazy(x))
+    return elementwise(ffunc.neg, lazy(x))
 
 
 def is_broadcastable(shape_a, shape_b):
@@ -1028,7 +1025,7 @@ def matmul(x1, x2) -> LazyTensor:
                 "Batch dimensions are not broadcastable for matrix multiplication"
             )
         return reduce(
-            operator.add,
+            ffunc.add,
             multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
             axis=-2,
         )
@@ -1040,7 +1037,7 @@ def matmul(x1, x2) -> LazyTensor:
         raise ValueError("Both inputs must be at least 1D arrays")
 
     if x1.ndim == 1 and x2.ndim == 1:
-        return reduce(operator.add, multiply(x1, x2), axis=0)
+        return reduce(ffunc.add, multiply(x1, x2), axis=0)
 
     if x1.ndim == 1:
         x1 = expand_dims(x1, axis=0)  # make it a row vector
@@ -1081,39 +1078,39 @@ def matrix_transpose(x) -> LazyTensor:
 
 
 def bitwise_inverse(x) -> LazyTensor:
-    return elementwise(operator.invert, lazy(x))
+    return elementwise(ffunc.invert, lazy(x))
 
 
 def bitwise_and(x1, x2) -> LazyTensor:
-    return elementwise(operator.and_, lazy(x1), lazy(x2))
+    return elementwise(ffunc.and_, lazy(x1), lazy(x2))
 
 
 def bitwise_left_shift(x1, x2) -> LazyTensor:
-    return elementwise(operator.lshift, lazy(x1), lazy(x2))
+    return elementwise(ffunc.lshift, lazy(x1), lazy(x2))
 
 
 def bitwise_or(x1, x2) -> LazyTensor:
-    return elementwise(operator.or_, lazy(x1), lazy(x2))
+    return elementwise(ffunc.or_, lazy(x1), lazy(x2))
 
 
 def bitwise_right_shift(x1, x2) -> LazyTensor:
-    return elementwise(operator.rshift, lazy(x1), lazy(x2))
+    return elementwise(ffunc.rshift, lazy(x1), lazy(x2))
 
 
 def bitwise_xor(x1, x2) -> LazyTensor:
-    return elementwise(operator.xor, lazy(x1), lazy(x2))
+    return elementwise(ffunc.xor, lazy(x1), lazy(x2))
 
 
 def truediv(x1, x2) -> LazyTensor:
-    return elementwise(operator.truediv, lazy(x1), lazy(x2))
+    return elementwise(ffunc.truediv, lazy(x1), lazy(x2))
 
 
 def floordiv(x1, x2) -> LazyTensor:
-    return elementwise(operator.floordiv, lazy(x1), lazy(x2))
+    return elementwise(ffunc.floordiv, lazy(x1), lazy(x2))
 
 
 def mod(x1, x2) -> LazyTensor:
-    return elementwise(operator.mod, lazy(x1), lazy(x2))
+    return elementwise(ffunc.mod, lazy(x1), lazy(x2))
 
 
 def pow(x1, x2) -> LazyTensor:
@@ -1121,11 +1118,11 @@ def pow(x1, x2) -> LazyTensor:
 
 
 def power(x1, x2) -> LazyTensor:
-    return elementwise(operator.pow, lazy(x1), lazy(x2))
+    return elementwise(ffunc.pow, lazy(x1), lazy(x2))
 
 
 def remainder(x1, x2) -> LazyTensor:
-    return elementwise(np.remainder, lazy(x1), lazy(x2))
+    return elementwise(ffunc.remainder, lazy(x1), lazy(x2))
 
 
 def conjugate(x) -> LazyTensor:
@@ -1142,7 +1139,7 @@ def conjugate(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the complex conjugate of `x`.
     """
-    return elementwise(conj, lazy(x))
+    return elementwise(ffunc.conjugate, lazy(x))
 
 
 def tensordot(
@@ -1223,7 +1220,7 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         )
 
     return reduce(
-        operator.add,
+        ffunc.add,
         multiply(conjugate(x1), x2),
         axis=axis,
     )
@@ -1345,7 +1342,7 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(first_arg, tensor, FillTensor(shape, None))
+    return elementwise(ffunc.first_arg, tensor, FillTensor(shape, None))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
@@ -1497,7 +1494,7 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     computed_arrays = tuple(_compute(arr) for arr in arrays)
     concat_tensor = ConcatTensor(*computed_arrays, axis=axis)
     # Create a LazyTensor that represents the concatenation
-    return elementwise(identity, lazy(concat_tensor))
+    return elementwise(ffunc.identity, lazy(concat_tensor))
 
 
 @dataclass(frozen=True)
@@ -1743,7 +1740,7 @@ def split_dims(x, axis: int, shape: tuple) -> LazyTensor:
     x = lazy(x)
     computed_x = _compute(x)
     split_tensor = SplitDimsTensor(computed_x, axis, shape)
-    return elementwise(identity, lazy(split_tensor))
+    return elementwise(ffunc.identity, lazy(split_tensor))
 
 
 def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
@@ -1755,7 +1752,7 @@ def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
     x = lazy(x)
     computed_x = _compute(x)
     combine_tensor = CombineDimsTensor(computed_x, axes)
-    return elementwise(identity, lazy(combine_tensor))
+    return elementwise(ffunc.identity, lazy(combine_tensor))
 
 
 def flatten(x) -> LazyTensor:
@@ -1778,7 +1775,7 @@ def flatten(x) -> LazyTensor:
     if x.ndim == 1:
         # we need it to pass through the elementwise
         # it may be benficial to optimize these cases
-        return elementwise(identity, x)
+        return elementwise(ffunc.identity, x)
     # Combine all dimensions into one
     return combine_dims(x, tuple(range(x.ndim)))
 
@@ -1824,151 +1821,151 @@ def stack(arrays, /, axis: int = 0) -> LazyTensor:
 
 
 def sin(x) -> LazyTensor:
-    return elementwise(np.sin, lazy(x))
+    return elementwise(ffunc.sin, lazy(x))
 
 
 def sinh(x) -> LazyTensor:
-    return elementwise(np.sinh, lazy(x))
+    return elementwise(ffunc.sinh, lazy(x))
 
 
 def cos(x) -> LazyTensor:
-    return elementwise(np.cos, lazy(x))
+    return elementwise(ffunc.cos, lazy(x))
 
 
 def cosh(x) -> LazyTensor:
-    return elementwise(np.cosh, lazy(x))
+    return elementwise(ffunc.cosh, lazy(x))
 
 
 def tan(x) -> LazyTensor:
-    return elementwise(np.tan, lazy(x))
+    return elementwise(ffunc.tan, lazy(x))
 
 
 def tanh(x) -> LazyTensor:
-    return elementwise(np.tanh, lazy(x))
+    return elementwise(ffunc.tanh, lazy(x))
 
 
 def asin(x) -> LazyTensor:
-    return elementwise(np.asin, lazy(x))
+    return elementwise(ffunc.asin, lazy(x))
 
 
 def asinh(x) -> LazyTensor:
-    return elementwise(np.asinh, lazy(x))
+    return elementwise(ffunc.asinh, lazy(x))
 
 
 def acos(x) -> LazyTensor:
-    return elementwise(np.acos, lazy(x))
+    return elementwise(ffunc.acos, lazy(x))
 
 
 def acosh(x) -> LazyTensor:
-    return elementwise(np.acosh, lazy(x))
+    return elementwise(ffunc.acosh, lazy(x))
 
 
 def atan(x) -> LazyTensor:
-    return elementwise(np.atan, lazy(x))
+    return elementwise(ffunc.atan, lazy(x))
 
 
 def hypot(x1, x2) -> LazyTensor:
-    return elementwise(np.hypot, lazy(x1), lazy(x2))
+    return elementwise(ffunc.hypot, lazy(x1), lazy(x2))
 
 
 def atanh(x) -> LazyTensor:
-    return elementwise(np.atanh, lazy(x))
+    return elementwise(ffunc.atanh, lazy(x))
 
 
 def atan2(x1, x2) -> LazyTensor:
-    return elementwise(np.atan2, lazy(x1), lazy(x2))
+    return elementwise(ffunc.atan2, lazy(x1), lazy(x2))
 
 
 def exp(x) -> LazyTensor:
-    return elementwise(np.exp, lazy(x))
+    return elementwise(ffunc.exp, lazy(x))
 
 
 def expm1(x) -> LazyTensor:
-    return elementwise(np.expm1, lazy(x))
+    return elementwise(ffunc.expm1, lazy(x))
 
 
 def log(x) -> LazyTensor:
-    return elementwise(np.log, lazy(x))
+    return elementwise(ffunc.log, lazy(x))
 
 
 def log1p(x) -> LazyTensor:
-    return elementwise(np.log1p, lazy(x))
+    return elementwise(ffunc.log1p, lazy(x))
 
 
 def log2(x) -> LazyTensor:
-    return elementwise(np.log2, lazy(x))
+    return elementwise(ffunc.log2, lazy(x))
 
 
 def log10(x) -> LazyTensor:
-    return elementwise(np.log10, lazy(x))
+    return elementwise(ffunc.log10, lazy(x))
 
 
 def logaddexp(x1, x2) -> LazyTensor:
-    return elementwise(np.logaddexp, lazy(x1), lazy(x2))
+    return elementwise(ffunc.logaddexp, lazy(x1), lazy(x2))
 
 
 def signbit(x) -> LazyTensor:
-    return elementwise(np.signbit, lazy(x))
+    return elementwise(ffunc.signbit, lazy(x))
 
 
 def copysign(x1, x2) -> LazyTensor:
-    return elementwise(np.copysign, lazy(x1), lazy(x2))
+    return elementwise(ffunc.copysign, lazy(x1), lazy(x2))
 
 
 def nextafter(x1, x2) -> LazyTensor:
-    return elementwise(np.nextafter, lazy(x1), lazy(x2))
+    return elementwise(ffunc.nextafter, lazy(x1), lazy(x2))
 
 
 def isfinite(x) -> LazyTensor:
-    return elementwise(np.isfinite, lazy(x))
+    return elementwise(ffunc.isfinite, lazy(x))
 
 
 def isinf(x) -> LazyTensor:
-    return elementwise(np.isinf, lazy(x))
+    return elementwise(ffunc.isinf, lazy(x))
 
 
 def isnan(x) -> LazyTensor:
-    return elementwise(np.isnan, lazy(x))
+    return elementwise(ffunc.isnan, lazy(x))
 
 
 def logical_and(x1, x2) -> LazyTensor:
-    return elementwise(np.logical_and, lazy(x1), lazy(x2))
+    return elementwise(ffunc.logical_and, lazy(x1), lazy(x2))
 
 
 def logical_or(x1, x2) -> LazyTensor:
-    return elementwise(np.logical_or, lazy(x1), lazy(x2))
+    return elementwise(ffunc.logical_or, lazy(x1), lazy(x2))
 
 
 def logical_xor(x1, x2) -> LazyTensor:
-    return elementwise(np.logical_xor, lazy(x1), lazy(x2))
+    return elementwise(ffunc.logical_xor, lazy(x1), lazy(x2))
 
 
 def logical_not(x) -> LazyTensor:
-    return elementwise(np.logical_not, lazy(x))
+    return elementwise(ffunc.logical_not, lazy(x))
 
 
 def less(x1, x2) -> LazyTensor:
-    return elementwise(np.less, lazy(x1), lazy(x2))
+    return elementwise(ffunc.less, lazy(x1), lazy(x2))
 
 
 def less_equal(x1, x2) -> LazyTensor:
-    return elementwise(np.less_equal, lazy(x1), lazy(x2))
+    return elementwise(ffunc.less_equal, lazy(x1), lazy(x2))
 
 
 def greater(x1, x2) -> LazyTensor:
-    return elementwise(np.greater, lazy(x1), lazy(x2))
+    return elementwise(ffunc.greater, lazy(x1), lazy(x2))
 
 
 def greater_equal(x1, x2) -> LazyTensor:
-    return elementwise(np.greater_equal, lazy(x1), lazy(x2))
+    return elementwise(ffunc.greater_equal, lazy(x1), lazy(x2))
 
 
 def equal(x1, x2) -> LazyTensor:
-    return elementwise(np.equal, lazy(x1), lazy(x2))
+    return elementwise(ffunc.equal, lazy(x1), lazy(x2))
 
 
 def not_equal(x1, x2) -> LazyTensor:
-    return elementwise(np.not_equal, lazy(x1), lazy(x2))
+    return elementwise(ffunc.not_equal, lazy(x1), lazy(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -2041,10 +2038,11 @@ def einsum(prgm, *args, **kwargs):
 
 
 def get_lazy_tensor_stats(
-    lazy_tensor: LazyTensor, StatsImpl: type[TensorStats]
+    lazy_tensor: LazyTensor,
+    stats_factory: StatsFactory,
 ) -> TensorStats:
     trace = lazy_tensor.ctx.trace()
-    interpreter = StatsInterpreter(StatsImpl=StatsImpl)
+    interpreter = StatsInterpreter(stats_factory=stats_factory)
     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
     last_stats: TensorStats | tuple[TensorStats, ...]
     for stmt in trace:

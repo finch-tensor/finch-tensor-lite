@@ -30,6 +30,7 @@ from .stages import (
     LogicTransform,
     compute_shape_vars,
 )
+from .tensor_stats import StatsFactory, TensorStats
 
 __all__ = [
     "Aggregate",
@@ -53,9 +54,11 @@ __all__ = [
     "Query",
     "Relabel",
     "Reorder",
+    "StatsFactory",
     "Table",
     "TableValue",
     "TableValueFType",
+    "TensorStats",
     "Value",
     "compute_shape_vars",
 ]

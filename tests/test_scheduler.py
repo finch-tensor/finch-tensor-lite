@@ -1,8 +1,7 @@
-from operator import add, mul
-
 import numpy as np
 
 import finchlite
+from finchlite.algebra import ffunc
 from finchlite.autoschedule import (
     normalize_names,
 )
@@ -70,11 +69,11 @@ def test_propagate_map_queries_backward():
             Query(Alias("A0"), Alias("A1")),
             Table(Alias("A0"), (Field("i0"), Field("i1"))),
             MapJoin(
-                Literal(mul),
+                Literal(ffunc.mul),
                 (
                     Table(Literal(10), (Field("i2"),)),
                     Aggregate(
-                        Literal(add),
+                        Literal(ffunc.add),
                         Literal(0),
                         Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
                         (Field("i3"),),
@@ -83,17 +82,17 @@ def test_propagate_map_queries_backward():
                 ),
             ),
             Aggregate(
-                Literal(add),
+                Literal(ffunc.add),
                 Literal(10),
-                Aggregate(Literal(add), Literal(0), Alias("A2"), (Field("i5"),)),
+                Aggregate(Literal(ffunc.add), Literal(0), Alias("A2"), (Field("i5"),)),
                 (Field("i6"),),
             ),
             Aggregate(
-                Literal(add),
+                Literal(ffunc.add),
                 Literal(0),
                 Reorder(
                     Aggregate(
-                        Literal(add),
+                        Literal(ffunc.add),
                         Literal(0),
                         Table(
                             Alias("A3"),
@@ -114,10 +113,10 @@ def test_propagate_map_queries_backward():
             Plan(()),
             Relabel(Alias("A1"), (Field("i0"), Field("i1"))),
             Aggregate(
-                Literal(add),
+                Literal(ffunc.add),
                 Literal(0),
                 MapJoin(
-                    Literal(mul),
+                    Literal(ffunc.mul),
                     (
                         Table(Literal(10), (Field("i2"),)),
                         Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
@@ -127,11 +126,11 @@ def test_propagate_map_queries_backward():
                 (Field("i3"),),
             ),
             Aggregate(
-                Literal(add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
+                Literal(ffunc.add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
             ),
             Reorder(
                 Aggregate(
-                    Literal(add),
+                    Literal(ffunc.add),
                     Literal(0),
                     Reorder(
                         Table(
@@ -163,10 +162,10 @@ def test_isolate_aggregates():
             Query(
                 Alias("A0"),
                 Aggregate(
-                    Literal("+"),
+                    Literal(ffunc.add),
                     Literal(0),
                     Aggregate(
-                        Literal("*"),
+                        Literal(ffunc.mul),
                         Literal(1),
                         Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                         (Field("i2"),),
@@ -184,7 +183,7 @@ def test_isolate_aggregates():
                     Query(
                         Alias(f"#A#{_sg.counter}"),
                         Aggregate(
-                            Literal("*"),
+                            Literal(ffunc.mul),
                             Literal(1),
                             Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                             (Field("i2"),),
@@ -193,7 +192,7 @@ def test_isolate_aggregates():
                     Query(
                         Alias("A0"),
                         Aggregate(
-                            Literal("+"),
+                            Literal(ffunc.add),
                             Literal(0),
                             Table(
                                 Alias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))
@@ -523,11 +522,11 @@ def test_set_loop_order():
     plan = Query(
         Alias("C"),
         Aggregate(
-            Literal(add),
+            Literal(ffunc.add),
             Literal(0),
             Reorder(
                 MapJoin(
-                    Literal(mul),
+                    Literal(ffunc.mul),
                     (
                         Reorder(
                             Table(Alias("A"), (Field("i0"), Field("i1"))),
@@ -548,12 +547,12 @@ def test_set_loop_order():
     expected = Query(
         Alias("C"),
         Aggregate(
-            Literal(add),
+            Literal(ffunc.add),
             Literal(0),
             Reorder(
                 Reorder(
                     MapJoin(
-                        Literal(mul),
+                        Literal(ffunc.mul),
                         (
                             Reorder(
                                 Table(Alias("A"), (Field("i0"), Field("i1"))),
@@ -626,13 +625,14 @@ def test_scheduler_e2e_matmul(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Aggregate(
-                    Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                    Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             Produces((Alias("C"),)),
@@ -664,21 +664,23 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j))),
                 ),
             ),
             # matmul
             Query(
                 Alias("C"),
                 Aggregate(
-                    Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                    Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             # elemwise
             Query(
                 Alias("RES"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i))),
                 ),
             ),
             Produces((Alias("RES"),)),

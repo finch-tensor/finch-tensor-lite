@@ -1,36 +1,25 @@
-from collections.abc import Callable
+from __future__ import annotations
+
 from typing import Any, Self
 
+from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
+from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
-from .tensor_stats import TensorStats
+from .tensor_stats import BaseTensorStatsFactory
 
 
-class DenseStats(TensorStats):
-    @classmethod
-    def from_def(cls, d: TensorDef) -> Self:
-        ds = object.__new__(cls)
-        ds.tensordef = d.copy()
-        return ds
+class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
+    def __init__(self):
+        super().__init__(DenseStats)
 
-    @staticmethod
-    def copy_stats(stat: TensorStats) -> TensorStats:
-        """
-        Deep copy of a DenseStats object.
-        """
+    def copy_stats(self, stat: DenseStats) -> DenseStats:
         if not isinstance(stat, DenseStats):
             raise TypeError("copy_stats expected a DenseStats instance")
         return DenseStats.from_def(stat.tensordef.copy())
 
-    def estimate_non_fill_values(self) -> float:
-        total = 1.0
-        for size in self.dim_sizes.values():
-            total *= size
-        return total
-
-    @staticmethod
-    def mapjoin(op: Callable, *args: TensorStats) -> TensorStats:
+    def mapjoin(self, op: FinchOperator, *args: DenseStats) -> DenseStats:
         axes_set = [set(s.index_order) for s in args]
         same_axes = all(axes_set[0] == axes for axes in axes_set)
 
@@ -43,19 +32,18 @@ class DenseStats(TensorStats):
 
         return DenseStats.from_def(new_def)
 
-    @staticmethod
     def aggregate(
-        op: Callable[..., Any],
+        self,
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: "TensorStats",
-    ) -> "DenseStats":
+        stats: DenseStats,
+    ) -> DenseStats:
         d = stats.tensordef
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
         return DenseStats.from_def(new_def)
 
-    @staticmethod
-    def issimilar(a: TensorStats, b: TensorStats) -> bool:
+    def issimilar(self, a: DenseStats, b: DenseStats) -> bool:
         return (
             isinstance(a, DenseStats)
             and isinstance(b, DenseStats)
@@ -63,19 +51,30 @@ class DenseStats(TensorStats):
             and a.fill_value == b.fill_value
         )
 
-    @staticmethod
     def relabel(
-        stats: "TensorStats", relabel_indices: tuple[Field, ...]
-    ) -> "DenseStats":
+        self, stats: DenseStats, relabel_indices: tuple[Field, ...]
+    ) -> DenseStats:
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
         return DenseStats.from_def(new_def)
 
-    @staticmethod
     def reorder(
-        stats: "TensorStats", reorder_indices: tuple[Field, ...]
-    ) -> "DenseStats":
-
+        self, stats: DenseStats, reorder_indices: tuple[Field, ...]
+    ) -> DenseStats:
         d = stats.tensordef
         new_def = TensorDef.reorder(d, reorder_indices)
         return DenseStats.from_def(new_def)
+
+
+class DenseStats(NumericStats):
+    @classmethod
+    def from_def(cls, d: TensorDef) -> Self:
+        ds = object.__new__(cls)
+        ds.tensordef = d.copy()
+        return ds
+
+    def estimate_non_fill_values(self) -> float:
+        total = 1.0
+        for size in self.dim_sizes.values():
+            total *= size
+        return total

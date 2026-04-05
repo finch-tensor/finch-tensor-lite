@@ -4,11 +4,21 @@ Galley logical optimizer: applies greedy or exact branch-and-bound query rewriti
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import OrderedDict
 from typing import TypedDict
 
-from ..finch_logic import Alias, LogicEvaluator, Plan, Query
+from ..finch_logic import (
+    Alias,
+    Field,
+    LogicEvaluator,
+    Plan,
+    Query,
+    StatsFactory,
+    TensorStats,
+)
+from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
 from .galley.logical_optimizer.greedy_optimizer import greedy_query
@@ -17,7 +27,8 @@ from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
     preprocess_plan_for_galley,
 )
-from .tensor_stats import TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
 
 def optimize_query(
@@ -63,7 +74,11 @@ def optimize_plan(
     optimized_queries = []
     # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings: OrderedDict[Alias, TensorStats] = OrderedDict(
-        (var, ST(T)) for var, T in bindings.items()
+        (
+            var,
+            stats_factory(T, tuple(Field(f"{var.name}_i_{i}") for i in range(T.ndim))),
+        )
+        for var, T in bindings.items()
     )
     cache_dict: dict[object, TensorStats] = {}
     for body in plan.bodies:
@@ -78,7 +93,11 @@ def optimize_plan(
             )
             for new_query in new_queries:
                 insert_statistics(
-                    ST, new_query, stats_bindings, replace=True, cache=cache_dict
+                    stats_factory,
+                    new_query,
+                    stats_bindings,
+                    replace=True,
+                    cache=cache_dict,
                 )
             optimized_queries.extend(new_queries)
         else:
@@ -104,17 +123,15 @@ class GalleyLogicalOptimizer(LogicEvaluator):
 
     def __init__(
         self,
-        ST,
+        stats_factory: StatsFactory,
         ctx: LogicEvaluator | None = None,
-        verbose: bool = False,
         use_components: bool = True,
         profile: bool = False,
         *,
         use_exact_branch_and_bound: bool = False,
     ):
-        self.ST = ST
+        self.stats_factory = stats_factory
         self.ctx = ctx
-        self.verbose = verbose
         self.use_components = use_components
         self.profile = profile
         self.use_exact_branch_and_bound = use_exact_branch_and_bound
@@ -124,10 +141,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             bindings = {}
 
         if isinstance(prgm, Plan):
-            if self.verbose:
-                # print("Input plan:")
-                # print(prgm)
-                print("Filler")
+            logger.debug("Optimizing plan: %s", prgm)
             t0 = time.perf_counter()
             prgm = optimize_plan(
                 prgm,
