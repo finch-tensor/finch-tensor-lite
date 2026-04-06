@@ -66,6 +66,10 @@ class _FusedFunctionParser:
         self.fn = fn
         self.fn_def = fn_def
         self.globals = getattr(fn, "__globals__", {})
+        self.closurevars: dict[str, Any] = {}
+        if hasattr(fn, "__code__") and hasattr(fn, "__closure__") and fn.__closure__:
+            for name, cell in zip(fn.__code__.co_freevars, fn.__closure__):
+                self.closurevars[name] = cell.cell_contents
         self.locals: set[str] = set()
 
     def parse(self) -> fzd.Function:
@@ -196,6 +200,8 @@ class _FusedFunctionParser:
     def _parse_name(self, name: str) -> fzd.FusedExpression:
         if name in self.locals:
             return fzd.Variable(name)
+        if name in self.closurevars:
+            return fzd.Literal(self.closurevars[name])
         if name in self.globals:
             return fzd.Literal(self.globals[name])
         if hasattr(builtins, name):
