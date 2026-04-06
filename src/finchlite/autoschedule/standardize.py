@@ -2,7 +2,7 @@ from functools import reduce
 from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic.nodes import LogicExpression, LogicNode
+from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
 
 from ..algebra import ffunc
 from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
@@ -317,6 +317,17 @@ class LogicStandardizer(LogicLoader):
             ctx = MockLogicLoader()
         self.ctx: LogicLoader = ctx
 
-    def __call__(self, prgm: LogicStatement, bindings: dict[Alias, TensorFType]):
+    def __call__(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
         prgm, bindings = standardize(prgm, bindings)
-        return self.ctx(prgm, bindings)
+        return self.ctx(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )

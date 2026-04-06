@@ -27,6 +27,7 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
@@ -208,7 +209,11 @@ class MockLogicLoader(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
