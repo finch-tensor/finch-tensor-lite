@@ -6,6 +6,7 @@ import inspect
 import operator
 import textwrap
 
+import finchlite
 import pytest
 
 import numpy as np
@@ -448,6 +449,31 @@ def test_jit_while():
         C = A
         while n > 0:
             C = add(C, B)
+            n = n - 1
+        return C
+
+    A = asarray(np.array([[1, 2], [3, 4]]))
+    B = asarray(np.array([[1, 0], [0, 1]]))
+    n = 3
+
+    finch_assert_allclose(opt_fn(A, B, n), simple_fn(A, B, n))
+
+
+def test_jit_module_function():
+    """A jit function with a function from a module."""
+   
+    def simple_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = finchlite.interface.add(C, B)
+            n = n - 1
+        return C
+
+    @jit
+    def opt_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = finchlite.interface.add(C, B)
             n = n - 1
         return C
 

@@ -8,6 +8,7 @@ import builtins
 import inspect
 import operator
 import textwrap
+import types
 from collections.abc import Callable
 from typing import Any
 
@@ -414,16 +415,14 @@ class _FusedToPythonAST:
 
             module = getattr(value, "__module__", None)
             name = getattr(value, "__name__", None)
-            if module == "operator" and name is not None:
-                return ast.Attribute(
-                    value=ast.Name(id="operator", ctx=ast.Load()),
-                    attr=name,
-                    ctx=ast.Load(),
-                )
-
             if name is not None and name.isidentifier():
                 self._extra_globals[name] = value
                 return ast.Name(id=name, ctx=ast.Load())
+
+        if isinstance(value, types.ModuleType):
+            name = value.__name__
+            self._extra_globals[name] = value
+            return ast.Name(id=name, ctx=ast.Load())
 
         raise ValueError(f"Literal cannot be represented in Python AST: {value!r}")
 
