@@ -28,8 +28,7 @@ is_windows = os.name == "nt"
 is_apple = sys.platform == "darwin"
 
 default = {
-    # "data_path": str(Path(sysconfig.get_path("data")) / "finchlite"),
-    "data_path": str(Path.home() / ".finchlite"),
+    "data_path": str(Path(sysconfig.get_path("data")) / "finchlite"),
     "cache_size": 10_000,
     "cache_enable": True,
     "cc": str(os.getenv("CC") or shutil.which("gcc") or ("cl" if is_windows else "cc")),

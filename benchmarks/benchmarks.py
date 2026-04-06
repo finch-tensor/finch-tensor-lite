@@ -28,7 +28,6 @@ import numpy as np
 
 import finchlite as fl
 import finchlite.interface as fl_interface
-from finchlite.algebra import ffunc
 from finchlite.autoschedule import (
     DefaultLogicFormatter,
     LogicExecutor,
@@ -40,6 +39,9 @@ from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     pruned_query_to_plan,
 )
+from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
+    preprocess_plan_for_galley,
+)
 from finchlite.autoschedule.galley_optimize import (
     GalleyLogicalOptimizer,
     GalleyProfileTimes,
@@ -47,17 +49,7 @@ from finchlite.autoschedule.galley_optimize import (
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.compile.lower import NotationCompiler
 from finchlite.finch_assembly.interpreter import AssemblyInterpreter
-from finchlite.finch_logic import (
-    Aggregate,
-    Alias,
-    Field,
-    Literal,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Table,
-)
+from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.symbolic import gensym
 
 # --- Defaults (compile uses more iterations; BnB uses 1 for heavy cases) ---
@@ -361,7 +353,7 @@ def make_sum_sum_benchmark_expr():
 
 
 # =============================================================================
-# BnB-specific frontend expressions and manual queries
+# BnB-specific frontend expressions (AnnotatedQuery from lazy, not hand-built IR)
 # =============================================================================
 
 
@@ -371,27 +363,23 @@ def make_chain_expr_from_shapes(shapes: list[tuple[int, int]]) -> object:
     return _lazy_matmul_chain(mats)
 
 
-def _query_from_matmul_chain_shapes(
-    shapes: list[tuple[int, int]],
-    *,
-    index_names: str | None = None,
-) -> Query:
-    n = len(shapes)
-    names = index_names or "ijklmnopqrstuvwxyz"[: n + 1]
-    assert len(names) == n + 1
-    fields = [Field(names[i]) for i in range(n + 1)]
-    tables = []
-    for t, (r, c) in enumerate(shapes):
-        arr = fl.asarray(np.ones((r, c)))
-        tables.append(Table(Literal(arr), (fields[t], fields[t + 1])))
-    return Query(
-        Alias("out"),
-        Aggregate(
-            Literal(ffunc.add),
-            Literal(0),
-            MapJoin(Literal(ffunc.mul), tuple(tables)),
-            tuple(fields[1:-1]),
-        ),
+def _query_from_lazy_expr(expr) -> Query:
+    """One merged logical ``Query`` after ``preprocess_plan_for_galley``."""
+    plan = preprocess_plan_for_galley(plan_from_expr(expr))
+    queries = [b for b in plan.bodies if isinstance(b, Query)]
+    if len(queries) != 1:
+        raise ValueError(
+            "expected exactly one merged Query in preprocessed plan for BnB; "
+            f"got {len(queries)}"
+        )
+    return queries[0]
+
+
+def _annotated_query_from_lazy_expr(expr) -> AnnotatedQuery:
+    return AnnotatedQuery(
+        _DENSE_STATS_FACTORY,
+        _query_from_lazy_expr(expr),
+        bindings=OrderedDict(),
     )
 
 
@@ -456,90 +444,6 @@ _HEAVY_SKEW_FOUR_MATRIX_SHAPES: list[tuple[int, int]] = [
 
 def make_heavy_skew_four_matrix_expr() -> object:
     return make_chain_expr_from_shapes(_HEAVY_SKEW_FOUR_MATRIX_SHAPES)
-
-
-def _four_index_chain_query() -> Query:
-    return _query_from_matmul_chain_shapes(_FOUR_INDEX_CHAIN_SHAPES, index_names="ijkl")
-
-
-def _three_index_chain_query() -> Query:
-    return _query_from_matmul_chain_shapes(_THREE_INDEX_CHAIN_SHAPES, index_names="ijk")
-
-
-def _annotated_query(q: Query) -> AnnotatedQuery:
-    return AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=OrderedDict())
-
-
-def _four_index_chain_aq() -> AnnotatedQuery:
-    return _annotated_query(_four_index_chain_query())
-
-
-def _three_index_chain_aq() -> AnnotatedQuery:
-    return _annotated_query(_three_index_chain_query())
-
-
-def _skewed_four_matrix_aq() -> AnnotatedQuery:
-    return _annotated_query(
-        _query_from_matmul_chain_shapes(_SKEWED_FOUR_MATRIX_SHAPES, index_names="ijklm")
-    )
-
-
-def _tapered_four_matrix_aq() -> AnnotatedQuery:
-    return _annotated_query(
-        _query_from_matmul_chain_shapes(
-            _TAPERED_FOUR_MATRIX_SHAPES, index_names="ijklm"
-        )
-    )
-
-
-def _heavy_skew_four_matrix_aq() -> AnnotatedQuery:
-    return _annotated_query(
-        _query_from_matmul_chain_shapes(
-            _HEAVY_SKEW_FOUR_MATRIX_SHAPES,
-            index_names="ijklm",
-        )
-    )
-
-
-def bnb_good_aq() -> AnnotatedQuery:
-    return _annotated_query(
-        _query_from_matmul_chain_shapes(
-            _BNB_GOOD_MATRIX_SHAPES,
-            index_names="ijklmnq",
-        )
-    )
-
-
-def _query_five_chain10_matmul() -> Query:
-    """
-    Logical query for five 10-way matmul chains summed; outer dims ``i``, ``j`` shared.
-    Shapes match ``chain10_shapes_benchmark`` per chain.
-    """
-    rng = _default_rng()
-    chain_exprs = []
-    for k in range(5):
-        chain_shapes = [tuple(m.shape) for m in chain10_shapes_benchmark(k, rng)]
-        fields = [Field("i")] + [Field(f"c{k}_t{t}") for t in range(9)] + [Field("j")]
-        tables = []
-        for t, (r, c) in enumerate(chain_shapes):
-            arr = fl.asarray(np.ones((r, c)))
-            tables.append(Table(Literal(arr), (fields[t], fields[t + 1])))
-        chain_exprs.append(
-            Aggregate(
-                Literal(ffunc.add),
-                Literal(0),
-                MapJoin(Literal(ffunc.mul), tuple(tables)),
-                tuple(fields[1:-1]),
-            )
-        )
-    return Query(
-        Alias("out"),
-        MapJoin(Literal(ffunc.add), tuple(chain_exprs)),
-    )
-
-
-def _five_chain10_matmul_aq() -> AnnotatedQuery:
-    return _annotated_query(_query_five_chain10_matmul())
 
 
 # =============================================================================
@@ -648,14 +552,14 @@ def _print_profile_comparison(
 class BenchmarkCaseSpec:
     """Shared benchmark case.
 
-    Compile rows set ``aq_factory=None``; BnB sets ``recursion_limit=None``.
+    Compile rows may set ``recursion_limit``; BnB derives ``AnnotatedQuery`` from
+    ``build_expr()`` via ``preprocess_plan_for_galley(plan_from_expr(...))``.
     """
 
     slug: str
     title: str
     build_expr: Callable[[], object]
     recursion_limit: int | None = None
-    aq_factory: Callable[[], AnnotatedQuery] | None = None
 
 
 def _exact_greedy_plan_stats(
@@ -669,8 +573,6 @@ def _exact_greedy_plan_stats(
 
 
 def _run_compile_case(case: BenchmarkCaseSpec) -> None:
-    if case.aq_factory is not None:
-        raise ValueError("compile case must not set aq_factory")
     print(f"Compile benchmark: {case.slug}...", flush=True)
     expr = case.build_expr()
     w, wo = time_compile_profile(expr, recursion_limit=case.recursion_limit)
@@ -684,14 +586,14 @@ def _run_compile_case(case: BenchmarkCaseSpec) -> None:
 
 
 def _run_bnb_case(case: BenchmarkCaseSpec) -> None:
-    if case.aq_factory is None:
-        raise ValueError("BnB case must set aq_factory")
     if case.recursion_limit is not None:
         raise ValueError("BnB case must use recursion_limit=None")
     print(f"BnB benchmark: {case.slug}...", flush=True)
     expr = case.build_expr()
     exact_t, greedy_t = time_galley_bnb_compile_profile(expr, n=DEFAULT_BNB_PROFILE_N)
-    cost_e, cost_g, nq_e, nq_g = _exact_greedy_plan_stats(case.aq_factory)
+    cost_e, cost_g, nq_e, nq_g = _exact_greedy_plan_stats(
+        lambda: _annotated_query_from_lazy_expr(expr)
+    )
     _print_profile_comparison(
         case.title,
         [
@@ -755,37 +657,31 @@ BNB_CASES: tuple[BenchmarkCaseSpec, ...] = (
         slug="bnb-good example",
         title="bnb-good example",
         build_expr=make_bnb_good_example,
-        aq_factory=bnb_good_aq,
     ),
     BenchmarkCaseSpec(
         slug="four-index chain",
         title="four-index chain",
         build_expr=make_four_index_chain_expr,
-        aq_factory=_four_index_chain_aq,
     ),
     BenchmarkCaseSpec(
         slug="three-index chain",
         title="three-index chain",
         build_expr=make_three_index_chain_expr,
-        aq_factory=_three_index_chain_aq,
     ),
     BenchmarkCaseSpec(
         slug="skewed 4-matrix chain",
         title="skewed 4-matrix chain",
         build_expr=make_skewed_four_matrix_expr,
-        aq_factory=_skewed_four_matrix_aq,
     ),
     BenchmarkCaseSpec(
         slug="tapered 4-matrix chain",
         title="tapered 4-matrix chain",
         build_expr=make_tapered_four_matrix_expr,
-        aq_factory=_tapered_four_matrix_aq,
     ),
     BenchmarkCaseSpec(
         slug="heavy skew 4-matrix chain",
         title="heavy skew 4-matrix chain",
         build_expr=make_heavy_skew_four_matrix_expr,
-        aq_factory=_heavy_skew_four_matrix_aq,
     ),
     BenchmarkCaseSpec(
         slug="five chain10 terms",
@@ -793,7 +689,6 @@ BNB_CASES: tuple[BenchmarkCaseSpec, ...] = (
         build_expr=lambda: make_five_chain10_expr(
             chain10_shapes_benchmark, _default_rng()
         ),
-        aq_factory=_five_chain10_matmul_aq,
     ),
 )
 
