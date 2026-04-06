@@ -76,7 +76,7 @@ def optimize_plan(
     stats_bindings: OrderedDict[Alias, TensorStats] = OrderedDict(
         (
             var,
-            stats_factory(T, tuple(Field(f"{var.name}_i_{i}") for i in range(T.ndim))),
+            ST(T, tuple(Field(f"{var.name}_i_{i}") for i in range(T.ndim))),
         )
         for var, T in bindings.items()
     )
@@ -93,7 +93,7 @@ def optimize_plan(
             )
             for new_query in new_queries:
                 insert_statistics(
-                    stats_factory,
+                    ST,
                     new_query,
                     stats_bindings,
                     replace=True,
@@ -145,7 +145,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             t0 = time.perf_counter()
             prgm = optimize_plan(
                 prgm,
-                self.ST,
+                self.stats_factory,
                 bindings,
                 use_components=self.use_components,
                 use_exact_branch_and_bound=self.use_exact_branch_and_bound,

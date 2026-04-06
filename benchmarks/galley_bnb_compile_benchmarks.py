@@ -104,11 +104,10 @@ def _three_index_chain_expr():
 
 def _chain_expr_from_shapes(shapes: list[tuple[int, int]]):
     mats = [fl.asarray(np.ones((r, c))) for r, c in shapes]
-    chain = reduce(
+    return reduce(
         lambda a, b: a @ b,
         [fl_interface.lazy(m) for m in mats],
     )
-    return chain
 
 
 def _skewed_four_matrix_expr():
@@ -122,6 +121,7 @@ def _tapered_four_matrix_expr():
         [(1, 1000), (1000, 100), (100, 10), (10, 1)],
     )
 
+
 base_n = 3
 _BNB_GOOD_MATRIX_SHAPES: list[tuple[int, int]] = [
     (base_n**2, base_n**5),
@@ -132,8 +132,10 @@ _BNB_GOOD_MATRIX_SHAPES: list[tuple[int, int]] = [
     (base_n**5, base_n**2),
 ]
 
+
 def bnb_good_example():
     return _chain_expr_from_shapes(_BNB_GOOD_MATRIX_SHAPES)
+
 
 # Four-matrix chain tuned so greedy cost is far above exact in both ratio (~1.2×)
 # and absolute model cost (large gap vs the smaller skewed 4-matrix case above).
@@ -260,7 +262,6 @@ def _heavy_skew_four_matrix_aq() -> AnnotatedQuery:
         ),
         bindings=OrderedDict(),
     )
-
 
 
 def bnb_good_aq() -> AnnotatedQuery:

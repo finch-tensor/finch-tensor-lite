@@ -16,7 +16,6 @@ Legacy entry points remain: ``galley_compile_benchmarks.py``,
 
 from __future__ import annotations
 
-import operator as op
 import sys
 from collections import OrderedDict
 from collections.abc import Callable, Iterable
@@ -29,7 +28,7 @@ import numpy as np
 
 import finchlite as fl
 import finchlite.interface as fl_interface
-from finchlite.algebra import as_finch_operator
+from finchlite.algebra import ffunc
 from finchlite.autoschedule import (
     DefaultLogicFormatter,
     LogicExecutor,
@@ -45,7 +44,7 @@ from finchlite.autoschedule.galley_optimize import (
     GalleyLogicalOptimizer,
     GalleyProfileTimes,
 )
-from finchlite.autoschedule.tensor_stats import DenseStats
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.compile.lower import NotationCompiler
 from finchlite.finch_assembly.interpreter import AssemblyInterpreter
 from finchlite.finch_logic import (
@@ -76,6 +75,8 @@ _BANNER_BNB_MAIN = "### Galley BnB vs greedy benchmarks ###"
 _MSG_DONE_COMPILE = "Done compile benchmarks."
 _MSG_DONE = "Done."
 
+_DENSE_STATS_FACTORY = DenseStatsFactory()
+
 # --- Downstream pipeline (shared structure) ---
 
 _DOWNSTREAM = LogicExecutor(
@@ -86,7 +87,7 @@ _DOWNSTREAM = LogicExecutor(
 
 GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DenseStats,
+        _DENSE_STATS_FACTORY,
         LogicExecutor(
             LogicStandardizer(
                 DefaultLogicFormatter(
@@ -100,7 +101,7 @@ GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(
 
 GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DenseStats,
+        _DENSE_STATS_FACTORY,
         LogicExecutor(
             LogicStandardizer(
                 DefaultLogicFormatter(
@@ -115,7 +116,7 @@ GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(
 
 GALLEY_PIPELINE_GREEDY = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DenseStats,
+        _DENSE_STATS_FACTORY,
         _DOWNSTREAM,
         profile=True,
         use_exact_branch_and_bound=False,
@@ -124,7 +125,7 @@ GALLEY_PIPELINE_GREEDY = LogicNormalizer(
 
 GALLEY_PIPELINE_EXACT_BNB = LogicNormalizer(
     GalleyLogicalOptimizer(
-        DenseStats,
+        _DENSE_STATS_FACTORY,
         _DOWNSTREAM,
         profile=True,
         use_exact_branch_and_bound=True,
@@ -386,9 +387,9 @@ def _query_from_matmul_chain_shapes(
     return Query(
         Alias("out"),
         Aggregate(
-            Literal(as_finch_operator(op.add)),
+            Literal(ffunc.add),
             Literal(0),
-            MapJoin(Literal(as_finch_operator(op.mul)), tuple(tables)),
+            MapJoin(Literal(ffunc.mul), tuple(tables)),
             tuple(fields[1:-1]),
         ),
     )
@@ -466,7 +467,7 @@ def _three_index_chain_query() -> Query:
 
 
 def _annotated_query(q: Query) -> AnnotatedQuery:
-    return AnnotatedQuery(DenseStats, q, bindings=OrderedDict())
+    return AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=OrderedDict())
 
 
 def _four_index_chain_aq() -> AnnotatedQuery:
@@ -485,7 +486,9 @@ def _skewed_four_matrix_aq() -> AnnotatedQuery:
 
 def _tapered_four_matrix_aq() -> AnnotatedQuery:
     return _annotated_query(
-        _query_from_matmul_chain_shapes(_TAPERED_FOUR_MATRIX_SHAPES, index_names="ijklm")
+        _query_from_matmul_chain_shapes(
+            _TAPERED_FOUR_MATRIX_SHAPES, index_names="ijklm"
+        )
     )
 
 
@@ -523,15 +526,15 @@ def _query_five_chain10_matmul() -> Query:
             tables.append(Table(Literal(arr), (fields[t], fields[t + 1])))
         chain_exprs.append(
             Aggregate(
-                Literal(as_finch_operator(op.add)),
+                Literal(ffunc.add),
                 Literal(0),
-                MapJoin(Literal(as_finch_operator(op.mul)), tuple(tables)),
+                MapJoin(Literal(ffunc.mul), tuple(tables)),
                 tuple(fields[1:-1]),
             )
         )
     return Query(
         Alias("out"),
-        MapJoin(Literal(as_finch_operator(op.add)), tuple(chain_exprs)),
+        MapJoin(Literal(ffunc.add), tuple(chain_exprs)),
     )
 
 
@@ -593,7 +596,9 @@ def time_compile_profile(
     def run_without() -> tuple[Any, GalleyProfileTimes]:
         return GALLEY_COMPILE_PROFILE_WITHOUT(plan_from_expr(expr))
 
-    return _time_profile_pair(run_with, run_without, n=n, recursion_limit=recursion_limit)
+    return _time_profile_pair(
+        run_with, run_without, n=n, recursion_limit=recursion_limit
+    )
 
 
 def time_galley_bnb_compile_profile(
@@ -614,7 +619,9 @@ def time_galley_bnb_compile_profile(
     def run_greedy() -> tuple[Any, GalleyProfileTimes]:
         return GALLEY_PIPELINE_GREEDY(plan_from_expr(expr), bindings)
 
-    return _time_profile_pair(run_exact, run_greedy, n=n, recursion_limit=recursion_limit)
+    return _time_profile_pair(
+        run_exact, run_greedy, n=n, recursion_limit=recursion_limit
+    )
 
 
 def _print_profile_comparison(
@@ -639,7 +646,10 @@ def _print_profile_comparison(
 
 @dataclass(frozen=True)
 class BenchmarkCaseSpec:
-    """Shared benchmark case: compile rows set ``aq_factory=None``; BnB sets ``recursion_limit=None``."""
+    """Shared benchmark case.
+
+    Compile rows set ``aq_factory=None``; BnB sets ``recursion_limit=None``.
+    """
 
     slug: str
     title: str
@@ -711,7 +721,9 @@ def _compile_benchmark_cases(rng: np.random.Generator) -> tuple[BenchmarkCaseSpe
         BenchmarkCaseSpec(
             slug="fifty terms × chain2",
             title="Galley compile profile (fifty terms × chain2)",
-            build_expr=lambda: make_fifty_chain2_terms_expr(chain2_shapes_benchmark, rng),
+            build_expr=lambda: make_fifty_chain2_terms_expr(
+                chain2_shapes_benchmark, rng
+            ),
         ),
         BenchmarkCaseSpec(
             slug="three terms × chain10",
@@ -778,7 +790,9 @@ BNB_CASES: tuple[BenchmarkCaseSpec, ...] = (
     BenchmarkCaseSpec(
         slug="five chain10 terms",
         title="five chain10 terms",
-        build_expr=lambda: make_five_chain10_expr(chain10_shapes_benchmark, _default_rng()),
+        build_expr=lambda: make_five_chain10_expr(
+            chain10_shapes_benchmark, _default_rng()
+        ),
         aq_factory=_five_chain10_matmul_aq,
     ),
 )
