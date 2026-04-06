@@ -68,7 +68,7 @@ class _FusedFunctionParser:
         self.globals = getattr(fn, "__globals__", {})
         self.closurevars: dict[str, Any] = {}
         if hasattr(fn, "__code__") and hasattr(fn, "__closure__") and fn.__closure__:
-            for name, cell in zip(fn.__code__.co_freevars, fn.__closure__):
+            for name, cell in zip(fn.__code__.co_freevars, fn.__closure__, strict=True):
                 self.closurevars[name] = cell.cell_contents
         self.locals: set[str] = set()
 
