@@ -2,6 +2,8 @@
 Branch-and-bound optimizer for Galley query planning.
 Converted from Julia.
 Removed general cache. Both alias_hash and cost_cache
+
+TODO: add dfs
 """
 
 from collections import OrderedDict
