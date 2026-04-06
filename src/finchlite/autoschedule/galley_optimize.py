@@ -1,5 +1,6 @@
 """
-Galley logical optimizer: applies greedy or exact branch-and-bound query rewriting.
+Galley logical optimizer: applies greedy query rewriting to logical plans, with
+an optional exact branch-and-bound path for query bodies.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
 def optimize_query(
     query,
-    ST,
+    stats_factory,
     stats_bindings,
     use_components: bool = True,
     *,
@@ -45,9 +46,7 @@ def optimize_query(
             "use_exact_branch_and_bound=True requires use_components=True "
             "(BnB requires components)."
         )
-    print("Query to optimize:")
-    print(query)
-    annotated_query = AnnotatedQuery(ST, query, stats_bindings)
+    annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
     if use_exact_branch_and_bound:
         new_queries, _ = pruned_query_to_plan(annotated_query, use_greedy=False)
         return new_queries
@@ -56,7 +55,7 @@ def optimize_query(
 
 def optimize_plan(
     plan,
-    ST,
+    stats_factory: StatsFactory,
     bindings,
     use_components: bool = True,
     *,
@@ -66,34 +65,28 @@ def optimize_plan(
     Optimize a full Plan: run the Galley optimizer on each Query body,
     pass through non-Query bodies (Produces), and update stats bindings.
     """
-    # Preprocess the plan into the canonical form expected by AnnotatedQuery and
-    # the chosen optimizer (greedy or exact BnB).
     plan = preprocess_plan_for_galley(plan)
-    # print("Preprocessed plan:")
-    # print(plan)
     optimized_queries = []
-    # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings: OrderedDict[Alias, TensorStats] = OrderedDict(
         (
             var,
-            ST(T, tuple(Field(f"{var.name}_i_{i}") for i in range(T.ndim))),
+            stats_factory(T, tuple(Field(f"{var.name}_i_{i}") for i in range(T.ndim))),
         )
         for var, T in bindings.items()
     )
     cache_dict: dict[object, TensorStats] = {}
     for body in plan.bodies:
-        # Put Queries through the Galley optimizer
         if isinstance(body, Query):
             new_queries = optimize_query(
                 body,
-                ST,
+                stats_factory,
                 stats_bindings,
                 use_components=use_components,
                 use_exact_branch_and_bound=use_exact_branch_and_bound,
             )
             for new_query in new_queries:
                 insert_statistics(
-                    ST,
+                    stats_factory,
                     new_query,
                     stats_bindings,
                     replace=True,
@@ -101,7 +94,6 @@ def optimize_plan(
                 )
             optimized_queries.extend(new_queries)
         else:
-            # Produces(...)
             optimized_queries.append(body)
 
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
@@ -116,9 +108,9 @@ class GalleyProfileTimes(TypedDict):
 
 class GalleyLogicalOptimizer(LogicEvaluator):
     """
-    Pipeline stage that optimizes logical Plans with the Galley rewriter (greedy
-    by default, or exact branch-and-bound when enabled), then forwards to an
-    optional downstream LogicEvaluator (ctx).
+    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter
+    (or exact branch-and-bound when enabled), then forwards to an optional
+    downstream LogicEvaluator (ctx).
     """
 
     def __init__(
@@ -162,9 +154,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
                 "optimize_plan_s": t_opt,
                 "downstream_s": t_down,
             }
-            #  End time
             if self.profile:
                 return out, times
             return out
-        # print("This probabiy should not happen")
         raise ValueError(f"Unsupported program type: {type(prgm)}")
