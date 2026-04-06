@@ -413,7 +413,6 @@ class _FusedToPythonAST:
             if getattr(builtins, getattr(value, "__name__", ""), None) is value:
                 return ast.Name(id=value.__name__, ctx=ast.Load())
 
-            module = getattr(value, "__module__", None)
             name = getattr(value, "__name__", None)
             if name is not None and name.isidentifier():
                 self._extra_globals[name] = value

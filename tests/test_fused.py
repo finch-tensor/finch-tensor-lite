@@ -6,11 +6,11 @@ import inspect
 import operator
 import textwrap
 
-import finchlite
 import pytest
 
 import numpy as np
 
+import finchlite
 from finchlite.finch_fused import jit
 from finchlite.finch_fused import nodes as fzd
 from finchlite.finch_fused.cfg_builder import (
@@ -461,7 +461,7 @@ def test_jit_while():
 
 def test_jit_module_function():
     """A jit function with a function from a module."""
-   
+
     def simple_fn(A, B, n):
         C = A
         while n > 0:
