@@ -1,6 +1,5 @@
 """Tests: branch-and-bound (exact) cost vs greedy."""
 
-import operator as op
 from collections import OrderedDict
 
 import pytest
@@ -8,14 +7,14 @@ import pytest
 import numpy as np
 
 import finchlite as fl
-from finchlite.algebra import as_finch_operator
+from finchlite.algebra import ffunc
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     _aq_with_stats,
     branch_and_bound,
     pruned_query_to_plan,
 )
-from finchlite.autoschedule.tensor_stats import DenseStats
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -25,6 +24,8 @@ from finchlite.finch_logic import (
     Query,
     Table,
 )
+
+_DENSE_STATS_FACTORY = DenseStatsFactory()
 
 
 def _make_aq_four_index_chain():
@@ -39,10 +40,10 @@ def _make_aq_four_index_chain():
     q = Query(
         Alias("out"),
         Aggregate(
-            Literal(as_finch_operator(op.add)),
+            Literal(ffunc.add),
             Literal(0),
             MapJoin(
-                Literal(as_finch_operator(op.mul)),
+                Literal(ffunc.mul),
                 (
                     Table(Literal(A), (Field("i"), Field("j"))),
                     Table(Literal(B), (Field("j"), Field("k"))),
@@ -52,7 +53,7 @@ def _make_aq_four_index_chain():
             (Field("i"), Field("j"), Field("k"), Field("l")),
         ),
     )
-    return AnnotatedQuery(DenseStats, q, bindings=OrderedDict())
+    return AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=OrderedDict())
 
 
 def _make_aq_three_index_chain():
@@ -62,10 +63,10 @@ def _make_aq_three_index_chain():
     q = Query(
         Alias("out"),
         Aggregate(
-            Literal(as_finch_operator(op.add)),
+            Literal(ffunc.add),
             Literal(0),
             MapJoin(
-                Literal(as_finch_operator(op.mul)),
+                Literal(ffunc.mul),
                 (
                     Table(Literal(A), (Field("i"), Field("j"))),
                     Table(Literal(B), (Field("j"), Field("k"))),
@@ -74,7 +75,7 @@ def _make_aq_three_index_chain():
             (Field("i"), Field("j"), Field("k")),
         ),
     )
-    return AnnotatedQuery(DenseStats, q, bindings=OrderedDict())
+    return AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=OrderedDict())
 
 
 _CHAIN_FACTORIES = (_make_aq_three_index_chain, _make_aq_four_index_chain)

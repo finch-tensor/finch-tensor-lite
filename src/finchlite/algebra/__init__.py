@@ -29,7 +29,6 @@ __all__ = [
     "NumbaOperator",
     "Tensor",
     "TensorFType",
-    "as_finch_operator",
     "cansplitpush",
     "ffunc",
     "fixpoint_type",
