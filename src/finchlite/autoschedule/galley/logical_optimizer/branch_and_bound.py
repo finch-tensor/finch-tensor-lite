@@ -307,6 +307,7 @@ def pruned_query_to_plan_dfs(
     while cur_aq.get_reducible_idxs():
         component = cur_aq.connected_components[0]
 
+        # Maybe remove, let dfs run
         greedy_result = branch_and_bound_dfs(cur_aq, component, 1, OrderedDict())
         (
             (greedy_order, _, _, greedy_cost),
