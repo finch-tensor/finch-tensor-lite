@@ -33,7 +33,7 @@ from finchlite.codegen.numba_codegen import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finchlite.compile import BufferizedNDArrayFType
+from finchlite.compile import BufferizedNDArray, BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 
@@ -1140,3 +1140,24 @@ def test_multiple_hashtable(compiler, tabletype):
     ) == table4.value_type.from_fields(0.2, 0.2)
 
     assert mod.setidx_5(table5, 3, 2) == 2
+
+
+def test_bufferized_ndarray_reshape():
+    arr = BufferizedNDArray.from_numpy(np.arange(12, dtype=np.float64).reshape(3, 4))
+    t = finchlite.ftype(arr)
+
+    # basic reshape, shares buffer
+    b = t.reshape(arr, (2, 6))
+    assert b.shape == (np.intp(2), np.intp(6))
+    assert b.strides == (np.intp(6), np.intp(1))
+    assert b.val is arr.val
+    assert np.array_equal(b.to_numpy(), np.arange(12, dtype=np.float64).reshape(2, 6))
+
+    # flatten to 1D
+    c = t.reshape(arr, (12,))
+    assert c.shape == (np.intp(12),)
+    assert np.array_equal(c.to_numpy(), np.arange(12, dtype=np.float64))
+
+    # size mismatch raises
+    with pytest.raises(ValueError, match="Cannot reshape"):
+        t.reshape(arr, (5, 3))
