@@ -12,7 +12,9 @@ from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     _aq_with_stats,
     branch_and_bound,
+    branch_and_bound_dfs,
     pruned_query_to_plan,
+    pruned_query_to_plan_dfs,
 )
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
@@ -112,3 +114,25 @@ def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
     (_, _, _, cost_k1), _ = r_greedy
     (_, _, _, cost_kinf), _ = r_exact
     assert cost_kinf <= cost_k1
+
+
+@pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
+@pytest.mark.parametrize("use_greedy", [True, False])
+def test_pruned_query_to_plan_dfs_matches_pruned_query_to_plan(factory, use_greedy):
+    """DFS variant agrees with layered B&B on total cost for chain fixtures."""
+    aq = factory()
+    _, cost_bfs = pruned_query_to_plan(aq, use_greedy=use_greedy)
+    _, cost_dfs = pruned_query_to_plan_dfs(aq, use_greedy=use_greedy)
+    assert cost_dfs == pytest.approx(cost_bfs)
+
+
+@pytest.mark.parametrize("k", [1, float("inf")])
+def test_branch_and_bound_dfs_matches_branch_and_bound_empty_bounds(k):
+    """Single-component B&B vs DFS agree on cost with empty pruning bounds."""
+    aq = _aq_with_stats(_make_aq_four_index_chain())
+    component = aq.connected_components[0]
+    r_bfs = branch_and_bound(aq, component, k, OrderedDict())
+    r_dfs = branch_and_bound_dfs(aq, component, k, OrderedDict())
+    (_, _, _, cost_bfs), _ = r_bfs
+    (_, _, _, cost_dfs), _ = r_dfs
+    assert cost_dfs == pytest.approx(cost_bfs)

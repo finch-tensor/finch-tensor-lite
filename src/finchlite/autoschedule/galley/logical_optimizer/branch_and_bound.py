@@ -6,7 +6,7 @@ Removed general cache. Both alias_hash and cost_cache
 TODO: add dfs
 """
 
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
@@ -154,6 +154,85 @@ def branch_and_bound(
     return (optimal_orders[component_set], optimal_subquery_costs)
 
 
+def branch_and_bound_dfs(
+    input_aq: AnnotatedQuery,
+    component: list,
+    k: float,
+    max_subquery_costs: OrderedDict,
+) -> tuple:
+    """
+    Same contract as :func:`branch_and_bound`.
+
+    For ``k != float("inf")``, delegates to :func:`branch_and_bound` so layered
+    semantics (including greedy ``k=1``) match exactly.
+
+    For ``k == float("inf")``, runs iterative DFS: ``deque`` stack (``appendleft`` /
+    ``popleft`` for LIFO on the left), ``memo[vars_key]`` minimum cumulative cost
+    to reach each eliminated-index set, the same ``max_subquery_costs`` superset
+    bound as the layered code, and optional incumbent pruning when a partial
+    state's cost is already at or above the best complete cost found so far.
+    """
+    if k != float("inf"):
+        return branch_and_bound(input_aq, component, k, max_subquery_costs)
+
+    component_set = frozenset(component)
+    memo: dict[frozenset, float] = {frozenset(): 0.0}
+    best_complete: tuple | None = None
+    best_complete_cost = float("inf")
+
+    stack: deque = deque()
+    stack.appendleft(
+        (frozenset(), input_aq, [], [], 0.0)
+    )
+
+    while stack:
+        vars_key, aq, order, queries, cost = stack.popleft()
+        if cost > memo.get(vars_key, float("inf")):
+            continue
+
+        if vars_key == component_set:
+            if cost < best_complete_cost:
+                best_complete_cost = cost
+                best_complete = (order, queries, aq, cost)
+            continue
+
+        if cost >= best_complete_cost:
+            continue
+
+        reducible_in_comp = _reducible_idxs_for_component(aq, component)
+        for idx in reducible_in_comp:
+            step_cost, reduced_vars = _cost_of_reduce(idx, aq)
+            total_cost = cost + step_cost
+            new_vars = vars_key | frozenset(reduced_vars)
+
+            bound = float("inf")
+            for vars2 in max_subquery_costs:
+                if vars2 >= new_vars:
+                    bound = min(bound, max_subquery_costs[vars2])
+
+            if total_cost > bound:
+                continue
+
+            prev_best = memo.get(new_vars, float("inf"))
+            if total_cost >= prev_best:
+                continue
+
+            memo[new_vars] = total_cost
+            new_aq = _aq_with_stats(aq)
+            reduce_query = new_aq.reduce_idx(idx)
+            new_queries = list(queries) + [reduce_query]
+            new_order = list(order) + [idx]
+            stack.appendleft((new_vars, new_aq, new_order, new_queries, total_cost))
+
+    if best_complete is None:
+        raise RuntimeError(
+            "This should not happen! Maybe delete this line because its impossible."
+        )
+
+    optimal_subquery_costs = OrderedDict()
+    return (best_complete, optimal_subquery_costs)
+
+
 def pruned_query_to_plan(
     input_aq: AnnotatedQuery,
     use_greedy: bool = False,
@@ -200,6 +279,57 @@ def pruned_query_to_plan(
         total_cost += exact_cost
 
     # --- Append remaining (non-reducible) query and fix output name ---
+    remaining_q = cur_aq.get_remaining_query()
+    if remaining_q is not None:
+        queries.append(remaining_q)
+    if queries:
+        last_query = queries[-1]
+        if last_query.lhs != cur_aq.output_name:
+            queries[-1] = Query(cur_aq.output_name, last_query.rhs)
+    return queries, total_cost
+
+
+def pruned_query_to_plan_dfs(
+    input_aq: AnnotatedQuery,
+    use_greedy: bool = False,
+) -> tuple[list[Query], float]:
+    """
+    Pruned optimizer like :func:`pruned_query_to_plan`, using :func:`branch_and_bound_dfs`
+    for the greedy and exact component passes (iterative DFS for ``k=inf``; other ``k``
+    delegate to the layered implementation).
+    Returns (queries, total_cost).
+    """
+    total_cost = 0.0
+    elimination_order: list = []
+    queries: list[Query] = []
+    cur_aq = _aq_with_stats(input_aq)
+
+    while cur_aq.get_reducible_idxs():
+        component = cur_aq.connected_components[0]
+
+        greedy_result = branch_and_bound_dfs(cur_aq, component, 1, OrderedDict())
+        (
+            (greedy_order, _, _, greedy_cost),
+            greedy_subquery_costs,
+        ) = greedy_result
+
+        if len(component) >= 10 or use_greedy:
+            elimination_order.extend(greedy_order)
+            for idx in greedy_order:
+                reduce_query = cur_aq.reduce_idx(idx)
+                queries.append(reduce_query)
+            total_cost += greedy_cost
+            continue
+
+        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
+            cur_aq, component, float("inf"), greedy_subquery_costs
+        )
+        elimination_order.extend(exact_order)
+        for idx in exact_order:
+            reduce_query = cur_aq.reduce_idx(idx)
+            queries.append(reduce_query)
+        total_cost += exact_cost
+
     remaining_q = cur_aq.get_remaining_query()
     if remaining_q is not None:
         queries.append(remaining_q)
