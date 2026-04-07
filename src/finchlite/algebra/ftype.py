@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from ..algebra import query_property
+from . import query_property
+import builtins
 
 
 class FType(ABC):
@@ -45,8 +46,32 @@ class FDTypeFloatComplex(FDTypeFloat, FDTypeComplex):...
 
 class FDTypeBoolean(FDType):...
 
+#Ftypes for python built-in datatypes
+class FDTypeBuiltinBool(FDTypeBoolean):
+    @property
+    def dtype(self):
+        return bool
+bool_ = FDTypeBuiltinBool()
 
-#FTypes for python built-in datatypes
+class FDTypeBuiltinInt(FDTypeInteger):
+    @property
+    def dtype(self):
+        return int
+int_ = FDTypeBuiltinInt()
+
+class FDTypeBuiltinFloat(FDTypeFloat):
+    @property
+    def dtype(self):
+        return float
+float_ = FDTypeBuiltinFloat()
+
+class FDTypeBuiltinComplex(FDTypeComplex):
+    @property
+    def dtype(self):
+        return complex
+complex_ = FDTypeBuiltinComplex()
+
+#FTypes for numpy built-in datatypes
 class FDTypeBool(FDTypeBoolean, FDTypeNumpy):
     @property
     def dtype(self):
@@ -130,6 +155,12 @@ class FDTypeComplex64(FDTypeComplex):
         return np.complex64
 complex64 = FDTypeComplex64()
 
+#alias for default ftypes
+int = int32 if np.intp == np.int32 else int64
+float = float64
+complex = complex64
+index = int32 if np.intp == np.int32 else int64
+
 class FTyped:
     """
     Abstract base class for objects that can be formatted.
@@ -159,36 +190,32 @@ def ftype(x) -> FType:
     Calls .ftype on the object if type not found.
     """
 
-    match x:
-        case np.bool_:
-            return bool
-        case np.int8:
-            return int8
-        case np.int16:
-            return int16
-        case np.int32:
-            return int32
-        case np.int64:
-            return int64
-        case np.uint8:
-            return uint8
-        case np.uint16:
-            return uint16
-        case np.uint32:
-            return uint32
-        case np.uint64:
-            return uint64
-        case np.float32:
-            return float32
-        case np.float64:
-            return float64
-        case np.complex64:
-            return complex32
-        case np.complex128:
-            return complex64
-        case x if x is np.bool_ or x is bool:
-            return bool
-        case isinstance(x, FTyped):
-            return x.ftype
-        case _:
-            raise NotImplementedError
+    if isinstance(x, FTyped):
+        return x.ftype
+    if isinstance(x, np.bool_):
+        return bool
+    if isinstance(x, np.int8):
+        return int8
+    if isinstance(x, np.int16):
+        return int16
+    if isinstance(x, np.int32):
+        return int32
+    if isinstance(x, np.int64):
+        return int64
+    if isinstance(x, np.uint8):
+        return uint8
+    if isinstance(x, np.uint16):
+        return uint16
+    if isinstance(x, np.uint32):
+        return uint32
+    if isinstance(x, np.uint64):
+        return uint64
+    if isinstance(x, np.float32):
+        return float32
+    if isinstance(x, np.float64):
+        return float64
+    if isinstance(x, np.complex64):
+        return complex32
+    if isinstance(x, np.complex128):
+        return complex64
+    raise NotImplementedError

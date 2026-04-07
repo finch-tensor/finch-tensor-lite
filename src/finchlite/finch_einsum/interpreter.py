@@ -7,7 +7,7 @@ from finchlite.finch_einsum.stages import (
     EinsumLoader,
     compute_shape_vars,
 )
-from finchlite.symbolic.ftype import fisinstance
+from finchlite.algebra.ftype import fisinstance
 
 from ..algebra import ffunc
 from . import nodes as ein

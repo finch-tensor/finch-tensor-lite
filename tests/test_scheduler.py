@@ -34,7 +34,7 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.symbolic.ftype import ftype
+from finchlite.algebra.ftype import ftype
 from finchlite.symbolic.gensym import _sg
 
 

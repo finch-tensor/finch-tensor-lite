@@ -1,3 +1,4 @@
+from .ftype import FType, FTyped, fisinstance, ftype
 from . import ffunc
 from .algebra import (
     COperator,
@@ -44,4 +45,8 @@ __all__ = [
     "register_property",
     "repeat_operator",
     "return_type",
+    "FType",
+    "FTyped",
+    "fisinstance",
+    "ftype",
 ]
