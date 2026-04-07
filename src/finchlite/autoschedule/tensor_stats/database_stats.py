@@ -147,8 +147,8 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
 
         join_cover = set().union(*(set(s.index_order) for s in join_like))
         if join_cover == set(new_def.index_order):
-            return DatabaseStats.merge_join(new_def, join_like)
-        return DatabaseStats.merge_union(new_def, join_like + union_like)
+            return self._merge_join(new_def, join_like)
+        return self._merge_union(new_def, join_like + union_like)
 
     def aggregate(
         self,
