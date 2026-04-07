@@ -22,7 +22,6 @@ from ..finch_logic import (
 from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
-from .galley.logical_optimizer.greedy_optimizer import greedy_query
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
 from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
@@ -41,16 +40,12 @@ def optimize_query(
     use_exact_branch_and_bound: bool = False,
 ):
     """Rewrite a single logical Query via greedy or exact branch-and-bound reduction."""
-    if use_exact_branch_and_bound and not use_components:
-        raise ValueError(
-            "use_exact_branch_and_bound=True requires use_components=True "
-            "(BnB requires components)."
-        )
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
-    if use_exact_branch_and_bound:
-        new_queries, _ = pruned_query_to_plan(annotated_query, use_greedy=False)
-        return new_queries
-    return greedy_query(annotated_query, use_components=use_components)
+    use_greedy = not use_exact_branch_and_bound
+    new_queries, _ = pruned_query_to_plan(
+        annotated_query, use_components=use_components, use_greedy=use_greedy
+    )
+    return new_queries
 
 
 def optimize_plan(
@@ -120,7 +115,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
         use_components: bool = True,
         profile: bool = False,
         *,
-        use_exact_branch_and_bound: bool = False,
+        use_exact_branch_and_bound: bool = True,
     ):
         self.stats_factory = stats_factory
         self.ctx = ctx

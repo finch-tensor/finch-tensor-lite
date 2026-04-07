@@ -154,6 +154,7 @@ def branch_and_bound(
 
 def pruned_query_to_plan(
     input_aq: AnnotatedQuery,
+    use_components: bool = True,
     use_greedy: bool = False,
 ) -> tuple[list[Query], float]:
     """
@@ -171,6 +172,10 @@ def pruned_query_to_plan(
     while cur_aq.get_reducible_idxs():
         component = cur_aq.connected_components[0]
 
+        if not use_components:
+            component = list(
+                set().union(*(set(c) for c in cur_aq.connected_components))
+            )
         # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
         greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
         (
@@ -179,7 +184,7 @@ def pruned_query_to_plan(
         ) = greedy_result
 
         # --- Large components or use_greedy: use greedy order directly ---
-        if len(component) >= 10 or use_greedy:
+        if (len(component) > 12) or use_greedy:
             elimination_order.extend(greedy_order)
             for idx in greedy_order:
                 reduce_query = cur_aq.reduce_idx(idx)
