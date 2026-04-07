@@ -31,7 +31,15 @@ class FDType(FType):
 
 def promote_type(T1: FDType, T2: FDType):
     """
-    Promote two types to a common type that can represent both.
+    Returns the data type with the smallest size and smallest scalar kind to
+    which both type1 and type2 may be safely cast.
+
+    Args:
+        *args: The types to promote.
+
+    Returns:
+        The common type of the given arguments.
+    """
     """
     if T1 == T2:
         return T1
