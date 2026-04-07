@@ -8,7 +8,7 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
     aq = input_aq
     queries: list[Query] = []
 
-    # Usign branch and bound compoent code to avoid indexes
+    # Using branch and bound component code to avoid indexes
     while aq.get_reducible_idxs():
         if not use_components:
             component = reduce(

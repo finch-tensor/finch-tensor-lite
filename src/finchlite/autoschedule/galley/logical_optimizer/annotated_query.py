@@ -262,6 +262,9 @@ class AnnotatedQuery:
         new.output_order = (
             None if self.output_order is None else list(self.output_order)
         )
+        new.bindings = OrderedDict(self.bindings.items())
+        new.cache = OrderedDict(self.cache.items())
+        new.cache_point = OrderedDict(self.cache_point.items())
 
         return new
 

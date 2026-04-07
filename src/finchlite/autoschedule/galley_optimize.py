@@ -1,5 +1,6 @@
 """
-Galley logical optimizer: applies greedy query rewriting to logical plans
+Galley logical optimizer: applies greedy query rewriting to logical plans, with
+an optional exact branch-and-bound path for query bodies.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from ..finch_logic import (
 )
 from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.greedy_optimizer import greedy_query
+from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
 from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
@@ -30,10 +31,21 @@ from .galley.logical_optimizer.query_normalization import (
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
 
-def optimize_query(query, stats_factory, stats_bindings, use_components: bool = True):
-    """Rewrite a single logical Query via greedy reduction over reducible indices."""
+def optimize_query(
+    query,
+    stats_factory,
+    stats_bindings,
+    use_components: bool = True,
+    *,
+    use_exact_branch_and_bound: bool = False,
+):
+    """Rewrite a single logical Query via greedy or exact branch-and-bound reduction."""
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
-    return greedy_query(annotated_query, use_components=use_components)
+    use_greedy = not use_exact_branch_and_bound
+    new_queries, _ = pruned_query_to_plan(
+        annotated_query, use_components=use_components, use_greedy=use_greedy
+    )
+    return new_queries
 
 
 def optimize_plan(
@@ -41,18 +53,15 @@ def optimize_plan(
     stats_factory: StatsFactory,
     bindings,
     use_components: bool = True,
+    *,
+    use_exact_branch_and_bound: bool = False,
 ):
     """
-    Optimize a full Plan: run the Galley greedy optimizer on each Query body,
+    Optimize a full Plan: run the Galley optimizer on each Query body,
     pass through non-Query bodies (Produces), and update stats bindings.
     """
-    # Preprocess the plan into the canonical form expected by AnnotatedQuery /
-    # greedy_query.
     plan = preprocess_plan_for_galley(plan)
-    # print("Preprocessed plan:")
-    # print(plan)
     optimized_queries = []
-    # Map alias -> tensor stats for cost/rewrite decisions
     stats_bindings: OrderedDict[Alias, TensorStats] = OrderedDict(
         (
             var,
@@ -62,13 +71,13 @@ def optimize_plan(
     )
     cache_dict: dict[object, TensorStats] = {}
     for body in plan.bodies:
-        # Only put Queries through the greedy optimizer
         if isinstance(body, Query):
             new_queries = optimize_query(
                 body,
                 stats_factory,
                 stats_bindings,
                 use_components=use_components,
+                use_exact_branch_and_bound=use_exact_branch_and_bound,
             )
             for new_query in new_queries:
                 insert_statistics(
@@ -80,7 +89,6 @@ def optimize_plan(
                 )
             optimized_queries.extend(new_queries)
         else:
-            # Produces(...)
             optimized_queries.append(body)
 
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
@@ -95,8 +103,9 @@ class GalleyProfileTimes(TypedDict):
 
 class GalleyLogicalOptimizer(LogicEvaluator):
     """
-    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter,
-    then forwards to an optional downstream LogicEvaluator (ctx)
+    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter
+    (or exact branch-and-bound when enabled), then forwards to an optional
+    downstream LogicEvaluator (ctx).
     """
 
     def __init__(
@@ -105,11 +114,14 @@ class GalleyLogicalOptimizer(LogicEvaluator):
         ctx: LogicEvaluator | None = None,
         use_components: bool = True,
         profile: bool = False,
+        *,
+        use_exact_branch_and_bound: bool = True,
     ):
         self.stats_factory = stats_factory
         self.ctx = ctx
         self.use_components = use_components
         self.profile = profile
+        self.use_exact_branch_and_bound = use_exact_branch_and_bound
 
     def __call__(self, prgm, bindings=None):
         if bindings is None:
@@ -123,6 +135,7 @@ class GalleyLogicalOptimizer(LogicEvaluator):
                 self.stats_factory,
                 bindings,
                 use_components=self.use_components,
+                use_exact_branch_and_bound=self.use_exact_branch_and_bound,
             )
             t_opt = time.perf_counter() - t0
             if self.ctx is not None:
@@ -142,5 +155,4 @@ class GalleyLogicalOptimizer(LogicEvaluator):
             if self.profile:
                 return out, times
             return out
-        # print("This probabiy should not happen")
         raise ValueError(f"Unsupported program type: {type(prgm)}")
