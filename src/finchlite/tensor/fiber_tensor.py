@@ -6,9 +6,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor
+from ..algebra import FType, FTyped, Tensor
 from ..compile.lower import FinchTensorFType
-from ..symbolic import FType, FTyped
 
 
 class LevelFType(FType, ABC):

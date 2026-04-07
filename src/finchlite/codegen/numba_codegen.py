@@ -11,6 +11,8 @@ from .. import finch_assembly as asm
 from ..algebra import (
     NumbaOperator,
     ffunc,
+    fisinstance,
+    ftype,
     query_property,
     register_property,
 )
@@ -20,7 +22,7 @@ from ..finch_assembly.struct import (  # type: ignore[import-untyped]
     ImmutableStructFType,
     MutableStructFType,
 )
-from ..symbolic import Context, Namespace, ScopedDict, fisinstance, ftype
+from ..symbolic import Context, Namespace, ScopedDict
 from ..util.logging import LOG_BACKEND_NUMBA
 from .stages import NumbaCode, NumbaLowerer
 

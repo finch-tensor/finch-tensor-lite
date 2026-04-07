@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import return_type
+from ..algebra import FType, ftype, return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 
 

@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self
 
-from ..algebra import return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..algebra import ftype, return_type
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 
 """

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..algebra import query_property
-from ..symbolic import FType, FTyped
+from ..algebra import FType, FTyped
 
 
 class Buffer(FTyped, ABC):

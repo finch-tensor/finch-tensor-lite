@@ -7,7 +7,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, ffunc, register_property
+from ..algebra import FTyped, TensorFType, ffunc, register_property
 from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
@@ -17,7 +17,7 @@ from ..finch_assembly import (
     AssemblyTransform,
 )
 from ..finch_notation import NotationLoader
-from ..symbolic import Context, FTyped, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
 from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer

@@ -9,10 +9,12 @@ from .. import finch_assembly as asm
 from ..algebra import (
     Tensor,
     TensorFType,
+    fisinstance,
+    ftype,
     query_property,
     register_property,
 )
-from ..symbolic import ScopedDict, fisinstance, ftype
+from ..symbolic import ScopedDict
 from . import nodes as ntn
 from .stages import NotationLoader
 

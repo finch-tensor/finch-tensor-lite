@@ -2,8 +2,8 @@ from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from ..algebra import return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..algebra import ftype, return_type
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 from .buffer import length_type
 

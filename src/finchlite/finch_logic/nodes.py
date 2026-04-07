@@ -5,15 +5,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
-from ..algebra import ffunc, fixpoint_type, promote_type, return_type
+from ..algebra import FType, FTyped, ffunc, fixpoint_type, ftype, promote_type, return_type
 from ..symbolic import (
     Context,
-    FType,
-    FTyped,
     NamedTerm,
     Term,
     TermTree,
-    ftype,
     literal_repr,
 )
 from ..util import qual_str

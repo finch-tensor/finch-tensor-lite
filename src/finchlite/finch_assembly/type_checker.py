@@ -3,7 +3,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from .. import algebra
-from ..symbolic import FType, ScopedDict, ftype
+from ..algebra import FType, ftype
+from ..symbolic import ScopedDict
 from . import nodes as asm
 from .buffer import BufferFType
 from .dct import DictFType

@@ -19,6 +19,7 @@ from ..algebra import (
     Tensor,
     TensorFType,
     ffunc,
+    ftype,
     fixpoint_type,
     init_value,
     promote_type,
@@ -42,7 +43,7 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import ftype, gensym
+from ..symbolic import gensym
 from .overrides import OverrideTensor
 
 

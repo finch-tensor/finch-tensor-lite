@@ -4,7 +4,8 @@ import sys
 from dataclasses import dataclass
 from typing import Any, overload
 
-from ..symbolic import ScopedDict, fisinstance
+from ..algebra import fisinstance
+from ..symbolic import ScopedDict
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 

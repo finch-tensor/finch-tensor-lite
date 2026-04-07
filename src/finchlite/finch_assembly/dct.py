@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ..symbolic import FType, FTyped
+from ..algebra import FType, FTyped
 
 
 class Dict(FTyped, ABC):

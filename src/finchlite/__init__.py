@@ -1,4 +1,4 @@
-from .algebra import Tensor, TensorFType, ffunc
+from .algebra import FTyped, Tensor, TensorFType, fisinstance, ffunc, ftype
 from .autoschedule.tensor_stats import (
     DC,
     BlockedStats,
@@ -129,11 +129,6 @@ from .interface import (
     trunc,
     var,
     vecdot,
-)
-from .symbolic import (
-    FTyped,
-    fisinstance,
-    ftype,
 )
 from .tensor import (
     DenseLevel,

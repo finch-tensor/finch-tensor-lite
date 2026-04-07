@@ -5,9 +5,9 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...algebra import FType, ftype
 from ...codegen import NumpyBufferFType
 from ...compile.lower import AssemblyContext
-from ...symbolic import FType, ftype
 from ..fiber_tensor import FiberTensorFields, Level, LevelFType
 
 

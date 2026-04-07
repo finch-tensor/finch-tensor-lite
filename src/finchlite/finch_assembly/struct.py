@@ -3,8 +3,7 @@ from collections import namedtuple
 from functools import lru_cache
 from typing import Any
 
-from ..algebra import register_property
-from ..symbolic import FType, fisinstance, ftype
+from ..algebra import FType, fisinstance, ftype, register_property
 
 
 class AssemblyStructFType(FType, ABC):
