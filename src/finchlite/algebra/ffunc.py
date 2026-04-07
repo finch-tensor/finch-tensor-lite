@@ -835,6 +835,17 @@ class _IsNan(UnaryBoolOperator):
 isnan = _IsNan()
 
 
+class _IsComplexObj(UnaryBoolOperator):
+    def __call__(self, a):
+        return np.iscomplexobj(a)
+
+    def __repr__(self) -> str:
+        return "iscomplexobj"
+
+
+iscomplexobj = _IsComplexObj()
+
+
 class _Real(UnaryOperator):
     def __call__(self, a):
         return np.real(a)

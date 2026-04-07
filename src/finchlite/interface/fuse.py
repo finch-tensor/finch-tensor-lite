@@ -75,7 +75,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import gensym
-from .lazy import LazyTensor, lazy
+from .lazy import LazyTensor, asarray, lazy
 
 _DEFAULT_SCHEDULER = threading.local()
 
@@ -204,7 +204,13 @@ def compute(arg, ctx=None):
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
         for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
-            outputs[out_idx] = res[lazy_idx]
+            if (
+                len(res[lazy_idx].shape) == 0
+            ):  # if the result is a scalar, extract the value and turn it into a
+                # finch `Scalar`
+                outputs[out_idx] = asarray(res[lazy_idx][()])
+            else:
+                outputs[out_idx] = res[lazy_idx]
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
