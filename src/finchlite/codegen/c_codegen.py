@@ -17,7 +17,14 @@ from finchlite.algebra import ffunc
 from finchlite.algebra.algebra import FinchOperator
 
 from .. import finch_assembly as asm
-from ..algebra import COperator, FType, fisinstance, ftype, query_property, register_property
+from ..algebra import (
+    COperator,
+    FType,
+    fisinstance,
+    ftype,
+    query_property,
+    register_property,
+)
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,

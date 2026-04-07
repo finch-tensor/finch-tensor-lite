@@ -2,6 +2,7 @@ import numpy as np
 
 import finchlite
 from finchlite.algebra import ffunc
+from finchlite.algebra.ftype import ftype
 from finchlite.autoschedule import (
     normalize_names,
 )
@@ -34,7 +35,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.algebra.ftype import ftype
 from finchlite.symbolic.gensym import _sg
 
 

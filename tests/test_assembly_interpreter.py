@@ -7,8 +7,8 @@ import numpy as np
 
 import finchlite  # noqa: F401, ICN001
 from finchlite import ffunc
-from finchlite.algebra import ftype
 from finchlite import finch_assembly as asm
+from finchlite.algebra import ftype
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import (  # noqa: F401
     AssemblyInterpreter,

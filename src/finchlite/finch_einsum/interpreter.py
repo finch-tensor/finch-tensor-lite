@@ -1,5 +1,6 @@
 import numpy as np
 
+from finchlite.algebra.ftype import fisinstance
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_einsum.stages import (
@@ -7,7 +8,6 @@ from finchlite.finch_einsum.stages import (
     EinsumLoader,
     compute_shape_vars,
 )
-from finchlite.algebra.ftype import fisinstance
 
 from ..algebra import ffunc
 from . import nodes as ein
