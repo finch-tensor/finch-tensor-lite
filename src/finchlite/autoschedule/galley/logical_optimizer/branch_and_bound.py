@@ -10,28 +10,6 @@ from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
 
 
-def _aq_with_stats(aq: AnnotatedQuery) -> AnnotatedQuery:
-    """
-    Return a copy of aq with bindings/cache/cache_point preserved.
-    Saves the stats for cost estimation and make sure we dont mutate the original aq
-    as we might use it later.
-    """
-    c = aq.copy()
-    for attr in ("bindings", "cache", "cache_point"):
-        if hasattr(aq, attr):
-            setattr(c, attr, getattr(aq, attr))
-    return c
-
-
-def _reducible_idxs_for_component(
-    aq: AnnotatedQuery,
-    component: list,
-) -> list:
-    """Make sure it is a list, precommit throws error."""
-    comp_set = set(component)
-    return [idx for idx in aq.get_reducible_idxs() if idx in comp_set]
-
-
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
     """
     Return (cost, reduced_vars) for reducing idx in aq.
@@ -76,7 +54,7 @@ def branch_and_bound(
         # --- Extend each current state by trying every possible next reduction ---
         for vars_key, pc in prev_new_optimal_orders.items():
             old_order, old_queries, aq, prev_cost = pc
-            reducible_in_comp = _reducible_idxs_for_component(aq, component)
+            reducible_in_comp = aq.get_reducible_idxs_for_component(component)
             for idx in reducible_in_comp:
                 # Cost of this reduction and which vars it eliminates
                 cost, reduced_vars = _cost_of_reduce(idx, aq)
@@ -126,7 +104,7 @@ def branch_and_bound(
         new_optimal_orders = OrderedDict()
         for new_vars, idx_ext_info in top_k_idx_ext.items():
             aq, idx, old_order, old_queries, cost = idx_ext_info
-            new_aq = _aq_with_stats(aq)
+            new_aq = aq.copy()
             reduce_query = new_aq.reduce_idx(idx)
             new_queries = list(old_queries) + [reduce_query]
             new_order = list(old_order) + [idx]
@@ -164,7 +142,7 @@ def pruned_query_to_plan(
     total_cost = 0.0
     elimination_order: list = []
     queries: list[Query] = []
-    cur_aq = _aq_with_stats(input_aq)
+    cur_aq = input_aq.copy()
 
     # --- Process components until no more reducible indices ---
     # Do this instead of for comp in components because components
@@ -220,7 +198,7 @@ def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
     """
     total_cost = 0.0
     elimination_order: list = []
-    cur_aq = _aq_with_stats(input_aq)
+    cur_aq = input_aq.copy()
 
     # --- Run exact branch-and-bound on each component, collect order ---
     for component in input_aq.connected_components:
@@ -232,7 +210,7 @@ def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
 
     # --- Rebuild queries by applying reductions in elimination order ---
     queries = []
-    cur_aq = _aq_with_stats(input_aq)
+    cur_aq = input_aq.copy()
     for idx in elimination_order:
         if idx in cur_aq.get_reducible_idxs():
             q = cur_aq.reduce_idx(idx)

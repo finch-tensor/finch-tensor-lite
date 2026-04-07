@@ -10,7 +10,6 @@ import finchlite as fl
 from finchlite.algebra import ffunc
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
-    _aq_with_stats,
     branch_and_bound,
     pruned_query_to_plan,
 )
@@ -104,7 +103,7 @@ def test_pruned_exact_never_more_expensive_than_pruned_greedy(factory):
 @pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
 def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
     """On one component, exact (k=inf) cost <= greedy (k=1) B&B cost."""
-    aq = _aq_with_stats(factory())
+    aq = factory()
     component = aq.connected_components[0]
     r_greedy = branch_and_bound(aq, component, 1, OrderedDict())
     r_exact = branch_and_bound(aq, component, float("inf"), OrderedDict())
