@@ -156,27 +156,6 @@ def register_property(cls, attr, prop, f):
     _properties[(cls, attr, prop)] = f
 
 
-def promote_type(a: Any, b: Any) -> type:
-    """Returns the data type with the smallest size and smallest scalar kind to
-    which both type1 and type2 may be safely cast.
-
-    Args:
-        *args: The types to promote.
-
-    Returns:
-        The common type of the given arguments.
-    """
-    return promote_type_stable(a, b)
-
-
-def promote_type_stable(a: Any, b: Any) -> type:
-    a = type(a) if not isinstance(a, type) else a
-    b = type(b) if not isinstance(b, type) else b
-    if issubclass(a, np.generic) or issubclass(b, np.generic):
-        return np.promote_types(a, b).type
-    return type(a(False) + b(False))
-
-
 class COperator(ABC):
     @property
     @abstractmethod
