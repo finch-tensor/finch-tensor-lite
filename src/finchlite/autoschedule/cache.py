@@ -61,7 +61,7 @@ class LogicCacheLRU(LogicLoader):
                     stats_factory.issimilar(stats[alias], saved_stats_dict[alias])
                     for alias in stats
                 ):
-                    # Keep the most used stats/kernel combo as MRU.
+                    # Keep the most used stats:kernel combo as MRU.
                     kernels.move_to_end(saved_stats)
                     return result
 
