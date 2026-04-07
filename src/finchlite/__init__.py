@@ -1,4 +1,12 @@
-from .algebra import Tensor, TensorFType
+from .algebra import Tensor, TensorFType, ffunc
+from .autoschedule.tensor_stats import (
+    DC,
+    BlockedStats,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -10,13 +18,7 @@ from .compile import (
     ExtentFType,
     dimension,
 )
-from .galley import (
-    DC,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
-)
+from .finch_fused import jit
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -152,6 +154,7 @@ from .tensor import (
 __all__ = [
     "DC",
     "AssemblyContext",
+    "BlockedStats",
     "BufferizedNDArray",
     "DCStats",
     "DenseLevel",
@@ -219,6 +222,7 @@ __all__ = [
     "expand_dims",
     "expm1",
     "extent",
+    "ffunc",
     "fiber_tensor",
     "fill_value",
     "fisinstance",
@@ -236,6 +240,7 @@ __all__ = [
     "isfinite",
     "isinf",
     "isnan",
+    "jit",
     "lazy",
     "less",
     "less_equal",

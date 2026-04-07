@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import operator
 from collections.abc import Iterable
 from typing import Any
 
@@ -14,10 +13,10 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import make_tuple, overwrite
-from ..compile.lower import ExtentOp
+from ..algebra import ffunc
+from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import LogicLoader, compute_shape_vars
+from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
 from ..finch_notation import NotationInterpreter
 from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
@@ -166,20 +165,20 @@ class NotationContext:
                 rhs = ctx(arg, loops)
                 lhs_access = ntn.Access(
                     self.slots[lhs],
-                    ntn.Update(ntn.Literal(overwrite)),
+                    ntn.Update(ntn.Literal(ffunc.overwrite)),
                     tuple(loops[idx] for idx in new_idxs),
                 )
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(loop_idxs):
                     t = loops[idx].type_
                     ext = ntn.Call(
-                        ntn.Literal(ExtentOp()),
+                        ntn.Literal(make_extent),
                         (ntn.Literal(t(0)), shapes.get(idx) or shapes[remap_idxs[idx]]),
                     )
                     if idx in remap_idxs:
                         body = ntn.If(
                             ntn.Call(
-                                ntn.Literal(operator.eq),
+                                ntn.Literal(ffunc.eq),
                                 (loops[idx], loops[remap_idxs[idx]]),
                             ),
                             body,
@@ -195,13 +194,13 @@ class NotationContext:
                         ntn.Declare(
                             self.slots[lhs],
                             ntn.Literal(self.bindings[lhs].fill_value),
-                            ntn.Literal(overwrite),
+                            ntn.Literal(ffunc.overwrite),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(overwrite),
+                            ntn.Literal(ffunc.overwrite),
                         ),
                     )
                 )
@@ -236,7 +235,7 @@ class NotationContext:
                 for idx in reversed(idxs_1):
                     t = loops[idx].type_
                     ext = ntn.Call(
-                        ntn.Literal(ExtentOp()),
+                        ntn.Literal(make_extent),
                         (ntn.Literal(t(0)), shapes[idx]),
                     )
                     body = ntn.Loop(
@@ -270,7 +269,7 @@ class NotationContext:
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
-                                ntn.Literal(make_tuple),
+                                ntn.Literal(ffunc.make_tuple),
                                 tuple(self.args[var] for var in vars),
                             )
                         ),
@@ -350,7 +349,11 @@ class LogicCompiler(LogicLoader):
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

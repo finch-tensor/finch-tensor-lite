@@ -1,10 +1,14 @@
-from operator import add, mul
-
 import pytest
 
 import numpy as np
 
 import finchlite as fl
+from finchlite.algebra import ffunc
+from finchlite.autoschedule.tensor_stats import DCStatsFactory
+from finchlite.autoschedule.tensor_stats.stats_interpreter import (
+    StatsInterpreter,
+    calculate_estimated_error,
+)
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -16,11 +20,6 @@ from finchlite.finch_logic import (
     Query,
     Reorder,
     Table,
-)
-from finchlite.galley.TensorStats import DCStats
-from finchlite.galley.TensorStats.stats_interpreter import (
-    StatsInterpreter,
-    calculate_estimated_error,
 )
 
 
@@ -46,14 +45,18 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add),
+                        Literal(0),
+                        Table(Alias("AB"), (i, k, j)),
+                        (k,),
                     ),
                     (i, j),
                 ),
@@ -62,7 +65,7 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
         )
     )
 
-    interpreter = StatsInterpreter(StatsImpl=DCStats)
+    interpreter = StatsInterpreter(stats_factory=DCStatsFactory())
     result_stats = interpreter(p, {})[0]
 
     expected_rows = shape_a[0]
@@ -88,14 +91,18 @@ def test_stats_matmul_error():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(mul), (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j)))
+                    Literal(ffunc.mul),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                        Literal(ffunc.add),
+                        Literal(0),
+                        Table(Alias("AB"), (i, k, j)),
+                        (k,),
                     ),
                     (i, j),
                 ),
@@ -105,7 +112,10 @@ def test_stats_matmul_error():
     )
 
     errors = calculate_estimated_error(
-        node=p, StatsImpl=DCStats, logic_bindings={}, stats_bindings={}
+        node=p,
+        stats_factory=DCStatsFactory(),
+        logic_bindings={},
+        stats_bindings={},
     )
 
     assert errors[0] == 0.0

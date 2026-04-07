@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
-from ..algebra import fixpoint_type, promote_max, promote_type, return_type
+from ..algebra import ffunc, fixpoint_type, promote_type, return_type
 from ..symbolic import (
     Context,
     FType,
@@ -31,7 +31,7 @@ def merge_dim(d1, d2):
     if d3 != d4:
         raise ValueError(f"Dimension mismatch: {d1} vs {d2}")
     if d1 and d2:
-        return promote_max(d1, d2)
+        return ffunc.promote_max(d1, d2)
     return d1 or d2
 
 

@@ -1,6 +1,5 @@
 import ctypes
 import logging
-import operator
 import shutil
 import subprocess
 import tempfile
@@ -14,8 +13,15 @@ from typing import Any, TypedDict
 
 import numpy as np
 
+from finchlite.algebra import ffunc
+from finchlite.algebra.algebra import FinchOperator
+
 from .. import finch_assembly as asm
+<<<<<<< HEAD
 from ..algebra import COperator, as_finch_operator, query_property, register_property
+=======
+from ..algebra import COperator, query_property, register_property
+>>>>>>> main
 from ..finch_assembly import (
     AssemblyStructFType,
     BufferFType,
@@ -418,7 +424,7 @@ class CCompiler(asm.AssemblyLoader):
         return CLibrary(lib, kernels)
 
 
-def c_function_name(op: Any, ctx, *args: Any) -> str:
+def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
     """Returns the C function name corresponding to the given Python function
     and argument types.
 
@@ -434,13 +440,19 @@ def c_function_name(op: Any, ctx, *args: Any) -> str:
         NotImplementedError: If the C function name is not implemented for the
         given function and types.
     """
+<<<<<<< HEAD
     finch_op = as_finch_operator(op)
     if isinstance(finch_op, COperator):
         return finch_op.c_symbol
     raise TypeError(f"{finch_op} has no C representation.")
+=======
+    if isinstance(op, COperator):
+        return op.c_symbol
+    raise TypeError(f"{op} has no C representation.")
+>>>>>>> main
 
 
-def c_function_call(op: Any, ctx, *args: Any) -> str:
+def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
     """Returns a call to the C function corresponding to the given Python
     function and argument types.
 
@@ -452,10 +464,16 @@ def c_function_call(op: Any, ctx, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
+<<<<<<< HEAD
     finch_op = as_finch_operator(op)
     if not isinstance(finch_op, COperator):
         raise TypeError(f"{finch_op} has no C representation.")
     return finch_op.c_function_call(ctx, *args)
+=======
+    if not isinstance(op, COperator):
+        raise TypeError(f"{op} has no C representation.")
+    return op.c_function_call(ctx, *args)
+>>>>>>> main
 
 
 def c_getattr(fmt, ctx, obj, attr):
@@ -470,6 +488,7 @@ def c_setattr(fmt, ctx, obj, attr, val):
     return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
 
 
+<<<<<<< HEAD
 op: Any
 symbol: str
 
@@ -489,6 +508,8 @@ for op, symbol in [
     )
 
 
+=======
+>>>>>>> main
 def c_literal(ctx, val):
     """
     Returns the C literal corresponding to the given Python value.
@@ -880,7 +901,7 @@ class CContext(Context):
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(
-                    asm.Literal(operator.sub), (asm.Length(buf), asm.Literal(1))
+                    asm.Literal(ffunc.sub), (asm.Length(buf), asm.Literal(1))
                 )
                 body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))

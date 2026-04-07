@@ -1,13 +1,16 @@
+from . import ffunc
 from .algebra import (
     COperator,
+<<<<<<< HEAD
     InitWrite,
     NumbaOperator,
     as_finch_operator,
+=======
+    FinchOperator,
+    NumbaOperator,
+>>>>>>> main
     cansplitpush,
-    conjugate,
-    first_arg,
     fixpoint_type,
-    identity,
     init_value,
     is_annihilator,
     is_associative,
@@ -15,16 +18,11 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
-    make_tuple,
-    overwrite,
-    promote_max,
-    promote_min,
     promote_type,
     query_property,
     register_property,
     repeat_operator,
     return_type,
-    scansearch,
 )
 from .tensor import (
     Tensor,
@@ -33,17 +31,22 @@ from .tensor import (
 
 __all__ = [
     "COperator",
+<<<<<<< HEAD
     "InitWrite",
     "NumbaOperator",
     "Tensor",
     "TensorFType",
     "as_finch_operator",
     "as_finch_operator",
+=======
+    "FinchOperator",
+    "NumbaOperator",
+    "Tensor",
+    "TensorFType",
+>>>>>>> main
     "cansplitpush",
-    "conjugate",
-    "first_arg",
+    "ffunc",
     "fixpoint_type",
-    "identity",
     "init_value",
     "is_annihilator",
     "is_associative",
@@ -51,14 +54,9 @@ __all__ = [
     "is_distributive",
     "is_idempotent",
     "is_identity",
-    "make_tuple",
-    "overwrite",
-    "promote_max",
-    "promote_min",
     "promote_type",
     "query_property",
     "register_property",
     "repeat_operator",
     "return_type",
-    "scansearch",
 ]

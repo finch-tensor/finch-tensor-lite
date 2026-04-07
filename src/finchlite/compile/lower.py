@@ -1,15 +1,14 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from operator import add, sub
 from typing import Any, overload
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import TensorFType, register_property, scansearch
-from ..algebra.algebra import FinchOperator, SingletonMeta
+from ..algebra import TensorFType, ffunc, register_property
+from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -98,14 +97,18 @@ class Extent(FTyped):
         )
 
 
-class ExtentOp(FinchOperator, metaclass=SingletonMeta):
-    __qualname__ = "ExtentOp"  # TODO: unify with the rest of FinchOperators
+class _MakeExtent(FinchOperator):
+    def __repr__(self):
+        return "make_extent"
 
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)
 
     def return_type(self, start: Any, end: Any):
         return ExtentFType(start, end)  # type: ignore[abstract]
+
+
+make_extent = _MakeExtent()
 
 
 def dimension(tns, mode: int) -> Extent:
@@ -131,7 +134,6 @@ register_property(
     "__attr__",
     lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
 )
-
 
 
 @dataclass(frozen=True)
@@ -160,7 +162,7 @@ class SymbolicExtent(FTyped):
     @classmethod
     def from_notation(cls, node: ntn.NotationNode):
         match node:
-            case ntn.Call(ntn.Literal(op), (start, end)) if op is ExtentOp():
+            case ntn.Call(ntn.Literal(op), (start, end)) if isinstance(op, _MakeExtent):
                 return SymbolicExtent(start, end)
             case _:
                 raise Exception(node)
@@ -177,7 +179,7 @@ class SymbolicExtent(FTyped):
     @staticmethod
     def point(idx):
         return SymbolicExtent(
-            idx, ntn.Call(ntn.Literal(add), (idx, ntn.Literal(np.intp(1))))
+            idx, ntn.Call(ntn.Literal(ffunc.add), (idx, ntn.Literal(np.intp(1))))
         )
 
     # TODO: Make it more robust
@@ -185,13 +187,13 @@ class SymbolicExtent(FTyped):
         return self.start_sym == self.end_sym
 
     def get_measure(self):
-        return ntn.Call(ntn.Literal(sub), (self.end_sym, self.start_sym))
+        return ntn.Call(ntn.Literal(ffunc.sub), (self.end_sym, self.start_sym))
 
     def bound_below(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, max)
+        return self._bound_ext(size, ffunc.max)
 
     def bound_above(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, min)
+        return self._bound_ext(size, ffunc.min)
 
     def _bound_ext(self, size, func) -> "SymbolicExtent":
         return SymbolicExtent(
@@ -200,7 +202,10 @@ class SymbolicExtent(FTyped):
                 self.end_sym,
                 ntn.Call(
                     ntn.Literal(func),
-                    (self.end_sym, ntn.Call(ntn.Literal(add), (self.start_sym, size))),
+                    (
+                        self.end_sym,
+                        ntn.Call(ntn.Literal(ffunc.add), (self.start_sym, size)),
+                    ),
                 ),
             ),
         )

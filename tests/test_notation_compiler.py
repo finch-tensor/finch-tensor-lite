@@ -1,16 +1,14 @@
-import operator
-
 import pytest
 
 import numpy as np
 
 import finchlite
 import finchlite.finch_notation as ntn
-from finchlite import ftype
+from finchlite import ffunc, ftype
 from finchlite.compile import (
     BufferizedNDArray,
-    ExtentOp,
     NotationCompiler,
+    make_extent,
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
@@ -57,15 +55,15 @@ def test_matrix_multiplication(a, b):
     p = ntn.Variable("p", np.int64)
 
     m_ext = ntn.Call(
-        ntn.Literal(ExtentOp()),
+        ntn.Literal(make_extent),
         (ntn.Literal(np.int64(0)), ntn.Variable("m", np.int64)),
     )
     n_ext = ntn.Call(
-        ntn.Literal(ExtentOp()),
+        ntn.Literal(make_extent),
         (ntn.Literal(np.int64(0)), ntn.Variable("n", np.int64)),
     )
     p_ext = ntn.Call(
-        ntn.Literal(ExtentOp()),
+        ntn.Literal(make_extent),
         (ntn.Literal(np.int64(0)), ntn.Variable("p", np.int64)),
     )
 
@@ -83,7 +81,7 @@ def test_matrix_multiplication(a, b):
                         ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
                         ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                            C_, ntn.Literal(0.0), ntn.Literal(ffunc.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
@@ -111,16 +109,14 @@ def test_matrix_multiplication(a, b):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.mul),
+                                                    ntn.Literal(ffunc.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(operator.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffunc.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -130,7 +126,7 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
@@ -187,9 +183,9 @@ def test_matrix_multiplication_regression(file_regression):
     n = ntn.Variable("n", np.int64)
     p = ntn.Variable("p", np.int64)
 
-    m_ext = ntn.Call(ntn.Literal(ExtentOp()), (ntn.Literal(np.int64(0)), m))
-    n_ext = ntn.Call(ntn.Literal(ExtentOp()), (ntn.Literal(np.int64(0)), n))
-    p_ext = ntn.Call(ntn.Literal(ExtentOp()), (ntn.Literal(np.int64(0)), p))
+    m_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), m))
+    n_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), n))
+    p_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), p))
 
     prgm = ntn.Module(
         (
@@ -207,7 +203,7 @@ def test_matrix_multiplication_regression(file_regression):
                         ntn.Declare(
                             C_,
                             ntn.Literal(0.0),
-                            ntn.Literal(operator.add),
+                            ntn.Literal(ffunc.add),
                             (m, n),
                         ),
                         ntn.Loop(
@@ -236,16 +232,14 @@ def test_matrix_multiplication_regression(file_regression):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.mul),
+                                                    ntn.Literal(ffunc.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(operator.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffunc.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -255,7 +249,7 @@ def test_matrix_multiplication_regression(file_regression):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
