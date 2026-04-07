@@ -189,9 +189,16 @@ def ftype(x) -> FType:
     Recognizes numpy, Python builtins, and Python tuples.
     Calls .ftype on the object if type not found.
     """
-
     if isinstance(x, FTyped):
         return x.ftype
+    if isinstance(x, bool):
+        return bool_
+    if isinstance(x, int):
+        return int_
+    if isinstance(x, float):
+        return float_
+    if isinstance(x, complex):
+        return complex_
     if isinstance(x, np.bool_):
         return bool
     if isinstance(x, np.int8):
