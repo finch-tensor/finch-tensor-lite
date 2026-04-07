@@ -15,51 +15,120 @@ class FType(ABC):
         Check if `other` is an instance of this ftype.
         """
         return ftype(other) == self
-    
+
+#https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
+
+class FDType(FType):...
+
+class FDTypeNumpy(FDType):
+    @property
+    @abstractmethod
+    def dtype(self):
+        """
+        The corresponding numpy dtype for this ftype.
+        """
+        ...
+
+class FDTypeNumeric(FDType):...
+
+class FDTypeReal(FDTypeNumeric):...
+
+class FDTypeComplex(FDTypeNumeric):...
+
+class FDTypeInteger(FDTypeNumeric):...
+
+class FDTypeFloat(FDTypeNumeric):...
+
+class FDTypeFloatReal(FDTypeFloat, FDTypeReal):...
+
+class FDTypeFloatComplex(FDTypeFloat, FDTypeComplex):...
+
+class FDTypeBoolean(FDType):...
+
 
 #FTypes for python built-in datatypes
-class BoolFType(FType):
-    dtype = np.bool_
+class FDTypeBool(FDTypeBoolean, FDTypeNumpy):
+    @property
+    def dtype(self):
+        return np.bool_
 
-class Int8FType(FType):
-    dtype = np.int8
+bool = FDTypeBool()
 
-class Int16FType(FType):
-    dtype = np.int16
+class FDTypeInt8(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.int8
 
-class Int32FType(FType):
-    dtype = np.int32
+int8 = FDTypeInt8()
 
-class Int64FType(FType):
-    dtype = np.int64
+class FDTypeInt16(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.int16
+    
+int16 = FDTypeInt16()
 
-class UInt8FType(FType):
-    dtype = np.uint8
+class FDTypeInt32(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.int32
+int32 = FDTypeInt32()
 
-class UInt16FType(FType):
-    dtype = np.uint16
+class FDTypeInt64(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.int64
+int64 = FDTypeInt64()
 
-class UInt32FType(FType):
-    dtype = np.uint32
+class FDTypeUInt8(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.uint8
+uint8 = FDTypeUInt8()
 
-class UInt64FType(FType):
-    dtype = np.uint64
+class FDTypeUInt16(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.uint16
+uint16 = FDTypeUInt16()
 
-class Float32FType(FType):
-    dtype = np.float32
+class FDTypeUInt32(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.uint32
+uint32 = FDTypeUInt32()
 
-class Float64FType(FType):
-    dtype = np.float64
+class FDTypeUInt64(FDTypeInteger):
+    @property
+    def dtype(self):
+        return np.uint64
 
-class Complex64FType(FType):
-    dtype = np.complex64
+uint64 = FDTypeUInt64()
 
-class Complex128FType(FType):
-    dtype = np.complex128
+class FDTypeFloat32(FDTypeFloat):
+    @property
+    def dtype(self):
+        return np.float32
+float32 = FDTypeFloat32()
 
-class StringFType(FType):
-    dtype = str
+class FDTypeFloat64(FDTypeFloat):
+    @property
+    def dtype(self):
+        return np.float64
+float64 = FDTypeFloat64()
 
+
+class FDTypeComplex32(FDTypeComplex):
+    @property
+    def dtype(self):
+        return np.complex64
+complex32 = FDTypeComplex32()
+
+class FDTypeComplex64(FDTypeComplex):
+    @property
+    def dtype(self):
+        return np.complex64
+complex64 = FDTypeComplex64()
 
 class FTyped:
     """
@@ -84,49 +153,42 @@ def fisinstance(x, f):
     return f.fisinstance(x)
 
 
-def ftype(dtype) -> FType:
+def ftype(x) -> FType:
     """Return the corresponding FType for a given dtype.
     Recognizes numpy, Python builtins, and Python tuples.
     Calls .ftype on the object if type not found.
     """
 
-
-    match dtype:
+    match x:
         case np.bool_:
-            return BoolFType()
+            return bool
         case np.int8:
-            return Int8FType()
+            return int8
         case np.int16:
-            return Int16FType()
-        case x if x is np.int32 or x is int:
-            return Int32FType()
+            return int16
+        case np.int32:
+            return int32
         case np.int64:
-            return Int64FType()
+            return int64
         case np.uint8:
-            return UInt8FType()
+            return uint8
         case np.uint16:
-            return UInt16FType()
+            return uint16
         case np.uint32:
-            return UInt32FType()
+            return uint32
         case np.uint64:
-            return UInt64FType()
+            return uint64
         case np.float32:
-            return Float32FType()
-        case x if x is np.float64 or x is float:
-            return Float64FType()
+            return float32
+        case np.float64:
+            return float64
         case np.complex64:
-            return Complex64FType()
-        case x if x is np.complex128 or x is complex:
-            return Complex128FType()
+            return complex32
+        case np.complex128:
+            return complex64
         case x if x is np.bool_ or x is bool:
-            return BoolFType()
-        case _ if dtype is str:
-            return StringFType()
-        case _ if dtype is tuple:
-            raise NotImplementedError
-        
-        #if not one of the above types
-        case x if hasattr(x, "ftype"):
+            return bool
+        case isinstance(x, FTyped):
             return x.ftype
         case _:
-            raise TypeError(f"No ftype registered for {dtype}")
+            raise NotImplementedError
