@@ -453,6 +453,10 @@ def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     return format(arg)
 
 
+def _is_convertible_to_array(arg: Any) -> bool:
+    return isinstance(arg, np.ndarray) or np.isscalar(arg) or arg is None
+
+
 def lazy(arr) -> LazyTensor:
     """
     - lazy(arr) -> LazyTensor:
@@ -466,6 +470,9 @@ def lazy(arr) -> LazyTensor:
     Returns:
     - LazyTensor: A lazy representation of the input array.
     """
+    if not isinstance(arr, Tensor) and not _is_convertible_to_array(arr):
+        return arr
+
     if isinstance(arr, LazyTensor):
         return arr
     arr = asarray(arr)
@@ -1926,6 +1933,10 @@ def isinf(x) -> LazyTensor:
 
 def isnan(x) -> LazyTensor:
     return elementwise(ffunc.isnan, lazy(x))
+
+
+def iscomplexobj(x) -> LazyTensor:
+    return elementwise(ffunc.iscomplexobj, lazy(x))
 
 
 def logical_and(x1, x2) -> LazyTensor:

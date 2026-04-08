@@ -12,6 +12,8 @@ from finchlite.autoschedule.tensor_stats import (
     DC,
     BlockedStats,
     BlockedStatsFactory,
+    DatabaseStats,
+    DatabaseStatsFactory,
     DCStats,
     DCStatsFactory,
     DenseStatsFactory,
@@ -25,6 +27,275 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+
+# ─────────────────────────────── DatabaseStats tests ─────────────────────────────
+
+
+def test_database_from_tensor_and_getters():
+    data = np.zeros((2, 3))
+    data[0, 0] = 1.0
+    data[1, 1] = 1.0
+    arr = fl.asarray(data)
+
+    node = Table(Literal(arr), (Field("i"), Field("j")))
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.index_order == (Field("i"), Field("j"))
+    assert stats.get_dim_size(Field("i")) == 2.0
+    assert stats.get_dim_size(Field("j")) == 3.0
+    assert stats.fill_value == 0
+    assert stats.estimate_non_fill_values() == 2.0
+
+
+@pytest.mark.parametrize(
+    "shape, nnz_indices, expected_nnz",
+    [
+        ((4, 5), [(0, 0), (1, 2), (3, 4)], 3.0),
+        ((5, 5), [(0, 0), (0, 1), (0, 2)], 3.0),
+        ((3, 3, 3), [(0, 0, 0), (1, 1, 1), (2, 2, 2)], 3.0),
+        ((5, 5, 5), [], 0.0),
+        ((2, 2), [(0, 0), (0, 1), (1, 0), (1, 1)], 4.0),
+    ],
+)
+def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
+    axes = tuple(Field(f"x{i}") for i in range(len(shape)))
+    data = np.zeros(shape)
+    for idx in nnz_indices:
+        data[idx] = 1.0
+
+    arr = fl.asarray(data)
+    node = Table(Literal(arr), axes)
+
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    assert stats.index_order == tuple(axes)
+    assert stats.estimate_non_fill_values() == expected_nnz
+
+
+def test_database_mapjoin_join():
+    i, k, j = Field("i"), Field("k"), Field("j")
+    data_a = np.eye(10)
+    data_b = np.eye(10)
+
+    ta = Table(Literal(fl.asarray(data_a)), (i, k))
+    tb = Table(Literal(fl.asarray(data_b)), (k, j))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node_mul,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(10.0)
+
+
+def test_database_mapjoin_elementwise():
+    i, j = Field("i"), Field("j")
+    data_a = np.zeros((10, 10))
+    data_a[:5, :] = 1.0
+    data_b = np.zeros((10, 10))
+    data_b[5:, :] = 1.0
+
+    ta = Table(Literal(fl.asarray(data_a)), (i, j))
+    tb = Table(Literal(fl.asarray(data_b)), (i, j))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=MapJoin(Literal(ffunc.add), (ta, tb)),
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(100.0)
+
+
+def test_database_mapjoin_broadcast():
+    i, j, k = Field("i"), Field("j"), Field("k")
+
+    data_a = np.zeros((4, 5))
+    data_a[0, 0] = 1.0
+    data_a[1, 1] = 1.0
+
+    data_b = np.zeros((5, 3))
+    data_b[0, 0] = 1.0
+    data_b[1, 1] = 1.0
+    data_b[2, 2] = 1.0
+
+    ta = Table(Literal(fl.asarray(data_a)), (i, j))
+    tb = Table(Literal(fl.asarray(data_b)), (j, k))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=MapJoin(Literal(ffunc.add), (ta, tb)),
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(2 * 3 + 4 * 3)
+    assert stats.V[i] == pytest.approx(4.0)
+    assert stats.V[j] == pytest.approx(5.0)
+    assert stats.V[k] == pytest.approx(3.0)
+
+
+def test_database_aggregate():
+    i, j = Field("i"), Field("j")
+    data = np.eye(10)
+    table = Table(Literal(fl.asarray(data)), (i, j))
+
+    node_sum = Aggregate(
+        op=Literal(ffunc.add),
+        init=None,
+        arg=table,
+        idxs=(j,),
+    )
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node_sum,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.index_order == (i,)
+    assert stats.get_dim_size(i) == 10.0
+    assert stats.estimate_non_fill_values() == pytest.approx(10.0)
+
+
+def test_database_issimilar():
+    data = np.eye(10)
+    arr = fl.asarray(data)
+    node = Table(Literal(arr), (Field("i"), Field("j")))
+
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert DatabaseStatsFactory().issimilar(stats, stats)
+
+    other = DatabaseStats.from_def(stats.tensordef, stats.nnz + 1.0, dict(stats.V))
+    assert not DatabaseStatsFactory().issimilar(stats, other)
+
+    i, j = Field("i"), Field("j")
+    bad_V = {i: stats.V[i] + 1.0, j: stats.V[j]}
+    other_v = DatabaseStats.from_def(stats.tensordef, stats.nnz, bad_V)
+    assert not DatabaseStatsFactory().issimilar(stats, other_v)
+
+
+def test_database_copy_stats():
+    data = np.eye(10)
+    arr = fl.asarray(data)
+    node = Table(Literal(arr), (Field("i"), Field("j")))
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    copy = DatabaseStatsFactory().copy_stats(stats)
+    assert copy.nnz == stats.nnz
+    assert copy.V == stats.V
+    assert copy is not stats
+
+
+def test_database_relabel():
+    data = np.eye(10)
+    arr = fl.asarray(data)
+    node = Table(Literal(arr), (Field("i"), Field("j")))
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    relabeled = DatabaseStatsFactory().relabel(stats, (Field("row"), Field("col")))
+    assert relabeled.index_order == (Field("row"), Field("col"))
+    assert relabeled.nnz == stats.nnz
+    assert relabeled.V[Field("row")] == stats.V[Field("i")]
+    assert relabeled.V[Field("col")] == stats.V[Field("j")]
+    assert Field("i") not in relabeled.V
+    assert Field("j") not in relabeled.V
+
+
+def test_database_reorder():
+    data = np.eye(10)
+    arr = fl.asarray(data)
+    node = Table(Literal(arr), (Field("i"), Field("j")))
+    stats = insert_statistics(
+        stats_factory=DatabaseStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    reordered = DatabaseStatsFactory().reorder(stats, (Field("j"), Field("i")))
+    assert reordered.index_order == (Field("j"), Field("i"))
+    assert reordered.nnz == stats.nnz
+
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
 

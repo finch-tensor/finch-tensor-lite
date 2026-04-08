@@ -55,7 +55,6 @@ import threading
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -75,7 +74,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import gensym
-from .lazy import LazyTensor, lazy
+from .lazy import LazyTensor, asarray, lazy
 
 _DEFAULT_SCHEDULER = threading.local()
 
@@ -124,16 +123,13 @@ COMPILE_NUMBA = LogicNormalizer(
     )
 )
 
-# TODO: Make Galley a LogicLoader that gets passed a stats bindings dictionary
-# rather than the tensors themselves.
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStatsFactory(),
-        LogicExecutor(
+    LogicExecutor(
+        GalleyLogicalOptimizer(
             LogicStandardizer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
-        ),
+        )
     )
 )
 
@@ -204,7 +200,13 @@ def compute(arg, ctx=None):
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
         for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
-            outputs[out_idx] = res[lazy_idx]
+            if (
+                len(res[lazy_idx].shape) == 0
+            ):  # if the result is a scalar, extract the value and turn it into a
+                # finch `Scalar`
+                outputs[out_idx] = asarray(res[lazy_idx][()])
+            else:
+                outputs[out_idx] = res[lazy_idx]
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
