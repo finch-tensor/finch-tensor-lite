@@ -156,7 +156,7 @@ class StepperPass(LoopletPass):
         full_body = Rewrite(PostWalk(lambda node: stepper_body(ctx, node)))(body)
 
         final_cond = asm.Call(
-            asm.L(ffunc.le),
+            asm.L(ffunc.lt),
             (
                 asm.Call(
                     asm.L(ffunc.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
@@ -181,7 +181,10 @@ class StepperPass(LoopletPass):
                 ),
             )
             ctx_2 = ctx.scope()
-            ext_2 = SymbolicExtent(idx_start, stepper.stop(ctx))
+            ext_2 = SymbolicExtent(
+                idx_start,
+                ntn.Call(ntn.L(ffunc.add), (stepper.stop(ctx), ext.get_unit())),
+            )
             ctx_2(ext_2, full_body)
             stepper_block = asm.If(
                 cond,
@@ -277,7 +280,8 @@ class SequencePass(LoopletPass):
                     heads + [seq],
                     tails,
                     SymbolicExtent(
-                        ext_start, ntn.Call(ntn.L(ffunc.min), (ext_end, split))
+                        ext_start,
+                        ntn.Call(ntn.L(ffunc.min), (ext_end, split)),
                     ),
                 )
                 right = cls.get_sequence_variations(
@@ -286,13 +290,7 @@ class SequencePass(LoopletPass):
                     heads,
                     tails + [seq],
                     SymbolicExtent(
-                        ntn.Call(
-                            ntn.L(ffunc.max),
-                            (
-                                ext_start,
-                                ntn.Call(ntn.L(ffunc.add), (split, ext.get_unit())),
-                            ),
-                        ),
+                        ntn.Call(ntn.L(ffunc.max), (ext_start, split)),
                         ext_end,
                     ),
                 )

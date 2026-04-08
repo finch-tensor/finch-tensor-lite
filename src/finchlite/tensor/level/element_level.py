@@ -5,7 +5,6 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import ffunc
 from ...codegen import NumpyBufferFType
 from ...compile.lower import AssemblyContext
 from ...symbolic import FType, ftype
@@ -106,16 +105,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         buf_s = self._get_buf_s(lvl_fields)
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(buf_s, i_var, asm.Literal(init.val))
-        ctx.exec(
-            asm.ForLoop(
-                i_var,
-                asm.Literal(np.intp(0)),
-                asm.Call(
-                    asm.L(ffunc.sub), (asm.Length(buf_s), asm.Literal(np.intp(1)))
-                ),
-                body,
-            )
-        )
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf_s), body))
 
     def level_lower_unwrap(self, ctx, obj: FiberTensorFields, pos):
         buf_s = self._get_buf_s(obj.lvl_fields)

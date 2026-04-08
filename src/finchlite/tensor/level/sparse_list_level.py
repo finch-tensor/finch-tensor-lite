@@ -147,13 +147,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
 
     def level_lower_dim(self, ctx, lvl_fields: SparseListLevelFields, r):
         if r == 0:
-            return asm.Call(
-                asm.L(ffunc.sub),
-                (
-                    asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension")),
-                    asm.L(self.position_type(1)),
-                ),
-            )
+            return asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(ctx, lvl_fields.next_lvl, r - 1)
 
     def level_lower_declare(
@@ -200,12 +194,12 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
         return asm.Block(
             (
                 asm.Assign(
-                    asm.Variable("status", self.p_t),
+                    level_fields.ptr_s,  # type: ignore[arg-type]
                     asm.Call(
                         asm.Literal(ffunc.resize_if_smaller),
                         (
                             level_fields.ptr_s,
-                            asm.Call(asm.L(ffunc.add), (pos_stop, asm.L(self.p_t(1)))),
+                            pos_stop,
                             asm.Literal(self.fill_value),
                         ),
                     ),
@@ -313,12 +307,8 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                                 lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
                             ),
                         ),
-                        split=lambda ctx, ext: ntn.Call(
-                            ntn.L(ffunc.sub),
-                            (
-                                ntn.Variable(i_stop.name, self.position_type),
-                                ntn.L(self.p_t(1)),
-                            ),
+                        split=lambda ctx, ext: ntn.Variable(
+                            i_stop.name, self.position_type
                         ),
                         tail=chunk_tail_fn,
                     ),
@@ -332,7 +322,10 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                     ),
                     seek=seek_fn,
                 ),
-                split=lambda ctx, idx: ntn.Variable(i_last.name, self.position_type),
+                split=lambda ctx, idx: ntn.Call(
+                    ntn.L(ffunc.add),
+                    (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
+                ),
                 tail=lambda ctx, idx: lplt.Run(
                     lambda ctx, idx: lplt.Leaf(
                         lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)

@@ -242,15 +242,9 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return tuple(np.intp for _ in range(self.ndim))
 
     def lower_dim(self, ctx, obj, r):
-        return asm.Call(
-            asm.L(ffunc.sub),
-            (
-                asm.GetAttr(
-                    asm.GetAttr(obj.buf, asm.Literal("shape")),
-                    asm.Literal(f"element_{r}"),
-                ),
-                asm.L(self.shape_type[r](1)),
-            ),
+        return asm.GetAttr(
+            asm.GetAttr(obj.buf, asm.Literal("shape")),
+            asm.Literal(f"element_{r}"),
         )
 
     def lower_declare(self, ctx, tns: ntn.Stack, init, op, shape):
@@ -261,15 +255,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             asm.Literal(init.val),
         )
         ctx.exec(
-            asm.ForLoop(
-                i_var,
-                asm.Literal(np.intp(0)),
-                asm.Call(
-                    asm.L(ffunc.sub),
-                    (asm.Length(tns.obj.buf_s), asm.Literal(np.intp(1))),
-                ),
-                body,
-            )
+            asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns.obj.buf_s), body)
         )
         tns.obj.dirty_bit = True
         return

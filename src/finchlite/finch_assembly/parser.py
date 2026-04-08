@@ -143,7 +143,7 @@ def parse_assembly(
             case Tree("add", [expr1, expr2]):
                 return asm.Call(asm.Literal(ffunc.add), (ctx(expr1), ctx(expr2)))
             case Tree("max", [expr1, expr2]):
-                return asm.Call(asm.Literal(max), (ctx(expr1), ctx(expr2)))
+                return asm.Call(asm.Literal(ffunc.max), (ctx(expr1), ctx(expr2)))
             case Tree("assign", [lhs, expr]):
                 return asm.Assign(ctx(lhs), ctx(expr))
             case Tree("access", [tns, access_expr]):

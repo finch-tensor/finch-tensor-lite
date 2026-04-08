@@ -14,10 +14,10 @@ def matmul(C: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64, A: Bufferized
     C__stride_1: int64 = C_.strides.element_1
     C__buf: np_buf_t(float64) = C_.val
     C__buf_slot: np_buf_t(float64) = unpack(C__buf)
-    m: int64 = sub(A_.shape.element_0, 1)
-    n: int64 = sub(B_.shape.element_1, 1)
-    p: int64 = sub(A_.shape.element_1, 1)
-    for i in range(0, sub(length(slot(C__buf_slot, np_buf_t(float64))), 1)):
+    m: int64 = A_.shape.element_0
+    n: int64 = B_.shape.element_1
+    p: int64 = A_.shape.element_1
+    for i in range(0, length(slot(C__buf_slot, np_buf_t(float64)))):
         store(slot(C__buf_slot, np_buf_t(float64)), i, 0.0)
     for i in range(0, m):
         i__pos: int64 = add(0, mul(A__stride_0, i))
