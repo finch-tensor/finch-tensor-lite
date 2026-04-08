@@ -1,3 +1,4 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import ctypes
 import re
 import subprocess
@@ -170,8 +171,8 @@ def test_dot_product_malloc(compiler, buffer):
     ab = buffer(len(a), np.float64, a)
     bb = buffer(len(b), np.float64, b)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
@@ -180,7 +181,7 @@ def test_dot_product_malloc(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -293,8 +294,8 @@ def test_dot_product(compiler, buffer):
     ab = buffer(a)
     bb = buffer(b)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -302,7 +303,7 @@ def test_dot_product(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -367,8 +368,8 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = buffer(len(a), np.float64, a)
     bb = buffer(len(b), np.float64, b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -378,7 +379,7 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -436,8 +437,8 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = buffer(a)
     bb = buffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -447,7 +448,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -503,11 +504,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     ],
 )
 def test_if_statement(compiler):
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
@@ -589,12 +590,12 @@ def test_simple_struct(compiler):
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", finchlite.float64)
     mod = compiler(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", finchlite.float64),
                     (p_var, x_var),
                     asm.Block(
                         (

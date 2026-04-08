@@ -1,3 +1,4 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import pytest
 
 import numpy  # noqa: F401, ICN001
@@ -46,9 +47,9 @@ from .conftest import finch_assert_equal
     ],
 )
 def test_matrix_multiplication(a, b):
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
     A = ntn.Variable("A", np.ndarray)
     B = ntn.Variable("B", np.ndarray)
@@ -57,13 +58,13 @@ def test_matrix_multiplication(a, b):
     B_ = ntn.Slot("B_", np.ndarray)
     C_ = ntn.Slot("C_", np.ndarray)
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
 
-    m = ntn.Variable("m", np.int64)
-    n = ntn.Variable("n", np.int64)
-    p = ntn.Variable("p", np.int64)
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
 
     prgm = ntn.Module(
         (
@@ -163,14 +164,14 @@ def test_count_nonfill_vector(a):
     A = ntn.Variable("A", np.ndarray)
     A_ = ntn.Slot("A_", np.ndarray)
 
-    d = ntn.Variable("d", np.int64)
-    i = ntn.Variable("i", np.int64)
-    m = ntn.Variable("m", np.int64)
+    d = ntn.Variable("d", finchlite.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    m = ntn.Variable("m", finchlite.int64)
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("count_nonfill_vector", np.int64),
+                ntn.Variable("count_nonfill_vector", finchlite.int64),
                 (A,),
                 ntn.Block(
                     (
@@ -218,25 +219,25 @@ def test_count_nonfill_matrix(a):
     A = ntn.Variable("A", np.ndarray)
     A_ = ntn.Slot("A_", np.ndarray)
 
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    ni = ntn.Variable("ni", np.int64)
-    nj = ntn.Variable("nj", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    ni = ntn.Variable("ni", finchlite.int64)
+    nj = ntn.Variable("nj", finchlite.int64)
 
-    dij = ntn.Variable("dij", np.int64)
+    dij = ntn.Variable("dij", finchlite.int64)
 
-    xi = ntn.Variable("xi", np.int64)
-    yj = ntn.Variable("yj", np.int64)
+    xi = ntn.Variable("xi", finchlite.int64)
+    yj = ntn.Variable("yj", finchlite.int64)
 
-    d_i = ntn.Variable("d_i", np.int64)
-    d_i_j = ntn.Variable("d_i_j", np.int64)
-    d_j = ntn.Variable("d_j", np.int64)
-    d_j_i = ntn.Variable("d_j_i", np.int64)
+    d_i = ntn.Variable("d_i", finchlite.int64)
+    d_i_j = ntn.Variable("d_i_j", finchlite.int64)
+    d_j = ntn.Variable("d_j", finchlite.int64)
+    d_j_i = ntn.Variable("d_j_i", finchlite.int64)
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matrix_total_nnz", np.int64),
+                ntn.Variable("matrix_total_nnz", finchlite.int64),
                 (A,),
                 ntn.Block(
                     (
@@ -420,31 +421,31 @@ def test_count_nonfill_3d(a):
     A = ntn.Variable("A", np.ndarray)
     A_ = ntn.Slot("A_", np.ndarray)
 
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
-    ni = ntn.Variable("ni", np.int64)
-    nj = ntn.Variable("nj", np.int64)
-    nk = ntn.Variable("nk", np.int64)
+    ni = ntn.Variable("ni", finchlite.int64)
+    nj = ntn.Variable("nj", finchlite.int64)
+    nk = ntn.Variable("nk", finchlite.int64)
 
-    dijk = ntn.Variable("dijk", np.int64)
+    dijk = ntn.Variable("dijk", finchlite.int64)
 
-    xi = ntn.Variable("xi", np.int64)
-    yj = ntn.Variable("yj", np.int64)
-    zk = ntn.Variable("zk", np.int64)
+    xi = ntn.Variable("xi", finchlite.int64)
+    yj = ntn.Variable("yj", finchlite.int64)
+    zk = ntn.Variable("zk", finchlite.int64)
 
-    d_i = ntn.Variable("d_i", np.int64)
-    d_i_jk = ntn.Variable("d_i_jk", np.int64)
-    d_j = ntn.Variable("d_j", np.int64)
-    d_j_ik = ntn.Variable("d_j_ik", np.int64)
-    d_k = ntn.Variable("d_k", np.int64)
-    d_k_ij = ntn.Variable("d_k_ij", np.int64)
+    d_i = ntn.Variable("d_i", finchlite.int64)
+    d_i_jk = ntn.Variable("d_i_jk", finchlite.int64)
+    d_j = ntn.Variable("d_j", finchlite.int64)
+    d_j_ik = ntn.Variable("d_j_ik", finchlite.int64)
+    d_k = ntn.Variable("d_k", finchlite.int64)
+    d_k_ij = ntn.Variable("d_k_ij", finchlite.int64)
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("_3d_total_nnz", np.int64),
+                ntn.Variable("_3d_total_nnz", finchlite.int64),
                 (A,),
                 ntn.Block(
                     (
@@ -723,36 +724,36 @@ def test_count_nonfill_4d(a):
     A = ntn.Variable("A", np.ndarray)
     A_ = ntn.Slot("A_", np.ndarray)
 
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
-    w = ntn.Variable("w", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
+    w = ntn.Variable("w", finchlite.int64)
 
-    ni = ntn.Variable("ni", np.int64)
-    nj = ntn.Variable("nj", np.int64)
-    nk = ntn.Variable("nk", np.int64)
-    nw = ntn.Variable("nw", np.int64)
+    ni = ntn.Variable("ni", finchlite.int64)
+    nj = ntn.Variable("nj", finchlite.int64)
+    nk = ntn.Variable("nk", finchlite.int64)
+    nw = ntn.Variable("nw", finchlite.int64)
 
-    dijkw = ntn.Variable("dijkw", np.int64)
+    dijkw = ntn.Variable("dijkw", finchlite.int64)
 
-    xi = ntn.Variable("xi", np.int64)
-    yj = ntn.Variable("yj", np.int64)
-    zk = ntn.Variable("zk", np.int64)
-    uw = ntn.Variable("uw", np.int64)
+    xi = ntn.Variable("xi", finchlite.int64)
+    yj = ntn.Variable("yj", finchlite.int64)
+    zk = ntn.Variable("zk", finchlite.int64)
+    uw = ntn.Variable("uw", finchlite.int64)
 
-    d_i = ntn.Variable("d_i", np.int64)
-    d_i_jkw = ntn.Variable("d_i_jkw", np.int64)
-    d_j = ntn.Variable("d_j", np.int64)
-    d_j_ikw = ntn.Variable("d_j_ikw", np.int64)
-    d_k = ntn.Variable("d_k", np.int64)
-    d_k_ijw = ntn.Variable("d_k_ijw", np.int64)
-    d_w = ntn.Variable("d_w", np.int64)
-    d_w_ijk = ntn.Variable("d_l_ijw", np.int64)
+    d_i = ntn.Variable("d_i", finchlite.int64)
+    d_i_jkw = ntn.Variable("d_i_jkw", finchlite.int64)
+    d_j = ntn.Variable("d_j", finchlite.int64)
+    d_j_ikw = ntn.Variable("d_j_ikw", finchlite.int64)
+    d_k = ntn.Variable("d_k", finchlite.int64)
+    d_k_ijw = ntn.Variable("d_k_ijw", finchlite.int64)
+    d_w = ntn.Variable("d_w", finchlite.int64)
+    d_w_ijk = ntn.Variable("d_l_ijw", finchlite.int64)
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("_4d_total_nnz", np.int64),
+                ntn.Variable("_4d_total_nnz", finchlite.int64),
                 (A,),
                 ntn.Block(
                     (

@@ -1,5 +1,7 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import numpy as np
 
+import finchlite
 import finchlite.finch_assembly as asm
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
@@ -9,9 +11,9 @@ from finchlite.compile import dimension
 
 
 def create_ntn_simple_node():
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
     A = ntn.Variable("A", np.ndarray)
     B = ntn.Variable("B", np.ndarray)
@@ -20,13 +22,13 @@ def create_ntn_simple_node():
     B_ = ntn.Slot("B_", np.ndarray)
     C_ = ntn.Slot("C_", np.ndarray)
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
 
-    m = ntn.Variable("m", np.int64)
-    n = ntn.Variable("n", np.int64)
-    p = ntn.Variable("p", np.int64)
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
 
     return ntn.Module(
         (
@@ -139,11 +141,11 @@ def create_log_simple_node():
 
 
 def create_asm_if_node():
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
@@ -202,8 +204,8 @@ def create_asm_if_node():
 
 
 def create_asm_dot_node():
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = NumpyBuffer(np.array([1, 2, 3], dtype=np.float64))
     bb = NumpyBuffer(np.array([4, 5, 6], dtype=np.float64))
     ab_v = asm.Variable("a", ab.ftype)
@@ -214,7 +216,7 @@ def create_asm_dot_node():
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -260,26 +262,26 @@ def create_asm_dot_node():
 
 
 def create_asm_comprehensive_node():
-    a = asm.Variable("a", np.int64)
-    b = asm.Variable("b", np.int64)
-    c = asm.Variable("c", np.int64)
-    d = asm.Variable("d", np.int64)
-    result = asm.Variable("result", np.int64)
-    i = asm.Variable("i", np.int64)
-    j = asm.Variable("j", np.int64)
-    temp = asm.Variable("temp", np.int64)
+    a = asm.Variable("a", finchlite.int64)
+    b = asm.Variable("b", finchlite.int64)
+    c = asm.Variable("c", finchlite.int64)
+    d = asm.Variable("d", finchlite.int64)
+    result = asm.Variable("result", finchlite.int64)
+    i = asm.Variable("i", finchlite.int64)
+    j = asm.Variable("j", finchlite.int64)
+    temp = asm.Variable("temp", finchlite.int64)
 
     helper_func = asm.Function(
-        asm.Variable("compute", np.int64),
-        (asm.Variable("x", np.int64), asm.Variable("y", np.int64)),
+        asm.Variable("compute", finchlite.int64),
+        (asm.Variable("x", finchlite.int64), asm.Variable("y", finchlite.int64)),
         asm.Block(
             (
-                asm.Assign(temp, asm.Variable("x", np.int64)),
+                asm.Assign(temp, asm.Variable("x", finchlite.int64)),
                 asm.Assign(
                     temp,
                     asm.Call(
                         asm.Literal(ffunc.add),
-                        (temp, asm.Variable("y", np.int64)),
+                        (temp, asm.Variable("y", finchlite.int64)),
                     ),
                 ),
                 asm.Return(temp),
@@ -288,7 +290,7 @@ def create_asm_comprehensive_node():
     )
 
     main_func = asm.Function(
-        asm.Variable("main", np.int64),
+        asm.Variable("main", finchlite.int64),
         (),
         asm.Block(
             (

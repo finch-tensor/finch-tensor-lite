@@ -1,3 +1,4 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from collections import namedtuple
 
 import pytest
@@ -41,8 +42,8 @@ from .conftest import finch_assert_allclose
 )
 def test_dot_product(a, b):
     # Simple dot product using numpy for expected result
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -54,7 +55,7 @@ def test_dot_product(a, b):
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("dot_product", np.float64),
+                    asm.Variable("dot_product", finchlite.float64),
                     (
                         ab_v,
                         bb_v,
@@ -105,11 +106,11 @@ def test_dot_product(a, b):
 
 
 def test_if_statement():
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     root = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
@@ -181,12 +182,12 @@ def test_simple_struct():
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", finchlite.float64)
     mod = AssemblyInterpreter()(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", finchlite.float64),
                     (p_var, x_var),
                     asm.Block(
                         (
@@ -241,12 +242,12 @@ def test_asm_print(capsys, file_regression):
 
     p_var = asm.Variable(p_var_name, ftype(p))
     x_var = asm.Variable(x_var_name, ftype(x))
-    res_var = asm.Variable(res_var_name, np.float64)
+    res_var = asm.Variable(res_var_name, finchlite.float64)
     mod = AssemblyInterpreter()(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", finchlite.float64),
                     (p_var, x_var),
                     asm.Block(
                         (

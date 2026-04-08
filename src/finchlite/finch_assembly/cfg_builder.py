@@ -1,8 +1,9 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from dataclasses import dataclass
 
 import numpy as np
 
-from ..algebra import ffunc
+from ..algebra import ffunc, int64
 from ..symbolic import (
     BasicBlock,
     ControlFlowGraph,
@@ -147,7 +148,7 @@ def assembly_desugar(
                 )
             case ForLoop(var, start, end, body):
                 fic_var_name = namespace.freshen("j")
-                fic_var = Variable(fic_var_name, np.int64)
+                fic_var = Variable(fic_var_name, int64)
 
                 init = Assign(fic_var, start)
                 cond = Call(Literal(ffunc.lt), (fic_var, end))
@@ -170,7 +171,7 @@ def assembly_desugar(
                 return go(Block((init, WhileLoop(cond, loop_body))))
             case BufferLoop(buf, var, body):
                 fic_var_name = namespace.freshen("j")
-                fic_var = Variable(fic_var_name, np.int64)
+                fic_var = Variable(fic_var_name, int64)
 
                 init = Assign(fic_var, Literal(np.int64(0)))
                 cond = Call(Literal(ffunc.lt), (fic_var, Length(buf)))

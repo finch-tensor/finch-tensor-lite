@@ -1,3 +1,4 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import pytest
 
 import numpy as np
@@ -30,9 +31,9 @@ from .conftest import finch_assert_equal
     ],
 )
 def test_matrix_multiplication(a, b):
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
     a_buf = BufferizedNDArray.from_numpy(a)
     b_buf = BufferizedNDArray.from_numpy(b)
@@ -46,25 +47,25 @@ def test_matrix_multiplication(a, b):
     B_ = ntn.Slot("B_", a_format)
     C_ = ntn.Slot("C_", a_format)
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
 
-    m = ntn.Variable("m", np.int64)
-    n = ntn.Variable("n", np.int64)
-    p = ntn.Variable("p", np.int64)
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
 
     m_ext = ntn.Call(
         ntn.Literal(make_extent),
-        (ntn.Literal(np.int64(0)), ntn.Variable("m", np.int64)),
+        (ntn.Literal(np.int64(0)), ntn.Variable("m", finchlite.int64)),
     )
     n_ext = ntn.Call(
         ntn.Literal(make_extent),
-        (ntn.Literal(np.int64(0)), ntn.Variable("n", np.int64)),
+        (ntn.Literal(np.int64(0)), ntn.Variable("n", finchlite.int64)),
     )
     p_ext = ntn.Call(
         ntn.Literal(make_extent),
-        (ntn.Literal(np.int64(0)), ntn.Variable("p", np.int64)),
+        (ntn.Literal(np.int64(0)), ntn.Variable("p", finchlite.int64)),
     )
 
     prgm = ntn.Module(
@@ -161,9 +162,9 @@ def test_matrix_multiplication(a, b):
 
 def test_matrix_multiplication_regression(file_regression):
     a = np.array([[2, 0], [1, 3]], dtype=np.float64)
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
     a_buf = finchlite.compile.BufferizedNDArray.from_numpy(a)
     a_format = ftype(a_buf)
@@ -175,13 +176,13 @@ def test_matrix_multiplication_regression(file_regression):
     B_ = ntn.Slot("B_", a_format)
     C_ = ntn.Slot("C_", a_format)
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
 
-    m = ntn.Variable("m", np.int64)
-    n = ntn.Variable("n", np.int64)
-    p = ntn.Variable("p", np.int64)
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
 
     m_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), m))
     n_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), n))

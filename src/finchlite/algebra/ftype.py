@@ -40,7 +40,6 @@ def promote_type(T1: FDType, T2: FDType):
     Returns:
         The common type of the given arguments.
     """
-    """
     if T1 == T2:
         return T1
     S1 = T1.__promote__(T2)

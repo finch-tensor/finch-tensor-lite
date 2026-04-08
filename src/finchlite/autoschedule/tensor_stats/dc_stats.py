@@ -1,3 +1,4 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from __future__ import annotations
 
 import math
@@ -11,7 +12,7 @@ import numpy as np
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import Tensor, ffunc, is_annihilator
+from ...algebra import Tensor, ffunc, int64, is_annihilator
 from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .numeric_stats import NumericStats
@@ -165,29 +166,27 @@ class DCStats(NumericStats):
     def _array_to_dcs(self, arr: Any, fields: Iterable[Field]) -> set[DC]:
         fields = list(fields)
         ndims = len(fields)
-        dim_loop_variables = [
-            ntn.Variable(f"{fields[i]}", np.int64) for i in range(ndims)
-        ]
+        dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
         dim_array_variables = [
             ntn.Variable(f"x_{fields[i]}", BufferizedNDArray) for i in range(ndims)
         ]
         dim_size_variables = [
-            ntn.Variable(f"n_{fields[i]}", np.int64) for i in range(ndims)
+            ntn.Variable(f"n_{fields[i]}", int64) for i in range(ndims)
         ]
         dim_array_slots = [
             ntn.Slot(f"x_{fields[i]}_", BufferizedNDArray) for i in range(ndims)
         ]
         dim_proj_variables = [
-            ntn.Variable(f"proj_{fields[i]}", np.int64) for i in range(ndims)
+            ntn.Variable(f"proj_{fields[i]}", int64) for i in range(ndims)
         ]
         dim_dc_variables = [
-            ntn.Variable(f"dc_{fields[i]}", np.int64) for i in range(ndims)
+            ntn.Variable(f"dc_{fields[i]}", int64) for i in range(ndims)
         ]
 
         A = ntn.Variable("A", arr.ftype)
         A_ = ntn.Slot("A_", arr.ftype)
         A_access = ntn.Unwrap(ntn.Access(A_, ntn.Read(), tuple(dim_loop_variables)))
-        A_nnz_variable = ntn.Variable("nnz", np.int64)
+        A_nnz_variable = ntn.Variable("nnz", int64)
 
         dim_size_assignments = []
         dim_proj_variable_assigments = []
@@ -392,14 +391,14 @@ class DCStats(NumericStats):
         A = ntn.Variable("A", arr.ftype)
         A_ = ntn.Slot("A_", arr.ftype)
 
-        d = ntn.Variable("d", np.int64)
-        i = ntn.Variable("i", np.int64)
-        m = ntn.Variable("m", np.int64)
+        d = ntn.Variable("d", int64)
+        i = ntn.Variable("i", int64)
+        m = ntn.Variable("m", int64)
 
         prgm = ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("vector_structure_to_dcs", np.int64),
+                    ntn.Variable("vector_structure_to_dcs", int64),
                     (A,),
                     ntn.Block(
                         (
@@ -458,27 +457,27 @@ class DCStats(NumericStats):
         A = ntn.Variable("A", arr.ftype)
         A_ = ntn.Slot("A_", arr.ftype)
 
-        i = ntn.Variable("i", np.int64)
-        j = ntn.Variable("j", np.int64)
-        ni = ntn.Variable("ni", np.int64)
-        nj = ntn.Variable("nj", np.int64)
+        i = ntn.Variable("i", int64)
+        j = ntn.Variable("j", int64)
+        ni = ntn.Variable("ni", int64)
+        nj = ntn.Variable("nj", int64)
 
-        dij = ntn.Variable("dij", np.int64)
+        dij = ntn.Variable("dij", int64)
 
         xi = ntn.Variable("xi", BufferizedNDArray)
         xi_ = ntn.Slot("xi_", BufferizedNDArray)
         yj = ntn.Variable("yj", BufferizedNDArray)
         yj_ = ntn.Slot("yj_", BufferizedNDArray)
 
-        d_i = ntn.Variable("d_i", np.int64)
-        d_i_j = ntn.Variable("d_i_j", np.int64)
-        d_j = ntn.Variable("d_j", np.int64)
-        d_j_i = ntn.Variable("d_j_i", np.int64)
+        d_i = ntn.Variable("d_i", int64)
+        d_i_j = ntn.Variable("d_i_j", int64)
+        d_j = ntn.Variable("d_j", int64)
+        d_j_i = ntn.Variable("d_j_i", int64)
 
         prgm = ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("matrix_total_nnz", np.int64),
+                    ntn.Variable("matrix_total_nnz", int64),
                     (A,),
                     ntn.Block(
                         (
@@ -750,31 +749,31 @@ class DCStats(NumericStats):
         A = ntn.Variable("A", arr.ftype)
         A_ = ntn.Slot("A_", arr.ftype)
 
-        i = ntn.Variable("i", np.int64)
-        j = ntn.Variable("j", np.int64)
-        k = ntn.Variable("k", np.int64)
+        i = ntn.Variable("i", int64)
+        j = ntn.Variable("j", int64)
+        k = ntn.Variable("k", int64)
 
-        ni = ntn.Variable("ni", np.int64)
-        nj = ntn.Variable("nj", np.int64)
-        nk = ntn.Variable("nk", np.int64)
+        ni = ntn.Variable("ni", int64)
+        nj = ntn.Variable("nj", int64)
+        nk = ntn.Variable("nk", int64)
 
-        dijk = ntn.Variable("dijk", np.int64)
+        dijk = ntn.Variable("dijk", int64)
 
-        xi = ntn.Variable("xi", np.int64)
-        yj = ntn.Variable("yj", np.int64)
-        zk = ntn.Variable("zk", np.int64)
+        xi = ntn.Variable("xi", int64)
+        yj = ntn.Variable("yj", int64)
+        zk = ntn.Variable("zk", int64)
 
-        d_i = ntn.Variable("d_i", np.int64)
-        d_i_jk = ntn.Variable("d_i_jk", np.int64)
-        d_j = ntn.Variable("d_j", np.int64)
-        d_j_ik = ntn.Variable("d_j_ik", np.int64)
-        d_k = ntn.Variable("d_k", np.int64)
-        d_k_ij = ntn.Variable("d_k_ij", np.int64)
+        d_i = ntn.Variable("d_i", int64)
+        d_i_jk = ntn.Variable("d_i_jk", int64)
+        d_j = ntn.Variable("d_j", int64)
+        d_j_ik = ntn.Variable("d_j_ik", int64)
+        d_k = ntn.Variable("d_k", int64)
+        d_k_ij = ntn.Variable("d_k_ij", int64)
 
         prgm = ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("_3d_total_nnz", np.int64),
+                    ntn.Variable("_3d_total_nnz", int64),
                     (A,),
                     ntn.Block(
                         (
@@ -1037,36 +1036,36 @@ class DCStats(NumericStats):
         A = ntn.Variable("A", arr.ftype)
         A_ = ntn.Slot("A_", arr.ftype)
 
-        i = ntn.Variable("i", np.int64)
-        j = ntn.Variable("j", np.int64)
-        k = ntn.Variable("k", np.int64)
-        w = ntn.Variable("w", np.int64)
+        i = ntn.Variable("i", int64)
+        j = ntn.Variable("j", int64)
+        k = ntn.Variable("k", int64)
+        w = ntn.Variable("w", int64)
 
-        ni = ntn.Variable("ni", np.int64)
-        nj = ntn.Variable("nj", np.int64)
-        nk = ntn.Variable("nk", np.int64)
-        nw = ntn.Variable("nw", np.int64)
+        ni = ntn.Variable("ni", int64)
+        nj = ntn.Variable("nj", int64)
+        nk = ntn.Variable("nk", int64)
+        nw = ntn.Variable("nw", int64)
 
-        dijkw = ntn.Variable("dijkw", np.int64)
+        dijkw = ntn.Variable("dijkw", int64)
 
-        xi = ntn.Variable("xi", np.int64)
-        yj = ntn.Variable("yj", np.int64)
-        zk = ntn.Variable("zk", np.int64)
-        uw = ntn.Variable("uw", np.int64)
+        xi = ntn.Variable("xi", int64)
+        yj = ntn.Variable("yj", int64)
+        zk = ntn.Variable("zk", int64)
+        uw = ntn.Variable("uw", int64)
 
-        d_i = ntn.Variable("d_i", np.int64)
-        d_i_jkw = ntn.Variable("d_i_jkw", np.int64)
-        d_j = ntn.Variable("d_j", np.int64)
-        d_j_ikw = ntn.Variable("d_j_ikw", np.int64)
-        d_k = ntn.Variable("d_k", np.int64)
-        d_k_ijw = ntn.Variable("d_k_ijw", np.int64)
-        d_w = ntn.Variable("d_w", np.int64)
-        d_w_ijk = ntn.Variable("d_w_ijk", np.int64)
+        d_i = ntn.Variable("d_i", int64)
+        d_i_jkw = ntn.Variable("d_i_jkw", int64)
+        d_j = ntn.Variable("d_j", int64)
+        d_j_ikw = ntn.Variable("d_j_ikw", int64)
+        d_k = ntn.Variable("d_k", int64)
+        d_k_ijw = ntn.Variable("d_k_ijw", int64)
+        d_w = ntn.Variable("d_w", int64)
+        d_w_ijk = ntn.Variable("d_w_ijk", int64)
 
         prgm = ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("_4d_total_nnz", np.int64),
+                    ntn.Variable("_4d_total_nnz", int64),
                     (A,),
                     ntn.Block(
                         (

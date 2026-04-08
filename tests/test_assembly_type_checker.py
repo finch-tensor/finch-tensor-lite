@@ -1,9 +1,11 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from collections import namedtuple
 
 import pytest
 
 import numpy as np
 
+import finchlite
 import finchlite.finch_assembly as asm
 from finchlite import ffunc
 from finchlite.algebra import FType, ftype
@@ -15,17 +17,17 @@ from finchlite.finch_assembly.struct import TupleFType
 
 def test_lit_basic():
     checker = asm.AssemblyTypeChecker()
-    assert checker(asm.Literal(np.float64(1.0))) is np.float64
+    assert checker(asm.Literal(np.float64(1.0))) is finchlite.float64
     assert checker(asm.Literal(True)) is bool
 
 
 def test_var_basic():
     checker = asm.AssemblyTypeChecker()
-    checker.ctxt["x"] = np.float64
-    x_type = checker(asm.Variable("x", np.float64))
-    assert x_type == np.float64
+    checker.ctxt["x"] = finchlite.float64
+    x_type = checker(asm.Variable("x", finchlite.float64))
+    assert x_type == finchlite.float64
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Variable("y", np.float64))
+        checker(asm.Variable("y", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("x", float))
     with pytest.raises(asm.AssemblyTypeError):
@@ -74,11 +76,11 @@ def test_call_basic():
                 ),
             )
         )
-        == np.float64
+        == finchlite.float64
     )
     assert (
         checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal(np.float64(3.0)),)))
-        == np.float64
+        == finchlite.float64
     )
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal("string"),)))
@@ -90,7 +92,7 @@ def test_load_basic():
     checker.ctxt["a"] = a.ftype
     assert (
         checker(asm.Load(asm.Slot("a", a.ftype), asm.Literal(np.int64(0))))
-        == np.float64
+        == finchlite.float64
     )
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Load(asm.Slot("a", a.ftype), asm.Literal(0.0)))
@@ -102,7 +104,7 @@ def test_length_basic():
     checker = asm.AssemblyTypeChecker()
     a = NumpyBuffer(np.array([1, 2, 3]))
     checker.ctxt["a"] = a.ftype
-    assert checker(asm.Length(asm.Slot("a", a.ftype))) == np.int64
+    assert checker(asm.Length(asm.Slot("a", a.ftype))) == finchlite.int64
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Length(asm.Literal(0.0)))
 
@@ -138,10 +140,14 @@ def test_repack_basic():
 def test_assign_basic():
     checker = asm.AssemblyTypeChecker()
     assert (
-        checker(asm.Assign(asm.Variable("x", np.float64), asm.Literal(np.float64(2.0))))
+        checker(
+            asm.Assign(
+                asm.Variable("x", finchlite.float64), asm.Literal(np.float64(2.0))
+            )
+        )
         is None
     )
-    assert checker(asm.Variable("x", np.float64)) is np.float64
+    assert checker(asm.Variable("x", finchlite.float64)) is finchlite.float64
     with pytest.raises(asm.AssemblyTypeError):
         checker(
             asm.Assign(
@@ -150,7 +156,7 @@ def test_assign_basic():
             )
         )
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Assign(asm.Variable("x", np.float64), asm.Literal(True)))
+        checker(asm.Assign(asm.Variable("x", finchlite.float64), asm.Literal(True)))
 
 
 def test_setattr_basic():
@@ -195,7 +201,8 @@ def test_store_basic():
         is None
     )
     assert (
-        checker(asm.Load(asm.Slot("a", a.ftype), asm.Literal(np.int64(0)))) is np.int64
+        checker(asm.Load(asm.Slot("a", a.ftype), asm.Literal(np.int64(0))))
+        is finchlite.int64
     )
     with pytest.raises(asm.AssemblyTypeError):
         checker(
@@ -231,12 +238,12 @@ def test_forloop_basic():
     assert (
         checker(
             asm.ForLoop(
-                asm.Variable("x", np.int64),
+                asm.Variable("x", finchlite.int64),
                 asm.Literal(np.int64(0)),
                 asm.Literal(np.int64(10)),
                 asm.Assign(
-                    asm.Variable("i", np.int64),
-                    asm.Variable("x", np.int64),
+                    asm.Variable("i", finchlite.int64),
+                    asm.Variable("x", finchlite.int64),
                 ),
             )
         )
@@ -245,12 +252,12 @@ def test_forloop_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(
             asm.ForLoop(
-                asm.Variable("x", np.float64),
+                asm.Variable("x", finchlite.float64),
                 asm.Literal(np.float64(0)),
                 asm.Literal(np.float64(10)),
                 asm.Assign(
-                    asm.Variable("i", np.float64),
-                    asm.Variable("x", np.float64),
+                    asm.Variable("i", finchlite.float64),
+                    asm.Variable("x", finchlite.float64),
                 ),
             )
         )
@@ -261,8 +268,8 @@ def test_forloop_basic():
                 asm.Literal(np.int64(0)),
                 asm.Literal(np.int64(10)),
                 asm.Assign(
-                    asm.Variable("i", np.int64),
-                    asm.Variable("x", np.int64),
+                    asm.Variable("i", finchlite.int64),
+                    asm.Variable("x", finchlite.int64),
                 ),
             )
         )
@@ -273,8 +280,8 @@ def test_forloop_basic():
                 asm.Literal(0),
                 asm.Literal(np.int64(10)),
                 asm.Assign(
-                    asm.Variable("i", np.int64),
-                    asm.Variable("x", np.int64),
+                    asm.Variable("i", finchlite.int64),
+                    asm.Variable("x", finchlite.int64),
                 ),
             )
         )
@@ -288,10 +295,10 @@ def test_bufferloop_basic():
         checker(
             asm.BufferLoop(
                 asm.Slot("a", a.ftype),
-                asm.Variable("x", np.float64),
+                asm.Variable("x", finchlite.float64),
                 asm.Assign(
-                    asm.Variable("i", np.float64),
-                    asm.Variable("x", np.float64),
+                    asm.Variable("i", finchlite.float64),
+                    asm.Variable("x", finchlite.float64),
                 ),
             )
         )
@@ -301,10 +308,10 @@ def test_bufferloop_basic():
         checker(
             asm.BufferLoop(
                 asm.Slot("a", a.ftype),
-                asm.Variable("x", np.int64),
+                asm.Variable("x", finchlite.int64),
                 asm.Assign(
-                    asm.Variable("i", np.float64),
-                    asm.Variable("x", np.float64),
+                    asm.Variable("i", finchlite.float64),
+                    asm.Variable("x", finchlite.float64),
                 ),
             )
         )
@@ -399,17 +406,17 @@ def test_ifelse_basic():
 def test_function_basic():
     checker = asm.AssemblyTypeChecker()
     fun = asm.Function(
-        asm.Variable("add", np.int64),
+        asm.Variable("add", finchlite.int64),
         (
-            asm.Variable("x", np.int64),
-            asm.Variable("y", np.int64),
+            asm.Variable("x", finchlite.int64),
+            asm.Variable("y", finchlite.int64),
         ),
         asm.Return(
             asm.Call(
                 asm.Literal(ffunc.add),
                 (
-                    asm.Variable("x", np.int64),
-                    asm.Variable("y", np.int64),
+                    asm.Variable("x", finchlite.int64),
+                    asm.Variable("y", finchlite.int64),
                 ),
             )
         ),
@@ -417,17 +424,17 @@ def test_function_basic():
     assert checker(fun) is None
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("add", np.float64),
+            asm.Variable("add", finchlite.float64),
             (
-                asm.Variable("x", np.int64),
-                asm.Variable("y", np.int64),
+                asm.Variable("x", finchlite.int64),
+                asm.Variable("y", finchlite.int64),
             ),
             asm.Return(
                 asm.Call(
                     asm.Literal(ffunc.add),
                     (
-                        asm.Variable("x", np.int64),
-                        asm.Variable("y", np.int64),
+                        asm.Variable("x", finchlite.int64),
+                        asm.Variable("y", finchlite.int64),
                     ),
                 )
             ),
@@ -435,10 +442,10 @@ def test_function_basic():
         checker(fun)
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("sub", np.float64),
+            asm.Variable("sub", finchlite.float64),
             (
-                asm.Variable("x", np.int64),
-                asm.Variable("y", np.int64),
+                asm.Variable("x", finchlite.int64),
+                asm.Variable("y", finchlite.int64),
             ),
             asm.Block(
                 (
@@ -446,8 +453,8 @@ def test_function_basic():
                         asm.Call(
                             asm.Literal(ffunc.sub),
                             (
-                                asm.Variable("x", np.int64),
-                                asm.Variable("y", np.int64),
+                                asm.Variable("x", finchlite.int64),
+                                asm.Variable("y", finchlite.int64),
                             ),
                         )
                     ),
@@ -460,18 +467,18 @@ def test_function_basic():
 def test_return_basic():
     checker = asm.AssemblyTypeChecker()
     fun = asm.Function(
-        asm.Variable("foo", np.int64), (), asm.Return(asm.Literal(np.int64(0)))
+        asm.Variable("foo", finchlite.int64), (), asm.Return(asm.Literal(np.int64(0)))
     )
     assert checker(fun) is None
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("foo", np.int64),
+            asm.Variable("foo", finchlite.int64),
             (),
             asm.If(asm.Literal(True), asm.Return(asm.Literal(np.int64(0)))),
         )
         checker(fun)
     fun = asm.Function(
-        asm.Variable("foo", np.int64),
+        asm.Variable("foo", finchlite.int64),
         (),
         asm.Block(
             (
@@ -483,7 +490,7 @@ def test_return_basic():
     assert checker(fun) is None
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("foo", np.int64),
+            asm.Variable("foo", finchlite.int64),
             (),
             asm.Block(
                 (
@@ -509,8 +516,8 @@ def test_return_basic():
 def test_dot_product(a, b):
     # Simple dot product
     # Borrowed from test_assembly_interpreter.py
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -521,7 +528,7 @@ def test_dot_product(a, b):
     mod = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -570,11 +577,11 @@ def test_dot_product(a, b):
 
 def test_if_statement():
     # borrowed from test_assembly_interpreter.py
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     root = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
@@ -642,11 +649,11 @@ def test_simple_struct():
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", finchlite.float64)
     mod = asm.Module(
         (
             asm.Function(
-                asm.Variable("simple_struct", np.float64),
+                asm.Variable("simple_struct", finchlite.float64),
                 (p_var, x_var),
                 asm.Block(
                     (
