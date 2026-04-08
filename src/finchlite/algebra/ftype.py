@@ -409,44 +409,46 @@ def isdtype(x, T):
 
 
 def ftype(x) -> FType:
-    """Return the corresponding FType for a given dtype.
+    """Return the corresponding FType for a given dtype or object.
     Recognizes numpy, Python builtins, and Python tuples.
     Calls .ftype on the object if type not found.
     """
+    if isinstance(x, FType):
+        return x
     if isinstance(x, FTyped):
         return x.ftype
-    if isinstance(x, bool):
+    if isinstance(x, bool) or x == bool:
         return bool_
-    if isinstance(x, int):
+    if isinstance(x, int) or x == int:
         return int_
-    if isinstance(x, float):
+    if isinstance(x, float) or x == float:
         return float_
-    if isinstance(x, complex):
+    if isinstance(x, complex) or x == complex:
         return complex_
-    if isinstance(x, np.bool_):
+    if isinstance(x, np.bool_) or x == np.bool_:
         return bool
-    if isinstance(x, np.int8):
+    if isinstance(x, np.int8) or x == np.int8:
         return int8
-    if isinstance(x, np.int16):
+    if isinstance(x, np.int16) or x == np.int16:
         return int16
-    if isinstance(x, np.int32):
+    if isinstance(x, np.int32) or x == np.int32:
         return int32
-    if isinstance(x, np.int64):
+    if isinstance(x, np.int64) or x == np.int64:
         return int64
-    if isinstance(x, np.uint8):
+    if isinstance(x, np.uint8) or x == np.uint8:
         return uint8
-    if isinstance(x, np.uint16):
+    if isinstance(x, np.uint16) or x == np.uint16:
         return uint16
-    if isinstance(x, np.uint32):
+    if isinstance(x, np.uint32) or x == np.uint32:
         return uint32
-    if isinstance(x, np.uint64):
+    if isinstance(x, np.uint64) or x == np.uint64:
         return uint64
-    if isinstance(x, np.float32):
+    if isinstance(x, np.float32) or x == np.float32:
         return float32
-    if isinstance(x, np.float64):
+    if isinstance(x, np.float64) or x == np.float64:
         return float64
-    if isinstance(x, np.complex64):
+    if isinstance(x, np.complex64) or x == np.complex64:
         return complex32
-    if isinstance(x, np.complex128):
+    if isinstance(x, np.complex128) or x == np.complex128:
         return complex64
     raise NotImplementedError
