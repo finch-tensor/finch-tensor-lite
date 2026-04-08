@@ -1,14 +1,23 @@
-from abc import ABC, abstractmethod
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
+import builtins
+from abc import abstractmethod
 
 import numpy as np
 
+"""
+This module defines the FType class and related classes for representing data
+types in Finch.  Many design decisions in this file are based on array api
+requirements:
+https://data-apis.org/array-api/latest/API_specification/data_types.html
+"""
 
-class FType(ABC):
-    @abstractmethod
-    def __eq__(self, other): ...
 
-    @abstractmethod
-    def __hash__(self): ...
+class FType:
+    def __eq__(self, other):
+        return self is other
+
+    def __hash__(self):
+        return id(self)
 
     def fisinstance(self, other):
         """
@@ -21,12 +30,11 @@ class FType(ABC):
 
 
 class FDType(FType):
-    @property
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
         """
-        return None
+        return
 
 
 def promote_type(T1: FDType, T2: FDType):
@@ -145,6 +153,18 @@ class FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
             "iinfo is not implemented for Python built-in int type"
         )
 
+    @property
+    def type_min(self):
+        raise NotImplementedError(
+            "type_min is not implemented for Python built-in int type"
+        )
+
+    @property
+    def type_max(self):
+        raise NotImplementedError(
+            "type_max is not implemented for Python built-in int type"
+        )
+
 
 int_ = FDTypeBuiltinInt()
 
@@ -161,6 +181,14 @@ class FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         """
         return np.float64.finfo
 
+    @property
+    def type_min(self):
+        return self.type(-np.inf)
+
+    @property
+    def type_max(self):
+        return self.type(np.inf)
+
 
 float_ = FDTypeBuiltinFloat()
 
@@ -169,6 +197,18 @@ class FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
         return complex
+
+    @property
+    def finfo(self):
+        return np.float64.finfo
+
+    @property
+    def type_min(self):
+        return self.type(complex(-np.inf, -np.inf))
+
+    @property
+    def type_max(self):
+        return self.type(complex(np.inf, np.inf))
 
 
 complex_ = FDTypeBuiltinComplex()
@@ -201,12 +241,11 @@ class FDTypeNumpy(FDType):
 
 class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
     @property
-    @abstractmethod
     def iinfo(self):
         """
         The iinfo object for this integer type.
         """
-        return self.np_dtype.iinfo
+        return np.iinfo(self.dtype)
 
     @property
     def type_min(self):
@@ -229,7 +268,7 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
         """
         The finfo object for this float type.
         """
-        return self.dtype.finfo
+        return np.finfo(self.dtype)
 
     @property
     def type_min(self):
@@ -337,6 +376,15 @@ class FDTypeFloat32(FDTypeNumpyFloat, FDTypeReal):
 float32 = FDTypeFloat32()
 
 
+class FDTypeFloat16(FDTypeNumpyFloat, FDTypeReal):
+    @property
+    def dtype(self):
+        return np.float16
+
+
+float16 = FDTypeFloat16()
+
+
 class FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
@@ -346,15 +394,6 @@ class FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
 float64 = FDTypeFloat64()
 
 
-class FDTypeComplex32(FDTypeNumpyFloat, FDTypeComplex):
-    @property
-    def dtype(self):
-        return np.complex64
-
-
-complex32 = FDTypeComplex32()
-
-
 class FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
     @property
     def dtype(self):
@@ -362,6 +401,15 @@ class FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
 
 
 complex64 = FDTypeComplex64()
+
+
+class FDTypeComplex128(FDTypeNumpyFloat, FDTypeComplex):
+    @property
+    def dtype(self):
+        return np.complex128
+
+
+complex128 = FDTypeComplex128()
 
 # alias for default ftypes
 int = int32 if np.intp == np.int32 else int64
@@ -417,13 +465,13 @@ def ftype(x) -> FType:
         return x
     if isinstance(x, FTyped):
         return x.ftype
-    if isinstance(x, bool) or x == bool:
+    if isinstance(x, builtins.bool) or x == builtins.bool:
         return bool_
-    if isinstance(x, int) or x == int:
+    if isinstance(x, builtins.int) or x == builtins.int:
         return int_
-    if isinstance(x, float) or x == float:
+    if isinstance(x, builtins.float) or x == builtins.float:
         return float_
-    if isinstance(x, complex) or x == complex:
+    if isinstance(x, builtins.complex) or x == builtins.complex:
         return complex_
     if isinstance(x, np.bool_) or x == np.bool_:
         return bool
@@ -448,7 +496,7 @@ def ftype(x) -> FType:
     if isinstance(x, np.float64) or x == np.float64:
         return float64
     if isinstance(x, np.complex64) or x == np.complex64:
-        return complex32
-    if isinstance(x, np.complex128) or x == np.complex128:
         return complex64
+    if isinstance(x, np.complex128) or x == np.complex128:
+        return complex128
     raise NotImplementedError

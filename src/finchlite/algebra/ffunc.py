@@ -1,7 +1,8 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import builtins
 import operator
 from functools import reduce
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -9,10 +10,10 @@ from .algebra import (
     COperator,
     FinchOperator,
     NumbaOperator,
-    promote_type,
     type_max,
     type_min,
 )
+from .ftype import FDType, ftype, promote_type
 
 
 class CNAryOperator(COperator):
@@ -1277,11 +1278,17 @@ class _PromoteMin(FinchOperator):
     is_idempotent = True
 
     def __call__(self, a: Any, b: Any):
-        cast = promote_type(type(a), type(b))
-        return cast(builtins.min(a, b))
+        promoted = promote_type(
+            cast(FDType, ftype(a)),
+            cast(FDType, ftype(b)),
+        )
+        return promoted(builtins.min(a, b))
 
     def return_type(self, a: Any, b: Any) -> type:
-        return promote_type(a, b)
+        return promote_type(
+            cast(FDType, ftype(a)),
+            cast(FDType, ftype(b)),
+        )
 
     def init_value(self, arg):
         return type_max(arg)
@@ -1299,11 +1306,17 @@ class _PromoteMax(FinchOperator):
     is_idempotent = True
 
     def __call__(self, a: Any, b: Any):
-        cast = promote_type(type(a), type(b))
-        return builtins.max(cast(a), cast(b))
+        promoted = promote_type(
+            cast(FDType, ftype(a)),
+            cast(FDType, ftype(b)),
+        )
+        return builtins.max(promoted(a), promoted(b))
 
     def return_type(self, a: Any, b: Any) -> type:
-        return promote_type(a, b)
+        return promote_type(
+            cast(FDType, ftype(a)),
+            cast(FDType, ftype(b)),
+        )
 
     def init_value(self, arg):
         return type_min(arg)

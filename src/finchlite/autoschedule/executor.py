@@ -1,6 +1,7 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from collections import OrderedDict
 
-from finchlite.algebra.tensor import Tensor
+from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
@@ -11,7 +12,7 @@ from ..finch_logic import (
     LogicNode,
     StatsFactory,
 )
-from ..symbolic import Namespace, PostWalk, Rewrite, ftype
+from ..symbolic import Namespace, PostWalk, Rewrite
 from .formatter import DefaultLogicFormatter
 
 
@@ -81,7 +82,9 @@ class LogicExecutor(LogicEvaluator):
             stmt = lgc.Plan((stmt,))
 
         stmt, bindings = extract_tensors(stmt, bindings)
-        binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
+        binding_ftypes: dict[lgc.Alias, TensorFType] = {
+            var: val.ftype for var, val in bindings.items()
+        }
         stats_bindings = OrderedDict()
 
         for var, T in bindings.items():

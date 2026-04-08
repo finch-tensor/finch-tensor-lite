@@ -1,5 +1,6 @@
+# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -316,7 +317,8 @@ class BufferizedNDArrayAccessor(Tensor):
     def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
-            pos = ftype(self.tns).buf_t.length_type(0)
+            tns_ftype = cast(BufferizedNDArrayFType, ftype(self.tns))
+            pos = tns_ftype.buf_t.length_type(0)
         self.pos = pos
         self.op = op
         if nind is None:
