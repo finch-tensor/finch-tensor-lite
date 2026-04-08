@@ -3,7 +3,10 @@ Branch-and-bound optimizer for Galley query planning.
 Converted from Julia.
 Removed general cache. Both alias_hash and cost_cache
 
-TODO: add dfs
+``branch_and_bound`` is layered BFS-style; ``branch_and_bound_dfs`` uses an
+iterative DFS (stack + memo) for ``k == float("inf")``, storing
+``memo[vars_key] = (cost, elimination_order)`` per set and suffix relaxation on
+the optimal complete order.
 """
 
 from collections import OrderedDict, deque
@@ -32,6 +35,55 @@ def _reducible_idxs_for_component(
     """Make sure it is a list, precommit throws error."""
     comp_set = set(component)
     return [idx for idx in aq.get_reducible_idxs() if idx in comp_set]
+
+
+def _vars_key_sort_key(vk: frozenset) -> tuple:
+    """Deterministic ordering for OrderedDict keys (subset size, then repr)."""
+    return (len(vk), tuple(sorted(repr(x) for x in vk)))
+
+
+def _dfs_memo_cost(memo: dict[frozenset, tuple[float, list]], vk: frozenset) -> float:
+    """Best cumulative cost for ``vk``, or inf if unseen."""
+    ent = memo.get(vk)
+    return ent[0] if ent is not None else float("inf")
+
+
+def _print_dfs_memo_snapshot(stage: str, n: int, memo: dict[frozenset, tuple[float, list]]) -> None:
+    """Print ``memo`` after each stack pop / memo assign (DFS ``k=inf``)."""
+    print(f"\n--- branch_and_bound_dfs memo {stage} #{n} ---")
+    for vk in sorted(memo.keys(), key=_vars_key_sort_key):
+        c, ord_ = memo[vk]
+        label = "∅" if not vk else "{" + ", ".join(sorted(repr(x) for x in vk)) + "}"
+        print(f"  {label} -> (cost={c}, order={[repr(x) for x in ord_]})")
+    print(f"  [n_entries={len(memo)}]")
+
+
+def _relax_suffix_induced_sets(
+    memo: dict[frozenset, tuple[float, list]],
+    order: list,
+    total_cost: float,
+) -> None:
+    """
+    Suffix-induced subset entries (optional tighten after DFS, not part of search).
+
+    For each non-empty suffix of the **best complete** ``order``, build
+    ``S = frozenset(suffix)`` (indices appearing in that suffix). If the **full**
+    plan cost ``total_cost`` strictly improves ``memo[S]``, set
+    ``memo[S] = (total_cost, suffix)``. Example: order [a,b,c,d] also touches
+    keys for ``{b,c,d}``, ``{c,d}``, ``{d}`` with cost ``total_cost`` — not the
+    same as “minimum cumulative cost to reach S” from the main DFS loop.
+    """
+    n = len(order)
+    for k in range(n):
+        suffix = order[k:]
+        if not suffix:
+            continue
+        # Subset S = indices in this suffix; may duplicate keys already filled by search.
+        s_set = frozenset(suffix)
+        prev = _dfs_memo_cost(memo, s_set)
+        if total_cost < prev:
+            # Full-plan total and suffix order; only applied when better than prior memo[S].
+            memo[s_set] = (total_cost, list(suffix))
 
 
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
@@ -161,22 +213,28 @@ def branch_and_bound_dfs(
     max_subquery_costs: OrderedDict,
 ) -> tuple:
     """
-    Same contract as :func:`branch_and_bound`.
+    Same contract as :func:`branch_and_bound`, plus a third return when
+    ``k == float("inf")``.
 
-    For ``k != float("inf")``, delegates to :func:`branch_and_bound` so layered
-    semantics (including greedy ``k=1``) match exactly.
+    For ``k != float("inf")``, delegates to :func:`branch_and_bound` and returns
+    ``(result, None)`` for the third element.
 
-    For ``k == float("inf")``, runs iterative DFS: ``deque`` stack (``appendleft`` /
-    ``popleft`` for LIFO on the left), ``memo[vars_key]`` minimum cumulative cost
-    to reach each eliminated-index set, the same ``max_subquery_costs`` superset
-    bound as the layered code, and optional incumbent pruning when a partial
-    state's cost is already at or above the best complete cost found so far.
+    For ``k == float("inf")``, runs iterative DFS: ``deque`` stack,
+    ``memo[vars_key] = (cumulative_cost, elimination_order)`` for each eliminated-
+    index set (single dict — cost and permutation updated together),
+    ``max_subquery_costs`` superset bound, incumbent pruning, and after the search
+    suffix relaxation on the best complete order (each suffix induces a set ``S``;
+    ``memo[S]`` improves when the full cost is lower).
+
+    Prints ``memo`` after each stack ``pop`` and each ``memo`` assignment.
+    Returns ``(best_complete, optimal_subquery_costs, optimal_perm_by_vars)``.
     """
     if k != float("inf"):
-        return branch_and_bound(input_aq, component, k, max_subquery_costs)
+        res = branch_and_bound(input_aq, component, k, max_subquery_costs)
+        return (*res, None)
 
     component_set = frozenset(component)
-    memo: dict[frozenset, float] = {frozenset(): 0.0}
+    memo: dict[frozenset, tuple[float, list]] = {frozenset(): (0.0, [])}
     best_complete: tuple | None = None
     best_complete_cost = float("inf")
 
@@ -185,9 +243,15 @@ def branch_and_bound_dfs(
         (frozenset(), input_aq, [], [], 0.0)
     )
 
+    pop_idx = 0
+    assign_idx = 0
     while stack:
         vars_key, aq, order, queries, cost = stack.popleft()
-        if cost > memo.get(vars_key, float("inf")):
+        pop_idx += 1
+        if __debug__:
+            _print_dfs_memo_snapshot("pop", pop_idx, dict(memo))
+        # Stale frame: a cheaper path to this vars_key already updated memo[vars_key].
+        if cost > _dfs_memo_cost(memo, vars_key):
             continue
 
         if vars_key == component_set:
@@ -213,11 +277,14 @@ def branch_and_bound_dfs(
             if total_cost > bound:
                 continue
 
-            prev_best = memo.get(new_vars, float("inf"))
+            prev_best = _dfs_memo_cost(memo, new_vars)
             if total_cost >= prev_best:
                 continue
 
-            memo[new_vars] = total_cost
+            # Search path: best cost so far to eliminated-index set ``new_vars`` (prefix walk).
+            memo[new_vars] = (total_cost, list(order) + [idx])
+            assign_idx += 1
+            _print_dfs_memo_snapshot("assign", assign_idx, dict(memo))
             new_aq = _aq_with_stats(aq)
             reduce_query = new_aq.reduce_idx(idx)
             new_queries = list(queries) + [reduce_query]
@@ -226,11 +293,20 @@ def branch_and_bound_dfs(
 
     if best_complete is None:
         raise RuntimeError(
-            "This should not happen! Maybe delete this line because its impossible."
+            "branch_and_bound_dfs: no complete reduction order for component "
+            f"{component!r}; reducible idxs on input: "
+            f"{input_aq.get_reducible_idxs()!r}"
         )
 
-    optimal_subquery_costs = OrderedDict()
-    return (best_complete, optimal_subquery_costs)
+    best_order, _, _, best_cost = best_complete
+    # Extra memo keys: suffix-induced subsets of best_order get (best_cost, suffix) if
+    # that improves memo[S] — separate from assignments in the DFS loop above.
+    _relax_suffix_induced_sets(memo, best_order, best_cost)
+
+    sorted_keys = sorted(memo.keys(), key=_vars_key_sort_key)
+    optimal_subquery_costs = OrderedDict((vk, memo[vk][0]) for vk in sorted_keys)
+    optimal_perm_by_vars = OrderedDict((vk, memo[vk][1]) for vk in sorted_keys)
+    return (best_complete, optimal_subquery_costs, optimal_perm_by_vars)
 
 
 def pruned_query_to_plan(
@@ -312,6 +388,7 @@ def pruned_query_to_plan_dfs(
         (
             (greedy_order, _, _, greedy_cost),
             greedy_subquery_costs,
+            _,
         ) = greedy_result
 
         if len(component) >= 10 or use_greedy:
@@ -322,7 +399,7 @@ def pruned_query_to_plan_dfs(
             total_cost += greedy_cost
             continue
 
-        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
+        (exact_order, _, _, exact_cost), _, _ = branch_and_bound_dfs(
             cur_aq, component, float("inf"), greedy_subquery_costs
         )
         elimination_order.extend(exact_order)

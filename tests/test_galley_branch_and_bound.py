@@ -134,5 +134,5 @@ def test_branch_and_bound_dfs_matches_branch_and_bound_empty_bounds(k):
     r_bfs = branch_and_bound(aq, component, k, OrderedDict())
     r_dfs = branch_and_bound_dfs(aq, component, k, OrderedDict())
     (_, _, _, cost_bfs), _ = r_bfs
-    (_, _, _, cost_dfs), _ = r_dfs
+    (_, _, _, cost_dfs), *_ = r_dfs
     assert cost_dfs == pytest.approx(cost_bfs)
