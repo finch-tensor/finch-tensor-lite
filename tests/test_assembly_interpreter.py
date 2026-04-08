@@ -67,10 +67,7 @@ def test_dot_product(a, b):
                             asm.ForLoop(
                                 i,
                                 asm.Literal(np.int64(0)),
-                                asm.Call(
-                                    asm.L(ffunc.sub),
-                                    (asm.Length(ab_slt), asm.L(np.int64(1))),
-                                ),
+                                asm.Length(ab_slt),
                                 asm.Block(
                                     (
                                         asm.Assign(

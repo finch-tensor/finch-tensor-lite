@@ -1524,7 +1524,6 @@ class _ResizeIfSmaller(FinchOperator, NumbaOperator):
     returns `arr` unchanged.
     """
 
-    # TODO: Implement with Finch Assembly
     @staticmethod
     def _func(
         arr: np.ndarray, new_size: np.integer, fill_value: np.number
