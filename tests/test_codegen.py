@@ -108,13 +108,13 @@ def test_codegen(compiler, buffer):
     buf = buffer(a)
 
     a_var = asm.Variable("a", buf.ftype)
-    i_var = asm.Variable("i", np.intp)
-    length_var = asm.Variable("l", np.intp)
+    i_var = asm.Variable("i", finchlite.intp)
+    length_var = asm.Variable("l", finchlite.intp)
     a_slt = asm.Slot("a_", buf.ftype)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("test_function", np.intp),
+                asm.Variable("test_function", finchlite.intp),
                 (a_var,),
                 asm.Block(
                     (
@@ -251,12 +251,12 @@ def test_malloc_resize(compiler, new_size):
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("b_", ab.ftype)
-    size = asm.Variable("size", np.intp)
+    size = asm.Variable("size", finchlite.intp)
 
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("length", np.intp),
+                asm.Variable("length", finchlite.intp),
                 (ab_v,),
                 asm.Block(
                     (

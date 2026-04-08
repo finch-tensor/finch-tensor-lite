@@ -40,7 +40,7 @@ ab = NumpyBuffer(a)
 ab_safe = SafeBuffer(ab)
 ab_v = asm.Variable("a", ab_safe.ftype)
 ab_slt = asm.Slot("a_", ab_safe.ftype)
-idx = asm.Variable("idx", np.intp)
+idx = asm.Variable("idx", finchlite.intp)
 val = asm.Variable("val", finchlite.int64)
 
 res_var = asm.Variable("val", ab_safe.ftype.element_type)
