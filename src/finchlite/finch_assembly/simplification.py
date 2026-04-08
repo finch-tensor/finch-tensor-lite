@@ -16,8 +16,10 @@ class AssemblySimplify(AssemblyTransform):
             # overwrite(x, y) => y
             case asm.Call(asm.Literal(fn), (_, y)) if fn is ffunc.overwrite:
                 return y
+            # max(x) => x, min(x) => x
             case asm.Call(asm.L(op), (arg,)) if op in (ffunc.min, ffunc.max):
                 return arg
+            # max(x, y) => x if x == y, min(x, y) => x if x == y
             case asm.Call(asm.L(op), (arg1, arg2)) if (
                 op in (ffunc.min, ffunc.max) and arg1 == arg2
             ):
@@ -58,6 +60,11 @@ class AssemblySimplify(AssemblyTransform):
             # if(...) {} is removed
             case asm.If(_, asm.Block(())):
                 return asm.Block(())
+            # if(x == x) { ... } => { ... }
+            case asm.If(asm.Call(asm.Literal(ffunc.eq), (arg1, arg2)), body) if (
+                arg1 == arg2
+            ):
+                return body
             # block(..., block(), ...) => block(...)
             case asm.Block(bodies):
                 for i, b in enumerate(bodies):
