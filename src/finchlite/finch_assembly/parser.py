@@ -30,8 +30,9 @@ assembly_parser = Lark(
     _FINCH: "finch" | "finch-asm"
     _NEWLINE: NEWLINE
     _COMMENT: C_COMMENT | CPP_COMMENT
-    OP: "+" | "-" | "*" | "or" | "and" | "|" | "&" | "^" | "<<" | ">>"
+    INFIX_OP: "+" | "-" | "*" | "or" | "and" | "|" | "&" | "^" | "<<" | ">>"
       | "//" | "/" | "%" | "**" | ">" | "<" | ">=" | "<=" | "==" | "!="
+    OP: "min" | "max"
 
     start: _FINCH _NEWLINE+ block
     block: (_stmt _NEWLINE+)* _stmt
@@ -42,16 +43,15 @@ assembly_parser = Lark(
          | if_else
          | resize
          | _COMMENT
-    ?access_expr: access_expr OP access_expr | CNAME | INT
+    ?access_expr: access_expr INFIX_OP access_expr | CNAME | INT
     access: CNAME "[" access_expr "]"
-    ?expr: CNAME | INT | DECIMAL | access | scansearch | add | max | expr OP expr
+    ?expr: CNAME | INT | DECIMAL | access | scansearch | bin_op | expr INFIX_OP expr
     ?lhs: CNAME | access
     assign: lhs "=" expr
-    increment: lhs OP "=" expr
+    increment: lhs INFIX_OP "=" expr
     resize: "resize" "(" CNAME "," access_expr ")"
     scansearch: "scansearch" "(" CNAME "," expr "," expr "," expr ")"
-    add: "add" "(" expr "," expr ")"
-    max: "max" "(" expr "," expr ")"
+    bin_op: OP "(" expr "," expr ")"
     for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ block _NEWLINE+ "end"
     if: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
     if_else: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "else" _NEWLINE+ block _NEWLINE+ "end"
@@ -67,6 +67,8 @@ _OPS = {
     "<=": ffunc.le,
     ">": ffunc.gt,
     ">=": ffunc.ge,
+    "min": ffunc.min,
+    "max": ffunc.max,
 }
 
 
@@ -109,7 +111,7 @@ def parse_assembly(
         match tree:
             case Token("CNAME", val):
                 return vars[val]
-            case Token("OP", val):
+            case Token("OP" | "INFIX_OP", val):
                 return _OPS[val]
             case Token("INT", val):
                 return asm.Literal(position_type(val))
@@ -140,10 +142,8 @@ def parse_assembly(
                 return asm.Call(
                     asm.Literal(ffunc.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
                 )
-            case Tree("add", [expr1, expr2]):
-                return asm.Call(asm.Literal(ffunc.add), (ctx(expr1), ctx(expr2)))
-            case Tree("max", [expr1, expr2]):
-                return asm.Call(asm.Literal(ffunc.max), (ctx(expr1), ctx(expr2)))
+            case Tree("bin_op", [op, expr1, expr2]):
+                return asm.Call(asm.Literal(ctx(op)), (ctx(expr1), ctx(expr2)))
             case Tree("assign", [lhs, expr]):
                 return asm.Assign(ctx(lhs), ctx(expr))
             case Tree("access", [tns, access_expr]):
