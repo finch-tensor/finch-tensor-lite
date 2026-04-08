@@ -367,7 +367,7 @@ complex64 = FDTypeComplex64()
 int = int32 if np.intp == np.int32 else int64
 float = float64
 complex = complex64
-index = int32 if np.intp == np.int32 else int64
+intp = int32 if np.intp == np.int32 else int64
 
 
 def finfo(T: FDTypeFloat):
