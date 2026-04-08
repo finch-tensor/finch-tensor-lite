@@ -21,6 +21,7 @@ from finchlite.finch_logic import (
     Literal,
     MapJoin,
     Query,
+    Reorder,
     Table,
 )
 
@@ -111,3 +112,48 @@ def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
     (_, _, _, cost_k1), _ = r_greedy
     (_, _, _, cost_kinf), _ = r_exact
     assert cost_kinf <= cost_k1
+
+
+def _make_aq_passthrough_alias():
+    """
+    AnnotatedQuery for a bare Reorder(Table(alias, ...), ...) — no
+    aggregation, so there are no reducible indices.  This is the minimal
+    case that previously caused ``pruned_query_to_plan`` to return an empty
+    list because ``get_remaining_query`` short-circuited on ``Table(Alias, _)``.
+    """
+    A = fl.asarray(np.ones((3, 4)))
+    a_alias = Alias("A_in")
+    bindings = OrderedDict()
+    bindings[a_alias] = _DENSE_STATS_FACTORY(A, (Field("a_in_i_0"), Field("a_in_i_1")))
+    q = Query(
+        Alias("out"),
+        Reorder(Table(a_alias, (Field("i"), Field("j"))), (Field("i"), Field("j"))),
+    )
+    return AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=bindings)
+
+
+def test_pruned_query_to_plan_nonempty_for_passthrough_alias():
+    """pruned_query_to_plan must return at least one query for a passthrough alias."""
+    aq = _make_aq_passthrough_alias()
+    queries, _ = pruned_query_to_plan(aq)
+    assert len(queries) >= 1, (
+        "pruned_query_to_plan returned no queries for a passthrough"
+    )
+
+
+def test_pruned_query_to_plan_passthrough_lhs_matches_output_name():
+    """The single query returned for a passthrough binds the correct output alias."""
+    aq = _make_aq_passthrough_alias()
+    queries, _ = pruned_query_to_plan(aq)
+    assert queries[-1].lhs == Alias("out")
+
+
+def test_pruned_query_to_plan_passthrough_body_references_input_alias():
+    """The returned query body references the original input alias Table."""
+    aq = _make_aq_passthrough_alias()
+    queries, _ = pruned_query_to_plan(aq)
+    last_rhs = queries[-1].rhs
+    # Body should be Reorder(Table(Alias("A_in"), ...), ...) — the input alias
+    assert isinstance(last_rhs, Reorder)
+    assert isinstance(last_rhs.arg, Table)
+    assert last_rhs.arg.tns == Alias("A_in")

@@ -182,12 +182,7 @@ def pruned_query_to_plan(
 
     # --- Append remaining (non-reducible) query and fix output name ---
     remaining_q = cur_aq.get_remaining_query()
-    if remaining_q is not None:
-        queries.append(remaining_q)
-    if queries:
-        last_query = queries[-1]
-        if last_query.lhs != cur_aq.output_name:
-            queries[-1] = Query(cur_aq.output_name, last_query.rhs)
+    queries.append(remaining_q)
     return queries, total_cost
 
 

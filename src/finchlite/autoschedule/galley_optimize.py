@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import OrderedDict
-from typing import TypedDict
 
+from ..algebra.tensor import TensorFType
+from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     Alias,
     Field,
-    LogicEvaluator,
+    LogicLoader,
+    LogicStatement,
     Plan,
     Query,
     StatsFactory,
@@ -51,7 +52,7 @@ def optimize_query(
 def optimize_plan(
     plan,
     stats_factory: StatsFactory,
-    bindings,
+    stats_bindings: dict[Alias, TensorStats],
     use_components: bool = True,
     *,
     use_exact_branch_and_bound: bool = False,
@@ -62,13 +63,6 @@ def optimize_plan(
     """
     plan = preprocess_plan_for_galley(plan)
     optimized_queries = []
-    stats_bindings: OrderedDict[Alias, TensorStats] = OrderedDict(
-        (
-            var,
-            stats_factory(T, tuple(Field(f"{var.name}_i_{i}") for i in range(T.ndim))),
-        )
-        for var, T in bindings.items()
-    )
     cache_dict: dict[object, TensorStats] = {}
     for body in plan.bodies:
         if isinstance(body, Query):
@@ -94,65 +88,46 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyProfileTimes(TypedDict):
-    """Time measurement for the compiler."""
-
-    optimize_plan_s: float
-    downstream_s: float
-
-
-class GalleyLogicalOptimizer(LogicEvaluator):
+class GalleyLogicalOptimizer(LogicLoader):
     """
-    Pipeline stage that optimizes logical Plans with the Galley greedy rewriter
-    (or exact branch-and-bound when enabled), then forwards to an optional
-    downstream LogicEvaluator (ctx).
+    LogicLoader stage that optimizes logical Plans with the Galley greedy
+    rewriter (or exact branch-and-bound when enabled), then forwards to a
+    downstream LogicLoader (ctx).
     """
 
     def __init__(
         self,
-        stats_factory: StatsFactory,
-        ctx: LogicEvaluator | None = None,
+        ctx: LogicLoader,
         use_components: bool = True,
-        profile: bool = False,
         *,
         use_exact_branch_and_bound: bool = True,
     ):
-        self.stats_factory = stats_factory
         self.ctx = ctx
         self.use_components = use_components
-        self.profile = profile
         self.use_exact_branch_and_bound = use_exact_branch_and_bound
+        self.last_optimize_plan_s: float | None = None
 
-    def __call__(self, prgm, bindings=None):
-        if bindings is None:
-            bindings = {}
-
-        if isinstance(prgm, Plan):
-            logger.debug("Optimizing plan: %s", prgm)
-            t0 = time.perf_counter()
-            prgm = optimize_plan(
-                prgm,
-                self.stats_factory,
-                bindings,
-                use_components=self.use_components,
-                use_exact_branch_and_bound=self.use_exact_branch_and_bound,
-            )
-            t_opt = time.perf_counter() - t0
-            if self.ctx is not None:
-                t1 = time.perf_counter()
-                out = self.ctx(prgm, bindings)
-                t_down = time.perf_counter() - t1
-            else:
-                out = prgm
-                t_down = 0.0
-            times = GalleyProfileTimes(
-                {
-                    "optimize_plan_s": t_opt,
-                    "downstream_s": t_down,
-                }
-            )
-            #  End time
-            if self.profile:
-                return out, times
-            return out
-        raise ValueError(f"Unsupported program type: {type(prgm)}")
+    def __call__(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[Alias, TensorFType],
+        dict[Alias, tuple[Field | None, ...]],
+    ]:
+        if not isinstance(term, Plan):
+            raise ValueError(f"Unsupported program type: {type(term)}")
+        logger.debug("Optimizing plan: %s", term)
+        t0 = time.perf_counter()
+        term = optimize_plan(
+            term,
+            stats_factory,
+            stats,
+            use_components=self.use_components,
+            use_exact_branch_and_bound=self.use_exact_branch_and_bound,
+        )
+        self.last_optimize_plan_s = time.perf_counter() - t0
+        return self.ctx(term, bindings, stats, stats_factory)
