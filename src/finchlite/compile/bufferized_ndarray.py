@@ -192,7 +192,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         ndim: int,
         dimension_type: TupleFType | tuple[type, ...],
     ):
-        if not fisinstance(dimension_type, TupleFType):
+        if not isinstance(dimension_type, TupleFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
         assert isinstance(dimension_type, TupleFType)
         self.buf_t = buffer_type
