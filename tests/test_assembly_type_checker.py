@@ -17,7 +17,7 @@ from finchlite.finch_assembly import assembly_check_types
 def test_lit_basic():
     checker = asm.AssemblyTypeChecker()
     assert checker(asm.Literal(np.float64(1.0))) is finchlite.float64
-    assert checker(asm.Literal(True)) is bool
+    assert checker(asm.Literal(True)) is finchlite.bool_
 
 
 def test_var_basic():
@@ -28,7 +28,7 @@ def test_var_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("y", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Variable("x", float))
+        checker(asm.Variable("x", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("x", 42))
 
@@ -41,7 +41,7 @@ def test_slot_basic():
     assert isinstance(b_type, FType)
     assert b_type == b.ftype
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Slot("b", float))
+        checker(asm.Slot("b", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Slot("b", 42))
 
