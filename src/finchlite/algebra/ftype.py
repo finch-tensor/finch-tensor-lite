@@ -124,13 +124,13 @@ class FDTypeBuiltin(FDType):
 
 
 # Ftypes for python built-in datatypes
-class FDTypeBuiltinBool(FDTypeBoolean):
+class _FDTypeBuiltinBool(FDTypeBoolean):
     @property
     def type(self):
         return bool
 
 
-bool_ = FDTypeBuiltinBool()
+bool_ = _FDTypeBuiltinBool()
 
 
 class FDTypeNumericBuiltin(FDType):
@@ -142,7 +142,7 @@ class FDTypeNumericBuiltin(FDType):
         return None
 
 
-class FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
+class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
     @property
     def type(self):
         return int
@@ -166,10 +166,10 @@ class FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
         )
 
 
-int_ = FDTypeBuiltinInt()
+int_ = _FDTypeBuiltinInt()
 
 
-class FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
+class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
     @property
     def type(self):
         return float
@@ -190,10 +190,10 @@ class FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         return self.type(np.inf)
 
 
-float_ = FDTypeBuiltinFloat()
+float_ = _FDTypeBuiltinFloat()
 
 
-class FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
+class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
         return complex
@@ -211,7 +211,7 @@ class FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
         return self.type(complex(np.inf, np.inf))
 
 
-complex_ = FDTypeBuiltinComplex()
+complex_ = _FDTypeBuiltinComplex()
 
 
 class FDTypeNumpy(FDType):
@@ -286,130 +286,130 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
 
 
 # FTypes for numpy built-in datatypes
-class FDTypeBool(FDTypeBoolean, FDTypeNumpy):
+class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
     @property
     def dtype(self):
         return np.bool_
 
 
-bool = FDTypeBool()
+bool = _FDTypeBool()
 
 
-class FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int8
 
 
-int8 = FDTypeInt8()
+int8 = _FDTypeInt8()
 
 
-class FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int16
 
 
-int16 = FDTypeInt16()
+int16 = _FDTypeInt16()
 
 
-class FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int32
 
 
-int32 = FDTypeInt32()
+int32 = _FDTypeInt32()
 
 
-class FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int64
 
 
-int64 = FDTypeInt64()
+int64 = _FDTypeInt64()
 
 
-class FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint8
 
 
-uint8 = FDTypeUInt8()
+uint8 = _FDTypeUInt8()
 
 
-class FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint16
 
 
-uint16 = FDTypeUInt16()
+uint16 = _FDTypeUInt16()
 
 
-class FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint32
 
 
-uint32 = FDTypeUInt32()
+uint32 = _FDTypeUInt32()
 
 
-class FDTypeUInt64(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint64
 
 
-uint64 = FDTypeUInt64()
+uint64 = _FDTypeUInt64()
 
 
-class FDTypeFloat32(FDTypeNumpyFloat, FDTypeReal):
+class _FDTypeFloat32(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
         return np.float32
 
 
-float32 = FDTypeFloat32()
+float32 = _FDTypeFloat32()
 
 
-class FDTypeFloat16(FDTypeNumpyFloat, FDTypeReal):
+class _FDTypeFloat16(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
         return np.float16
 
 
-float16 = FDTypeFloat16()
+float16 = _FDTypeFloat16()
 
 
-class FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
+class _FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
         return np.float64
 
 
-float64 = FDTypeFloat64()
+float64 = _FDTypeFloat64()
 
 
-class FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
+class _FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
     @property
     def dtype(self):
         return np.complex64
 
 
-complex64 = FDTypeComplex64()
+complex64 = _FDTypeComplex64()
 
 
-class FDTypeComplex128(FDTypeNumpyFloat, FDTypeComplex):
+class _FDTypeComplex128(FDTypeNumpyFloat, FDTypeComplex):
     @property
     def dtype(self):
         return np.complex128
 
 
-complex128 = FDTypeComplex128()
+complex128 = _FDTypeComplex128()
 
 # alias for default ftypes
 int = int32 if np.intp == np.int32 else int64
@@ -440,16 +440,14 @@ class FTyped:
         ...
 
 
-def fisinstance(x, f):
+def fisinstance(x, f:FType):
     """
     Check if `x` is an instance of `f`.
     """
-    if isinstance(f, type):
-        return isinstance(x, f)
     return f.fisinstance(x)
 
 
-def isdtype(x, T):
+def isdtype(x, T:FType):
     """
     Check if `x` is an instance of `T`.
     """
