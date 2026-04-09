@@ -9,7 +9,9 @@ from finchlite.finch_logic import (
     StatsFactory,
     TensorStats,
 )
-
+import logging
+from ..util.logging import LOG_LOGIC_POST_OPT
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 class LogicCacheFirst(LogicLoader):
     def __init__(self, ctx: LogicLoader):
@@ -26,8 +28,11 @@ class LogicCacheFirst(LogicLoader):
         key = (prgm, tuple(bindings.items()))
 
         if key not in self.cache:
+            logger.debug("CacheFirst MISS, compiling a new kernel")
             self.cache[key] = self.ctx(prgm, bindings, stats, stats_factory)
-
+        else :
+            logger.debug("CacheFirst HIT, reusing kernel")
+        
         return self.cache[key]
 
 
@@ -62,9 +67,11 @@ class LogicCacheLRU(LogicLoader):
                     for alias in stats
                 ):
                     # Keep the most used stats:kernel combo as MRU.
+                    logger.debug("CacheLRU HIT, reusing kernel")
                     kernels.move_to_end(saved_stats)
                     return result
-
+                
+        logger.debug("CacheLRU MISS, compiling new kernel ") 
         result = self.ctx(prgm, bindings, stats, stats_factory)
         new_stats_key = tuple(stats.items()) if stats else ()
 

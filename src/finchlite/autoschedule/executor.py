@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import Any
 
 from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic.nodes import TableValue
@@ -53,6 +54,7 @@ class LogicExecutor(LogicEvaluator):
         self,
         ctx: LogicLoader | None = None,
         stats_factory: StatsFactory | None = None,
+        cache : bool = False,
     ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
@@ -60,6 +62,8 @@ class LogicExecutor(LogicEvaluator):
             stats_factory = DenseStatsFactory()
         self.ctx: LogicLoader = ctx
         self.stats_factory = stats_factory
+        self.cache = cache
+        self.stats_cache : dict[tuple[Any,Any], OrderedDict] = {}
 
     def __call__(
         self,
@@ -82,12 +86,20 @@ class LogicExecutor(LogicEvaluator):
 
         stmt, bindings = extract_tensors(stmt, bindings)
         binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
-        stats_bindings = OrderedDict()
+        exec_cache_key = (stmt,tuple(binding_ftypes.items()))
 
-        for var, T in bindings.items():
-            shape = T.shape
-            fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
-            stats_bindings[var] = self.stats_factory(T, fields)
+        if self.cache and exec_cache_key in self.stats_cache :
+            stats_bindings = self.stats_cache[exec_cache_key]
+
+        else : 
+            stats_bindings = OrderedDict()
+            for var, T in bindings.items():
+                shape = T.shape
+                fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
+                stats_bindings[var] = self.stats_factory(T, fields)
+            
+            if self.cache:
+                self.stats_cache[exec_cache_key] = stats_bindings
 
         mod, binding_ftypes, binding_idxs = self.ctx(
             stmt,
