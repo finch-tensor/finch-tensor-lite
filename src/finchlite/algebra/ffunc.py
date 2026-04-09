@@ -13,7 +13,7 @@ from .algebra import (
     type_max,
     type_min,
 )
-from .ftype import FDType, TupleFType, ftype, promote_type
+from .ftype import FDType, FDTypeBoolean, TupleFType, ftype, promote_type, FDTypeNumpyInteger
 
 
 class CNAryOperator(COperator):
@@ -68,7 +68,7 @@ class _Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     def is_identity(self, arg: Any) -> bool:
         return arg == 0
 
-    def is_annihilator(self, arg: Any) -> bool:
+    def is_annihilator(self, arg: Any, argtype) -> bool:
         return np.isinf(arg)
 
     def repeat_operator(self):
@@ -107,7 +107,7 @@ class _Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (_Add, _Sub))
 
-    def is_annihilator(self, val):
+    def is_annihilator(self, val, argtype):
         return val == 0
 
     def init_value(self, type_: type) -> Any:
@@ -225,7 +225,7 @@ class _Pow(ReflexiveFinchOperator, COperator):
     def is_identity(self, arg):
         return arg == 1
 
-    def is_annihilator(self, arg):
+    def is_annihilator(self, arg, argtype):
         return arg == 0
 
     def __repr__(self) -> str:
@@ -289,7 +289,7 @@ class _And(ReflexiveFinchOperator, CNAryOperator):
     def is_identity(self, arg):
         return bool(arg)
 
-    def is_annihilator(self, arg):
+    def is_annihilator(self, arg, argtype):
         return not bool(arg)
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
@@ -344,8 +344,16 @@ class _Or(ReflexiveFinchOperator, CNAryOperator):
     def is_identity(self, arg):
         return not bool(arg)
 
-    def is_annihilator(self, arg):
-        return bool(arg)
+    def is_annihilator(self, arg, argtype):
+        if argtype is None:
+            return False
+        promoted = promote_type(cast(FDType, ftype(arg)), cast(FDType, ftype(argtype)))
+        arg = promoted(arg)
+        if isinstance(promoted, FDTypeBoolean):
+            return bool(arg)
+        if isinstance(promoted, FDTypeNumpyInteger):
+            return arg == ~promoted.dtype(0)
+        return False
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, _And)
@@ -582,7 +590,7 @@ class _LogAddExp(BinaryFloatOperator):
     def is_identity(self, val) -> bool:
         return val == -np.inf
 
-    def is_annihilator(self, val) -> bool:
+    def is_annihilator(self, val, argtype) -> bool:
         return val == np.inf
 
     def init_value(self, type_: type) -> Any:
@@ -604,7 +612,7 @@ class _LogicalAnd(LogicalBinaryOperator):
     def is_identity(self, val) -> bool:
         return bool(val)
 
-    def is_annihilator(self, val) -> bool:
+    def is_annihilator(self, val, argtype) -> bool:
         return not bool(val)
 
     def is_distributive(self, other_op: FinchOperator) -> bool:
@@ -629,7 +637,7 @@ class _LogicalOr(LogicalBinaryOperator):
     def is_identity(self, val) -> bool:
         return not bool(val)
 
-    def is_annihilator(self, val) -> bool:
+    def is_annihilator(self, val, argtype) -> bool:
         return bool(val)
 
     def is_distributive(self, other_op: FinchOperator) -> bool:
@@ -684,6 +692,25 @@ class _Truth(UnaryBoolOperator):
 
 
 truth = _Truth()
+
+class _ShortcircuitOr(UnaryBoolOperator):
+    is_associative = True
+    is_commutative = False
+
+    def __repr__(self) -> str:
+        return "shortcircuit_or"
+
+    def __call__(self, a, b):
+        return a if a else b
+
+    def is_identity(self, arg):
+        return not bool(arg)
+
+    def is_annihilator(self, arg, argtype):
+        return bool(arg)
+
+
+shortcircuit_or = _ShortcircuitOr()
 
 
 class _Min(FinchOperator, NumbaOperator):
@@ -1591,6 +1618,7 @@ __all__ = [
     "round",
     "rshift",
     "scansearch",
+    "shortcircuit_or",
     "sign",
     "signbit",
     "sin",
