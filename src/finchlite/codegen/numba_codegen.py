@@ -16,6 +16,7 @@ from ..algebra import (
     query_property,
     register_property,
 )
+from ..algebra.ftype import TupleFType
 from ..finch_assembly import AssemblyStructFType, BufferFType
 from ..finch_assembly.dct import DictFType
 from ..finch_assembly.struct import (  # type: ignore[import-untyped]
@@ -90,6 +91,19 @@ register_property(
 )
 register_property(
     ImmutableStructFType,
+    "numba_type",
+    "__attr__",
+    lambda t: tuple,
+)
+
+register_property(
+    TupleFType,
+    "numba_jitclass_type",
+    "__attr__",
+    immutable_struct_jitclass_type,
+)
+register_property(
+    TupleFType,
     "numba_type",
     "__attr__",
     lambda t: tuple,
@@ -241,6 +255,10 @@ register_property(
     ImmutableStructFType, "serialize_to_numba", "__attr__", serialize_immutable_to_numba
 )
 
+register_property(
+    TupleFType, "serialize_to_numba", "__attr__", serialize_immutable_to_numba
+)
+
 
 def immutable_construct_from_numba(fmt: AssemblyStructFType, numba_tuple):
     return fmt.from_fields(
@@ -255,6 +273,13 @@ def immutable_construct_from_numba(fmt: AssemblyStructFType, numba_tuple):
 
 register_property(
     ImmutableStructFType,
+    "construct_from_numba",
+    "__attr__",
+    immutable_construct_from_numba,
+)
+
+register_property(
+    TupleFType,
     "construct_from_numba",
     "__attr__",
     immutable_construct_from_numba,
@@ -812,6 +837,13 @@ register_property(
     _deserialize_asm_struct_from_numba,
 )
 
+register_property(
+    TupleFType,
+    "deserialize_from_numba",
+    "__attr__",
+    _deserialize_asm_struct_from_numba,
+)
+
 
 def struct_numba_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
     return f"{obj}.{attr}"
@@ -832,6 +864,13 @@ def immutable_struct_numba_getattr(fmt: AssemblyStructFType, ctx, obj, attr):
 
 register_property(
     ImmutableStructFType,
+    "numba_getattr",
+    "__attr__",
+    immutable_struct_numba_getattr,
+)
+
+register_property(
+    TupleFType,
     "numba_getattr",
     "__attr__",
     immutable_struct_numba_getattr,
