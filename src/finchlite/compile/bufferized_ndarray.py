@@ -8,7 +8,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import Tensor, ffunc, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
-from ..finch_assembly import AssemblyStructFType, TupleFType
+from ..finch_assembly import StructFType, TupleFType
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
 
@@ -131,7 +131,7 @@ class BufferizedNDArrayFields:
     dirty_bit: bool
 
 
-class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
+class BufferizedNDArrayFType(FinchTensorFType, StructFType):
     """
     A ftype for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
@@ -147,8 +147,8 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         dt = np.dtype(self.buf_t.element_type)
         return (
             f"BufferizedNDArray_{dt.kind}{dt.itemsize * 8}_"
-            f"shape_{str_format(self.shape_t.struct_fieldformats)}_"
-            f"strides_{str_format(self.strides_t.struct_fieldformats)}"
+            f"shape_{str_format(self.shape_t.struct_fieldtypes)}_"
+            f"strides_{str_format(self.strides_t.struct_fieldtypes)}"
         )
 
     @property
@@ -174,13 +174,13 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             shape=tuple(
                 t(s)
                 for s, t in zip(
-                    arr.shape, self.shape_t.struct_fieldformats, strict=True
+                    arr.shape, self.shape_t.struct_fieldtypes, strict=True
                 )
             ),
             strides=tuple(
                 t(s)
                 for (s, t) in zip(
-                    strides, self.strides_t.struct_fieldformats, strict=True
+                    strides, self.strides_t.struct_fieldtypes, strict=True
                 )
             ),
         )

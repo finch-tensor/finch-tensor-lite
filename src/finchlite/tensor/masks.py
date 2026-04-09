@@ -15,7 +15,7 @@ from ..tensor import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
-class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
+class LoTriMaskFType(LevelFType, asm.StructFType):
     body: LevelFType
 
     @property

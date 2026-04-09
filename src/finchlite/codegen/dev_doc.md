@@ -165,7 +165,7 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldtypes]
     name = ctx.freshen("hash")
     ctx.datastructures[fmt]["hash"] = name
 
@@ -197,7 +197,7 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
     name = ctx.freshen("eq")
     ctx.datastructures[fmt]["eq"] = name
 

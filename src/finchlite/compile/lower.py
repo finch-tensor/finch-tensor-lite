@@ -13,7 +13,7 @@ from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
-    AssemblyStructFType,
+    StructFType,
     AssemblyTransform,
 )
 from ..finch_notation import NotationLoader
@@ -216,7 +216,7 @@ class SymbolicExtent(FTyped):
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFType(AssemblyStructFType):
+class ExtentFType(StructFType):
     start_t: type
     end_t: type
 

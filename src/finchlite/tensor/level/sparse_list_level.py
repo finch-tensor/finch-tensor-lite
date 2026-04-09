@@ -20,7 +20,7 @@ class SparseListLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
+class SparseListLevelFType(LevelFType, asm.StructFType):
     _lvl_t: LevelFType
     dimension_type: Any = None
 

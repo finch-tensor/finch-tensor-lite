@@ -280,7 +280,7 @@ class FiberTensorFields:
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
+class FiberTensorFType(FinchTensorFType, asm.StructFType):
     """
     An abstract base class representing the ftype of a fiber tensor.
 

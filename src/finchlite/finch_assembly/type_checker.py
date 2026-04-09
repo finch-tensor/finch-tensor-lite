@@ -9,7 +9,7 @@ from ..symbolic import ScopedDict
 from . import nodes as asm
 from .buffer import BufferFType
 from .dct import DictFType
-from .struct import AssemblyStructFType
+from .struct import StructFType
 
 
 class AssemblyTypeError(Exception):
@@ -98,7 +98,7 @@ class AssemblyTypeChecker:
 
     def check_struct(self, struct):
         struct_type = self.check_expr(struct)
-        if isinstance(struct_type, (AssemblyStructFType, TupleFType)):
+        if isinstance(struct_type, (StructFType)):
             return struct_type
         raise AssemblyTypeError(f"Expected struct, got {struct_type}.")
 

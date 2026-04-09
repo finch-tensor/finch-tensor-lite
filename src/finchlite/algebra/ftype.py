@@ -4,6 +4,13 @@ from abc import abstractmethod
 from functools import lru_cache
 from typing import Any
 
+from abc import ABC, abstractmethod
+from collections import namedtuple
+from typing import Any
+
+from ..algebra import FType, fisinstance, ftype, register_property
+from ..algebra.ftype import TupleFType
+
 import numpy as np
 
 """
@@ -495,46 +502,108 @@ class FTyped:
         """
         ...
 
-
-class TupleFType(FType):
-    """FType for Python tuples, with a struct-compatible interface."""
-
-    is_mutable = False
-
-    def __init__(self, struct_name, struct_formats):
-        self._struct_name = struct_name
-        self._struct_formats = struct_formats
-
+class StructFType(FType, ABC):
     def __eq__(self, other):
         return (
-            isinstance(other, TupleFType)
+            type(other) == type(self)
             and self.struct_name == other.struct_name
-            and self._struct_formats == other._struct_formats
+            and self.struct_fields == other.struct_fields
         )
-
-    def __len__(self):
-        return len(self._struct_formats)
-
+    
     def __hash__(self):
-        return hash((self.struct_name, tuple(self.struct_fieldformats)))
+        return hash((type(self), self.struct_name, tuple(self.struct_fields)))
 
-    def __str__(self):
-        return f"{self.struct_name}({', '.join(map(str, self._struct_formats))})"
-
-    @property
-    def struct_name(self):
-        return self._struct_name
+    def __repr__(self):
+        fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
+        return f"{self.struct_name}({fields_str})"
 
     @property
-    def struct_fields(self):
-        return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
+    @abstractmethod
+    def struct_name(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def struct_fields(self) -> list[tuple[str, FType]]: ...
+
+    @abstractmethod
+    def from_fields(self, *args): ...
+
+    @property
+    @abstractmethod
+    def is_mutable(self) -> bool:...
+
+    def struct_getattr(self, obj, attr) -> Any:
+        return getattr(obj, attr)
+
+    def struct_setattr(self, obj, attr, value) -> None:
+        setattr(obj, attr, value)
+        return
 
     @property
     def struct_fieldnames(self) -> list[str]:
         return [name for (name, _) in self.struct_fields]
 
     @property
-    def struct_fieldformats(self) -> list[Any]:
+    def struct_fieldtypes(self) -> list[FType]:
+        return [type_ for (_, type_) in self.struct_fields]
+
+    def struct_hasattr(self, attr: str) -> bool:
+        return attr in dict(self.struct_fields)
+
+    def struct_attrtype(self, attr: str) -> FType:
+        return dict(self.struct_fields)[attr]
+
+
+class ImmutableStructFType(StructFType):
+    @property
+    def is_mutable(self) -> bool:
+        return False
+
+
+class MutableStructFType(StructFType):
+    """
+    Class for a mutable struct type.
+    It is currently not used anywhere, but maybe it will be useful in the future?
+    """
+
+    @property
+    def is_mutable(self) -> bool:
+        return True
+
+class TupleFType(ImmutableStructFType):
+    """FType for Python tuples, with a struct-compatible interface."""
+
+    def __init__(self, struct_types):
+        self._struct_types = struct_types
+
+    def __repr__(self):
+        fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
+        return f"{self.struct_name}({fields_str})"
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, TupleFType)
+            and self.struct_name == other.struct_name
+            and self._struct_types == other._struct_types
+        )
+
+    def __str__(self):
+        return f"{self.struct_name}({', '.join(map(str, self._struct_types))})"
+
+    @property
+    def struct_name(self):
+        return "tuple"
+
+    @property
+    def struct_fields(self):
+        return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_types)]
+
+    @property
+    def struct_fieldnames(self) -> list[str]:
+        return [name for (name, _) in self.struct_fields]
+
+    @property
+    def struct_fieldtypes(self) -> list[Any]:
         return [type_ for (_, type_) in self.struct_fields]
 
     def struct_hasattr(self, attr: str) -> bool:
@@ -552,17 +621,17 @@ class TupleFType(FType):
         obj[index] = value
 
     def fisinstance(self, other):
-        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldformats):
+        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldtypes):
             return False
         return all(
             fisinstance(elt, fmt)
-            for elt, fmt in zip(other, self.struct_fieldformats, strict=False)
+            for elt, fmt in zip(other, self.struct_fieldtypes, strict=False)
         )
 
     def from_fields(self, *args):
         assert all(
             fisinstance(a, f)
-            for a, f in zip(args, self.struct_fieldformats, strict=False)
+            for a, f in zip(args, self.struct_fieldtypes, strict=False)
         )
         return tuple(args)
 
@@ -574,6 +643,54 @@ class TupleFType(FType):
     def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
         return TupleFType("tuple", types)
 
+
+class NamedTupleFType(ImmutableStructFType):
+    def __init__(self, struct_name, struct_fields):
+        self._struct_name = struct_name
+        self._struct_fields = struct_fields
+
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, NamedTupleFType)
+            and self.struct_name == other.struct_name
+            and self.struct_fields == other.struct_fields
+        )
+
+    def __len__(self):
+        return len(self._struct_fields)
+
+    def __hash__(self):
+        return hash((self.struct_name, tuple(self.struct_fields)))
+
+    @property
+    def struct_name(self):
+        return self._struct_name
+
+    @property
+    def struct_fields(self):
+        return self._struct_fields
+
+    def fisinstance(self, other):
+        if not isinstance(other, tuple) or not hasattr(other, "_fields"):
+            return False
+        if tuple(other._fields) != tuple(self.struct_fieldnames):
+            return False
+
+        return all(
+            fisinstance(elt, format)
+            for elt, format in zip(other, self.struct_fieldtypes, strict=False)
+        )
+
+    def from_fields(self, *args):
+        assert all(
+            fisinstance(a, f)
+            for a, f in zip(args, self.struct_fieldtypes, strict=False)
+        )
+        return namedtuple(self.struct_name, self.struct_fieldnames)(args)
+
+    def __call__(self, *args):
+        return self.from_fields(*args)
 
 def fisinstance(x, f: FType):
     """
@@ -632,4 +749,15 @@ def ftype(x) -> FType:
         return complex64
     if type(x) is np.complex128 or x is np.complex128:
         return complex128
+    if type(x) is tuple:
+        return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
+    if isinstance(x, NamedTuple) or issubclass(x, NamedTuple):
+        return NamedTupleFType(
+            x.__name__,
+            [
+                (fieldname, ftype(getattr(x, fieldname)))
+                for fieldname in x._fields
+            ]
+        )
     raise NotImplementedError
+

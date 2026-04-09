@@ -18,7 +18,7 @@ class DenseLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(LevelFType, asm.AssemblyStructFType):
+class DenseLevelFType(LevelFType, asm.StructFType):
     _lvl_t: LevelFType
     dimension_type: Any = None
 

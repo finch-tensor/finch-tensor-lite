@@ -26,7 +26,7 @@ from ..algebra import (
     register_property,
 )
 from ..finch_assembly import (
-    AssemblyStructFType,
+    StructFType,
     BufferFType,
     DictFType,
     ImmutableStructFType,
@@ -1111,17 +1111,17 @@ class CStackFType(ABC):
         ...
 
 
-def serialize_struct_to_c(fmt: AssemblyStructFType, obj) -> Any:
+def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
     args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
     return struct_c_type(fmt)(*args)
 
 
 register_property(
-    AssemblyStructFType, "serialize_to_c", "__attr__", serialize_struct_to_c
+    StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c
 )
 
 
-def deserialize_struct_from_c(fmt: AssemblyStructFType, obj, c_struct: Any) -> None:
+def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
     if fmt.is_mutable:
         for name in fmt.struct_fieldnames:
             setattr(obj, name, getattr(c_struct, name))
@@ -1129,14 +1129,14 @@ def deserialize_struct_from_c(fmt: AssemblyStructFType, obj, c_struct: Any) -> N
 
 
 register_property(
-    AssemblyStructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
+    StructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
 )
 
 c_structs: dict[Any, Any] = {}
 c_structnames = Namespace()
 
 
-def struct_c_type(fmt: AssemblyStructFType):
+def struct_c_type(fmt: StructFType):
     res = c_structs.get(fmt)
     if res:
         return res
@@ -1187,7 +1187,7 @@ register_property(
 )
 
 
-def struct_mutable_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
+def struct_mutable_setattr(fmt: StructFType, ctx, obj, attr, val):
     ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
 
 
@@ -1202,13 +1202,13 @@ register_property(
 )
 
 
-def struct_construct_from_c(fmt: AssemblyStructFType, c_struct):
+def struct_construct_from_c(fmt: StructFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return fmt.__class__(*args)
 
 
 register_property(
-    AssemblyStructFType,
+    StructFType,
     "construct_from_c",
     "__attr__",
     struct_construct_from_c,
@@ -1277,7 +1277,7 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldtypes]
     name = ctx.freshen("hash")
     ctx.datastructures[fmt]["hash"] = name
 
@@ -1316,7 +1316,7 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
     name = ctx.freshen("eq")
     ctx.datastructures[fmt]["eq"] = name
 

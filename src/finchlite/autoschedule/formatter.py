@@ -101,6 +101,6 @@ class DefaultLogicFormatter(LogicFormatter):
             ndim=len(shape_type),
             dimension_type=TupleFType(
                 struct_name=gensym("tuple", sep="_"),
-                struct_formats=shape_type,
+                struct_types=shape_type,
             ),
         )

@@ -16,7 +16,7 @@ class ElementLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
+class ElementLevelFType(LevelFType, asm.StructFType):
     fill_value: Any = None
     element_type: type | FType | None = None
     position_type: type | FType | None = None

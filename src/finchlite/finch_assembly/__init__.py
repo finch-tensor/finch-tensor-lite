@@ -49,7 +49,7 @@ from .parser import parse_assembly
 from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
 from .struct import (
-    AssemblyStructFType,
+    StructFType,
     ImmutableStructFType,
     MutableStructFType,
     NamedTupleFType,
@@ -68,7 +68,7 @@ __all__ = [
     "AssemblyLoader",
     "AssemblyNode",
     "AssemblySimplify",
-    "AssemblyStructFType",
+    "StructFType",
     "AssemblyTransform",
     "AssemblyTypeChecker",
     "AssemblyTypeError",

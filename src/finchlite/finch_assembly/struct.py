@@ -6,7 +6,7 @@ from ..algebra import FType, fisinstance, ftype, register_property
 from ..algebra.ftype import TupleFType
 
 
-class AssemblyStructFType(FType, ABC):
+class StructFType(FType, ABC):
     @property
     @abstractmethod
     def struct_name(self) -> str: ...
@@ -34,7 +34,7 @@ class AssemblyStructFType(FType, ABC):
         return [name for (name, _) in self.struct_fields]
 
     @property
-    def struct_fieldformats(self) -> list[Any]:
+    def struct_fieldtypes(self) -> list[Any]:
         return [type_ for (_, type_) in self.struct_fields]
 
     def struct_hasattr(self, attr: str) -> bool:
@@ -44,13 +44,13 @@ class AssemblyStructFType(FType, ABC):
         return dict(self.struct_fields)[attr]
 
 
-class ImmutableStructFType(AssemblyStructFType):
+class ImmutableStructFType(StructFType):
     @property
     def is_mutable(self) -> bool:
         return False
 
 
-class MutableStructFType(AssemblyStructFType):
+class MutableStructFType(StructFType):
     """
     Class for a mutable assembly struct type.
     It is currently not used anywhere, but maybe it will be useful in the future?
@@ -95,13 +95,13 @@ class NamedTupleFType(ImmutableStructFType):
 
         return all(
             fisinstance(elt, format)
-            for elt, format in zip(other, self.struct_fieldformats, strict=False)
+            for elt, format in zip(other, self.struct_fieldtypes, strict=False)
         )
 
     def from_fields(self, *args):
         assert all(
             fisinstance(a, f)
-            for a, f in zip(args, self.struct_fieldformats, strict=False)
+            for a, f in zip(args, self.struct_fieldtypes, strict=False)
         )
         return namedtuple(self.struct_name, self.struct_fieldnames)(args)
 
