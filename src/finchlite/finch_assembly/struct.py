@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from functools import lru_cache
 from typing import Any
 
 from ..algebra import FType, fisinstance, ftype, register_property
+from ..algebra.ftype import TupleFType
 
 
 class AssemblyStructFType(FType, ABC):
@@ -107,71 +107,6 @@ class NamedTupleFType(ImmutableStructFType):
 
     def __call__(self, *args):
         return self.from_fields(*args)
-
-
-class TupleFType(ImmutableStructFType):
-    def __init__(self, struct_name, struct_formats):
-        self._struct_name = struct_name
-        self._struct_formats = struct_formats
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, TupleFType)
-            and self.struct_name == other.struct_name
-            and self._struct_formats == other._struct_formats
-        )
-
-    def __len__(self):
-        return len(self._struct_formats)
-
-    def struct_getattr(self, obj, attr):
-        index = list(self.struct_fieldnames).index(attr)
-        return obj[index]
-
-    def struct_setattr(self, obj, attr, value):
-        index = list(self.struct_fieldnames).index(attr)
-        obj[index] = value
-        return
-
-    def __hash__(self):
-        return hash((self.struct_name, tuple(self.struct_fieldformats)))
-
-    @property
-    def struct_name(self):
-        return self._struct_name
-
-    @property
-    def struct_fields(self):
-        return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
-
-    def fisinstance(self, other):
-        """
-        Overridden fisinstance that matches what we have below.
-        """
-        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldformats):
-            return False
-        return all(
-            fisinstance(elt, format)
-            for elt, format in zip(other, self.struct_fieldformats, strict=False)
-        )
-
-    def __call__(self, **kwargs):
-        return self.from_fields(*kwargs.values())
-
-    def from_fields(self, *args):
-        assert all(
-            fisinstance(a, f)
-            for a, f in zip(args, self.struct_fieldformats, strict=False)
-        )
-        return tuple(args)
-
-    @staticmethod
-    @lru_cache
-    def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
-        return TupleFType("tuple", types)
-
-    def __str__(self):
-        return f"{self.struct_name}({', '.join(map(str, self._struct_formats))})"
 
 
 def tupleformat(x):

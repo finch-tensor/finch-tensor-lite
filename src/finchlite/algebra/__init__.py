@@ -20,6 +20,7 @@ from .algebra import (
 from .ftype import (
     FType,
     FTyped,
+    TupleFType,
     bool_,
     complex64,
     complex128,
@@ -58,6 +59,7 @@ __all__ = [
     "NumbaOperator",
     "Tensor",
     "TensorFType",
+    "TupleFType",
     "bool_",
     "cansplitpush",
     "complex64",
