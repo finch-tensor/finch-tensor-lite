@@ -20,18 +20,19 @@ from .. import finch_assembly as asm
 from ..algebra import (
     COperator,
     FType,
+    ImmutableStructFType,
+    MutableStructFType,
+    NamedTupleFType,
+    StructFType,
+    TupleFType,
     fisinstance,
     ftype,
     query_property,
     register_property,
 )
 from ..finch_assembly import (
-    StructFType,
     BufferFType,
     DictFType,
-    ImmutableStructFType,
-    MutableStructFType,
-    TupleFType,
 )
 from ..symbolic import Context, Namespace, ScopedDict
 from ..util import config, file_cache
@@ -1116,9 +1117,7 @@ def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
     return struct_c_type(fmt)(*args)
 
 
-register_property(
-    StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c
-)
+register_property(StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c)
 
 
 def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
@@ -1244,7 +1243,7 @@ register_property(
     TupleFType,
     "c_type",
     "__attr__",
-    lambda fmt: struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
+    lambda fmt: struct_c_type(NamedTupleFType("CTuple", fmt.struct_fields)),
 )
 
 register_property(
@@ -1269,7 +1268,7 @@ class CHashableProperties(TypedDict):
 
 def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable)
+    assert isinstance(fmt, Hashable) and isinstance(fmt, ImmutableStructFType)
     if fmt in ctx.datastructures:
         properties: CHashableProperties = ctx.datastructures[fmt]
         if properties.get("hash") is not None:
@@ -1277,7 +1276,7 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldtypes]
+    macros = [c_hash(fmt2, ctx) for fmt2 in fmt.struct_fieldtypes]
     name = ctx.freshen("hash")
     ctx.datastructures[fmt]["hash"] = name
 
@@ -1308,7 +1307,7 @@ register_property(
 
 def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable)
+    assert isinstance(fmt, Hashable) and isinstance(fmt, ImmutableStructFType)
     if fmt in ctx.datastructures:
         properties: CHashableProperties = ctx.datastructures[fmt]
         if properties.get("eq") is not None:

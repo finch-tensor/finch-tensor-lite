@@ -18,6 +18,7 @@ from ..algebra import (
     FinchOperator,
     Tensor,
     TensorFType,
+    TupleFType,
     ffunc,
     fixpoint_type,
     ftype,
@@ -27,7 +28,6 @@ from ..algebra import (
 )
 from ..autoschedule.tensor_stats import StatsInterpreter
 from ..compile import BufferizedNDArray
-from ..finch_assembly import TupleFType
 from ..finch_logic import (
     Aggregate,
     Alias,

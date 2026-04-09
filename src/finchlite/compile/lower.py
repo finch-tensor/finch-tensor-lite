@@ -7,13 +7,12 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import FTyped, TensorFType, ffunc, register_property
+from ..algebra import FTyped, StructFType, TensorFType, ffunc, register_property
 from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
-    StructFType,
     AssemblyTransform,
 )
 from ..finch_notation import NotationLoader

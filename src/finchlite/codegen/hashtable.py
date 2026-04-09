@@ -8,7 +8,8 @@ from typing import Any, NamedTuple
 
 import numba
 
-from ..finch_assembly import AssemblyExpression, Dict, ImmutableStructFType, Stack
+from ..algebra import ImmutableStructFType
+from ..finch_assembly import AssemblyExpression, Dict, Stack
 from .c_codegen import (
     CContext,
     CDictFType,

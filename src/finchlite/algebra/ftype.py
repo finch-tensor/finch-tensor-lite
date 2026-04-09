@@ -1,15 +1,9 @@
 # AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import builtins
-from abc import abstractmethod
-from functools import lru_cache
-from typing import Any
-
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from typing import Any
-
-from ..algebra import FType, fisinstance, ftype, register_property
-from ..algebra.ftype import TupleFType
+from functools import lru_cache
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -502,14 +496,15 @@ class FTyped:
         """
         ...
 
+
 class StructFType(FType, ABC):
     def __eq__(self, other):
         return (
-            type(other) == type(self)
+            type(other) is type(self)
             and self.struct_name == other.struct_name
             and self.struct_fields == other.struct_fields
         )
-    
+
     def __hash__(self):
         return hash((type(self), self.struct_name, tuple(self.struct_fields)))
 
@@ -530,7 +525,7 @@ class StructFType(FType, ABC):
 
     @property
     @abstractmethod
-    def is_mutable(self) -> bool:...
+    def is_mutable(self) -> builtins.bool: ...
 
     def struct_getattr(self, obj, attr) -> Any:
         return getattr(obj, attr)
@@ -547,7 +542,7 @@ class StructFType(FType, ABC):
     def struct_fieldtypes(self) -> list[FType]:
         return [type_ for (_, type_) in self.struct_fields]
 
-    def struct_hasattr(self, attr: str) -> bool:
+    def struct_hasattr(self, attr: str) -> builtins.bool:
         return attr in dict(self.struct_fields)
 
     def struct_attrtype(self, attr: str) -> FType:
@@ -556,7 +551,7 @@ class StructFType(FType, ABC):
 
 class ImmutableStructFType(StructFType):
     @property
-    def is_mutable(self) -> bool:
+    def is_mutable(self) -> builtins.bool:
         return False
 
 
@@ -567,8 +562,9 @@ class MutableStructFType(StructFType):
     """
 
     @property
-    def is_mutable(self) -> bool:
+    def is_mutable(self) -> builtins.bool:
         return True
+
 
 class TupleFType(ImmutableStructFType):
     """FType for Python tuples, with a struct-compatible interface."""
@@ -606,7 +602,7 @@ class TupleFType(ImmutableStructFType):
     def struct_fieldtypes(self) -> list[Any]:
         return [type_ for (_, type_) in self.struct_fields]
 
-    def struct_hasattr(self, attr: str) -> bool:
+    def struct_hasattr(self, attr: str) -> builtins.bool:
         return attr in dict(self.struct_fields)
 
     def struct_attrtype(self, attr: str) -> Any:
@@ -641,14 +637,13 @@ class TupleFType(ImmutableStructFType):
     @staticmethod
     @lru_cache
     def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
-        return TupleFType("tuple", types)
+        return TupleFType(types)
 
 
 class NamedTupleFType(ImmutableStructFType):
     def __init__(self, struct_name, struct_fields):
         self._struct_name = struct_name
         self._struct_fields = struct_fields
-
 
     def __eq__(self, other):
         return (
@@ -691,6 +686,7 @@ class NamedTupleFType(ImmutableStructFType):
 
     def __call__(self, *args):
         return self.from_fields(*args)
+
 
 def fisinstance(x, f: FType):
     """
@@ -754,10 +750,6 @@ def ftype(x) -> FType:
     if isinstance(x, NamedTuple) or issubclass(x, NamedTuple):
         return NamedTupleFType(
             x.__name__,
-            [
-                (fieldname, ftype(getattr(x, fieldname)))
-                for fieldname in x._fields
-            ]
+            [(fieldname, ftype(getattr(x, fieldname))) for fieldname in x._fields],
         )
     raise NotImplementedError
-

@@ -9,20 +9,19 @@ import numba
 
 from .. import finch_assembly as asm
 from ..algebra import (
+    ImmutableStructFType,
+    MutableStructFType,
     NumbaOperator,
+    StructFType,
+    TupleFType,
     ffunc,
     fisinstance,
     ftype,
     query_property,
     register_property,
 )
-from ..algebra.ftype import TupleFType
-from ..finch_assembly import StructFType, BufferFType
+from ..finch_assembly import BufferFType
 from ..finch_assembly.dct import DictFType
-from ..finch_assembly.struct import (  # type: ignore[import-untyped]
-    ImmutableStructFType,
-    MutableStructFType,
-)
 from ..symbolic import Context, Namespace, ScopedDict
 from ..util.logging import LOG_BACKEND_NUMBA
 from .stages import NumbaCode, NumbaLowerer

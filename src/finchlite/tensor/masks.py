@@ -8,14 +8,14 @@ from finchlite.tensor.fiber_tensor import FiberTensor, FiberTensorFields
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import ffunc
+from ..algebra import StructFType, ffunc
 from ..compile import looplets as lplt
 from ..interface import Scalar
 from ..tensor import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
-class LoTriMaskFType(LevelFType, asm.StructFType):
+class LoTriMaskFType(LevelFType, StructFType):
     body: LevelFType
 
     @property

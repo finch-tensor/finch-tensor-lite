@@ -48,13 +48,6 @@ from .nodes import (
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
-from .struct import (
-    StructFType,
-    ImmutableStructFType,
-    MutableStructFType,
-    NamedTupleFType,
-    TupleFType,
-)
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 
 __all__ = [
@@ -68,7 +61,6 @@ __all__ = [
     "AssemblyLoader",
     "AssemblyNode",
     "AssemblySimplify",
-    "StructFType",
     "AssemblyTransform",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
@@ -88,15 +80,12 @@ __all__ = [
     "GetAttr",
     "If",
     "IfElse",
-    "ImmutableStructFType",
     "L",
     "Length",
     "Literal",
     "Load",
     "LoadDict",
     "Module",
-    "MutableStructFType",
-    "NamedTupleFType",
     "NumberedStatement",
     "Print",
     "Repack",
@@ -107,7 +96,6 @@ __all__ = [
     "Stack",
     "Store",
     "StoreDict",
-    "TupleFType",
     "Unpack",
     "Variable",
     "WhileLoop",

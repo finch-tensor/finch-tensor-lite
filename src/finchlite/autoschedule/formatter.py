@@ -5,12 +5,11 @@ from typing import Any
 import numpy as np
 
 from .. import finch_logic as lgc
-from ..algebra import TensorFType
+from ..algebra import TensorFType, TupleFType
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
-from ..finch_assembly import AssemblyLibrary, TupleFType
+from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
-from ..symbolic import gensym
 from ..util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -100,7 +99,6 @@ class DefaultLogicFormatter(LogicFormatter):
             buffer_type=NumpyBufferFType(type(fill_value)),
             ndim=len(shape_type),
             dimension_type=TupleFType(
-                struct_name=gensym("tuple", sep="_"),
                 struct_types=shape_type,
             ),
         )

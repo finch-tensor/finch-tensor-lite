@@ -3,13 +3,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from .. import algebra
-from ..algebra import FType, ftype
-from ..algebra.ftype import TupleFType
+from ..algebra import FType, StructFType, ftype
 from ..symbolic import ScopedDict
 from . import nodes as asm
 from .buffer import BufferFType
 from .dct import DictFType
-from .struct import StructFType
 
 
 class AssemblyTypeError(Exception):

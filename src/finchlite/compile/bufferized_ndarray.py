@@ -6,9 +6,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor, ffunc, ftype
+from ..algebra import ImmutableStructFType, Tensor, TupleFType, ffunc, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
-from ..finch_assembly import StructFType, TupleFType
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
 
@@ -131,7 +130,7 @@ class BufferizedNDArrayFields:
     dirty_bit: bool
 
 
-class BufferizedNDArrayFType(FinchTensorFType, StructFType):
+class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     """
     A ftype for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
@@ -173,9 +172,7 @@ class BufferizedNDArrayFType(FinchTensorFType, StructFType):
             val=val,
             shape=tuple(
                 t(s)
-                for s, t in zip(
-                    arr.shape, self.shape_t.struct_fieldtypes, strict=True
-                )
+                for s, t in zip(arr.shape, self.shape_t.struct_fieldtypes, strict=True)
             ),
             strides=tuple(
                 t(s)

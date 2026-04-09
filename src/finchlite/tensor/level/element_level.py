@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import FType, ftype
+from ...algebra import FType, StructFType, ftype
 from ...codegen import NumpyBufferFType
 from ...compile.lower import AssemblyContext
 from ..fiber_tensor import FiberTensorFields, Level, LevelFType
@@ -16,7 +16,7 @@ class ElementLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class ElementLevelFType(LevelFType, asm.StructFType):
+class ElementLevelFType(LevelFType, StructFType):
     fill_value: Any = None
     element_type: type | FType | None = None
     position_type: type | FType | None = None
