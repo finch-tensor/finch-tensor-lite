@@ -302,11 +302,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                     ),
                     stop=lambda ctx: ntn.Variable(i_stop.name, self.position_type),
                     chunk=lplt.Sequence(
-                        head=lambda ctx, idx: lplt.Run(
-                            lambda ctx, idx: lplt.Leaf(
-                                lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
-                            ),
-                        ),
+                        head=lambda ctx, idx: lplt.Run(scalar),
                         split=lambda ctx, ext: ntn.Variable(
                             i_stop.name, self.position_type
                         ),
@@ -326,11 +322,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                     ntn.L(ffunc.add),
                     (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
                 ),
-                tail=lambda ctx, idx: lplt.Run(
-                    lambda ctx, idx: lplt.Leaf(
-                        lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
-                    )
-                ),
+                tail=lambda ctx, idx: lplt.Run(scalar),
             ),
         )
 
