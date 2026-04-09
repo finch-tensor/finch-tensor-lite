@@ -1,10 +1,12 @@
 import builtins
+import math
 import sys
 from abc import ABC
 from collections.abc import Sequence
 from typing import Any
 
 from ..algebra import FinchOperator
+from ..symbolic import ftype
 from . import lazy
 from .fuse import compute
 from .overrides import OverrideTensor
@@ -811,6 +813,81 @@ def flatten(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.flatten(x)
     return compute(lazy.flatten(x))
+
+
+def reshape(x, shape: tuple, /, *, copy=None):
+    """
+    Gives a new shape to an array without changing its data.
+
+    Parameters
+    ----------
+    x: array
+        Input array. Must be a concrete tensor type (e.g. BufferizedNDArray).
+        LazyTensor and FiberTensor are not supported yet.
+    shape: tuple[int, ...]
+        New shape. Exactly one element may be -1, in which case that dimension
+        is inferred from the total number of elements and the remaining dimensions.
+    copy: bool or None
+        If True, always return a copy. If False, raise ValueError if a copy
+        would be required. If None (default), copy only when necessary.
+
+    Returns
+    -------
+    out: array
+        An array with the given shape and the same data as x.
+
+    https://data-apis.org/array-api/2024.12/API_specification/generated/array_api.reshape.html
+    """
+
+    neg_ones = [i for i, s in enumerate(shape) if s == -1]
+    if len(neg_ones) > 1:
+        raise ValueError("reshape: only one dimension can be inferred (-1)")
+
+    total = math.prod(x.shape) if x.shape else 1
+
+    if len(neg_ones) == 1:
+        idx = neg_ones[0]
+        known = (
+            math.prod(s for i, s in enumerate(shape) if i != idx)
+            if len(shape) > 1
+            else 1
+        )
+        if known == 0 or total % known != 0:
+            raise ValueError(
+                f"reshape: cannot array of size {total} into shape {shape}"
+            )
+        shape = shape[:idx] + (total // known,) + shape[idx + 1 :]
+
+    if builtins.any(s < 0 for s in shape):
+        raise ValueError(
+            f"reshape: negative dimensions are not allowed in shape {shape}"
+        )
+
+    new_total = math.prod(shape) if shape else 1
+    if new_total != total:
+        raise ValueError(
+            f"reshape: cannot reshape array of size {total} into shape {shape}"
+        )
+
+    if x.shape == shape:
+        if copy is True:
+            fmt = ftype(x)
+            if not hasattr(fmt, "from_numpy"):
+                raise NotImplementedError(
+                    f"reshape copy is not supported for {type(x).__name__}"
+                )
+            return fmt.from_numpy(x.to_numpy())
+        return x
+
+    if copy is False:
+        raise ValueError(
+            f"reshape: cannot reshape array from {x.shape} to {shape} without copying"
+        )
+
+    fmt = ftype(x)
+    if not hasattr(fmt, "reshape"):
+        raise NotImplementedError(f"reshape is not supported for {type(x).__name__}")
+    return fmt.reshape(x, shape)
 
 
 # trigonometric functions:
