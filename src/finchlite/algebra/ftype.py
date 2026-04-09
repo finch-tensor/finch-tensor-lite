@@ -1,6 +1,8 @@
 # AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import builtins
 from abc import abstractmethod
+from functools import lru_cache
+from typing import Any
 
 import numpy as np
 
@@ -492,6 +494,85 @@ class FTyped:
         The ftype of the object.
         """
         ...
+
+
+class TupleFType(FType):
+    """FType for Python tuples, with a struct-compatible interface."""
+
+    is_mutable = False
+
+    def __init__(self, struct_name, struct_formats):
+        self._struct_name = struct_name
+        self._struct_formats = struct_formats
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, TupleFType)
+            and self.struct_name == other.struct_name
+            and self._struct_formats == other._struct_formats
+        )
+
+    def __len__(self):
+        return len(self._struct_formats)
+
+    def __hash__(self):
+        return hash((self.struct_name, tuple(self.struct_fieldformats)))
+
+    def __str__(self):
+        return f"{self.struct_name}({', '.join(map(str, self._struct_formats))})"
+
+    @property
+    def struct_name(self):
+        return self._struct_name
+
+    @property
+    def struct_fields(self):
+        return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
+
+    @property
+    def struct_fieldnames(self) -> list[str]:
+        return [name for (name, _) in self.struct_fields]
+
+    @property
+    def struct_fieldformats(self) -> list[Any]:
+        return [type_ for (_, type_) in self.struct_fields]
+
+    def struct_hasattr(self, attr: str) -> bool:
+        return attr in dict(self.struct_fields)
+
+    def struct_attrtype(self, attr: str) -> Any:
+        return dict(self.struct_fields)[attr]
+
+    def struct_getattr(self, obj, attr):
+        index = list(self.struct_fieldnames).index(attr)
+        return obj[index]
+
+    def struct_setattr(self, obj, attr, value):
+        index = list(self.struct_fieldnames).index(attr)
+        obj[index] = value
+
+    def fisinstance(self, other):
+        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldformats):
+            return False
+        return all(
+            fisinstance(elt, fmt)
+            for elt, fmt in zip(other, self.struct_fieldformats, strict=False)
+        )
+
+    def from_fields(self, *args):
+        assert all(
+            fisinstance(a, f)
+            for a, f in zip(args, self.struct_fieldformats, strict=False)
+        )
+        return tuple(args)
+
+    def __call__(self, **kwargs):
+        return self.from_fields(*kwargs.values())
+
+    @staticmethod
+    @lru_cache
+    def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
+        return TupleFType("tuple", types)
 
 
 def fisinstance(x, f: FType):
