@@ -277,7 +277,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         )
         return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
 
-    def reshape(self, arr, new_shape: tuple[int, ...]):
+    def reshape(self, arr, new_shape: tuple):
         new_shape = tuple(np.intp(s) for s in new_shape)
         old_size = int(np.prod(arr.shape, dtype=np.intp)) if arr.shape else 1
         new_size = int(np.prod(new_shape, dtype=np.intp)) if new_shape else 1
