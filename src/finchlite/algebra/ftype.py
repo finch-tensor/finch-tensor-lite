@@ -745,11 +745,12 @@ def ftype(x) -> FType:
         return complex64
     if type(x) is np.complex128 or x is np.complex128:
         return complex128
-    if type(x) is tuple:
+    if isinstance(x, tuple): #TODO does not work for tuple types.
+        T = type(x)
+        if hasattr(T, "_fields") and all(isinstance(field, str) for field in T._fields):
+            return NamedTupleFType(
+                T.__name__,
+                [(fieldname, ftype(getattr(x, fieldname))) for fieldname in T._fields],
+            )
         return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
-    if isinstance(x, NamedTuple) or issubclass(x, NamedTuple):
-        return NamedTupleFType(
-            x.__name__,
-            [(fieldname, ftype(getattr(x, fieldname))) for fieldname in x._fields],
-        )
     raise NotImplementedError
