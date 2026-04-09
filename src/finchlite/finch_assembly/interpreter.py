@@ -256,7 +256,7 @@ class AssemblyInterpreter(AssemblyLoader):
             case asm.ForLoop(asm.Variable(var_n, var_t) as var, start, end, body):
                 start_e = self(start)
                 end_e = self(end)
-                if not isinstance(start_e, var_t):
+                if not fisinstance(start_e, var_t):
                     raise TypeError(
                         f"Start value {start_e} is not of type {var_t} for "
                         f"variable '{var_n}'."

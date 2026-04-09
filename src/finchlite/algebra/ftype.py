@@ -129,6 +129,9 @@ class _FDTypeBuiltinBool(FDTypeBoolean):
     def type(self):
         return bool
 
+    def __repr__(self):
+        return "finchlite.bool_"
+
 
 bool_ = _FDTypeBuiltinBool()
 
@@ -146,6 +149,9 @@ class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
     @property
     def type(self):
         return int
+
+    def __repr__(self):
+        return "finchlite.int_"
 
     @property
     def iinfo(self):
@@ -174,6 +180,9 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
     def type(self):
         return float
 
+    def __repr__(self):
+        return "finchlite.float_"
+
     @property
     def finfo(self):
         """
@@ -197,6 +206,9 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
         return complex
+
+    def __repr__(self):
+        return "finchlite.complex_"
 
     @property
     def finfo(self):
@@ -291,6 +303,9 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
     def dtype(self):
         return np.bool_
 
+    def __repr__(self):
+        return "finchlite.bool"
+
 
 bool = _FDTypeBool()
 
@@ -299,6 +314,9 @@ class _FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int8
+
+    def __repr__(self):
+        return "finchlite.int8"
 
 
 int8 = _FDTypeInt8()
@@ -309,6 +327,9 @@ class _FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
     def dtype(self):
         return np.int16
 
+    def __repr__(self):
+        return "finchlite.int16"
+
 
 int16 = _FDTypeInt16()
 
@@ -317,6 +338,9 @@ class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int32
+
+    def __repr__(self):
+        return "finchlite.int32"
 
 
 int32 = _FDTypeInt32()
@@ -327,6 +351,9 @@ class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
     def dtype(self):
         return np.int64
 
+    def __repr__(self):
+        return "finchlite.int64"
+
 
 int64 = _FDTypeInt64()
 
@@ -335,6 +362,9 @@ class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint8
+
+    def __repr__(self):
+        return "finchlite.uint8"
 
 
 uint8 = _FDTypeUInt8()
@@ -345,6 +375,9 @@ class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
     def dtype(self):
         return np.uint16
 
+    def __repr__(self):
+        return "finchlite.uint16"
+
 
 uint16 = _FDTypeUInt16()
 
@@ -353,6 +386,9 @@ class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint32
+
+    def __repr__(self):
+        return "finchlite.uint32"
 
 
 uint32 = _FDTypeUInt32()
@@ -363,6 +399,9 @@ class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeReal):
     def dtype(self):
         return np.uint64
 
+    def __repr__(self):
+        return "finchlite.uint64"
+
 
 uint64 = _FDTypeUInt64()
 
@@ -371,6 +410,9 @@ class _FDTypeFloat32(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
         return np.float32
+
+    def __repr__(self):
+        return "finchlite.float32"
 
 
 float32 = _FDTypeFloat32()
@@ -381,6 +423,9 @@ class _FDTypeFloat16(FDTypeNumpyFloat, FDTypeReal):
     def dtype(self):
         return np.float16
 
+    def __repr__(self):
+        return "finchlite.float16"
+
 
 float16 = _FDTypeFloat16()
 
@@ -389,6 +434,9 @@ class _FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
         return np.float64
+
+    def __repr__(self):
+        return "finchlite.float64"
 
 
 float64 = _FDTypeFloat64()
@@ -399,6 +447,9 @@ class _FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
     def dtype(self):
         return np.complex64
 
+    def __repr__(self):
+        return "finchlite.complex64"
+
 
 complex64 = _FDTypeComplex64()
 
@@ -407,6 +458,9 @@ class _FDTypeComplex128(FDTypeNumpyFloat, FDTypeComplex):
     @property
     def dtype(self):
         return np.complex128
+
+    def __repr__(self):
+        return "finchlite.complex128"
 
 
 complex128 = _FDTypeComplex128()
@@ -463,38 +517,38 @@ def ftype(x) -> FType:
         return x
     if isinstance(x, FTyped):
         return x.ftype
-    if isinstance(x, builtins.bool) or x == builtins.bool:
+    if type(x) is builtins.bool or x is builtins.bool:
         return bool_
-    if isinstance(x, builtins.int) or x == builtins.int:
+    if type(x) is builtins.int or x is builtins.int:
         return int_
-    if isinstance(x, builtins.float) or x == builtins.float:
+    if type(x) is builtins.float or x is builtins.float:
         return float_
-    if isinstance(x, builtins.complex) or x == builtins.complex:
+    if type(x) is builtins.complex or x is builtins.complex:
         return complex_
-    if isinstance(x, np.bool_) or x == np.bool_:
+    if type(x) is np.bool_ or x is np.bool_:
         return bool
-    if isinstance(x, np.int8) or x == np.int8:
+    if type(x) is np.int8 or x is np.int8:
         return int8
-    if isinstance(x, np.int16) or x == np.int16:
+    if type(x) is np.int16 or x is np.int16:
         return int16
-    if isinstance(x, np.int32) or x == np.int32:
+    if type(x) is np.int32 or x is np.int32:
         return int32
-    if isinstance(x, np.int64) or x == np.int64:
+    if type(x) is np.int64 or x is np.int64:
         return int64
-    if isinstance(x, np.uint8) or x == np.uint8:
+    if type(x) is np.uint8 or x is np.uint8:
         return uint8
-    if isinstance(x, np.uint16) or x == np.uint16:
+    if type(x) is np.uint16 or x is np.uint16:
         return uint16
-    if isinstance(x, np.uint32) or x == np.uint32:
+    if type(x) is np.uint32 or x is np.uint32:
         return uint32
-    if isinstance(x, np.uint64) or x == np.uint64:
+    if type(x) is np.uint64 or x is np.uint64:
         return uint64
-    if isinstance(x, np.float32) or x == np.float32:
+    if type(x) is np.float32 or x is np.float32:
         return float32
-    if isinstance(x, np.float64) or x == np.float64:
+    if type(x) is np.float64 or x is np.float64:
         return float64
-    if isinstance(x, np.complex64) or x == np.complex64:
+    if type(x) is np.complex64 or x is np.complex64:
         return complex64
-    if isinstance(x, np.complex128) or x == np.complex128:
+    if type(x) is np.complex128 or x is np.complex128:
         return complex128
     raise NotImplementedError

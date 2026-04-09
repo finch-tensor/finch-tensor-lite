@@ -79,6 +79,7 @@ state of tensors. Queries in Finch Logic IR can bind the result of an expression
 to an alias for later use, or update the value of an existing alias.
 """
 
+
 @dataclass(eq=True, frozen=True)
 class TableValueFType(FType):
     tns: Any
@@ -91,6 +92,7 @@ class TableValueFType(FType):
 
     def __hash__(self):
         return hash((self.tns, self.idxs))
+
 
 @dataclass(frozen=True)
 class TableValue(FTyped):

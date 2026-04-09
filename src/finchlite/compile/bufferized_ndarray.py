@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor, ffunc, fisinstance, ftype
+from ..algebra import Tensor, ffunc, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..finch_assembly import AssemblyStructFType, TupleFType
 from . import looplets as lplt
