@@ -1247,6 +1247,20 @@ register_property(
     lambda fmt: struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
 )
 
+register_property(
+    TupleFType,
+    "c_getattr",
+    "__attr__",
+    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
+)
+
+register_property(
+    TupleFType,
+    "deserialize_from_c",
+    "__attr__",
+    lambda fmt, obj, c_struct: None,
+)
+
 
 class CHashableProperties(TypedDict):
     eq: str | None
@@ -1284,6 +1298,13 @@ register_property(
     c_hash_struct,
 )
 
+register_property(
+    TupleFType,
+    "c_hash",
+    "__attr__",
+    c_hash_struct,
+)
+
 
 def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     # this should be true in whatever structs we have.
@@ -1312,6 +1333,13 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
 
 register_property(
     ImmutableStructFType,
+    "c_eq",
+    "__attr__",
+    c_eq_struct,
+)
+
+register_property(
+    TupleFType,
     "c_eq",
     "__attr__",
     c_eq_struct,
