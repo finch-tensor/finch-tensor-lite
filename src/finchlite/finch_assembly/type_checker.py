@@ -4,6 +4,7 @@ import numpy as np
 
 from .. import algebra
 from ..algebra import FType, ftype
+from ..algebra.ftype import TupleFType
 from ..symbolic import ScopedDict
 from . import nodes as asm
 from .buffer import BufferFType
@@ -97,7 +98,7 @@ class AssemblyTypeChecker:
 
     def check_struct(self, struct):
         struct_type = self.check_expr(struct)
-        if isinstance(struct_type, AssemblyStructFType):
+        if isinstance(struct_type, (AssemblyStructFType, TupleFType)):
             return struct_type
         raise AssemblyTypeError(f"Expected struct, got {struct_type}.")
 
