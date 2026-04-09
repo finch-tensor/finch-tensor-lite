@@ -440,14 +440,14 @@ class FTyped:
         ...
 
 
-def fisinstance(x, f:FType):
+def fisinstance(x, f: FType):
     """
     Check if `x` is an instance of `f`.
     """
     return f.fisinstance(x)
 
 
-def isdtype(x, T:FType):
+def isdtype(x, T: FType):
     """
     Check if `x` is an instance of `T`.
     """
