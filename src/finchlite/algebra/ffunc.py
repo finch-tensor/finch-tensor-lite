@@ -13,7 +13,7 @@ from .algebra import (
     type_max,
     type_min,
 )
-from .ftype import FDType, ftype, promote_type
+from .ftype import FDType, TupleFType, ftype, promote_type
 
 
 class CNAryOperator(COperator):
@@ -1445,8 +1445,6 @@ class _MakeTuple(FinchOperator, NumbaOperator):
         return tuple(args)
 
     def return_type(self, *args: Any) -> Any:
-        from finchlite.finch_assembly.struct import TupleFType
-
         return TupleFType.from_tuple(args)
 
     def numba_literal(self, val: Any, ctx: Any, *args: Any):
