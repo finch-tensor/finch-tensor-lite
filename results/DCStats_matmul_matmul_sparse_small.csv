@@ -1,0 +1,6 @@
+Framework,Benchmark,Data Generator,Iteration,ExecutionTime
+DCStats,matmul,matmul_sparse_small,1,8.234249000001
+DCStats,matmul,matmul_sparse_small,2,8.272308583007543
+DCStats,matmul,matmul_sparse_small,3,8.10319629200967
+DCStats,matmul,matmul_sparse_small,4,7.9520476249890635
+DCStats,matmul,matmul_sparse_small,5,8.049378541996703
