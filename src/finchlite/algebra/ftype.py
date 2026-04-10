@@ -607,13 +607,6 @@ class TupleFType(ImmutableStructFType):
         fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
         return f"{self.struct_name}({fields_str})"
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, TupleFType)
-            and self.struct_name == other.struct_name
-            and self._struct_types == other._struct_types
-        )
-
     def __str__(self):
         return f"{self.struct_name}({', '.join(map(str, self._struct_types))})"
 

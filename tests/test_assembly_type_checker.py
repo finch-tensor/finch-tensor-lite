@@ -328,7 +328,7 @@ def test_whileloop_basic():
                         asm.Literal(0),
                     ),
                 ),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
         is None
@@ -339,7 +339,7 @@ def test_whileloop_basic():
         checker(
             asm.WhileLoop(
                 asm.Slot("a", a.ftype),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
 
@@ -356,7 +356,7 @@ def test_if_basic():
                         asm.Literal(0),
                     ),
                 ),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
         is None
@@ -367,7 +367,7 @@ def test_if_basic():
         checker(
             asm.If(
                 asm.Slot("a", a.ftype),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
 
@@ -384,8 +384,8 @@ def test_ifelse_basic():
                         asm.Literal(0),
                     ),
                 ),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
-                asm.Assign(asm.Variable("x", int), asm.Literal(1)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(1)),
             )
         )
         is None
@@ -396,8 +396,8 @@ def test_ifelse_basic():
         checker(
             asm.IfElse(
                 asm.Slot("a", a.ftype),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
-                asm.Assign(asm.Variable("x", int), asm.Literal(1)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(1)),
             )
         )
 
@@ -700,8 +700,8 @@ def test_simple_struct():
 )
 def test_hashtable(constructor):
     table = constructor(
-        asm.TupleFType.from_tuple((int, int)),
-        asm.TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_, finchlite.int_)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -716,7 +716,7 @@ def test_hashtable(constructor):
         (
             asm.Function(
                 asm.Variable(
-                    "setidx", TupleFType.from_tuple(tuple(int for _ in range(3)))
+                    "setidx", TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(3)))
                 ),
                 (table_v, key_v, val_v),
                 asm.Block(
@@ -733,7 +733,7 @@ def test_hashtable(constructor):
                 ),
             ),
             asm.Function(
-                asm.Variable("exists", bool),
+                asm.Variable("exists", finchlite.bool_),
                 (table_v, key_v),
                 asm.Block(
                     (
@@ -753,8 +753,8 @@ def test_hashtable(constructor):
 )
 def test_hashtable_fail(constructor):
     table = constructor(
-        asm.TupleFType.from_tuple((int, int)),
-        asm.TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_, finchlite.int_)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -768,7 +768,7 @@ def test_hashtable_fail(constructor):
         (
             asm.Function(
                 asm.Variable(
-                    "setidx", TupleFType.from_tuple(tuple(int for _ in range(2)))
+                    "setidx", TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(2)))
                 ),
                 (table_v, key_v, val_v),
                 asm.Block(

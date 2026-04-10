@@ -7,6 +7,7 @@ import numba
 
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 
+from ..algebra import ftype
 from ..finch_assembly import Buffer
 from ..util import qual_str
 from .c_codegen import CBufferFType, CContext, CStackFType, c_type
