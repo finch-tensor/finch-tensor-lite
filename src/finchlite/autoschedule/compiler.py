@@ -13,7 +13,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import ffunc
+from ..algebra import ffuncs
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
@@ -165,7 +165,7 @@ class NotationContext:
                 rhs = ctx(arg, loops)
                 lhs_access = ntn.Access(
                     self.slots[lhs],
-                    ntn.Update(ntn.Literal(ffunc.overwrite)),
+                    ntn.Update(ntn.Literal(ffuncs.overwrite)),
                     tuple(loops[idx] for idx in new_idxs),
                 )
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
@@ -178,7 +178,7 @@ class NotationContext:
                     if idx in remap_idxs:
                         body = ntn.If(
                             ntn.Call(
-                                ntn.Literal(ffunc.eq),
+                                ntn.Literal(ffuncs.eq),
                                 (loops[idx], loops[remap_idxs[idx]]),
                             ),
                             body,
@@ -194,13 +194,13 @@ class NotationContext:
                         ntn.Declare(
                             self.slots[lhs],
                             ntn.Literal(self.bindings[lhs].fill_value),
-                            ntn.Literal(ffunc.overwrite),
+                            ntn.Literal(ffuncs.overwrite),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(ffunc.overwrite),
+                            ntn.Literal(ffuncs.overwrite),
                         ),
                     )
                 )
@@ -269,7 +269,7 @@ class NotationContext:
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
-                                ntn.Literal(ffunc.make_tuple),
+                                ntn.Literal(ffuncs.make_tuple),
                                 tuple(self.args[var] for var in vars),
                             )
                         ),

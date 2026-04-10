@@ -8,7 +8,7 @@ from typing import Any, Self, TypeVar
 from ..algebra import (
     FType,
     FTyped,
-    ffunc,
+    ffuncs,
     fixpoint_type,
     ftype,
     promote_type,
@@ -36,7 +36,7 @@ def merge_dim(d1, d2):
     if d3 != d4:
         raise ValueError(f"Dimension mismatch: {d1} vs {d2}")
     if d1 and d2:
-        return ffunc.max(d1, d2)
+        return ffuncs.max(d1, d2)
     return d1 or d2
 
 

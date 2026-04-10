@@ -7,9 +7,9 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import FType, FTyped, StructFType, TensorFType, ffunc, register_property
+from ..algebra import FType, FTyped, StructFType, TensorFType, ffuncs, register_property
 from ..algebra.algebra import FinchOperator
-from ..algebra.ftype import FDTypeBuiltin, FDTypeNumpy
+from ..algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -187,7 +187,7 @@ class SymbolicExtent(FTyped):
     @staticmethod
     def point(idx):
         return SymbolicExtent(
-            idx, ntn.Call(ntn.Literal(ffunc.add), (idx, ntn.Literal(np.intp(1))))
+            idx, ntn.Call(ntn.Literal(ffuncs.add), (idx, ntn.Literal(np.intp(1))))
         )
 
     # TODO: Make it more robust
@@ -195,13 +195,13 @@ class SymbolicExtent(FTyped):
         return self.start_sym == self.end_sym
 
     def get_measure(self):
-        return ntn.Call(ntn.Literal(ffunc.sub), (self.end_sym, self.start_sym))
+        return ntn.Call(ntn.Literal(ffuncs.sub), (self.end_sym, self.start_sym))
 
     def bound_below(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, ffunc.max)
+        return self._bound_ext(size, ffuncs.max)
 
     def bound_above(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, ffunc.min)
+        return self._bound_ext(size, ffuncs.min)
 
     def _bound_ext(self, size, func) -> "SymbolicExtent":
         return SymbolicExtent(
@@ -212,7 +212,7 @@ class SymbolicExtent(FTyped):
                     ntn.Literal(func),
                     (
                         self.end_sym,
-                        ntn.Call(ntn.Literal(ffunc.add), (self.start_sym, size)),
+                        ntn.Call(ntn.Literal(ffuncs.add), (self.start_sym, size)),
                     ),
                 ),
             ),

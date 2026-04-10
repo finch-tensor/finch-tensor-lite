@@ -13,8 +13,9 @@ from typing import Any, TypedDict
 
 import numpy as np
 
-from finchlite.algebra import ffunc
+from finchlite.algebra import ffuncs
 from finchlite.algebra.algebra import FinchOperator
+from .. import algebra
 
 from .. import finch_assembly as asm
 from ..algebra import (
@@ -546,20 +547,20 @@ def c_type(t):
     return query_property(t, "c_type", "__attr__")
 
 
-register_property(int, "c_type", "__attr__", lambda x: ctypes.c_int)
-register_property(float, "c_type", "__attr__", lambda x: ctypes.c_double)
-register_property(str, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
+register_property(algebra.int_, "c_type", "__attr__", lambda x: ctypes.c_int)
+register_property(algebra.float_, "c_type", "__attr__", lambda x: ctypes.c_double)
+register_property(algebra.str_, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
 register_property(
-    np.generic, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
+    algebra.ftypes.FDTypeNumpy, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
 register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 register_property(type(None), "c_type", "__attr__", lambda x: None)
 
 # ints and floats should be serialized and constructed trivially.
-register_property(int, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
-register_property(float, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
-register_property(int, "construct_from_c", "__attr__", lambda fmt, x: x.value)
-register_property(float, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+register_property(algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(algebra.float_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(algebra.int_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+register_property(algebra.float_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
@@ -869,7 +870,7 @@ class CContext(Context):
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(
-                    asm.Literal(ffunc.sub), (asm.Length(buf), asm.Literal(1))
+                    asm.Literal(ffuncs.sub), (asm.Length(buf), asm.Literal(1))
                 )
                 body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))

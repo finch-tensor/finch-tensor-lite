@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from .ftype import FType, FTyped
+from .ftypes import FType, FTyped
 
 
 class TensorFType(FType, ABC):

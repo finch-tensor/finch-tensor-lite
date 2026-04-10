@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import StructFType, ffunc
+from ...algebra import StructFType, ffuncs
 from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
@@ -172,11 +172,11 @@ class DenseLevelFType(LevelFType, StructFType):
                 asm.Assign(
                     pos_2,
                     asm.Call(
-                        asm.Literal(ffunc.add),
+                        asm.Literal(ffuncs.add),
                         (
                             pos,
                             asm.Call(
-                                asm.Literal(ffunc.mul),
+                                asm.Literal(ffuncs.mul),
                                 (
                                     asm.GetAttr(lvl, asm.Literal("stride")),
                                     asm.Variable(

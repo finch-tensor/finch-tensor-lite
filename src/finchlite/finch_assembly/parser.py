@@ -13,7 +13,7 @@ import numpy as np
 
 from lark import Lark, Token, Tree
 
-from ..algebra import ffunc
+from ..algebra import ffuncs
 from . import nodes as asm
 
 assembly_parser = Lark(
@@ -57,14 +57,14 @@ assembly_parser = Lark(
 )
 
 _OPS = {
-    "+": ffunc.add,
-    "-": ffunc.sub,
-    "*": ffunc.mul,
-    "/": ffunc.truediv,
-    "<": ffunc.lt,
-    "<=": ffunc.le,
-    ">": ffunc.gt,
-    ">=": ffunc.ge,
+    "+": ffuncs.add,
+    "-": ffuncs.sub,
+    "*": ffuncs.mul,
+    "/": ffuncs.truediv,
+    "<": ffuncs.lt,
+    "<=": ffuncs.le,
+    ">": ffuncs.gt,
+    ">=": ffuncs.ge,
 }
 
 
@@ -136,7 +136,7 @@ def parse_assembly(
                 return asm.Call(asm.Literal(np.resize), (ctx(arr), ctx(size)))
             case Tree("scansearch", [arr, x, lo, hi]):
                 return asm.Call(
-                    asm.Literal(ffunc.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
+                    asm.Literal(ffuncs.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
                 )
             case Tree("assign", [lhs, expr]):
                 return asm.Assign(ctx(lhs), ctx(expr))

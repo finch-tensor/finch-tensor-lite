@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import ffunc
+from ..algebra import ffuncs
 from ..compile.extents import intersect_extents
 from ..compile.lower import (
     LoopletContext,
@@ -95,7 +95,7 @@ class SwitchPass(LoopletPass):
         ctx_2 = ctx.scope()
         ctx_2(ext, body_if)
 
-        cond = reduce(lambda x, y: asm.Call(asm.L(ffunc.and_), (x, y)), conditions)
+        cond = reduce(lambda x, y: asm.Call(asm.L(ffuncs.and_), (x, y)), conditions)
 
         body_else = PostWalk(switch_node_else)(body)
         ctx_3 = ctx.scope()
@@ -164,17 +164,17 @@ class StepperPass(LoopletPass):
             ctx,
             total_ext,
             chunk_ext.bound_above(
-                ntn.Call(ntn.L(ffunc.sub), (total_ext.get_end(), total_ext.get_unit()))
+                ntn.Call(ntn.L(ffuncs.sub), (total_ext.get_end(), total_ext.get_unit()))
             ),
         )
 
-        if prove(ntn.Call(ntn.L(ffunc.le), (node.stop(ctx), chunk_ext.get_end()))):
+        if prove(ntn.Call(ntn.L(ffuncs.le), (node.stop(ctx), chunk_ext.get_end()))):
             return full_chunk
-        if prove(ntn.Call(ntn.L(ffunc.ge), (node.stop(ctx), chunk_ext.get_end()))):
+        if prove(ntn.Call(ntn.L(ffuncs.ge), (node.stop(ctx), chunk_ext.get_end()))):
             return truncated_chunk
         return Switch(
             asm.Call(
-                asm.L(ffunc.eq),
+                asm.L(ffuncs.eq),
                 (ctx.ctx(node.stop(ctx)), ctx.ctx(chunk_ext.get_end())),
             ),
             full_chunk,
@@ -235,11 +235,11 @@ class StepperPass(LoopletPass):
         ctx_truncated_body(ext_3, truncated_body)
 
         if not prove(
-            ntn.Call(ntn.L(ffunc.ge), (ext_3.get_measure(), ext_3.get_unit()))
+            ntn.Call(ntn.L(ffuncs.ge), (ext_3.get_measure(), ext_3.get_unit()))
         ):
             truncated_body = asm.If(
                 asm.Call(
-                    asm.L(ffunc.ge),
+                    asm.L(ffuncs.ge),
                     (ctx.ctx(ext_3.get_end()), ctx.ctx(ext_3.get_start())),
                 ),
                 truncated_body,
@@ -247,11 +247,11 @@ class StepperPass(LoopletPass):
 
         while_loop_body = asm.IfElse(
             asm.Call(
-                asm.L(ffunc.lt),
+                asm.L(ffuncs.lt),
                 (
                     ctx.ctx(ext_2.get_end()),
                     asm.Call(
-                        asm.L(ffunc.sub),
+                        asm.L(ffuncs.sub),
                         (ctx.ctx(ext.get_end()), ctx.ctx(ext.get_unit())),
                     ),
                 ),
@@ -266,7 +266,7 @@ class StepperPass(LoopletPass):
                 asm.Assign(
                     ctx.ctx(idx_start),
                     asm.Call(
-                        asm.L(ffunc.add),
+                        asm.L(ffuncs.add),
                         (ctx.ctx(ext_2.get_end()), ctx.ctx(ext_2.get_unit())),
                     ),
                 ),
@@ -293,10 +293,10 @@ class Sequence(Looplet):
     ):
         if prove(
             ntn.Call(
-                ntn.L(ffunc.ge),
+                ntn.L(ffuncs.ge),
                 (
                     ntn.Call(
-                        ntn.L(ffunc.sub),
+                        ntn.L(ffuncs.sub),
                         (current_ext.get_end(), current_ext.get_unit()),
                     ),
                     remaining_ext.get_end(),
@@ -306,14 +306,14 @@ class Sequence(Looplet):
             return Run(self.head)
         if prove(
             ntn.Call(
-                ntn.L(ffunc.eq),
+                ntn.L(ffuncs.eq),
                 (current_ext.get_end(), remaining_ext.get_end()),
             )
         ):
             return self
         return Switch(
             asm.Call(
-                asm.L(ffunc.lt),
+                asm.L(ffuncs.lt),
                 (ctx.ctx(remaining_ext.get_end()), ctx.ctx(current_ext.get_end())),
             ),
             self,
@@ -347,7 +347,7 @@ class SequencePass(LoopletPass):
         split_var = found_sequence.split(ctx, ext)
         ext_2 = SymbolicExtent(
             ext.get_start(),
-            ntn.Call(ntn.Literal(ffunc.min), (split_var, ext.get_end())),
+            ntn.Call(ntn.Literal(ffuncs.min), (split_var, ext.get_end())),
         )
         ctx_2 = ctx.scope()
         ctx_2(ext_2, body_head)

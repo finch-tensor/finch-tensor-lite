@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import ImmutableStructFType, Tensor, TupleFType, ffunc, ftype
+from ..algebra import ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
@@ -500,9 +500,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             op_e,
             (asm.Load(obj.tns.buf_s, pos_e), val_e),
         )
-        if obj.tns.dirty_bit and op.val is ffunc.overwrite:
+        if obj.tns.dirty_bit and op.val is ffuncs.overwrite:
             increment_call = asm.Call(
-                asm.Literal(ffunc.init_write(tns.type.fill_value)),
+                asm.Literal(ffuncs.init_write(tns.type.fill_value)),
                 (asm.Load(obj.tns.buf_s, pos_e), increment_call),
             )
 
@@ -515,11 +515,11 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 asm.Assign(
                     pos_2,
                     asm.Call(
-                        asm.Literal(ffunc.add),
+                        asm.Literal(ffuncs.add),
                         (
                             tns.obj.pos,
                             asm.Call(
-                                asm.Literal(ffunc.mul),
+                                asm.Literal(ffuncs.mul),
                                 (
                                     tns.obj.tns.stride[self.nind],
                                     asm.Variable(idx.name, idx.type_),

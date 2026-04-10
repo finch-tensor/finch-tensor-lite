@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import StructFType, ffunc
+from ...algebra import StructFType, ffuncs
 from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
@@ -278,14 +278,14 @@ class SparseListLevelFType(LevelFType, StructFType):
                         (
                             asm.Assign(
                                 q,
-                                asm.Call(asm.L(ffunc.add), (q, asm.L(self.p_t(1)))),
+                                asm.Call(asm.L(ffuncs.add), (q, asm.L(self.p_t(1)))),
                             ),
                         )
                     ),
                     seek=seek_fn,
                 ),
                 split=lambda ctx, idx: ntn.Call(
-                    ntn.L(ffunc.add),
+                    ntn.L(ffuncs.add),
                     (ntn.Variable(i_last.name, self.position_type), ntn.L(self.p_t(1))),
                 ),
                 tail=lambda ctx, idx: lplt.Run(

@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 
 import finchlite as fl
-from finchlite.algebra import ffunc
+from finchlite.algebra import ffuncs
 from finchlite.autoschedule.tensor_stats import DatabaseStatsFactory, DCStatsFactory
 from finchlite.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
@@ -45,7 +45,7 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -53,7 +53,7 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Alias("AB"), (i, k, j)),
                         (k,),
@@ -91,7 +91,7 @@ def test_stats_matmul_error():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -99,7 +99,7 @@ def test_stats_matmul_error():
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Alias("AB"), (i, k, j)),
                         (k,),
@@ -143,7 +143,7 @@ def test_database_stats_matrix_multiplication(shape_a, shape_b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -151,7 +151,7 @@ def test_database_stats_matrix_multiplication(shape_a, shape_b):
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Alias("AB"), (i, k, j)),
                         (k,),
@@ -189,7 +189,7 @@ def test_database_stats_matmul_error():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -197,7 +197,7 @@ def test_database_stats_matmul_error():
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Alias("AB"), (i, k, j)),
                         (k,),

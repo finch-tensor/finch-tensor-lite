@@ -4,8 +4,8 @@ import numpy as np
 
 from .. import algebra
 from ..algebra import FType, StructFType, ftype
-from ..algebra.ftype import FDTypeBoolean, FDTypeInteger, FDTypeNumeric
-from ..algebra.ftype import bool as finch_bool
+from ..algebra.ftypes import FDTypeBoolean, FDTypeInteger, FDTypeNumeric
+from ..algebra.ftypes import bool as finch_bool
 from ..symbolic import ScopedDict
 from . import nodes as asm
 from .buffer import BufferFType

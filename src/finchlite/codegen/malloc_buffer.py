@@ -20,12 +20,13 @@ from .c_codegen import (
     serialize_to_c,
 )
 from .numpy_buffer import CBufferFields
+from ..algebra import ftypes
 
 
 class CMallocBufferStruct(ctypes.Structure):
     _fields_ = [
         ("data", ctypes.c_void_p),
-        ("length", c_type(np.intp)),
+        ("length", c_type(ftypes.intp)),
     ]
 
 

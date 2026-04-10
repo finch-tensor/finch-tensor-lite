@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self, cast
 
-from finchlite.algebra import ffunc
+from finchlite.algebra import ffuncs
 from finchlite.symbolic import Context, Term, TermTree
 from finchlite.util.print import qual_str
 
@@ -270,30 +270,30 @@ class Produces(EinsumTree, EinsumStatement):
 
 
 infix_strs = {
-    ffunc.overwrite: "",
-    ffunc.add: "+",
-    ffunc.sub: "-",
-    ffunc.mul: "*",
-    ffunc.truediv: "/",
-    ffunc.mod: "%",
-    ffunc.pow: "**",
-    ffunc.and_: "&",
-    ffunc.or_: "|",
-    ffunc.xor: "^",
-    ffunc.floordiv: "//",
-    ffunc.mod: "%",
-    ffunc.pow: "**",
-    ffunc.max: "max",
-    ffunc.min: "min",
+    ffuncs.overwrite: "",
+    ffuncs.add: "+",
+    ffuncs.sub: "-",
+    ffuncs.mul: "*",
+    ffuncs.truediv: "/",
+    ffuncs.mod: "%",
+    ffuncs.pow: "**",
+    ffuncs.and_: "&",
+    ffuncs.or_: "|",
+    ffuncs.xor: "^",
+    ffuncs.floordiv: "//",
+    ffuncs.mod: "%",
+    ffuncs.pow: "**",
+    ffuncs.max: "max",
+    ffuncs.min: "min",
 }
 
 
 unary_strs = {
-    ffunc.add: "+",
-    ffunc.pos: "+",
-    ffunc.sub: "-",
-    ffunc.neg: "-",
-    ffunc.invert: "~",
+    ffuncs.add: "+",
+    ffuncs.pos: "+",
+    ffuncs.sub: "-",
+    ffuncs.neg: "-",
+    ffuncs.invert: "~",
 }
 
 

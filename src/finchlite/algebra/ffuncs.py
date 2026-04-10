@@ -13,7 +13,7 @@ from .algebra import (
     type_max,
     type_min,
 )
-from .ftype import (
+from .ftypes import (
     FDType,
     FDTypeOrdered,
     FType,

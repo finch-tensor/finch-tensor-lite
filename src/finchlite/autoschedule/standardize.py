@@ -4,7 +4,7 @@ from typing import overload
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
 
-from ..algebra import ffunc
+from ..algebra import ffuncs
 from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from ..finch_logic import (
     Aggregate,
@@ -101,7 +101,7 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 return Query(
                     lhs,
                     Aggregate(
-                        Literal(ffunc.overwrite),
+                        Literal(ffuncs.overwrite),
                         Literal(rhs.fill_value(fill_values)),
                         Reorder(rhs, rhs.fields()),
                         (),

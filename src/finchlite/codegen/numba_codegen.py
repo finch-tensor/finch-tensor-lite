@@ -14,7 +14,7 @@ from ..algebra import (
     NumbaOperator,
     StructFType,
     TupleFType,
-    ffunc,
+    ffuncs,
     fisinstance,
     ftype,
     query_property,
@@ -32,7 +32,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffunc.scansearch._func)}
+numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
 
 
 def numba_type(t):

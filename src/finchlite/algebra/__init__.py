@@ -1,4 +1,4 @@
-from . import ffunc
+from . import ffuncs
 from .algebra import (
     COperator,
     FinchOperator,
@@ -17,7 +17,7 @@ from .algebra import (
     repeat_operator,
     return_type,
 )
-from .ftype import (
+from .ftypes import (
     FType,
     FTyped,
     ImmutableStructFType,
@@ -77,7 +77,7 @@ __all__ = [
     "complex64",
     "complex128",
     "complex_",
-    "ffunc",
+    "ffuncs",
     "finfo",
     "fisinstance",
     "fisinstance",
@@ -86,8 +86,8 @@ __all__ = [
     "float32",
     "float64",
     "float_",
-    "ftype",
-    "ftype",
+    "ftypes",
+    "ftypes",
     "iinfo",
     "init_value",
     "int8",

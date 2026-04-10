@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 
 import finchlite as fl
-from finchlite import ffunc
+from finchlite import ffuncs
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.autoschedule.tensor_stats import (
     DC,
@@ -107,7 +107,7 @@ def test_database_mapjoin_join():
         cache=cache,
     )
 
-    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
+    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
         stats_factory=DatabaseStatsFactory(),
         node=node_mul,
@@ -146,7 +146,7 @@ def test_database_mapjoin_elementwise():
 
     stats = insert_statistics(
         stats_factory=DatabaseStatsFactory(),
-        node=MapJoin(Literal(ffunc.add), (ta, tb)),
+        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
@@ -187,7 +187,7 @@ def test_database_mapjoin_broadcast():
 
     stats = insert_statistics(
         stats_factory=DatabaseStatsFactory(),
-        node=MapJoin(Literal(ffunc.add), (ta, tb)),
+        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
@@ -204,7 +204,7 @@ def test_database_aggregate():
     table = Table(Literal(fl.asarray(data)), (i, j))
 
     node_sum = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=None,
         arg=table,
         idxs=(j,),
@@ -376,7 +376,7 @@ def test_uniform_mapjoin_mul_and_add():
     )
 
     # P(a)*P(b) = 0.5 * 0.5 = 0.25 -> 0.25 * 100 = 25 nnz
-    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
+    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     us_mul = insert_statistics(
         stats_factory=UniformStatsFactory(),
         node=node_mul,
@@ -388,7 +388,7 @@ def test_uniform_mapjoin_mul_and_add():
     assert us_mul.fill_value == 0.0
 
     # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
-    node_add = MapJoin(Literal(ffunc.add), (ta, tb))
+    node_add = MapJoin(Literal(ffuncs.add), (ta, tb))
     us_add = insert_statistics(
         stats_factory=UniformStatsFactory(),
         node=node_add,
@@ -411,7 +411,7 @@ def test_uniform_aggregate_and_issimilar():
         cache={},
     )
     node_sum = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=None,
         arg=table,
         idxs=(Field("j"),),
@@ -455,7 +455,7 @@ def test_blocked_stats_aggregate():
 
     reduce_indices = (Field("j"),)
     agg_bs = BlockedStatsFactory(blocks_per_dim, DenseStatsFactory()).aggregate(
-        ffunc.add, 0.0, reduce_indices, bs
+        ffuncs.add, 0.0, reduce_indices, bs
     )
 
     assert agg_bs.blocks.ndim == 1
@@ -480,7 +480,7 @@ def test_blocked_stats_mapjoin():
     )
 
     result = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).mapjoin(
-        ffunc.add, bs1, bs2
+        ffuncs.add, bs1, bs2
     )
 
     assert result.estimate_non_fill_values() == 50.0
@@ -621,7 +621,7 @@ def test_benchmark_structured_comparison():
             g_a = impl_factory(tns_a, (i, k))
             g_b = impl_factory(tns_b, (k, j))
             g_res = impl_factory.aggregate(
-                ffunc.add, 0.0, (k,), impl_factory.mapjoin(ffunc.mul, g_a, g_b)
+                ffuncs.add, 0.0, (k,), impl_factory.mapjoin(ffuncs.mul, g_a, g_b)
             )
             g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
@@ -630,7 +630,7 @@ def test_benchmark_structured_comparison():
             b_a = BlockedStats.from_tensor(tns_a, (i, k), blocks_per_dim, impl_factory)
             b_b = BlockedStats.from_tensor(tns_b, (k, j), blocks_per_dim, impl_factory)
             b_res = blocked_factory.aggregate(
-                ffunc.add, 0.0, (k,), blocked_factory.mapjoin(ffunc.mul, b_a, b_b)
+                ffuncs.add, 0.0, (k,), blocked_factory.mapjoin(ffuncs.mul, b_a, b_b)
             )
             b_perf = abs(b_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
@@ -697,7 +697,7 @@ def test_add_dummy_idx():
                 ((Field("i"), Field("j")), {Field("i"): 10.0, Field("j"): 5.0}, 2.0),
                 ((Field("i"), Field("k")), {Field("i"): 20.0, Field("k"): 7.0}, 3.0),
             ],
-            ffunc.add,
+            ffuncs.add,
             (Field("i"), Field("j"), Field("k")),
             {Field("i"): 10.0, Field("j"): 5.0, Field("k"): 7.0},
             5.0,
@@ -708,7 +708,7 @@ def test_add_dummy_idx():
                 ((Field("i"),), {Field("i"): 6.0}, 2.0),
                 ((Field("i"),), {Field("i"): 9.0}, 4.0),
             ],
-            ffunc.max,
+            ffuncs.max,
             (Field("i"),),
             {Field("i"): 6.0},
             4.0,
@@ -749,7 +749,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
     [
         # addition: drop one axis (n = size('j') = 5) → fill' = 0.5 * 5
         (
-            ffunc.add,
+            ffuncs.add,
             (Field("i"), Field("j"), Field("k")),
             {Field("i"): 10.0, Field("j"): 5.0, Field("k"): 3.0},
             0.5,
@@ -760,7 +760,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # addition: drop multiple axes (n = 4*16 = 64) → fill' = 7 * 64
         (
-            ffunc.add,
+            ffuncs.add,
             (Field("a"), Field("b"), Field("c"), Field("d")),
             {Field("a"): 2.0, Field("b"): 4.0, Field("c"): 8.0, Field("d"): 16.0},
             7.0,
@@ -771,7 +771,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # addition: no-op when reduce set is empty (n = 1) → fill unchanged
         (
-            ffunc.add,
+            ffuncs.add,
             (Field("x"), Field("y")),
             {Field("x"): 3.0, Field("y"): 9.0},
             1.0,
@@ -782,7 +782,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # addition: missing axis in reduce set → nothing reduced → fill unchanged
         (
-            ffunc.add,
+            ffuncs.add,
             (Field("i"), Field("j")),
             {Field("i"): 5.0, Field("j"): 6.0},
             0.0,
@@ -793,7 +793,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # multiplication: reduce 'j' (n = 3) → fill' = (2.0) ** 3 = 8
         (
-            ffunc.mul,
+            ffuncs.mul,
             (Field("i"), Field("j")),
             {Field("i"): 2.0, Field("j"): 3.0},
             2.0,
@@ -804,7 +804,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
         # idempotent op: reduce entire axis → empty shape
         (
-            ffunc.min,
+            ffuncs.min,
             (Field("i"),),
             {Field("i"): 4.0},
             7.0,
@@ -909,7 +909,7 @@ def test_mapjoin_mul_and_add():
     cache[ta].fill_value = 1
     cache[tb].fill_value = 1
     cache[ta2].fill_value = 2
-    node_mul = MapJoin(Literal(ffunc.mul), (ta, tb))
+    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     dsm = insert_statistics(
         stats_factory=DenseStatsFactory(),
         node=node_mul,
@@ -924,7 +924,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("k")) == 4.0
     assert dsm.fill_value == 0.0
 
-    node_add = MapJoin(Literal(ffunc.add), (ta, ta2))
+    node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
     ds_sum = insert_statistics(
         stats_factory=DenseStatsFactory(),
         node=node_add,
@@ -953,7 +953,7 @@ def test_aggregate_and_issimilar():
     )
 
     node_add = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=None,
         arg=table,
         idxs=(Field("j"),),
@@ -1665,7 +1665,7 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2.tensordef = TensorDef(frozenset({Field("i")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(ffunc.add), (node1, node2))
+    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
     reduce_stats = insert_statistics(
         stats_factory=DCStatsFactory(),
         node=parent,
@@ -1718,7 +1718,7 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(ffunc.add), (node1, node2))
+    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
     reduce_stats = insert_statistics(
         stats_factory=DCStatsFactory(),
         node=parent,
@@ -1767,7 +1767,7 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
     s2.tensordef = TensorDef(frozenset({Field("j")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(ffunc.add), (node1, node2))
+    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
     reduce_stats = insert_statistics(
         stats_factory=DCStatsFactory(),
         node=parent,
@@ -1824,7 +1824,7 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
     s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 0)
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(ffunc.add), (node1, node2))
+    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
     reduce_stats = insert_statistics(
         stats_factory=DCStatsFactory(),
         node=parent,
@@ -1901,9 +1901,9 @@ def test_large_disjoint_disjunction_dc_card(
     s3.tensordef = TensorDef(frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1)
     s3.dcs = set(dcs3)
 
-    map = MapJoin(Literal(ffunc.mul), (node1, node2))
+    map = MapJoin(Literal(ffuncs.mul), (node1, node2))
 
-    parent = MapJoin(Literal(ffunc.mul), (map, node3))
+    parent = MapJoin(Literal(ffuncs.mul), (map, node3))
 
     reduce_stats = insert_statistics(
         stats_factory=DCStatsFactory(),
@@ -1975,8 +1975,8 @@ def test_mixture_disjoint_disjunction_dc_card(
     s3.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0)
     s3.dcs = set(dcs3)
 
-    map = MapJoin(Literal(ffunc.mul), (node1, node2))
-    parent = MapJoin(Literal(ffunc.mul), (map, node3))
+    map = MapJoin(Literal(ffuncs.mul), (node1, node2))
+    parent = MapJoin(Literal(ffuncs.mul), (map, node3))
 
     reduce_stats = insert_statistics(
         stats_factory=DCStatsFactory(),
@@ -2029,7 +2029,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
     stat.dcs = set(dcs)
 
     reduce_node = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=Literal(0),
         idxs=(Field("i"), Field("j"), Field("k")),
         arg=node,
@@ -2083,7 +2083,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=Literal(0),
         idxs=(Field("i"), Field("j")),
         arg=node,
@@ -2137,7 +2137,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=Literal(0),
         idxs=(Field("i"),),
         arg=node,
@@ -2209,7 +2209,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
 
     reduce_fields = tuple(reduce_indices)
     reduce_node = Aggregate(
-        op=Literal(ffunc.add),
+        op=Literal(ffuncs.add),
         init=Literal(0),
         idxs=reduce_fields,
         arg=node,
