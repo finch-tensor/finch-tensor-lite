@@ -27,7 +27,7 @@ class FType:
         Check if `other` is an instance of this ftype.
         """
         return ftype(other) == self
-
+    
 
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
 
@@ -703,9 +703,9 @@ def isdtype(x, T: FType):
 
 
 def ftype(x) -> FType:
-    """Return the corresponding FType for a given dtype or object.
-    Recognizes numpy, Python builtins, and Python tuples.
-    Calls .ftype on the object if type not found.
+    """Return the corresponding FType for a given object.  Recognizes numpy,
+    Python builtins, and Python tuples.  Sometimes recognizes types.  
+    Override .ftype to customize the ftype of an object.
     """
     if isinstance(x, FType):
         return x
@@ -745,7 +745,7 @@ def ftype(x) -> FType:
         return complex64
     if type(x) is np.complex128 or x is np.complex128:
         return complex128
-    if isinstance(x, tuple): #TODO does not work for tuple types.
+    if isinstance(x, tuple):
         T = type(x)
         if hasattr(T, "_fields") and all(isinstance(field, str) for field in T._fields):
             return NamedTupleFType(
