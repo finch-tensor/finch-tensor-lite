@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import StructFType, ffuncs
+from ...algebra import ImmutableStructFType, ffuncs
 from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
@@ -18,7 +18,7 @@ class DenseLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(LevelFType, StructFType):
+class DenseLevelFType(LevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
     dimension_type: Any = None
 

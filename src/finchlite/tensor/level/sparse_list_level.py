@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import StructFType, ffuncs
+from ...algebra import ImmutableStructFType, ffuncs
 from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
@@ -20,7 +20,7 @@ class SparseListLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class SparseListLevelFType(LevelFType, StructFType):
+class SparseListLevelFType(LevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
     dimension_type: Any = None
 

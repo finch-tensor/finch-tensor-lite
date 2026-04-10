@@ -192,6 +192,11 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         if not isinstance(dimension_type, TupleFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
         assert isinstance(dimension_type, TupleFType)
+        # Normalize dimension field types to Finch ftypes so generated
+        # result_format values are consistent with strict asm type checks.
+        dimension_type = TupleFType.from_tuple(
+            tuple(ftype(t) for t in dimension_type.struct_fieldtypes)
+        )
         self.buf_t = buffer_type
         self._ndim = ndim
         self.shape_t = dimension_type
@@ -236,7 +241,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     @property
     def shape_type(self) -> tuple:
-        return tuple(np.intp for _ in range(self.ndim))
+        return tuple(self.shape_t.struct_fieldtypes)
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(

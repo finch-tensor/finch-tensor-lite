@@ -12,6 +12,7 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
+from finchlite.algebra import TupleFType
 from finchlite import dense, element, ffuncs, fiber_tensor, ftype
 from finchlite.codegen import (
     CCompiler,
@@ -979,8 +980,8 @@ def test_e2e_numba(fmt_fn, dtype):
 )
 def test_hashtable(compiler, constructor):
     table = constructor(
-        asm.TupleFType.from_tuple((int, int)),
-        asm.TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((int, int)),
+        TupleFType.from_tuple((int, int, int)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -1060,7 +1061,7 @@ def test_multiple_hashtable(compiler, tabletype):
     """
 
     def _int_tupletype(arity):
-        return asm.TupleFType.from_tuple(tuple(int for _ in range(arity)))
+        return TupleFType.from_tuple(tuple(int for _ in range(arity)))
 
     def func(table, num: int):
         key_type = table.ftype.key_type
@@ -1089,14 +1090,14 @@ def test_multiple_hashtable(compiler, tabletype):
     table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
     table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
     table3 = tabletype(
-        asm.TupleFType.from_tuple((float, int)),
-        asm.TupleFType.from_tuple((float, float)),
+        TupleFType.from_tuple((float, int)),
+        TupleFType.from_tuple((float, float)),
     )
     table4 = tabletype(
-        asm.TupleFType.from_tuple((float, asm.TupleFType.from_tuple((int, float)))),
-        asm.TupleFType.from_tuple((float, float)),
+        TupleFType.from_tuple((float, TupleFType.from_tuple((int, float)))),
+        TupleFType.from_tuple((float, float)),
     )
-    nestedtype = asm.TupleFType.from_tuple((int, float))
+    nestedtype = TupleFType.from_tuple((int, float))
     table5 = tabletype(int, int)
 
     mod = compiler(

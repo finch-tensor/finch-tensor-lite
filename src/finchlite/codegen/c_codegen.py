@@ -567,6 +567,7 @@ def c_type(t):
 
 register_property(algebra.int_, "c_type", "__attr__", lambda x: ctypes.c_int)
 register_property(algebra.float_, "c_type", "__attr__", lambda x: ctypes.c_double)
+register_property(algebra.bool_, "c_type", "__attr__", lambda x: ctypes.c_bool)
 register_property(algebra.str_, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
 register_property(
     algebra.ftypes.FDTypeNumpy, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
@@ -576,8 +577,10 @@ register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 # ints and floats should be serialized and constructed trivially.
 register_property(algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
 register_property(algebra.float_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(algebra.bool_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
 register_property(algebra.int_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
 register_property(algebra.float_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+register_property(algebra.bool_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
