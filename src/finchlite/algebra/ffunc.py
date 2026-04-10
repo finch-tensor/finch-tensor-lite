@@ -15,13 +15,13 @@ from .algebra import (
 )
 from .ftype import (
     FDType,
-    FDTypeBuiltin,
-    FDTypeNumpy,
     FType,
     TupleFType,
-    bool as finch_bool,
     ftype,
     promote_type,
+)
+from .ftype import (
+    bool as finch_bool,
 )
 
 
@@ -47,23 +47,27 @@ class CUnaryOperator(COperator):
 
 class NAryFinchOperator(FinchOperator):
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        assert isinstance(a, FDtype) and isinstance(b, FDType)
+        assert isinstance(a, FDType) and isinstance(b, FDType)
         return ftype(self(a(True), b(True)))
+
 
 class BinaryFinchOperator(FinchOperator):
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        assert isinstance(a, FDtype) and isinstance(b, FDType)
+        assert isinstance(a, FDType) and isinstance(b, FDType)
         return ftype(self(a(True), b(True)))
+
 
 class UnaryFinchOperator(FinchOperator):
     def return_type(self, a: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType)
         return ftype(self(a(True)))
 
+
 class ComparisonFinchOperator(FinchOperator):
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType) and isinstance(b, FDType)
         return finch_bool
+
 
 class _Add(NAryFinchOperator, CNAryOperator, NumbaOperator):
     is_associative = True
@@ -533,6 +537,8 @@ class _Le(ComparisonFinchOperator, CBinaryOperator):
 
 
 le = _Le()
+
+
 class _Divide(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.divide(a, b)
@@ -545,6 +551,7 @@ class _Divide(BinaryFinchOperator):
 
 
 divide = _Divide()
+
 
 class _LogAddExp(BinaryFinchOperator):
     is_associative = True

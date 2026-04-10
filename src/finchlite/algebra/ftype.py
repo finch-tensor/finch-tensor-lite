@@ -3,7 +3,7 @@ import builtins
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from functools import lru_cache
-from typing import Any, NamedTuple
+from typing import Any
 
 import numpy as np
 
@@ -27,7 +27,7 @@ class FType:
         Check if `other` is an instance of this ftype.
         """
         return ftype(other) == self
-    
+
 
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
 
@@ -36,7 +36,8 @@ class FDType(FType):
     @abstractmethod
     def __call__(self, other):
         """
-        Create an instance of this ftype with the given value, attempt to cast if necessary.
+        Create an instance of this ftype with the given value, attempt to cast
+        if necessary.
         """
 
     def __promote__(self, other):
@@ -710,7 +711,7 @@ def isdtype(x, T: FType):
 
 def ftype(x) -> FType:
     """Return the corresponding FType for a given object.  Recognizes numpy,
-    Python builtins, and Python tuples.  Sometimes recognizes types.  
+    Python builtins, and Python tuples.  Sometimes recognizes types.
     Override .ftype to customize the ftype of an object.
     """
     if isinstance(x, FType):

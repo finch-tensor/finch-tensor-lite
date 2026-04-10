@@ -8,8 +8,8 @@ import numpy as np
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import FType, FTyped, StructFType, TensorFType, ffunc, register_property
-from ..algebra.ftype import FDTypeBuiltin, FDTypeNumpy
 from ..algebra.algebra import FinchOperator
+from ..algebra.ftype import FDTypeBuiltin, FDTypeNumpy
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,

@@ -54,11 +54,9 @@ itself.
 
 from abc import ABC, abstractmethod
 from collections.abc import Hashable
-from typing import Any, cast
+from typing import Any
 
-import numpy as np
-
-from .ftype import FDTypeBoolean, FDTypeNumeric, FType, ftype
+from .ftype import FDTypeNumeric, FType, ftype
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
