@@ -6,7 +6,18 @@ Removed general cache. Both alias_hash and cost_cache
 ``branch_and_bound`` is layered BFS-style; ``branch_and_bound_dfs`` uses an
 iterative DFS (stack + memo) for ``k == float("inf")``, storing
 ``memo[vars_key] = (cost, elimination_order)`` per set (suffix relaxation
-disabled).
+disabled). Optional **ordered-prefix dominance** (default on): for each
+adjacent pair ``(d,e)`` along a witness path ``T`` (every split
+``T = P + (d,) + (e,) + …``), if ``cost(T)`` beats the best known cost for the
+sibling prefix ``P + (e,)`` (which must have been visited), extensions of
+``P + (e,)`` are skipped. If a witness path is seen **before** ``P + (e,)`` is
+visited, its cost is stored and the same skip applies when that prefix is
+reached later (e.g. ``ABCDE`` before ``ABCE``). This is a heuristic unless a
+problem-specific proof applies; set env ``GALLEY_BNB_DFS_PREFIX_BLOCK=0`` to
+disable.
+
+NOTE: remove _PRINT_BNB_DFS_MEMO, its for testing 
+remove _PREFIX_BLOCK_DFS, its a parameter
 """
 
 import os
@@ -18,6 +29,8 @@ from .annotated_query import AnnotatedQuery
 
 # Set env ``GALLEY_PRINT_BNB_DFS_MEMO=1`` to trace DFS memo (verbose).
 _PRINT_BNB_DFS_MEMO = os.environ.get("GALLEY_PRINT_BNB_DFS_MEMO", "") == "1"
+# All-fork sibling prefix blocking in ``branch_and_bound_dfs`` (module doc).
+_PREFIX_BLOCK_DFS = os.environ.get("GALLEY_BNB_DFS_PREFIX_BLOCK", "1") == "1"
 
 
 def _aq_with_stats(aq: AnnotatedQuery) -> AnnotatedQuery:
@@ -53,6 +66,39 @@ def _dfs_memo_cost(memo: dict[frozenset, tuple[float, list]], vk: frozenset) -> 
     return ent[0] if ent is not None else float("inf")
 
 
+def _dfs_order_prefix_blocked(order: list, blocked: set[tuple]) -> bool:
+    """True if ``tuple(order)`` equals or extends some blocked elimination prefix."""
+    if not blocked:
+        return False
+    t = tuple(order)
+    for b in blocked:
+        if len(t) >= len(b) and t[: len(b)] == b:
+            return True
+    return False
+
+
+def _dfs_fork_sibling_blocks(
+    full_order: tuple,
+    cost_full: float,
+    prefix_best: dict[tuple, float],
+    blocked: set[tuple],
+    sibling_witness_best: dict[tuple, float],
+) -> None:
+    """Min witness cost per sibling prefix ``S``; block ``S`` if already visited and beaten."""
+    n = len(full_order)
+    for i in range(n - 1):
+        d, e = full_order[i], full_order[i + 1]
+        if d == e:
+            continue
+        p = full_order[:i]
+        s = p + (e,)
+        prev_w = sibling_witness_best.get(s, float("inf"))
+        if cost_full < prev_w:
+            sibling_witness_best[s] = cost_full
+        if s in prefix_best and cost_full < prefix_best[s]:
+            blocked.add(s)
+
+
 def _print_dfs_memo_snapshot(stage: str, n: int, memo: dict[frozenset, tuple[float, list]]) -> None:
     """Print ``memo`` after each stack pop / memo assign (DFS ``k=inf``)."""
     print(f"\n--- branch_and_bound_dfs memo {stage} #{n} ---")
@@ -62,33 +108,6 @@ def _print_dfs_memo_snapshot(stage: str, n: int, memo: dict[frozenset, tuple[flo
         print(f"  {label} -> (cost={c}, order={[repr(x) for x in ord_]})")
     print(f"  [n_entries={len(memo)}]")
 
-
-# def _relax_suffix_induced_sets(
-#     memo: dict[frozenset, tuple[float, list]],
-#     order: list,
-#     total_cost: float,
-# ) -> None:
-#     """
-#     Suffix-induced subset entries (optional tighten after DFS, not part of search).
-#
-#     For each non-empty suffix of the **best complete** ``order``, build
-#     ``S = frozenset(suffix)`` (indices appearing in that suffix). If the **full**
-#     plan cost ``total_cost`` strictly improves ``memo[S]``, set
-#     ``memo[S] = (total_cost, suffix)``. Example: order [a,b,c,d] also touches
-#     keys for ``{b,c,d}``, ``{c,d}``, ``{d}`` with cost ``total_cost`` — not the
-#     same as “minimum cumulative cost to reach S” from the main DFS loop.
-#     """
-#     n = len(order)
-#     for k in range(n):
-#         suffix = order[k:]
-#         if not suffix:
-#             continue
-#         # Subset S = indices in this suffix; may duplicate keys already filled by search.
-#         s_set = frozenset(suffix)
-#         prev = _dfs_memo_cost(memo, s_set)
-#         if total_cost < prev:
-#             # Full-plan total and suffix order; only applied when better than prior memo[S].
-#             memo[s_set] = (total_cost, list(suffix))
 
 
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
@@ -228,7 +247,8 @@ def branch_and_bound_dfs(
     For ``k == float("inf")``, runs iterative DFS: ``deque`` stack,
     ``memo[vars_key] = (cumulative_cost, elimination_order)`` for each eliminated-
     index set (single dict — cost and permutation updated together),
-    ``max_subquery_costs`` superset bound, incumbent pruning.
+    ``max_subquery_costs`` superset bound, incumbent pruning, and optional
+    penultimate-fork ordered-prefix blocking (env ``GALLEY_BNB_DFS_PREFIX_BLOCK``).
 
     Prints ``memo`` after each stack ``pop`` and each ``memo`` assignment.
     Returns ``(best_complete, optimal_subquery_costs, optimal_perm_by_vars)``.
@@ -239,6 +259,9 @@ def branch_and_bound_dfs(
 
     component_set = frozenset(component)
     memo: dict[frozenset, tuple[float, list]] = {frozenset(): (0.0, [])}
+    prefix_best: dict[tuple, float] = {(): 0.0}
+    blocked_prefixes: set[tuple] = set()
+    sibling_witness_best: dict[tuple, float] = {}
     best_complete: tuple | None = None
     best_complete_cost = float("inf")
 
@@ -257,6 +280,14 @@ def branch_and_bound_dfs(
         # Stale frame: a cheaper path to this vars_key already updated memo[vars_key].
         if cost > _dfs_memo_cost(memo, vars_key):
             continue
+
+        if _PREFIX_BLOCK_DFS and _dfs_order_prefix_blocked(order, blocked_prefixes):
+            continue
+
+        if _PREFIX_BLOCK_DFS:
+            w = sibling_witness_best.get(tuple(order), float("inf"))
+            if w < cost:
+                continue
 
         if vars_key == component_set:
             if cost < best_complete_cost:
@@ -285,15 +316,32 @@ def branch_and_bound_dfs(
             if total_cost >= prev_best:
                 continue
 
+            new_order = list(order) + [idx]
+            new_t = tuple(new_order)
+            if _PREFIX_BLOCK_DFS:
+                w = sibling_witness_best.get(new_t, float("inf"))
+                if w < total_cost:
+                    continue
+
             # Search path: best cost so far to eliminated-index set ``new_vars`` (prefix walk).
-            memo[new_vars] = (total_cost, list(order) + [idx])
+            memo[new_vars] = (total_cost, new_order)
+            prev_pb = prefix_best.get(new_t, float("inf"))
+            if total_cost < prev_pb:
+                prefix_best[new_t] = total_cost
+            if _PREFIX_BLOCK_DFS:
+                _dfs_fork_sibling_blocks(
+                    new_t,
+                    total_cost,
+                    prefix_best,
+                    blocked_prefixes,
+                    sibling_witness_best,
+                )
             assign_idx += 1
             if __debug__ and _PRINT_BNB_DFS_MEMO:
                 _print_dfs_memo_snapshot("assign", assign_idx, dict(memo))
             new_aq = _aq_with_stats(aq)
             reduce_query = new_aq.reduce_idx(idx)
             new_queries = list(queries) + [reduce_query]
-            new_order = list(order) + [idx]
             stack.appendleft((new_vars, new_aq, new_order, new_queries, total_cost))
 
     if best_complete is None:
@@ -303,10 +351,6 @@ def branch_and_bound_dfs(
             f"{input_aq.get_reducible_idxs()!r}"
         )
 
-    # best_order, _, _, best_cost = best_complete
-    # Extra memo keys: suffix-induced subsets of best_order get (best_cost, suffix) if
-    # that improves memo[S] — separate from assignments in the DFS loop above.
-    # _relax_suffix_induced_sets(memo, best_order, best_cost)
 
     sorted_keys = sorted(memo.keys(), key=_vars_key_sort_key)
     # --- optimal_subquery_costs and optimal_perm_by_vars only used for testing ---
