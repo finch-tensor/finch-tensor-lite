@@ -9,10 +9,15 @@ iterative DFS (stack + memo) for ``k == float("inf")``, storing
 disabled).
 """
 
+import os
 from collections import OrderedDict, deque
+from functools import reduce
 
-from ....finch_logic import Query
+from ....finch_logic import Field, Query
 from .annotated_query import AnnotatedQuery
+
+# Set env ``GALLEY_PRINT_BNB_DFS_MEMO=1`` to trace DFS memo (verbose).
+_PRINT_BNB_DFS_MEMO = os.environ.get("GALLEY_PRINT_BNB_DFS_MEMO", "") == "1"
 
 
 def _aq_with_stats(aq: AnnotatedQuery) -> AnnotatedQuery:
@@ -53,7 +58,7 @@ def _print_dfs_memo_snapshot(stage: str, n: int, memo: dict[frozenset, tuple[flo
     print(f"\n--- branch_and_bound_dfs memo {stage} #{n} ---")
     for vk in sorted(memo.keys(), key=_vars_key_sort_key):
         c, ord_ = memo[vk]
-        label = "∅" if not vk else "{" + ", ".join(sorted(repr(x) for x in vk)) + "}"
+        label = "{}" if not vk else "{" + ", ".join(sorted(repr(x) for x in vk)) + "}"
         print(f"  {label} -> (cost={c}, order={[repr(x) for x in ord_]})")
     print(f"  [n_entries={len(memo)}]")
 
@@ -247,7 +252,7 @@ def branch_and_bound_dfs(
     while stack:
         vars_key, aq, order, queries, cost = stack.popleft()
         pop_idx += 1
-        if __debug__:
+        if __debug__ and _PRINT_BNB_DFS_MEMO:
             _print_dfs_memo_snapshot("pop", pop_idx, dict(memo))
         # Stale frame: a cheaper path to this vars_key already updated memo[vars_key].
         if cost > _dfs_memo_cost(memo, vars_key):
@@ -283,7 +288,8 @@ def branch_and_bound_dfs(
             # Search path: best cost so far to eliminated-index set ``new_vars`` (prefix walk).
             memo[new_vars] = (total_cost, list(order) + [idx])
             assign_idx += 1
-            _print_dfs_memo_snapshot("assign", assign_idx, dict(memo))
+            if __debug__ and _PRINT_BNB_DFS_MEMO:
+                _print_dfs_memo_snapshot("assign", assign_idx, dict(memo))
             new_aq = _aq_with_stats(aq)
             reduce_query = new_aq.reduce_idx(idx)
             new_queries = list(queries) + [reduce_query]
@@ -312,6 +318,8 @@ def branch_and_bound_dfs(
 def pruned_query_to_plan(
     input_aq: AnnotatedQuery,
     use_greedy: bool = False,
+    *,
+    use_components: bool = True,
 ) -> tuple[list[Query], float]:
     """
     Pruned optimizer: greedy first for bounds, then exact with pruning.
@@ -326,7 +334,12 @@ def pruned_query_to_plan(
     # Do this instead of for comp in components because components
     # are recomputed in reduce_idx same as julia code
     while cur_aq.get_reducible_idxs():
-        component = cur_aq.connected_components[0]
+        if not use_components:
+            component = reduce(
+                lambda a, b: a + b, cur_aq.connected_components, list[Field]()
+            )
+        else:
+            component = cur_aq.connected_components[0]
 
         # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
         greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
@@ -368,6 +381,8 @@ def pruned_query_to_plan(
 def pruned_query_to_plan_dfs(
     input_aq: AnnotatedQuery,
     use_greedy: bool = False,
+    *,
+    use_components: bool = True,
 ) -> tuple[list[Query], float]:
     """
     Pruned optimizer like :func:`pruned_query_to_plan`, using :func:`branch_and_bound_dfs`
@@ -381,7 +396,12 @@ def pruned_query_to_plan_dfs(
     cur_aq = _aq_with_stats(input_aq)
 
     while cur_aq.get_reducible_idxs():
-        component = cur_aq.connected_components[0]
+        if not use_components:
+            component = reduce(
+                lambda a, b: a + b, cur_aq.connected_components, list[Field]()
+            )
+        else:
+            component = cur_aq.connected_components[0]
 
         # Maybe remove, let dfs run
         greedy_result = branch_and_bound_dfs(cur_aq, component, 1, OrderedDict())

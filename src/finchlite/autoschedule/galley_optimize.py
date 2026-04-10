@@ -22,7 +22,10 @@ from ..finch_logic import (
 )
 from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
+from .galley.logical_optimizer.branch_and_bound import (
+    pruned_query_to_plan,
+    pruned_query_to_plan_dfs,
+)
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
 from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
@@ -39,12 +42,16 @@ def optimize_query(
     use_components: bool = True,
     *,
     use_exact_branch_and_bound: bool = False,
+    use_branch_and_bound_dfs: bool = False,
 ):
     """Rewrite a single logical Query via greedy or exact branch-and-bound reduction."""
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
     use_greedy = not use_exact_branch_and_bound
-    new_queries, _ = pruned_query_to_plan(
-        annotated_query, use_components=use_components, use_greedy=use_greedy
+    prune = pruned_query_to_plan_dfs if use_branch_and_bound_dfs else pruned_query_to_plan
+    new_queries, _ = prune(
+        annotated_query,
+        use_components=use_components,
+        use_greedy=use_greedy,
     )
     return new_queries
 
@@ -56,6 +63,7 @@ def optimize_plan(
     use_components: bool = True,
     *,
     use_exact_branch_and_bound: bool = False,
+    use_branch_and_bound_dfs: bool = False,
 ):
     """
     Optimize a full Plan: run the Galley optimizer on each Query body,
@@ -68,14 +76,15 @@ def optimize_plan(
         if isinstance(body, Query):
             new_queries = optimize_query(
                 body,
-                ST,
+                stats_factory,
                 stats_bindings,
                 use_components=use_components,
                 use_exact_branch_and_bound=use_exact_branch_and_bound,
+                use_branch_and_bound_dfs=use_branch_and_bound_dfs,
             )
             for new_query in new_queries:
                 insert_statistics(
-                    ST,
+                    stats_factory,
                     new_query,
                     stats_bindings,
                     replace=True,
@@ -101,10 +110,12 @@ class GalleyLogicalOptimizer(LogicLoader):
         use_components: bool = True,
         *,
         use_exact_branch_and_bound: bool = True,
+        use_branch_and_bound_dfs: bool = False,
     ):
         self.ctx = ctx
         self.use_components = use_components
         self.use_exact_branch_and_bound = use_exact_branch_and_bound
+        self.use_branch_and_bound_dfs = use_branch_and_bound_dfs
         self.last_optimize_plan_s: float | None = None
 
     def __call__(
@@ -128,6 +139,7 @@ class GalleyLogicalOptimizer(LogicLoader):
             stats,
             use_components=self.use_components,
             use_exact_branch_and_bound=self.use_exact_branch_and_bound,
+            use_branch_and_bound_dfs=self.use_branch_and_bound_dfs,
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
         return self.ctx(term, bindings, stats, stats_factory)
