@@ -89,8 +89,8 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     of the BufferFType class.
     """
 
-    def __init__(self, dtype: type):
-        self._dtype = np.dtype(dtype).type
+    def __init__(self, element_type: FDType):
+        self._dtype = element_type
 
     def __eq__(self, other):
         if not isinstance(other, NumpyBufferFType):
@@ -104,14 +104,14 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         return f"NumpyBufferFType({qual_str(self._dtype)})"
 
     @property
-    def length_type(self):
+    def length_type(self) -> FType:
         """
         Returns the type used for the length of the buffer.
         """
-        return np.intp
+        return ftype.intp
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Returns the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.

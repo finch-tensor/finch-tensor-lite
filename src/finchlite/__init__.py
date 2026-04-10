@@ -27,6 +27,7 @@ from .algebra import (
     uint16,
     uint32,
     uint64,
+    str_,
 )
 from .autoschedule.tensor_stats import (
     DC,
@@ -228,6 +229,7 @@ __all__ = [
     "bool",
     "bool_",
     "broadcast_arrays",
+    "str_",
     "broadcast_to",
     "ceil",
     "clip",

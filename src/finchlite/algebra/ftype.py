@@ -135,6 +135,15 @@ class FDTypeBuiltin(FDType):
         """
         return self.type(val)
 
+class _FDTypeBuiltinStr(FDTypeBuiltin):
+    @property
+    def type(self):
+        return str
+
+    def __repr__(self):
+        return "finchlite.str_"
+
+str_ = _FDTypeBuiltinStr()
 
 # Ftypes for python built-in datatypes
 class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
@@ -767,6 +776,8 @@ def ftype(x) -> FType:
         return complex64
     if type(x) is np.complex128 or x is np.complex128:
         return complex128
+    if type(x) is builtins.str or x is builtins.str:
+        return str_
     if isinstance(x, tuple):
         T = type(x)
         if hasattr(T, "_fields") and all(isinstance(field, str) for field in T._fields):

@@ -50,6 +50,7 @@ from .ftype import (
     uint16,
     uint32,
     uint64,
+    str_,
 )
 from .tensor import (
     Tensor,
