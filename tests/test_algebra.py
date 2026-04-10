@@ -11,6 +11,8 @@ from finchlite.algebra import (
     is_identity,
     repeat_operator,
 )
+import finchlite
+import numpy as np
 
 
 def test_algebra_selected():
@@ -49,13 +51,13 @@ def test_algebra_selected():
     assert is_associative(ffunc.logical_xor)
     assert is_associative(ffunc.logical_or)
     assert is_associative(ffunc.logaddexp)
-    assert init_value(ffunc.and_, bool) is True
-    assert init_value(ffunc.or_, bool) is False
-    assert init_value(ffunc.xor, bool) is False
-    assert init_value(ffunc.logaddexp, float) == -math.inf
-    assert init_value(ffunc.logical_and, bool) is True
-    assert init_value(ffunc.logical_or, bool) is False
-    assert init_value(ffunc.logical_xor, bool) is False
+    assert init_value(ffunc.and_, finchlite.bool_) is np.True_
+    assert init_value(ffunc.or_, finchlite.bool_) is np.False_
+    assert init_value(ffunc.xor, finchlite.bool_) is np.False_
+    assert init_value(ffunc.logaddexp, finchlite.float64) == -math.inf
+    assert init_value(ffunc.logical_and, finchlite.bool_) is True
+    assert init_value(ffunc.logical_or, finchlite.bool_) is False
+    assert init_value(ffunc.logical_xor, finchlite.bool_) is False
     assert is_idempotent(ffunc.and_)
     assert is_idempotent(ffunc.or_)
     assert is_idempotent(ffunc.logical_and)
