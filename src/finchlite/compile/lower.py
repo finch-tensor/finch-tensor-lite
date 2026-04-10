@@ -7,7 +7,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import FType, FTyped, StructFType, TensorFType, ffuncs, register_property
+from ..algebra import FType, FTyped, ImmutableStructFType, TensorFType, ffuncs, register_property
 from ..algebra.algebra import FinchOperator
 from ..algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from ..finch_assembly import (
@@ -224,7 +224,7 @@ class SymbolicExtent(FTyped):
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFType(StructFType):
+class ExtentFType(ImmutableStructFType):
     start_t: type
     end_t: type
 

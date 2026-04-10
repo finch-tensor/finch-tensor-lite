@@ -52,7 +52,7 @@ class LazyTensorFType(TensorFType):
     _element_type: Any
     _shape_type: Any
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: TupleFType):
+    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple[type, ...]):
         self._fill_value = _fill_value
         self._element_type = _element_type
         self._shape_type = _shape_type
@@ -185,7 +185,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=ftype(self._shape),
+            _shape_type=tuple(type(dim) for dim in self._shape),
         )
 
     @property

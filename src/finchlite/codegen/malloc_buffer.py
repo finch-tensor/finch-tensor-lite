@@ -20,7 +20,7 @@ from .c_codegen import (
     serialize_to_c,
 )
 from .numpy_buffer import CBufferFields
-from ..algebra import ftypes
+from ..algebra import ftypes, ftype
 
 
 class CMallocBufferStruct(ctypes.Structure):

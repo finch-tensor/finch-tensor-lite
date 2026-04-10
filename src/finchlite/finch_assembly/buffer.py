@@ -35,7 +35,7 @@ class Buffer(FTyped, ABC):
         Return the type of indices used to access elements in the buffer.
         This is typically an integer type.
         """
-        return self.ftype.length_type()
+        return self.ftype.length_type
 
     @abstractmethod
     def load(self, idx: int): ...
