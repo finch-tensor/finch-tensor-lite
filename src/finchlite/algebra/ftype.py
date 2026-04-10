@@ -33,6 +33,12 @@ class FType:
 
 
 class FDType(FType):
+    @abstractmethod
+    def __call__(self, other):
+        """
+        Create an instance of this ftype with the given value, attempt to cast if necessary.
+        """
+
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -127,7 +133,7 @@ class FDTypeBuiltin(FDType):
 
 
 # Ftypes for python built-in datatypes
-class _FDTypeBuiltinBool(FDTypeBoolean):
+class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     @property
     def type(self):
         return bool
@@ -139,7 +145,7 @@ class _FDTypeBuiltinBool(FDTypeBoolean):
 bool_ = _FDTypeBuiltinBool()
 
 
-class FDTypeNumericBuiltin(FDType):
+class FDTypeNumericBuiltin(FDTypeBuiltin, FDTypeNumeric):
     def __promote__(self, other):
         if isinstance(other, FDTypeBuiltin):
             return ftype(self.type(False) + other.type(False))
