@@ -56,7 +56,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Hashable
 from typing import Any
 
-from .ftype import FDTypeNumeric, FDTypeOrdered, FType, ftype
+from .ftype import FDTypeOrdered, FType, ftype
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 

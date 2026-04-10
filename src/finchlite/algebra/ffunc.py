@@ -2,7 +2,7 @@
 import builtins
 import operator
 from functools import reduce
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 
@@ -15,14 +15,12 @@ from .algebra import (
 )
 from .ftype import (
     FDType,
+    FDTypeOrdered,
     FType,
     TupleFType,
+    bool,
     ftype,
     promote_type,
-    FDTypeOrdered,
-)
-from .ftype import (
-    bool
 )
 
 
@@ -48,12 +46,13 @@ class CUnaryOperator(COperator):
 
 class NAryFinchOperator(FinchOperator):
     def return_type(self, *args) -> FType:  # type: ignore[override]
-        new_args:list[Any] = []
+        new_args: list[Any] = []
         for arg in args:
             arg_type = ftype(arg)
             assert isinstance(arg_type, FDType)
             new_args.append(arg_type(True))
         return ftype(self(*new_args))
+
 
 class BinaryFinchOperator(FinchOperator):
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
@@ -160,8 +159,6 @@ class _Sub(BinaryFinchOperator, CBinaryOperator, NumbaOperator):
 
 
 sub = _Sub()
-
-
 
 
 class _TrueDiv(BinaryFinchOperator, CBinaryOperator):
@@ -368,6 +365,7 @@ class _Or(NAryFinchOperator, CNAryOperator):
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
         return self(type_(False), type_(False))
+
 
 or_ = _Or()
 
@@ -670,6 +668,7 @@ class _Truth(UnaryFinchOperator):
 
 truth = _Truth()
 
+
 class _Min(NAryFinchOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
@@ -682,6 +681,7 @@ class _Min(NAryFinchOperator, NumbaOperator):
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
             return C(builtins.min(a, b))
+
         return reduce(op, args)
 
     def is_identity(self, val) -> builtins.bool:
@@ -700,7 +700,9 @@ class _Min(NAryFinchOperator, NumbaOperator):
     def __repr__(self) -> str:
         return "min"
 
+
 min = _Min()
+
 
 class _Max(NAryFinchOperator, NumbaOperator):
     is_associative = True
@@ -714,6 +716,7 @@ class _Max(NAryFinchOperator, NumbaOperator):
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
             return C(builtins.min(a, b))
+
         return reduce(op, args)
 
     def is_identity(self, val) -> builtins.bool:
@@ -1262,8 +1265,6 @@ class _Sign(UnaryFinchOperator):
 sign = _Sign()
 
 
-
-
 class _InitWrite(FinchOperator, NumbaOperator):
     """
     init_write may assert that its first argument is
@@ -1506,8 +1507,9 @@ __all__ = [
     "lshift",
     "lt",
     "make_tuple",
-    "matmul",
     "max",
+    "max",
+    "min",
     "min",
     "mod",
     "mul",
@@ -1519,8 +1521,6 @@ __all__ = [
     "overwrite",
     "pos",
     "pow",
-    "max",
-    "min",
     "real",
     "reciprocal",
     "remainder",

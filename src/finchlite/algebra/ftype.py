@@ -69,6 +69,7 @@ def promote_type(T1: FDType, T2: FDType):
         return S2
     raise TypeError(f"Cannot promote types {T1} and {T2}")
 
+
 class FDTypeOrdered(FDType):
     @property
     @abstractmethod
@@ -86,11 +87,15 @@ class FDTypeOrdered(FDType):
         """
         ...
 
-class FDTypeNumeric(FDTypeOrdered):...
+
+class FDTypeNumeric(FDTypeOrdered): ...
+
 
 class FDTypeReal(FDTypeNumeric): ...
 
+
 class FDTypeComplex(FDTypeNumeric): ...
+
 
 class FDTypeInteger(FDTypeNumeric):
     @property
@@ -136,13 +141,13 @@ class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     @property
     def type(self):
         return bool
-    
+
     def __repr__(self):
         return "finchlite.bool_"
 
     def type_min(self):
         return False
-    
+
     def type_max(self):
         return True
 
@@ -322,7 +327,7 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
 
     def type_min(self):
         return np.bool_(False)
-    
+
     def type_max(self):
         return np.bool_(True)
 
