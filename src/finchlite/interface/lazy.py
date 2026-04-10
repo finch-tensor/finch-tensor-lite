@@ -926,7 +926,7 @@ def min(
     Return the minimum of input array ``arr`` along given axis.
     """
     x = lazy(x)
-    return reduce(ffunc.promote_min, x, axis=axis, keepdims=keepdims, init=init)
+    return reduce(ffunc.min, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def max(
@@ -941,7 +941,7 @@ def max(
     Return the maximum of input array ``arr`` along given axis.
     """
     x = lazy(x)
-    return reduce(ffunc.promote_max, x, axis=axis, keepdims=keepdims, init=init)
+    return reduce(ffunc.max, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def clip(x, /, *, min=None, max=None) -> LazyTensor:

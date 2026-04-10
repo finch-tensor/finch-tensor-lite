@@ -34,8 +34,8 @@ nary_ops = {
     ffunc.logical_and: "logical_and",
     ffunc.logical_or: "logical_or",
     ffunc.logical_not: "logical_not",
-    ffunc.promote_min: "minimum",
-    ffunc.promote_max: "maximum",
+    ffunc.min: "minimum",
+    ffunc.max: "maximum",
 }
 unary_ops = {
     ffunc.pos: "positive",
@@ -67,8 +67,8 @@ reduction_ops = {
     ffunc.mul: "prod",
     ffunc.and_: "all",
     ffunc.or_: "any",
-    ffunc.promote_min: "min",
-    ffunc.promote_max: "max",
+    ffunc.min: "min",
+    ffunc.max: "max",
     ffunc.logical_and: "all",
     ffunc.logical_or: "any",
 }

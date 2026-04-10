@@ -19,9 +19,10 @@ from .ftype import (
     TupleFType,
     ftype,
     promote_type,
+    FDTypeOrdered,
 )
 from .ftype import (
-    bool as finch_bool,
+    bool
 )
 
 
@@ -46,10 +47,13 @@ class CUnaryOperator(COperator):
 
 
 class NAryFinchOperator(FinchOperator):
-    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        assert isinstance(a, FDType) and isinstance(b, FDType)
-        return ftype(self(a(True), b(True)))
-
+    def return_type(self, *args) -> FType:  # type: ignore[override]
+        new_args:list[Any] = []
+        for arg in args:
+            arg_type = ftype(arg)
+            assert isinstance(arg_type, FDType)
+            new_args.append(arg_type(True))
+        return ftype(self(*new_args))
 
 class BinaryFinchOperator(FinchOperator):
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
@@ -66,7 +70,7 @@ class UnaryFinchOperator(FinchOperator):
 class ComparisonFinchOperator(FinchOperator):
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType) and isinstance(b, FDType)
-        return finch_bool
+        return bool
 
 
 class _Add(NAryFinchOperator, CNAryOperator, NumbaOperator):
@@ -83,10 +87,10 @@ class _Add(NAryFinchOperator, CNAryOperator, NumbaOperator):
     def __call__(self, *args: Any) -> Any:
         return reduce(operator.add, args)
 
-    def is_identity(self, arg: Any) -> builtinbool:
+    def is_identity(self, arg: Any) -> builtins.bool:
         return arg == 0
 
-    def is_annihilator(self, arg: Any) -> bool:
+    def is_annihilator(self, arg: Any) -> builtins.bool:
         return np.isinf(arg)
 
     def repeat_operator(self):
@@ -117,13 +121,13 @@ class _Mul(NAryFinchOperator, CNAryOperator, NumbaOperator):
     def __call__(self, *args: Any) -> Any:
         return reduce(operator.mul, args)
 
-    def is_identity(self, arg: Any) -> bool:
+    def is_identity(self, arg: Any) -> builtins.bool:
         return arg == 1
 
     def repeat_operator(self):
         return pow
 
-    def is_distributive(self, other_op: "FinchOperator") -> bool:
+    def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, (_Add, _Sub))
 
     def is_annihilator(self, val):
@@ -301,11 +305,12 @@ class _And(NAryFinchOperator, CNAryOperator):
     def is_annihilator(self, arg):
         return not bool(arg)
 
-    def is_distributive(self, other_op: "FinchOperator") -> bool:
+    def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, (_Or, _Xor))
 
     def init_value(self, type_: FType) -> Any:
-        return type_(True)
+        assert isinstance(type_, FDType)
+        return self(type_(True), type_(True))
 
 
 and_ = _And()
@@ -329,6 +334,7 @@ class _Xor(NAryFinchOperator, CNAryOperator):
         return arg == 0
 
     def init_value(self, type_: FType) -> Any:
+        assert isinstance(type_, FDType)
         return self(type_(False), type_(False))
 
 
@@ -356,12 +362,12 @@ class _Or(NAryFinchOperator, CNAryOperator):
     def is_annihilator(self, arg):
         return bool(arg)
 
-    def is_distributive(self, other_op: "FinchOperator") -> bool:
+    def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, _And)
 
     def init_value(self, type_: FType) -> Any:
-        return type_(False)
-
+        assert isinstance(type_, FDType)
+        return self(type_(False), type_(False))
 
 or_ = _Or()
 
@@ -534,7 +540,7 @@ class _Divide(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.divide(a, b)
 
-    def is_identity(self, val) -> bool:
+    def is_identity(self, val) -> builtins.bool:
         return val == 1
 
     def __repr__(self) -> str:
@@ -552,10 +558,10 @@ class _LogAddExp(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.logaddexp(a, b)
 
-    def is_identity(self, val) -> bool:
+    def is_identity(self, val) -> builtins.bool:
         return val == -np.inf
 
-    def is_annihilator(self, val) -> bool:
+    def is_annihilator(self, val) -> builtins.bool:
         return val == np.inf
 
     def init_value(self, type_: FType) -> Any:
@@ -576,13 +582,13 @@ class _LogicalAnd(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.logical_and(a, b)
 
-    def is_identity(self, val) -> bool:
-        return bool(val)
+    def is_identity(self, val) -> builtins.bool:
+        return builtins.bool(val)
 
-    def is_annihilator(self, val) -> bool:
-        return not bool(val)
+    def is_annihilator(self, val) -> builtins.bool:
+        return not builtins.bool(val)
 
-    def is_distributive(self, other_op: FinchOperator) -> bool:
+    def is_distributive(self, other_op: FinchOperator) -> builtins.bool:
         return isinstance(other_op, (_LogicalOr, _LogicalXor))
 
     def init_value(self, type_: FType) -> Any:
@@ -603,13 +609,13 @@ class _LogicalOr(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.logical_or(a, b)
 
-    def is_identity(self, val) -> bool:
-        return not bool(val)
+    def is_identity(self, val) -> builtins.bool:
+        return not builtins.bool(val)
 
-    def is_annihilator(self, val) -> bool:
-        return bool(val)
+    def is_annihilator(self, val) -> builtins.bool:
+        return builtins.bool(val)
 
-    def is_distributive(self, other_op: FinchOperator) -> bool:
+    def is_distributive(self, other_op: FinchOperator) -> builtins.bool:
         return isinstance(other_op, _LogicalAnd)
 
     def init_value(self, type_: FType) -> Any:
@@ -630,8 +636,8 @@ class _LogicalXor(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.logical_xor(a, b)
 
-    def is_identity(self, val) -> bool:
-        return not bool(val)
+    def is_identity(self, val) -> builtins.bool:
+        return not builtins.bool(val)
 
     def init_value(self, type_: FType) -> Any:
         return False
@@ -664,22 +670,25 @@ class _Truth(UnaryFinchOperator):
 
 truth = _Truth()
 
-
-class _Min(FinchOperator, NumbaOperator):
+class _Min(NAryFinchOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
 
-    def __call__(self, a, b):
-        return builtins.min(a, b)
+    def __call__(self, *args: Any) -> Any:
+        def op(a, b):
+            A = ftype(a)
+            B = ftype(b)
+            assert isinstance(A, FDType) and isinstance(B, FDType)
+            C = promote_type(A, B)
+            return C(builtins.min(a, b))
+        return reduce(op, args)
 
-    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        return ftype(builtins.min(a(True), b(True)))
-
-    def is_identity(self, val) -> bool:
+    def is_identity(self, val) -> builtins.bool:
         return val == np.inf
 
     def init_value(self, type_: FType):
+        assert isinstance(type_, FDTypeOrdered)
         return type_max(type_)
 
     def numba_name(self) -> str:
@@ -691,25 +700,27 @@ class _Min(FinchOperator, NumbaOperator):
     def __repr__(self) -> str:
         return "min"
 
-
 min = _Min()
 
-
-class _Max(FinchOperator, NumbaOperator):
+class _Max(NAryFinchOperator, NumbaOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
 
-    def __call__(self, a, b):
-        return builtins.max(a, b)
+    def __call__(self, *args: Any) -> Any:
+        def op(a, b):
+            A = ftype(a)
+            B = ftype(b)
+            assert isinstance(A, FDType) and isinstance(B, FDType)
+            C = promote_type(A, B)
+            return C(builtins.min(a, b))
+        return reduce(op, args)
 
-    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        return ftype(builtins.max(a(True), b(True)))
-
-    def is_identity(self, val) -> bool:
+    def is_identity(self, val) -> builtins.bool:
         return val == -np.inf
 
     def init_value(self, type_: FType):
+        assert isinstance(type_, FDTypeOrdered)
         return type_min(type_)
 
     def numba_name(self) -> str:
@@ -1251,60 +1262,6 @@ class _Sign(UnaryFinchOperator):
 sign = _Sign()
 
 
-class _PromoteMin(FinchOperator):
-    is_associative = True
-    is_commutative = True
-    is_idempotent = True
-
-    def __call__(self, a: Any, b: Any):
-        promoted = promote_type(
-            cast(FDType, ftype(a)),
-            cast(FDType, ftype(b)),
-        )
-        return promoted(builtins.min(a, b))
-
-    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        return promote_type(
-            cast(FDType, ftype(a)),
-            cast(FDType, ftype(b)),
-        )
-
-    def init_value(self, arg):
-        return type_max(arg)
-
-    def __repr__(self) -> str:
-        return "promote_min"
-
-
-promote_min = _PromoteMin()
-
-
-class _PromoteMax(FinchOperator):
-    is_associative = True
-    is_commutative = True
-    is_idempotent = True
-
-    def __call__(self, a: Any, b: Any):
-        promoted = promote_type(
-            cast(FDType, ftype(a)),
-            cast(FDType, ftype(b)),
-        )
-        return builtins.max(promoted(a), promoted(b))
-
-    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
-        return promote_type(
-            cast(FDType, ftype(a)),
-            cast(FDType, ftype(b)),
-        )
-
-    def init_value(self, arg):
-        return type_min(arg)
-
-    def __repr__(self) -> str:
-        return "promote_max"
-
-
-promote_max = _PromoteMax()
 
 
 class _InitWrite(FinchOperator, NumbaOperator):
@@ -1562,8 +1519,8 @@ __all__ = [
     "overwrite",
     "pos",
     "pow",
-    "promote_max",
-    "promote_min",
+    "max",
+    "min",
     "real",
     "reciprocal",
     "remainder",

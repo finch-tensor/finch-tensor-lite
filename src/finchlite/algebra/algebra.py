@@ -56,7 +56,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Hashable
 from typing import Any
 
-from .ftype import FDTypeNumeric, FType, ftype
+from .ftype import FDTypeNumeric, FDTypeOrdered, FType, ftype
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
@@ -265,7 +265,7 @@ def fixpoint_type(op: FinchOperator, z: Any, t: FType) -> FType:
     return r
 
 
-def type_min(type_: FDTypeNumeric) -> Any:
+def type_min(type_: FDTypeOrdered) -> Any:
     """
     Returns the minimum value of the given type.
 
@@ -281,7 +281,7 @@ def type_min(type_: FDTypeNumeric) -> Any:
     return type_.type_min
 
 
-def type_max(type_: FDTypeNumeric) -> Any:
+def type_max(type_: FDTypeOrdered) -> Any:
     """
     Returns the maximum value of the given type.
 

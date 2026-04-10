@@ -283,8 +283,8 @@ infix_strs = {
     ffunc.floordiv: "//",
     ffunc.mod: "%",
     ffunc.pow: "**",
-    ffunc.promote_max: "max",
-    ffunc.promote_min: "min",
+    ffunc.max: "max",
+    ffunc.min: "min",
 }
 
 
