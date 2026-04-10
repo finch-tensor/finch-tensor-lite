@@ -71,9 +71,7 @@ def galley_autoscheduler(stats_factory):
     )
 
 
-def blocked_factory(inner_factory=None):
-    if inner_factory is None:
-        inner_factory = DatabaseStatsFactory()
+def blocked_factory(inner_factory):
     factory = BlockedStatsFactory({}, inner_factory)
     factory.blocks_per_dim = defaultdict(lambda: 8)
     return factory
@@ -113,7 +111,7 @@ DATA_GENERATOR_DICT = {
         "matmul_dense_large": dg_matmul_dense_large,
         "matmul_sparse_small": dg_matmul_sparse_small,
         "matmul_sparse_large": dg_matmul_sparse_large,
-    }
+    },
 }
 
 
