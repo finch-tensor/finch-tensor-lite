@@ -60,13 +60,13 @@ class AutoschedulerFramework(AbstractFramework):
 
 def galley_autoscheduler(stats_factory):
     return LogicNormalizer(
-        GalleyLogicalOptimizer(
-            stats_factory,
-            LogicExecutor(
+        LogicExecutor(
+            GalleyLogicalOptimizer(
                 LogicStandardizer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
                 )
             ),
+            stats_factory=stats_factory,
         )
     )
 

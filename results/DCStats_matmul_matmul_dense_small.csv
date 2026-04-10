@@ -1,6 +1,6 @@
 Framework,Benchmark,Data Generator,Iteration,ExecutionTime
-DCStats,matmul,matmul_dense_small,1,8.626682833011728
-DCStats,matmul,matmul_dense_small,2,7.934740540993516
-DCStats,matmul,matmul_dense_small,3,8.09045299999707
-DCStats,matmul,matmul_dense_small,4,8.396517624991247
-DCStats,matmul,matmul_dense_small,5,8.172649082989665
+DCStats,matmul,matmul_dense_small,1,9.136221209002542
+DCStats,matmul,matmul_dense_small,2,8.692713124997681
+DCStats,matmul,matmul_dense_small,3,8.797088875013287
+DCStats,matmul,matmul_dense_small,4,6.251431832992239
+DCStats,matmul,matmul_dense_small,5,6.308169875002932
