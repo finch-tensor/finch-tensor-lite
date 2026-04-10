@@ -733,7 +733,7 @@ def test_hashtable(constructor):
                 ),
             ),
             asm.Function(
-                asm.Variable("exists", finchlite.bool_),
+                asm.Variable("exists", finchlite.bool),
                 (table_v, key_v),
                 asm.Block(
                     (

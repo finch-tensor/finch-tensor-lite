@@ -8,7 +8,6 @@ from collections import namedtuple
 from collections.abc import Hashable
 from functools import lru_cache
 from pathlib import Path
-from types import NoneType
 from typing import Any, TypedDict
 
 import numpy as np
@@ -122,6 +121,7 @@ def c_hash(fmt, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
+    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "c_hash"):
         return fmt.c_hash(ctx)
     return query_property(fmt, "c_hash", "__attr__", ctx)
@@ -141,6 +141,7 @@ def c_eq(fmt, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
+    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "c_eq"):
         return fmt.c_eq(ctx)
     return query_property(fmt, "c_eq", "__attr__", ctx)
@@ -149,6 +150,25 @@ def c_eq(fmt, ctx: "CContext"):
 def c_eq_default(fmt, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_eq"
+
+
+def _normalize_fmt(fmt):
+    # Keep ctypes types untouched; use Finch ftypes for builtins/NumPy inputs.
+    if isinstance(fmt, type):
+        if issubclass(fmt, ctypes._SimpleCData):
+            return fmt
+        if issubclass(fmt, ctypes._Pointer):
+            return fmt
+        if issubclass(fmt, ctypes._CFuncPtr):
+            return fmt
+        if issubclass(fmt, ctypes.Structure):
+            return fmt
+        if issubclass(fmt, ctypes.Union):
+            return fmt
+    try:
+        return ftype(fmt)
+    except NotImplementedError:
+        return fmt
 
 
 def serialize_to_c(fmt, obj):
@@ -162,6 +182,7 @@ def serialize_to_c(fmt, obj):
     Returns:
         A ctypes-compatible struct.
     """
+    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "serialize_to_c"):
         return fmt.serialize_to_c(obj)
     return query_property(fmt, "serialize_to_c", "__attr__", obj)
@@ -179,6 +200,7 @@ def deserialize_from_c(fmt, obj, c_obj):
     Returns:
         None
     """
+    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "deserialize_from_c"):
         fmt.deserialize_from_c(obj, c_obj)
     else:
@@ -199,6 +221,7 @@ def construct_from_c(fmt, c_obj):
     Returns:
         An instance of the original object type.
     """
+    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "construct_from_c"):
         return fmt.construct_from_c(c_obj)
     try:
@@ -206,21 +229,6 @@ def construct_from_c(fmt, c_obj):
     except AttributeError:
         return fmt(c_obj)
 
-
-register_property(
-    tuple,
-    "serialize_to_c",
-    "__attr__",
-    lambda c_obj: None,
-)
-
-
-register_property(
-    NoneType,
-    "construct_from_c",
-    "__attr__",
-    lambda c_obj: None,
-)
 
 for t in (
     ctypes.c_bool,
@@ -281,21 +289,21 @@ for t in (
 
 
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "serialize_to_c",
     "__attr__",
     lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
 )
 
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "c_hash",
     "__attr__",
     c_hash_default,
 )
 
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "c_eq",
     "__attr__",
     c_eq_default,
@@ -303,19 +311,22 @@ register_property(
 
 # pass by value -> no op
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "deserialize_from_c",
     "__attr__",
     lambda fmt, obj, c_value: None,
 )
 
 register_property(
-    np.generic, "construct_from_c", "__attr__", lambda fmt, c_value: fmt(c_value.value)
+    algebra.ftypes.FDTypeNumpy,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, c_value: fmt(c_value.value),
 )
 
 # deserialize_to_c should modify in place. TODO: implement
 
-for typ in (int, float):
+for typ in (algebra.int_, algebra.float_):
     register_property(
         typ,
         "c_hash",
@@ -492,17 +503,21 @@ def c_literal(ctx, val):
     """
     if hasattr(val, "c_literal"):
         return val.c_literal(ctx)
-    return query_property(val, "c_literal", "__attr__", ctx)
+    try:
+        fmt = ftype(val)
+    except NotImplementedError:
+        return query_property(val, "c_literal", "__attr__", ctx)
+    return query_property(fmt, "c_literal", "__attr__", val, ctx)
 
 
-register_property(int, "c_literal", "__attr__", lambda x, ctx: str(x))
-register_property(float, "c_literal", "__attr__", lambda x, ctx: str(x))
-register_property(str, "c_literal", "__attr__", lambda x, ctx: f'"{x}"')
+register_property(algebra.int_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
+register_property(algebra.float_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
+register_property(algebra.str_, "c_literal", "__attr__", lambda fmt, x, ctx: f'"{x}"')
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "c_literal",
     "__attr__",
-    lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
+    lambda fmt, x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
 )
 for t in (
     ctypes.c_bool,
@@ -542,6 +557,9 @@ def c_type(t):
     Returns:
         The corresponding C type as a ctypes type.
     """
+    t = _normalize_fmt(t)
+    if t is type(None):
+        return None
     if hasattr(t, "c_type"):
         return t.c_type()
     return query_property(t, "c_type", "__attr__")
@@ -554,7 +572,6 @@ register_property(
     algebra.ftypes.FDTypeNumpy, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
 )
 register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
-register_property(type(None), "c_type", "__attr__", lambda x: None)
 
 # ints and floats should be serialized and constructed trivially.
 register_property(algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))

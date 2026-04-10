@@ -1,3 +1,4 @@
+# AI modified: 2026-04-10T21:26:00Z 9e1552f1
 import logging
 from abc import ABC, abstractmethod
 from textwrap import dedent
@@ -7,6 +8,7 @@ import numpy as np
 
 import numba
 
+from .. import algebra
 from .. import finch_assembly as asm
 from ..algebra import (
     ImmutableStructFType,
@@ -35,6 +37,13 @@ numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
 
 
+def _normalize_fmt(fmt):
+    try:
+        return ftype(fmt)
+    except NotImplementedError:
+        return fmt
+
+
 def numba_type(t):
     """
     Returns the Numba type/ftype after serialization.
@@ -45,6 +54,7 @@ def numba_type(t):
     Returns:
         The corresponding Numba type.
     """
+    t = _normalize_fmt(t)
     if hasattr(t, "numba_type"):
         return t.numba_type()
     try:
@@ -63,16 +73,17 @@ def numba_jitclass_type(t):
     Returns:
         The corresponding Numba jitclass spec type.
     """
+    t = _normalize_fmt(t)
     if hasattr(t, "numba_jitclass_type"):
         return t.numba_jitclass_type()
     return query_property(t, "numba_jitclass_type", "__attr__")
 
 
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "numba_type",
     "__attr__",
-    lambda t: numba.from_dtype(t),
+    lambda t: numba.from_dtype(t.dtype),
 )
 
 
@@ -160,21 +171,21 @@ def assembly_struct_numba_jitclass_type(ftype_) -> numba.types.Type:
 
 
 register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "numba_jitclass_type",
     "__attr__",
-    lambda t: numba.from_dtype(t),
+    lambda t: numba.from_dtype(t.dtype),
 )
 
 register_property(
-    int,
+    algebra.int_,
     "numba_jitclass_type",
     "__attr__",
     lambda t: numba.int32,
 )
 
 register_property(
-    float,
+    algebra.float_,
     "numba_jitclass_type",
     "__attr__",
     lambda t: numba.float64,
@@ -223,20 +234,16 @@ def serialize_to_numba(fmt, obj):
     Returns:
         A Numba-compatible object.
     """
+    fmt = _normalize_fmt(fmt)
+    if fmt is type(None):
+        return None
     if hasattr(fmt, "serialize_to_numba"):
         return fmt.serialize_to_numba(obj)
     return query_property(fmt, "serialize_to_numba", "__attr__", obj)
 
 
 register_property(
-    type(None),
-    "serialize_to_numba",
-    "__attr__",
-    lambda fmt, numba_obj: None,
-)
-
-register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "serialize_to_numba",
     "__attr__",
     lambda fmt, numba_obj: numba_obj,
@@ -297,6 +304,9 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     Returns:
         None
     """
+    fmt = _normalize_fmt(fmt)
+    if fmt is type(None):
+        return None
     if hasattr(fmt, "deserialize_from_numba"):
         fmt.deserialize_from_numba(obj, numba_obj)
     else:
@@ -307,14 +317,7 @@ def deserialize_from_numba(fmt, obj, numba_obj):
 
 
 register_property(
-    type(None),
-    "deserialize_from_numba",
-    "__attr__",
-    lambda fmt, obj, numba_obj: None,
-)
-
-register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "deserialize_from_numba",
     "__attr__",
     lambda fmt, obj, numba_obj: None,
@@ -332,6 +335,9 @@ def construct_from_numba(fmt, numba_obj):
     Returns:
         An instance of the original object type.
     """
+    fmt = _normalize_fmt(fmt)
+    if fmt is type(None):
+        return None
     if hasattr(fmt, "construct_from_numba"):
         return fmt.construct_from_numba(numba_obj)
     try:
@@ -341,14 +347,7 @@ def construct_from_numba(fmt, numba_obj):
 
 
 register_property(
-    type(None),
-    "construct_from_numba",
-    "__attr__",
-    lambda fmt, numba_obj: None,
-)
-
-register_property(
-    np.generic,
+    algebra.ftypes.FDTypeNumpy,
     "construct_from_numba",
     "__attr__",
     lambda fmt, numba_obj: fmt(numba_obj),
@@ -905,21 +904,8 @@ register_property(
 )
 
 
-def serialize_tuple_to_numba(fmt, obj):
-    if not isinstance(fmt, StructFType):
-        fmt = ftype(fmt)
-    return numba_type(fmt)(obj)
-
-
-register_property(
-    tuple,
-    "serialize_to_numba",
-    "__attr__",
-    serialize_tuple_to_numba,
-)
-
 # trivial ser/deser
-for t in (int, bool, float):
+for t in (algebra.int_, algebra.bool_, algebra.float_):
     register_property(
         t,
         "construct_from_numba",
