@@ -28,7 +28,7 @@ def test_var_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("y", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Variable("x", finchlite.float64))
+        checker(asm.Variable("x", finchlite.float32))
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("x", 42))
 
@@ -48,11 +48,11 @@ def test_slot_basic():
 
 def test_getattr_basic():
     checker = asm.AssemblyTypeChecker()
-    p = (1, "one")
+    p = (np.int64(1), np.float64(1.0))
     p_var = asm.Variable("p", ftype(p))
     checker.ctxt["p"] = ftype(p)
-    assert checker(asm.GetAttr(p_var, asm.Literal("element_0"))) is int
-    assert checker(asm.GetAttr(p_var, asm.Literal("element_1"))) is str
+    assert checker(asm.GetAttr(p_var, asm.Literal("element_0"))) is finchlite.int64
+    assert checker(asm.GetAttr(p_var, asm.Literal("element_1"))) is finchlite.float64
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.GetAttr(p_var, asm.Literal("element_3")))
     with pytest.raises(asm.AssemblyTypeError):
