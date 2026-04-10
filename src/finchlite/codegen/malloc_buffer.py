@@ -261,14 +261,14 @@ class MallocBufferFType(CBufferFType, CStackFType):
         """
         Returns the type used for the length of the buffer.
         """
-        return np.intp
+        return ftype(np.intp)
 
     @property
     def element_type(self):
         """
         Returns the type of elements stored in the buffer. This will be a ctypes array.
         """
-        return self._dtype
+        return ftype(self._dtype)
 
     def __hash__(self):
         return hash(("MallocBufferFType", self._dtype))
