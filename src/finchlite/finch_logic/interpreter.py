@@ -7,7 +7,8 @@ import finchlite
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
-from ..algebra import fisinstance, fixpoint_type, return_type
+from ..algebra import fisinstance, fixpoint_type, ftype, return_type
+from ..algebra.ftype import FDTypeBuiltin, FDTypeNumpy
 from ..util.logging import LOG_LOGIC_PRE_OPT
 from . import nodes as lgc
 from .nodes import (

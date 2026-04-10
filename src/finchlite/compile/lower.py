@@ -1,13 +1,14 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, cast, overload
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import FTyped, StructFType, TensorFType, ffunc, register_property
+from ..algebra import FType, FTyped, StructFType, TensorFType, ffunc, register_property
+from ..algebra.ftype import FDTypeBuiltin, FDTypeNumpy
 from ..algebra.algebra import FinchOperator
 from ..finch_assembly import (
     AssemblyInterpreter,
@@ -103,8 +104,16 @@ class _MakeExtent(FinchOperator):
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)
 
-    def return_type(self, start: Any, end: Any):
-        return ExtentFType(start, end)  # type: ignore[abstract]
+    def return_type(self, start: FType, end: FType) -> FType:  # type: ignore[override]
+        if isinstance(start, FDTypeNumpy):
+            start = start.dtype
+        elif isinstance(start, FDTypeBuiltin):
+            start = start.type
+        if isinstance(end, FDTypeNumpy):
+            end = end.dtype
+        elif isinstance(end, FDTypeBuiltin):
+            end = end.type
+        return ExtentFType(cast(type, start), cast(type, end))  # type: ignore[abstract]
 
 
 make_extent = _MakeExtent()

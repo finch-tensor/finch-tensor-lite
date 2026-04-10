@@ -13,7 +13,16 @@ from .algebra import (
     type_max,
     type_min,
 )
-from .ftype import FDType, TupleFType, ftype, promote_type
+from .ftype import (
+    FDType,
+    FDTypeBuiltin,
+    FDTypeNumpy,
+    FType,
+    TupleFType,
+    bool as finch_bool,
+    ftype,
+    promote_type,
+)
 
 
 class CNAryOperator(COperator):
@@ -37,18 +46,18 @@ class CNUnaryOperator(COperator):
 
 
 class ReflexiveFinchOperator(FinchOperator):
-    def return_type(self, a: Any, b: Any) -> type:
-        return type(self(a(True), b(True)))
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
+        return ftype(self(a(True), b(True)))
 
 
 class UnaryFinchOperator(FinchOperator):
-    def return_type(self, a: Any) -> type:
-        return type(self(a(True)))
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return ftype(self(a(True)))
 
 
 class ComparisonFinchOperator(FinchOperator):
-    def return_type(self, a: Any, b: Any) -> type:
-        return bool
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
+        return finch_bool
 
 
 class _Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
@@ -74,7 +83,7 @@ class _Add(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     def repeat_operator(self):
         return mul
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return type_(0)
 
     def numba_name(self) -> str:
@@ -110,7 +119,7 @@ class _Mul(ReflexiveFinchOperator, CNAryOperator, NumbaOperator):
     def is_annihilator(self, val):
         return val == 0
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return type_(1)
 
     def numba_name(self) -> str:
@@ -295,7 +304,7 @@ class _And(ReflexiveFinchOperator, CNAryOperator):
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, (_Or, _Xor))
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return type_(True)
 
 
@@ -319,7 +328,7 @@ class _Xor(ReflexiveFinchOperator, CNAryOperator):
     def is_identity(self, arg):
         return arg == 0
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return type_(False)
 
 
@@ -350,7 +359,7 @@ class _Or(ReflexiveFinchOperator, CNAryOperator):
     def is_distributive(self, other_op: "FinchOperator") -> bool:
         return isinstance(other_op, _And)
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return type_(False)
 
 
@@ -522,34 +531,37 @@ le = _Le()
 
 
 class BinaryFloatOperator(FinchOperator):
-    def return_type(self, a: Any, b: Any) -> type:
-        return float
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
+        return ftype(float)
 
 
 class UnaryOperator(FinchOperator):
-    def return_type(self, a: Any) -> type:
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
         # TODO: Temporary implementation
-        if a is np.float16:
+        a = ftype(a)
+        if a == ftype(np.float16):
             return a
-        if a is np.float32:
+        if a == ftype(np.float32):
             return a
-        if np.can_cast(a, np.float64):
-            return np.float64
-        if a is np.complex64:
+        if a == ftype(np.complex64):
             return a
-        if a is np.complex128:
+        if a == ftype(np.complex128):
             return a
+        if isinstance(a, FDTypeNumpy) and np.can_cast(a.dtype, np.float64):
+            return ftype(np.float64)
+        if isinstance(a, FDTypeBuiltin) and np.can_cast(a.type, np.float64):
+            return ftype(np.float64)
         raise TypeError(f"Unsupported operand type for {self}: {a}")
 
 
 class UnaryBoolOperator(FinchOperator):
-    def return_type(self, a: Any) -> type:
-        return bool
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return finch_bool
 
 
 class BinaryBoolOperator(FinchOperator):
-    def return_type(self, a: Any, b: Any) -> type:
-        return bool
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
+        return finch_bool
 
 
 class LogicalBinaryOperator(BinaryBoolOperator):
@@ -585,7 +597,7 @@ class _LogAddExp(BinaryFloatOperator):
     def is_annihilator(self, val) -> bool:
         return val == np.inf
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return -np.inf
 
     def __repr__(self) -> str:
@@ -610,7 +622,7 @@ class _LogicalAnd(LogicalBinaryOperator):
     def is_distributive(self, other_op: FinchOperator) -> bool:
         return isinstance(other_op, (_LogicalOr, _LogicalXor))
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return True
 
     def __repr__(self) -> str:
@@ -635,7 +647,7 @@ class _LogicalOr(LogicalBinaryOperator):
     def is_distributive(self, other_op: FinchOperator) -> bool:
         return isinstance(other_op, _LogicalAnd)
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return False
 
     def __repr__(self) -> str:
@@ -654,7 +666,7 @@ class _LogicalXor(LogicalBinaryOperator):
     def is_identity(self, val) -> bool:
         return not bool(val)
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         return False
 
     def __repr__(self) -> str:
@@ -694,13 +706,13 @@ class _Min(FinchOperator, NumbaOperator):
     def __call__(self, a, b):
         return builtins.min(a, b)
 
-    def return_type(self, a: Any, b: Any) -> type:
-        return type(builtins.min(a(True), b(True)))
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
+        return ftype(builtins.min(a(True), b(True)))
 
     def is_identity(self, val) -> bool:
         return val == np.inf
 
-    def init_value(self, type_: type):
+    def init_value(self, type_: FType):
         return type_max(type_)
 
     def numba_name(self) -> str:
@@ -724,13 +736,13 @@ class _Max(FinchOperator, NumbaOperator):
     def __call__(self, a, b):
         return builtins.max(a, b)
 
-    def return_type(self, a: Any, b: Any) -> type:
-        return type(builtins.max(a(True), b(True)))
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
+        return ftype(builtins.max(a(True), b(True)))
 
     def is_identity(self, val) -> bool:
         return val == -np.inf
 
-    def init_value(self, type_: type):
+    def init_value(self, type_: FType):
         return type_min(type_)
 
     def numba_name(self) -> str:
@@ -851,8 +863,8 @@ class _Real(UnaryOperator):
     def __call__(self, a):
         return np.real(a)
 
-    def return_type(self, a: Any) -> type:
-        return float
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return ftype(float)
 
     def __repr__(self) -> str:
         return "real"
@@ -865,8 +877,8 @@ class _Imag(UnaryOperator):
     def __call__(self, a: Any):
         return np.imag(a)
 
-    def return_type(self, a: Any) -> type:
-        return float
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return ftype(float)
 
     def __repr__(self) -> str:
         return "imag"
@@ -879,8 +891,8 @@ class _Clip(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
         return np.clip(a, b, c)
 
-    def return_type(self, a: Any, b: Any, c: Any) -> type:
-        return float
+    def return_type(self, a: FType, b: FType, c: FType) -> FType:  # type: ignore[override]
+        return ftype(float)
 
     def __repr__(self) -> str:
         return "clip"
@@ -1284,7 +1296,7 @@ class _PromoteMin(FinchOperator):
         )
         return promoted(builtins.min(a, b))
 
-    def return_type(self, a: Any, b: Any) -> type:
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         return promote_type(
             cast(FDType, ftype(a)),
             cast(FDType, ftype(b)),
@@ -1312,7 +1324,7 @@ class _PromoteMax(FinchOperator):
         )
         return builtins.max(promoted(a), promoted(b))
 
-    def return_type(self, a: Any, b: Any) -> type:
+    def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         return promote_type(
             cast(FDType, ftype(a)),
             cast(FDType, ftype(b)),
@@ -1349,7 +1361,7 @@ class _InitWrite(FinchOperator, NumbaOperator):
         assert x == self.value, f"Expected {self.value}, got {x}"
         return y
 
-    def return_type(self, x: Any, y: Any) -> type:
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         return y
 
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
@@ -1371,7 +1383,7 @@ class _Overwrite(FinchOperator):
     def __call__(self, x: Any, y: Any):
         return y
 
-    def return_type(self, x: Any, y: Any) -> type:
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         return y
 
     def __repr__(self) -> str:
@@ -1389,7 +1401,7 @@ class _FirstArg(FinchOperator):
     def __call__(self, *args):
         return args[0] if args else None
 
-    def return_type(self, *args) -> type:
+    def return_type(self, *args: FType) -> FType:
         return args[0]
 
     def __repr__(self) -> str:
@@ -1409,7 +1421,7 @@ class _Identity(FinchOperator):
     def __call__(self, x: Any):
         return x
 
-    def return_type(self, x: Any) -> type:
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
         return x
 
     def __repr__(self) -> str:
@@ -1427,7 +1439,7 @@ class _Conjugate(FinchOperator):
     def __call__(self, x: Any):
         return np.conjugate(x)
 
-    def return_type(self, x: Any) -> type:
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
         return x
 
     def __repr__(self) -> str:
@@ -1444,7 +1456,7 @@ class _MakeTuple(FinchOperator, NumbaOperator):
     def __call__(self, *args: Any) -> tuple:
         return tuple(args)
 
-    def return_type(self, *args: Any) -> Any:
+    def return_type(self, *args: FType) -> FType:
         return TupleFType.from_tuple(args)
 
     def numba_literal(self, val: Any, ctx: Any, *args: Any):
@@ -1495,7 +1507,7 @@ class _Scansearch(FinchOperator, NumbaOperator):
     def __call__(self, *args, **kwargs):
         return self._func(*args, **kwargs)
 
-    def return_type(self, arr, x, lo, hi) -> type:
+    def return_type(self, arr: FType, x: FType, lo: FType, hi: FType) -> FType:  # type: ignore[override]
         return hi
 
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
