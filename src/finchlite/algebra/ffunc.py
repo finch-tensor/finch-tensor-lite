@@ -83,7 +83,7 @@ class _Add(NAryFinchOperator, CNAryOperator, NumbaOperator):
     def __call__(self, *args: Any) -> Any:
         return reduce(operator.add, args)
 
-    def is_identity(self, arg: Any) -> bool:
+    def is_identity(self, arg: Any) -> builtinbool:
         return arg == 0
 
     def is_annihilator(self, arg: Any) -> bool:
@@ -93,7 +93,8 @@ class _Add(NAryFinchOperator, CNAryOperator, NumbaOperator):
         return mul
 
     def init_value(self, type_: FType) -> Any:
-        return type_(0)
+        assert isinstance(type_, FDType)
+        return self(type_(0), type_(0))
 
     def numba_name(self) -> str:
         return "+"
@@ -129,7 +130,8 @@ class _Mul(NAryFinchOperator, CNAryOperator, NumbaOperator):
         return val == 0
 
     def init_value(self, type_: FType) -> Any:
-        return type_(1)
+        assert isinstance(type_, FDType)
+        return self(type_(1), type_(1))
 
     def numba_name(self) -> str:
         return "*"
@@ -156,17 +158,6 @@ class _Sub(BinaryFinchOperator, CBinaryOperator, NumbaOperator):
 sub = _Sub()
 
 
-class _MatMul(BinaryFinchOperator, COperator):
-    is_associative = True
-
-    def __repr__(self) -> str:
-        return "matmul"
-
-    def __call__(self, a: Any, b: Any):
-        return operator.matmul(a, b)
-
-
-matmul = _MatMul()
 
 
 class _TrueDiv(BinaryFinchOperator, CBinaryOperator):
@@ -338,7 +329,7 @@ class _Xor(NAryFinchOperator, CNAryOperator):
         return arg == 0
 
     def init_value(self, type_: FType) -> Any:
-        return type_(False)
+        return self(type_(False), type_(False))
 
 
 xor = _Xor()
