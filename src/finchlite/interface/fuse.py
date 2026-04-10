@@ -142,7 +142,7 @@ def set_default_scheduler(
         _DEFAULT_SCHEDULER.value = ctx
 
 
-set_default_scheduler(ctx=INTERPRET_NOTATION_GALLEY)
+set_default_scheduler()
 
 
 def get_default_scheduler():

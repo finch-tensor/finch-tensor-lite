@@ -174,6 +174,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         axes_mapping = [
             old_order.index(idx) for idx in reorder_indices if idx in old_order
         ]
+
         new_blocks = np.transpose(stats.blocks, axes=axes_mapping)
 
         if len(reorder_indices) > len(old_order):
