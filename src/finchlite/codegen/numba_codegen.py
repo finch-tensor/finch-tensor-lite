@@ -44,6 +44,19 @@ def _normalize_fmt(fmt):
         return fmt
 
 
+def to_numpy_type(t: Any) -> np.dtype:
+    """Return a NumPy dtype for a Finch scalar/data type."""
+    if isinstance(t, np.dtype):
+        return t
+
+    t = _normalize_fmt(t)
+    if isinstance(t, algebra.ftypes.FDTypeNumpy):
+        return np.dtype(t.dtype)
+    if isinstance(t, algebra.ftypes.FDTypeBuiltin):
+        return np.dtype(t.type)
+    return np.dtype(t)
+
+
 def numba_type(t):
     """
     Returns the Numba type/ftype after serialization.

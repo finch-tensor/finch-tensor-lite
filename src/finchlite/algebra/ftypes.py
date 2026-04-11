@@ -661,6 +661,10 @@ class TupleFType(ImmutableStructFType):
     @staticmethod
     @lru_cache
     def from_tuple(types: tuple[FType, ...]) -> "TupleFType":
+        if not isinstance(types, tuple):
+            raise TypeError("TupleFType.from_tuple expects tuple[FType, ...]")
+        if not all(isinstance(type_, FType) for type_ in types):
+            raise TypeError("TupleFType.from_tuple expects tuple[FType, ...]")
         return TupleFType(types)
 
 

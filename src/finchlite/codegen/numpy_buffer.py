@@ -11,7 +11,7 @@ from ..algebra import ftype
 from ..finch_assembly import Buffer
 from ..util import qual_str
 from .c_codegen import CBufferFType, CContext, CStackFType, c_type
-from .numba_codegen import NumbaBufferFType
+from .numba_codegen import NumbaBufferFType, to_numpy_type
 
 
 class NumbaBufferFields(NamedTuple):
@@ -90,8 +90,8 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     of the BufferFType class.
     """
 
-    def __init__(self, dtype: type):
-        self._dtype = np.dtype(dtype).type
+    def __init__(self, element_type: FType):
+        self._dtype = to_numpy_type(element_type).type
 
     def __eq__(self, other):
         if not isinstance(other, NumpyBufferFType):
@@ -122,9 +122,11 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     def __hash__(self):
         return hash(self._dtype)
 
-    def __call__(self, len: int = 0, dtype: type | None = None):
-        if dtype is None:
+    def __call__(self, len: int = 0, element_type: FType | None = None):
+        if element_type is None:
             dtype = self._dtype
+        else:
+            dtype = to_numpy_type(element_type)
         return NumpyBuffer(np.zeros(len, dtype=dtype))
 
     def c_type(self):
@@ -217,7 +219,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
 
     def numba_jitclass_type(self) -> numba.types.Type:
         return numba.types.ListType(
-            numba.types.Array(numba.from_dtype(self.element_type), 1, "C")
+            numba.types.Array(numba.from_dtype(self._dtype), 1, "C")
         )
 
     def numba_length(self, ctx, buf):

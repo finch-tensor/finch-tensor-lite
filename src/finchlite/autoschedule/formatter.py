@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 
 from .. import finch_logic as lgc
-from ..algebra import TensorFType, TupleFType
+from ..algebra import TensorFType, TupleFType, ftype, FType, ftypes
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import AssemblyLibrary
@@ -94,11 +94,9 @@ class DefaultLogicFormatter(LogicFormatter):
     ):
         super().__init__(loader)
 
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
+    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
         return BufferizedNDArrayFType(
             buffer_type=NumpyBufferFType(type(fill_value)),
             ndim=len(shape_type),
-            dimension_type=TupleFType(
-                struct_types=shape_type,
-            ),
+            dimension_type=TupleFType.from_tuple(shape_type))
         )

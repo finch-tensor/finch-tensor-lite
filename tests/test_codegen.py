@@ -12,7 +12,7 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite.algebra import TupleFType
+from finchlite.algebra import TupleFType, ftypes
 from finchlite import dense, element, ffuncs, fiber_tensor, ftype
 from finchlite.codegen import (
     CCompiler,
@@ -927,7 +927,7 @@ def test_np_numba_serialization(value, np_type):
         lambda dtype: BufferizedNDArrayFType(
             buffer_type=NumpyBufferFType(dtype),
             ndim=2,
-            dimension_type=(np.intp, np.intp),
+            dimension_type=(ftypes.intp, ftypes.intp),
         ),
         lambda dtype: fiber_tensor(
             dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
@@ -980,8 +980,8 @@ def test_e2e_numba(fmt_fn, dtype):
 )
 def test_hashtable(compiler, constructor):
     table = constructor(
-        TupleFType.from_tuple((int, int)),
-        TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((ftypes.int_, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.int_, ftypes.int_, ftypes.int_)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -1061,7 +1061,7 @@ def test_multiple_hashtable(compiler, tabletype):
     """
 
     def _int_tupletype(arity):
-        return TupleFType.from_tuple(tuple(int for _ in range(arity)))
+        return TupleFType.from_tuple(tuple(ftypes.int_ for _ in range(arity)))
 
     def func(table, num: int):
         key_type = table.ftype.key_type
@@ -1090,15 +1090,15 @@ def test_multiple_hashtable(compiler, tabletype):
     table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
     table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
     table3 = tabletype(
-        TupleFType.from_tuple((float, int)),
-        TupleFType.from_tuple((float, float)),
+        TupleFType.from_tuple((ftypes.float64, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.float64, ftypes.float64)),
     )
     table4 = tabletype(
-        TupleFType.from_tuple((float, TupleFType.from_tuple((int, float)))),
-        TupleFType.from_tuple((float, float)),
+        TupleFType.from_tuple((ftypes.float64, TupleFType.from_tuple((ftypes.int_, ftypes.float64)))),
+        TupleFType.from_tuple((ftypes.float64, ftypes.float64)),
     )
-    nestedtype = TupleFType.from_tuple((int, float))
-    table5 = tabletype(int, int)
+    nestedtype = TupleFType.from_tuple((ftypes.int_, ftypes.float64))
+    table5 = tabletype(ftypes.int_, ftypes.int_)
 
     mod = compiler(
         asm.Module(

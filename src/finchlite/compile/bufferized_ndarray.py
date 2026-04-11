@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
+from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
@@ -187,7 +187,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         *,
         buffer_type: NumpyBufferFType,
         ndim: int,
-        dimension_type: TupleFType | tuple[type, ...],
+        dimension_type: TupleFType | tuple[FType, ...],
     ):
         if not isinstance(dimension_type, TupleFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
