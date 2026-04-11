@@ -8,6 +8,7 @@ from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
+from ..codegen.numba_codegen import to_numpy_type
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
 
@@ -206,7 +207,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self,
         shape: tuple[int, ...],
     ) -> BufferizedNDArray:
-        arr = np.zeros(shape, dtype=self.element_type)
+        arr = np.zeros(shape, dtype=to_numpy_type(self.element_type))
         return self.from_numpy(arr)
 
     def __eq__(self, other):
@@ -233,7 +234,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     @property
     def fill_value(self) -> Any:
-        return np.zeros((), dtype=self.buf_t.element_type)[()]
+        return np.zeros((), dtype=to_numpy_type(self.buf_t.element_type))[()]
 
     @property
     def element_type(self):

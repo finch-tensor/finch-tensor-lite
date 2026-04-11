@@ -68,6 +68,10 @@ def numba_type(t):
         The corresponding Numba type.
     """
     t = _normalize_fmt(t)
+    if isinstance(t, algebra.ftypes.FDTypeNumpy):
+        return numba.from_dtype(t.dtype)
+    if isinstance(t, algebra.ftypes.FDTypeBuiltin):
+        return t.type
     if hasattr(t, "numba_type"):
         return t.numba_type()
     try:
@@ -593,10 +597,14 @@ class NumbaContext(Context):
 
     @staticmethod
     def full_name(val: Any) -> str:
+        if isinstance(val, algebra.ftypes.FType):
+            val = numba_type(val)
         if hasattr(val, "numba_name"):
             return val.numba_name()
         if hasattr(val, "name"):
             return val.name
+        if not hasattr(val, "__module__") or not hasattr(val, "__name__"):
+            return str(val)
         return f"{val.__module__}.{val.__name__}"
 
     def __call__(self, prgm: asm.AssemblyNode):

@@ -204,7 +204,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         return DenseLevel(lvl=lvl, dimension=dimension)
 
 
-def dense(lvl, dimension_type=None):
+def dense(lvl, dimension_type=ftypes.intp):
     return DenseLevelFType(lvl, dimension_type=dimension_type)
 
 
