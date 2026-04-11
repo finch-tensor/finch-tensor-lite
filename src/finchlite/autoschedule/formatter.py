@@ -26,7 +26,7 @@ class LogicFormatter(LogicLoader):
         self.loader = loader
 
     @abstractmethod
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
+    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.

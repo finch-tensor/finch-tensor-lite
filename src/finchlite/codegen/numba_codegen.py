@@ -631,10 +631,13 @@ class NumbaContext(Context):
                 return None
             case asm.GetAttr(obj, attr):
                 obj_code = self(obj)
-                if not obj.result_type.struct_hasattr(attr.val):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not obj_t.struct_hasattr(attr.val):
                     raise ValueError(f"trying to get missing attr: {attr}")
                 return query_property(
-                    obj.result_type,
+                    obj_t,
                     "numba_getattr",
                     "__attr__",
                     self,
@@ -643,14 +646,17 @@ class NumbaContext(Context):
                 )
             case asm.SetAttr(obj, attr, val):
                 obj_code = self(obj)
-                if not fisinstance(val, obj.result_type.struct_attrtype(attr.val)):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_type} != "
-                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                        f"{obj_t.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
                 query_property(
-                    obj.result_type,
+                    obj_t,
                     "numba_setattr",
                     "__attr__",
                     self,
@@ -694,27 +700,48 @@ class NumbaContext(Context):
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
-                return buf.result_type.numba_load(self, buf, idx)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, NumbaBufferFType):
+                    raise TypeError(f"Expected numba buffer type, got: {buf_t}")
+                return buf_t.numba_load(self, buf, idx)
             case asm.Store(buf, idx, val):
                 buf = self.resolve(buf)
-                buf.result_type.numba_store(self, buf, idx, val)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, NumbaBufferFType):
+                    raise TypeError(f"Expected numba buffer type, got: {buf_t}")
+                buf_t.numba_store(self, buf, idx, val)
                 return None
             case asm.Resize(buf, size):
                 buf = self.resolve(buf)
-                buf.result_type.numba_resize(self, buf, size)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, NumbaBufferFType):
+                    raise TypeError(f"Expected numba buffer type, got: {buf_t}")
+                buf_t.numba_resize(self, buf, size)
                 return None
             case asm.Length(buf):
                 buf = self.resolve(buf)
-                return buf.result_type.numba_length(self, buf)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, NumbaBufferFType):
+                    raise TypeError(f"Expected numba buffer type, got: {buf_t}")
+                return buf_t.numba_length(self, buf)
             case asm.LoadDict(dct, idx):
                 dct = self.resolve(dct)
-                return dct.result_type.numba_loaddict(self, dct, idx)
+                dct_t = dct.result_type
+                if not isinstance(dct_t, NumbaDictFType):
+                    raise TypeError(f"Expected numba dict type, got: {dct_t}")
+                return dct_t.numba_loaddict(self, dct, idx)
             case asm.ExistsDict(dct, idx):
                 dct = self.resolve(dct)
-                return dct.result_type.numba_existsdict(self, dct, idx)
+                dct_t = dct.result_type
+                if not isinstance(dct_t, NumbaDictFType):
+                    raise TypeError(f"Expected numba dict type, got: {dct_t}")
+                return dct_t.numba_existsdict(self, dct, idx)
             case asm.StoreDict(dct, idx, val):
                 dct = self.resolve(dct)
-                return dct.result_type.numba_storedict(self, dct, idx, val)
+                dct_t = dct.result_type
+                if not isinstance(dct_t, NumbaDictFType):
+                    raise TypeError(f"Expected numba dict type, got: {dct_t}")
+                return dct_t.numba_storedict(self, dct, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 if bodies == ():

@@ -22,13 +22,13 @@ class TensorFType(FType, ABC):
 
     @property
     @abstractmethod
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         ...
 
     @property
     @abstractmethod
-    def shape_type(self) -> tuple[type, ...]:
+    def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
         should be an actual tuple, rather than a tuple type, so that it can hold
@@ -81,7 +81,7 @@ class Tensor(FTyped, ABC):
         return self.ftype.fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         """The element type of the tensor.  The element type is the scalar type of
         the elements in a tensor, which may be different from the data type of the
         tensor.
@@ -89,7 +89,7 @@ class Tensor(FTyped, ABC):
         return self.ftype.element_type
 
     @property
-    def shape_type(self) -> tuple:
+    def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
         should be an actual tuple, rather than a tupleftype, so that it can hold

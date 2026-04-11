@@ -40,11 +40,11 @@ def merge_dim(d1, d2):
     return d1 or d2
 
 
-def merge_element_type(op, *args):
+def merge_element_type(op, *args: FType) -> FType:
     return return_type(op, *args)
 
 
-def reduce_element_type(op, z, t):
+def reduce_element_type(op, z: Any, t: FType) -> FType:
     return fixpoint_type(op, z, t)
 
 
@@ -193,8 +193,8 @@ class LogicExpression(LogicNode):
 
     def shape_type(
         self,
-        dim_bindings: dict[Alias, tuple[Any, ...]],
-    ) -> tuple[Any, ...]:
+        dim_bindings: dict[Alias, tuple[FType, ...]],
+    ) -> tuple[FType, ...]:
         """Returns the shape type of the node."""
         return self.dimmap(merge_dim_type, dim_bindings)
 
@@ -206,8 +206,8 @@ class LogicExpression(LogicNode):
         return self.dimmap(merge_dim, dim_bindings)
 
     def element_type(
-        self, bindings: dict[Alias, Any]
-    ) -> Any:  # In the future should be FType
+        self, bindings: dict[Alias, FType]
+    ) -> FType:
         """Returns element type of the node."""
         return self.valmap(merge_element_type, reduce_element_type, bindings)
 
@@ -249,8 +249,8 @@ class LogicStatement(LogicNode):
 
     def infer_shape_type(
         self,
-        dim_bindings: dict[Alias, tuple[Any, ...]],
-    ) -> dict[Alias, tuple[Any, ...]]:
+        dim_bindings: dict[Alias, tuple[FType, ...]],
+    ) -> dict[Alias, tuple[FType, ...]]:
         """Infers shape_type for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_dimmap(merge_dim_type, dim_bindings)
@@ -264,8 +264,8 @@ class LogicStatement(LogicNode):
         return self.infer_dimmap(merge_dim, dim_bindings)
 
     def infer_element_type(
-        self, bindings: dict[Alias, Any]
-    ) -> dict[Alias, Any]:  # In the future should be FType
+        self, bindings: dict[Alias, FType]
+    ) -> dict[Alias, FType]:
         """Infers element types for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_element_type, reduce_element_type, bindings)

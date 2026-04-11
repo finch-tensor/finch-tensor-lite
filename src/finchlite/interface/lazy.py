@@ -15,6 +15,7 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from .. import finch_einsum as ein
 from ..algebra import (
+    FType,
     FinchOperator,
     Tensor,
     TensorFType,
@@ -48,15 +49,18 @@ from .overrides import OverrideTensor
 
 class LazyTensorFType(TensorFType):
     _fill_value: Any
-    _element_type: Any
-    _shape_type: Any
+    _element_type: FType
+    _shape_type: tuple[FType, ...]
 
     def __init__(
-        self, _fill_value: Any, _element_type: Any, _shape_type: tuple[type, ...]
+        self,
+        _fill_value: Any,
+        _element_type: FType | type,
+        _shape_type: tuple[FType | type, ...],
     ):
         self._fill_value = _fill_value
-        self._element_type = _element_type
-        self._shape_type = _shape_type
+        self._element_type = ftype(_element_type)
+        self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
 
     def __eq__(self, other):
         if not isinstance(other, LazyTensorFType):
@@ -88,7 +92,7 @@ class LazyTensorFType(TensorFType):
         return self._fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         return self._element_type
 
     @property
@@ -173,7 +177,7 @@ class LazyTensor(OverrideTensor):
         ctx: EffectBlob,
         shape: tuple,
         fill_value: Any,
-        element_type: Any,
+        element_type: FType,
     ):
         self.data: Alias = data
         self.ctx = ctx
@@ -203,7 +207,7 @@ class LazyTensor(OverrideTensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 
@@ -1243,7 +1247,7 @@ class DefaultTensorFType(TensorFType):
     """
 
     _fill_value: Any
-    _element_type: Any
+    _element_type: FType
     _shape_type: tuple
 
     @property
@@ -1251,7 +1255,7 @@ class DefaultTensorFType(TensorFType):
         return self._fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         return self._element_type
 
     @property
@@ -1274,7 +1278,7 @@ class WrapperTensorFType(TensorFType):
         return self._child_formats[0].fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Promotes the element type to be compatible with all constituent formats."""
         etype = self._child_formats[0].element_type
         for t in self._child_formats:
@@ -1315,12 +1319,12 @@ class FillTensor(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor's elements."""
         return self.ftype.element_type
 
     @property
-    def shape_type(self) -> tuple[type, ...]:
+    def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor."""
         return self.ftype.shape_type
 
@@ -1468,7 +1472,7 @@ class ConcatTensor(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 
@@ -1604,7 +1608,7 @@ class SplitDimsTensor(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 
@@ -1724,7 +1728,7 @@ class CombineDimsTensor(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 

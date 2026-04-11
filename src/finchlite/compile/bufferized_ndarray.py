@@ -71,7 +71,7 @@ class BufferizedNDArray(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 
@@ -344,7 +344,7 @@ class BufferizedNDArrayAccessor(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 

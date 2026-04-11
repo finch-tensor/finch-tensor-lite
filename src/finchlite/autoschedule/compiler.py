@@ -4,8 +4,6 @@ import logging
 from collections.abc import Iterable
 from typing import Any
 
-import numpy as np
-
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
@@ -13,7 +11,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import ffuncs
+from ..algebra import FType, ffuncs, ftypes
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
@@ -82,7 +80,7 @@ class NotationContext:
         args: dict[lgc.Alias, ntn.Variable],
         slots: dict[lgc.Alias, ntn.Slot],
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
-        shape_types: dict[lgc.Alias, tuple[Any, ...]] | None = None,
+        shape_types: dict[lgc.Alias, tuple[FType, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
     ):
         self.bindings = bindings
@@ -118,7 +116,7 @@ class NotationContext:
                 arg_types = arg.shape_type(self.shape_types)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
                 shape_type = {
-                    idx: shape_type_map.get(idx) or np.intp for idx in idxs_1 + idxs_2
+                    idx: shape_type_map.get(idx) or ftypes.intp for idx in idxs_1 + idxs_2
                 }
                 loop_idxs = []
                 remap_idxs = {}
@@ -170,10 +168,9 @@ class NotationContext:
                 )
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(loop_idxs):
-                    t = loops[idx].type_
                     ext = ntn.Call(
                         ntn.Literal(make_extent),
-                        (ntn.Literal(t(0)), shapes.get(idx) or shapes[remap_idxs[idx]]),
+                        (ntn.Literal(0), shapes.get(idx) or shapes[remap_idxs[idx]]),
                     )
                     if idx in remap_idxs:
                         body = ntn.If(
@@ -219,7 +216,7 @@ class NotationContext:
                 shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
                 arg_types = arg_2.shape_type(self.shape_types)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
-                shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1}
+                shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in idxs_1}
                 loops = {
                     idx: ntn.Variable(gensym(idx.name), shape_type[idx])
                     for idx in idxs_1
@@ -233,10 +230,9 @@ class NotationContext:
                 )
                 body = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(idxs_1):
-                    t = loops[idx].type_
                     ext = ntn.Call(
                         ntn.Literal(make_extent),
-                        (ntn.Literal(t(0)), shapes[idx]),
+                        (ntn.Literal(0), shapes[idx]),
                     )
                     body = ntn.Loop(
                         loops[idx],

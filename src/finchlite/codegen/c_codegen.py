@@ -805,18 +805,24 @@ class CContext(Context):
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.GetAttr(obj, attr):
-                if not obj.result_type.struct_hasattr(attr.val):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not obj_t.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return c_getattr(obj.result_type, self, self(obj), attr.val)
+                return c_getattr(obj_t, self, self(obj), attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
-                if not fisinstance(val, obj.result_type.struct_attrtype(attr.val)):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
                     raise TypeError(
                         f"Type mismatch: {val.result_type} != "
-                        f"{obj.result_type.struct_attrtype(attr.val)}"
+                        f"{obj_t.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                c_setattr(obj.result_type, self, self(obj), attr.val, val_code)
+                c_setattr(obj_t, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
                 return c_function_call(f.val, self, *args)
@@ -854,25 +860,46 @@ class CContext(Context):
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
-                return buf.result_type.c_load(self, buf, idx)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
                 buf = self.resolve(buf)
-                return buf.result_type.c_store(self, buf, idx, val)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
                 buf = self.resolve(buf)
-                return buf.result_type.c_resize(self, buf, len)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_resize(self, buf, len)
             case asm.Length(buf):
                 buf = self.resolve(buf)
-                return buf.result_type.c_length(self, buf)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_length(self, buf)
             case asm.LoadDict(map, idx):
                 map = self.resolve(map)
-                return map.result_type.c_loaddict(self, map, idx)
+                map_t = map.result_type
+                if not isinstance(map_t, CDictFType):
+                    raise TypeError(f"Expected C dict type, got: {map_t}")
+                return map_t.c_loaddict(self, map, idx)
             case asm.ExistsDict(map, idx):
                 map = self.resolve(map)
-                return map.result_type.c_existsdict(self, map, idx)
+                map_t = map.result_type
+                if not isinstance(map_t, CDictFType):
+                    raise TypeError(f"Expected C dict type, got: {map_t}")
+                return map_t.c_existsdict(self, map, idx)
             case asm.StoreDict(map, idx, val):
                 map = self.resolve(map)
-                return map.result_type.c_storedict(self, map, idx, val)
+                map_t = map.result_type
+                if not isinstance(map_t, CDictFType):
+                    raise TypeError(f"Expected C dict type, got: {map_t}")
+                return map_t.c_storedict(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -896,8 +923,10 @@ class CContext(Context):
                 )
                 return None
             case asm.BufferLoop(buf, asm.Variable(_, _) as var, body):
+                if not isinstance(buf.result_type, BufferFType):
+                    raise TypeError(f"Expected buffer type, got: {buf.result_type}")
                 idx = asm.Variable(
-                    self.freshen(var.name + "_i"), buf.result_type.shape_type()
+                    self.freshen(var.name + "_i"), buf.result_type.length_type
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(

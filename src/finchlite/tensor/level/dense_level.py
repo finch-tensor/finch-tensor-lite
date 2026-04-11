@@ -164,6 +164,8 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         next_lvl = tns.lvl_fields.next_lvl
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
+            if idx.type_ is None:
+                raise TypeError(f"Expected loop variable type for {idx.name}")
             pos_2 = asm.Variable(
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )

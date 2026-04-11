@@ -204,6 +204,8 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
 
     def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
         tns: FiberTensorFields = stack.obj
+        if not isinstance(stack.type, FiberTensorFType):
+            raise TypeError(f"Expected FiberTensorFType, got: {stack.type}")
         ft_ftype: FiberTensorFType = stack.type
         assert isinstance(tns.lvl_fields, SparseListLevelFields)
         ptr_s = tns.lvl_fields.ptr_s

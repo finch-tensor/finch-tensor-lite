@@ -12,7 +12,7 @@ import numpy as np
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import Tensor, ffuncs, int64, is_annihilator
+from ...algebra import Tensor, ffuncs, ftype, int64, is_annihilator
 from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .numeric_stats import NumericStats

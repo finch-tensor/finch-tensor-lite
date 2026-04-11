@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import TensorFType
+from ..algebra import FType, TensorFType, ftype
 from .eager import EagerTensor
 
 
 class ScalarFType(TensorFType):
-    def __init__(self, _element_type: type, _fill_value: Any):
+    def __init__(self, _element_type: FType, _fill_value: Any):
         self._element_type = _element_type
         self._fill_value = _fill_value
 
@@ -35,7 +35,7 @@ class ScalarFType(TensorFType):
         return self._fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         return self._element_type
 
     @property
@@ -67,7 +67,7 @@ class Scalar(EagerTensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the scalar."""
         return self.ftype.element_type
 
