@@ -370,7 +370,7 @@ class CKernel(asm.AssemblyKernel):
             self.argtypes, args, serial_args, strict=False
         ):
             deserialize_from_c(type_, arg, serial_arg)
-        if self.ret_type is type(None):
+        if self.ret_type is algebra.none_:
             return None
         return construct_from_c(self.ret_type, res)
 
@@ -558,7 +558,7 @@ def c_type(t):
         The corresponding C type as a ctypes type.
     """
     t = _normalize_fmt(t)
-    if t is type(None):
+    if t is algebra.none_:
         return None
     if hasattr(t, "c_type"):
         return t.c_type()
@@ -569,6 +569,7 @@ register_property(algebra.int_, "c_type", "__attr__", lambda x: ctypes.c_int)
 register_property(algebra.float_, "c_type", "__attr__", lambda x: ctypes.c_double)
 register_property(algebra.bool_, "c_type", "__attr__", lambda x: ctypes.c_bool)
 register_property(algebra.str_, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
+register_property(algebra.none_, "c_type", "__attr__", lambda x: None)
 register_property(
     algebra.ftypes.FDTypeNumpy,
     "c_type",
@@ -593,6 +594,8 @@ register_property(
 )
 register_property(algebra.bool_, "construct_from_c", "__attr__", lambda fmt, x: bool(x.value if hasattr(x, 'value') else x)
 )
+register_property(algebra.none_, "serialize_to_c", "__attr__", lambda fmt, x: None)
+register_property(algebra.none_, "construct_from_c", "__attr__", lambda fmt, x: None)
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
     ctypes.c_char: ("char", []),

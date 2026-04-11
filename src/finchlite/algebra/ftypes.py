@@ -148,6 +148,24 @@ class _FDTypeBuiltinStr(FDTypeBuiltin):
 str_ = _FDTypeBuiltinStr()
 
 
+class _FDTypeBuiltinNone(FDType):
+    @property
+    def type(self):
+        return type(None)
+
+    def __repr__(self):
+        return "none_"
+    
+    def __call__(self, val):
+        """None type cannot be called, always returns None"""
+        if val is not None:
+            raise TypeError(f"Cannot convert {val!r} to None type")
+        return None
+
+
+none_ = _FDTypeBuiltinNone()
+
+
 # Ftypes for python built-in datatypes
 class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     @property
@@ -778,6 +796,8 @@ def ftype(x) -> FType:
         return complex128
     if type(x) is builtins.str or x is builtins.str:
         return str_
+    if x is None:
+        return none_
     if isinstance(x, tuple):
         T = type(x)
         if hasattr(T, "_fields") and all(isinstance(field, str) for field in T._fields):

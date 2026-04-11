@@ -59,7 +59,7 @@ class Scalar(EagerTensor):
 
     @property
     def ftype(self):
-        return ScalarFType(type(self.val), self._fill_value)
+        return ScalarFType(ftype(self.val), self._fill_value)
 
     @property
     def shape(self):
