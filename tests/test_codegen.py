@@ -1011,7 +1011,7 @@ def test_hashtable(compiler, constructor):
                 ),
             ),
             asm.Function(
-                asm.Variable("exists", bool),
+                asm.Variable("exists", ftypes.bool),
                 (table_v, key_v),
                 asm.Block(
                     (
@@ -1090,16 +1090,16 @@ def test_multiple_hashtable(compiler, tabletype):
     table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
     table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
     table3 = tabletype(
-        TupleFType.from_tuple((ftypes.float64, ftypes.int_)),
-        TupleFType.from_tuple((ftypes.float64, ftypes.float64)),
+        TupleFType.from_tuple((ftypes.float_, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
     )
     table4 = tabletype(
         TupleFType.from_tuple(
-            (ftypes.float64, TupleFType.from_tuple((ftypes.int_, ftypes.float64)))
+            (ftypes.float_, TupleFType.from_tuple((ftypes.int_, ftypes.float_)))
         ),
-        TupleFType.from_tuple((ftypes.float64, ftypes.float64)),
+        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
     )
-    nestedtype = TupleFType.from_tuple((ftypes.int_, ftypes.float64))
+    nestedtype = TupleFType.from_tuple((ftypes.int_, ftypes.float_))
     table5 = tabletype(ftypes.int_, ftypes.int_)
 
     mod = compiler(
@@ -1118,29 +1118,29 @@ def test_multiple_hashtable(compiler, tabletype):
     # setidx_2 on table2.
     assert mod.setidx_1(
         table1,
-        table1.key_type.from_fields(1, 2),
-        table1.value_type.from_fields(2, 3, 4),
-    ) == table1.value_type.from_fields(2, 3, 4)
+        (1, 2),
+        (2, 3, 4),
+    ) == (2, 3, 4)
 
     assert mod.setidx_2(
         table2,
-        table2.key_type.from_fields(1),
-        table2.value_type.from_fields(2, 3, 4, 5),
-    ) == table2.value_type.from_fields(2, 3, 4, 5)
+        (1,),
+        (2, 3, 4, 5),
+    ) == (2, 3, 4, 5)
 
     assert mod.setidx_3(
         table3,
-        table3.key_type.from_fields(0.1, 2),
-        table3.value_type.from_fields(0.2, 0.2),
-    ) == table3.value_type.from_fields(0.2, 0.2)
+        (0.1, 2),
+        (0.2, 0.2),
+    ) == (0.2, 0.2)
 
     assert mod.setidx_4(
         table4,
-        table4.key_type.from_fields(
+        (
             0.1,
-            nestedtype.from_fields(1, 0.2),
+            (1, 0.2),
         ),
-        table4.value_type.from_fields(0.2, 0.2),
-    ) == table4.value_type.from_fields(0.2, 0.2)
+        (0.2, 0.2),
+    ) == (0.2, 0.2)
 
     assert mod.setidx_5(table5, 3, 2) == 2

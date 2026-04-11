@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from finchlite.algebra.ftypes import FType
+from finchlite.algebra import ftypes
 
 from ..algebra import ftype, return_type
 from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
@@ -364,7 +365,7 @@ class ExistsDict(AssemblyExpression, AssemblyTree):
         return [self.map, self.index]
 
     def result_type(self):
-        return bool
+        return ftypes.bool
 
 
 @dataclass(eq=True, frozen=True)
