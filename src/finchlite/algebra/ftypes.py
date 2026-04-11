@@ -660,7 +660,7 @@ class TupleFType(ImmutableStructFType):
 
     @staticmethod
     @lru_cache
-    def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
+    def from_tuple(types: tuple[FType, ...]) -> "TupleFType":
         return TupleFType(types)
 
 

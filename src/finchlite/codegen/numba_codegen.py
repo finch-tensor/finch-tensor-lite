@@ -85,6 +85,12 @@ register_property(
     "__attr__",
     lambda t: numba.from_dtype(t.dtype),
 )
+register_property(
+    algebra.ftypes.FDTypeBuiltin,
+    "numba_type",
+    "__attr__",
+    lambda t: t.type,
+)
 
 
 def immutable_struct_jitclass_type(fmt: ImmutableStructFType):

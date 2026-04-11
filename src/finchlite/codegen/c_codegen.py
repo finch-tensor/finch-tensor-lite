@@ -570,7 +570,10 @@ register_property(algebra.float_, "c_type", "__attr__", lambda x: ctypes.c_doubl
 register_property(algebra.bool_, "c_type", "__attr__", lambda x: ctypes.c_bool)
 register_property(algebra.str_, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
 register_property(
-    algebra.ftypes.FDTypeNumpy, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
+    algebra.ftypes.FDTypeNumpy,
+    "c_type",
+    "__attr__",
+    lambda x: np.ctypeslib.as_ctypes_type(x.dtype),
 )
 register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 
