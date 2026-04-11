@@ -89,7 +89,7 @@ def test_buffer_function():
     b = NumpyBuffer(a)
     f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
     k = finchlite.codegen.c_codegen.CKernel(
-        f, type(None), [NumpyBufferFType(np.float64)]
+        f, finchlite.none_, [NumpyBufferFType(np.float64)]
     )
     k(b)
     result = b.arr
