@@ -1,6 +1,6 @@
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
-from finchlite.algebra import ffuncs, init_value
+from finchlite.algebra import ffuncs, init_value, ftype
 from finchlite.algebra.tensor import TensorFType
 from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
@@ -27,7 +27,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 arg=generate_einsum_expr(arg),
             )
             if operation != ffuncs.overwrite and init != init_value(
-                operation, type(init)
+                operation, ftype(init)
             ):
                 return ein.Plan(
                     (

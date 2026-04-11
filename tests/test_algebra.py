@@ -52,9 +52,9 @@ def test_algebra_selected():
     assert is_associative(ffuncs.logical_xor)
     assert is_associative(ffuncs.logical_or)
     assert is_associative(ffuncs.logaddexp)
-    assert init_value(ffuncs.and_, finchlite.bool_) is np.True_
-    assert init_value(ffuncs.or_, finchlite.bool_) is np.False_
-    assert init_value(ffuncs.xor, finchlite.bool_) is np.False_
+    assert init_value(ffuncs.and_, finchlite.bool) is np.True_
+    assert init_value(ffuncs.or_, finchlite.bool) is np.False_
+    assert init_value(ffuncs.xor, finchlite.bool) is np.False_
     assert init_value(ffuncs.logaddexp, finchlite.float64) == -math.inf
     assert init_value(ffuncs.logical_and, finchlite.bool_) is True
     assert init_value(ffuncs.logical_or, finchlite.bool_) is False

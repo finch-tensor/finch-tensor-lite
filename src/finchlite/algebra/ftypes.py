@@ -170,7 +170,7 @@ none_ = _FDTypeBuiltinNone()
 class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     @property
     def type(self):
-        return bool
+        return builtins.bool
 
     def __repr__(self):
         return "finchlite.bool_"
@@ -197,7 +197,7 @@ class FDTypeNumericBuiltin(FDTypeBuiltin, FDTypeNumeric):
 class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
     @property
     def type(self):
-        return int
+        return builtins.int
 
     def __repr__(self):
         return "finchlite.int_"
@@ -227,7 +227,7 @@ int_ = _FDTypeBuiltinInt()
 class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
     @property
     def type(self):
-        return float
+        return builtins.float
 
     def __repr__(self):
         return "finchlite.float_"
@@ -254,7 +254,7 @@ float_ = _FDTypeBuiltinFloat()
 class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
-        return complex
+        return builtins.complex
 
     def __repr__(self):
         return "finchlite.complex_"
