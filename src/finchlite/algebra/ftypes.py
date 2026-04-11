@@ -135,6 +135,7 @@ class FDTypeBuiltin(FDType):
         """
         return self.type(val)
 
+
 class _FDTypeBuiltinStr(FDTypeBuiltin):
     @property
     def type(self):
@@ -143,7 +144,9 @@ class _FDTypeBuiltinStr(FDTypeBuiltin):
     def __repr__(self):
         return "finchlite.str_"
 
+
 str_ = _FDTypeBuiltinStr()
+
 
 # Ftypes for python built-in datatypes
 class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):

@@ -122,7 +122,9 @@ def test_rule_add_with_min():
 def test_rule_disjoint_nested_max_min():
     # max(a, min(b, max(a, c))) with non-disjoint sets
     a, b, c = L("a"), L("b"), L("c")
-    expr = Call(L(ffuncs.max), (a, Call(L(ffuncs.min), (b, Call(L(ffuncs.max), (a, c))))))
+    expr = Call(
+        L(ffuncs.max), (a, Call(L(ffuncs.min), (b, Call(L(ffuncs.max), (a, c)))))
+    )
     result = rule_disjoint_nested_max_min(expr)
     # Should return max(a, min(b, c)) since 'a' appears in both outer and inner max
     assert result == Call(L(ffuncs.max), (a, Call(L(ffuncs.min), (b, c))))
@@ -131,7 +133,9 @@ def test_rule_disjoint_nested_max_min():
 def test_rule_disjoint_nested_min_max():
     # min(a, max(b, min(a, c))) with non-disjoint sets
     a, b, c = L("a"), L("b"), L("c")
-    expr = Call(L(ffuncs.min), (a, Call(L(ffuncs.max), (b, Call(L(ffuncs.min), (a, c))))))
+    expr = Call(
+        L(ffuncs.min), (a, Call(L(ffuncs.max), (b, Call(L(ffuncs.min), (a, c)))))
+    )
     result = rule_disjoint_nested_min_max(expr)
     # Should return min(a, max(b, c)) since 'a' appears in both outer and inner min
     assert result == Call(L(ffuncs.min), (a, Call(L(ffuncs.max), (b, c))))
@@ -170,7 +174,9 @@ def test_rule_disjoint_flat_single_min_max():
 def test_rule_disjoint_flat_pair_max_min():
     # max(min(a, b), min(a, c)) with non-disjoint mins
     a, b, c = L("a"), L("b"), L("c")
-    expr = Call(L(ffuncs.max), (Call(L(ffuncs.min), (a, b)), Call(L(ffuncs.min), (a, c))))
+    expr = Call(
+        L(ffuncs.max), (Call(L(ffuncs.min), (a, b)), Call(L(ffuncs.min), (a, c)))
+    )
     result = rule_disjoint_flat_pair_max_min(expr)
     # Should create nested structure with intersection and differences
     assert result == Call(
@@ -191,7 +197,9 @@ def test_rule_disjoint_flat_pair_max_min():
 
     # Should not match when disjoint
     d = L("d")
-    expr = Call(L(ffuncs.max), (Call(L(ffuncs.min), (a, b)), Call(L(ffuncs.min), (c, d))))
+    expr = Call(
+        L(ffuncs.max), (Call(L(ffuncs.min), (a, b)), Call(L(ffuncs.min), (c, d)))
+    )
     result = rule_disjoint_flat_pair_max_min(expr)
     assert result is None
 
@@ -199,7 +207,9 @@ def test_rule_disjoint_flat_pair_max_min():
 def test_rule_disjoint_flat_pair_min_max():
     # min(max(a, b), max(a, c)) with non-disjoint maxs
     a, b, c = L("a"), L("b"), L("c")
-    expr = Call(L(ffuncs.min), (Call(L(ffuncs.max), (a, b)), Call(L(ffuncs.max), (a, c))))
+    expr = Call(
+        L(ffuncs.min), (Call(L(ffuncs.max), (a, b)), Call(L(ffuncs.max), (a, c)))
+    )
     result = rule_disjoint_flat_pair_min_max(expr)
     # Should create nested structure with intersection and differences
     assert result == Call(
@@ -220,6 +230,8 @@ def test_rule_disjoint_flat_pair_min_max():
 
     # Should not match when disjoint
     d = L("d")
-    expr = Call(L(ffuncs.min), (Call(L(ffuncs.max), (a, b)), Call(L(ffuncs.max), (c, d))))
+    expr = Call(
+        L(ffuncs.min), (Call(L(ffuncs.max), (a, b)), Call(L(ffuncs.max), (c, d)))
+    )
     result = rule_disjoint_flat_pair_min_max(expr)
     assert result is None

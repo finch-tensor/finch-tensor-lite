@@ -18,7 +18,6 @@ from ..algebra import (
     FinchOperator,
     Tensor,
     TensorFType,
-    TupleFType,
     ffuncs,
     fixpoint_type,
     ftype,
@@ -52,7 +51,9 @@ class LazyTensorFType(TensorFType):
     _element_type: Any
     _shape_type: Any
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple[type, ...]):
+    def __init__(
+        self, _fill_value: Any, _element_type: Any, _shape_type: tuple[type, ...]
+    ):
         self._fill_value = _fill_value
         self._element_type = _element_type
         self._shape_type = _shape_type

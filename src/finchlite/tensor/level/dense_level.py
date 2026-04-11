@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import ImmutableStructFType, ffuncs, ftypes, FType
+from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from ...compile import AssemblyContext, LoopletContext
 from ...compile import looplets as lplt
 from ...compile.lower import SymbolicExtent
@@ -33,6 +33,9 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             ("dimension", self.dimension_type),
             ("stride", self.dimension_type),
         ]
+
+    def __post_init__(self):
+        self.dimension_type = ftype(self.dimension_type)
 
     def __call__(self, *, shape):
         """
@@ -228,7 +231,7 @@ class DenseLevel(Level):
     def ftype(self) -> DenseLevelFType:
         # mypy does not understand that dataclasses generate __hash__ and __eq__
         # https://github.com/python/mypy/issues/19799
-        return DenseLevelFType(self.lvl.ftype, type(self.dimension))  # type: ignore[abstract]
+        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
 
     @property
     def val(self) -> Any:

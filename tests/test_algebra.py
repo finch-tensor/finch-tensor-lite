@@ -1,5 +1,8 @@
 import math
 
+import numpy as np
+
+import finchlite
 from finchlite.algebra import (
     cansplitpush,
     ffuncs,
@@ -11,8 +14,6 @@ from finchlite.algebra import (
     is_identity,
     repeat_operator,
 )
-import finchlite
-import numpy as np
 
 
 def test_algebra_selected():

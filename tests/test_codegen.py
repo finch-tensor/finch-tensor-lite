@@ -12,8 +12,8 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite.algebra import TupleFType, ftypes
 from finchlite import dense, element, ffuncs, fiber_tensor, ftype
+from finchlite.algebra import TupleFType, ftypes
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
@@ -1094,7 +1094,9 @@ def test_multiple_hashtable(compiler, tabletype):
         TupleFType.from_tuple((ftypes.float64, ftypes.float64)),
     )
     table4 = tabletype(
-        TupleFType.from_tuple((ftypes.float64, TupleFType.from_tuple((ftypes.int_, ftypes.float64)))),
+        TupleFType.from_tuple(
+            (ftypes.float64, TupleFType.from_tuple((ftypes.int_, ftypes.float64)))
+        ),
         TupleFType.from_tuple((ftypes.float64, ftypes.float64)),
     )
     nestedtype = TupleFType.from_tuple((ftypes.int_, ftypes.float64))

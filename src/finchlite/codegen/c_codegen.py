@@ -14,8 +14,8 @@ import numpy as np
 
 from finchlite.algebra import ffuncs
 from finchlite.algebra.algebra import FinchOperator
-from .. import algebra
 
+from .. import algebra
 from .. import finch_assembly as asm
 from ..algebra import (
     COperator,
@@ -578,11 +578,19 @@ register_property(
 register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 
 # ints and floats should be serialized and constructed trivially.
-register_property(algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
-register_property(algebra.float_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
-register_property(algebra.bool_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
+register_property(
+    algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
+)
+register_property(
+    algebra.float_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
+)
+register_property(
+    algebra.bool_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
+)
 register_property(algebra.int_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
-register_property(algebra.float_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+register_property(
+    algebra.float_, "construct_from_c", "__attr__", lambda fmt, x: x.value
+)
 register_property(algebra.bool_, "construct_from_c", "__attr__", lambda fmt, x: x.value)
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {

@@ -716,7 +716,8 @@ def test_hashtable(constructor):
         (
             asm.Function(
                 asm.Variable(
-                    "setidx", TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(3)))
+                    "setidx",
+                    TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(3))),
                 ),
                 (table_v, key_v, val_v),
                 asm.Block(
@@ -768,7 +769,8 @@ def test_hashtable_fail(constructor):
         (
             asm.Function(
                 asm.Variable(
-                    "setidx", TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(2)))
+                    "setidx",
+                    TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(2))),
                 ),
                 (table_v, key_v, val_v),
                 asm.Block(

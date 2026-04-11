@@ -126,7 +126,10 @@ def test_propagate_map_queries_backward():
                 (Field("i3"),),
             ),
             Aggregate(
-                Literal(ffuncs.add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
+                Literal(ffuncs.add),
+                Literal(10),
+                Alias("A2"),
+                (Field("i5"), Field("i6")),
             ),
             Reorder(
                 Aggregate(

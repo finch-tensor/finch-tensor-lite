@@ -23,11 +23,11 @@ from .algebra import (
     int_,
     intp,
     isdtype,
+    str_,
     uint8,
     uint16,
     uint32,
     uint64,
-    str_,
 )
 from .autoschedule.tensor_stats import (
     DC,
@@ -229,7 +229,6 @@ __all__ = [
     "bool",
     "bool_",
     "broadcast_arrays",
-    "str_",
     "broadcast_to",
     "ceil",
     "clip",
@@ -337,6 +336,7 @@ __all__ = [
     "squeeze",
     "stack",
     "std",
+    "str_",
     "subtract",
     "sum",
     "tan",

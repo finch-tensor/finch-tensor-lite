@@ -325,7 +325,7 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     """
     fmt = _normalize_fmt(fmt)
     if fmt is type(None):
-        return None
+        return
     if hasattr(fmt, "deserialize_from_numba"):
         fmt.deserialize_from_numba(obj, numba_obj)
     else:

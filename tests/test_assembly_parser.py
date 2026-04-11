@@ -150,7 +150,9 @@ def test_if_statement():
                             i1,
                             Load(
                                 lvl_idx,
-                                Call(Literal(ffuncs.sub), (q_stop, Literal(np.intp(1)))),
+                                Call(
+                                    Literal(ffuncs.sub), (q_stop, Literal(np.intp(1)))
+                                ),
                             ),
                         ),
                     )

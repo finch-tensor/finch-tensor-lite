@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import ImmutableStructFType, ffuncs, ftypes, FType
+from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
@@ -23,6 +23,9 @@ class SparseListLevelFields(NamedTuple):
 class SparseListLevelFType(LevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
     dimension_type: FType = ftypes.intp
+
+    def __post_init__(self):
+        self.dimension_type = ftype(self.dimension_type)
 
     @property
     def struct_name(self):
@@ -317,9 +320,9 @@ class SparseListLevel(Level):
 
     def __post_init__(self):
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type())
+            self.ptr = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
         if self.idx is None:
-            self.idx = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type())
+            self.idx = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
 
     @property
     def stride(self) -> np.integer:
@@ -329,7 +332,7 @@ class SparseListLevel(Level):
     def ftype(self) -> SparseListLevelFType:
         # mypy does not understand that dataclasses generate __hash__ and __eq__
         # https://github.com/python/mypy/issues/19799
-        return SparseListLevelFType(self.lvl.ftype, type(self.dimension))  # type: ignore[abstract]
+        return SparseListLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
 
     @property
     def val(self) -> Any:

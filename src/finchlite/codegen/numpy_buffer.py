@@ -7,7 +7,7 @@ import numba
 
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 
-from ..algebra import ftype
+from ..algebra import FType, ftype
 from ..finch_assembly import Buffer
 from ..util import qual_str
 from .c_codegen import CBufferFType, CContext, CStackFType, c_type
@@ -123,10 +123,9 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         return hash(self._dtype)
 
     def __call__(self, len: int = 0, element_type: FType | None = None):
-        if element_type is None:
-            dtype = self._dtype
-        else:
-            dtype = to_numpy_type(element_type)
+        dtype = (
+            self._dtype if element_type is None else to_numpy_type(element_type).type
+        )
         return NumpyBuffer(np.zeros(len, dtype=dtype))
 
     def c_type(self):
