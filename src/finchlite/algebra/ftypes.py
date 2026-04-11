@@ -15,18 +15,21 @@ https://data-apis.org/array-api/latest/API_specification/data_types.html
 """
 
 
-class FType:
+class FType(ABC):
+
+    @abstractmethod
     def __eq__(self, other):
-        return self is other
-
+        ...
+    
+    @abstractmethod
     def __hash__(self):
-        return id(self)
-
+        ...
     def fisinstance(self, other):
         """
         Check if `other` is an instance of this ftype.
         """
         return ftype(other) == self
+
 
 
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
@@ -129,6 +132,12 @@ class FDTypeBuiltin(FDType):
         """
         ...
 
+    def __eq__(self, other):
+        return isinstance(other, FDTypeBuiltin) and self.type == other.type
+    
+    def __hash__(self):
+        return hash(self.type)
+
     def __call__(self, val):
         """
         Create an instance of this ftype with the given value.
@@ -148,7 +157,8 @@ class _FDTypeBuiltinStr(FDTypeBuiltin):
 str_ = _FDTypeBuiltinStr()
 
 
-class _FDTypeBuiltinNone(FDType):
+class _FDTypeBuiltinNone(FDTypeBuiltin):
+
     @property
     def type(self):
         return type(None)
@@ -286,6 +296,13 @@ class FDTypeNumpy(FDType):
         """
         ...
 
+
+    def __eq__(self, other):
+        return isinstance(other, FDTypeNumpy) and self.dtype == other.dtype
+    
+    def __hash__(self):
+        return hash(self.dtype)
+
     def __call__(self, val):
         """
         Create an instance of this ftype with the given value.
@@ -403,6 +420,7 @@ class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
 
 
 int32 = _FDTypeInt32()
+
 
 
 class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
