@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 import numba
 import numpy as np
 
-from ..algebra import ImmutableStructFType
+from ..algebra import ImmutableStructFType, FType
 from ..finch_assembly import AssemblyExpression, Dict, Stack
 from .c_codegen import (
     CContext,
