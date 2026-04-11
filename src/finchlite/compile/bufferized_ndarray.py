@@ -141,10 +141,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def struct_name(self):
         def str_format(types):
             return "_".join(
-                f"{np.dtype(t).kind}{np.dtype(t).itemsize * 8}" for t in types
+                f"{to_numpy_type(t).kind}{to_numpy_type(t).itemsize * 8}" for t in types
             )
 
-        dt = np.dtype(self.buf_t.element_type)
+        dt = to_numpy_type(self.buf_t.element_type)
         return (
             f"BufferizedNDArray_{dt.kind}{dt.itemsize * 8}_"
             f"shape_{str_format(self.shape_t.struct_fieldtypes)}_"

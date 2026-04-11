@@ -628,7 +628,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
         result_with_op = finchlite.compute(result_with_op)
         result_with_np = finchlite.compute(result_with_np)
 
-    assert expected.dtype == result.element_type, (
+    assert finchlite.ftype(expected.dtype.type) == result.element_type, (
         f"Expected dtype {expected.dtype}, got {result.dtype}"
     )
     finch_assert_allclose(result, expected)

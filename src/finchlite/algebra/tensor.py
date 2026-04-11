@@ -27,6 +27,10 @@ class TensorFType(FType, ABC):
         ...
 
     @property
+    def dtype(self):
+        return self.element_type
+
+    @property
     @abstractmethod
     def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index
@@ -88,6 +92,10 @@ class Tensor(FTyped, ABC):
         """
         return self.ftype.element_type
 
+    @property
+    def dtype(self):
+        return self.element_type
+        
     @property
     def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index

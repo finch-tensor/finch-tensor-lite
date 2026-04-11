@@ -1362,7 +1362,7 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(ffuncs.first_arg, tensor, FillTensor(shape, None))
+    return elementwise(ffuncs.first_arg, tensor, FillTensor(shape, np.False_))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
@@ -1566,7 +1566,6 @@ class SplitDimsTensor(Tensor):
         self.split_shape = shape
         self._ndim = len(self._shape)
         self._element_type = tensor.element_type
-        self.dtype = self._element_type
 
     def __getitem__(self, idxs: tuple):
         """
@@ -1681,7 +1680,6 @@ class CombineDimsTensor(Tensor):
         )
         self._ndim = len(self._shape)
         self._element_type = tensor.element_type
-        self.dtype = self._element_type
 
         # Store original dimensions for reconstruction. For ease of access
         self.original_dims = [tensor.shape[i] for i in axes]

@@ -175,9 +175,11 @@ class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     def __repr__(self):
         return "finchlite.bool_"
 
+    @property
     def type_min(self):
         return False
 
+    @property
     def type_max(self):
         return True
 
@@ -293,10 +295,10 @@ class FDTypeNumpy(FDType):
     def __promote__(self, other):
         if isinstance(other, FDTypeNumpy):
             promoted_dtype = np.promote_types(self.dtype, other.dtype)
-            return ftype(promoted_dtype)
+            return ftype(promoted_dtype.type)
         if isinstance(other, FDTypeBuiltin):
             promoted_dtype = np.promote_types(self.dtype, other.type)
-            return ftype(promoted_dtype)
+            return ftype(promoted_dtype.type)
         return None
 
 
@@ -355,9 +357,11 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
     def __repr__(self):
         return "finchlite.bool"
 
+    @property
     def type_min(self):
         return np.bool_(False)
 
+    @property
     def type_max(self):
         return np.bool_(True)
 
