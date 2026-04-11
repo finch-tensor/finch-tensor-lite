@@ -55,7 +55,7 @@ class NotationExpression(NotationNode):
 
     @property
     @abstractmethod
-    def result_type(self) -> FType: 
+    def result_type(self) -> FType:
         """
         Get the type of the expression.
         """
