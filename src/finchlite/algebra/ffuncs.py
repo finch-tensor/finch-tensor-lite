@@ -715,7 +715,7 @@ class _Max(NAryFinchOperator, NumbaOperator):
             B = ftype(b)
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
-            return C(builtins.min(a, b))
+            return C(builtins.max(a, b))
 
         return reduce(op, args)
 
