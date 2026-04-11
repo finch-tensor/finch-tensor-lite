@@ -3,12 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 from ..algebra import FType, TensorFType, ftype
+from ..algebra.ftypes import FDType
 from .eager import EagerTensor
 
 
 class ScalarFType(TensorFType):
     def __init__(self, _element_type: FType, _fill_value: Any):
-        self._element_type = _element_type
+        elt = _element_type
+        if not isinstance(elt, FDType):
+            raise TypeError(f"Scalar element type must be FDType, got {elt}")
+        self._element_type = elt
         self._fill_value = _fill_value
 
     def __eq__(self, other):

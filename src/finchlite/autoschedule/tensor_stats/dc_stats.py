@@ -38,6 +38,13 @@ class DC:
     value: float
 
 
+_INT64_VECTOR_FTYPE = BufferizedNDArray.from_numpy(np.zeros(1, dtype=np.int64)).ftype
+
+
+def _int_tuple_ftype(size: int):
+    return ftype(tuple(np.int64(0) for _ in range(size)))
+
+
 class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
     def __init__(self):
         super().__init__(DCStats)
@@ -168,13 +175,13 @@ class DCStats(NumericStats):
         ndims = len(fields)
         dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
         dim_array_variables = [
-            ntn.Variable(f"x_{fields[i]}", BufferizedNDArray) for i in range(ndims)
+            ntn.Variable(f"x_{fields[i]}", _INT64_VECTOR_FTYPE) for i in range(ndims)
         ]
         dim_size_variables = [
             ntn.Variable(f"n_{fields[i]}", int64) for i in range(ndims)
         ]
         dim_array_slots = [
-            ntn.Slot(f"x_{fields[i]}_", BufferizedNDArray) for i in range(ndims)
+            ntn.Slot(f"x_{fields[i]}_", _INT64_VECTOR_FTYPE) for i in range(ndims)
         ]
         dim_proj_variables = [
             ntn.Variable(f"proj_{fields[i]}", int64) for i in range(ndims)
@@ -339,7 +346,7 @@ class DCStats(NumericStats):
         prgm = ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("array_to_dcs", tuple),
+                    ntn.Variable("array_to_dcs", _int_tuple_ftype(2 * ndims + 1)),
                     (A, *dim_array_variables),
                     ntn.Block(
                         (
@@ -464,10 +471,10 @@ class DCStats(NumericStats):
 
         dij = ntn.Variable("dij", int64)
 
-        xi = ntn.Variable("xi", BufferizedNDArray)
-        xi_ = ntn.Slot("xi_", BufferizedNDArray)
-        yj = ntn.Variable("yj", BufferizedNDArray)
-        yj_ = ntn.Slot("yj_", BufferizedNDArray)
+        xi = ntn.Variable("xi", _INT64_VECTOR_FTYPE)
+        xi_ = ntn.Slot("xi_", _INT64_VECTOR_FTYPE)
+        yj = ntn.Variable("yj", _INT64_VECTOR_FTYPE)
+        yj_ = ntn.Slot("yj_", _INT64_VECTOR_FTYPE)
 
         d_i = ntn.Variable("d_i", int64)
         d_i_j = ntn.Variable("d_i_j", int64)
@@ -527,7 +534,7 @@ class DCStats(NumericStats):
                     ),
                 ),
                 ntn.Function(
-                    ntn.Variable("matrix_structure_to_dcs", tuple),
+                    ntn.Variable("matrix_structure_to_dcs", _int_tuple_ftype(4)),
                     (A, xi, yj),
                     ntn.Block(
                         (
@@ -823,7 +830,7 @@ class DCStats(NumericStats):
                     ),
                 ),
                 ntn.Function(
-                    ntn.Variable("_3d_structure_to_dcs", tuple),
+                    ntn.Variable("_3d_structure_to_dcs", _int_tuple_ftype(6)),
                     (A,),
                     ntn.Block(
                         (
@@ -1125,7 +1132,7 @@ class DCStats(NumericStats):
                     ),
                 ),
                 ntn.Function(
-                    ntn.Variable("_4d_structure_to_dcs", tuple),
+                    ntn.Variable("_4d_structure_to_dcs", _int_tuple_ftype(8)),
                     (A,),
                     ntn.Block(
                         (

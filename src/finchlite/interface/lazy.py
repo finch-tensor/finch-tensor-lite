@@ -8,7 +8,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
@@ -44,6 +44,7 @@ from ..finch_logic import (
     TensorStats,
 )
 from ..symbolic import gensym
+from ..algebra.ftypes import FDType
 from .overrides import OverrideTensor
 
 
@@ -1281,9 +1282,15 @@ class WrapperTensorFType(TensorFType):
     def element_type(self) -> FType:
         """Promotes the element type to be compatible with all constituent formats."""
         etype = self._child_formats[0].element_type
+        if not isinstance(etype, FDType):
+            raise TypeError(f"Expected scalar dtype in wrapper, got {etype}")
+        etype_fd = cast(FDType, etype)
         for t in self._child_formats:
-            etype = promote_type(etype, t.element_type)
-        return etype
+            t_etype = t.element_type
+            if not isinstance(t_etype, FDType):
+                raise TypeError(f"Expected scalar dtype in wrapper, got {t_etype}")
+            etype_fd = promote_type(etype_fd, t_etype)
+        return etype_fd
 
     def from_numpy(self, arr):
         raise NotImplementedError

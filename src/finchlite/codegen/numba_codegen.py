@@ -460,7 +460,7 @@ class NumbaLibrary(asm.AssemblyLibrary):
 
 
 class NumbaKernel(asm.AssemblyKernel):
-    def __init__(self, numba_func, ret_type: type, arg_types):
+    def __init__(self, numba_func, ret_type: Any, arg_types):
         self.numba_func = numba_func
         self.ret_type = ret_type
         self.arg_types = arg_types

@@ -193,8 +193,8 @@ class LogicExpression(LogicNode):
 
     def shape_type(
         self,
-        dim_bindings: dict[Alias, tuple[FType, ...]],
-    ) -> tuple[FType, ...]:
+        dim_bindings: dict[Alias, tuple[FType | None, ...]],
+    ) -> tuple[FType | None, ...]:
         """Returns the shape type of the node."""
         return self.dimmap(merge_dim_type, dim_bindings)
 
@@ -249,8 +249,8 @@ class LogicStatement(LogicNode):
 
     def infer_shape_type(
         self,
-        dim_bindings: dict[Alias, tuple[FType, ...]],
-    ) -> dict[Alias, tuple[FType, ...]]:
+        dim_bindings: dict[Alias, tuple[FType | None, ...]],
+    ) -> dict[Alias, tuple[FType | None, ...]]:
         """Infers shape_type for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_dimmap(merge_dim_type, dim_bindings)

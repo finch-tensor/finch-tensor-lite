@@ -80,7 +80,7 @@ class NotationContext:
         args: dict[lgc.Alias, ntn.Variable],
         slots: dict[lgc.Alias, ntn.Slot],
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
-        shape_types: dict[lgc.Alias, tuple[FType, ...]] | None = None,
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
     ):
         self.bindings = bindings
