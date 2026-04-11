@@ -508,7 +508,7 @@ class NumbaCompiler(asm.AssemblyLoader):
             match func:
                 case asm.Function(asm.Variable(func_name, ret_type), args, _):
                     kern = _globals[func_name]
-                    arg_ts = [arg.result_format for arg in args]
+                    arg_ts = [arg.result_type for arg in args]
                     kernels[func_name] = NumbaKernel(kern, ret_type, arg_ts)
                 case _:
                     raise NotImplementedError(
@@ -579,7 +579,7 @@ class NumbaContext(Context):
         if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
-        var_t = val.result_format
+        var_t = val.result_type
         self.exec(f"{self.feed}{var_n} = {self(val)}")
         return asm.Variable(var_n, var_t)
 
@@ -617,8 +617,8 @@ class NumbaContext(Context):
             case asm.Assign(asm.Variable(var_n, var_t) as var, val):
                 val_code = self(val)
                 var_code = self(var)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_code} = {val_code}")
@@ -631,10 +631,10 @@ class NumbaContext(Context):
                 return None
             case asm.GetAttr(obj, attr):
                 obj_code = self(obj)
-                if not obj.result_format.struct_hasattr(attr.val):
+                if not obj.result_type.struct_hasattr(attr.val):
                     raise ValueError(f"trying to get missing attr: {attr}")
                 return query_property(
-                    obj.result_format,
+                    obj.result_type,
                     "numba_getattr",
                     "__attr__",
                     self,
@@ -643,14 +643,14 @@ class NumbaContext(Context):
                 )
             case asm.SetAttr(obj, attr, val):
                 obj_code = self(obj)
-                if not fisinstance(val, obj.result_format.struct_attrtype(attr.val)):
+                if not fisinstance(val, obj.result_type.struct_attrtype(attr.val)):
                     raise TypeError(
-                        f"Type mismatch: {val.result_format} != "
-                        f"{obj.result_format.struct_attrtype(attr.val)}"
+                        f"Type mismatch: {val.result_type} != "
+                        f"{obj.result_type.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
                 query_property(
-                    obj.result_format,
+                    obj.result_type,
                     "numba_setattr",
                     "__attr__",
                     self,
@@ -665,8 +665,8 @@ class NumbaContext(Context):
                 return op.numba_literal(op, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.slots:
                     raise KeyError(
                         f"Slot {var_n} already exists in context, cannot unpack"
@@ -694,27 +694,27 @@ class NumbaContext(Context):
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
-                return buf.result_format.numba_load(self, buf, idx)
+                return buf.result_type.numba_load(self, buf, idx)
             case asm.Store(buf, idx, val):
                 buf = self.resolve(buf)
-                buf.result_format.numba_store(self, buf, idx, val)
+                buf.result_type.numba_store(self, buf, idx, val)
                 return None
             case asm.Resize(buf, size):
                 buf = self.resolve(buf)
-                buf.result_format.numba_resize(self, buf, size)
+                buf.result_type.numba_resize(self, buf, size)
                 return None
             case asm.Length(buf):
                 buf = self.resolve(buf)
-                return buf.result_format.numba_length(self, buf)
+                return buf.result_type.numba_length(self, buf)
             case asm.LoadDict(dct, idx):
                 dct = self.resolve(dct)
-                return dct.result_format.numba_loaddict(self, dct, idx)
+                return dct.result_type.numba_loaddict(self, dct, idx)
             case asm.ExistsDict(dct, idx):
                 dct = self.resolve(dct)
-                return dct.result_format.numba_existsdict(self, dct, idx)
+                return dct.result_type.numba_existsdict(self, dct, idx)
             case asm.StoreDict(dct, idx, val):
                 dct = self.resolve(dct)
-                return dct.result_format.numba_storedict(self, dct, idx, val)
+                return dct.result_type.numba_storedict(self, dct, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 if bodies == ():
@@ -730,7 +730,7 @@ class NumbaContext(Context):
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
-                ctx_2.types[var.name] = var.result_format
+                ctx_2.types[var.name] = var.result_type
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}")
                 return None

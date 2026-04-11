@@ -194,7 +194,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
         assert isinstance(dimension_type, TupleFType)
         # Normalize dimension field types to Finch ftypes so generated
-        # result_format values are consistent with strict asm type checks.
+        # result_type values are consistent with strict asm type checks.
         dimension_type = TupleFType.from_tuple(
             tuple(ftype(t) for t in dimension_type.struct_fieldtypes)
         )

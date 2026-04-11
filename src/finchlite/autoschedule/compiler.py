@@ -323,7 +323,7 @@ class NotationGenerator(LogicNotationLowerer):
         for node in PostOrderDFS(body):
             match node:
                 case ntn.Return(expr):
-                    ret_t = expr.result_format
+                    ret_t = expr.result_type
         return ntn.Module(
             (
                 ntn.Function(

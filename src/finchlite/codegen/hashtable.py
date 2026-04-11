@@ -362,7 +362,7 @@ class CHashTableFType(CDictFType, CStackFType):
         """
         Unpack the map into C context.
         """
-        assert val.result_format == self
+        assert val.result_type == self
         data = ctx.freshen(var_n, "data")
         # Add all the stupid header stuff from above.
         if self not in ctx.datastructures:

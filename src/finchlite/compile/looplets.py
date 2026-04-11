@@ -211,7 +211,7 @@ class StepperPass(LoopletPass):
 
         ctx_2 = ctx.scope()
 
-        idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_format)
+        idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_type)
         ctx.exec(asm.Assign(ctx.ctx(idx_start), ctx.ctx(ext.get_start())))
 
         # intersection of all steppers - chunk extent

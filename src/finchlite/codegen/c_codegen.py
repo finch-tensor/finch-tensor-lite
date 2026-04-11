@@ -430,7 +430,7 @@ class CCompiler(asm.AssemblyLoader):
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
                     # return_t = c_type(return_t)
-                    arg_ts = [arg.result_format for arg in args]
+                    arg_ts = [arg.result_type for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
                 case _:
@@ -775,7 +775,7 @@ class CContext(Context):
         if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
-        var_t = val.result_format
+        var_t = val.result_type
         var_t_code = self.ctype_name(c_type(var_t))
         self.exec(f"{self.feed}{var_t_code} {var_n} = {self(val)};")
         return asm.Variable(var_n, var_t)
@@ -794,8 +794,8 @@ class CContext(Context):
                 return name
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_n} = {val_code};")
@@ -805,18 +805,18 @@ class CContext(Context):
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.GetAttr(obj, attr):
-                if not obj.result_format.struct_hasattr(attr.val):
+                if not obj.result_type.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return c_getattr(obj.result_format, self, self(obj), attr.val)
+                return c_getattr(obj.result_type, self, self(obj), attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
-                if not fisinstance(val, obj.result_format.struct_attrtype(attr.val)):
+                if not fisinstance(val, obj.result_type.struct_attrtype(attr.val)):
                     raise TypeError(
-                        f"Type mismatch: {val.result_format} != "
-                        f"{obj.result_format.struct_attrtype(attr.val)}"
+                        f"Type mismatch: {val.result_type} != "
+                        f"{obj.result_type.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                c_setattr(obj.result_format, self, self(obj), attr.val, val_code)
+                c_setattr(obj.result_type, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
                 return c_function_call(f.val, self, *args)
@@ -826,8 +826,8 @@ class CContext(Context):
             #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.slots:
                     raise KeyError(
                         f"Slot {var_n} already exists in context, cannot unpack"
@@ -854,25 +854,25 @@ class CContext(Context):
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
-                return buf.result_format.c_load(self, buf, idx)
+                return buf.result_type.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
                 buf = self.resolve(buf)
-                return buf.result_format.c_store(self, buf, idx, val)
+                return buf.result_type.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
                 buf = self.resolve(buf)
-                return buf.result_format.c_resize(self, buf, len)
+                return buf.result_type.c_resize(self, buf, len)
             case asm.Length(buf):
                 buf = self.resolve(buf)
-                return buf.result_format.c_length(self, buf)
+                return buf.result_type.c_length(self, buf)
             case asm.LoadDict(map, idx):
                 map = self.resolve(map)
-                return map.result_format.c_loaddict(self, map, idx)
+                return map.result_type.c_loaddict(self, map, idx)
             case asm.ExistsDict(map, idx):
                 map = self.resolve(map)
-                return map.result_format.c_existsdict(self, map, idx)
+                return map.result_type.c_existsdict(self, map, idx)
             case asm.StoreDict(map, idx, val):
                 map = self.resolve(map)
-                return map.result_format.c_storedict(self, map, idx, val)
+                return map.result_type.c_storedict(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -880,13 +880,13 @@ class CContext(Context):
                 self.exec(ctx_2.emit())
                 return None
             case asm.ForLoop(asm.Variable(_, _) as var, start, end, body):
-                var_t = self.ctype_name(c_type(var.result_format))
+                var_t = self.ctype_name(c_type(var.result_type))
                 var_2 = self(var)
                 start = self(start)
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
-                ctx_2.types[var.name] = var.result_format
+                ctx_2.types[var.name] = var.result_type
                 body_code = ctx_2.emit()
                 self.exec(
                     f"{feed}for ({var_t} {var_2} = {start}; "
@@ -897,7 +897,7 @@ class CContext(Context):
                 return None
             case asm.BufferLoop(buf, asm.Variable(_, _) as var, body):
                 idx = asm.Variable(
-                    self.freshen(var.name + "_i"), buf.result_format.shape_type()
+                    self.freshen(var.name + "_i"), buf.result_type.shape_type()
                 )
                 start = asm.Literal(0)
                 stop = asm.Call(
@@ -907,7 +907,7 @@ class CContext(Context):
                 return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
                 if not isinstance(cond, asm.Literal | asm.Variable):
-                    cond_var = asm.Variable(self.freshen("cond"), cond.result_format)
+                    cond_var = asm.Variable(self.freshen("cond"), cond.result_type)
                     new_prgm = asm.Block(
                         (
                             asm.Assign(cond_var, cond),
