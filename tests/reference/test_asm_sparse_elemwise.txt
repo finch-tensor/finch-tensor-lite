@@ -1,91 +1,91 @@
-def main(#A#14: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))), #A_2#18: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))), #A_3#22: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64) -> tuple(BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64):
-    #_A#15: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))) = #A#14
-    #_A#15_ptr: np_buf_t(int64) = #_A#15.lvl.lvl.ptr
-    #_A#15_ptr_slot: np_buf_t(int64) = unpack(#_A#15_ptr)
-    #_A#15_idx: np_buf_t(int64) = #_A#15.lvl.lvl.idx
-    #_A#15_idx_slot: np_buf_t(int64) = unpack(#_A#15_idx)
-    #_A#15_buf: np_buf_t(float64) = #_A#15.lvl.lvl.lvl.val
-    #_A#15_buf_slot: np_buf_t(float64) = unpack(#_A#15_buf)
-    #A_dim_0#16: int64 = #_A#15.lvl.dimension
-    #A_dim_1#17: int64 = #_A#15.lvl.lvl.dimension
-    #_A_2#19: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))) = #A_2#18
-    #_A_2#19_ptr: np_buf_t(int64) = #_A_2#19.lvl.lvl.ptr
-    #_A_2#19_ptr_slot: np_buf_t(int64) = unpack(#_A_2#19_ptr)
-    #_A_2#19_idx: np_buf_t(int64) = #_A_2#19.lvl.lvl.idx
-    #_A_2#19_idx_slot: np_buf_t(int64) = unpack(#_A_2#19_idx)
-    #_A_2#19_buf: np_buf_t(float64) = #_A_2#19.lvl.lvl.lvl.val
-    #_A_2#19_buf_slot: np_buf_t(float64) = unpack(#_A_2#19_buf)
-    #A_2_dim_0#20: int64 = #_A_2#19.lvl.dimension
-    #A_2_dim_1#21: int64 = #_A_2#19.lvl.lvl.dimension
-    #_A_3#23: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = #A_3#22
-    #_A_3#23_stride_0: int64 = #_A_3#23.strides.element_0
-    #_A_3#23_stride_1: int64 = #_A_3#23.strides.element_1
-    #_A_3#23_buf: np_buf_t(float64) = #_A_3#23.val
-    #_A_3#23_buf_slot: np_buf_t(float64) = unpack(#_A_3#23_buf)
-    #A_3_dim_0#24: int64 = #_A_3#23.shape.element_0
-    #A_3_dim_1#25: int64 = #_A_3#23.shape.element_1
-    for i in range(0, length(slot(#_A_3#23_buf_slot, np_buf_t(float64)))):
-        store(slot(#_A_3#23_buf_slot, np_buf_t(float64)), i, 0.0)
-    for #i#26 in range(0, #A_2_dim_0#20):
-        #i#26__pos: int64 = add(0, mul(#_A_3#23_stride_0, #i#26))
-        #i#26__pos_2: int64 = add(#_A#15.pos, mul(#_A#15.lvl.stride, #i#26))
-        #i#26__pos_3: int64 = add(#_A_2#19.pos, mul(#_A_2#19.lvl.stride, #i#26))
-        q: int64 = load(slot(#_A#15_ptr_slot, np_buf_t(int64)), #i#26__pos_2)
-        q_stop: int64 = load(slot(#_A#15_ptr_slot, np_buf_t(int64)), add(#i#26__pos_2, 1))
+def main(#A#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))), #A_2#2: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))), #A_3#3: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64) -> tuple(BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64):
+    #_A#4: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))) = #A#1
+    #_A#4_ptr: np_buf_t(int64) = #_A#4.lvl.lvl.ptr
+    #_A#4_ptr_slot: np_buf_t(int64) = unpack(#_A#4_ptr)
+    #_A#4_idx: np_buf_t(int64) = #_A#4.lvl.lvl.idx
+    #_A#4_idx_slot: np_buf_t(int64) = unpack(#_A#4_idx)
+    #_A#4_buf: np_buf_t(float64) = #_A#4.lvl.lvl.lvl.val
+    #_A#4_buf_slot: np_buf_t(float64) = unpack(#_A#4_buf)
+    #A_dim_0#5: int64 = #_A#4.lvl.dimension
+    #A_dim_1#6: int64 = #_A#4.lvl.lvl.dimension
+    #_A_2#7: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))) = #A_2#2
+    #_A_2#7_ptr: np_buf_t(int64) = #_A_2#7.lvl.lvl.ptr
+    #_A_2#7_ptr_slot: np_buf_t(int64) = unpack(#_A_2#7_ptr)
+    #_A_2#7_idx: np_buf_t(int64) = #_A_2#7.lvl.lvl.idx
+    #_A_2#7_idx_slot: np_buf_t(int64) = unpack(#_A_2#7_idx)
+    #_A_2#7_buf: np_buf_t(float64) = #_A_2#7.lvl.lvl.lvl.val
+    #_A_2#7_buf_slot: np_buf_t(float64) = unpack(#_A_2#7_buf)
+    #A_2_dim_0#8: int64 = #_A_2#7.lvl.dimension
+    #A_2_dim_1#9: int64 = #_A_2#7.lvl.lvl.dimension
+    #_A_3#10: BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64 = #A_3#3
+    #_A_3#10_stride_0: int64 = #_A_3#10.strides.element_0
+    #_A_3#10_stride_1: int64 = #_A_3#10.strides.element_1
+    #_A_3#10_buf: np_buf_t(float64) = #_A_3#10.val
+    #_A_3#10_buf_slot: np_buf_t(float64) = unpack(#_A_3#10_buf)
+    #A_3_dim_0#11: int64 = #_A_3#10.shape.element_0
+    #A_3_dim_1#12: int64 = #_A_3#10.shape.element_1
+    for i in range(0, length(slot(#_A_3#10_buf_slot, np_buf_t(float64)))):
+        store(slot(#_A_3#10_buf_slot, np_buf_t(float64)), i, 0.0)
+    for #i#13 in range(0, #A_2_dim_0#8):
+        #i#13__pos: int64 = add(0, mul(#_A_3#10_stride_0, #i#13))
+        #i#13__pos_2: int64 = add(#_A#4.pos, mul(#_A#4.lvl.stride, #i#13))
+        #i#13__pos_3: int64 = add(#_A_2#7.pos, mul(#_A_2#7.lvl.stride, #i#13))
+        q: int64 = load(slot(#_A#4_ptr_slot, np_buf_t(int64)), #i#13__pos_2)
+        q_stop: int64 = load(slot(#_A#4_ptr_slot, np_buf_t(int64)), add(#i#13__pos_2, 1))
         if lt(q, q_stop):
-            i_stop: int64 = load(slot(#_A#15_idx_slot, np_buf_t(int64)), q)
-            i_last: int64 = load(slot(#_A#15_idx_slot, np_buf_t(int64)), sub(q_stop, 1))
+            i_stop: int64 = load(slot(#_A#4_idx_slot, np_buf_t(int64)), q)
+            i_last: int64 = load(slot(#_A#4_idx_slot, np_buf_t(int64)), sub(q_stop, 1))
         else:
             i_stop: int64 = 1
             i_last: int64 = 0
-        q_2: int64 = load(slot(#_A_2#19_ptr_slot, np_buf_t(int64)), #i#26__pos_3)
-        q_stop_2: int64 = load(slot(#_A_2#19_ptr_slot, np_buf_t(int64)), add(#i#26__pos_3, 1))
+        q_2: int64 = load(slot(#_A_2#7_ptr_slot, np_buf_t(int64)), #i#13__pos_3)
+        q_stop_2: int64 = load(slot(#_A_2#7_ptr_slot, np_buf_t(int64)), add(#i#13__pos_3, 1))
         if lt(q_2, q_stop_2):
-            i_stop_2: int64 = load(slot(#_A_2#19_idx_slot, np_buf_t(int64)), q_2)
-            i_last_2: int64 = load(slot(#_A_2#19_idx_slot, np_buf_t(int64)), sub(q_stop_2, 1))
+            i_stop_2: int64 = load(slot(#_A_2#7_idx_slot, np_buf_t(int64)), q_2)
+            i_last_2: int64 = load(slot(#_A_2#7_idx_slot, np_buf_t(int64)), sub(q_stop_2, 1))
         else:
             i_stop_2: int64 = 1
             i_last_2: int64 = 0
-        if lt(load(slot(#_A#15_idx_slot, np_buf_t(int64)), q), 0):
-            q: int64 = scansearch(slot(#_A#15_idx_slot, np_buf_t(int64)), 0, q, sub(q_stop, 1))
-        if lt(load(slot(#_A_2#19_idx_slot, np_buf_t(int64)), q_2), 0):
-            q_2: int64 = scansearch(slot(#_A_2#19_idx_slot, np_buf_t(int64)), 0, q_2, sub(q_stop_2, 1))
+        if lt(load(slot(#_A#4_idx_slot, np_buf_t(int64)), q), 0):
+            q: int64 = scansearch(slot(#_A#4_idx_slot, np_buf_t(int64)), 0, q, sub(q_stop, 1))
+        if lt(load(slot(#_A_2#7_idx_slot, np_buf_t(int64)), q_2), 0):
+            q_2: int64 = scansearch(slot(#_A_2#7_idx_slot, np_buf_t(int64)), 0, q_2, sub(q_stop_2, 1))
         i_start: int64 = 0
-        while lt(min(i_stop, i_stop_2), min(min(#A_2_dim_1#21, add(i_last, 1)), add(i_last_2, 1))):
+        while lt(min(i_stop, i_stop_2), min(min(#A_2_dim_1#9, add(i_last, 1)), add(i_last_2, 1))):
             if eq(min(i_stop, i_stop_2), i_stop):
-                #i_2#27__pos_2: int64 = q_2
-                #i_2#27__pos_4: int64 = q
-                #i_2#27__pos_6: int64 = q
-                #i_2#27__pos_7: int64 = q_2
-                for #i_2#27 in range(max(max(i_start, i_stop), i_stop_2), add(i_stop, 1)):
-                    #i_2#27__pos_8: int64 = add(#i#26__pos, mul(#_A_3#23_stride_1, #i_2#27))
-                    store(slot(#_A_3#23_buf_slot, np_buf_t(float64)), #i_2#27__pos_8, _initwrite(load(slot(#_A_3#23_buf_slot, np_buf_t(float64)), #i_2#27__pos_8), mul(load(slot(#_A#15_buf_slot, np_buf_t(float64)), #i_2#27__pos_6), load(slot(#_A_2#19_buf_slot, np_buf_t(float64)), #i_2#27__pos_7))))
+                #i_2#14__pos_2: int64 = q_2
+                #i_2#14__pos_4: int64 = q
+                #i_2#14__pos_6: int64 = q
+                #i_2#14__pos_7: int64 = q_2
+                for #i_2#14 in range(max(max(i_start, i_stop), i_stop_2), add(i_stop, 1)):
+                    #i_2#14__pos_8: int64 = add(#i#13__pos, mul(#_A_3#10_stride_1, #i_2#14))
+                    store(slot(#_A_3#10_buf_slot, np_buf_t(float64)), #i_2#14__pos_8, _initwrite(load(slot(#_A_3#10_buf_slot, np_buf_t(float64)), #i_2#14__pos_8), mul(load(slot(#_A#4_buf_slot, np_buf_t(float64)), #i_2#14__pos_6), load(slot(#_A_2#7_buf_slot, np_buf_t(float64)), #i_2#14__pos_7))))
                 i_start: int64 = add(i_stop, 1)
                 q: int64 = add(q, 1)
                 if lt(q, q_stop):
-                    i_stop: int64 = load(slot(#_A#15_idx_slot, np_buf_t(int64)), q)
+                    i_stop: int64 = load(slot(#_A#4_idx_slot, np_buf_t(int64)), q)
                 else:
-                    i_stop: int64 = #_A#15.lvl.lvl.dimension
+                    i_stop: int64 = #_A#4.lvl.lvl.dimension
             if eq(min(i_stop, i_stop_2), i_stop_2):
-                #i_2#27__pos_10: int64 = q_2
-                #i_2#27__pos_12: int64 = q
-                #i_2#27__pos_14: int64 = q
-                #i_2#27__pos_15: int64 = q_2
-                for #i_2#27 in range(max(max(i_start, i_stop), i_stop_2), add(i_stop_2, 1)):
-                    #i_2#27__pos_16: int64 = add(#i#26__pos, mul(#_A_3#23_stride_1, #i_2#27))
-                    store(slot(#_A_3#23_buf_slot, np_buf_t(float64)), #i_2#27__pos_16, _initwrite(load(slot(#_A_3#23_buf_slot, np_buf_t(float64)), #i_2#27__pos_16), mul(load(slot(#_A#15_buf_slot, np_buf_t(float64)), #i_2#27__pos_14), load(slot(#_A_2#19_buf_slot, np_buf_t(float64)), #i_2#27__pos_15))))
+                #i_2#14__pos_10: int64 = q_2
+                #i_2#14__pos_12: int64 = q
+                #i_2#14__pos_14: int64 = q
+                #i_2#14__pos_15: int64 = q_2
+                for #i_2#14 in range(max(max(i_start, i_stop), i_stop_2), add(i_stop_2, 1)):
+                    #i_2#14__pos_16: int64 = add(#i#13__pos, mul(#_A_3#10_stride_1, #i_2#14))
+                    store(slot(#_A_3#10_buf_slot, np_buf_t(float64)), #i_2#14__pos_16, _initwrite(load(slot(#_A_3#10_buf_slot, np_buf_t(float64)), #i_2#14__pos_16), mul(load(slot(#_A#4_buf_slot, np_buf_t(float64)), #i_2#14__pos_14), load(slot(#_A_2#7_buf_slot, np_buf_t(float64)), #i_2#14__pos_15))))
                 i_start: int64 = add(i_stop_2, 1)
                 q_2: int64 = add(q_2, 1)
                 if lt(q_2, q_stop_2):
-                    i_stop_2: int64 = load(slot(#_A_2#19_idx_slot, np_buf_t(int64)), q_2)
+                    i_stop_2: int64 = load(slot(#_A_2#7_idx_slot, np_buf_t(int64)), q_2)
                 else:
-                    i_stop_2: int64 = #_A_2#19.lvl.lvl.dimension
-    repack(#_A#15_ptr_slot)
-    repack(#_A#15_idx_slot)
-    repack(#_A#15_buf_slot)
-    repack(#_A_2#19_ptr_slot)
-    repack(#_A_2#19_idx_slot)
-    repack(#_A_2#19_buf_slot)
-    repack(#_A_3#23_buf_slot)
-    main_return: tuple(BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64) = make_tuple(#A_3#22)
+                    i_stop_2: int64 = #_A_2#7.lvl.lvl.dimension
+    repack(#_A#4_ptr_slot)
+    repack(#_A#4_idx_slot)
+    repack(#_A#4_buf_slot)
+    repack(#_A_2#7_ptr_slot)
+    repack(#_A_2#7_idx_slot)
+    repack(#_A_2#7_buf_slot)
+    repack(#_A_3#10_buf_slot)
+    main_return: tuple(BufferizedNDArray_f64_shape_i64_i64_strides_i64_i64) = make_tuple(#A_3#3)
     return main_return
