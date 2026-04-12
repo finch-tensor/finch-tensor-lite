@@ -32,7 +32,7 @@ assembly_parser = Lark(
     _COMMENT: C_COMMENT | CPP_COMMENT
     INFIX_OP: "+" | "-" | "*" | "or" | "and" | "|" | "&" | "^" | "<<" | ">>"
       | "//" | "/" | "%" | "**" | ">" | "<" | ">=" | "<=" | "==" | "!="
-    OP: "min" | "max"
+    OP: "min" | "max" | "add" | "sub" | "mul"
 
     start: _FINCH _NEWLINE+ block
     block: (_stmt _NEWLINE+)* _stmt
@@ -69,6 +69,9 @@ _OPS = {
     ">=": ffunc.ge,
     "min": ffunc.min,
     "max": ffunc.max,
+    "add": ffunc.add,
+    "sub": ffunc.sub,
+    "mul": ffunc.mul,
 }
 
 
