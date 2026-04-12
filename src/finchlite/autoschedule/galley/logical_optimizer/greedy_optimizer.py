@@ -23,12 +23,5 @@ def greedy_query(input_aq: AnnotatedQuery, use_components: bool = True) -> list[
         queries.append(query)
 
     remaining_q = aq.get_remaining_query()
-    if remaining_q is not None:
-        queries.append(remaining_q)
-
-    if queries:
-        last_query = queries[-1]
-        if last_query.lhs != aq.output_name:
-            queries[-1] = Query(aq.output_name, last_query.rhs)
-
+    queries.append(remaining_q)
     return queries

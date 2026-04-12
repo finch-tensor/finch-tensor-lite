@@ -243,32 +243,14 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
 
         def seek_fn(ctx, ext):
             start = ctx.ctx(ext.get_start())
-            return asm.Block(
-                (
-                    asm.If(
-                        asm.Call(asm.L(ffunc.lt), (asm.Load(idx_s, q), start)),
-                        asm.Block(
-                            (
-                                asm.Assign(
-                                    q,
-                                    asm.Call(
-                                        asm.L(ffunc.scansearch),
-                                        (
-                                            idx_s,
-                                            start,
-                                            q,
-                                            asm.Call(
-                                                asm.L(ffunc.sub),
-                                                (q_stop, asm.L(self.p_t(1))),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            )
-                        ),
-                    ),
-                )
-            )
+
+            code = f"""finch
+            if (idx_s[q] < {start})
+              q = scansearch(idx_s, {start}, q, q_stop - 1)
+            end
+            """
+
+            return parse_assembly(code, tmp_locals | asm.get_vars_in_expr(start))
 
         def chunk_tail_fn(ctx, idx):
             pos_2 = asm.Variable(

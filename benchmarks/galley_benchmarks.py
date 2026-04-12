@@ -8,6 +8,7 @@ Run: ``poetry run python benchmarks/galley_benchmarks.py``
 from __future__ import annotations
 
 import sys
+import time
 from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -32,10 +33,7 @@ from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
 from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
     preprocess_plan_for_galley,
 )
-from finchlite.autoschedule.galley_optimize import (
-    GalleyLogicalOptimizer,
-    GalleyProfileTimes,
-)
+from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.compile.lower import NotationCompiler
 from finchlite.finch_assembly.interpreter import AssemblyInterpreter
@@ -47,46 +45,38 @@ CHAIN_RECURSION_LIMIT = 4000
 DEFAULT_COMPILE_PROFILE_N = 5
 DEFAULT_BNB_PROFILE_N = 1
 
-_DOWNSTREAM = LogicExecutor(
-    LogicStandardizer(
+
+def _make_inner_loader():
+    return LogicStandardizer(
         DefaultLogicFormatter(LogicCompiler(NotationCompiler(AssemblyInterpreter())))
     )
+
+
+_GALLEY_WITH = GalleyLogicalOptimizer(_make_inner_loader())
+_GALLEY_WITHOUT = GalleyLogicalOptimizer(_make_inner_loader(), use_components=False)
+_GALLEY_GREEDY = GalleyLogicalOptimizer(
+    _make_inner_loader(), use_exact_branch_and_bound=False
+)
+_GALLEY_EXACT_BNB = GalleyLogicalOptimizer(
+    _make_inner_loader(), use_exact_branch_and_bound=True
 )
 
-GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStatsFactory(),
-        _DOWNSTREAM,
-        profile=True,
-    )
-)
+GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(LogicExecutor(_GALLEY_WITH))
+GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(LogicExecutor(_GALLEY_WITHOUT))
+GALLEY_PIPELINE_GREEDY = LogicNormalizer(LogicExecutor(_GALLEY_GREEDY))
+GALLEY_PIPELINE_EXACT_BNB = LogicNormalizer(LogicExecutor(_GALLEY_EXACT_BNB))
 
-GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStatsFactory(),
-        _DOWNSTREAM,
-        use_components=False,
-        profile=True,
-    )
-)
 
-GALLEY_PIPELINE_GREEDY = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStatsFactory(),
-        _DOWNSTREAM,
-        profile=True,
-        use_exact_branch_and_bound=False,
-    )
-)
-
-GALLEY_PIPELINE_EXACT_BNB = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStatsFactory(),
-        _DOWNSTREAM,
-        profile=True,
-        use_exact_branch_and_bound=True,
-    )
-)
+def _run_and_time(
+    pipeline, optimizer: GalleyLogicalOptimizer, *args
+) -> tuple[Any, dict[str, float]]:
+    """Run ``pipeline(*args)`` and return
+    ``(result, {optimize_plan_s, downstream_s})``."""
+    t0 = time.perf_counter()
+    out = pipeline(*args)
+    total = time.perf_counter() - t0
+    opt_s = optimizer.last_optimize_plan_s or 0.0
+    return out, {"optimize_plan_s": opt_s, "downstream_s": max(total - opt_s, 0.0)}
 
 
 @contextmanager
@@ -234,12 +224,12 @@ def make_bnb_slow_example() -> LazyTensor:
 
 
 def _time_profile_pair(
-    run_first: Callable[[], tuple[Any, GalleyProfileTimes]],
-    run_second: Callable[[], tuple[Any, GalleyProfileTimes]],
+    run_first: Callable[[], tuple[Any, dict[str, float]]],
+    run_second: Callable[[], tuple[Any, dict[str, float]]],
     *,
     n: int,
     recursion_limit: int | None,
-) -> tuple[GalleyProfileTimes, GalleyProfileTimes]:
+) -> tuple[dict[str, float], dict[str, float]]:
     with _recursion_limit_ctx(recursion_limit):
         for _ in range(2):
             run_first()
@@ -249,7 +239,7 @@ def _time_profile_pair(
             _, t = run_first()
             opt_a += t["optimize_plan_s"]
             down_a += t["downstream_s"]
-        first: GalleyProfileTimes = {
+        first: dict[str, float] = {
             "optimize_plan_s": opt_a / n,
             "downstream_s": down_a / n,
         }
@@ -258,7 +248,7 @@ def _time_profile_pair(
             _, t = run_second()
             opt_b += t["optimize_plan_s"]
             down_b += t["downstream_s"]
-        second: GalleyProfileTimes = {
+        second: dict[str, float] = {
             "optimize_plan_s": opt_b / n,
             "downstream_s": down_b / n,
         }
@@ -270,17 +260,21 @@ def time_compile_profile(
     *,
     n: int = DEFAULT_COMPILE_PROFILE_N,
     recursion_limit: int | None = None,
-) -> tuple[GalleyProfileTimes, GalleyProfileTimes]:
+) -> tuple[dict[str, float], dict[str, float]]:
     """
     Average ``optimize_plan_s`` and ``downstream_s`` per iteration for pipelines
     with and without Galley components.
     """
 
-    def run_with() -> tuple[Any, GalleyProfileTimes]:
-        return GALLEY_COMPILE_PROFILE_WITH(plan_from_expr(expr))
+    def run_with() -> tuple[Any, dict[str, float]]:
+        return _run_and_time(
+            GALLEY_COMPILE_PROFILE_WITH, _GALLEY_WITH, plan_from_expr(expr)
+        )
 
-    def run_without() -> tuple[Any, GalleyProfileTimes]:
-        return GALLEY_COMPILE_PROFILE_WITHOUT(plan_from_expr(expr))
+    def run_without() -> tuple[Any, dict[str, float]]:
+        return _run_and_time(
+            GALLEY_COMPILE_PROFILE_WITHOUT, _GALLEY_WITHOUT, plan_from_expr(expr)
+        )
 
     return _time_profile_pair(
         run_with, run_without, n=n, recursion_limit=recursion_limit
@@ -292,18 +286,22 @@ def time_galley_bnb_compile_profile(
     *,
     n: int = DEFAULT_BNB_PROFILE_N,
     recursion_limit: int | None = None,
-) -> tuple[GalleyProfileTimes, GalleyProfileTimes]:
+) -> tuple[dict[str, float], dict[str, float]]:
     """
     Average ``optimize_plan_s`` and ``downstream_s`` per iteration for exact BnB vs
     greedy Galley pipelines.
     """
     bindings: dict = {}
 
-    def run_exact() -> tuple[Any, GalleyProfileTimes]:
-        return GALLEY_PIPELINE_EXACT_BNB(plan_from_expr(expr), bindings)
+    def run_exact() -> tuple[Any, dict[str, float]]:
+        return _run_and_time(
+            GALLEY_PIPELINE_EXACT_BNB, _GALLEY_EXACT_BNB, plan_from_expr(expr), bindings
+        )
 
-    def run_greedy() -> tuple[Any, GalleyProfileTimes]:
-        return GALLEY_PIPELINE_GREEDY(plan_from_expr(expr), bindings)
+    def run_greedy() -> tuple[Any, dict[str, float]]:
+        return _run_and_time(
+            GALLEY_PIPELINE_GREEDY, _GALLEY_GREEDY, plan_from_expr(expr), bindings
+        )
 
     return _time_profile_pair(
         run_exact, run_greedy, n=n, recursion_limit=recursion_limit
@@ -312,7 +310,7 @@ def time_galley_bnb_compile_profile(
 
 def _print_profile_comparison(
     title: str,
-    rows: list[tuple[str, GalleyProfileTimes, tuple[float, int] | None]],
+    rows: list[tuple[str, dict[str, float], tuple[float, int] | None]],
 ) -> None:
     print("", flush=True)
     print("=" * 60, flush=True)
