@@ -11,7 +11,9 @@ from finchlite.algebra import ffunc
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     branch_and_bound,
+    branch_and_bound_dfs,
     pruned_query_to_plan,
+    pruned_query_to_plan_dfs,
 )
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
@@ -81,6 +83,40 @@ def _make_aq_three_index_chain():
 _CHAIN_FACTORIES = (_make_aq_three_index_chain, _make_aq_four_index_chain)
 
 
+def test_layered_bnb_exact_matches_dfs_bnb_exact_on_matmul_chain():
+    """Layered exact BnB vs DFS exact BnB: same optimal cost on a matmul chain."""
+    rng = np.random.default_rng(42)
+    shapes = ((3, 10), (10, 5), (5, 2))
+    mats = [
+        fl.asarray(rng.standard_normal((r, c)).astype(np.float64)) for r, c in shapes
+    ]
+    q = Query(
+        Alias("out"),
+        Aggregate(
+            Literal(ffunc.add),
+            Literal(0),
+            MapJoin(
+                Literal(ffunc.mul),
+                (
+                    Table(Literal(mats[0]), (Field("i"), Field("j"))),
+                    Table(Literal(mats[1]), (Field("j"), Field("k"))),
+                    Table(Literal(mats[2]), (Field("k"), Field("l"))),
+                ),
+            ),
+            (Field("i"), Field("j"), Field("k"), Field("l")),
+        ),
+    )
+    aq = AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=OrderedDict())
+    component = aq.connected_components[0]
+    (_, _, _, cost_layered), _ = branch_and_bound(
+        aq, component, float("inf"), OrderedDict()
+    )
+    (_, _, _, cost_dfs), _, _ = branch_and_bound_dfs(
+        aq, component, float("inf"), OrderedDict()
+    )
+    assert cost_layered == pytest.approx(cost_dfs)
+
+
 def test_pruned_exact_strictly_cheaper_than_pruned_greedy_on_four_index_chain():
     """Four-index chain: exact (pruned) cost is strictly below greedy (pruned)."""
     aq = _make_aq_four_index_chain()
@@ -112,6 +148,20 @@ def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
     (_, _, _, cost_k1), _ = r_greedy
     (_, _, _, cost_kinf), _ = r_exact
     assert cost_kinf <= cost_k1
+
+
+@pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
+def test_pruned_query_to_plan_dfs_exact_no_worse_than_greedy(factory):
+    """DFS exact pruned plan cost is never above greedy-only pruned plan."""
+    aq = factory()
+    _, greedy_cost = pruned_query_to_plan(aq, use_greedy=True)
+    _, exact_dfs_cost = pruned_query_to_plan_dfs(aq, use_greedy=False)
+    assert exact_dfs_cost <= greedy_cost
+    assert np.isfinite(exact_dfs_cost) and exact_dfs_cost > 0
+    if factory is _make_aq_four_index_chain:
+        assert exact_dfs_cost < greedy_cost, (
+            f"Expected exact DFS ({exact_dfs_cost}) < greedy ({greedy_cost})"
+        )
 
 
 def _make_aq_passthrough_alias():
