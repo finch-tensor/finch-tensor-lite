@@ -421,14 +421,14 @@ invert = _Invert()
 
 
 class _Eq(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
+    is_commutative = True
+
     @property
     def c_symbol(self) -> str:
         return "=="
 
     def numba_name(self) -> str:
         return "=="
-
-    is_commutative = True
 
     def __call__(self, a: Any, b: Any):
         return operator.eq(a, b)
@@ -440,12 +440,15 @@ class _Eq(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
 eq = _Eq()
 
 
-class _Ne(ComparisonFinchOperator, CBinaryOperator):
+class _Ne(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
+    is_commutative = True
+
     @property
     def c_symbol(self) -> str:
         return "!="
 
-    is_commutative = True
+    def numba_name(self) -> str:
+        return "!="
 
     def __call__(self, a: Any, b: Any):
         return operator.ne(a, b)
@@ -457,9 +460,12 @@ class _Ne(ComparisonFinchOperator, CBinaryOperator):
 ne = _Ne()
 
 
-class _Gt(ComparisonFinchOperator, CBinaryOperator):
+class _Gt(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     @property
     def c_symbol(self) -> str:
+        return ">"
+
+    def numba_name(self) -> str:
         return ">"
 
     def __call__(self, a: Any, b: Any):
@@ -490,9 +496,12 @@ class _Lt(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
 lt = _Lt()
 
 
-class _Ge(ComparisonFinchOperator, CBinaryOperator):
+class _Ge(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     @property
     def c_symbol(self) -> str:
+        return ">="
+
+    def numba_name(self) -> str:
         return ">="
 
     def __call__(self, a: Any, b: Any):
@@ -505,9 +514,12 @@ class _Ge(ComparisonFinchOperator, CBinaryOperator):
 ge = _Ge()
 
 
-class _Le(ComparisonFinchOperator, CBinaryOperator):
+class _Le(ComparisonFinchOperator, CBinaryOperator, NumbaOperator):
     @property
     def c_symbol(self) -> str:
+        return "<="
+
+    def numba_name(self) -> str:
         return "<="
 
     def __call__(self, a: Any, b: Any):
@@ -1500,6 +1512,47 @@ class _Scansearch(FinchOperator, NumbaOperator):
 
 scansearch = _Scansearch()
 
+
+class _ResizeIfSmaller(FinchOperator, NumbaOperator):
+    """
+    ResizeIfSmaller resizes an array to a new size if the new size is larger
+    than the current size.
+
+    It takes an array `arr` and a new size `new_size`, and returns a resized
+    version of `arr` if `new_size` is larger than the current size of `arr`.
+    If `new_size` is less than or equal to the current size of `arr`, it
+    returns `arr` unchanged.
+    """
+
+    @staticmethod
+    def _func(
+        arr: np.ndarray, new_size: np.integer, fill_value: np.number
+    ) -> np.ndarray:
+        if new_size > arr.size:
+            new_arr = np.full(new_size, fill_value, arr.dtype)
+            new_arr[: arr.size] = arr
+            return new_arr
+        return arr
+
+    def __call__(self, *args, **kwargs):
+        return self._func(*args, **kwargs)
+
+    def return_type(self, arr, new_size, fill_value) -> type:
+        return arr
+
+    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+        arr = args[0]
+        new_size = args[1]
+        fill_value = args[2]
+        return f"resize_if_smaller({ctx(arr)}, {ctx(new_size)}, {ctx(fill_value)})"
+
+    def __repr__(self) -> str:
+        return "resize_if_smaller"
+
+
+resize_if_smaller = _ResizeIfSmaller()
+
+
 __all__ = [
     "abs",
     "abs",
@@ -1577,6 +1630,7 @@ __all__ = [
     "real",
     "reciprocal",
     "remainder",
+    "resize_if_smaller",
     "round",
     "rshift",
     "scansearch",
