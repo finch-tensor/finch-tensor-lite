@@ -16,7 +16,7 @@ reached later (e.g. ``ABCDE`` before ``ABCE``). This is a heuristic unless a
 problem-specific proof applies; set env ``GALLEY_BNB_DFS_PREFIX_BLOCK=0`` to
 disable.
 
-NOTE: remove _PRINT_BNB_DFS_MEMO, its for testing 
+NOTE: remove _PRINT_BNB_DFS_MEMO, its for testing
 remove _PREFIX_BLOCK_DFS, its a parameter
 """
 
@@ -71,10 +71,7 @@ def _dfs_order_prefix_blocked(order: list, blocked: set[tuple]) -> bool:
     if not blocked:
         return False
     t = tuple(order)
-    for b in blocked:
-        if len(t) >= len(b) and t[: len(b)] == b:
-            return True
-    return False
+    return any(len(t) >= len(b) and t[: len(b)] == b for b in blocked)
 
 
 def _dfs_fork_sibling_blocks(
@@ -84,7 +81,7 @@ def _dfs_fork_sibling_blocks(
     blocked: set[tuple],
     sibling_witness_best: dict[tuple, float],
 ) -> None:
-    """Min witness cost per sibling prefix ``S``; block ``S`` if already visited and beaten."""
+    """Min witness cost per sibling ``S``; block ``S`` if visited and beaten."""
     n = len(full_order)
     for i in range(n - 1):
         d, e = full_order[i], full_order[i + 1]
@@ -99,7 +96,9 @@ def _dfs_fork_sibling_blocks(
             blocked.add(s)
 
 
-def _print_dfs_memo_snapshot(stage: str, n: int, memo: dict[frozenset, tuple[float, list]]) -> None:
+def _print_dfs_memo_snapshot(
+    stage: str, n: int, memo: dict[frozenset, tuple[float, list]]
+) -> None:
     """Print ``memo`` after each stack pop / memo assign (DFS ``k=inf``)."""
     print(f"\n--- branch_and_bound_dfs memo {stage} #{n} ---")
     for vk in sorted(memo.keys(), key=_vars_key_sort_key):
@@ -107,7 +106,6 @@ def _print_dfs_memo_snapshot(stage: str, n: int, memo: dict[frozenset, tuple[flo
         label = "{}" if not vk else "{" + ", ".join(sorted(repr(x) for x in vk)) + "}"
         print(f"  {label} -> (cost={c}, order={[repr(x) for x in ord_]})")
     print(f"  [n_entries={len(memo)}]")
-
 
 
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
@@ -266,9 +264,7 @@ def branch_and_bound_dfs(
     best_complete_cost = float("inf")
 
     stack: deque = deque()
-    stack.appendleft(
-        (frozenset(), input_aq, [], [], 0.0)
-    )
+    stack.appendleft((frozenset(), input_aq, [], [], 0.0))
 
     pop_idx = 0
     assign_idx = 0
@@ -323,7 +319,7 @@ def branch_and_bound_dfs(
                 if w < total_cost:
                     continue
 
-            # Search path: best cost so far to eliminated-index set ``new_vars`` (prefix walk).
+            # Best cost so far to eliminated-index set ``new_vars`` (prefix walk).
             memo[new_vars] = (total_cost, new_order)
             prev_pb = prefix_best.get(new_t, float("inf"))
             if total_cost < prev_pb:
@@ -350,7 +346,6 @@ def branch_and_bound_dfs(
             f"{component!r}; reducible idxs on input: "
             f"{input_aq.get_reducible_idxs()!r}"
         )
-
 
     sorted_keys = sorted(memo.keys(), key=_vars_key_sort_key)
     # --- optimal_subquery_costs and optimal_perm_by_vars only used for testing ---
@@ -429,9 +424,9 @@ def pruned_query_to_plan_dfs(
     use_components: bool = True,
 ) -> tuple[list[Query], float]:
     """
-    Pruned optimizer like :func:`pruned_query_to_plan`, using :func:`branch_and_bound_dfs`
-    for the greedy and exact component passes (iterative DFS for ``k=inf``; other ``k``
-    delegate to the layered implementation).
+    Pruned optimizer like :func:`pruned_query_to_plan`, using
+    :func:`branch_and_bound_dfs` for the greedy and exact component passes
+    (iterative DFS for ``k=inf``; other ``k`` delegate to the layered implementation).
     Returns (queries, total_cost).
     """
     total_cost = 0.0
