@@ -344,10 +344,11 @@ class _Or(ReflexiveFinchOperator, CNAryOperator):
     def is_identity(self, arg):
         return not bool(arg)
 
-    def is_annihilator(self, arg, argtype):
-        if argtype is None:
+    def is_annihilator(self, arg, *argtypes):
+        if argtypes is None:
             return False
-        promoted = promote_type(cast(FDType, ftype(arg)), cast(FDType, ftype(argtype)))
+        promote_others = reduce(promote_type, argtypes)
+        promoted = promote_type(ftype(arg), promote_others)
         arg = promoted(arg)
         if isinstance(promoted, FDTypeBoolean):
             return bool(arg)
