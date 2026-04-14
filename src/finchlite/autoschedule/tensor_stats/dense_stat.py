@@ -8,6 +8,7 @@ from finchlite.finch_logic import Field
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory
+import numpy as np
 
 
 class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
@@ -78,3 +79,9 @@ class DenseStats(NumericStats):
         for size in self.dim_sizes.values():
             total *= size
         return total
+
+    def get_embeddings(self) -> np.ndarray:
+        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
+        
+        return np.array(np.log2(sizes))
+        

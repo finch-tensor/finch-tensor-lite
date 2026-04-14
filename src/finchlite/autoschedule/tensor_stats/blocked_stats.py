@@ -266,3 +266,14 @@ class BlockedStats(NumericStats):
 
     def estimate_non_fill_values(self):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
+    
+    def get_embeddings(self) -> np.ndarray: 
+        total_elements = math.prod(self.tensordef.dim_sizes.values())
+        num_blocks = self.blocks.size
+        block_volume = total_elements / num_blocks
+        densities = [b.estimate_non_fill_values() / block_volume for b in self.blocks.flat]
+        density_array = np.array(densities)
+        return np.log2(density_array + 1)
+    
+
+    

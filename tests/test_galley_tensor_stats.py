@@ -13,6 +13,8 @@ from finchlite.autoschedule.tensor_stats import (
     BlockedStats,
     BlockedStatsFactory,
     DCStats,
+    UniformStats,
+    DenseStats,
     DCStatsFactory,
     DenseStatsFactory,
     TensorDef,
@@ -25,6 +27,36 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+
+
+# ─────────────────────────────── Test Embeddings ───────────────────────────────
+def test_embeddings():
+    data = np.zeros((20, 20))
+    data[0:10, 0:10] = 1.0   
+    data[10:20, 10:20] = 1.0
+    
+    arr = fl.asarray(data)
+    fields = (Field("i"), Field("j"))
+    
+    print("\n" + "="*80)
+    ds = DenseStats(arr,fields)
+    ds_emb = ds.get_embeddings()
+    print(f"DenseStats Embeddings : {ds_emb}")
+
+    us = UniformStats(arr, fields)
+    us_emb = us.get_embeddings()
+    print(f"UniformStats Embeddings : {us_emb}")
+
+    dc_stats = DCStats(arr, fields)
+    dc_emb = dc_stats.get_embeddings()
+    print(f"DCStats Embeddings: {dc_emb}")
+
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(arr, fields, blocks_per_dim, UniformStatsFactory())
+    bs_emb = bs.get_embeddings()
+    print(f"BlockedStats Embeddings: {bs_emb}")
+
+    print("="*80)
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
 
@@ -163,6 +195,27 @@ def test_uniform_aggregate_and_issimilar():
 
 
 # ------------------------------ BlockedStats -------------------------------------
+def test_blocked_stats_embeddings():
+    data = np.zeros((10, 10))
+    data[0:5, 0:5] = 1.0
+    
+    indices = (Field("i"), Field("j"))
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+
+    bs = BlockedStats.from_tensor(
+        fl.asarray(data), 
+        indices, 
+        blocks_per_dim, 
+        UniformStatsFactory()
+    )
+    
+    embedding = bs.get_embeddings()
+    print(f"Embedding Vector: {embedding}")
+    expected = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    np.testing.assert_array_almost_equal(embedding, expected)
+
+
+
 def test_blocked_stats_from_tensor():
     data = np.eye(10)
     arr = fl.asarray(data)
@@ -327,7 +380,7 @@ def test_benchmark_structured_comparison():
     print("\n" + "=" * 85)
     print(
         f"{'Matrix Type':<15} | {'Stats':<15} |"
-        f" {'Stats Perf':<18} | {'Blocked Stats Perf'}"
+        f" {'Stats Relative Error':<18} | {'Blocked Stats Relatibe Error'}"
     )
     print("-" * 85)
 
