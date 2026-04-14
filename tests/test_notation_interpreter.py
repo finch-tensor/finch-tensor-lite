@@ -51,12 +51,13 @@ def test_matrix_multiplication(a, b):
     j = ntn.Variable("j", finchlite.int64)
     k = ntn.Variable("k", finchlite.int64)
 
-    A = ntn.Variable("A", np.ndarray)
-    B = ntn.Variable("B", np.ndarray)
-    C = ntn.Variable("C", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
-    B_ = ntn.Slot("B_", np.ndarray)
-    C_ = ntn.Slot("C_", np.ndarray)
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    B = ntn.Variable("B", finchlite.ftype(a))
+    C = ntn.Variable("C", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
+    B_ = ntn.Slot("B_", finchlite.ftype(a))
+    C_ = ntn.Slot("C_", finchlite.ftype(a))
 
     a_ik = ntn.Variable("a_ik", finchlite.float64)
     b_kj = ntn.Variable("b_kj", finchlite.float64)
@@ -216,8 +217,9 @@ def test_count_nonfill_vector(a):
     ],
 )
 def test_count_nonfill_matrix(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     i = ntn.Variable("i", finchlite.int64)
     j = ntn.Variable("j", finchlite.int64)
