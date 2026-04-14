@@ -1099,7 +1099,6 @@ def test_multiple_hashtable(compiler, tabletype):
         ),
         TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
     )
-    nestedtype = TupleFType.from_tuple((ftypes.int_, ftypes.float_))
     table5 = tabletype(ftypes.int_, ftypes.int_)
 
     mod = compiler(
