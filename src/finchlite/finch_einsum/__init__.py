@@ -1,8 +1,13 @@
 from .interpreter import (
+    Collective,
+    DistributedFinchTensor,
     EinsumInterpreter,
     MockEinsumKernel,
     MockEinsumLibrary,
     MockEinsumLoader,
+    SummaEinsumKernel,
+    SummaEinsumLibrary,
+    SummaEinsumLoader,
 )
 from .nodes import (
     Access,
@@ -28,6 +33,8 @@ __all__ = [
     "Access",
     "Alias",
     "Call",
+    "Collective",
+    "DistributedFinchTensor",
     "Einsum",
     "EinsumCompiler",
     "EinsumEvaluator",
@@ -45,6 +52,9 @@ __all__ = [
     "MockEinsumLoader",
     "Plan",
     "Produces",
+    "SummaEinsumKernel",
+    "SummaEinsumLibrary",
+    "SummaEinsumLoader",
     "compute_shape_vars",
     "parse_einop",
     "parse_einsum",
