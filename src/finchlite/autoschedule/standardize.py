@@ -71,7 +71,7 @@ def split_increments(root: LogicStatement) -> LogicStatement:
                 if lhs in PostOrderDFS(rhs):
                     var = Alias(gensym("A"))
                     new_query = Query(var, rhs)
-                    new_root = Query(lhs, var)
+                    new_root = Query(lhs, Table(var, rhs.fields()))
                     return Plan((new_query, new_root))
         return None
 
