@@ -1,6 +1,6 @@
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
-from finchlite.algebra import ffuncs, init_value, ftype
+from finchlite.algebra import ffuncs, ftype, init_value
 from finchlite.algebra.tensor import TensorFType
 from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary

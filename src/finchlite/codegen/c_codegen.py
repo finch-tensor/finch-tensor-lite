@@ -588,11 +588,23 @@ register_property(
 register_property(
     algebra.bool_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
 )
-register_property(algebra.int_, "construct_from_c", "__attr__", lambda fmt, x: int(x.value if hasattr(x, 'value') else x))
 register_property(
-    algebra.float_, "construct_from_c", "__attr__", lambda fmt, x: float(x.value if hasattr(x, 'value') else x)
+    algebra.int_,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, x: int(x.value if hasattr(x, "value") else x),
 )
-register_property(algebra.bool_, "construct_from_c", "__attr__", lambda fmt, x: bool(x.value if hasattr(x, 'value') else x)
+register_property(
+    algebra.float_,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, x: float(x.value if hasattr(x, "value") else x),
+)
+register_property(
+    algebra.bool_,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, x: bool(x.value if hasattr(x, "value") else x),
 )
 register_property(algebra.none_, "serialize_to_c", "__attr__", lambda fmt, x: None)
 register_property(algebra.none_, "construct_from_c", "__attr__", lambda fmt, x: None)

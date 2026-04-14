@@ -205,9 +205,7 @@ class LogicExpression(LogicNode):
         """Returns the shape of the node."""
         return self.dimmap(merge_dim, dim_bindings)
 
-    def element_type(
-        self, bindings: dict[Alias, FType]
-    ) -> FType:
+    def element_type(self, bindings: dict[Alias, FType]) -> FType:
         """Returns element type of the node."""
         return self.valmap(merge_element_type, reduce_element_type, bindings)
 
@@ -263,9 +261,7 @@ class LogicStatement(LogicNode):
         will be stored in the dictionary passed to the method."""
         return self.infer_dimmap(merge_dim, dim_bindings)
 
-    def infer_element_type(
-        self, bindings: dict[Alias, FType]
-    ) -> dict[Alias, FType]:
+    def infer_element_type(self, bindings: dict[Alias, FType]) -> dict[Alias, FType]:
         """Infers element types for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_element_type, reduce_element_type, bindings)

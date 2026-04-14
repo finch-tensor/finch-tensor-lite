@@ -15,8 +15,8 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from .. import finch_einsum as ein
 from ..algebra import (
-    FType,
     FinchOperator,
+    FType,
     Tensor,
     TensorFType,
     ffuncs,
@@ -26,6 +26,7 @@ from ..algebra import (
     promote_type,
     return_type,
 )
+from ..algebra.ftypes import FDType
 from ..autoschedule.tensor_stats import StatsInterpreter
 from ..compile import BufferizedNDArray
 from ..finch_logic import (
@@ -44,7 +45,6 @@ from ..finch_logic import (
     TensorStats,
 )
 from ..symbolic import gensym
-from ..algebra.ftypes import FDType
 from .overrides import OverrideTensor
 
 
