@@ -159,8 +159,34 @@ class SummaEinsumKernel(AssemblyKernel):
                 and reduce_op in (ffunc.overwrite, ffunc.add)
             ):
                 pass
+            case ein.Plan(bodies):
+                stmt = next((x for x in bodies if isinstance(x, ein.Einsum)), None)
+                if stmt is None:
+                    raise ValueError("SUMMA kernel expects a matrix-multiply einsum")
+                match stmt:
+                    case ein.Einsum(
+                        ein.Literal(reduce_op),
+                        out,
+                        (i, j),
+                        ein.Call(
+                            ein.Literal(mul_op),
+                            (
+                                ein.Access(lhs, (i2, k1)),
+                                ein.Access(rhs, (k2, j2)),
+                            ),
+                        ),
+                    ) if (
+                        mul_op == ffunc.mul
+                        and i == i2
+                        and j == j2
+                        and k1 == k2
+                        and reduce_op in (ffunc.overwrite, ffunc.add)
+                    ):
+                        pass
+                    case _:
+                        raise ValueError("SUMMA kernel expects a matrix-multiply einsum")
             case _:
-                return EinsumInterpreter()(self.prgm, b)
+                raise ValueError("SUMMA kernel expects a matrix-multiply einsum")
 
         self.collective.run_same_kernel(f"summa_mvp::{out.name}={lhs.name}@{rhs.name}")
         a_obj, r_obj = b[lhs], b[rhs]
