@@ -6,10 +6,11 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, NamedTuple
 
-import numba
 import numpy as np
 
-from ..algebra import ImmutableStructFType, FType
+import numba
+
+from ..algebra import FType, ImmutableStructFType
 from ..finch_assembly import AssemblyExpression, Dict, Stack
 from .c_codegen import (
     CContext,

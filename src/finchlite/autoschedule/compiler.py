@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_notation.stages import NotationLoader
@@ -116,7 +115,8 @@ class NotationContext:
                 arg_types = arg.shape_type(self.shape_types)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
                 shape_type = {
-                    idx: shape_type_map.get(idx) or ftypes.intp for idx in idxs_1 + idxs_2
+                    idx: shape_type_map.get(idx) or ftypes.intp
+                    for idx in idxs_1 + idxs_2
                 }
                 loop_idxs = []
                 remap_idxs = {}
@@ -216,7 +216,9 @@ class NotationContext:
                 shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
                 arg_types = arg_2.shape_type(self.shape_types)
                 shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
-                shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in idxs_1}
+                shape_type = {
+                    idx: shape_type_map.get(idx) or ftypes.intp for idx in idxs_1
+                }
                 loops = {
                     idx: ntn.Variable(gensym(idx.name), shape_type[idx])
                     for idx in idxs_1

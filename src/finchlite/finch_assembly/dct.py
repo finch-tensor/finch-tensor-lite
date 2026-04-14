@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
-from ..algebra import FType, FTyped
 import numpy as np
+
+from ..algebra import FType, FTyped
 
 
 class Dict(FTyped, ABC):

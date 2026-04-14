@@ -165,12 +165,12 @@ class _FDTypeBuiltinNone(FDTypeBuiltin):
 
     def __repr__(self):
         return "none_"
-    
+
     def __call__(self, val):
         """None type cannot be called, always returns None"""
         if val is not None:
             raise TypeError(f"Cannot convert {val!r} to None type")
-        return None
+        return
 
 
 none_ = _FDTypeBuiltinNone()
