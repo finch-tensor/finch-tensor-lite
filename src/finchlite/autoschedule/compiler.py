@@ -97,6 +97,45 @@ class NotationContext:
             epilogue = ()
         self.epilogue = epilogue
 
+    def _lower_query_aggregates(
+        self,
+        query_lhs: lgc.Alias,
+        agg_op: Any,
+        agg_arg: lgc.Reorder,
+        agg_idxs: tuple[lgc.Field, ...],
+    ):
+        # Build a dict mapping fields to their shapes
+        arg_dims = agg_arg.dimmap(merge_shapes, self.shapes)
+        shapes_map = dict(zip(agg_arg.idxs, arg_dims, strict=True))
+        shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in agg_arg.idxs}
+        arg_types = agg_arg.shape_type(self.shape_types)
+        shape_type_map = dict(zip(agg_arg.idxs, arg_types, strict=True))
+        shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in agg_arg.idxs}
+        loops = {
+            idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in agg_arg.idxs
+        }
+        ctx = PointwiseContext(self)
+        rhs = ctx(agg_arg.arg, loops)
+        lhs_access = ntn.Access(
+            self.slots[query_lhs],
+            ntn.Update(ntn.Literal(agg_op)),
+            tuple(loops[idx] for idx in agg_arg.idxs if idx not in agg_idxs),
+        )
+        body = ntn.Increment(lhs_access, rhs)
+        for idx in reversed(agg_arg.idxs):
+            t = loops[idx].type_
+            ext = ntn.Call(
+                ntn.Literal(make_extent),
+                (ntn.Literal(t(0)), shapes[idx]),
+            )
+            body = ntn.Loop(
+                loops[idx],
+                ext,
+                body,
+            )
+
+        return body
+
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
         Lower Finch Logic to Finch Notation. First we check for early
@@ -213,37 +252,7 @@ class NotationContext:
                     idxs_2,
                 ),
             ):
-                # Build a dict mapping fields to their shapes
-                arg_dims = arg_2.dimmap(merge_shapes, self.shapes)
-                shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
-                shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in idxs_1}
-                arg_types = arg_2.shape_type(self.shape_types)
-                shape_type_map = dict(zip(idxs_1, arg_types, strict=True))
-                shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in idxs_1}
-                loops = {
-                    idx: ntn.Variable(gensym(idx.name), shape_type[idx])
-                    for idx in idxs_1
-                }
-                ctx = PointwiseContext(self)
-                rhs = ctx(arg, loops)
-                lhs_access = ntn.Access(
-                    self.slots[lhs],
-                    ntn.Update(ntn.Literal(op)),
-                    tuple(loops[idx] for idx in idxs_1 if idx not in idxs_2),
-                )
-                body = ntn.Increment(lhs_access, rhs)
-                for idx in reversed(idxs_1):
-                    t = loops[idx].type_
-                    ext = ntn.Call(
-                        ntn.Literal(make_extent),
-                        (ntn.Literal(t(0)), shapes[idx]),
-                    )
-                    body = ntn.Loop(
-                        loops[idx],
-                        ext,
-                        body,
-                    )
-
+                body = self._lower_query_aggregates(lhs, op, arg_2, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Declare(
@@ -256,6 +265,34 @@ class NotationContext:
                         ntn.Freeze(
                             self.slots[lhs],
                             ntn.Literal(op),
+                        ),
+                    )
+                )
+            case lgc.Query(
+                lhs_1,
+                lgc.Reorder(
+                    lgc.MapJoin(
+                        lgc.Literal(op_1),
+                        (
+                            lgc.Table(lhs_2, idxs_1),
+                            lgc.Aggregate(
+                                lgc.Literal(op_2),
+                                lgc.Literal(init),
+                                lgc.Reorder(arg, idxs_2) as arg_2,
+                                idxs_3,
+                            ),
+                        ),
+                    ),
+                    idxs_4,
+                ),
+            ) if lhs_1 == lhs_2 and op_1 == op_2 and idxs_1 == idxs_4:
+                body = self._lower_query_aggregates(lhs_1, op_1, arg_2, idxs_3)
+                return ntn.Block(
+                    (
+                        body,
+                        ntn.Freeze(
+                            self.slots[lhs_1],
+                            ntn.Literal(op_1),
                         ),
                     )
                 )
