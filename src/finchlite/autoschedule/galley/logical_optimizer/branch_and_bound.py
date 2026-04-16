@@ -2,110 +2,12 @@
 Branch-and-bound optimizer for Galley query planning.
 Converted from Julia.
 Removed general cache. Both alias_hash and cost_cache
-
-``branch_and_bound`` is layered BFS-style; ``branch_and_bound_dfs`` uses an
-iterative DFS (stack + memo) for ``k == float("inf")``, storing
-``memo[vars_key] = (cost, elimination_order)`` per set (suffix relaxation
-disabled). Optional **ordered-prefix dominance** (default on): for each
-adjacent pair ``(d,e)`` along a witness path ``T`` (every split
-``T = P + (d,) + (e,) + …``), if ``cost(T)`` beats the best known cost for the
-sibling prefix ``P + (e,)`` (which must have been visited), extensions of
-``P + (e,)`` are skipped. If a witness path is seen **before** ``P + (e,)`` is
-visited, its cost is stored and the same skip applies when that prefix is
-reached later (e.g. ``ABCDE`` before ``ABCE``). This is a heuristic unless a
-problem-specific proof applies; set env ``GALLEY_BNB_DFS_PREFIX_BLOCK=0`` to
-disable.
-
-NOTE: remove _PRINT_BNB_DFS_MEMO, its for testing
-remove _PREFIX_BLOCK_DFS, its a parameter
 """
 
-import os
 from collections import OrderedDict, deque
-from functools import reduce
 
-from ....finch_logic import Field, Query
+from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
-
-# Set env ``GALLEY_PRINT_BNB_DFS_MEMO=1`` to trace DFS memo (verbose).
-_PRINT_BNB_DFS_MEMO = os.environ.get("GALLEY_PRINT_BNB_DFS_MEMO", "") == "1"
-# All-fork sibling prefix blocking in ``branch_and_bound_dfs`` (module doc).
-_PREFIX_BLOCK_DFS = os.environ.get("GALLEY_BNB_DFS_PREFIX_BLOCK", "1") == "1"
-
-
-def _aq_with_stats(aq: AnnotatedQuery) -> AnnotatedQuery:
-    """
-    Return a copy of aq with bindings/cache/cache_point preserved.
-    Saves the stats for cost estimation and make sure we dont mutate the original aq
-    as we might use it later.
-    """
-    c = aq.copy()
-    for attr in ("bindings", "cache", "cache_point"):
-        if hasattr(aq, attr):
-            setattr(c, attr, getattr(aq, attr))
-    return c
-
-
-def _reducible_idxs_for_component(
-    aq: AnnotatedQuery,
-    component: list,
-) -> list:
-    """Make sure it is a list, precommit throws error."""
-    comp_set = set(component)
-    return [idx for idx in aq.get_reducible_idxs() if idx in comp_set]
-
-
-def _vars_key_sort_key(vk: frozenset) -> tuple:
-    """Deterministic ordering for OrderedDict keys (subset size, then repr)."""
-    return (len(vk), tuple(sorted(repr(x) for x in vk)))
-
-
-def _dfs_memo_cost(memo: dict[frozenset, tuple[float, list]], vk: frozenset) -> float:
-    """Best cumulative cost for ``vk``, or inf if unseen."""
-    ent = memo.get(vk)
-    return ent[0] if ent is not None else float("inf")
-
-
-def _dfs_order_prefix_blocked(order: list, blocked: set[tuple]) -> bool:
-    """True if ``tuple(order)`` equals or extends some blocked elimination prefix."""
-    if not blocked:
-        return False
-    t = tuple(order)
-    return any(len(t) >= len(b) and t[: len(b)] == b for b in blocked)
-
-
-def _dfs_fork_sibling_blocks(
-    full_order: tuple,
-    cost_full: float,
-    prefix_best: dict[tuple, float],
-    blocked: set[tuple],
-    sibling_witness_best: dict[tuple, float],
-) -> None:
-    """Min witness cost per sibling ``S``; block ``S`` if visited and beaten."""
-    n = len(full_order)
-    for i in range(n - 1):
-        d, e = full_order[i], full_order[i + 1]
-        if d == e:
-            continue
-        p = full_order[:i]
-        s = p + (e,)
-        prev_w = sibling_witness_best.get(s, float("inf"))
-        if cost_full < prev_w:
-            sibling_witness_best[s] = cost_full
-        if s in prefix_best and cost_full < prefix_best[s]:
-            blocked.add(s)
-
-
-def _print_dfs_memo_snapshot(
-    stage: str, n: int, memo: dict[frozenset, tuple[float, list]]
-) -> None:
-    """Print ``memo`` after each stack pop / memo assign (DFS ``k=inf``)."""
-    print(f"\n--- branch_and_bound_dfs memo {stage} #{n} ---")
-    for vk in sorted(memo.keys(), key=_vars_key_sort_key):
-        c, ord_ = memo[vk]
-        label = "{}" if not vk else "{" + ", ".join(sorted(repr(x) for x in vk)) + "}"
-        print(f"  {label} -> (cost={c}, order={[repr(x) for x in ord_]})")
-    print(f"  [n_entries={len(memo)}]")
 
 
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
@@ -152,7 +54,7 @@ def branch_and_bound(
         # --- Extend each current state by trying every possible next reduction ---
         for vars_key, pc in prev_new_optimal_orders.items():
             old_order, old_queries, aq, prev_cost = pc
-            reducible_in_comp = _reducible_idxs_for_component(aq, component)
+            reducible_in_comp = aq.get_reducible_idxs_for_component(component)
             for idx in reducible_in_comp:
                 # Cost of this reduction and which vars it eliminates
                 cost, reduced_vars = _cost_of_reduce(idx, aq)
@@ -202,7 +104,7 @@ def branch_and_bound(
         new_optimal_orders = OrderedDict()
         for new_vars, idx_ext_info in top_k_idx_ext.items():
             aq, idx, old_order, old_queries, cost = idx_ext_info
-            new_aq = _aq_with_stats(aq)
+            new_aq = aq.copy()
             reduce_query = new_aq.reduce_idx(idx)
             new_queries = list(old_queries) + [reduce_query]
             new_order = list(old_order) + [idx]
@@ -219,7 +121,6 @@ def branch_and_bound(
 
     # --- Return result if we found a full order for the component ---
     component_set = frozenset(component)
-    # Maybe delete below since it should never happen
     if component_set not in optimal_orders:
         raise RuntimeError(
             "branch_and_bound: no complete reduction order for component "
@@ -232,133 +133,147 @@ def branch_and_bound(
 def branch_and_bound_dfs(
     input_aq: AnnotatedQuery,
     component: list,
-    k: float,
     max_subquery_costs: OrderedDict,
 ) -> tuple:
     """
-    Same contract as :func:`branch_and_bound`, plus a third return when
-    ``k == float("inf")``.
+    Depth-first branch-and-bound (full expansion at each node: no beam width).
 
-    For ``k != float("inf")``, delegates to :func:`branch_and_bound` and returns
-    ``(result, None)`` for the third element.
+    Prunes with the same greedy ``max_subquery_costs`` bound, and additionally:
+    if some set ``S`` already seen has ``S >= new_vars`` (i.e. ``new_vars`` ⊆ ``S``)
+    and ``cost(S) < total_cost`` for reaching ``new_vars``, the branch is discarded.
+    Frozenset comparison is used to check if a set is a superset of another set.
 
-    For ``k == float("inf")``, runs iterative DFS: ``deque`` stack,
-    ``memo[vars_key] = (cumulative_cost, elimination_order)`` for each eliminated-
-    index set (single dict — cost and permutation updated together),
-    ``max_subquery_costs`` superset bound, incumbent pruning, and optional
-    penultimate-fork ordered-prefix blocking (env ``GALLEY_BNB_DFS_PREFIX_BLOCK``).
-
-    Prints ``memo`` after each stack ``pop`` and each ``memo`` assignment.
-    Returns ``(best_complete, optimal_subquery_costs, optimal_perm_by_vars)``.
+    Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` like
+    ``branch_and_bound``. ``optimal_subquery_costs`` maps every visited state to its
+    best cost (for use as pruning bounds after a greedy pass).
     """
-    if k != float("inf"):
-        res = branch_and_bound(input_aq, component, k, max_subquery_costs)
-        return (*res, None)
-
     component_set = frozenset(component)
-    memo: dict[frozenset, tuple[float, list]] = {frozenset(): (0.0, [])}
-    prefix_best: dict[tuple, float] = {(): 0.0}
-    blocked_prefixes: set[tuple] = set()
-    sibling_witness_best: dict[tuple, float] = {}
-    best_complete: tuple | None = None
-    best_complete_cost = float("inf")
+    optimal_orders: OrderedDict[frozenset, tuple] = OrderedDict(
+        [(frozenset(), ([], [], input_aq, 0.0))]
+    )
+    # Minimum cost observed for each reduced-var set (for superset domination).
+    seen_min_cost: dict[frozenset, float] = {frozenset(): 0.0}
 
-    stack: deque = deque()
-    stack.appendleft((frozenset(), input_aq, [], [], 0.0))
+    queue: deque[tuple[frozenset, AnnotatedQuery, list, list, float]] = deque()
+    queue.appendleft((frozenset(), input_aq.copy(), [], [], 0.0))
 
-    pop_idx = 0
-    assign_idx = 0
-    while stack:
-        vars_key, aq, order, queries, cost = stack.popleft()
-        pop_idx += 1
-        if __debug__ and _PRINT_BNB_DFS_MEMO:
-            _print_dfs_memo_snapshot("pop", pop_idx, dict(memo))
-        # Stale frame: a cheaper path to this vars_key already updated memo[vars_key].
-        if cost > _dfs_memo_cost(memo, vars_key):
-            continue
-
-        if _PREFIX_BLOCK_DFS and _dfs_order_prefix_blocked(order, blocked_prefixes):
-            continue
-
-        if _PREFIX_BLOCK_DFS:
-            w = sibling_witness_best.get(tuple(order), float("inf"))
-            if w < cost:
-                continue
-
+    while queue:
+        vars_key, aq, order, queries_list, prev_cost = queue.popleft()
         if vars_key == component_set:
-            if cost < best_complete_cost:
-                best_complete_cost = cost
-                best_complete = (order, queries, aq, cost)
             continue
 
-        if cost >= best_complete_cost:
-            continue
-
-        reducible_in_comp = _reducible_idxs_for_component(aq, component)
+        reducible_in_comp = aq.get_reducible_idxs_for_component(component)
+        candidates: list[tuple[float, int, list]] = []
         for idx in reducible_in_comp:
-            step_cost, reduced_vars = _cost_of_reduce(idx, aq)
-            total_cost = cost + step_cost
+            cost, reduced_vars = _cost_of_reduce(idx, aq)
+            total_cost = cost + prev_cost
             new_vars = vars_key | frozenset(reduced_vars)
-
             bound = float("inf")
             for vars2 in max_subquery_costs:
                 if vars2 >= new_vars:
                     bound = min(bound, max_subquery_costs[vars2])
-
-            if total_cost > bound:
+            best_known = optimal_orders.get(
+                new_vars, (None, None, None, float("inf"))
+            )[3]
+            cheapest_here = min(best_known, bound)
+            if total_cost > cheapest_here:
                 continue
+            for superset, cost in seen_min_cost.items():
+                if superset >= new_vars and cost < total_cost:
+                    break
+            else:
+                candidates.append((total_cost, idx, reduced_vars))
 
-            prev_best = _dfs_memo_cost(memo, new_vars)
-            if total_cost >= prev_best:
+        for total_cost, idx, reduced_vars in candidates:
+            new_vars = vars_key | frozenset(reduced_vars)
+            best_known = optimal_orders.get(
+                new_vars, (None, None, None, float("inf"))
+            )[3]
+            if total_cost > best_known:
                 continue
-
-            new_order = list(order) + [idx]
-            new_t = tuple(new_order)
-            if _PREFIX_BLOCK_DFS:
-                w = sibling_witness_best.get(new_t, float("inf"))
-                if w < total_cost:
-                    continue
-
-            # Best cost so far to eliminated-index set ``new_vars`` (prefix walk).
-            memo[new_vars] = (total_cost, new_order)
-            prev_pb = prefix_best.get(new_t, float("inf"))
-            if total_cost < prev_pb:
-                prefix_best[new_t] = total_cost
-            if _PREFIX_BLOCK_DFS:
-                _dfs_fork_sibling_blocks(
-                    new_t,
-                    total_cost,
-                    prefix_best,
-                    blocked_prefixes,
-                    sibling_witness_best,
+            for superset, cost in seen_min_cost.items():
+                if superset >= new_vars and cost < total_cost:
+                    break
+            else:
+                new_aq = aq.copy()
+                reduce_query = new_aq.reduce_idx(idx)
+                new_queries = list(queries_list) + [reduce_query]
+                new_order = list(order) + [idx]
+                optimal_orders[new_vars] = (new_order, new_queries, new_aq, total_cost)
+                seen_min_cost[new_vars] = min(
+                    seen_min_cost.get(new_vars, float("inf")), total_cost
                 )
-            assign_idx += 1
-            if __debug__ and _PRINT_BNB_DFS_MEMO:
-                _print_dfs_memo_snapshot("assign", assign_idx, dict(memo))
-            new_aq = _aq_with_stats(aq)
-            reduce_query = new_aq.reduce_idx(idx)
-            new_queries = list(queries) + [reduce_query]
-            stack.appendleft((new_vars, new_aq, new_order, new_queries, total_cost))
+                queue.appendleft((new_vars, new_aq, new_order, new_queries, total_cost))
 
-    if best_complete is None:
+    optimal_subquery_costs = OrderedDict()
+    for vars_key in optimal_orders:
+        optimal_subquery_costs[vars_key] = optimal_orders[vars_key][3]
+
+    if component_set not in optimal_orders:
         raise RuntimeError(
             "branch_and_bound_dfs: no complete reduction order for component "
             f"{component!r}; reducible idxs on input: "
             f"{input_aq.get_reducible_idxs()!r}"
         )
+    return (optimal_orders[component_set], optimal_subquery_costs)
 
-    sorted_keys = sorted(memo.keys(), key=_vars_key_sort_key)
-    # --- optimal_subquery_costs and optimal_perm_by_vars only used for testing ---
-    optimal_subquery_costs = OrderedDict((vk, memo[vk][0]) for vk in sorted_keys)
-    optimal_perm_by_vars = OrderedDict((vk, memo[vk][1]) for vk in sorted_keys)
-    return (best_complete, optimal_subquery_costs, optimal_perm_by_vars)
+
+bnb_dfs = branch_and_bound_dfs
+
+
+def pruned_query_to_plan_dfs(
+    input_aq: AnnotatedQuery,
+    use_components: bool = True,
+    use_greedy: bool = False,
+) -> tuple[list[Query], float]:
+    """
+    Same as ``pruned_query_to_plan`` but uses depth-first branch-and-bound
+    for the exact phase.
+    """
+    total_cost = 0.0
+    elimination_order: list = []
+    queries: list[Query] = []
+    cur_aq = input_aq.copy()
+
+    while cur_aq.get_reducible_idxs():
+        component = cur_aq.connected_components[0]
+
+        if not use_components:
+            component = list(
+                set().union(*(set(c) for c in cur_aq.connected_components))
+            )
+        greedy_result = branch_and_bound_dfs(cur_aq, component, OrderedDict())
+        (
+            (greedy_order, _, _, greedy_cost),
+            greedy_subquery_costs,
+        ) = greedy_result
+
+        if (len(component) > 12) or use_greedy:
+            elimination_order.extend(greedy_order)
+            for idx in greedy_order:
+                reduce_query = cur_aq.reduce_idx(idx)
+                queries.append(reduce_query)
+            total_cost += greedy_cost
+            continue
+
+        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
+            cur_aq, component, greedy_subquery_costs
+        )
+        elimination_order.extend(exact_order)
+        for idx in exact_order:
+            reduce_query = cur_aq.reduce_idx(idx)
+            queries.append(reduce_query)
+        total_cost += exact_cost
+
+    remaining_q = cur_aq.get_remaining_query()
+    queries.append(remaining_q)
+    return queries, total_cost
 
 
 def pruned_query_to_plan(
     input_aq: AnnotatedQuery,
-    use_greedy: bool = False,
-    *,
     use_components: bool = True,
+    use_greedy: bool = False,
 ) -> tuple[list[Query], float]:
     """
     Pruned optimizer: greedy first for bounds, then exact with pruning.
@@ -367,19 +282,18 @@ def pruned_query_to_plan(
     total_cost = 0.0
     elimination_order: list = []
     queries: list[Query] = []
-    cur_aq = _aq_with_stats(input_aq)
+    cur_aq = input_aq.copy()
 
     # --- Process components until no more reducible indices ---
     # Do this instead of for comp in components because components
     # are recomputed in reduce_idx same as julia code
     while cur_aq.get_reducible_idxs():
-        if not use_components:
-            component = reduce(
-                lambda a, b: a + b, cur_aq.connected_components, list[Field]()
-            )
-        else:
-            component = cur_aq.connected_components[0]
+        component = cur_aq.connected_components[0]
 
+        if not use_components:
+            component = list(
+                set().union(*(set(c) for c in cur_aq.connected_components))
+            )
         # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
         greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
         (
@@ -388,7 +302,7 @@ def pruned_query_to_plan(
         ) = greedy_result
 
         # --- Large components or use_greedy: use greedy order directly ---
-        if len(component) >= 10 or use_greedy:
+        if (len(component) > 12) or use_greedy:
             elimination_order.extend(greedy_order)
             for idx in greedy_order:
                 reduce_query = cur_aq.reduce_idx(idx)
@@ -408,72 +322,7 @@ def pruned_query_to_plan(
 
     # --- Append remaining (non-reducible) query and fix output name ---
     remaining_q = cur_aq.get_remaining_query()
-    if remaining_q is not None:
-        queries.append(remaining_q)
-    if queries:
-        last_query = queries[-1]
-        if last_query.lhs != cur_aq.output_name:
-            queries[-1] = Query(cur_aq.output_name, last_query.rhs)
-    return queries, total_cost
-
-
-def pruned_query_to_plan_dfs(
-    input_aq: AnnotatedQuery,
-    use_greedy: bool = False,
-    *,
-    use_components: bool = True,
-) -> tuple[list[Query], float]:
-    """
-    Pruned optimizer like :func:`pruned_query_to_plan`, using
-    :func:`branch_and_bound_dfs` for the greedy and exact component passes
-    (iterative DFS for ``k=inf``; other ``k`` delegate to the layered implementation).
-    Returns (queries, total_cost).
-    """
-    total_cost = 0.0
-    elimination_order: list = []
-    queries: list[Query] = []
-    cur_aq = _aq_with_stats(input_aq)
-
-    while cur_aq.get_reducible_idxs():
-        if not use_components:
-            component = reduce(
-                lambda a, b: a + b, cur_aq.connected_components, list[Field]()
-            )
-        else:
-            component = cur_aq.connected_components[0]
-
-        # Maybe remove, let dfs run
-        greedy_result = branch_and_bound_dfs(cur_aq, component, 1, OrderedDict())
-        (
-            (greedy_order, _, _, greedy_cost),
-            greedy_subquery_costs,
-            _,
-        ) = greedy_result
-
-        if len(component) >= 10 or use_greedy:
-            elimination_order.extend(greedy_order)
-            for idx in greedy_order:
-                reduce_query = cur_aq.reduce_idx(idx)
-                queries.append(reduce_query)
-            total_cost += greedy_cost
-            continue
-
-        (exact_order, _, _, exact_cost), _, _ = branch_and_bound_dfs(
-            cur_aq, component, float("inf"), greedy_subquery_costs
-        )
-        elimination_order.extend(exact_order)
-        for idx in exact_order:
-            reduce_query = cur_aq.reduce_idx(idx)
-            queries.append(reduce_query)
-        total_cost += exact_cost
-
-    remaining_q = cur_aq.get_remaining_query()
-    if remaining_q is not None:
-        queries.append(remaining_q)
-    if queries:
-        last_query = queries[-1]
-        if last_query.lhs != cur_aq.output_name:
-            queries[-1] = Query(cur_aq.output_name, last_query.rhs)
+    queries.append(remaining_q)
     return queries, total_cost
 
 
@@ -484,7 +333,7 @@ def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
     """
     total_cost = 0.0
     elimination_order: list = []
-    cur_aq = _aq_with_stats(input_aq)
+    cur_aq = input_aq.copy()
 
     # --- Run exact branch-and-bound on each component, collect order ---
     for component in input_aq.connected_components:
@@ -496,7 +345,7 @@ def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
 
     # --- Rebuild queries by applying reductions in elimination order ---
     queries = []
-    cur_aq = _aq_with_stats(input_aq)
+    cur_aq = input_aq.copy()
     for idx in elimination_order:
         if idx in cur_aq.get_reducible_idxs():
             q = cur_aq.reduce_idx(idx)
