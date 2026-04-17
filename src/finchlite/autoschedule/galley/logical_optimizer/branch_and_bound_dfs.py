@@ -2,9 +2,8 @@
 Depth-first branch-and-bound for Galley reduction order (same optimum as layered
 ``branch_and_bound`` with ``k=`` ``float('inf')``).
 
-Pruning uses the minimum cost among all **known** supersets of the child state's
-variable set: greedy ``k=1`` bounds, entries in the DFS ``memo``, and the best
-complete cost found so far.
+Pruning uses the minimum cost among all **known** supersets of each state's
+variable set in the DFS ``memo`` (including the full component once found).
 """
 
 from __future__ import annotations
@@ -26,13 +25,14 @@ def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
 def branch_and_bound_dfs(
     input_aq: AnnotatedQuery,
     component: list,
-    max_subquery_costs: OrderedDict,
 ) -> tuple:
     """
     Exact branch-and-bound via iterative DFS (cheapest child expanded first).
 
+    Bounds tighten as the search discovers cheaper prefixes and completions
+
     Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` where the
-    second element is an empty ``OrderedDict`` (greedy bounds use layered BnB).
+    second element is an empty ``OrderedDict``.
 
     Raises
     ------
@@ -57,9 +57,14 @@ def branch_and_bound_dfs(
             if cost < best_complete:
                 best_complete = cost
                 best_state = (order, queries, aq, cost)
+                memo[component_set] = cost
             continue
 
-        if cost >= best_complete:
+        sup_pop = float("inf")
+        for v, c in memo.items():
+            if v >= vars_key:
+                sup_pop = min(sup_pop, c)
+        if cost > sup_pop:
             continue
 
         reducible_in_comp = aq.get_reducible_idxs_for_component(component)
@@ -69,16 +74,10 @@ def branch_and_bound_dfs(
             new_cost = cost + step_cost
             new_vars = vars_key | frozenset(reduced_vars)
 
-            # Getting all supersets and getting min cost
             sup_best = float("inf")
-            for v, c in max_subquery_costs.items():
-                if v >= new_vars:
-                    sup_best = min(sup_best, c)
             for v, c in memo.items():
                 if v >= new_vars:
                     sup_best = min(sup_best, c)
-            if best_complete < float("inf"):
-                sup_best = min(sup_best, best_complete)
             prev_best = memo.get(new_vars, float("inf"))
 
             if new_cost > sup_best:
@@ -112,8 +111,8 @@ def pruned_query_to_plan_dfs(
     use_greedy: bool = False,
 ) -> tuple[list[Query], float]:
     """
-    Like ``pruned_query_to_plan``, but the exact phase uses ``branch_and_bound_dfs``.
-    Greedy bounds still use layered ``branch_and_bound`` with ``k=1``.
+    Like ``pruned_query_to_plan``, but the exact phase uses ``branch_and_bound_dfs``
+    without a prior greedy bound pass.
     """
     total_cost = 0.0
     elimination_order: list = []
@@ -127,13 +126,10 @@ def pruned_query_to_plan_dfs(
             component = list(
                 set().union(*(set(c) for c in cur_aq.connected_components))
             )
-        greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
-        (
-            (greedy_order, _, _, greedy_cost),
-            greedy_subquery_costs,
-        ) = greedy_result
 
         if (len(component) > 12) or use_greedy:
+            greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
+            (greedy_order, _, _, greedy_cost), _ = greedy_result
             elimination_order.extend(greedy_order)
             for idx in greedy_order:
                 reduce_query = cur_aq.reduce_idx(idx)
@@ -141,9 +137,7 @@ def pruned_query_to_plan_dfs(
             total_cost += greedy_cost
             continue
 
-        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
-            cur_aq, component, greedy_subquery_costs
-        )
+        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(cur_aq, component)
         elimination_order.extend(exact_order)
         for idx in exact_order:
             reduce_query = cur_aq.reduce_idx(idx)
