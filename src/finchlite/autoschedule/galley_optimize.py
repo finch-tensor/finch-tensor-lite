@@ -44,16 +44,24 @@ def optimize_query(
 ):
     """Rewrite a single logical Query via greedy or exact branch-and-bound reduction."""
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
-    use_greedy = not use_exact_branch_and_bound
-    # NOTE: this is for test only
-    prune = (
-        pruned_query_to_plan_dfs if use_branch_and_bound_dfs else pruned_query_to_plan
-    )
-    new_queries, _ = prune(
-        annotated_query,
-        use_components=use_components,
-        use_greedy=use_greedy,
-    )
+    if use_branch_and_bound_dfs:
+        new_queries, _ = pruned_query_to_plan_dfs(
+            annotated_query,
+            use_components=use_components,
+            use_greedy=not use_exact_branch_and_bound,
+        )
+    elif use_exact_branch_and_bound:
+        new_queries, _ = pruned_query_to_plan(
+            annotated_query,
+            use_components=use_components,
+            use_greedy=False,
+        )
+    else:
+        new_queries, _ = pruned_query_to_plan(
+            annotated_query,
+            use_components=use_components,
+            use_greedy=True,
+        )
     return new_queries
 
 

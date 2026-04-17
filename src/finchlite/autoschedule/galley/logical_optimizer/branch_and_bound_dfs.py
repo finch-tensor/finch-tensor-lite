@@ -2,8 +2,9 @@
 Depth-first branch-and-bound for Galley reduction order (same optimum as layered
 ``branch_and_bound`` with ``k=`` ``float('inf')``).
 
-Greedy bounds for ``pruned_query_to_plan_dfs`` use layered ``branch_and_bound``
-with ``k=1``, matching ``pruned_query_to_plan``.
+Pruning uses the minimum cost among all **known** supersets of the child state's
+variable set: greedy ``k=1`` bounds, entries in the DFS ``memo``, and the best
+complete cost found so far.
 """
 
 from __future__ import annotations
@@ -68,17 +69,19 @@ def branch_and_bound_dfs(
             new_cost = cost + step_cost
             new_vars = vars_key | frozenset(reduced_vars)
 
-            bound = float("inf")
-            for vars2 in max_subquery_costs:
-                if vars2 >= new_vars:
-                    bound = min(bound, max_subquery_costs[vars2])
-
+            # Getting all supersets and getting min cost
+            sup_best = float("inf")
+            for v, c in max_subquery_costs.items():
+                if v >= new_vars:
+                    sup_best = min(sup_best, c)
+            for v, c in memo.items():
+                if v >= new_vars:
+                    sup_best = min(sup_best, c)
+            if best_complete < float("inf"):
+                sup_best = min(sup_best, best_complete)
             prev_best = memo.get(new_vars, float("inf"))
-            cheapest = min(prev_best, bound)
 
-            if new_cost > cheapest:
-                continue
-            if new_cost >= best_complete:
+            if new_cost > sup_best:
                 continue
             if new_cost >= prev_best:
                 continue
