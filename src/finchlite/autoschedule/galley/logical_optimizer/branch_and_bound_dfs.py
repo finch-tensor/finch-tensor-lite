@@ -70,7 +70,7 @@ def branch_and_bound_dfs(
 
             # Getting all supersets and getting min cost
             sup_best = float("inf")
-            #for v, c in max_subquery_costs.items():
+            # for v, c in max_subquery_costs.items():
             #    if v >= new_vars:
             #        sup_best = min(sup_best, c)
             for v, c in memo.items():
@@ -140,9 +140,7 @@ def pruned_query_to_plan_dfs(
             total_cost += greedy_cost
             continue
 
-        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
-            cur_aq, component
-        )
+        (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(cur_aq, component)
         elimination_order.extend(exact_order)
         for idx in exact_order:
             reduce_query = cur_aq.reduce_idx(idx)
