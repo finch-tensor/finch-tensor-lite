@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -29,6 +30,8 @@ from finchlite.autoschedule import (
 from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
+    _cost_of_reduce,
+    branch_and_bound,
     pruned_query_to_plan,
 )
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound_dfs import (
@@ -228,24 +231,16 @@ def make_bnb_slow_example() -> LazyTensor:
     return make_chain_expr_from_shapes([(5, 5) for _ in range(12)])
 
 
-# Shapes found by random search where core ``branch_and_bound_dfs`` wall time
-# beats BFS ``branch_and_bound`` (same optimal cost); full Galley
-# ``optimize_plan_s`` may still favor BFS.
-_BNB_CORE_DFS_WINS_SHAPES: list[tuple[int, int]] = [
-    (8, 3),
-    (3, 28),
-    (28, 13),
-    (13, 6),
-    (6, 11),
-    (11, 52),
-    (52, 61),
-    (61, 7),
-]
+# Nine 2×2 matmuls: every elimination order has the same total cost, so the
+# depth-first walk that always extends the first reducible index (Field name
+# order) hits **optimal cost on its first complete path**—no cheapest-child
+# heuristic. Contrasts layered BFS expansion on the same optimum.
+_BNB_DFS_FIRST_COMPLETE_OPTIMAL_SHAPES: list[tuple[int, int]] = [(2, 2)] * 9
 
 
-def make_bnb_core_dfs_wins_chain() -> LazyTensor:
-    """Eight-matrix matmul chain used for BFS vs DFS Galley benchmarks."""
-    return make_chain_expr_from_shapes(_BNB_CORE_DFS_WINS_SHAPES)
+def make_bnb_dfs_first_complete_optimal_chain() -> LazyTensor:
+    """Uniform 2×2 chain for BFS vs DFS (first DFS completion is optimal)."""
+    return make_chain_expr_from_shapes(_BNB_DFS_FIRST_COMPLETE_OPTIMAL_SHAPES)
 
 
 # =============================================================================
@@ -423,6 +418,39 @@ def _bfs_dfs_exact_plan_stats(
     return cost_b, cost_d, len(queries_b), len(queries_d)
 
 
+def _leftmost_elimination_total_cost(aq: AnnotatedQuery, component: list) -> float:
+    """Total cost if we always reduce ``get_reducible_idxs_for_component(component)[0]``."""
+    aq = aq.copy()
+    comp_set = frozenset(component)
+    seen = frozenset()
+    total = 0.0
+    while seen != comp_set:
+        reds = aq.get_reducible_idxs_for_component(component)
+        if not reds:
+            raise RuntimeError("leftmost elimination path stuck before covering component")
+        idx = reds[0]
+        step, rv = _cost_of_reduce(idx, aq)
+        total += step
+        aq.reduce_idx(idx)
+        seen |= frozenset(rv)
+    return total
+
+
+def _assert_leftmost_path_is_optimal(expr: LazyTensor) -> None:
+    """For benchmarks built so DFS's first completion matches layered exact cost."""
+    aq = _annotated_query_from_lazy_expr(expr)
+    component = aq.connected_components[0]
+    (_, _, _, optimal), _ = branch_and_bound(
+        aq.copy(), component, float("inf"), OrderedDict()
+    )
+    left = _leftmost_elimination_total_cost(aq, component)
+    if not np.isclose(optimal, left, rtol=0.0, atol=1e-4):
+        raise AssertionError(
+            f"expected leftmost path cost {left!r} == optimal {optimal!r} "
+            "(DFS first completion should be optimal for this case)"
+        )
+
+
 def _run_compile_case(case: BenchmarkCaseSpec) -> None:
     print(f"Compile benchmark: {case.title}...", flush=True)
     expr = case.build_expr()
@@ -459,6 +487,7 @@ def _run_bnb_bfs_vs_dfs_case(case: BenchmarkCaseSpec) -> None:
         raise ValueError("BFS vs DFS BnB case must use recursion_limit=None")
     print(f"BnB BFS vs DFS benchmark: {case.title}...", flush=True)
     expr = case.build_expr()
+    _assert_leftmost_path_is_optimal(expr)
     bfs_t, dfs_t = time_galley_bnb_bfs_vs_dfs_compile_profile(
         expr, n=max(3, DEFAULT_BNB_PROFILE_N)
     )
@@ -509,8 +538,8 @@ BNB_CASES: tuple[BenchmarkCaseSpec, ...] = (
 
 BNB_BFS_VS_DFS_CASES: tuple[BenchmarkCaseSpec, ...] = (
     BenchmarkCaseSpec(
-        title="BFS vs DFS — eight-matrix chain",
-        build_expr=make_bnb_core_dfs_wins_chain,
+        title="BFS vs DFS — uniform 2×2 chain",
+        build_expr=make_bnb_dfs_first_complete_optimal_chain,
     ),
 )
 

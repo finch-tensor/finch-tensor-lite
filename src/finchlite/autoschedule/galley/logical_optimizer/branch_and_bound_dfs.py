@@ -1,9 +1,6 @@
 """
-Depth-first branch-and-bound for Galley reduction order (same optimum as layered
-``branch_and_bound`` with ``k=`` ``float('inf')``).
-
-Pruning uses the minimum cost among all **known** supersets of each state's
-variable set in the DFS ``memo`` (including the full component once found).
+Skipped branches are dominated by ``memo`` supersets; pruning does not remove
+lower-cost complete orders, so the search remains exact.
 """
 
 from __future__ import annotations
@@ -27,9 +24,8 @@ def branch_and_bound_dfs(
     component: list,
 ) -> tuple:
     """
-    Exact branch-and-bound via iterative DFS (cheapest child expanded first).
-
-    Bounds tighten as the search discovers cheaper prefixes and completions
+    Exact branch-and-bound via iterative DFS. Children follow
+    ``get_reducible_idxs_for_component`` order.
 
     Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` where the
     second element is an empty ``OrderedDict``.
@@ -92,7 +88,8 @@ def branch_and_bound_dfs(
             new_queries = list(queries) + [reduce_query]
             children.append((new_vars, new_order, new_queries, new_aq, new_cost))
 
-        children.sort(key=lambda x: x[4])
+        # make sure the children are processed 
+        # in the order of get_reducible_idxs_for_component
         for ch in reversed(children):
             stack.appendleft(ch)
 
