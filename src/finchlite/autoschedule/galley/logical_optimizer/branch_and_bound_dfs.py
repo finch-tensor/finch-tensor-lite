@@ -1,19 +1,22 @@
 """
-Depth-first branch-and-bound for Galley reduction ordering.
+Depth-first branch-and-bound for Galley reduction order (same optimum as layered
+``branch_and_bound`` with ``k=`` ``float('inf')``).
+
+Greedy bounds for ``pruned_query_to_plan_dfs`` use layered ``branch_and_bound``
+with ``k=1``, matching ``pruned_query_to_plan``.
 """
+
+from __future__ import annotations
 
 from collections import OrderedDict, deque
 
 from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
+from .branch_and_bound import branch_and_bound
 
 
 def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
-    """
-    Return (cost, reduced_vars) for reducing idx in aq.
-    Used to score each candidate reduction and to know which indices
-    get eliminated (reduced_vars) for the branch-and-bound state key.
-    """
+    """Return (cost, reduced_vars) for reducing ``idx`` in ``aq``."""
     _, _, _, reduced_idxs = aq.get_reduce_query(idx)
     cost = aq.get_cost_of_reduce_idx(idx)
     return cost, list(reduced_idxs)
@@ -25,89 +28,79 @@ def branch_and_bound_dfs(
     max_subquery_costs: OrderedDict,
 ) -> tuple:
     """
-    Depth-first branch-and-bound (full expansion at each node: no beam width).
+    Exact branch-and-bound via iterative DFS (cheapest child expanded first).
 
-    Prunes with the same greedy ``max_subquery_costs`` bound, and additionally:
-    if some set ``S`` already seen has ``S >= new_vars`` (i.e. ``new_vars`` ⊆ ``S``)
-    and ``cost(S) < total_cost`` for reaching ``new_vars``, the branch is discarded.
-    Frozenset comparison is used to check if a set is a superset of another set.
+    Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` where the
+    second element is an empty ``OrderedDict`` (greedy bounds use layered BnB).
 
-    Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` like
-    ``branch_and_bound``. ``optimal_subquery_costs`` maps every visited state to its
-    best cost (for use as pruning bounds after a greedy pass).
+    Raises
+    ------
+    RuntimeError
+        If no complete elimination order exists for ``component``.
     """
     component_set = frozenset(component)
-    optimal_orders: OrderedDict[frozenset, tuple] = OrderedDict(
-        [(frozenset(), ([], [], input_aq, 0.0))]
-    )
-    # Minimum cost observed for each reduced-var set (for superset domination).
-    seen_min_cost: dict[frozenset, float] = {frozenset(): 0.0}
+    memo: dict[frozenset, float] = {frozenset(): 0.0}
+    best_complete = float("inf")
+    best_state: tuple[list, list, AnnotatedQuery, float] | None = None
 
-    queue: deque[tuple[frozenset, AnnotatedQuery, list, list, float]] = deque()
-    queue.appendleft((frozenset(), input_aq.copy(), [], [], 0.0))
+    stack: deque[tuple[frozenset, list, list, AnnotatedQuery, float]] = deque()
+    stack.append((frozenset(), [], [], input_aq, 0.0))
 
-    while queue:
-        vars_key, aq, order, queries_list, prev_cost = queue.popleft()
+    while stack:
+        vars_key, order, queries, aq, cost = stack.popleft()
+
+        if cost > memo.get(vars_key, float("inf")):
+            continue
+
         if vars_key == component_set:
+            if cost < best_complete:
+                best_complete = cost
+                best_state = (order, queries, aq, cost)
+            continue
+
+        if cost >= best_complete:
             continue
 
         reducible_in_comp = aq.get_reducible_idxs_for_component(component)
-        candidates: list[tuple[float, int, list]] = []
+        children: list[tuple[frozenset, list, list, AnnotatedQuery, float]] = []
         for idx in reducible_in_comp:
-            cost, reduced_vars = _cost_of_reduce(idx, aq)
-            total_cost = cost + prev_cost
+            step_cost, reduced_vars = _cost_of_reduce(idx, aq)
+            new_cost = cost + step_cost
             new_vars = vars_key | frozenset(reduced_vars)
+
             bound = float("inf")
             for vars2 in max_subquery_costs:
                 if vars2 >= new_vars:
                     bound = min(bound, max_subquery_costs[vars2])
-            best_known = optimal_orders.get(
-                new_vars, (None, None, None, float("inf"))
-            )[3]
-            cheapest_here = min(best_known, bound)
-            if total_cost > cheapest_here:
+
+            prev_best = memo.get(new_vars, float("inf"))
+            cheapest = min(prev_best, bound)
+
+            if new_cost > cheapest:
                 continue
-            for superset, sup_cost in seen_min_cost.items():
-                if superset >= new_vars and sup_cost < total_cost:
-                    break
-            else:
-                candidates.append((total_cost, idx, reduced_vars))
-
-        for total_cost, idx, reduced_vars in candidates:
-            new_vars = vars_key | frozenset(reduced_vars)
-            best_known = optimal_orders.get(
-                new_vars, (None, None, None, float("inf"))
-            )[3]
-            if total_cost > best_known:
+            if new_cost >= best_complete:
                 continue
-            for superset, sup_cost in seen_min_cost.items():
-                if superset >= new_vars and sup_cost < total_cost:
-                    break
-            else:
-                new_aq = aq.copy()
-                reduce_query = new_aq.reduce_idx(idx)
-                new_queries = list(queries_list) + [reduce_query]
-                new_order = list(order) + [idx]
-                optimal_orders[new_vars] = (new_order, new_queries, new_aq, total_cost)
-                seen_min_cost[new_vars] = min(
-                    seen_min_cost.get(new_vars, float("inf")), total_cost
-                )
-                queue.appendleft((new_vars, new_aq, new_order, new_queries, total_cost))
+            if new_cost >= prev_best:
+                continue
 
-    optimal_subquery_costs = OrderedDict()
-    for vars_key in optimal_orders:
-        optimal_subquery_costs[vars_key] = optimal_orders[vars_key][3]
+            memo[new_vars] = new_cost
+            new_aq = aq.copy()
+            reduce_query = new_aq.reduce_idx(idx)
+            new_order = list(order) + [idx]
+            new_queries = list(queries) + [reduce_query]
+            children.append((new_vars, new_order, new_queries, new_aq, new_cost))
 
-    if component_set not in optimal_orders:
+        children.sort(key=lambda x: x[4])
+        for ch in reversed(children):
+            stack.appendleft(ch)
+
+    if best_state is None:
         raise RuntimeError(
             "branch_and_bound_dfs: no complete reduction order for component "
             f"{component!r}; reducible idxs on input: "
             f"{input_aq.get_reducible_idxs()!r}"
         )
-    return (optimal_orders[component_set], optimal_subquery_costs)
-
-
-bnb_dfs = branch_and_bound_dfs
+    return (best_state, OrderedDict())
 
 
 def pruned_query_to_plan_dfs(
@@ -116,8 +109,8 @@ def pruned_query_to_plan_dfs(
     use_greedy: bool = False,
 ) -> tuple[list[Query], float]:
     """
-    Same as ``pruned_query_to_plan`` but uses depth-first branch-and-bound
-    for the exact phase.
+    Like ``pruned_query_to_plan``, but the exact phase uses ``branch_and_bound_dfs``.
+    Greedy bounds still use layered ``branch_and_bound`` with ``k=1``.
     """
     total_cost = 0.0
     elimination_order: list = []
@@ -131,7 +124,7 @@ def pruned_query_to_plan_dfs(
             component = list(
                 set().union(*(set(c) for c in cur_aq.connected_components))
             )
-        greedy_result = branch_and_bound_dfs(cur_aq, component, OrderedDict())
+        greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
         (
             (greedy_order, _, _, greedy_cost),
             greedy_subquery_costs,
