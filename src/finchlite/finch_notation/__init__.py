@@ -1,10 +1,6 @@
 from .cfg_builder import (
     NotationCFGBuilder,
-    NotationCfgBuilder,
     NumberedStatement,
-    notation_build_cfg,
-    notation_desugar,
-    notation_number_statements,
 )
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
@@ -61,7 +57,6 @@ __all__ = [
     "Loop",
     "Module",
     "NotationCFGBuilder",
-    "NotationCfgBuilder",
     "NotationExpression",
     "NotationInterpreter",
     "NotationLoader",
@@ -81,7 +76,4 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
-    "notation_build_cfg",
-    "notation_desugar",
-    "notation_number_statements",
 ]
