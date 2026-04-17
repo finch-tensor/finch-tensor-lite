@@ -371,7 +371,7 @@ class DCStats(NumericStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         dim_array_instances = [
-            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i])) for i in range(ndims)
+            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64)) for i in range(ndims)
         ]
         dc_proj_pairs = mod.array_to_dcs(arr, *dim_array_instances)
         dcs = set()
@@ -732,8 +732,8 @@ class DCStats(NumericStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         d_ij = mod.matrix_total_nnz(arr)
-        xi_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[0]))
-        yj_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[1]))
+        xi_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[0], dtype=np.int64))
+        yj_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[1], dtype=np.int64))
         d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr, xi_vec, yj_vec)
         i_field, j_field = tuple(fields)
 

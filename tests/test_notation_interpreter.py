@@ -70,7 +70,7 @@ def test_matrix_multiplication(a, b):
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", np.ndarray),
+                ntn.Variable("matmul", finchlite.ftype(a)),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -144,13 +144,14 @@ def test_matrix_multiplication(a, b):
     mod = ntn.NotationInterpreter()(prgm)
 
     c = np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
-    result = mod.matmul(c, a, b)
+    result = mod.matmul(finchlite.asarray(c), finchlite.asarray(a), finchlite.asarray(b))
 
     expected = np.matmul(a, b)
 
     finch_assert_equal(result, expected)
+    print(repr(prgm))
 
-    assert prgm == eval(repr(prgm), {**vars(ntn), **vars(ffuncs), **globals()})
+    assert prgm == eval(repr(prgm), {**vars(ntn), **vars(finchlite.codegen), **vars(finchlite.compile), **vars(ffuncs), **globals()})
 
 
 @pytest.mark.parametrize(
@@ -162,8 +163,9 @@ def test_matrix_multiplication(a, b):
     ],
 )
 def test_count_nonfill_vector(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     d = ntn.Variable("d", finchlite.int64)
     i = ntn.Variable("i", finchlite.int64)
@@ -277,7 +279,7 @@ def test_count_nonfill_matrix(a):
                 ),
             ),
             ntn.Function(
-                ntn.Variable("matrix_structure_to_dcs", tuple),
+                ntn.Variable("matrix_structure_to_dcs", finchlite.algebra.TupleFType((finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64))),
                 (A,),
                 ntn.Block(
                     (

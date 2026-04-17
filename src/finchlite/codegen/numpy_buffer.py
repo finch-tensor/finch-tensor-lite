@@ -102,7 +102,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         return f"np_buf_t({qual_str(self._dtype)})"
 
     def __repr__(self):
-        return f"NumpyBufferFType({qual_str(self._dtype)})"
+        return f"NumpyBufferFType({repr(ftype(self._dtype))})"
 
     @property
     def length_type(self):

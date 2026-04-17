@@ -647,11 +647,11 @@ class TupleFType(ImmutableStructFType):
         self._struct_types = struct_types
 
     def __repr__(self):
-        fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
-        return f"{self.struct_name}({fields_str})"
+        return f"TupleFType(({', '.join(map(repr, self._struct_types))},))"
 
     def __str__(self):
-        return f"{self.struct_name}({', '.join(map(str, self._struct_types))})"
+        fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
+        return f"{self.struct_name}({fields_str})"
 
     @property
     def struct_name(self):

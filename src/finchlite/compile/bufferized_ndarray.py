@@ -117,10 +117,10 @@ class BufferizedNDArray(Tensor):
         self.val.store(index, value)
 
     def __str__(self):
-        return f"BufferizedNDArray(shape={self.shape})"
+        return f"{self.ftype}(shape={self.shape})"
 
     def __repr__(self):
-        return f"BufferizedNDArray(shape={self.shape})"
+        return f"{self.ftype}(shape={self.shape})"
 
 
 @dataclass(unsafe_hash=True)
@@ -139,17 +139,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     @property
     def struct_name(self):
-        def str_format(types):
-            return "_".join(
-                f"{to_numpy_type(t).kind}{to_numpy_type(t).itemsize * 8}" for t in types
-            )
-
-        dt = to_numpy_type(self.buf_t.element_type)
-        return (
-            f"BufferizedNDArray_{dt.kind}{dt.itemsize * 8}_"
-            f"shape_{str_format(self.shape_t.struct_fieldtypes)}_"
-            f"strides_{str_format(self.strides_t.struct_fieldtypes)}"
-        )
+        return "BufferizedNDArray"
 
     @property
     def struct_fields(self):
@@ -222,7 +212,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return str(self.struct_name)
 
     def __repr__(self):
-        return f"{self.struct_name}({repr(self.buf_t)})"
+        return f"BufferizedNDArrayFType(buffer_type={repr(self.buf_t)}, ndim = {self.ndim}, dimension_type ={repr(self.shape_t)})"
 
     @property
     def ndim(self) -> np.intp:

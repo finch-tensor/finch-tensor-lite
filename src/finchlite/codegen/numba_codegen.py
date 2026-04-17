@@ -48,7 +48,6 @@ def to_numpy_type(t: Any) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
     if isinstance(t, np.dtype):
         return t
-
     t = _normalize_fmt(t)
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
         return np.dtype(t.dtype)
