@@ -1,3 +1,11 @@
+from .cfg_builder import (
+    NotationCFGBuilder,
+    NotationCfgBuilder,
+    NumberedStatement,
+    notation_build_cfg,
+    notation_desugar,
+    notation_number_statements,
+)
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
@@ -52,12 +60,15 @@ __all__ = [
     "Literal",
     "Loop",
     "Module",
+    "NotationCFGBuilder",
+    "NotationCfgBuilder",
     "NotationExpression",
     "NotationInterpreter",
     "NotationLoader",
     "NotationNode",
     "NotationStatement",
     "NotationTransform",
+    "NumberedStatement",
     "Read",
     "Repack",
     "Return",
@@ -70,4 +81,7 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
+    "notation_build_cfg",
+    "notation_desugar",
+    "notation_number_statements",
 ]
