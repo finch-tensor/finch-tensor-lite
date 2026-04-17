@@ -22,10 +22,8 @@ from ..finch_logic import (
 )
 from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import (
-    pruned_query_to_plan,
-    pruned_query_to_plan_dfs,
-)
+from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
+from .galley.logical_optimizer.branch_and_bound_dfs import pruned_query_to_plan_dfs
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
 from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,

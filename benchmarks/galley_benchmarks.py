@@ -1,6 +1,6 @@
 """
 Galley benchmarks: compile profile (with vs without connected components),
-exact branch-and-bound vs greedy, and layered BnB vs DFS BnB (exact).
+exact branch-and-bound vs greedy.
 
 Run: ``poetry run python benchmarks/galley_benchmarks.py``
 """
@@ -29,7 +29,6 @@ from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     pruned_query_to_plan,
-    pruned_query_to_plan_dfs,
 )
 from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
     preprocess_plan_for_galley,
@@ -61,17 +60,11 @@ _GALLEY_GREEDY = GalleyLogicalOptimizer(
 _GALLEY_EXACT_BNB = GalleyLogicalOptimizer(
     _make_inner_loader(), use_exact_branch_and_bound=True
 )
-_GALLEY_EXACT_BNB_DFS = GalleyLogicalOptimizer(
-    _make_inner_loader(),
-    use_exact_branch_and_bound=True,
-    use_branch_and_bound_dfs=True,
-)
 
 GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(LogicExecutor(_GALLEY_WITH))
 GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(LogicExecutor(_GALLEY_WITHOUT))
 GALLEY_PIPELINE_GREEDY = LogicNormalizer(LogicExecutor(_GALLEY_GREEDY))
 GALLEY_PIPELINE_EXACT_BNB = LogicNormalizer(LogicExecutor(_GALLEY_EXACT_BNB))
-GALLEY_PIPELINE_EXACT_BNB_DFS = LogicNormalizer(LogicExecutor(_GALLEY_EXACT_BNB_DFS))
 
 
 def _run_and_time(
@@ -225,14 +218,6 @@ def make_bnb_slow_example() -> LazyTensor:
     return make_chain_expr_from_shapes([(5, 5) for _ in range(12)])
 
 
-def make_bnb_dfs_optimal_two_matrix_chain() -> LazyTensor:
-    return make_chain_expr_from_shapes([(4, 8), (8, 6)])
-
-
-def make_bnb_dfs_optimal_three_matrix_chain() -> LazyTensor:
-    return make_chain_expr_from_shapes([(2, 3), (3, 4), (4, 5)])
-
-
 # =============================================================================
 # Timing helpers
 # =============================================================================
@@ -323,40 +308,6 @@ def time_galley_bnb_compile_profile(
     )
 
 
-def time_galley_bnb_layered_vs_dfs_compile_profile(
-    expr,
-    *,
-    n: int = DEFAULT_BNB_PROFILE_N,
-    recursion_limit: int | None = None,
-) -> tuple[dict[str, float], dict[str, float]]:
-    """
-    Average ``optimize_plan_s`` and ``downstream_s`` for layered exact BnB vs
-    DFS-based exact BnB (both use greedy bounds then exact search; ``k=inf`` uses
-    different search implementations).
-    """
-    bindings: dict = {}
-
-    def run_layered() -> tuple[Any, dict[str, float]]:
-        return _run_and_time(
-            GALLEY_PIPELINE_EXACT_BNB,
-            _GALLEY_EXACT_BNB,
-            plan_from_expr(expr),
-            bindings,
-        )
-
-    def run_dfs() -> tuple[Any, dict[str, float]]:
-        return _run_and_time(
-            GALLEY_PIPELINE_EXACT_BNB_DFS,
-            _GALLEY_EXACT_BNB_DFS,
-            plan_from_expr(expr),
-            bindings,
-        )
-
-    return _time_profile_pair(
-        run_layered, run_dfs, n=n, recursion_limit=recursion_limit
-    )
-
-
 def _print_profile_comparison(
     title: str,
     rows: list[tuple[str, dict[str, float], tuple[float, int] | None]],
@@ -400,17 +351,6 @@ def _exact_greedy_plan_stats(
     return cost_exact, cost_greedy, len(queries_exact), len(queries_greedy)
 
 
-def _layered_dfs_plan_stats(
-    aq_factory: Callable[[], AnnotatedQuery],
-) -> tuple[float, float, int, int]:
-    """Layered exact vs DFS exact: costs and subquery counts."""
-    aq_l = aq_factory()
-    aq_d = aq_factory()
-    queries_l, cost_l = pruned_query_to_plan(aq_l, use_greedy=False)
-    queries_d, cost_d = pruned_query_to_plan_dfs(aq_d, use_greedy=False)
-    return cost_l, cost_d, len(queries_l), len(queries_d)
-
-
 def _run_compile_case(case: BenchmarkCaseSpec) -> None:
     print(f"Compile benchmark: {case.title}...", flush=True)
     expr = case.build_expr()
@@ -438,26 +378,6 @@ def _run_bnb_case(case: BenchmarkCaseSpec) -> None:
         [
             ("Exact BnB", exact_t, (cost_e, nq_e)),
             ("Greedy", greedy_t, (cost_g, nq_g)),
-        ],
-    )
-
-
-def _run_bnb_dfs_case(case: BenchmarkCaseSpec) -> None:
-    if case.recursion_limit is not None:
-        raise ValueError("BnB DFS case must use recursion_limit=None")
-    print(f"BnB DFS benchmark: {case.title}...", flush=True)
-    expr = case.build_expr()
-    layered_t, dfs_t = time_galley_bnb_layered_vs_dfs_compile_profile(
-        expr, n=DEFAULT_BNB_PROFILE_N
-    )
-    cost_l, cost_d, nq_l, nq_d = _layered_dfs_plan_stats(
-        lambda: _annotated_query_from_lazy_expr(expr)
-    )
-    _print_profile_comparison(
-        case.title,
-        [
-            ("Exact BnB (layered)", layered_t, (cost_l, nq_l)),
-            ("Exact BnB (DFS)", dfs_t, (cost_d, nq_d)),
         ],
     )
 
@@ -491,17 +411,6 @@ BNB_CASES: tuple[BenchmarkCaseSpec, ...] = (
     ),
 )
 
-BNB_DFS_CASES: tuple[BenchmarkCaseSpec, ...] = (
-    BenchmarkCaseSpec(
-        title="bnb-dfs matches layered (2-matrix chain)",
-        build_expr=make_bnb_dfs_optimal_two_matrix_chain,
-    ),
-    BenchmarkCaseSpec(
-        title="bnb-dfs matches layered (3-matrix chain)",
-        build_expr=make_bnb_dfs_optimal_three_matrix_chain,
-    ),
-)
-
 
 # =============================================================================
 # main sections (all tests from both original files)
@@ -521,12 +430,6 @@ def main_bnb_benchmarks() -> None:
         _run_bnb_case(case)
 
 
-def main_bnb_dfs_benchmarks() -> None:
-    """Layered exact BnB vs DFS exact BnB (cost + subqueries)."""
-    for case in BNB_DFS_CASES:
-        _run_bnb_dfs_case(case)
-
-
 def main() -> None:
     print("", flush=True)
     print("### Galley compile benchmarks (with vs without components) ###", flush=True)
@@ -536,9 +439,6 @@ def main() -> None:
     print("", flush=True)
     print("### Galley BnB vs greedy benchmarks ###", flush=True)
     main_bnb_benchmarks()
-    print("", flush=True)
-    print("### Galley layered BnB vs DFS BnB benchmarks ###", flush=True)
-    main_bnb_dfs_benchmarks()
     print("", flush=True)
     print("Done.", flush=True)
 
