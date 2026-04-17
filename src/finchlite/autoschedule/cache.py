@@ -12,6 +12,7 @@ from finchlite.finch_logic import (
 import logging
 from ..util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+import numpy as np
 
 class LogicCacheFirst(LogicLoader):
     def __init__(self, ctx: LogicLoader):
@@ -52,7 +53,7 @@ class LogicCacheLRU(LogicLoader):
 
         prgm_key = (prgm, tuple(bindings.items()))
         if prgm_key not in self.cache:
-            self.cache[prgm_key] = OrderedDict()  # stats : result (kernel)
+            self.cache[prgm_key] = OrderedDict()  # (prgm, bindings) : [stats (Associated with the program) : result (kernel)]
 
         kernels = self.cache[
             prgm_key
@@ -82,3 +83,54 @@ class LogicCacheLRU(LogicLoader):
             kernels.popitem(last=False)
 
         return result
+    
+class LogicCacheLRU_Embeddings(LogicLoader):
+    def __init__(self, ctx: LogicLoader, max_depth: int = 10, threshold : int = 1): 
+        self.ctx = ctx
+        self.max_depth = max_depth
+        self.cache: dict[tuple, dict] = {}
+        self.threshold = threshold
+
+    def __call__(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+
+        prgm_key = (prgm, tuple(bindings.items()), stats_factory)
+        if prgm_key not in self.cache:
+            self.cache[prgm_key] = {'cached_embeddings' : None, 'kernels' : []}  # embeddings : result (kernel)
+
+        entry = self.cache[
+            prgm_key
+        ] #fetching the cached vectors and kernels 
+
+        if stats:
+            current_vec = np.concatenate([s.get_embeddings() for s in stats.values()]) #concatenating the embeddings
+            if entry['cached_embeddings'] is not None:
+                dist = np.abs(entry['cached_embeddings'] - current_vec)
+                max_dist = np.max(dist, axis=1)
+                chosen_idx = np.argmin(max_dist)   #threshold = 1 
+                if max_dist[chosen_idx] < self.threshold :
+                    logger.debug("CacheLRU_Embeddings HIT, reusing kernel")
+                    return entry['kernels'][chosen_idx]
+                
+        logger.debug("CacheLRU_Embeddings MISS, compiling new kernel and embeddings")
+        result = self.ctx(prgm, bindings, stats, stats_factory)
+
+        if stats:
+            if entry['cached_embeddings'] is None:
+                entry['cached_embeddings'] = np.array([current_vec])
+            else :
+                entry['cached_embeddings'] = np.vstack([entry['cached_embeddings'], current_vec])
+            
+            entry['kernels'].append(result)
+            
+            if len(entry['kernels']) > self.max_depth:
+                entry['cached_embeddings'] = np.delete(entry['cached_embeddings'], 0, axis=0)
+                entry['kernels'].pop(0)
+
+        return result
+ 

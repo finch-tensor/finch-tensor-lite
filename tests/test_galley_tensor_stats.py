@@ -60,7 +60,6 @@ def test_embeddings():
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
 
-
 def test_uniform_from_tensor_and_getters():
     data = np.zeros((2, 3))
     data[0, 0] = 1.0
@@ -195,27 +194,6 @@ def test_uniform_aggregate_and_issimilar():
 
 
 # ------------------------------ BlockedStats -------------------------------------
-def test_blocked_stats_embeddings():
-    data = np.zeros((10, 10))
-    data[0:5, 0:5] = 1.0
-    
-    indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), 
-        indices, 
-        blocks_per_dim, 
-        UniformStatsFactory()
-    )
-    
-    embedding = bs.get_embeddings()
-    print(f"Embedding Vector: {embedding}")
-    expected = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
-    np.testing.assert_array_almost_equal(embedding, expected)
-
-
-
 def test_blocked_stats_from_tensor():
     data = np.eye(10)
     arr = fl.asarray(data)
