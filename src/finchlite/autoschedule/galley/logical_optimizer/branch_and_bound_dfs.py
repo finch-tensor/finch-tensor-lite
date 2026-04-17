@@ -26,7 +26,6 @@ def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
 def branch_and_bound_dfs(
     input_aq: AnnotatedQuery,
     component: list,
-    max_subquery_costs: OrderedDict,
 ) -> tuple:
     """
     Exact branch-and-bound via iterative DFS (cheapest child expanded first).
@@ -71,9 +70,9 @@ def branch_and_bound_dfs(
 
             # Getting all supersets and getting min cost
             sup_best = float("inf")
-            for v, c in max_subquery_costs.items():
-                if v >= new_vars:
-                    sup_best = min(sup_best, c)
+            #for v, c in max_subquery_costs.items():
+            #    if v >= new_vars:
+            #        sup_best = min(sup_best, c)
             for v, c in memo.items():
                 if v >= new_vars:
                     sup_best = min(sup_best, c)
@@ -127,13 +126,13 @@ def pruned_query_to_plan_dfs(
             component = list(
                 set().union(*(set(c) for c in cur_aq.connected_components))
             )
-        greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
-        (
-            (greedy_order, _, _, greedy_cost),
-            greedy_subquery_costs,
-        ) = greedy_result
 
         if (len(component) > 12) or use_greedy:
+            greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
+            (
+                (greedy_order, _, _, greedy_cost),
+                greedy_subquery_costs,
+            ) = greedy_result
             elimination_order.extend(greedy_order)
             for idx in greedy_order:
                 reduce_query = cur_aq.reduce_idx(idx)
@@ -142,7 +141,7 @@ def pruned_query_to_plan_dfs(
             continue
 
         (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
-            cur_aq, component, greedy_subquery_costs
+            cur_aq, component
         )
         elimination_order.extend(exact_order)
         for idx in exact_order:
