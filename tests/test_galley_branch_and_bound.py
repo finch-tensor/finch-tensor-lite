@@ -113,7 +113,7 @@ def test_layered_bnb_exact_matches_dfs_bnb_exact_on_matmul_chain():
     (_, _, _, cost_layered), _ = branch_and_bound(
         aq, component, float("inf"), OrderedDict()
     )
-    (_, _, _, cost_dfs), _ = branch_and_bound_dfs(aq, component)
+    (_, _, _, cost_dfs), _ = branch_and_bound_dfs(aq, component, OrderedDict())
     assert cost_layered == pytest.approx(cost_dfs)
 
 
