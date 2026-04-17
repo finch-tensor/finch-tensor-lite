@@ -366,9 +366,7 @@ def time_galley_bnb_bfs_vs_dfs_compile_profile(
             bindings,
         )
 
-    return _time_profile_pair(
-        run_bfs, run_dfs, n=n, recursion_limit=recursion_limit
-    )
+    return _time_profile_pair(run_bfs, run_dfs, n=n, recursion_limit=recursion_limit)
 
 
 def _print_profile_comparison(
