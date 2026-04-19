@@ -58,17 +58,9 @@ def _make_inner_loader():
 
 _GALLEY_WITH = GalleyLogicalOptimizer(_make_inner_loader())
 _GALLEY_WITHOUT = GalleyLogicalOptimizer(_make_inner_loader(), use_components=False)
-_GALLEY_GREEDY = GalleyLogicalOptimizer(
-    _make_inner_loader(), use_exact_branch_and_bound=False
-)
-_GALLEY_EXACT_BNB = GalleyLogicalOptimizer(
-    _make_inner_loader(), use_exact_branch_and_bound=True
-)
-_GALLEY_EXACT_BNB_DFS = GalleyLogicalOptimizer(
-    _make_inner_loader(),
-    use_exact_branch_and_bound=True,
-    use_branch_and_bound_dfs=True,
-)
+_GALLEY_GREEDY = GalleyLogicalOptimizer(_make_inner_loader(), optimizer="greedy")
+_GALLEY_EXACT_BNB = GalleyLogicalOptimizer(_make_inner_loader(), optimizer="bfs")
+_GALLEY_EXACT_BNB_DFS = GalleyLogicalOptimizer(_make_inner_loader(), optimizer="dfs")
 
 GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(LogicExecutor(_GALLEY_WITH))
 GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(LogicExecutor(_GALLEY_WITHOUT))

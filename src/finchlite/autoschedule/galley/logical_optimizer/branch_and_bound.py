@@ -184,35 +184,3 @@ def pruned_query_to_plan(
     remaining_q = cur_aq.get_remaining_query()
     queries.append(remaining_q)
     return queries, total_cost
-
-
-def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
-    """
-    Exact optimizer: branch-and-bound with k=Inf for each component.
-    Returns (queries, total_cost).
-    """
-    total_cost = 0.0
-    elimination_order: list = []
-    cur_aq = input_aq.copy()
-
-    # --- Run exact branch-and-bound on each component, collect order ---
-    for component in input_aq.connected_components:
-        (exact_order, _, _, exact_cost), _ = branch_and_bound(
-            cur_aq, component, float("inf"), OrderedDict()
-        )
-        elimination_order.extend(exact_order)
-        total_cost += exact_cost
-
-    # --- Rebuild queries by applying reductions in elimination order ---
-    queries = []
-    cur_aq = input_aq.copy()
-    for idx in elimination_order:
-        if idx in cur_aq.get_reducible_idxs():
-            q = cur_aq.reduce_idx(idx)
-            queries.append(q)
-    remaining_q = cur_aq.get_remaining_query()
-    if remaining_q is not None:
-        queries.append(remaining_q)
-    if queries and queries[-1].lhs != cur_aq.output_name:
-        queries[-1] = Query(cur_aq.output_name, queries[-1].rhs)
-    return queries, total_cost
