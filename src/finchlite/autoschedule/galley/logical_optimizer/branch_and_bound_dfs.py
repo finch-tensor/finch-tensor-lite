@@ -1,6 +1,7 @@
 """
-Depth-first branch-and-bound for Galley reduction order (same optimum as layered
-``branch_and_bound`` with ``k=`` ``float('inf')``).
+Depth-first branch-and-bound for Galley reduction order. For a fixed component it
+searches the same elimination-order space as layered ``branch_and_bound`` with
+``k = float('inf')`` and returns the same optimal cost.
 
 Pruning uses the minimum cost among all **known** supersets of the child state's
 variable set: greedy ``k=1`` bounds, entries in the DFS ``memo``, and the best
