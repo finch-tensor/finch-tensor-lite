@@ -219,6 +219,7 @@ def test_count_nonfill_vector(a):
     ],
 )
 def test_count_nonfill_matrix(a):
+    a_np = a
     a = finchlite.asarray(a)
     A = ntn.Variable("A", finchlite.ftype(a))
     A_ = ntn.Slot("A_", finchlite.ftype(a))
@@ -396,10 +397,10 @@ def test_count_nonfill_matrix(a):
 
     d_ij = mod.matrix_total_nnz(a)
     d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(a)
-    col_sums = a.sum(axis=0)
-    row_sums = a.sum(axis=1)
+    col_sums = a_np.sum(axis=0)
+    row_sums = a_np.sum(axis=1)
 
-    assert d_ij == int(np.count_nonzero(a))
+    assert d_ij == int(np.count_nonzero(a_np))
     assert d_i_ == int((col_sums > 0).sum())
     assert d_i_j_ == int(col_sums.max(initial=0))
     assert d_j_ == int((row_sums > 0).sum())
@@ -422,8 +423,10 @@ def test_count_nonfill_matrix(a):
     ],
 )
 def test_count_nonfill_3d(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a_np = a
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     i = ntn.Variable("i", finchlite.int64)
     j = ntn.Variable("j", finchlite.int64)
@@ -499,7 +502,7 @@ def test_count_nonfill_3d(a):
                 ),
             ),
             ntn.Function(
-                ntn.Variable("_3d_structure_to_dcs", tuple),
+                ntn.Variable("_3d_structure_to_dcs", finchlite.algebra.TupleFType((finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64))),
                 (A,),
                 ntn.Block(
                     (
@@ -690,11 +693,11 @@ def test_count_nonfill_3d(a):
 
     d_ijk = mod._3d_total_nnz(a)
     d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(a)
-    X = a.sum(axis=(0, 1))
-    Y = a.sum(axis=(0, 2))
-    Z = a.sum(axis=(1, 2))
+    X = a_np.sum(axis=(0, 1))
+    Y = a_np.sum(axis=(0, 2))
+    Z = a_np.sum(axis=(1, 2))
 
-    assert d_ijk == int(np.count_nonzero(a))
+    assert d_ijk == int(np.count_nonzero(a_np))
 
     assert d_i_ == int((X > 0).sum())
     assert d_i_jk_ == int(X.max(initial=0))
@@ -725,8 +728,10 @@ def test_count_nonfill_3d(a):
     ],
 )
 def test_count_nonfill_4d(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a_np = a
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     i = ntn.Variable("i", finchlite.int64)
     j = ntn.Variable("j", finchlite.int64)
@@ -815,7 +820,7 @@ def test_count_nonfill_4d(a):
                 ),
             ),
             ntn.Function(
-                ntn.Variable("_4d_structure_to_dcs", tuple),
+                ntn.Variable("_4d_structure_to_dcs", finchlite.algebra.TupleFType((finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64))),
                 (A,),
                 ntn.Block(
                     (
@@ -1099,12 +1104,12 @@ def test_count_nonfill_4d(a):
         mod._4d_structure_to_dcs(a)
     )
 
-    X = a.sum(axis=(0, 1, 2))
-    Y = a.sum(axis=(0, 1, 3))
-    Z = a.sum(axis=(0, 2, 3))
-    W = a.sum(axis=(1, 2, 3))
+    X = a_np.sum(axis=(0, 1, 2))
+    Y = a_np.sum(axis=(0, 1, 3))
+    Z = a_np.sum(axis=(0, 2, 3))
+    W = a_np.sum(axis=(1, 2, 3))
 
-    assert d_ijkw == int(np.count_nonzero(a))
+    assert d_ijkw == int(np.count_nonzero(a_np))
 
     assert d_i_ == int((X > 0).sum())
     assert d_i_jkw_ == int(X.max(initial=0))
