@@ -6,12 +6,12 @@ from typing import Any
 
 from ..algebra import return_type
 from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, FType, HashCons, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 
 @dataclass(eq=True, frozen=True)
-class NotationNode(Term, ABC):
+class NotationNode(HashCons, Term, ABC):
     """
     NotationNode
 
