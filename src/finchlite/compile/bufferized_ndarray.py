@@ -291,6 +291,26 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             return BufferizedNDArray(arr.val, new_shape, new_strides)
         return BufferizedNDArray.from_numpy(arr.to_numpy().reshape(new_shape))
 
+    def permute_dims(self, arr, axes: tuple):
+        new_shape = tuple(arr.shape[i] for i in axes)
+        new_strides = tuple(arr.strides[i] for i in axes)
+        return BufferizedNDArray(arr.val, new_shape, new_strides)
+
+    def expand_dims(self, arr, axis: tuple):
+        ndim_new = len(arr.shape) + len(axis)
+        orig_idx = 0
+        new_shape = []
+        new_strides = []
+        for i in range(ndim_new):
+            if i in axis:
+                new_shape.append(np.intp(1))
+                new_strides.append(np.intp(0))
+            else:
+                new_shape.append(arr.shape[orig_idx])
+                new_strides.append(arr.strides[orig_idx])
+                orig_idx += 1
+        return BufferizedNDArray(arr.val, tuple(new_shape), tuple(new_strides))
+
     def lower_unwrap(self, ctx, obj): ...
 
     def lower_increment(self, ctx, obj, op, val): ...

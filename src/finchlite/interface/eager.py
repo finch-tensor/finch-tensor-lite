@@ -267,6 +267,9 @@ def full(
 def permute_dims(arg, /, axis: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
         return lazy.permute_dims(arg, axis=axis)
+    fmt = ftype(arg)
+    if hasattr(fmt, "permute_dims"):
+        return fmt.permute_dims(arg, axis)
     return compute(lazy.permute_dims(arg, axis=axis))
 
 
@@ -277,6 +280,11 @@ def expand_dims(
 ):
     if isinstance(x, lazy.LazyTensor):
         return lazy.expand_dims(x, axis=axis)
+    fmt = ftype(x)
+    if hasattr(fmt, "expand_dims"):
+        if isinstance(axis, int):
+            axis = (axis,)
+        return fmt.expand_dims(x, axis)
     return compute(lazy.expand_dims(x, axis=axis))
 
 
