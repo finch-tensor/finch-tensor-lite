@@ -309,23 +309,23 @@ def test_dot_product(compiler, buffer):
                 ),
                 asm.Block(
                     (
-                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Assign(c, asm.L(np.float64(0.0))),
                         asm.Unpack(ab_slt, ab_v),
                         asm.Unpack(bb_slt, bb_v),
                         asm.ForLoop(
                             i,
-                            asm.Literal(np.int64(0)),
+                            asm.L(np.int64(0)),
                             asm.Length(ab_slt),
                             asm.Block(
                                 (
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.L(ffunc.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffunc.mul),
+                                                    asm.L(ffunc.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),

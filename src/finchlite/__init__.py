@@ -18,6 +18,7 @@ from .compile import (
     ExtentFType,
     dimension,
 )
+from .finch_fused import jit
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -240,6 +241,7 @@ __all__ = [
     "isfinite",
     "isinf",
     "isnan",
+    "jit",
     "lazy",
     "less",
     "less_equal",

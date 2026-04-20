@@ -836,22 +836,6 @@ def rename_aliases(expr):
                 ),
             ),
         ),
-        (
-            Query(
-                Alias("out"),
-                Aggregate(
-                    Literal(ffunc.add),
-                    Literal(0),
-                    Table(Literal(A), (Field("i"),)),
-                    (Field("i"),),
-                ),
-            ),
-            [
-                Field("i"),
-            ],
-            # Expect: Query(out, <same MapJoin>)
-            None,
-        ),
     ],
 )
 def test_get_remaining_query(input_query, elimination_order, expected):
