@@ -1,9 +1,6 @@
 import builtins
-<<<<<<< vick/buff-nd-reshape
 import math
-=======
 import operator
->>>>>>> main
 import sys
 from abc import ABC
 from collections.abc import Sequence
