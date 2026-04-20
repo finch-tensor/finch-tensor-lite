@@ -34,15 +34,12 @@ def test_preorder_dfs():
         {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 2, "Field": 5}
     )
 
-    pos = {}
-    for i, obj in enumerate(preorder):
-        k = id(obj)
-        if k in pos:
-            continue
-        pos[k] = i
-    for node in preorder:
+    for i, node in enumerate(preorder):
         for child in getattr(node, "children", ()):
-            assert pos[id(node)] < pos[id(child)]
+            child_pos = next(
+                (j for j, n in enumerate(preorder) if n is child and j > i), None
+            )
+            assert child_pos is not None
 
 
 def test_postorder_dfs():
@@ -75,15 +72,12 @@ def test_postorder_dfs():
         {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 2, "Field": 5}
     )
 
-    pos = {}
-    for i, obj in enumerate(postorder):
-        k = id(obj)
-        if k in pos:
-            continue
-        pos[k] = i
-    for node in postorder:
+    for i, node in enumerate(postorder):
         for child in getattr(node, "children", ()):
-            assert pos[id(child)] < pos[id(node)]
+            child_pos = next(
+                (j for j, n in enumerate(postorder) if n is child and j < i), None
+            )
+            assert child_pos is not None
 
 
 def test_intree():
