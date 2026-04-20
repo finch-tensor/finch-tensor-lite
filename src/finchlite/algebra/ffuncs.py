@@ -90,7 +90,12 @@ class _Add(NAryFinchOperator, CNAryOperator, NumbaOperator):
         return arg == 0
 
     def is_annihilator(self, arg: Any) -> builtins.bool:
-        return np.isinf(arg)
+        try:
+            return np.isinf(arg)
+        except (TypeError, ValueError):
+            # If arg is not a type that can be checked for infinity, it cannot
+            # be an annihilator for addition.
+            return False
 
     def repeat_operator(self):
         return mul

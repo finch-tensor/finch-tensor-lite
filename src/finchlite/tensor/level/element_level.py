@@ -34,8 +34,12 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         ]
 
     def __post_init__(self):
+        # Ensure element_type is an FType
         if self.element_type is None:
+            assert self.fill_value is not None, "Must provide either element_type or fill_value."
             self.element_type = ftype(self.fill_value)
+        assert isinstance(self.element_type, FType), "element_type must be an instance of FType"
+        
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
