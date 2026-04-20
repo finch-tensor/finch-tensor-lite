@@ -818,6 +818,7 @@ def flatten(x):
 def reshape(x, shape: tuple, /, *, copy=None):
     """
     Gives a new shape to an array without changing its data.
+    Works for BuffNDArray, but not LazyTensor or FiberTensor.
 
     Parameters
     ----------
