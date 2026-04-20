@@ -1,11 +1,11 @@
-def main(#A0#1: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64, #A1#2: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64, #A2#3: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64) -> tuple(BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64):
-    #_A0#4: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64 = unpack(#A0#1)
+def main(#A0#1: BufferizedNDArray, #A1#2: BufferizedNDArray, #A2#3: BufferizedNDArray) -> tuple(element_0: BufferizedNDArray):
+    #_A0#4: BufferizedNDArray = unpack(#A0#1)
     #A0_dim_0#5: finchlite.int64 = #_A0#4.shape[0]
     #A0_dim_1#6: finchlite.int64 = #_A0#4.shape[1]
-    #_A1#7: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64 = unpack(#A1#2)
+    #_A1#7: BufferizedNDArray = unpack(#A1#2)
     #A1_dim_0#8: finchlite.int64 = #_A1#7.shape[0]
     #A1_dim_1#9: finchlite.int64 = #_A1#7.shape[1]
-    #_A2#10: BufferizedNDArray_i64_shape_i64_i64_strides_i64_i64 = unpack(#A2#3)
+    #_A2#10: BufferizedNDArray = unpack(#A2#3)
     #A2_dim_0#11: finchlite.int64 = #_A2#10.shape[0]
     #A2_dim_1#12: finchlite.int64 = #_A2#10.shape[1]
     declare(#_A2#10, 0, add, [])
