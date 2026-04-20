@@ -527,6 +527,7 @@ def main_bnb_bfs_vs_dfs_benchmarks() -> None:
     for case in BNB_BFS_VS_DFS_CASES:
         _run_bnb_bfs_vs_dfs_case(case)
 
+
 def main() -> None:
     print("", flush=True)
     print("### Galley compile benchmarks (with vs without components) ###", flush=True)
