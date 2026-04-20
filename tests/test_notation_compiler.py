@@ -5,7 +5,7 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_notation as ntn
-from finchlite import ffunc, ftype
+from finchlite import ffuncs, ftype
 from finchlite.compile import (
     BufferizedNDArray,
     NotationCompiler,
@@ -82,7 +82,7 @@ def test_matrix_multiplication(a, b):
                         ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
                         ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(ffunc.add), (m, n)
+                            C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
@@ -110,14 +110,14 @@ def test_matrix_multiplication(a, b):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.mul),
+                                                    ntn.Literal(ffuncs.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(ntn.Literal(ffunc.add)),
+                                                    ntn.Update(ntn.Literal(ffuncs.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -127,7 +127,7 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
@@ -204,7 +204,7 @@ def test_matrix_multiplication_regression(file_regression):
                         ntn.Declare(
                             C_,
                             ntn.Literal(0.0),
-                            ntn.Literal(ffunc.add),
+                            ntn.Literal(ffuncs.add),
                             (m, n),
                         ),
                         ntn.Loop(
@@ -233,14 +233,14 @@ def test_matrix_multiplication_regression(file_regression):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.mul),
+                                                    ntn.Literal(ffuncs.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(ntn.Literal(ffunc.add)),
+                                                    ntn.Update(ntn.Literal(ffuncs.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -250,7 +250,7 @@ def test_matrix_multiplication_regression(file_regression):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )

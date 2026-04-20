@@ -12,7 +12,7 @@ import numpy as np
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import Tensor, ffunc, int64, is_annihilator
+from ...algebra import Tensor, ffuncs, ftype, int64, is_annihilator
 from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, dimension
 from .numeric_stats import NumericStats
@@ -36,6 +36,13 @@ class DC:
     from_indices: frozenset[Field]
     to_indices: frozenset[Field]
     value: float
+
+
+_INT64_VECTOR_FTYPE = BufferizedNDArray.from_numpy(np.zeros(1, dtype=np.int64)).ftype
+
+
+def _int_tuple_ftype(size: int):
+    return ftype(tuple(np.int64(0) for _ in range(size)))
 
 
 class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
@@ -168,13 +175,13 @@ class DCStats(NumericStats):
         ndims = len(fields)
         dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
         dim_array_variables = [
-            ntn.Variable(f"x_{fields[i]}", BufferizedNDArray) for i in range(ndims)
+            ntn.Variable(f"x_{fields[i]}", _INT64_VECTOR_FTYPE) for i in range(ndims)
         ]
         dim_size_variables = [
             ntn.Variable(f"n_{fields[i]}", int64) for i in range(ndims)
         ]
         dim_array_slots = [
-            ntn.Slot(f"x_{fields[i]}_", BufferizedNDArray) for i in range(ndims)
+            ntn.Slot(f"x_{fields[i]}_", _INT64_VECTOR_FTYPE) for i in range(ndims)
         ]
         dim_proj_variables = [
             ntn.Variable(f"proj_{fields[i]}", int64) for i in range(ndims)
@@ -214,18 +221,18 @@ class DCStats(NumericStats):
                 ntn.Declare(
                     dim_array_slots[i],
                     ntn.Literal(0),
-                    ntn.Literal(ffunc.add),
+                    ntn.Literal(ffuncs.add),
                     (dim_size_variables[i],),
                 )
             )
             inc_expr = ntn.Increment(
                 ntn.Access(
                     dim_array_slots[i],
-                    ntn.Update(ntn.Literal(ffunc.add)),
+                    ntn.Update(ntn.Literal(ffuncs.add)),
                     (dim_loop_variables[i],),
                 ),
                 ntn.Call(
-                    ntn.Literal(ffunc.ne),
+                    ntn.Literal(ffuncs.ne),
                     (
                         A_access,
                         ntn.Literal(self.tensordef.fill_value),
@@ -240,11 +247,11 @@ class DCStats(NumericStats):
                 ntn.Assign(
                     A_nnz_variable,
                     ntn.Call(
-                        ntn.Literal(ffunc.add),
+                        ntn.Literal(ffuncs.add),
                         (
                             A_nnz_variable,
                             ntn.Call(
-                                ntn.Literal(ffunc.ne),
+                                ntn.Literal(ffuncs.ne),
                                 (
                                     A_access,
                                     ntn.Literal(self.tensordef.fill_value),
@@ -265,7 +272,7 @@ class DCStats(NumericStats):
         dim_array_repacks = []
         for i in range(ndims):
             dim_array_freezes.append(
-                ntn.Freeze(dim_array_slots[i], ntn.Literal(ffunc.add))
+                ntn.Freeze(dim_array_slots[i], ntn.Literal(ffuncs.add))
             )
             dc_compute_loops.append(
                 ntn.Loop(
@@ -275,7 +282,7 @@ class DCStats(NumericStats):
                         (
                             ntn.If(
                                 ntn.Call(
-                                    ntn.Literal(ffunc.ne),
+                                    ntn.Literal(ffuncs.ne),
                                     (
                                         ntn.Unwrap(
                                             ntn.Access(
@@ -290,7 +297,7 @@ class DCStats(NumericStats):
                                 ntn.Assign(
                                     dim_proj_variables[i],
                                     ntn.Call(
-                                        ntn.Literal(ffunc.add),
+                                        ntn.Literal(ffuncs.add),
                                         (
                                             dim_proj_variables[i],
                                             ntn.Literal(np.int64(1)),
@@ -301,7 +308,7 @@ class DCStats(NumericStats):
                             ntn.Assign(
                                 dim_dc_variables[i],
                                 ntn.Call(
-                                    ntn.Literal(ffunc.max),
+                                    ntn.Literal(ffuncs.max),
                                     (
                                         dim_dc_variables[i],
                                         ntn.Unwrap(
@@ -339,7 +346,7 @@ class DCStats(NumericStats):
         prgm = ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("array_to_dcs", tuple),
+                    ntn.Variable("array_to_dcs", _int_tuple_ftype(2 * ndims + 1)),
                     (A, *dim_array_variables),
                     ntn.Block(
                         (
@@ -364,7 +371,7 @@ class DCStats(NumericStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         dim_array_instances = [
-            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i])) for i in range(ndims)
+            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64)) for i in range(ndims)
         ]
         dc_proj_pairs = mod.array_to_dcs(arr, *dim_array_instances)
         dcs = set()
@@ -413,11 +420,11 @@ class DCStats(NumericStats):
                                 ntn.Assign(
                                     d,
                                     ntn.Call(
-                                        ntn.Literal(ffunc.add),
+                                        ntn.Literal(ffuncs.add),
                                         (
                                             d,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (
                                                     ntn.Unwrap(
                                                         ntn.Access(A_, ntn.Read(), (i,))
@@ -464,10 +471,10 @@ class DCStats(NumericStats):
 
         dij = ntn.Variable("dij", int64)
 
-        xi = ntn.Variable("xi", BufferizedNDArray)
-        xi_ = ntn.Slot("xi_", BufferizedNDArray)
-        yj = ntn.Variable("yj", BufferizedNDArray)
-        yj_ = ntn.Slot("yj_", BufferizedNDArray)
+        xi = ntn.Variable("xi", _INT64_VECTOR_FTYPE)
+        xi_ = ntn.Slot("xi_", _INT64_VECTOR_FTYPE)
+        yj = ntn.Variable("yj", _INT64_VECTOR_FTYPE)
+        yj_ = ntn.Slot("yj_", _INT64_VECTOR_FTYPE)
 
         d_i = ntn.Variable("d_i", int64)
         d_i_j = ntn.Variable("d_i_j", int64)
@@ -500,11 +507,11 @@ class DCStats(NumericStats):
                                     ntn.Assign(
                                         dij,
                                         ntn.Call(
-                                            ntn.Literal(ffunc.add),
+                                            ntn.Literal(ffuncs.add),
                                             (
                                                 dij,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.ne),
+                                                    ntn.Literal(ffuncs.ne),
                                                     (
                                                         ntn.Unwrap(
                                                             ntn.Access(
@@ -527,7 +534,7 @@ class DCStats(NumericStats):
                     ),
                 ),
                 ntn.Function(
-                    ntn.Variable("matrix_structure_to_dcs", tuple),
+                    ntn.Variable("matrix_structure_to_dcs", _int_tuple_ftype(4)),
                     (A, xi, yj),
                     ntn.Block(
                         (
@@ -545,13 +552,13 @@ class DCStats(NumericStats):
                             ntn.Declare(
                                 xi_,
                                 ntn.Literal(np.int64(0)),
-                                ntn.Literal(ffunc.add),
+                                ntn.Literal(ffuncs.add),
                                 (ni,),
                             ),
                             ntn.Declare(
                                 yj_,
                                 ntn.Literal(np.int64(0)),
-                                ntn.Literal(ffunc.add),
+                                ntn.Literal(ffuncs.add),
                                 (nj,),
                             ),
                             ntn.Loop(
@@ -568,12 +575,12 @@ class DCStats(NumericStats):
                                                         ntn.Access(
                                                             xi_,
                                                             ntn.Update(
-                                                                ntn.Literal(ffunc.add)
+                                                                ntn.Literal(ffuncs.add)
                                                             ),
                                                             (i,),
                                                         ),
                                                         ntn.Call(
-                                                            ntn.Literal(ffunc.ne),
+                                                            ntn.Literal(ffuncs.ne),
                                                             (
                                                                 ntn.Unwrap(
                                                                     ntn.Access(
@@ -592,12 +599,12 @@ class DCStats(NumericStats):
                                                         ntn.Access(
                                                             yj_,
                                                             ntn.Update(
-                                                                ntn.Literal(ffunc.add)
+                                                                ntn.Literal(ffuncs.add)
                                                             ),
                                                             (j,),
                                                         ),
                                                         ntn.Call(
-                                                            ntn.Literal(ffunc.ne),
+                                                            ntn.Literal(ffuncs.ne),
                                                             (
                                                                 ntn.Unwrap(
                                                                     ntn.Access(
@@ -620,7 +627,7 @@ class DCStats(NumericStats):
                             ),
                             ntn.Assign(d_i, ntn.Literal(np.int64(0))),
                             ntn.Assign(d_i_j, ntn.Literal(np.int64(0))),
-                            ntn.Freeze(xi_, ntn.Literal(ffunc.add)),
+                            ntn.Freeze(xi_, ntn.Literal(ffuncs.add)),
                             ntn.Loop(
                                 i,
                                 ni,
@@ -628,7 +635,7 @@ class DCStats(NumericStats):
                                     (
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (
                                                     ntn.Unwrap(
                                                         ntn.Access(
@@ -641,7 +648,7 @@ class DCStats(NumericStats):
                                             ntn.Assign(
                                                 d_i,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_i, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -663,7 +670,7 @@ class DCStats(NumericStats):
                                     )
                                 ),
                             ),
-                            ntn.Freeze(yj_, ntn.Literal(ffunc.add)),
+                            ntn.Freeze(yj_, ntn.Literal(ffuncs.add)),
                             ntn.Assign(d_j, ntn.Literal(np.int64(0))),
                             ntn.Assign(d_j_i, ntn.Literal(np.int64(0))),
                             ntn.Loop(
@@ -673,7 +680,7 @@ class DCStats(NumericStats):
                                     (
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (
                                                     ntn.Unwrap(
                                                         ntn.Access(
@@ -686,7 +693,7 @@ class DCStats(NumericStats):
                                             ntn.Assign(
                                                 d_j,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_j, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -694,7 +701,7 @@ class DCStats(NumericStats):
                                         ntn.Assign(
                                             d_j_i,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.max),
+                                                ntn.Literal(ffuncs.max),
                                                 (
                                                     d_j_i,
                                                     ntn.Unwrap(
@@ -725,8 +732,8 @@ class DCStats(NumericStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         d_ij = mod.matrix_total_nnz(arr)
-        xi_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[0]))
-        yj_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[1]))
+        xi_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[0], dtype=np.int64))
+        yj_vec = BufferizedNDArray.from_numpy(np.zeros(arr.shape[1], dtype=np.int64))
         d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(arr, xi_vec, yj_vec)
         i_field, j_field = tuple(fields)
 
@@ -803,7 +810,7 @@ class DCStats(NumericStats):
                                         ntn.Assign(
                                             dijk,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (
                                                     dijk,
                                                     ntn.Unwrap(
@@ -823,7 +830,7 @@ class DCStats(NumericStats):
                     ),
                 ),
                 ntn.Function(
-                    ntn.Variable("_3d_structure_to_dcs", tuple),
+                    ntn.Variable("_3d_structure_to_dcs", _int_tuple_ftype(6)),
                     (A,),
                     ntn.Block(
                         (
@@ -857,7 +864,7 @@ class DCStats(NumericStats):
                                                 ntn.Assign(
                                                     xi,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             xi,
                                                             ntn.Unwrap(
@@ -874,13 +881,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (xi, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_i,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_i, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -909,7 +916,7 @@ class DCStats(NumericStats):
                                                 ntn.Assign(
                                                     yj,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             yj,
                                                             ntn.Unwrap(
@@ -926,13 +933,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (yj, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_j,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_j, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -961,7 +968,7 @@ class DCStats(NumericStats):
                                                 ntn.Assign(
                                                     zk,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             zk,
                                                             ntn.Unwrap(
@@ -978,13 +985,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (zk, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_k,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_k, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1102,7 +1109,7 @@ class DCStats(NumericStats):
                                             ntn.Assign(
                                                 dijkw,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (
                                                         dijkw,
                                                         ntn.Unwrap(
@@ -1125,7 +1132,7 @@ class DCStats(NumericStats):
                     ),
                 ),
                 ntn.Function(
-                    ntn.Variable("_4d_structure_to_dcs", tuple),
+                    ntn.Variable("_4d_structure_to_dcs", _int_tuple_ftype(8)),
                     (A,),
                     ntn.Block(
                         (
@@ -1166,7 +1173,7 @@ class DCStats(NumericStats):
                                                     ntn.Assign(
                                                         xi,
                                                         ntn.Call(
-                                                            ntn.Literal(ffunc.add),
+                                                            ntn.Literal(ffuncs.add),
                                                             (
                                                                 xi,
                                                                 ntn.Unwrap(
@@ -1184,13 +1191,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (xi, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_i,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_i, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1222,7 +1229,7 @@ class DCStats(NumericStats):
                                                     ntn.Assign(
                                                         yj,
                                                         ntn.Call(
-                                                            ntn.Literal(ffunc.add),
+                                                            ntn.Literal(ffuncs.add),
                                                             (
                                                                 yj,
                                                                 ntn.Unwrap(
@@ -1240,13 +1247,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (yj, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_j,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_j, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1278,7 +1285,7 @@ class DCStats(NumericStats):
                                                     ntn.Assign(
                                                         zk,
                                                         ntn.Call(
-                                                            ntn.Literal(ffunc.add),
+                                                            ntn.Literal(ffuncs.add),
                                                             (
                                                                 zk,
                                                                 ntn.Unwrap(
@@ -1296,13 +1303,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (zk, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_k,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_k, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),
@@ -1334,7 +1341,7 @@ class DCStats(NumericStats):
                                                     ntn.Assign(
                                                         uw,
                                                         ntn.Call(
-                                                            ntn.Literal(ffunc.add),
+                                                            ntn.Literal(ffuncs.add),
                                                             (
                                                                 uw,
                                                                 ntn.Unwrap(
@@ -1352,13 +1359,13 @@ class DCStats(NumericStats):
                                         ),
                                         ntn.If(
                                             ntn.Call(
-                                                ntn.Literal(ffunc.ne),
+                                                ntn.Literal(ffuncs.ne),
                                                 (uw, ntn.Literal(np.int64(0))),
                                             ),
                                             ntn.Assign(
                                                 d_w,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (d_w, ntn.Literal(np.int64(1))),
                                                 ),
                                             ),

@@ -1,19 +1,26 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, cast, overload
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import FTyped, TensorFType, ffunc, register_property
+from ..algebra import (
+    FType,
+    FTyped,
+    ImmutableStructFType,
+    TensorFType,
+    ffuncs,
+    register_property,
+)
 from ..algebra.algebra import FinchOperator
+from ..algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
-    AssemblyStructFType,
     AssemblyTransform,
 )
 from ..finch_notation import NotationLoader
@@ -104,8 +111,16 @@ class _MakeExtent(FinchOperator):
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)
 
-    def return_type(self, start: Any, end: Any):
-        return ExtentFType(start, end)  # type: ignore[abstract]
+    def return_type(self, start: FType, end: FType) -> FType:  # type: ignore[override]
+        if isinstance(start, FDTypeNumpy):
+            start = start.dtype
+        elif isinstance(start, FDTypeBuiltin):
+            start = start.type
+        if isinstance(end, FDTypeNumpy):
+            end = end.dtype
+        elif isinstance(end, FDTypeBuiltin):
+            end = end.type
+        return ExtentFType(cast(type, start), cast(type, end))  # type: ignore[abstract]
 
 
 make_extent = _MakeExtent()
@@ -179,7 +194,7 @@ class SymbolicExtent(FTyped):
     @staticmethod
     def point(idx):
         return SymbolicExtent(
-            idx, ntn.Call(ntn.Literal(ffunc.add), (idx, ntn.Literal(np.intp(1))))
+            idx, ntn.Call(ntn.Literal(ffuncs.add), (idx, ntn.Literal(np.intp(1))))
         )
 
     # TODO: Make it more robust
@@ -187,13 +202,13 @@ class SymbolicExtent(FTyped):
         return self.start_sym == self.end_sym
 
     def get_measure(self):
-        return ntn.Call(ntn.Literal(ffunc.sub), (self.end_sym, self.start_sym))
+        return ntn.Call(ntn.Literal(ffuncs.sub), (self.end_sym, self.start_sym))
 
     def bound_below(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, ffunc.max)
+        return self._bound_ext(size, ffuncs.max)
 
     def bound_above(self, size) -> "SymbolicExtent":
-        return self._bound_ext(size, ffunc.min)
+        return self._bound_ext(size, ffuncs.min)
 
     def _bound_ext(self, size, func) -> "SymbolicExtent":
         return SymbolicExtent(
@@ -204,7 +219,7 @@ class SymbolicExtent(FTyped):
                     ntn.Literal(func),
                     (
                         self.end_sym,
-                        ntn.Call(ntn.Literal(ffunc.add), (self.start_sym, size)),
+                        ntn.Call(ntn.Literal(ffuncs.add), (self.start_sym, size)),
                     ),
                 ),
             ),
@@ -212,11 +227,11 @@ class SymbolicExtent(FTyped):
 
     @property
     def ftype(self):
-        return ExtentFType(self.start_sym.result_format, self.end_sym.result_format)
+        return ExtentFType(self.start_sym.result_type, self.end_sym.result_type)
 
 
 @dataclass(eq=True, frozen=True)
-class ExtentFType(AssemblyStructFType):
+class ExtentFType(ImmutableStructFType):
     start_t: type
     end_t: type
 
@@ -275,7 +290,7 @@ class ExtentFType(AssemblyStructFType):
 
         map(assert_lowered, PostOrderDFS(body))
 
-        idx = asm.Variable(ctx.freshen(idx.name), idx.result_format)
+        idx = asm.Variable(ctx.freshen(idx.name), idx.result_type)
         ctx_2 = ctx.scope()
         ctx_2.bindings[idx.name] = idx
         ctx_2(body)
@@ -486,8 +501,8 @@ class AssemblyContext(Context):
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
             case ntn.Unpack(ntn.Slot(var_n, var_t), val):
                 val_code = self(val)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.slots:
                     raise KeyError(
                         f"Slot {var_n} already exists in context, cannot unpack"
@@ -518,26 +533,26 @@ class AssemblyContext(Context):
                 assert isinstance(mode, ntn.Read)
                 assert idxs == ()
                 tns = self.resolve(tns)
-                return tns.result_format.lower_unwrap(self, tns)
+                return tns.result_type.lower_unwrap(self, tns)
             case ntn.Increment(ntn.Access(tns, mode, idxs), val):
                 assert isinstance(mode, ntn.Update)
                 assert idxs == ()
                 tns = self.resolve(tns)
                 op = mode.op
-                return tns.result_format.lower_increment(self, tns, op, val)
+                return tns.result_type.lower_increment(self, tns, op, val)
             case ntn.Block(bodies):
                 for body in bodies:
                     self(body)
                 return None
             case ntn.Loop(idx, ext, body):
-                ext.result_format.lower_loop(
+                ext.result_type.lower_loop(
                     self, idx, SymbolicExtent.from_notation(ext), body
                 )
                 return None
             case ntn.Dimension(tns, ntn.Literal(r)):
                 assert isinstance(r, int)
                 tns = self.resolve(tns)
-                return tns.result_format.lower_dim(self, tns.obj, r)
+                return tns.result_type.lower_dim(self, tns.obj, r)
             case ntn.Cached(arg, _):
                 return self(arg)
             case ntn.Declare(tns, init, op, shape):
@@ -546,17 +561,17 @@ class AssemblyContext(Context):
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]
-                return tns.result_format.lower_declare(self, tns, init_e, op_e, shape_e)
+                return tns.result_type.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
                 self._freeze_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 op_e = self(op)
-                return tns.result_format.lower_freeze(self, tns, op_e)
+                return tns.result_type.lower_freeze(self, tns, op_e)
             case ntn.Thaw(tns, op):
                 self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
                 op_e = self(op)
-                return tns.result_format.lower_thaw(self, tns, op_e)
+                return tns.result_type.lower_thaw(self, tns, op_e)
             case ntn.If(cond, body):
                 ctx = self.block()
                 ctx_2 = ctx.scope()
@@ -651,7 +666,7 @@ def lower_looplets(
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_format.unfurl(ctx_2, tns, ext, mode, proto=None)
+                    tns_2 = tns.result_type.unfurl(ctx_2, tns, ext, mode, proto=None)
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
@@ -682,7 +697,7 @@ class DefaultPass(LoopletPass):
         """
         Default pass that does nothing. This is used when no other pass is selected.
         """
-        ext.result_format.default_loop(ctx, idx, ext, body)
+        ext.result_type.default_loop(ctx, idx, ext, body)
 
 
 class LoopletContext(Context):

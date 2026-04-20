@@ -350,10 +350,10 @@ class NotationInterpreter(NotationLoader):
                 return val
             case ntn.Value(val, val_t):
                 val_e = self(val)
-                if type(val_e) is not val_t:
+                if ftype(val_e) is not val_t:
                     raise TypeError(
-                        f"Value '{val_e}' is expected to be of type {val_t}, "
-                        f"but is a type {type(val_e)}."
+                        f"Value '{val_e}' is expected to be of ftype {val_t}, "
+                        f"but is a type {ftype(val_e)}."
                     )
                 return val_e
             case ntn.Variable(var_n, var_t):

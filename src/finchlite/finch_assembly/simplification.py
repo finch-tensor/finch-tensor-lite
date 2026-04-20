@@ -1,5 +1,5 @@
 from .. import finch_assembly as asm
-from ..algebra import ffunc, is_annihilator, is_identity
+from ..algebra import ffuncs, is_annihilator, is_identity
 from ..symbolic import Fixpoint, PostWalk, Rewrite
 from .stages import AssemblyTransform
 
@@ -14,7 +14,7 @@ class AssemblySimplify(AssemblyTransform):
 
         match term:
             # overwrite(x, y) => y
-            case asm.Call(asm.Literal(fn), (_, y)) if fn is ffunc.overwrite:
+            case asm.Call(asm.Literal(fn), (_, y)) if fn is ffuncs.overwrite:
                 return y
             # op(..., arg, ...) where arg is anihilator => arg
             case asm.Call(asm.Literal(_) as op, args):
@@ -42,7 +42,7 @@ class AssemblySimplify(AssemblyTransform):
                     ),
                 )
             ) if s1 == s2 and idx1 == idx2:
-                if op == ffunc.init_write(arg.val):
+                if op == ffuncs.init_write(arg.val):
                     return asm.Block(())
                 if is_identity(op, arg.val):
                     return asm.Block(())

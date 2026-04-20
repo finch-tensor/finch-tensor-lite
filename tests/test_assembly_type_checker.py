@@ -7,18 +7,17 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite import ffunc
-from finchlite.algebra import FType, ftype
+from finchlite import ffuncs
+from finchlite.algebra import FType, TupleFType, ftype
 from finchlite.codegen import NumpyBuffer
 from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
 from finchlite.finch_assembly import assembly_check_types
-from finchlite.finch_assembly.struct import TupleFType
 
 
 def test_lit_basic():
     checker = asm.AssemblyTypeChecker()
     assert checker(asm.Literal(np.float64(1.0))) is finchlite.float64
-    assert checker(asm.Literal(True)) is bool
+    assert checker(asm.Literal(True)) is finchlite.bool_
 
 
 def test_var_basic():
@@ -29,7 +28,7 @@ def test_var_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("y", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Variable("x", float))
+        checker(asm.Variable("x", finchlite.float32))
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("x", 42))
 
@@ -42,18 +41,18 @@ def test_slot_basic():
     assert isinstance(b_type, FType)
     assert b_type == b.ftype
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Slot("b", float))
+        checker(asm.Slot("b", finchlite.float64))
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Slot("b", 42))
 
 
 def test_getattr_basic():
     checker = asm.AssemblyTypeChecker()
-    p = (1, "one")
+    p = (np.int64(1), np.float64(1.0))
     p_var = asm.Variable("p", ftype(p))
     checker.ctxt["p"] = ftype(p)
-    assert checker(asm.GetAttr(p_var, asm.Literal("element_0"))) is int
-    assert checker(asm.GetAttr(p_var, asm.Literal("element_1"))) is str
+    assert checker(asm.GetAttr(p_var, asm.Literal("element_0"))) is finchlite.int64
+    assert checker(asm.GetAttr(p_var, asm.Literal("element_1"))) is finchlite.float64
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.GetAttr(p_var, asm.Literal("element_3")))
     with pytest.raises(asm.AssemblyTypeError):
@@ -69,7 +68,7 @@ def test_call_basic():
     assert (
         checker(
             asm.Call(
-                asm.Literal(ffunc.add),
+                asm.Literal(ffuncs.add),
                 (
                     asm.Literal(np.float64(2.0)),
                     asm.Literal(np.float64(3.0)),
@@ -79,11 +78,11 @@ def test_call_basic():
         == finchlite.float64
     )
     assert (
-        checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal(np.float64(3.0)),)))
+        checker(asm.Call(asm.Literal(ffuncs.sin), (asm.Literal(np.float64(3.0)),)))
         == finchlite.float64
     )
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Call(asm.Literal(ffunc.sin), (asm.Literal("string"),)))
+        checker(asm.Call(asm.Literal(ffuncs.sin), (asm.Literal("string"),)))
 
 
 def test_load_basic():
@@ -323,13 +322,13 @@ def test_whileloop_basic():
         checker(
             asm.WhileLoop(
                 asm.Call(
-                    asm.Literal(ffunc.and_),
+                    asm.Literal(ffuncs.and_),
                     (
                         asm.Literal(True),
                         asm.Literal(0),
                     ),
                 ),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
         is None
@@ -340,7 +339,7 @@ def test_whileloop_basic():
         checker(
             asm.WhileLoop(
                 asm.Slot("a", a.ftype),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
 
@@ -351,13 +350,13 @@ def test_if_basic():
         checker(
             asm.If(
                 asm.Call(
-                    asm.Literal(ffunc.and_),
+                    asm.Literal(ffuncs.and_),
                     (
                         asm.Literal(True),
                         asm.Literal(0),
                     ),
                 ),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
         is None
@@ -368,7 +367,7 @@ def test_if_basic():
         checker(
             asm.If(
                 asm.Slot("a", a.ftype),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
             )
         )
 
@@ -379,14 +378,14 @@ def test_ifelse_basic():
         checker(
             asm.IfElse(
                 asm.Call(
-                    asm.Literal(ffunc.and_),
+                    asm.Literal(ffuncs.and_),
                     (
                         asm.Literal(True),
                         asm.Literal(0),
                     ),
                 ),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
-                asm.Assign(asm.Variable("x", int), asm.Literal(1)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(1)),
             )
         )
         is None
@@ -397,8 +396,8 @@ def test_ifelse_basic():
         checker(
             asm.IfElse(
                 asm.Slot("a", a.ftype),
-                asm.Assign(asm.Variable("x", int), asm.Literal(0)),
-                asm.Assign(asm.Variable("x", int), asm.Literal(1)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(0)),
+                asm.Assign(asm.Variable("x", finchlite.int_), asm.Literal(1)),
             )
         )
 
@@ -413,7 +412,7 @@ def test_function_basic():
         ),
         asm.Return(
             asm.Call(
-                asm.Literal(ffunc.add),
+                asm.Literal(ffuncs.add),
                 (
                     asm.Variable("x", finchlite.int64),
                     asm.Variable("y", finchlite.int64),
@@ -431,7 +430,7 @@ def test_function_basic():
             ),
             asm.Return(
                 asm.Call(
-                    asm.Literal(ffunc.add),
+                    asm.Literal(ffuncs.add),
                     (
                         asm.Variable("x", finchlite.int64),
                         asm.Variable("y", finchlite.int64),
@@ -451,7 +450,7 @@ def test_function_basic():
                 (
                     asm.Return(
                         asm.Call(
-                            asm.Literal(ffunc.sub),
+                            asm.Literal(ffuncs.sub),
                             (
                                 asm.Variable("x", finchlite.int64),
                                 asm.Variable("y", finchlite.int64),
@@ -547,11 +546,11 @@ def test_dot_product(a, b):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffunc.mul),
+                                                    asm.Literal(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -588,7 +587,7 @@ def test_if_statement():
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(ffunc.eq),
+                                asm.Literal(ffuncs.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -596,7 +595,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -605,7 +604,7 @@ def test_if_statement():
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(ffunc.lt),
+                                asm.Literal(ffuncs.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -613,7 +612,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.sub),
+                                            asm.Literal(ffuncs.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -624,7 +623,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -660,7 +659,7 @@ def test_simple_struct():
                         asm.Assign(
                             res_var,
                             asm.Call(
-                                asm.Literal(ffunc.mul),
+                                asm.Literal(ffuncs.mul),
                                 (
                                     asm.GetAttr(p_var, asm.Literal("x")),
                                     asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -670,11 +669,11 @@ def test_simple_struct():
                         asm.Assign(
                             res_var,
                             asm.Call(
-                                asm.Literal(ffunc.add),
+                                asm.Literal(ffuncs.add),
                                 (
                                     res_var,
                                     asm.Call(
-                                        asm.Literal(ffunc.mul),
+                                        asm.Literal(ffuncs.mul),
                                         (
                                             asm.GetAttr(p_var, asm.Literal("y")),
                                             asm.GetAttr(
@@ -701,8 +700,8 @@ def test_simple_struct():
 )
 def test_hashtable(constructor):
     table = constructor(
-        asm.TupleFType.from_tuple((int, int)),
-        asm.TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_, finchlite.int_)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -717,7 +716,8 @@ def test_hashtable(constructor):
         (
             asm.Function(
                 asm.Variable(
-                    "setidx", TupleFType.from_tuple(tuple(int for _ in range(3)))
+                    "setidx",
+                    TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(3))),
                 ),
                 (table_v, key_v, val_v),
                 asm.Block(
@@ -734,7 +734,7 @@ def test_hashtable(constructor):
                 ),
             ),
             asm.Function(
-                asm.Variable("exists", bool),
+                asm.Variable("exists", finchlite.bool),
                 (table_v, key_v),
                 asm.Block(
                     (
@@ -754,8 +754,8 @@ def test_hashtable(constructor):
 )
 def test_hashtable_fail(constructor):
     table = constructor(
-        asm.TupleFType.from_tuple((int, int)),
-        asm.TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_)),
+        TupleFType.from_tuple((finchlite.int_, finchlite.int_, finchlite.int_)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -769,7 +769,8 @@ def test_hashtable_fail(constructor):
         (
             asm.Function(
                 asm.Variable(
-                    "setidx", TupleFType.from_tuple(tuple(int for _ in range(2)))
+                    "setidx",
+                    TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(2))),
                 ),
                 (table_v, key_v, val_v),
                 asm.Block(

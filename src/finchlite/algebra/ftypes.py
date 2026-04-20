@@ -1,6 +1,7 @@
 # AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import builtins
-from abc import abstractmethod
+from abc import ABC, abstractmethod
+from collections import namedtuple
 from functools import lru_cache
 from typing import Any
 
@@ -14,13 +15,15 @@ https://data-apis.org/array-api/latest/API_specification/data_types.html
 """
 
 
-class FType:
+class FType(ABC):
+
+    @abstractmethod
     def __eq__(self, other):
-        return self is other
-
+        ...
+    
+    @abstractmethod
     def __hash__(self):
-        return id(self)
-
+        ...
     def fisinstance(self, other):
         """
         Check if `other` is an instance of this ftype.
@@ -28,10 +31,18 @@ class FType:
         return ftype(other) == self
 
 
+
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
 
 
 class FDType(FType):
+    @abstractmethod
+    def __call__(self, other):
+        """
+        Create an instance of this ftype with the given value, attempt to cast
+        if necessary.
+        """
+
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -62,7 +73,7 @@ def promote_type(T1: FDType, T2: FDType):
     raise TypeError(f"Cannot promote types {T1} and {T2}")
 
 
-class FDTypeNumeric(FDType):
+class FDTypeOrdered(FDType):
     @property
     @abstractmethod
     def type_min(self):
@@ -78,6 +89,9 @@ class FDTypeNumeric(FDType):
         The maximum value for this type.
         """
         ...
+
+
+class FDTypeNumeric(FDTypeOrdered): ...
 
 
 class FDTypeReal(FDTypeNumeric): ...
@@ -106,7 +120,7 @@ class FDTypeFloat(FDTypeNumeric):
         ...
 
 
-class FDTypeBoolean(FDType): ...
+class FDTypeBoolean(FDTypeOrdered): ...
 
 
 class FDTypeBuiltin(FDType):
@@ -118,6 +132,12 @@ class FDTypeBuiltin(FDType):
         """
         ...
 
+    def __eq__(self, other):
+        return isinstance(other, FDTypeBuiltin) and self.type == other.type
+    
+    def __hash__(self):
+        return hash(self.type)
+
     def __call__(self, val):
         """
         Create an instance of this ftype with the given value.
@@ -125,20 +145,59 @@ class FDTypeBuiltin(FDType):
         return self.type(val)
 
 
-# Ftypes for python built-in datatypes
-class _FDTypeBuiltinBool(FDTypeBoolean):
+class _FDTypeBuiltinStr(FDTypeBuiltin):
     @property
     def type(self):
-        return bool
+        return str
+
+    def __repr__(self):
+        return "finchlite.str_"
+
+
+str_ = _FDTypeBuiltinStr()
+
+
+class _FDTypeBuiltinNone(FDTypeBuiltin):
+
+    @property
+    def type(self):
+        return type(None)
+
+    def __repr__(self):
+        return "none_"
+
+    def __call__(self, val):
+        """None type cannot be called, always returns None"""
+        if val is not None:
+            raise TypeError(f"Cannot convert {val!r} to None type")
+        return
+
+
+none_ = _FDTypeBuiltinNone()
+
+
+# Ftypes for python built-in datatypes
+class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
+    @property
+    def type(self):
+        return builtins.bool
 
     def __repr__(self):
         return "finchlite.bool_"
+
+    @property
+    def type_min(self):
+        return False
+
+    @property
+    def type_max(self):
+        return True
 
 
 bool_ = _FDTypeBuiltinBool()
 
 
-class FDTypeNumericBuiltin(FDType):
+class FDTypeNumericBuiltin(FDTypeBuiltin, FDTypeNumeric):
     def __promote__(self, other):
         if isinstance(other, FDTypeBuiltin):
             return ftype(self.type(False) + other.type(False))
@@ -150,7 +209,7 @@ class FDTypeNumericBuiltin(FDType):
 class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
     @property
     def type(self):
-        return int
+        return builtins.int
 
     def __repr__(self):
         return "finchlite.int_"
@@ -180,7 +239,7 @@ int_ = _FDTypeBuiltinInt()
 class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
     @property
     def type(self):
-        return float
+        return builtins.float
 
     def __repr__(self):
         return "finchlite.float_"
@@ -207,7 +266,7 @@ float_ = _FDTypeBuiltinFloat()
 class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
-        return complex
+        return builtins.complex
 
     def __repr__(self):
         return "finchlite.complex_"
@@ -237,6 +296,13 @@ class FDTypeNumpy(FDType):
         """
         ...
 
+
+    def __eq__(self, other):
+        return isinstance(other, FDTypeNumpy) and self.dtype == other.dtype
+    
+    def __hash__(self):
+        return hash(self.dtype)
+
     def __call__(self, val):
         """
         Create an instance of this ftype with the given value.
@@ -246,10 +312,10 @@ class FDTypeNumpy(FDType):
     def __promote__(self, other):
         if isinstance(other, FDTypeNumpy):
             promoted_dtype = np.promote_types(self.dtype, other.dtype)
-            return ftype(promoted_dtype)
+            return ftype(promoted_dtype.type)
         if isinstance(other, FDTypeBuiltin):
             promoted_dtype = np.promote_types(self.dtype, other.type)
-            return ftype(promoted_dtype)
+            return ftype(promoted_dtype.type)
         return None
 
 
@@ -308,6 +374,14 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
     def __repr__(self):
         return "finchlite.bool"
 
+    @property
+    def type_min(self):
+        return np.bool_(False)
+
+    @property
+    def type_max(self):
+        return np.bool_(True)
+
 
 bool = _FDTypeBool()
 
@@ -346,6 +420,7 @@ class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
 
 
 int32 = _FDTypeInt32()
+
 
 
 class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
@@ -496,48 +571,105 @@ class FTyped:
         ...
 
 
-class TupleFType(FType):
-    """FType for Python tuples, with a struct-compatible interface."""
-
-    is_mutable = False
-
-    def __init__(self, struct_name, struct_formats):
-        self._struct_name = struct_name
-        self._struct_formats = struct_formats
-
+class StructFType(FType, ABC):
     def __eq__(self, other):
         return (
-            isinstance(other, TupleFType)
+            type(other) is type(self)
             and self.struct_name == other.struct_name
-            and self._struct_formats == other._struct_formats
+            and self.struct_fields == other.struct_fields
         )
 
-    def __len__(self):
-        return len(self._struct_formats)
-
     def __hash__(self):
-        return hash((self.struct_name, tuple(self.struct_fieldformats)))
+        return hash((type(self), self.struct_name, tuple(self.struct_fields)))
 
-    def __str__(self):
-        return f"{self.struct_name}({', '.join(map(str, self._struct_formats))})"
-
-    @property
-    def struct_name(self):
-        return self._struct_name
+    def __repr__(self):
+        fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
+        return f"{self.struct_name}({fields_str})"
 
     @property
-    def struct_fields(self):
-        return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_formats)]
+    @abstractmethod
+    def struct_name(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def struct_fields(self) -> list[tuple[str, FType]]: ...
+
+    @abstractmethod
+    def from_fields(self, *args): ...
+
+    @property
+    @abstractmethod
+    def is_mutable(self) -> builtins.bool: ...
+
+    def struct_getattr(self, obj, attr) -> Any:
+        return getattr(obj, attr)
+
+    def struct_setattr(self, obj, attr, value) -> None:
+        setattr(obj, attr, value)
+        return
 
     @property
     def struct_fieldnames(self) -> list[str]:
         return [name for (name, _) in self.struct_fields]
 
     @property
-    def struct_fieldformats(self) -> list[Any]:
+    def struct_fieldtypes(self) -> list[FType]:
         return [type_ for (_, type_) in self.struct_fields]
 
-    def struct_hasattr(self, attr: str) -> bool:
+    def struct_hasattr(self, attr: str) -> builtins.bool:
+        return attr in dict(self.struct_fields)
+
+    def struct_attrtype(self, attr: str) -> FType:
+        return dict(self.struct_fields)[attr]
+
+
+class ImmutableStructFType(StructFType):
+    @property
+    def is_mutable(self) -> builtins.bool:
+        return False
+
+
+class MutableStructFType(StructFType):
+    """
+    Class for a mutable struct type.
+    It is currently not used anywhere, but maybe it will be useful in the future?
+    """
+
+    @property
+    def is_mutable(self) -> builtins.bool:
+        return True
+
+
+class TupleFType(ImmutableStructFType):
+    """FType for Python tuples, with a struct-compatible interface."""
+
+    def __init__(self, struct_types):
+        self._struct_types = struct_types
+
+    def __repr__(self):
+        return f"TupleFType(({', '.join(map(repr, self._struct_types))},))"
+
+    def __str__(self):
+        fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
+        return f"{self.struct_name}({fields_str})"
+
+    @property
+    def struct_name(self):
+        return "tuple"
+
+    @property
+    def struct_fields(self):
+        return [(f"element_{i}", fmt) for i, fmt in enumerate(self._struct_types)]
+
+    @property
+    def struct_fieldnames(self) -> list[str]:
+        return [name for (name, _) in self.struct_fields]
+
+    @property
+    def struct_fieldtypes(self) -> list[Any]:
+        return [type_ for (_, type_) in self.struct_fields]
+
+    def struct_hasattr(self, attr: str) -> builtins.bool:
         return attr in dict(self.struct_fields)
 
     def struct_attrtype(self, attr: str) -> Any:
@@ -552,17 +684,17 @@ class TupleFType(FType):
         obj[index] = value
 
     def fisinstance(self, other):
-        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldformats):
+        if not isinstance(other, tuple) or len(other) != len(self.struct_fieldtypes):
             return False
         return all(
             fisinstance(elt, fmt)
-            for elt, fmt in zip(other, self.struct_fieldformats, strict=False)
+            for elt, fmt in zip(other, self.struct_fieldtypes, strict=False)
         )
 
     def from_fields(self, *args):
         assert all(
             fisinstance(a, f)
-            for a, f in zip(args, self.struct_fieldformats, strict=False)
+            for a, f in zip(args, self.struct_fieldtypes, strict=False)
         )
         return tuple(args)
 
@@ -571,8 +703,60 @@ class TupleFType(FType):
 
     @staticmethod
     @lru_cache
-    def from_tuple(types: tuple[Any, ...]) -> "TupleFType":
-        return TupleFType("tuple", types)
+    def from_tuple(types: tuple[FType, ...]) -> "TupleFType":
+        if not isinstance(types, tuple):
+            raise TypeError("TupleFType.from_tuple expects tuple[FType, ...]")
+        if not all(isinstance(type_, FType) for type_ in types):
+            raise TypeError("TupleFType.from_tuple expects tuple[FType, ...]")
+        return TupleFType(types)
+
+
+class NamedTupleFType(ImmutableStructFType):
+    def __init__(self, struct_name, struct_fields):
+        self._struct_name = struct_name
+        self._struct_fields = struct_fields
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, NamedTupleFType)
+            and self.struct_name == other.struct_name
+            and self.struct_fields == other.struct_fields
+        )
+
+    def __len__(self):
+        return len(self._struct_fields)
+
+    def __hash__(self):
+        return hash((self.struct_name, tuple(self.struct_fields)))
+
+    @property
+    def struct_name(self):
+        return self._struct_name
+
+    @property
+    def struct_fields(self):
+        return self._struct_fields
+
+    def fisinstance(self, other):
+        if not isinstance(other, tuple) or not hasattr(other, "_fields"):
+            return False
+        if tuple(other._fields) != tuple(self.struct_fieldnames):
+            return False
+
+        return all(
+            fisinstance(elt, format)
+            for elt, format in zip(other, self.struct_fieldtypes, strict=False)
+        )
+
+    def from_fields(self, *args):
+        assert all(
+            fisinstance(a, f)
+            for a, f in zip(args, self.struct_fieldtypes, strict=False)
+        )
+        return namedtuple(self.struct_name, self.struct_fieldnames)(args)
+
+    def __call__(self, *args):
+        return self.from_fields(*args)
 
 
 def fisinstance(x, f: FType):
@@ -590,9 +774,9 @@ def isdtype(x, T: FType):
 
 
 def ftype(x) -> FType:
-    """Return the corresponding FType for a given dtype or object.
-    Recognizes numpy, Python builtins, and Python tuples.
-    Calls .ftype on the object if type not found.
+    """Return the corresponding FType for a given object.  Recognizes numpy,
+    Python builtins, and Python tuples.  Sometimes recognizes types.
+    Override .ftype to customize the ftype of an object.
     """
     if isinstance(x, FType):
         return x
@@ -632,4 +816,16 @@ def ftype(x) -> FType:
         return complex64
     if type(x) is np.complex128 or x is np.complex128:
         return complex128
+    if type(x) is builtins.str or x is builtins.str:
+        return str_
+    if x is None:
+        return none_
+    if isinstance(x, tuple):
+        T = type(x)
+        if hasattr(T, "_fields") and all(isinstance(field, str) for field in T._fields):
+            return NamedTupleFType(
+                T.__name__,
+                [(fieldname, ftype(getattr(x, fieldname))) for fieldname in T._fields],
+            )
+        return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
     raise NotImplementedError

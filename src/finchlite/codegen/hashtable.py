@@ -6,9 +6,12 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, NamedTuple
 
+import numpy as np
+
 import numba
 
-from ..finch_assembly import AssemblyExpression, Dict, ImmutableStructFType, Stack
+from ..algebra import FType, ImmutableStructFType
+from ..finch_assembly import AssemblyExpression, Dict, Stack
 from .c_codegen import (
     CContext,
     CDictFType,
@@ -253,10 +256,10 @@ class CHashTable(Dict):
     def __del__(self):
         getattr(self.lib.library, self.lib.methods.cleanup)(self.dct)
 
-    def exists(self, idx) -> bool:
+    def exists(self, idx) -> np.bool:
         c_key = serialize_to_c(self.ftype.key_type, idx)
         c_value = getattr(self.lib.library, self.lib.methods.exists)(self.dct, c_key)
-        return bool(c_value)
+        return np.bool(c_value)
 
     def load(self, idx):
         c_key = serialize_to_c(self.ftype.key_type, idx)
@@ -361,7 +364,7 @@ class CHashTableFType(CDictFType, CStackFType):
         """
         Unpack the map into C context.
         """
-        assert val.result_format == self
+        assert val.result_type == self
         data = ctx.freshen(var_n, "data")
         # Add all the stupid header stuff from above.
         if self not in ctx.datastructures:
@@ -414,8 +417,8 @@ class NumbaHashTable(Dict):
 
     def __init__(
         self,
-        key_type: ImmutableStructFType,
-        value_type: ImmutableStructFType,
+        key_type: FType,
+        value_type: FType,
         dct: dict[tuple, tuple] | None = None,
     ):
         self._key_type = key_type
@@ -439,13 +442,13 @@ class NumbaHashTable(Dict):
         """
         return NumbaHashTableFType(self._key_type, self._value_type)
 
-    def exists(self, idx) -> bool:
+    def exists(self, idx) -> np.bool:
         """
         Exists function of the numba hash table.
         It will accept an object with TupleFType and return a bool.
         """
         idx = serialize_to_numba(self.key_type, idx)
-        return idx in self.dct
+        return np.bool(idx in self.dct)
 
     def load(self, idx):
         idx = serialize_to_numba(self.key_type, idx)

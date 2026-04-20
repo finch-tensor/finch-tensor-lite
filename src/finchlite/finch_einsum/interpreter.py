@@ -1,6 +1,6 @@
 import numpy as np
 
-from finchlite.algebra.ftype import fisinstance
+from finchlite.algebra.ftypes import fisinstance
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_einsum.stages import (
@@ -9,68 +9,68 @@ from finchlite.finch_einsum.stages import (
     compute_shape_vars,
 )
 
-from ..algebra import ffunc
+from ..algebra import ffuncs
 from . import nodes as ein
 
 nary_ops = {
-    ffunc.add: "add",
-    ffunc.mul: "multiply",
-    ffunc.sub: "subtract",
-    ffunc.truediv: "divide",
-    ffunc.floordiv: "floor_divide",
-    ffunc.mod: "remainder",
-    ffunc.pow: "power",
-    ffunc.eq: "equal",
-    ffunc.ne: "not_equal",
-    ffunc.lt: "less",
-    ffunc.le: "less_equal",
-    ffunc.gt: "greater",
-    ffunc.ge: "greater_equal",
-    ffunc.and_: "bitwise_and",
-    ffunc.or_: "bitwise_or",
-    ffunc.xor: "bitwise_xor",
-    ffunc.lshift: "bitwise_left_shift",
-    ffunc.rshift: "bitwise_right_shift",
-    ffunc.logical_and: "logical_and",
-    ffunc.logical_or: "logical_or",
-    ffunc.logical_not: "logical_not",
-    ffunc.promote_min: "minimum",
-    ffunc.promote_max: "maximum",
+    ffuncs.add: "add",
+    ffuncs.mul: "multiply",
+    ffuncs.sub: "subtract",
+    ffuncs.truediv: "divide",
+    ffuncs.floordiv: "floor_divide",
+    ffuncs.mod: "remainder",
+    ffuncs.pow: "power",
+    ffuncs.eq: "equal",
+    ffuncs.ne: "not_equal",
+    ffuncs.lt: "less",
+    ffuncs.le: "less_equal",
+    ffuncs.gt: "greater",
+    ffuncs.ge: "greater_equal",
+    ffuncs.and_: "bitwise_and",
+    ffuncs.or_: "bitwise_or",
+    ffuncs.xor: "bitwise_xor",
+    ffuncs.lshift: "bitwise_left_shift",
+    ffuncs.rshift: "bitwise_right_shift",
+    ffuncs.logical_and: "logical_and",
+    ffuncs.logical_or: "logical_or",
+    ffuncs.logical_not: "logical_not",
+    ffuncs.min: "minimum",
+    ffuncs.max: "maximum",
 }
 unary_ops = {
-    ffunc.pos: "positive",
-    ffunc.neg: "negative",
-    ffunc.invert: "bitwise_invert",
-    ffunc.abs: "absolute",
-    ffunc.sqrt: "sqrt",
-    ffunc.exp: "exp",
-    ffunc.log: "log",
-    ffunc.log1p: "log1p",
-    ffunc.log10: "log10",
-    ffunc.log2: "log2",
-    ffunc.sin: "sin",
-    ffunc.cos: "cos",
-    ffunc.tan: "tan",
-    ffunc.sinh: "sinh",
-    ffunc.cosh: "cosh",
-    ffunc.tanh: "tanh",
-    ffunc.arcsin: "arcsin",
-    ffunc.arccos: "arccos",
-    ffunc.arctan: "arctan",
-    ffunc.arcsinh: "arcsinh",
-    ffunc.arccosh: "arccosh",
-    ffunc.arctanh: "arctanh",
+    ffuncs.pos: "positive",
+    ffuncs.neg: "negative",
+    ffuncs.invert: "bitwise_invert",
+    ffuncs.abs: "absolute",
+    ffuncs.sqrt: "sqrt",
+    ffuncs.exp: "exp",
+    ffuncs.log: "log",
+    ffuncs.log1p: "log1p",
+    ffuncs.log10: "log10",
+    ffuncs.log2: "log2",
+    ffuncs.sin: "sin",
+    ffuncs.cos: "cos",
+    ffuncs.tan: "tan",
+    ffuncs.sinh: "sinh",
+    ffuncs.cosh: "cosh",
+    ffuncs.tanh: "tanh",
+    ffuncs.arcsin: "arcsin",
+    ffuncs.arccos: "arccos",
+    ffuncs.arctan: "arctan",
+    ffuncs.arcsinh: "arcsinh",
+    ffuncs.arccosh: "arccosh",
+    ffuncs.arctanh: "arctanh",
 }
 
 reduction_ops = {
-    ffunc.add: "sum",
-    ffunc.mul: "prod",
-    ffunc.and_: "all",
-    ffunc.or_: "any",
-    ffunc.promote_min: "min",
-    ffunc.promote_max: "max",
-    ffunc.logical_and: "all",
-    ffunc.logical_or: "any",
+    ffuncs.add: "sum",
+    ffuncs.mul: "prod",
+    ffuncs.and_: "all",
+    ffuncs.or_: "any",
+    ffuncs.min: "min",
+    ffuncs.max: "max",
+    ffuncs.logical_and: "all",
+    ffuncs.logical_or: "any",
 }
 
 
@@ -146,7 +146,7 @@ class EinsumMachine:
                 ctx = PointwiseEinsumMachine(self.xp, self.bindings, loops)
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
-                if op != ffunc.overwrite:
+                if op != ffuncs.overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
                 else:

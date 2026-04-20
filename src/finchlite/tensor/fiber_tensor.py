@@ -6,7 +6,7 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import FType, FTyped, Tensor
+from ..algebra import FType, FTyped, ImmutableStructFType, Tensor, TupleFType
 from ..compile.lower import FinchTensorFType
 
 
@@ -280,7 +280,7 @@ class FiberTensorFields:
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
+class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     """
     An abstract base class representing the ftype of a fiber tensor.
 
@@ -299,7 +299,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def struct_fields(self):
         return [
             ("lvl", self.lvl_t),
-            ("shape", asm.TupleFType.from_tuple(self.shape_type)),
+            ("shape", TupleFType.from_tuple(self.shape_type)),
             ("pos", self.position_type),
             ("dirty_bit", np.bool_),
         ]

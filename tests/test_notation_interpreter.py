@@ -6,7 +6,7 @@ import numpy as np
 
 import finchlite  # noqa: F401
 import finchlite.finch_notation as ntn
-from finchlite import ffunc
+from finchlite import ffuncs
 from finchlite.compile import dimension
 from finchlite.finch_notation import (  # noqa: F401
     Access,
@@ -51,12 +51,13 @@ def test_matrix_multiplication(a, b):
     j = ntn.Variable("j", finchlite.int64)
     k = ntn.Variable("k", finchlite.int64)
 
-    A = ntn.Variable("A", np.ndarray)
-    B = ntn.Variable("B", np.ndarray)
-    C = ntn.Variable("C", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
-    B_ = ntn.Slot("B_", np.ndarray)
-    C_ = ntn.Slot("C_", np.ndarray)
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    B = ntn.Variable("B", finchlite.ftype(a))
+    C = ntn.Variable("C", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
+    B_ = ntn.Slot("B_", finchlite.ftype(a))
+    C_ = ntn.Slot("C_", finchlite.ftype(a))
 
     a_ik = ntn.Variable("a_ik", finchlite.float64)
     b_kj = ntn.Variable("b_kj", finchlite.float64)
@@ -69,7 +70,7 @@ def test_matrix_multiplication(a, b):
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", np.ndarray),
+                ntn.Variable("matmul", finchlite.ftype(a)),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -86,7 +87,7 @@ def test_matrix_multiplication(a, b):
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(ffunc.add), (m, n)
+                            C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
@@ -114,14 +115,14 @@ def test_matrix_multiplication(a, b):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.mul),
+                                                    ntn.Literal(ffuncs.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(ntn.Literal(ffunc.add)),
+                                                    ntn.Update(ntn.Literal(ffuncs.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -131,7 +132,7 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
@@ -143,13 +144,14 @@ def test_matrix_multiplication(a, b):
     mod = ntn.NotationInterpreter()(prgm)
 
     c = np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
-    result = mod.matmul(c, a, b)
+    result = mod.matmul(finchlite.asarray(c), finchlite.asarray(a), finchlite.asarray(b))
 
     expected = np.matmul(a, b)
 
     finch_assert_equal(result, expected)
+    print(repr(prgm))
 
-    assert prgm == eval(repr(prgm), {**vars(ntn), **vars(ffunc), **globals()})
+    assert prgm == eval(repr(prgm), {**vars(ntn), **vars(finchlite.codegen), **vars(finchlite.compile), **vars(ffuncs), **globals()})
 
 
 @pytest.mark.parametrize(
@@ -161,8 +163,9 @@ def test_matrix_multiplication(a, b):
     ],
 )
 def test_count_nonfill_vector(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     d = ntn.Variable("d", finchlite.int64)
     i = ntn.Variable("i", finchlite.int64)
@@ -186,7 +189,7 @@ def test_count_nonfill_vector(a):
                             ntn.Assign(
                                 d,
                                 ntn.Call(
-                                    Literal(ffunc.add),
+                                    Literal(ffuncs.add),
                                     (
                                         d,
                                         ntn.Unwrap(ntn.Access(A_, ntn.Read(), (i,))),
@@ -216,8 +219,10 @@ def test_count_nonfill_vector(a):
     ],
 )
 def test_count_nonfill_matrix(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a_np = a
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     i = ntn.Variable("i", finchlite.int64)
     j = ntn.Variable("j", finchlite.int64)
@@ -258,7 +263,7 @@ def test_count_nonfill_matrix(a):
                                 ntn.Assign(
                                     dij,
                                     ntn.Call(
-                                        ntn.Literal(ffunc.add),
+                                        ntn.Literal(ffuncs.add),
                                         (
                                             dij,
                                             ntn.Unwrap(
@@ -275,7 +280,7 @@ def test_count_nonfill_matrix(a):
                 ),
             ),
             ntn.Function(
-                ntn.Variable("matrix_structure_to_dcs", tuple),
+                ntn.Variable("matrix_structure_to_dcs", finchlite.algebra.TupleFType((finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64))),
                 (A,),
                 ntn.Block(
                     (
@@ -300,7 +305,7 @@ def test_count_nonfill_matrix(a):
                                         ntn.Assign(
                                             xi,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (
                                                     xi,
                                                     ntn.Unwrap(
@@ -314,13 +319,13 @@ def test_count_nonfill_matrix(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (xi, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_i,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_i, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -345,7 +350,7 @@ def test_count_nonfill_matrix(a):
                                         ntn.Assign(
                                             yj,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (
                                                     yj,
                                                     ntn.Unwrap(
@@ -359,13 +364,13 @@ def test_count_nonfill_matrix(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (yj, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_j,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_j, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -392,10 +397,10 @@ def test_count_nonfill_matrix(a):
 
     d_ij = mod.matrix_total_nnz(a)
     d_i_, d_i_j_, d_j_, d_j_i_ = mod.matrix_structure_to_dcs(a)
-    col_sums = a.sum(axis=0)
-    row_sums = a.sum(axis=1)
+    col_sums = a_np.sum(axis=0)
+    row_sums = a_np.sum(axis=1)
 
-    assert d_ij == int(np.count_nonzero(a))
+    assert d_ij == int(np.count_nonzero(a_np))
     assert d_i_ == int((col_sums > 0).sum())
     assert d_i_j_ == int(col_sums.max(initial=0))
     assert d_j_ == int((row_sums > 0).sum())
@@ -418,8 +423,10 @@ def test_count_nonfill_matrix(a):
     ],
 )
 def test_count_nonfill_3d(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a_np = a
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     i = ntn.Variable("i", finchlite.int64)
     j = ntn.Variable("j", finchlite.int64)
@@ -475,7 +482,7 @@ def test_count_nonfill_3d(a):
                                     ntn.Assign(
                                         dijk,
                                         ntn.Call(
-                                            ntn.Literal(ffunc.add),
+                                            ntn.Literal(ffuncs.add),
                                             (
                                                 dijk,
                                                 ntn.Unwrap(
@@ -495,7 +502,7 @@ def test_count_nonfill_3d(a):
                 ),
             ),
             ntn.Function(
-                ntn.Variable("_3d_structure_to_dcs", tuple),
+                ntn.Variable("_3d_structure_to_dcs", finchlite.algebra.TupleFType((finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64))),
                 (A,),
                 ntn.Block(
                     (
@@ -529,7 +536,7 @@ def test_count_nonfill_3d(a):
                                             ntn.Assign(
                                                 xi,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (
                                                         xi,
                                                         ntn.Unwrap(
@@ -546,13 +553,13 @@ def test_count_nonfill_3d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (xi, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_i,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_i, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -581,7 +588,7 @@ def test_count_nonfill_3d(a):
                                             ntn.Assign(
                                                 yj,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (
                                                         yj,
                                                         ntn.Unwrap(
@@ -598,13 +605,13 @@ def test_count_nonfill_3d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (yj, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_j,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_j, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -633,7 +640,7 @@ def test_count_nonfill_3d(a):
                                             ntn.Assign(
                                                 zk,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.add),
+                                                    ntn.Literal(ffuncs.add),
                                                     (
                                                         zk,
                                                         ntn.Unwrap(
@@ -650,13 +657,13 @@ def test_count_nonfill_3d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (zk, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_k,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_k, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -686,11 +693,11 @@ def test_count_nonfill_3d(a):
 
     d_ijk = mod._3d_total_nnz(a)
     d_i_, d_i_jk_, d_j_, d_j_ik_, d_k_, d_k_ij_ = mod._3d_structure_to_dcs(a)
-    X = a.sum(axis=(0, 1))
-    Y = a.sum(axis=(0, 2))
-    Z = a.sum(axis=(1, 2))
+    X = a_np.sum(axis=(0, 1))
+    Y = a_np.sum(axis=(0, 2))
+    Z = a_np.sum(axis=(1, 2))
 
-    assert d_ijk == int(np.count_nonzero(a))
+    assert d_ijk == int(np.count_nonzero(a_np))
 
     assert d_i_ == int((X > 0).sum())
     assert d_i_jk_ == int(X.max(initial=0))
@@ -721,8 +728,10 @@ def test_count_nonfill_3d(a):
     ],
 )
 def test_count_nonfill_4d(a):
-    A = ntn.Variable("A", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
+    a_np = a
+    a = finchlite.asarray(a)
+    A = ntn.Variable("A", finchlite.ftype(a))
+    A_ = ntn.Slot("A_", finchlite.ftype(a))
 
     i = ntn.Variable("i", finchlite.int64)
     j = ntn.Variable("j", finchlite.int64)
@@ -790,7 +799,7 @@ def test_count_nonfill_4d(a):
                                         ntn.Assign(
                                             dijkw,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (
                                                     dijkw,
                                                     ntn.Unwrap(
@@ -811,7 +820,7 @@ def test_count_nonfill_4d(a):
                 ),
             ),
             ntn.Function(
-                ntn.Variable("_4d_structure_to_dcs", tuple),
+                ntn.Variable("_4d_structure_to_dcs", finchlite.algebra.TupleFType((finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64, finchlite.int64))),
                 (A,),
                 ntn.Block(
                     (
@@ -852,7 +861,7 @@ def test_count_nonfill_4d(a):
                                                 ntn.Assign(
                                                     xi,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             xi,
                                                             ntn.Unwrap(
@@ -870,13 +879,13 @@ def test_count_nonfill_4d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (xi, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_i,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_i, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -908,7 +917,7 @@ def test_count_nonfill_4d(a):
                                                 ntn.Assign(
                                                     yj,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             yj,
                                                             ntn.Unwrap(
@@ -926,13 +935,13 @@ def test_count_nonfill_4d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (yj, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_j,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_j, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -964,7 +973,7 @@ def test_count_nonfill_4d(a):
                                                 ntn.Assign(
                                                     zk,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             zk,
                                                             ntn.Unwrap(
@@ -982,13 +991,13 @@ def test_count_nonfill_4d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (zk, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_k,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_k, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -1020,7 +1029,7 @@ def test_count_nonfill_4d(a):
                                                 ntn.Assign(
                                                     uw,
                                                     ntn.Call(
-                                                        ntn.Literal(ffunc.add),
+                                                        ntn.Literal(ffuncs.add),
                                                         (
                                                             uw,
                                                             ntn.Unwrap(
@@ -1038,13 +1047,13 @@ def test_count_nonfill_4d(a):
                                     ),
                                     ntn.If(
                                         ntn.Call(
-                                            ntn.Literal(ffunc.ne),
+                                            ntn.Literal(ffuncs.ne),
                                             (uw, ntn.Literal(np.int64(0))),
                                         ),
                                         ntn.Assign(
                                             d_w,
                                             ntn.Call(
-                                                ntn.Literal(ffunc.add),
+                                                ntn.Literal(ffuncs.add),
                                                 (d_w, ntn.Literal(np.int64(1))),
                                             ),
                                         ),
@@ -1095,12 +1104,12 @@ def test_count_nonfill_4d(a):
         mod._4d_structure_to_dcs(a)
     )
 
-    X = a.sum(axis=(0, 1, 2))
-    Y = a.sum(axis=(0, 1, 3))
-    Z = a.sum(axis=(0, 2, 3))
-    W = a.sum(axis=(1, 2, 3))
+    X = a_np.sum(axis=(0, 1, 2))
+    Y = a_np.sum(axis=(0, 1, 3))
+    Z = a_np.sum(axis=(0, 2, 3))
+    W = a_np.sum(axis=(1, 2, 3))
 
-    assert d_ijkw == int(np.count_nonzero(a))
+    assert d_ijkw == int(np.count_nonzero(a_np))
 
     assert d_i_ == int((X > 0).sum())
     assert d_i_jkw_ == int(X.max(initial=0))
