@@ -150,7 +150,7 @@ class UniformStats(NumericStats):
     def estimate_non_fill_values(self) -> float:
         return self.nnz
     
-    def get_embeddings(self) -> np.ndarray:
+    def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
         volume = self._get_volume(self.tensordef)
         

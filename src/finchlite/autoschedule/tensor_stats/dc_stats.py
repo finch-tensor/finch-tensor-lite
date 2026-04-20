@@ -1568,7 +1568,7 @@ class DCStats(NumericStats):
                 min_weight = min(min_weight, weight)
         return min_weight
     
-    def get_embeddings(self) -> np.ndarray:
+    def get_embedding(self) -> np.ndarray:
         all_fields = frozenset(self.tensordef.index_order)
         total_val = next(dc.value for dc in self.dcs 
                         if not dc.from_indices and dc.to_indices == all_fields)

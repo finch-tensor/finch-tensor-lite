@@ -80,7 +80,7 @@ class DenseStats(NumericStats):
             total *= size
         return total
 
-    def get_embeddings(self) -> np.ndarray:
+    def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
         
         return np.array(np.log2(sizes))

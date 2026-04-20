@@ -12,7 +12,7 @@ class NumericStats(BaseTensorStats):
         ...
     
     @abstractmethod
-    def get_embeddings(self) -> np.ndarray:
+    def get_embedding(self) -> np.ndarray:
         """
         Returns vector embedding for the stat.
         """
