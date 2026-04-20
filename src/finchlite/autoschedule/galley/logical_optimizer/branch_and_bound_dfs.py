@@ -2,10 +2,6 @@
 Depth-first branch-and-bound for Galley reduction order. For a fixed component it
 searches the same elimination-order space as layered ``branch_and_bound`` with
 ``k = float('inf')`` and returns the same optimal cost.
-
-Pruning uses the minimum cost among all **known** supersets of the child state's
-variable set: greedy ``k=1`` bounds, entries in the DFS ``memo``, and the best
-complete cost found so far.
 """
 
 from __future__ import annotations
@@ -65,7 +61,8 @@ def branch_and_bound_dfs(
         reducible_in_comp = aq.get_reducible_idxs_for_component(component)
         children: list[tuple[frozenset, list, list, AnnotatedQuery, float]] = []
         for idx in reducible_in_comp:
-            step_cost, reduced_vars = _cost_of_reduce(idx, aq)
+            _, _, _, reduced_vars = aq.get_reduce_query(idx)
+            step_cost = aq.get_cost_of_reduce_idx(idx)
             new_cost = cost + step_cost
             new_vars = vars_key | frozenset(reduced_vars)
 

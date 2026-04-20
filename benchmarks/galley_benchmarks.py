@@ -527,11 +527,6 @@ def main_bnb_bfs_vs_dfs_benchmarks() -> None:
     for case in BNB_BFS_VS_DFS_CASES:
         _run_bnb_bfs_vs_dfs_case(case)
 
-
-# Backward-compatible name (older docs / one-liners).
-main_bnb_layered_vs_dfs_benchmarks = main_bnb_bfs_vs_dfs_benchmarks
-
-
 def main() -> None:
     print("", flush=True)
     print("### Galley compile benchmarks (with vs without components) ###", flush=True)

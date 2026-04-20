@@ -10,17 +10,6 @@ from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
 
 
-def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
-    """
-    Return (cost, reduced_vars) for reducing idx in aq.
-    Used to score each candidate reduction and to know which indices
-    get eliminated (reduced_vars) for the branch-and-bound state key.
-    """
-    _, _, _, reduced_idxs = aq.get_reduce_query(idx)
-    cost = aq.get_cost_of_reduce_idx(idx)
-    return cost, list(reduced_idxs)
-
-
 def branch_and_bound(
     input_aq: AnnotatedQuery,
     component: list,
@@ -57,7 +46,8 @@ def branch_and_bound(
             reducible_in_comp = aq.get_reducible_idxs_for_component(component)
             for idx in reducible_in_comp:
                 # Cost of this reduction and which vars it eliminates
-                cost, reduced_vars = _cost_of_reduce(idx, aq)
+                _, _, _, reduced_vars = aq.get_reduce_query(idx)
+                cost = aq.get_cost_of_reduce_idx(idx)
                 total_cost = cost + prev_cost
                 new_vars = vars_key | frozenset(reduced_vars)
 

@@ -1,13 +1,6 @@
 """
-Galley logical optimizer: rewrites logical query bodies via a selectable backend.
-
-``optimizer`` selects greedy reduction, exact layered (BFS-style) branch-and-bound,
-or exact DFS branch-and-bound. The layered exact path may run a greedy ``k=1`` pass
-per component to derive pruning bounds; the DFS path does not reuse those bounds
-inside ``branch_and_bound_dfs`` (see ``pruned_query_to_plan_dfs``). Greedy mode is
-heuristic; exact ``bfs`` / ``dfs`` modes search for an optimal-cost elimination order
-within the same cost model. DFS pruning is described (with optimality assumptions)
-in ``branch_and_bound_dfs``.
+Galley logical optimizer: applies greedy query rewriting to logical plans, with
+an optional exact branch-and-bound path for query bodies.
 """
 
 from __future__ import annotations
@@ -49,7 +42,7 @@ def optimize_query(
     stats_bindings,
     use_components: bool = True,
     *,
-    optimizer: GalleyOptimizer = "greedy",
+    optimizer: GalleyOptimizer = "dfs",
 ):
     """Rewrite a single logical Query using ``optimizer``:
     greedy,BFS, or DFS."""
