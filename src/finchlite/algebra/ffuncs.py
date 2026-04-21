@@ -1490,7 +1490,7 @@ class _ResizeIfSmaller(FinchOperator, NumbaOperator):
     def __call__(self, *args, **kwargs):
         return self._func(*args, **kwargs)
 
-    def return_type(self, arr: FType, new_size: FType, fill_value: FType) -> FType:   # type: ignore[override]
+    def return_type(self, arr: FType, new_size: FType, fill_value: FType) -> FType:  # type: ignore[override]
         return arr
 
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
