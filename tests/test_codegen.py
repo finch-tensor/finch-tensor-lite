@@ -930,7 +930,7 @@ def test_np_numba_serialization(value, np_type):
             dimension_type=(ftypes.intp, ftypes.intp),
         ),
         lambda dtype: fiber_tensor(
-            dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
+            dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
         ),
     ],
 )

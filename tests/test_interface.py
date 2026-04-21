@@ -6,6 +6,7 @@ import numpy as np
 
 import finchlite
 from finchlite import ffuncs
+from finchlite.algebra import ftype
 
 from .conftest import finch_assert_allclose, finch_assert_equal
 
@@ -1451,7 +1452,7 @@ def test_flatten(array_shape, expected_shape, wrapper):
 def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
     # construct dense format
     fmt = finchlite.element(
-        arr1.dtype.type(0), arr1.dtype, np.intp, finchlite.NumpyBufferFType
+        arr1.dtype.type(0), ftype(arr1.dtype), ftype(np.intp), finchlite.NumpyBufferFType
     )
     for _ in range(arr1.ndim):
         fmt = finchlite.dense(fmt)
