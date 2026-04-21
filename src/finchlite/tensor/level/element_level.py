@@ -18,8 +18,8 @@ class ElementLevelFields(NamedTuple):
 @dataclass(unsafe_hash=True)
 class ElementLevelFType(LevelFType, ImmutableStructFType):
     fill_value: Any = None
-    element_type: type | FType | None = None
-    position_type: type | FType | None = None
+    element_type: FType | None = None
+    position_type: FType | None = None
     buffer_factory: Any = NumpyBufferFType
     buffer_type: Any = None
 
@@ -39,7 +39,6 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             assert self.fill_value is not None, "Must provide either element_type or fill_value."
             self.element_type = ftype(self.fill_value)
         assert isinstance(self.element_type, FType), "element_type must be an instance of FType"
-        
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
@@ -159,7 +158,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def from_numpy(self, shape, val):
-        return self(shape=shape, val=val)
+        return self.construct(shape, val=val)
 
 
 def element(
