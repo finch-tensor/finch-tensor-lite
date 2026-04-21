@@ -96,7 +96,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def idx_type(self):
         return self.buffer_factory(self.dimension_type)
 
-    def __call__(self, *, shape):
+    def construct(self, *, shape):
         """
         Creates an instance of SparseListLevel.
 
@@ -105,7 +105,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl_t(shape=shape[1:])
+        lvl = self.lvl_t.construct(shape=shape[1:])
         return SparseListLevel(lvl, self.dimension_type(shape[0]))
 
     @property

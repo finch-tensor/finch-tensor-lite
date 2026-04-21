@@ -23,7 +23,7 @@ class NumPyFType(TensorFType):
     def shape_type(self) -> tuple[FType, ...]:
         return (intp,) * self._ndim
 
-    def __call__(self, shape: tuple) -> "NumPyWrapper":
+    def construct(self, shape: tuple) -> "NumPyWrapper":
         # creates a zero-filled tensor
         return NumPyWrapper(np.zeros(shape, dtype=self._dtype))
 

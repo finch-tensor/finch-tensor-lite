@@ -110,7 +110,7 @@ class LogicExecutor(LogicEvaluator):
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
-                bindings[var] = tns_ftype(shape)
+                bindings[var] = tns_ftype.construct(shape)
 
         args = list(bindings.values())
 

@@ -40,7 +40,7 @@ class TensorFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(self, shape: tuple) -> Tensor:
+    def construct(self, shape: tuple) -> Tensor:
         """
         Create a tensor instance with the given shape.
 
@@ -95,7 +95,7 @@ class Tensor(FTyped, ABC):
     @property
     def dtype(self):
         return self.element_type
-        
+
     @property
     def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index

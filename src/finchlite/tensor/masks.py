@@ -50,8 +50,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def lvl_t(self):
         return self.body.lvl_t
 
-    def __call__(self, shape):
-        return LoTriMask(self.lvl_t(shape=shape))
+    def construct(self, shape):
+        return LoTriMask(self.lvl_t.construct(shape=shape))
 
     def from_numpy(self, shape, arr):
         return LoTriMask(self.lvl_t.from_numpy(shape, arr))

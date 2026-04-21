@@ -304,11 +304,11 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", np.bool_),
         ]
 
-    def __call__(self, shape: tuple[int, ...]):
+    def construct(self, shape: tuple[int, ...]):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape=shape), self.position_type(0))
+        return FiberTensor(self.lvl_t.construct(shape=shape), self.position_type(0))
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"

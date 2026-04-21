@@ -77,7 +77,7 @@ class TestEagerTensorFType(finchlite.TensorFType):
     def __hash__(self):
         return hash(self.fmt)
 
-    def __call__(self, shape: tuple):
+    def construct(self, shape: tuple):
         return TestEagerTensor(
             np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
         )

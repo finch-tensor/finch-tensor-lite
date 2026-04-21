@@ -75,7 +75,7 @@ class LazyTensorFType(TensorFType):
     def __hash__(self):
         return hash((self._fill_value, self._element_type, self._shape_type))
 
-    def __call__(self, shape: tuple) -> LazyTensor:
+    def construct(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
         ctx = EffectBlob()
         expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
@@ -1298,7 +1298,7 @@ class WrapperTensorFType(TensorFType):
 
 @dataclass(frozen=True)
 class FillTensorFType(DefaultTensorFType):
-    def __call__(self, shape: tuple) -> FillTensor:
+    def construct(self, shape: tuple) -> FillTensor:
         return FillTensor(shape, self.fill_value)
 
 
@@ -1388,13 +1388,13 @@ class ConcatTensorFType(WrapperTensorFType):
     def shape_type(self):
         return self._shape_type
 
-    def __call__(self, shape: tuple) -> ConcatTensor:
-        tns = self._child_formats[0](shape)
+    def construct(self, shape: tuple) -> ConcatTensor:
+        tns = self._child_formats[0].construct(shape)
         shape2 = tuple(
             dim if i != self.concat_axis else self._shape_type[i](0)
             for i, dim in enumerate(shape)
         )
-        tnss = (tns,) + tuple(fmt(shape2) for fmt in self._child_formats[1:])
+        tnss = (tns,) + tuple(fmt.construct(shape2) for fmt in self._child_formats[1:])
         return ConcatTensor(*tnss, axis=self.concat_axis)
 
 
@@ -1531,7 +1531,7 @@ class SplitDimsTensorFType(WrapperTensorFType):
         ]
         return tuple(shape_type_list)
 
-    def __call__(self, shape: tuple) -> SplitDimsTensor:
+    def construct(self, shape: tuple) -> SplitDimsTensor:
         raise NotImplementedError(
             "Cannot directly instantiate SplitDimsTensor from ftype"
         )
@@ -1633,7 +1633,7 @@ class CombineDimsTensorFType(WrapperTensorFType):
     def shape_type(self):
         return self._shape_type
 
-    def __call__(self, shape: tuple) -> SplitDimsTensor:
+    def construct(self, shape: tuple) -> SplitDimsTensor:
         raise NotImplementedError(
             "Cannot directly instantiate SplitDimsTensor from ftype"
         )

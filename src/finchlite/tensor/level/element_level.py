@@ -48,7 +48,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape, *, val=None):
+    def construct(self, shape, *, val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
