@@ -36,9 +36,13 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def __post_init__(self):
         # Ensure element_type is an FType
         if self.element_type is None:
-            assert self.fill_value is not None, "Must provide either element_type or fill_value."
+            assert self.fill_value is not None, (
+                "Must provide either element_type or fill_value."
+            )
             self.element_type = ftype(self.fill_value)
-        assert isinstance(self.element_type, FType), "element_type must be an instance of FType"
+        assert isinstance(self.element_type, FType), (
+            "element_type must be an instance of FType"
+        )
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
@@ -75,7 +79,9 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         Returns:
             An ElementLevel instance of this type.
         """
-        raise NotImplementedError(f"Level conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"ElementLevelFType(fv={self.fill_value})"

@@ -97,7 +97,9 @@ class LazyTensorFType(TensorFType):
         Returns:
             A LazyTensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     @property
     def fill_value(self):
@@ -1321,7 +1323,9 @@ class FillTensorFType(DefaultTensorFType):
         Returns:
             A FillTensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
 class FillTensor(Tensor):
@@ -1419,7 +1423,9 @@ class ConcatTensorFType(WrapperTensorFType):
         Returns:
             A concatenated tensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def construct(self, shape: tuple) -> ConcatTensor:
         tns = self._child_formats[0].construct(shape)
@@ -1578,7 +1584,9 @@ class SplitDimsTensorFType(WrapperTensorFType):
         Returns:
             A split dimensions tensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
 class SplitDimsTensor(Tensor):
@@ -1691,7 +1699,9 @@ class CombineDimsTensorFType(WrapperTensorFType):
         Returns:
             A combined dimensions tensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
 class CombineDimsTensor(Tensor):

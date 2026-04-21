@@ -62,7 +62,9 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         Returns:
             A LoTriMask instance of this type.
         """
-        raise NotImplementedError(f"Level conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, shape, arr):
         return LoTriMask(self.lvl_t.from_numpy(shape, arr))

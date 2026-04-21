@@ -616,20 +616,8 @@ class NumbaContext(Context):
             case asm.Assign(asm.Variable(var_n, var_t) as var, val):
                 val_code = self(val)
                 var_code = self(var)
-                # Check if types are compatible for assignment
-                # Allow assignment between different integer types and different float types
-                val_result_type = val.result_type
-                val_is_int = isinstance(val_result_type, algebra.ftypes.FDTypeInteger)
-                var_is_int = isinstance(var_t, algebra.ftypes.FDTypeInteger)
-                val_is_float = isinstance(val_result_type, algebra.ftypes.FDTypeFloat)
-                var_is_float = isinstance(var_t, algebra.ftypes.FDTypeFloat)
-                types_compatible = (
-                    val_result_type == var_t
-                    or (val_is_int and var_is_int)
-                    or (val_is_float and var_is_float)
-                )
-                if not types_compatible:
-                    raise TypeError(f"Type mismatch: {val_result_type} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_code} = {val_code}")

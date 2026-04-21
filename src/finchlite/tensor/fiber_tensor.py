@@ -319,7 +319,9 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         Returns:
             A FiberTensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"

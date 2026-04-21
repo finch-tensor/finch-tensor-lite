@@ -36,7 +36,9 @@ class NumPyFType(TensorFType):
         Returns:
             A NumPyWrapper instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
         if not isinstance(other, NumPyFType):

@@ -117,7 +117,9 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         Returns:
             A SparseListLevel instance of this type.
         """
-        raise NotImplementedError(f"Level conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     @property
     def lvl_t(self):

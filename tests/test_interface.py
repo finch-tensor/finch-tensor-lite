@@ -92,7 +92,9 @@ class TestEagerTensorFType(finchlite.TensorFType):
         Returns:
             A TestEagerTensor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, arr):
         return TestEagerTensor(arr)
@@ -1452,7 +1454,10 @@ def test_flatten(array_shape, expected_shape, wrapper):
 def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
     # construct dense format
     fmt = finchlite.element(
-        arr1.dtype.type(0), ftype(arr1.dtype), ftype(np.intp), finchlite.NumpyBufferFType
+        arr1.dtype.type(0),
+        ftype(arr1.dtype),
+        ftype(np.intp),
+        finchlite.NumpyBufferFType,
     )
     for _ in range(arr1.ndim):
         fmt = finchlite.dense(fmt)

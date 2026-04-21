@@ -10,7 +10,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import FType, ffuncs, ftypes, ftype
+from ..algebra import FType, ffuncs, ftypes
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars

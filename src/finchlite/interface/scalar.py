@@ -40,7 +40,9 @@ class ScalarFType(TensorFType):
         Returns:
             A Scalar instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, arr):
         return self(arr)

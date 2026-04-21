@@ -7,7 +7,6 @@ import numpy as np
 import finchlite  # noqa: F401
 import finchlite.finch_notation as ntn
 from finchlite import ffuncs
-from finchlite.compile import dimension
 from finchlite.finch_notation import (  # noqa: F401
     Access,
     Assign,
@@ -77,27 +76,30 @@ def test_matrix_multiplication(a, b):
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
-                        ntn.Assign(
-                            m, ntn.Dimension(A_, ntn.Literal(0))
-                        ),
-                        ntn.Assign(
-                            n, ntn.Dimension(B_, ntn.Literal(1))
-                        ),
-                        ntn.Assign(
-                            p, ntn.Dimension(A_, ntn.Literal(1))
-                        ),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
                             C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
-                            ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), m)),
+                            ntn.Call(
+                                ntn.Literal(finchlite.compile.make_extent),
+                                (ntn.Literal(finchlite.int64(0)), m),
+                            ),
                             ntn.Loop(
                                 k,
-                                ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), p)),
+                                ntn.Call(
+                                    ntn.Literal(finchlite.compile.make_extent),
+                                    (ntn.Literal(finchlite.int64(0)), p),
+                                ),
                                 ntn.Loop(
                                     j,
-                                    ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), n)),
+                                    ntn.Call(
+                                        ntn.Literal(finchlite.compile.make_extent),
+                                        (ntn.Literal(finchlite.int64(0)), n),
+                                    ),
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -144,14 +146,25 @@ def test_matrix_multiplication(a, b):
     mod = ntn.NotationInterpreter()(prgm)
 
     c = np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
-    result = mod.matmul(finchlite.asarray(c), finchlite.asarray(a), finchlite.asarray(b))
+    result = mod.matmul(
+        finchlite.asarray(c), finchlite.asarray(a), finchlite.asarray(b)
+    )
 
     expected = np.matmul(a, b)
 
     finch_assert_equal(result, expected)
     print(repr(prgm))
 
-    assert prgm == eval(repr(prgm), {**vars(ntn), **vars(finchlite.codegen), **vars(finchlite.compile), **vars(ffuncs), **globals()})
+    assert prgm == eval(
+        repr(prgm),
+        {
+            **vars(ntn),
+            **vars(finchlite.codegen),
+            **vars(finchlite.compile),
+            **vars(ffuncs),
+            **globals(),
+        },
+    )
 
 
 @pytest.mark.parametrize(
@@ -180,12 +193,13 @@ def test_count_nonfill_vector(a):
                     (
                         ntn.Assign(d, ntn.Literal(np.int64(0))),
                         ntn.Unpack(A_, A),
-                        ntn.Assign(
-                            m, ntn.Dimension(A_, ntn.Literal(0))
-                        ),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
                         ntn.Loop(
                             i,
-                            ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), m)),
+                            ntn.Call(
+                                ntn.Literal(finchlite.compile.make_extent),
+                                (ntn.Literal(finchlite.int64(0)), m),
+                            ),
                             ntn.Assign(
                                 d,
                                 ntn.Call(

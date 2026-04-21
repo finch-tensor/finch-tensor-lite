@@ -7,7 +7,6 @@ import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite import ffuncs
 from finchlite.codegen.numpy_buffer import NumpyBuffer
-from finchlite.compile import dimension
 
 
 def create_ntn_simple_node():
@@ -42,27 +41,30 @@ def create_ntn_simple_node():
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
-                        ntn.Assign(
-                            m, ntn.Dimension(A_, ntn.Literal(0))
-                        ),
-                        ntn.Assign(
-                            n, ntn.Dimension(B_, ntn.Literal(1))
-                        ),
-                        ntn.Assign(
-                            p, ntn.Dimension(A_, ntn.Literal(1))
-                        ),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
                             C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
-                            ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), m)),
+                            ntn.Call(
+                                ntn.Literal(finchlite.compile.make_extent),
+                                (ntn.Literal(finchlite.int64(0)), m),
+                            ),
                             ntn.Loop(
                                 k,
-                                ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), p)),
+                                ntn.Call(
+                                    ntn.Literal(finchlite.compile.make_extent),
+                                    (ntn.Literal(finchlite.int64(0)), p),
+                                ),
                                 ntn.Loop(
                                     j,
-                                    ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), n)),
+                                    ntn.Call(
+                                        ntn.Literal(finchlite.compile.make_extent),
+                                        (ntn.Literal(finchlite.int64(0)), n),
+                                    ),
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -105,7 +107,6 @@ def create_ntn_simple_node():
             ),
         )
     )
-   
 
 
 def create_log_simple_node():

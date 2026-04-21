@@ -1,5 +1,6 @@
 import numpy as np
 
+import finchlite
 from finchlite import (
     NumpyBufferFType,
     asarray,
@@ -7,7 +8,6 @@ from finchlite import (
     element,
     fiber_tensor,
 )
-import finchlite
 
 
 def test_fiber_tensor_attributes():
@@ -40,7 +40,11 @@ def test_fiber_tensor_attributes():
 
 def test_fiber_tensor():
     fmt = fiber_tensor(
-        dense(dense(element(np.int64(0), finchlite.int64, finchlite.intp, NumpyBufferFType)))
+        dense(
+            dense(
+                element(np.int64(0), finchlite.int64, finchlite.intp, NumpyBufferFType)
+            )
+        )
     )
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)

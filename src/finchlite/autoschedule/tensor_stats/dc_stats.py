@@ -267,9 +267,9 @@ class DCStats(NumericStats):
                 dim_loop_variables[i],
                 ntn.Call(
                     ntn.Literal(make_extent),
-                    (ntn.Literal(int64(0)), dim_size_variables[i])
+                    (ntn.Literal(int64(0)), dim_size_variables[i]),
                 ),
-                array_build_loop
+                array_build_loop,
             )
 
         dim_array_freezes = []
@@ -284,7 +284,7 @@ class DCStats(NumericStats):
                     dim_loop_variables[i],
                     ntn.Call(
                         ntn.Literal(make_extent),
-                        (ntn.Literal(int64(0)), dim_size_variables[i])
+                        (ntn.Literal(int64(0)), dim_size_variables[i]),
                     ),
                     ntn.Block(
                         (
@@ -379,7 +379,8 @@ class DCStats(NumericStats):
         mod = ntn.NotationInterpreter()(prgm)
 
         dim_array_instances = [
-            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64)) for i in range(ndims)
+            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64))
+            for i in range(ndims)
         ]
         dc_proj_pairs = mod.array_to_dcs(arr, *dim_array_instances)
         dcs = set()
@@ -394,7 +395,6 @@ class DCStats(NumericStats):
             )
         dcs.add(DC(frozenset({}), frozenset({*fields}), dc_proj_pairs[-1]))
         return dcs
-
 
     @staticmethod
     def _merge_dc_join(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:

@@ -212,7 +212,9 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         Returns:
             A BufferizedNDArray instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
@@ -226,7 +228,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return str(self.struct_name)
 
     def __repr__(self):
-        return f"BufferizedNDArrayFType(buffer_type={repr(self.buf_t)}, ndim = {self.ndim}, dimension_type ={repr(self.shape_t)})"
+        return (
+            f"BufferizedNDArrayFType(buffer_type={repr(self.buf_t)},"
+            f" ndim = {self.ndim}, dimension_type ={repr(self.shape_t)})"
+        )
 
     @property
     def ndim(self) -> np.intp:
@@ -436,7 +441,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         Returns:
             A BufferizedNDArrayAccessor instance of this type.
         """
-        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, arr):
         raise NotImplementedError(

@@ -58,7 +58,9 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         Returns:
             A DenseLevel instance of this type.
         """
-        raise NotImplementedError(f"Level conversion not yet implemented for {type(self).__name__}")
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, shape, val):
         """

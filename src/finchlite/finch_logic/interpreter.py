@@ -7,7 +7,8 @@ import finchlite
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
-from ..algebra import fisinstance, fixpoint_type, return_type, ftype
+from ..algebra import fisinstance, fixpoint_type, ftype, return_type
+from ..codegen.numba_codegen import to_numpy_type
 from ..util.logging import LOG_LOGIC_PRE_OPT
 from . import nodes as lgc
 from .nodes import (
@@ -27,7 +28,6 @@ from .nodes import (
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 from .tensor_stats import StatsFactory, TensorStats
-from ..codegen.numba_codegen import to_numpy_type
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
@@ -35,7 +35,10 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 def make_tensor(shape, fill_value, *, dtype=None):
     if dtype is None:
         dtype = ftype(fill_value)
-    return finchlite.asarray(np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype))))
+    return finchlite.asarray(
+        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
+    )
+
 
 class LogicInterpreter(LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor):
