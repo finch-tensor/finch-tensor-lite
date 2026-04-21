@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from ...algebra import is_annihilator
 from ...algebra.algebra import FinchOperator
+from ...algebra.ftypes import ftype
 from ...finch_logic import Field
 from .dc_stats import DCStats
 from .numeric_stats import NumericStats
@@ -129,11 +130,13 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         join_like: list[DatabaseStats] = []
         union_like: list[DatabaseStats] = []
 
-        for stats in all_stats:
+        all_fill_ftypes = [ftype(s.tensordef.fill_value) for s in all_stats]
+        for i, stats in enumerate(all_stats):
             if len(stats.tensordef.index_order) == 0:
                 continue
             s = cast(DatabaseStats, stats)
-            if is_annihilator(op, stats.tensordef.fill_value):
+            other_ftypes = all_fill_ftypes[:i] + all_fill_ftypes[i + 1 :]
+            if is_annihilator(op, stats.tensordef.fill_value, *other_ftypes):
                 join_like.append(s)
             else:
                 union_like.append(s)

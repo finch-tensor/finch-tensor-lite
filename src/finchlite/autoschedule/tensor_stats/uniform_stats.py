@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra.algebra import FinchOperator, is_annihilator, is_identity
+from finchlite.algebra.ftypes import ftype
 from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
@@ -33,14 +34,16 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
         join_probs: list[float] = []
         union_probs: list[float] = []
 
-        for s in args:
+        all_fill_ftypes = [ftype(s.tensordef.fill_value) for s in args]
+        for i, s in enumerate(args):
             vol = UniformStats._get_volume(s.tensordef)
             if isinstance(s, NumericStats):
                 p = s.estimate_non_fill_values() / vol if vol > 0 else 0.0
             else:
                 raise TypeError("Stats Class must be inherit from NumericStats")
 
-            if is_annihilator(op, s.tensordef.fill_value):
+            other_ftypes = all_fill_ftypes[:i] + all_fill_ftypes[i + 1 :]
+            if is_annihilator(op, s.tensordef.fill_value, *other_ftypes):
                 join_probs.append(p)
             else:
                 union_probs.append(p)
@@ -75,7 +78,7 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
             p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
         else:
             raise TypeError("Stats Class must be inherit from NumericStats")
-        if is_annihilator(op, stats.tensordef.fill_value):
+        if is_annihilator(op, stats.tensordef.fill_value, ftype(stats.tensordef.fill_value)):
             res_p = math.pow(p_old, k)
         elif is_identity(op, stats.tensordef.fill_value):
             res_p = 1 - math.pow((1 - p_old), k)
