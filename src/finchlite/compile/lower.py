@@ -13,6 +13,7 @@ from ..algebra import (
     ImmutableStructFType,
     TensorFType,
     ffuncs,
+    ftype,
     register_property,
 )
 from ..algebra.algebra import FinchOperator
@@ -128,7 +129,7 @@ make_extent = _MakeExtent()
 
 def dimension(tns, mode: int) -> Extent:
     end = tns.shape[mode]
-    return Extent(type(end)(0), end)
+    return Extent(ftype(end)(0), end)
 
 
 def numba_lower_dimension(ctx, tns, mode: int) -> str:

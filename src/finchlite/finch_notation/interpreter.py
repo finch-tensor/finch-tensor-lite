@@ -378,6 +378,8 @@ class NotationInterpreter(NotationLoader):
             case ntn.Assign(var, val):
                 val_e = self(val)
                 if isinstance(var, ntn.Variable):
+                    if var.type_ is not None:
+                        assert fisinstance(val_e, var.type_)
                     var_n = var.name
                     self.bindings[var_n] = val_e
                     return None
