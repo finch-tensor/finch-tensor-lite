@@ -1,14 +1,14 @@
-def matmul(C: ndarray, A: ndarray, B: ndarray) -> ndarray:
-    m: finchlite.int64 = dimension(A, 0)
-    n: finchlite.int64 = dimension(B, 1)
-    p: finchlite.int64 = dimension(A, 1)
-    A_: ndarray = unpack(A)
-    B_: ndarray = unpack(B)
-    C_: ndarray = unpack(C)
+def matmul(C: BufferizedNDArray, A: BufferizedNDArray, B: BufferizedNDArray) -> BufferizedNDArray:
+    A_: BufferizedNDArray = unpack(A)
+    B_: BufferizedNDArray = unpack(B)
+    C_: BufferizedNDArray = unpack(C)
+    m: finchlite.int64 = A_.shape[0]
+    n: finchlite.int64 = B_.shape[1]
+    p: finchlite.int64 = A_.shape[1]
     declare(C_, 0.0, add, ['m', 'n'])
-    loop(i, m):
-        loop(j, n):
-            loop(k, p):
+    loop(i, make_extent(0, m)):
+        loop(k, make_extent(0, p)):
+            loop(j, make_extent(0, n)):
                 a_ik: finchlite.float64 = unwrap(read(A_, ['i', 'k']))
                 b_kj: finchlite.float64 = unwrap(read(B_, ['k', 'j']))
                 c_ij: finchlite.float64 = mul(a_ik, b_kj)

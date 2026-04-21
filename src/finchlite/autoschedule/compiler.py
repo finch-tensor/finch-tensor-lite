@@ -10,7 +10,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import FType, ffuncs, ftypes
+from ..algebra import FType, ffuncs, ftypes, ftype
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
@@ -109,7 +109,7 @@ class NotationContext:
                 arg_dims = arg.dimmap(merge_shapes, self.shapes)
                 shapes_map = dict(zip(idxs_1, arg_dims, strict=True))
                 shapes = {
-                    idx: shapes_map.get(idx) or ntn.Literal(1)
+                    idx: shapes_map.get(idx) or ntn.Literal(ftypes.intp(1))
                     for idx in idxs_1 + idxs_2
                 }
                 arg_types = arg.shape_type(self.shape_types)
@@ -168,9 +168,10 @@ class NotationContext:
                 )
                 body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
                 for idx in reversed(loop_idxs):
+                    stop = shapes.get(idx) or shapes[remap_idxs[idx]]
                     ext = ntn.Call(
                         ntn.Literal(make_extent),
-                        (ntn.Literal(0), shapes.get(idx) or shapes[remap_idxs[idx]]),
+                        (ntn.Literal(stop.result_type(0)), stop),
                     )
                     if idx in remap_idxs:
                         body = ntn.If(
@@ -234,7 +235,7 @@ class NotationContext:
                 for idx in reversed(idxs_1):
                     ext = ntn.Call(
                         ntn.Literal(make_extent),
-                        (ntn.Literal(0), shapes[idx]),
+                        (ntn.Literal(shape_type[idx](0)), shapes[idx]),
                     )
                     body = ntn.Loop(
                         loops[idx],

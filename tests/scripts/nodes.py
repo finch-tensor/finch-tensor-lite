@@ -15,12 +15,14 @@ def create_ntn_simple_node():
     j = ntn.Variable("j", finchlite.int64)
     k = ntn.Variable("k", finchlite.int64)
 
-    A = ntn.Variable("A", np.ndarray)
-    B = ntn.Variable("B", np.ndarray)
-    C = ntn.Variable("C", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
-    B_ = ntn.Slot("B_", np.ndarray)
-    C_ = ntn.Slot("C_", np.ndarray)
+    T = finchlite.ftype(finchlite.asarray(np.zeros((1, 1))))
+
+    A = ntn.Variable("A", T)
+    B = ntn.Variable("B", T)
+    C = ntn.Variable("C", T)
+    A_ = ntn.Slot("A_", T)
+    B_ = ntn.Slot("B_", T)
+    C_ = ntn.Slot("C_", T)
 
     a_ik = ntn.Variable("a_ik", finchlite.float64)
     b_kj = ntn.Variable("b_kj", finchlite.float64)
@@ -33,34 +35,34 @@ def create_ntn_simple_node():
     return ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", np.ndarray),
+                ntn.Variable("matmul", T),
                 (C, A, B),
                 ntn.Block(
                     (
-                        ntn.Assign(
-                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
-                        ),
-                        ntn.Assign(
-                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
-                        ),
-                        ntn.Assign(
-                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
-                        ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
+                        ntn.Assign(
+                            m, ntn.Dimension(A_, ntn.Literal(0))
+                        ),
+                        ntn.Assign(
+                            n, ntn.Dimension(B_, ntn.Literal(1))
+                        ),
+                        ntn.Assign(
+                            p, ntn.Dimension(A_, ntn.Literal(1))
+                        ),
                         ntn.Declare(
                             C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
-                            m,
+                            ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), m)),
                             ntn.Loop(
-                                j,
-                                n,
+                                k,
+                                ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), p)),
                                 ntn.Loop(
-                                    k,
-                                    p,
+                                    j,
+                                    ntn.Call(ntn.Literal(finchlite.compile.make_extent), (ntn.Literal(finchlite.int64(0)), n)),
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -96,16 +98,14 @@ def create_ntn_simple_node():
                             ),
                         ),
                         ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
-                        ntn.Repack(
-                            val=C_,
-                            obj=C,
-                        ),
+                        ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
                 ),
             ),
         )
     )
+   
 
 
 def create_log_simple_node():

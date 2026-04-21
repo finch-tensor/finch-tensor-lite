@@ -202,7 +202,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=tuple(type(dim) for dim in self._shape),
+            _shape_type=tuple(ftype(dim) for dim in self._shape),
         )
 
     @property
@@ -1362,7 +1362,7 @@ class FillTensor(Tensor):
         return FillTensorFType(
             self._fill_value,
             ftype(self._fill_value),
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
         )
 
 
@@ -1498,7 +1498,7 @@ class ConcatTensor(Tensor):
                 )
         return ConcatTensorFType(
             tuple(formats),
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
             self.concat_axis,
         )
 
@@ -1560,7 +1560,7 @@ class SplitDimsTensorFType(WrapperTensorFType):
         parent_shape_type = self._child_formats[0].shape_type
         shape_type_list = list(parent_shape_type)
         shape_type_list[self.split_axis : self.split_axis + 1] = [
-            type(dim) for dim in self.split_shape
+            ftype(dim) for dim in self.split_shape
         ]
         return tuple(shape_type_list)
 
@@ -1775,7 +1775,7 @@ class CombineDimsTensor(Tensor):
         return CombineDimsTensorFType(
             (child_format,),
             self.axes,
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
         )
 
     @property

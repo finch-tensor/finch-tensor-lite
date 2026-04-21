@@ -937,15 +937,15 @@ class CContext(Context):
                     f"\n{feed}}}"
                 )
                 return None
-            case asm.BufferLoop(buf, asm.Variable(_, _) as var, body):
+            case asm.BufferLoop(buf, asm.Variable(_, t) as var, body):
                 if not isinstance(buf.result_type, BufferFType):
                     raise TypeError(f"Expected buffer type, got: {buf.result_type}")
                 idx = asm.Variable(
                     self.freshen(var.name + "_i"), buf.result_type.length_type
                 )
-                start = asm.Literal(0)
+                start = asm.Literal(t(0))
                 stop = asm.Call(
-                    asm.Literal(ffuncs.sub), (asm.Length(buf), asm.Literal(1))
+                    asm.Literal(ffuncs.sub), (asm.Length(buf), asm.Literal(t(1)))
                 )
                 body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))
