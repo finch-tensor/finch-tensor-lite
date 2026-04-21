@@ -2,16 +2,13 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
-
-from finchlite.tensor.fiber_tensor import FiberTensor, FiberTensorFields
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
 from ..algebra import ImmutableStructFType, ffuncs
 from ..compile import looplets as lplt
 from ..interface import Scalar
 from ..tensor import Level, LevelFType
+from .fiber_tensor import FiberTensor, FiberTensorFields
 
 
 @dataclass(unsafe_hash=True)
@@ -94,7 +91,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
             split=lambda ctx, ext: ntn.Call(
-                ntn.L(ffuncs.add), (tns.visited_idxs[-1], ntn.L(np.intp(1)))
+                ntn.L(ffuncs.add), (tns.visited_idxs[-1], ext.get_unit())
             ),
             tail=lambda ctx, idx: lplt.Run(
                 lambda ctx, idx: lplt.Leaf(

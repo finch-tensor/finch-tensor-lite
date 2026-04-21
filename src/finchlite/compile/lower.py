@@ -82,8 +82,11 @@ class FinchTensorFType(TensorFType, ABC):
 @dataclass(frozen=True)
 class Extent(FTyped):
     """
-    A class to represent the extent of a loop variable.
-    This is used to define the start and end values of a loop.
+    A class to represent the extent of a loop variable. This is used to define
+    the start and end values of a loop.
+
+    The extent is start-inclusive and end-exclusive, meaning that the loop variable
+    will take on values from start to end-1.
     """
 
     start: Any

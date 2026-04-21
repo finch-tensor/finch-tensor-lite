@@ -119,9 +119,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         ctx.exec(asm.Unpack(buf_s, buf))
         return ElementLevelFields(buf_s)
 
-    def level_asm_repack(self, ctx, lvl_fields):
-        buf_s = self._get_buf_s(lvl_fields)
-        ctx.exec(asm.Repack(buf_s))
+    def level_asm_repack(self, ctx, lvl_fields: ElementLevelFields):
+        ctx.exec(asm.Repack(lvl_fields.buf_s))
 
     def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
         buf_s = self._get_buf_s(lvl_fields)
