@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from __future__ import annotations
 
 import math

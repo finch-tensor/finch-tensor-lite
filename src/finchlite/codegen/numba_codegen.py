@@ -1,4 +1,3 @@
-# AI modified: 2026-04-10T21:26:00Z 9e1552f1
 import logging
 from abc import ABC, abstractmethod
 from textwrap import dedent

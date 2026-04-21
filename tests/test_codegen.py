@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import ctypes
 import re
 import subprocess

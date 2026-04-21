@@ -1,5 +1,3 @@
-"""AI modified: 2026-03-16T14:23:28Z parent=18fbb013175241f5081102d7b13f81f0e6c3de04"""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

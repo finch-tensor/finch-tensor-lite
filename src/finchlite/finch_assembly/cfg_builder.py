@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from dataclasses import dataclass
 
 import numpy as np
