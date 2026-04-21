@@ -208,21 +208,21 @@ def test_logic_cache_embeddings_norms_l1():
 
 
     #Initiating the cache with a (prgm, bindngs, statsfactory) pair - Expected MISS
-    plan_1_u = Plan((
+    plan_1_d = Plan((
         Query(Alias("out"), Table(Literal(data_1), (i, j))),
         Produces((Table(Alias("out"), (i, j)),))
     ))
     #Using dense stats
-    dense_executor_l1(plan_1_u)
+    dense_executor_l1(plan_1_d)
 
     #Case 1 : Same prgm, bindings, statsfactory -  Expected HIT
     #Passing in the same (prgm, bindings, statsfactory) hence same stats to see if we get a HIT
-    plan_1_u_sim = Plan((
+    plan_1_d_sim = Plan((
         Query(Alias("out"), Table(Literal(data_2), (i, j))),
         Produces((Table(Alias("out"), (i, j)),))
     ))
     #Same stats as above
-    dense_executor_l1(plan_1_u_sim)
+    dense_executor_l1(plan_1_d_sim)
     
     # ------------------------ Testing plans with diff bindings  ---------------------------------  
     mul_node = MapJoin(
@@ -277,21 +277,21 @@ def test_logic_cache_embeddings_norms_l2():
 
 
     #Initiating the cache with a (prgm, bindngs, statsfactory) pair - Expected MISS
-    plan_1_u = Plan((
+    plan_1_d = Plan((
         Query(Alias("out"), Table(Literal(data_1), (i, j))),
         Produces((Table(Alias("out"), (i, j)),))
     ))
     #Using dense stats
-    dense_executor_2(plan_1_u)
+    dense_executor_2(plan_1_d)
 
     #Case 1 : Same prgm, bindings, statsfactory -  Expected HIT
     #Passing in the same (prgm, bindings, statsfactory) hence same stats to see if we get a HIT
-    plan_1_u_sim = Plan((
+    plan_1_d_sim = Plan((
         Query(Alias("out"), Table(Literal(data_2), (i, j))),
         Produces((Table(Alias("out"), (i, j)),))
     ))
     #Same stats as above
-    dense_executor_2(plan_1_u_sim)
+    dense_executor_2(plan_1_d_sim)
     
     # ------------------------ Testing plans with diff bindings  ---------------------------------  
     mul_node = MapJoin(
@@ -322,3 +322,30 @@ def test_logic_cache_embeddings_norms_l2():
 
     dc_executor_l2(plan_mul)   #MISS
     dc_executor_l2(plan_mul_2) #MISS
+
+
+
+def test_blocked_vector_embedding():
+    logger.debug("------------- Using blocked stats for testing ----------------")
+    raw_loader = MockLogicLoader()
+    cache_linf = LogicCacheLRU_Embeddings_Norms(raw_loader, max_depth=3, threshold=1,norm_order=1)
+
+    d0, d1 = Field("d0"), Field("d1")
+    blocks_per_dim = {d0: 2, d1: 2}
+
+    blocked_executor_linf = LogicExecutor(ctx=cache_linf, stats_factory=BlockedStatsFactory(blocks_per_dim,DenseStatsFactory()),cache=False)
+
+    data_1 = fl.asarray(np.ones((10, 10))) 
+    data_2 = fl.asarray(np.eye(10))     
+    data_3 = fl.asarray(np.zeros((10, 10)))
+    data_3.to_numpy()[0, 0] = 1.0
+
+
+
+    plan_1_d = Plan((
+        Query(Alias("out"), Table(Literal(data_1), (d0,d1))),
+        Produces((Table(Alias("out"), (d0,d1)),))
+    ))
+
+    blocked_executor_linf(plan_1_d)
+    blocked_executor_linf(plan_1_d)
