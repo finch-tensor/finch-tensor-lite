@@ -24,6 +24,23 @@ class FType(ABC):
     @abstractmethod
     def __hash__(self):
         ...
+
+    @abstractmethod
+    def __call__(self, val):
+        """
+        Perform type conversion or construction with the given value.
+        
+        For numeric/scalar types, this converts the value to this type.
+        For composite types, this may construct an instance of this type.
+        
+        Args:
+            val: The value to convert or use for construction
+            
+        Returns:
+            The converted/constructed value
+        """
+        ...
+
     def fisinstance(self, other):
         """
         Check if `other` is an instance of this ftype.
@@ -36,13 +53,6 @@ class FType(ABC):
 
 
 class FDType(FType):
-    @abstractmethod
-    def __call__(self, other):
-        """
-        Create an instance of this ftype with the given value, attempt to cast
-        if necessary.
-        """
-
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -585,6 +595,24 @@ class StructFType(FType, ABC):
     def __repr__(self):
         fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
         return f"{self.struct_name}({fields_str})"
+
+    def __call__(self, *args, **kwargs):
+        """
+        Construct a struct instance from the given fields.
+        
+        Can be called with positional arguments matching struct_fields order,
+        or keyword arguments matching field names.
+        """
+        if args and kwargs:
+            raise TypeError("Cannot use both positional and keyword arguments")
+        if args:
+            return self.from_fields(*args)
+        elif kwargs:
+            # Convert kwargs to positional args in field order
+            field_values = [kwargs[name] for name, _ in self.struct_fields]
+            return self.from_fields(*field_values)
+        else:
+            raise TypeError("__call__ requires at least one argument")
 
     @property
     @abstractmethod
