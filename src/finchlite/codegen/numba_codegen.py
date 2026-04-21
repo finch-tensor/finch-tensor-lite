@@ -616,7 +616,6 @@ class NumbaContext(Context):
             case asm.Assign(asm.Variable(var_n, var_t) as var, val):
                 val_code = self(val)
                 var_code = self(var)
-                print(val.result_type is var_t)
                 if val.result_type != var_t:
                     raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.types:
