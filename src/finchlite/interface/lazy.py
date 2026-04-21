@@ -88,6 +88,17 @@ class LazyTensorFType(TensorFType):
             element_type=self._element_type,
         )
 
+    def __call__(self, val: Any) -> LazyTensor:
+        """
+        Convert a tensor to this tensor type.
+
+        Args:
+            val: A tensor to convert to this tensor type.
+        Returns:
+            A LazyTensor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+
     @property
     def fill_value(self):
         return self._fill_value
@@ -1301,6 +1312,17 @@ class FillTensorFType(DefaultTensorFType):
     def construct(self, shape: tuple) -> FillTensor:
         return FillTensor(shape, self.fill_value)
 
+    def __call__(self, val: Any) -> FillTensor:
+        """
+        Convert a tensor to this fill tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A FillTensor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+
 
 class FillTensor(Tensor):
     """
@@ -1387,6 +1409,17 @@ class ConcatTensorFType(WrapperTensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    def __call__(self, val: Any) -> Any:
+        """
+        Convert a tensor to this concatenated tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A concatenated tensor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
 
     def construct(self, shape: tuple) -> ConcatTensor:
         tns = self._child_formats[0].construct(shape)
@@ -1536,6 +1569,17 @@ class SplitDimsTensorFType(WrapperTensorFType):
             "Cannot directly instantiate SplitDimsTensor from ftype"
         )
 
+    def __call__(self, val: Any) -> SplitDimsTensor:
+        """
+        Convert a tensor to this split dimensions tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A split dimensions tensor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+
 
 class SplitDimsTensor(Tensor):
     """
@@ -1637,6 +1681,17 @@ class CombineDimsTensorFType(WrapperTensorFType):
         raise NotImplementedError(
             "Cannot directly instantiate SplitDimsTensor from ftype"
         )
+
+    def __call__(self, val: Any) -> SplitDimsTensor:
+        """
+        Convert a tensor to this combined dimensions tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A combined dimensions tensor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
 
 
 class CombineDimsTensor(Tensor):

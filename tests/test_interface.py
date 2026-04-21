@@ -82,6 +82,17 @@ class TestEagerTensorFType(finchlite.TensorFType):
             np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
         )
 
+    def __call__(self, val):
+        """
+        Convert a tensor to this test eager tensor type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A TestEagerTensor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+
     def from_numpy(self, arr):
         return TestEagerTensor(arr)
 

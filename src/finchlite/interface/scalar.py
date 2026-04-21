@@ -31,6 +31,17 @@ class ScalarFType(TensorFType):
             raise ValueError("ScalarFType can only be called with empty shape ()")
         return self._element_type(self._fill_value)
 
+    def __call__(self, val: Any) -> Scalar:
+        """
+        Convert a tensor to this scalar tensor type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A Scalar instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
+
     def from_numpy(self, arr):
         return self(arr)
 

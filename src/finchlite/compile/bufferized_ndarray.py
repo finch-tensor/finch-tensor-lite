@@ -193,12 +193,26 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self.shape_t = dimension_type
         self.strides_t = dimension_type  # assuming strides is the same type as shape
 
-    def __call__(
+    def construct(
         self,
         shape: tuple[int, ...],
     ) -> BufferizedNDArray:
         arr = np.zeros(shape, dtype=to_numpy_type(self.element_type))
         return self.from_numpy(arr)
+
+    def __call__(
+        self,
+        val: Any,
+    ) -> BufferizedNDArray:
+        """
+        Convert a tensor to this bufferized ndarray type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A BufferizedNDArray instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
@@ -412,6 +426,17 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         raise NotImplementedError(
             "Cannot directly instantiate BufferizedNDArrayAccessor from ftype"
         )
+
+    def __call__(self, val: Any) -> BufferizedNDArrayAccessor:
+        """
+        Convert a tensor to this bufferized ndarray accessor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A BufferizedNDArrayAccessor instance of this type.
+        """
+        raise NotImplementedError(f"Tensor conversion not yet implemented for {type(self).__name__}")
 
     def from_numpy(self, arr):
         raise NotImplementedError(
