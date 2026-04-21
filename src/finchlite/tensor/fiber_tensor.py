@@ -141,9 +141,9 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(self, shape):
+    def construct(self, shape, **kwargs):
         """
-        Construct level
+        Construct a level instance with the given shape.
         """
         ...
 

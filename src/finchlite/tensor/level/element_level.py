@@ -67,6 +67,17 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         return ElementLevel(self, val)
 
+    def __call__(self, val: Any) -> "ElementLevel":
+        """
+        Convert a level to this element level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            An ElementLevel instance of this type.
+        """
+        raise NotImplementedError(f"Level conversion not yet implemented for {type(self).__name__}")
+
     def __str__(self):
         return f"ElementLevelFType(fv={self.fill_value})"
 

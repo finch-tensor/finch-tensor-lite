@@ -108,6 +108,17 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         lvl = self.lvl_t.construct(shape=shape[1:])
         return SparseListLevel(lvl, self.dimension_type(shape[0]))
 
+    def __call__(self, val: Any) -> "SparseListLevel":
+        """
+        Convert a level to this sparse list level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A SparseListLevel instance of this type.
+        """
+        raise NotImplementedError(f"Level conversion not yet implemented for {type(self).__name__}")
+
     @property
     def lvl_t(self):
         return self._lvl_t
