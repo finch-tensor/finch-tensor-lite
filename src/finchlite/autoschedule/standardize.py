@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from functools import reduce
 from typing import overload
 
@@ -26,12 +27,12 @@ from ..symbolic import (
     Chain,
     Fixpoint,
     Namespace,
-    PostOrderDFS,
     PostWalk,
     PreWalk,
     Rewrite,
     gensym,
 )
+from ..symbolic.traversal import Term, TermTree
 from .normalize import normalize_names
 
 
@@ -65,10 +66,24 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
 
 
 def split_increments(root: LogicStatement) -> LogicStatement:
+
     def rule_2(stmt):
+        def AggregateGuardedPostOrderDFS(
+            node: Term, is_agg_seen=False
+        ) -> Iterator[Term]:
+            """PostOrderDFS of nodes behind aggregates."""
+            if isinstance(node, TermTree):
+                for arg in node.children:
+                    yield from AggregateGuardedPostOrderDFS(
+                        arg, is_agg_seen or isinstance(arg, Aggregate)
+                    )
+
+            if is_agg_seen:
+                yield node
+
         match stmt:
             case Query(lhs, rhs):
-                if lhs in PostOrderDFS(rhs):
+                if lhs in AggregateGuardedPostOrderDFS(rhs):
                     var = Alias(gensym("A"))
                     new_query = Query(var, rhs)
                     new_root = Query(lhs, Table(var, rhs.fields()))
