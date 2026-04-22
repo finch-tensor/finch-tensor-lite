@@ -10,6 +10,7 @@ from ..symbolic import (
     Context,
     FType,
     FTyped,
+    HashCons,
     NamedTerm,
     Term,
     TermTree,
@@ -109,7 +110,7 @@ class TableValue(FTyped):
 
 
 @dataclass(eq=True, frozen=True)
-class LogicNode(Term, ABC):
+class LogicNode(HashCons, Term, ABC):
     """
     LogicNode
 

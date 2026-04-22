@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from ..algebra import return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, HashCons, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 
 """
@@ -25,7 +25,7 @@ Nested function declarations are intentionally not representable in this IR.
 
 
 @dataclass(eq=True, frozen=True)
-class FusedNode(Term, ABC):
+class FusedNode(HashCons, Term, ABC):
     @classmethod
     def head(cls):
         return cls

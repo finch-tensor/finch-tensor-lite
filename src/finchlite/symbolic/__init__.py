@@ -12,6 +12,7 @@ from .rewriters import (
 )
 from .stage import Stage
 from .term import (
+    HashCons,
     Term,
     TermTree,
     literal_repr,
@@ -21,6 +22,7 @@ from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 __all__ = [
     "BasicBlock",
     "Chain",
+    "HashCons",
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",

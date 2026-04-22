@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import weakref
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
@@ -43,6 +45,40 @@ Notes:
     members of Term.  Instead of overriding `make_term` in subclasses, introduce
     your own method to override, and call that from make_term.
 """
+
+
+hash_cons_table: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
+_sig_cache: dict = {}
+
+
+def _key_part(a: object) -> object:
+    if isinstance(a, Term):
+        return id(a)
+    if isinstance(a, tuple):
+        return tuple(_key_part(x) for x in a)
+    return (type(a), a)
+
+
+class HashCons:
+    def __new__(cls, *args, **kwargs):
+        try:
+            if kwargs:
+                sig = _sig_cache.get(cls)
+                if sig is None:
+                    _sig_cache[cls] = sig = inspect.signature(cls)
+                bound = sig.bind(*args, **kwargs)
+                bound.apply_defaults()
+                norm = tuple(bound.arguments.values())
+            else:
+                norm = args
+            key = (cls,) + tuple(_key_part(a) for a in norm)
+            obj = hash_cons_table.get(key)
+            if obj is None:
+                obj = object.__new__(cls)
+                hash_cons_table[key] = obj
+            return obj
+        except TypeError:
+            return object.__new__(cls)
 
 
 class Term:

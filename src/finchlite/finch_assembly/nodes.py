@@ -3,12 +3,12 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..algebra import return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..symbolic import Context, HashCons, NamedTerm, Term, TermTree, ftype, literal_repr
 from ..util import qual_str
 from .buffer import length_type
 
 
-class AssemblyNode(Term):
+class AssemblyNode(HashCons, Term):
     """
     AssemblyNode
 

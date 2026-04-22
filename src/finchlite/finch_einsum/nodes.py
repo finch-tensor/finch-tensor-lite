@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import Any, Self, cast
 
 from finchlite.algebra import ffunc
-from finchlite.symbolic import Context, Term, TermTree
+from finchlite.symbolic import Context, HashCons, Term, TermTree
 from finchlite.util.print import qual_str
 
 
-class EinsumNode(Term):
+class EinsumNode(HashCons, Term):
     @classmethod
     def head(cls):
         """Returns the head of the node."""
