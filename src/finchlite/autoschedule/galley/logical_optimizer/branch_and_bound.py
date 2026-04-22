@@ -122,6 +122,7 @@ def branch_and_bound(
         )
     return (optimal_orders[component_set], optimal_subquery_costs)
 
+
 def branch_and_bound_dfs(
     input_aq: AnnotatedQuery,
     component: list,
@@ -250,9 +251,7 @@ def pruned_query_to_plan(
             continue
 
         if optimizer == "dfs":
-            (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(
-                cur_aq, component
-            )
+            (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(cur_aq, component)
         else:
             (
                 (greedy_order, _, _, _greedy_cost),
