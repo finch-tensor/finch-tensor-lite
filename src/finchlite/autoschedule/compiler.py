@@ -312,6 +312,10 @@ class NotationContext:
 
                 return ntn.Block(
                     (
+                        ntn.Thaw(
+                            self.slots[lhs],
+                            ntn.Literal(op),
+                        ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
