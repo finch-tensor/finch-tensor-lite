@@ -54,7 +54,11 @@ class NumberedStatement(AssemblyStatement):
     sid: int
 
     def __str__(self) -> str:
-        return str(self.stmt)
+        return f"[{self.sid}] {str(self.stmt)}"
+
+    @property
+    def children(self):
+        return (self.stmt, self.sid)
 
 
 def assembly_build_cfg(
