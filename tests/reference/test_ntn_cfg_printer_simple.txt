@@ -1,0 +1,38 @@
+ENTRY_0: #succs=[matmul_2]
+
+EXIT_1: #succs=[]
+
+matmul_2: #succs=[matmul_4, matmul_5]
+    m: int64 = dimension(A, 0)
+    n: int64 = dimension(B, 1)
+    p: int64 = dimension(A, 1)
+    A_: ndarray = unpack(A)
+    B_: ndarray = unpack(B)
+    C_: ndarray = unpack(C)
+    declare(C_, 0.0, add, ['m', 'n'])
+    m
+
+matmul_3: #succs=[EXIT_1]
+
+matmul_4: #succs=[matmul_6, matmul_7]
+    n
+
+matmul_5: #succs=[matmul_3]
+    freeze(C_, add)
+    repack(C_, C)
+    return C
+
+matmul_6: #succs=[matmul_8, matmul_9]
+    p
+
+matmul_7: #succs=[matmul_4, matmul_5]
+
+matmul_8: #succs=[matmul_8, matmul_9]
+    a_ik: float64 = unwrap(read(A_, ['i', 'k']))
+    b_kj: float64 = unwrap(read(B_, ['k', 'j']))
+    c_ij: float64 = mul(a_ik, b_kj)
+    increment(update(C_, ['i', 'j'], add), c_ij)
+
+matmul_9: #succs=[matmul_6, matmul_7]
+
+matmul_10: #succs=[matmul_3]
