@@ -34,6 +34,7 @@ from ..symbolic import (
 )
 from ..symbolic.traversal import Term, TermTree
 from .normalize import normalize_names
+from .utils import is_inplace_expr
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -112,6 +113,12 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
+            case Query(lhs, Reorder(MapJoin(op, args), _)) if is_inplace_expr(
+                lhs, op, args
+            ):
+                return ex
+            case Query(lhs, MapJoin(op, args) as rhs) if is_inplace_expr(lhs, op, args):
+                return Query(lhs, Reorder(rhs, rhs.fields()))
             case Query(lhs, rhs):
                 return Query(
                     lhs,

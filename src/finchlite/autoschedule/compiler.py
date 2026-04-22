@@ -20,6 +20,7 @@ from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_
 from ..finch_notation import NotationInterpreter
 from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
+from .utils import is_inplace_expr
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
@@ -223,40 +224,6 @@ class NotationContext:
 
         return body
 
-    def _is_inplace_rhs(
-        self,
-        query_lhs: lgc.Alias,
-        mapjoin_op: Any,
-        rhs: tuple[lgc.LogicExpression, ...],
-    ):
-        # TODO: This is a temporary measure till we figure out
-        # how to handle the case where args = [lhs_arg, arg1, arg2].
-        if len(rhs) > 2:
-            return False
-
-        # Return false if rhs does not contain lhs (i.e. not inplace)
-        if not any(
-            isinstance(arg, lgc.Reorder)
-            and isinstance(arg.arg, lgc.Table)
-            and arg.arg.tns == query_lhs
-            for arg in rhs
-        ):
-            return False
-
-        # Return false if the inner argument is not one of the following
-        # 1. Queries that perform a Reorder of a single argument.
-        # 2. Queries that perform an Aggregate (with mapjoin_op) over a Reorder
-        #    of a series of map-joins.
-        return all(
-            (isinstance(arg, lgc.Reorder) and isinstance(arg.arg, lgc.Table))
-            or (
-                isinstance(arg, lgc.Aggregate)
-                and isinstance(arg.arg, lgc.Reorder)
-                and arg.op.val == mapjoin_op
-            )
-            for arg in rhs
-        )
-
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
         Lower Finch Logic to Finch Notation. First we check for early
@@ -312,16 +279,9 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Reorder(
-                    lgc.MapJoin(
-                        lgc.Literal(op),
-                        args,
-                    ),
-                    _,
-                ),
-            ) if self._is_inplace_rhs(lhs, op, args):
+                lgc.Reorder(lgc.MapJoin(op, args), _),
+            ) if is_inplace_expr(lhs, op, args):
                 body = None
-
                 for rhs_arg in args:
                     match rhs_arg:
                         case lgc.Reorder(lgc.Table(lhs_1, idxs_1) as arg, idxs_2) if (
