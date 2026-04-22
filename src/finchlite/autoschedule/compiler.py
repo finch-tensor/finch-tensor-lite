@@ -208,7 +208,7 @@ class NotationContext:
             ntn.Update(ntn.Literal(agg_op)),
             tuple(loops[idx] for idx in agg_arg.idxs if idx not in agg_idxs),
         )
-        body = ntn.Increment(lhs_access, rhs)
+        body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(agg_arg.idxs):
             t = loops[idx].type_
             ext = ntn.Call(
@@ -224,7 +224,10 @@ class NotationContext:
         return body
 
     def _is_inplace_rhs(
-        self, query_lhs: lgc.Alias, mapjoin_op: Any, rhs: tuple[lgc.LogicExpression]
+        self,
+        query_lhs: lgc.Alias,
+        mapjoin_op: Any,
+        rhs: tuple[lgc.LogicExpression, ...],
     ):
         # TODO: This is a temporary measure till we figure out
         # how to handle the case where args = [lhs_arg, arg1, arg2].
