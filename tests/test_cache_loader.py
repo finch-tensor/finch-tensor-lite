@@ -330,10 +330,9 @@ def test_blocked_vector_embedding():
     raw_loader = MockLogicLoader()
     cache_linf = LogicCacheLRU_Embeddings_Norms(raw_loader, max_depth=3, threshold=1,norm_order=1)
 
-    d0, d1 = Field("d0"), Field("d1")
-    blocks_per_dim = {d0: 2, d1: 2}
+    i, j = Field("i"), Field("j")
 
-    blocked_executor_linf = LogicExecutor(ctx=cache_linf, stats_factory=BlockedStatsFactory(blocks_per_dim,DenseStatsFactory()),cache=False)
+    blocked_executor_linf = LogicExecutor(ctx=cache_linf, stats_factory=BlockedStatsFactory(DenseStatsFactory()),cache=False)
 
     data_1 = fl.asarray(np.ones((10, 10))) 
     data_2 = fl.asarray(np.eye(10))     
@@ -343,8 +342,8 @@ def test_blocked_vector_embedding():
 
 
     plan_1_d = Plan((
-        Query(Alias("out"), Table(Literal(data_1), (d0,d1))),
-        Produces((Table(Alias("out"), (d0,d1)),))
+        Query(Alias("out"), Table(Literal(data_1), (i,j))),
+        Produces((Table(Alias("out"), (i,j)),))
     ))
 
     blocked_executor_linf(plan_1_d)

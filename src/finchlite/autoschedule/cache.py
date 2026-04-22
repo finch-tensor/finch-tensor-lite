@@ -2,6 +2,7 @@ from collections import OrderedDict
 from typing import Any
 
 from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finchlite.finch_logic import (
     Alias,
     LogicLoader,
@@ -110,7 +111,7 @@ class LogicCacheLRU_Embeddings(LogicLoader):
         ] #fetching the cached vectors and kernels 
 
         if stats:
-            current_vec = np.concatenate([s.get_embedding() for s in stats.values()]) #concatenating the embeddings
+            current_vec = np.concatenate([s.get_embedding() for s in stats.values() if isinstance(s,NumericStats)]) #concatenating the embeddings
             if entry['cached_embeddings'] is not None:
                 dist = np.abs(entry['cached_embeddings'] - current_vec)
                 max_dist = np.max(dist, axis=1)
@@ -177,11 +178,12 @@ class LogicCacheLRU_Embeddings_Norms(LogicLoader):
         if stats:
             match self.norm_order:
                 case np.inf :
-                    current_vec = np.concatenate([s.get_embedding() for s in stats.values()])
+                    current_vec = np.concatenate([s.get_embedding() for s in stats.values() if isinstance(s,NumericStats)])
                 case 1:
-                    current_vec = np.concatenate([(s.get_embedding()/ len(s.get_embedding()))for s in stats.values()])
+                    current_vec = np.concatenate([(s.get_embedding()/ len(s.get_embedding()))for s in stats.values() if isinstance(s,NumericStats)])
                 case 2:
-                    current_vec = np.concatenate([(s.get_embedding()/ np.sqrt(len(s.get_embedding()))) for s in stats.values()])
+
+                    current_vec = np.concatenate([(s.get_embedding()/ np.sqrt(len(s.get_embedding()))) for s in stats.values() if isinstance(s,NumericStats)])
 
             if entry['cached_embeddings'] is not None:
                 distances = apply_norm(entry['cached_embeddings'], current_vec, self.norm_order)

@@ -18,17 +18,19 @@ from .tensor_def import TensorDef
 class BlockedStatsFactory(StatsFactory["BlockedStats"]):
     def __init__(
         self,
-        blocks_per_dim: Mapping[Field, int],
         stats_factory: StatsFactory[NumericStats],
+        block_count : int = 5,
+        block_width : int = 2,
     ):
-        self.blocks_per_dim = dict(blocks_per_dim)
+        self.block_count = block_count
+        self.block_width = block_width
         self.inner_factory = stats_factory
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> BlockedStats:
         return BlockedStats.from_tensor(
             tensor,
             fields,
-            blocks_per_dim=self.blocks_per_dim,
+            blocks_per_dim= {f : int(min(self.block_count, n/self.block_width)) for f,n in zip(fields, tensor.shape)},
             stats_factory=self.inner_factory,
         )
 

@@ -40,20 +40,20 @@ def test_embeddings():
     
     print("\n" + "="*80)
     ds = DenseStats(arr,fields)
-    ds_emb = ds.get_embeddings()
+    ds_emb = ds.get_embedding()
     print(f"DenseStats Embeddings : {ds_emb}")
 
     us = UniformStats(arr, fields)
-    us_emb = us.get_embeddings()
+    us_emb = us.get_embedding()
     print(f"UniformStats Embeddings : {us_emb}")
 
     dc_stats = DCStats(arr, fields)
-    dc_emb = dc_stats.get_embeddings()
+    dc_emb = dc_stats.get_embedding()
     print(f"DCStats Embeddings: {dc_emb}")
 
     blocks_per_dim = {Field("i"): 2, Field("j"): 2}
     bs = BlockedStats.from_tensor(arr, fields, blocks_per_dim, UniformStatsFactory())
-    bs_emb = bs.get_embeddings()
+    bs_emb = bs.get_embedding()
     print(f"BlockedStats Embeddings: {bs_emb}")
 
     print("="*80)
@@ -198,9 +198,8 @@ def test_blocked_stats_from_tensor():
     data = np.eye(10)
     arr = fl.asarray(data)
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-
-    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
+    bs = bs_factory(arr, indices)
 
     assert bs.estimate_non_fill_values() == 10.0
 
@@ -208,38 +207,32 @@ def test_blocked_stats_from_tensor():
 def test_blocked_stats_aggregate():
     data = np.eye(10)
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), indices, blocks_per_dim, DenseStatsFactory()
-    )
+    bs_factory = BlockedStatsFactory(DenseStatsFactory())
+    bs = bs_factory(fl.asarray(data), indices)
 
     reduce_indices = (Field("j"),)
-    agg_bs = BlockedStatsFactory(blocks_per_dim, DenseStatsFactory()).aggregate(
+    agg_bs = bs_factory.aggregate(
         ffunc.add, 0.0, reduce_indices, bs
     )
 
     assert agg_bs.blocks.ndim == 1
-    assert len(agg_bs.blocks) == 2
+    assert len(agg_bs.blocks) == 5
     assert agg_bs.estimate_non_fill_values() == 10.0
 
 
 def test_blocked_stats_mapjoin():
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
 
     data1 = np.zeros((10, 10))
     data1[0:5, 0:5] = 1.0
-    bs1 = BlockedStats.from_tensor(
-        fl.asarray(data1), indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs_factory = BlockedStatsFactory(UniformStatsFactory(),block_count=2)
+    bs1 = bs_factory(fl.asarray(data1), indices)
 
     data2 = np.zeros((10, 10))
     data2[5:10, 5:10] = 1.0
-    bs2 = BlockedStats.from_tensor(
-        fl.asarray(data2), indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs2 = bs_factory(fl.asarray(data2), indices)
 
-    result = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).mapjoin(
+    result = bs_factory.mapjoin(
         ffunc.add, bs1, bs2
     )
 
@@ -249,13 +242,11 @@ def test_blocked_stats_mapjoin():
 
 def test_blocked_stats_relabel():
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(np.eye(10)), indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
+    bs = bs_factory(fl.asarray(np.eye(10)), indices)
 
     new_names = (Field("row"), Field("col"))
-    relabeled = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).relabel(
+    relabeled = bs_factory.relabel(
         bs, new_names
     )
 
@@ -270,58 +261,56 @@ def test_blocked_stats_reorder():
     arr = fl.asarray(data)
 
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
+    bs = bs_factory(arr, indices)
 
     # Before reordering
     assert bs.blocks[0, 0].get_dim_size(Field("i")) == 2.0
-    assert bs.blocks[0, 0].get_dim_size(Field("j")) == 5.0
+    assert bs.blocks[0, 0].get_dim_size(Field("j")) == 2.0
 
     new_indices = (Field("j"), Field("i"))
-    reordered_bs = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
+    reordered_bs = bs_factory.reorder(
         bs, new_indices
     )
 
     new_block = reordered_bs.blocks[0, 0]
 
     # After reordering
-    assert new_block.get_dim_size(Field("j")) == 5.0
+    assert new_block.get_dim_size(Field("j")) == 2.0
     assert new_block.get_dim_size(Field("i")) == 2.0
     assert new_block.index_order == (Field("j"), Field("i"))
 
 
 def test_blocked_stats_issimilar():
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
     data = np.eye(10)
     arr = fl.asarray(data)
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
 
     # Identical
-    bs1 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
-    bs2 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
-    blocked_factory = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory())
-    assert blocked_factory.issimilar(bs1, bs2) is True
+    bs1 = bs_factory(arr, indices)
+    bs2 = bs_factory(arr, indices)
+    assert bs_factory.issimilar(bs1, bs2) is True
 
     # Different data
     data_diff = np.eye(10)
     data_diff[0, 0] = 0.0
-    bs_diff_data = BlockedStats.from_tensor(
-        fl.asarray(data_diff), indices, blocks_per_dim, UniformStatsFactory()
+    bs_diff_data = bs_factory(
+        fl.asarray(data_diff), indices
     )
-    assert blocked_factory.issimilar(bs1, bs_diff_data) is False
+    assert bs_factory.issimilar(bs1, bs_diff_data) is False
 
     # Different blocks_per_dim
-    alt_blocks_per_dim = {Field("i"): 5, Field("j"): 5}
-    bs_diff_grid = BlockedStats.from_tensor(
-        arr, indices, alt_blocks_per_dim, UniformStatsFactory()
-    )
-    assert blocked_factory.issimilar(bs1, bs_diff_grid) is False
+    bs_factory_diff = BlockedStatsFactory(UniformStatsFactory(), block_count = 10, block_width = 10)
+    bs_diff_grid = bs_factory_diff(arr, indices)
+    assert bs_factory_diff.issimilar(bs1, bs_diff_grid) is False
 
     # Different StatsImpl
-    bs_diff_impl = BlockedStats.from_tensor(
-        arr, indices, blocks_per_dim, DenseStatsFactory()
+    bs_factory_dense = BlockedStatsFactory(DenseStatsFactory())
+    bs_diff_impl = bs_factory_dense(
+        arr, indices
     )
-    assert blocked_factory.issimilar(bs1, bs_diff_impl) is False
+    assert bs_factory_dense.issimilar(bs1, bs_diff_impl) is False
 
 
 def get_structured_example(M, K, matrix_type):
@@ -346,7 +335,6 @@ def get_structured_example(M, K, matrix_type):
 def test_benchmark_structured_comparison():
     M, K, N = 20, 20, 20
     i, j, k = Field("i"), Field("j"), Field("k")
-    blocks_per_dim = {i: 5, j: 5, k: 5}
 
     matrix_types = ["diagonal", "tridiagonal", "banded", "triangular", "striped"]
     implementations = [
@@ -358,7 +346,7 @@ def test_benchmark_structured_comparison():
     print("\n" + "=" * 85)
     print(
         f"{'Matrix Type':<15} | {'Stats':<15} |"
-        f" {'Stats Relative Error':<18} | {'Blocked Stats Relatibe Error'}"
+        f" {'Stats Relative Error':<18} | {'Blocked Stats Relative Error'}"
     )
     print("-" * 85)
 
@@ -386,9 +374,9 @@ def test_benchmark_structured_comparison():
             g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
             # Blocked Stats Performance
-            blocked_factory = BlockedStatsFactory(blocks_per_dim, impl_factory)
-            b_a = BlockedStats.from_tensor(tns_a, (i, k), blocks_per_dim, impl_factory)
-            b_b = BlockedStats.from_tensor(tns_b, (k, j), blocks_per_dim, impl_factory)
+            blocked_factory = BlockedStatsFactory(impl_factory)
+            b_a = blocked_factory(tns_a, (i, k))
+            b_b = blocked_factory(tns_b, (k, j))
             b_res = blocked_factory.aggregate(
                 ffunc.add, 0.0, (k,), blocked_factory.mapjoin(ffunc.mul, b_a, b_b)
             )
