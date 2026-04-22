@@ -101,6 +101,7 @@ class NotationContext:
     def _lower_query_of_reorder(
         self,
         query_lhs: lgc.Alias,
+        op: Any,
         arg: lgc.Table,
         arg_idxs: tuple[lgc.Field, ...],
         reorder_idxs: tuple[lgc.Field, ...],
@@ -159,7 +160,7 @@ class NotationContext:
         rhs = ctx(arg, loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
-            ntn.Update(ntn.Literal(ffunc.overwrite)),
+            ntn.Update(ntn.Literal(op)),
             tuple(loops[idx] for idx in new_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
@@ -236,7 +237,9 @@ class NotationContext:
             case lgc.Query(
                 lhs, lgc.Reorder(lgc.Table(lgc.Alias(_), idxs_1) as arg, idxs_2)
             ):
-                body = self._lower_query_of_reorder(lhs, arg, idxs_1, idxs_2)
+                body = self._lower_query_of_reorder(
+                    lhs, ffunc.overwrite, arg, idxs_1, idxs_2
+                )
                 return ntn.Block(
                     (
                         ntn.Declare(
@@ -292,16 +295,16 @@ class NotationContext:
                             lgc.Table(lgc.Alias(_), idxs_1) as arg, idxs_2
                         ):
                             body = self._lower_query_of_reorder(
-                                lhs, arg, idxs_1, idxs_2
+                                lhs, op.val, arg, idxs_1, idxs_2
                             )
                         case lgc.Aggregate(
-                            lgc.Literal(op),
+                            lgc.Literal(op_1),
                             lgc.Literal(init),
                             lgc.Reorder(arg, idxs_1) as arg_2,
                             idxs_2,
                         ):
                             body = self._lower_query_of_aggregate(
-                                lhs, op, arg_2, idxs_2
+                                lhs, op_1, arg_2, idxs_2
                             )
 
                 if body is None:

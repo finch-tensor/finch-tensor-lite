@@ -100,6 +100,12 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     )
 
     def rule(ex):
+        def wrap_tables_in_reorder(args):
+            return tuple(
+                Reorder(arg, arg.fields()) if isinstance(arg, Table) else arg
+                for arg in args
+            )
+
         match ex:
             case Query(
                 lhs,
@@ -113,11 +119,10 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
-            case Query(lhs, Reorder(MapJoin(op, args), _)) if is_inplace_expr(
-                lhs, op, args
+            case Query(lhs, Reorder(MapJoin(op, args), _) | MapJoin(op, args)) if (
+                is_inplace_expr(lhs, op, wrap_tables_in_reorder(args))
             ):
-                return ex
-            case Query(lhs, MapJoin(op, args) as rhs) if is_inplace_expr(lhs, op, args):
+                rhs = MapJoin(op, wrap_tables_in_reorder(args))
                 return Query(lhs, Reorder(rhs, rhs.fields()))
             case Query(lhs, rhs):
                 return Query(
