@@ -308,8 +308,9 @@ class LogicStandardizer(LogicLoader):
     The LogicStandardizer applies a series of transformations to standardize
     logic statements into a canonical form. Any Logic is accepted as input, and
     the output logic should be a plan with only two forms of queries:
-    1. Queries that perform a Reorder of a single argument
+    1. Queries that perform a Reorder of a single argument.
     2. Queries that perform an Aggregate over a Reorder of a series of map-joins.
+    3. Queries that perform a Reorder of a map-join between query lhs and (1)/(2).
     """
 
     def __init__(self, ctx: LogicLoader | None = None):
