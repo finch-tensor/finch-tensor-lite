@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Literal
 
 from ..algebra.tensor import TensorFType
 from ..finch_assembly import AssemblyLibrary
@@ -23,8 +22,10 @@ from ..finch_logic import (
 )
 from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
-from .galley.logical_optimizer.branch_and_bound_dfs import pruned_query_to_plan_dfs
+from .galley.logical_optimizer.branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
 from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
@@ -32,8 +33,6 @@ from .galley.logical_optimizer.query_normalization import (
 )
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
-
-GalleyOptimizer = Literal["greedy", "bfs", "dfs"]
 
 
 def optimize_query(
@@ -45,26 +44,13 @@ def optimize_query(
     optimizer: GalleyOptimizer = "dfs",
 ):
     """Rewrite a single logical Query using ``optimizer``:
-    greedy,BFS, or DFS."""
+    greedy, bfs, or dfs."""
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
-    if optimizer == "dfs":
-        new_queries, _ = pruned_query_to_plan_dfs(
-            annotated_query,
-            use_components=use_components,
-            use_greedy=False,
-        )
-    elif optimizer == "bfs":
-        new_queries, _ = pruned_query_to_plan(
-            annotated_query,
-            use_components=use_components,
-            use_greedy=False,
-        )
-    else:
-        new_queries, _ = pruned_query_to_plan(
-            annotated_query,
-            use_components=use_components,
-            use_greedy=True,
-        )
+    new_queries, _ = pruned_query_to_plan(
+        annotated_query,
+        use_components=use_components,
+        optimizer=optimizer,
+    )
     return new_queries
 
 

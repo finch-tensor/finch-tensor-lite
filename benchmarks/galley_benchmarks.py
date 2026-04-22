@@ -31,9 +31,6 @@ from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     pruned_query_to_plan,
 )
-from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound_dfs import (
-    pruned_query_to_plan_dfs,
-)
 from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
     preprocess_plan_for_galley,
 )
@@ -396,8 +393,8 @@ def _exact_greedy_plan_stats(
 ) -> tuple[float, float, int, int]:
     aq_e = aq_factory()
     aq_g = aq_factory()
-    queries_exact, cost_exact = pruned_query_to_plan(aq_e, use_greedy=False)
-    queries_greedy, cost_greedy = pruned_query_to_plan(aq_g, use_greedy=True)
+    queries_exact, cost_exact = pruned_query_to_plan(aq_e, optimizer="bfs")
+    queries_greedy, cost_greedy = pruned_query_to_plan(aq_g, optimizer="greedy")
     return cost_exact, cost_greedy, len(queries_exact), len(queries_greedy)
 
 
@@ -407,8 +404,8 @@ def _bfs_dfs_exact_plan_stats(
     """BFS exact vs DFS exact: optimal costs (must match) and subquery counts."""
     aq_b = aq_factory()
     aq_d = aq_factory()
-    queries_b, cost_b = pruned_query_to_plan(aq_b, use_greedy=False)
-    queries_d, cost_d = pruned_query_to_plan_dfs(aq_d, use_greedy=False)
+    queries_b, cost_b = pruned_query_to_plan(aq_b, optimizer="bfs")
+    queries_d, cost_d = pruned_query_to_plan(aq_d, optimizer="dfs")
     return cost_b, cost_d, len(queries_b), len(queries_d)
 
 

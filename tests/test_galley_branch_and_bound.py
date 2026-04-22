@@ -11,11 +11,8 @@ from finchlite.algebra import ffunc
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     branch_and_bound,
-    pruned_query_to_plan,
-)
-from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound_dfs import (
     branch_and_bound_dfs,
-    pruned_query_to_plan_dfs,
+    pruned_query_to_plan,
 )
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
@@ -120,8 +117,8 @@ def test_layered_bnb_exact_matches_dfs_bnb_exact_on_matmul_chain():
 def test_pruned_exact_strictly_cheaper_than_pruned_greedy_on_four_index_chain():
     """Four-index chain: exact (pruned) cost is strictly below greedy (pruned)."""
     aq = _make_aq_four_index_chain()
-    _, greedy_cost = pruned_query_to_plan(aq, use_greedy=True)
-    _, exact_cost = pruned_query_to_plan(aq, use_greedy=False)
+    _, greedy_cost = pruned_query_to_plan(aq, optimizer="greedy")
+    _, exact_cost = pruned_query_to_plan(aq, optimizer="bfs")
     assert exact_cost <= greedy_cost
     assert exact_cost < greedy_cost, (
         f"Expected exact ({exact_cost}) < greedy ({greedy_cost})"
@@ -132,8 +129,8 @@ def test_pruned_exact_strictly_cheaper_than_pruned_greedy_on_four_index_chain():
 def test_pruned_exact_never_more_expensive_than_pruned_greedy(factory):
     """Exact pruned plan cost is never above greedy-only pruned plan."""
     aq = factory()
-    _, greedy_cost = pruned_query_to_plan(aq, use_greedy=True)
-    _, exact_cost = pruned_query_to_plan(aq, use_greedy=False)
+    _, greedy_cost = pruned_query_to_plan(aq, optimizer="greedy")
+    _, exact_cost = pruned_query_to_plan(aq, optimizer="bfs")
     assert exact_cost <= greedy_cost
 
 
@@ -151,11 +148,11 @@ def test_bnb_exact_k_inf_cost_no_worse_than_greedy_k1(factory):
 
 
 @pytest.mark.parametrize("factory", _CHAIN_FACTORIES)
-def test_pruned_query_to_plan_dfs_exact_no_worse_than_greedy(factory):
+def test_pruned_query_to_plan_use_dfs_exact_no_worse_than_greedy(factory):
     """DFS exact pruned plan cost is never above greedy-only pruned plan."""
     aq = factory()
-    _, greedy_cost = pruned_query_to_plan(aq, use_greedy=True)
-    _, exact_dfs_cost = pruned_query_to_plan_dfs(aq, use_greedy=False)
+    _, greedy_cost = pruned_query_to_plan(aq, optimizer="greedy")
+    _, exact_dfs_cost = pruned_query_to_plan(aq, optimizer="dfs")
     assert exact_dfs_cost <= greedy_cost
     assert np.isfinite(exact_dfs_cost) and exact_dfs_cost > 0
     if factory is _make_aq_four_index_chain:
