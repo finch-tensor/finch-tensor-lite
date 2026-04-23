@@ -43,7 +43,7 @@ class PointwiseContext:
                         for arg in args
                     ),
                 )
-            case lgc.Table(lgc.Alias(_) as var, idxs):
+            case lgc.Table(lgc.Alias() as var, idxs):
                 return ntn.Unwrap(
                     ntn.Access(
                         self.ctx.slots[var],
@@ -233,7 +233,7 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(_), _) as arg, idxs_2)):
+            case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
                 body = self._lower_query_of_reorder(lhs, ffunc.overwrite, arg, idxs_2)
                 return ntn.Block(
                     (
@@ -281,17 +281,19 @@ class NotationContext:
             ) if is_inplace_expr(lhs, op, mj_idxs, mj_args):
                 body = None
                 match arg:
-                    case lgc.Reorder(lgc.Table(_) as arg_2, reorder_idxs):
+                    case lgc.Reorder(lgc.Table() as tbl, reorder_idxs):
                         body = self._lower_query_of_reorder(
-                            lhs, op.val, arg_2, reorder_idxs
+                            lhs, op.val, tbl, reorder_idxs
                         )
                     case lgc.Aggregate(
                         lgc.Literal(op_1),
                         lgc.Literal(init),
-                        lgc.Reorder(_) as arg_2,
+                        lgc.Reorder() as agg_arg,
                         idxs_2,
                     ):
-                        body = self._lower_query_of_aggregate(lhs, op_1, arg_2, idxs_2)
+                        body = self._lower_query_of_aggregate(
+                            lhs, op_1, agg_arg, idxs_2
+                        )
                     case _:
                         raise Exception(f"Unrecognized logic: {prgm}")
 
