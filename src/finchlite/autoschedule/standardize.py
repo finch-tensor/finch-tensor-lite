@@ -1,11 +1,10 @@
-from collections.abc import Iterator
 from functools import reduce
 from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
 
-from ..algebra import ffunc
+from ..algebra import ffunc, is_associative, is_commutative
 from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from ..finch_logic import (
     Aggregate,
@@ -27,12 +26,12 @@ from ..symbolic import (
     Chain,
     Fixpoint,
     Namespace,
+    PostOrderDFS,
     PostWalk,
     PreWalk,
     Rewrite,
     gensym,
 )
-from ..symbolic.traversal import Term, TermTree
 from .normalize import normalize_names
 from .utils import is_inplace_expr
 
@@ -66,25 +65,62 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(transform))(root)
 
 
-def split_increments(root: LogicStatement) -> LogicStatement:
+def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
+    def rule_1(stmt):
+        match stmt:
+            case MapJoin(Literal(op), args) if is_associative(op):
+                new_args = []
+                for arg in args:
+                    if isinstance(arg, MapJoin) and arg.op.val == op:
+                        new_args.extend(arg.args)
+                    else:
+                        new_args.append(arg)
+                return MapJoin(Literal(op), tuple(new_args))
+
+    root = Rewrite(PostWalk(rule_1))(root)
 
     def rule_2(stmt):
-        def AggregateGuardedPostOrderDFS(
-            node: Term, is_agg_seen=False
-        ) -> Iterator[Term]:
-            """PostOrderDFS of nodes behind aggregates."""
-            if isinstance(node, TermTree):
-                for arg in node.children:
-                    yield from AggregateGuardedPostOrderDFS(
-                        arg, is_agg_seen or isinstance(arg, Aggregate)
-                    )
-
-            if is_agg_seen:
-                yield node
-
         match stmt:
+            case Query(lhs, MapJoin() as rhs):
+                return Query(lhs, Reorder(rhs, rhs.fields()))
+
+    root = Rewrite(PostWalk(rule_2))(root)
+
+    def rule_3(stmt):
+        match stmt:
+            case Query(lhs, Reorder(MapJoin(op, args), reorder_idxs)) if is_commutative(
+                op
+            ):
+                matches = [arg for arg in args if lhs in PostOrderDFS(arg)]
+
+                if len(matches) == 1:
+                    match_arg = matches[0]
+                    if (
+                        isinstance(match_arg, Reorder)
+                        and isinstance(match_arg.arg, Table)
+                        and match_arg.idxs == reorder_idxs
+                    ):
+                        others = [arg for arg in args if arg is not match_arg]
+                        rhs_2 = others[0] if len(others) == 1 else MapJoin(op, others)
+                        return Query(
+                            lhs, Reorder(MapJoin(op, (match_arg, rhs_2)), reorder_idxs)
+                        )
+
+                return None
+
+    return Rewrite(PostWalk(rule_3))(root)
+
+
+def split_increments(root: LogicStatement) -> LogicStatement:
+    def rule_2(stmt):
+        match stmt:
+            case Query(
+                lhs,
+                Reorder(MapJoin(op, args), idxs),
+            ) if is_inplace_expr(lhs, op, idxs, args):
+                return None
             case Query(lhs, rhs):
-                if lhs in AggregateGuardedPostOrderDFS(rhs):
+                if lhs in PostOrderDFS(rhs):
                     var = Alias(gensym("A"))
                     new_query = Query(var, rhs)
                     new_root = Query(lhs, Table(var, rhs.fields()))
@@ -317,6 +353,7 @@ def standardize(
     bindings: dict[Alias, TensorFType],
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
     prgm = isolate_aggregates(prgm)
+    prgm = standardize_inplace_queries(prgm)
     prgm = push_fields(prgm)
     prgm = split_increments(prgm)
     prgm = standardize_query_roots(prgm, bindings)

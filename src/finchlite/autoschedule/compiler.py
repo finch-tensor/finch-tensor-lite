@@ -277,10 +277,10 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Reorder(lgc.MapJoin(op, (_, arg) as mj_args), mj_idxs),
+                lgc.Reorder(lgc.MapJoin(op, (_, non_lhs_arg) as mj_args), mj_idxs),
             ) if is_inplace_expr(lhs, op, mj_idxs, mj_args):
                 body = None
-                match arg:
+                match non_lhs_arg:
                     case lgc.Reorder(lgc.Table() as tbl, reorder_idxs):
                         body = self._lower_query_of_reorder(
                             lhs, op.val, tbl, reorder_idxs
