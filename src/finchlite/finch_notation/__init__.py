@@ -36,6 +36,7 @@ from .nodes import (
     Value,
     Variable,
 )
+from .simplification import LoopletSimplify
 from .stages import NotationLoader, NotationTransform
 
 __all__ = [
@@ -55,6 +56,7 @@ __all__ = [
     "L",
     "Literal",
     "Loop",
+    "LoopletSimplify",
     "Module",
     "NotationCFGBuilder",
     "NotationExpression",

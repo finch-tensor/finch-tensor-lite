@@ -16,7 +16,7 @@ from ..finch_assembly import (
     AssemblyStructFType,
     AssemblyTransform,
 )
-from ..finch_notation import NotationLoader
+from ..finch_notation import LoopletSimplify, NotationLoader
 from ..symbolic import Context, FTyped, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from ..util import qual_str
 from ..util.logging import LOG_ASSEMBLY
@@ -667,6 +667,9 @@ class LoopletPass(ABC):
     @property
     @abstractmethod
     def priority(self): ...
+
+    def __init__(self):
+        self.looplet_simplify = LoopletSimplify()
 
     def __lt__(self, other):
         assert isinstance(other, LoopletPass)

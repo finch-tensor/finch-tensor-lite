@@ -327,7 +327,7 @@ class SequencePass(LoopletPass):
             sub_body = PostWalk(partial(sequence_node, heads=heads, tails=tails))(body)
             subext = SymbolicExtent(subext_start, subext_end)
             sub_ctx = ctx.scope()
-            sub_ctx(subext, sub_body)
+            sub_ctx(subext, self.looplet_simplify(sub_body))
             blocks += sub_ctx.emit()
 
         ctx.exec(asm.Block(tuple(blocks)))
@@ -352,7 +352,15 @@ class RunPass(LoopletPass):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
                     if j == idx and isinstance(tns, Run):
-                        return ntn.Access(tns.body(ctx, idx), mode, (j, *idxs))
+                        return ntn.Access(
+                            Leaf(
+                                lambda ctx: ntn.Stack(
+                                    asm.Literal(tns.body), tns.body.ftype
+                                )
+                            ),
+                            mode,
+                            (j, *idxs),
+                        )
             return None
 
         body_2 = PostWalk(run_node)(body)
