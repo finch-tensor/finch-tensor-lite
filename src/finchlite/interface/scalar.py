@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import TensorFType
+from ..algebra import FType, TensorFType, ftype
+from ..algebra.ftypes import FDType
 from .eager import EagerTensor
 
 
 class ScalarFType(TensorFType):
-    def __init__(self, _element_type: type, _fill_value: Any):
-        self._element_type = _element_type
+    def __init__(self, _element_type: FType, _fill_value: Any):
+        elt = _element_type
+        if not isinstance(elt, FDType):
+            raise TypeError(f"Scalar element type must be FDType, got {elt}")
+        self._element_type = elt
         self._fill_value = _fill_value
 
     def __eq__(self, other):
@@ -22,10 +26,23 @@ class ScalarFType(TensorFType):
     def __hash__(self):
         return hash((self._element_type, self._fill_value))
 
-    def __call__(self, shape: tuple) -> Scalar:
+    def construct(self, shape: tuple) -> Scalar:
         if shape != ():
             raise ValueError("ScalarFType can only be called with empty shape ()")
         return self._element_type(self._fill_value)
+
+    def __call__(self, val: Any) -> Scalar:
+        """
+        Convert a tensor to this scalar tensor type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A Scalar instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, arr):
         return self(arr)
@@ -35,7 +52,7 @@ class ScalarFType(TensorFType):
         return self._fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         return self._element_type
 
     @property
@@ -55,7 +72,7 @@ class Scalar(EagerTensor):
 
     @property
     def ftype(self):
-        return ScalarFType(type(self.val), self._fill_value)
+        return ScalarFType(ftype(self.val), self._fill_value)
 
     @property
     def shape(self):
@@ -67,7 +84,7 @@ class Scalar(EagerTensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the scalar."""
         return self.ftype.element_type
 

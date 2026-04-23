@@ -11,7 +11,8 @@ import numpy as np
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite import dense, element, ffunc, fiber_tensor, ftype
+from finchlite import dense, element, ffuncs, fiber_tensor, ftype
+from finchlite.algebra import TupleFType, ftypes
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
@@ -87,7 +88,7 @@ def test_buffer_function():
     b = NumpyBuffer(a)
     f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
     k = finchlite.codegen.c_codegen.CKernel(
-        f, type(None), [NumpyBufferFType(np.float64)]
+        f, finchlite.none_, [NumpyBufferFType(np.float64)]
     )
     k(b)
     result = b.arr
@@ -107,13 +108,13 @@ def test_codegen(compiler, buffer):
     buf = buffer(a)
 
     a_var = asm.Variable("a", buf.ftype)
-    i_var = asm.Variable("i", np.intp)
-    length_var = asm.Variable("l", np.intp)
+    i_var = asm.Variable("i", finchlite.intp)
+    length_var = asm.Variable("l", finchlite.intp)
     a_slt = asm.Slot("a_", buf.ftype)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("test_function", np.intp),
+                asm.Variable("test_function", finchlite.intp),
                 (a_var,),
                 asm.Block(
                     (
@@ -122,7 +123,7 @@ def test_codegen(compiler, buffer):
                         asm.Resize(
                             a_slt,
                             asm.Call(
-                                asm.Literal(ffunc.mul),
+                                asm.Literal(ffuncs.mul),
                                 (asm.Length(a_slt), asm.Literal(2)),
                             ),
                         ),
@@ -132,9 +133,9 @@ def test_codegen(compiler, buffer):
                             length_var,
                             asm.Store(
                                 a_slt,
-                                asm.Call(asm.Literal(ffunc.add), (i_var, length_var)),
+                                asm.Call(asm.Literal(ffuncs.add), (i_var, length_var)),
                                 asm.Call(
-                                    asm.Literal(ffunc.add),
+                                    asm.Literal(ffuncs.add),
                                     (asm.Load(a_slt, i_var), asm.Literal(1)),
                                 ),
                             ),
@@ -170,8 +171,8 @@ def test_dot_product_malloc(compiler, buffer):
     ab = buffer(len(a), np.float64, a)
     bb = buffer(len(b), np.float64, b)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
@@ -180,7 +181,7 @@ def test_dot_product_malloc(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -199,11 +200,11 @@ def test_dot_product_malloc(compiler, buffer):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffunc.mul),
+                                                    asm.Literal(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -250,12 +251,12 @@ def test_malloc_resize(compiler, new_size):
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("b_", ab.ftype)
-    size = asm.Variable("size", np.intp)
+    size = asm.Variable("size", finchlite.intp)
 
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("length", np.intp),
+                asm.Variable("length", finchlite.intp),
                 (ab_v,),
                 asm.Block(
                     (
@@ -293,8 +294,8 @@ def test_dot_product(compiler, buffer):
     ab = buffer(a)
     bb = buffer(b)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -302,7 +303,7 @@ def test_dot_product(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -321,11 +322,11 @@ def test_dot_product(compiler, buffer):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.L(ffunc.add),
+                                            asm.L(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.L(ffunc.mul),
+                                                    asm.L(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -367,8 +368,8 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = buffer(len(a), np.float64, a)
     bb = buffer(len(b), np.float64, b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -378,7 +379,7 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -397,11 +398,11 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffunc.mul),
+                                                    asm.Literal(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -436,8 +437,8 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = buffer(a)
     bb = buffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -447,7 +448,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -466,11 +467,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffunc.mul),
+                                                    asm.Literal(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -503,18 +504,18 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     ],
 )
 def test_if_statement(compiler):
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(ffunc.eq),
+                                asm.Literal(ffuncs.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -522,7 +523,7 @@ def test_if_statement(compiler):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -531,7 +532,7 @@ def test_if_statement(compiler):
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(ffunc.lt),
+                                asm.Literal(ffuncs.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -539,7 +540,7 @@ def test_if_statement(compiler):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.sub),
+                                            asm.Literal(ffuncs.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -550,7 +551,7 @@ def test_if_statement(compiler):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -589,19 +590,19 @@ def test_simple_struct(compiler):
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", finchlite.float64)
     mod = compiler(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", finchlite.float64),
                     (p_var, x_var),
                     asm.Block(
                         (
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(ffunc.mul),
+                                    asm.Literal(ffuncs.mul),
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
                                         asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -611,11 +612,11 @@ def test_simple_struct(compiler):
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(ffunc.add),
+                                    asm.Literal(ffuncs.add),
                                     (
                                         res_var,
                                         asm.Call(
-                                            asm.Literal(ffunc.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
                                                 asm.GetAttr(
@@ -925,10 +926,12 @@ def test_np_numba_serialization(value, np_type):
         lambda dtype: BufferizedNDArrayFType(
             buffer_type=NumpyBufferFType(dtype),
             ndim=2,
-            dimension_type=(np.intp, np.intp),
+            dimension_type=(ftypes.intp, ftypes.intp),
         ),
         lambda dtype: fiber_tensor(
-            dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
         ),
     ],
 )
@@ -978,8 +981,8 @@ def test_e2e_numba(fmt_fn, dtype):
 )
 def test_hashtable(compiler, constructor):
     table = constructor(
-        asm.TupleFType.from_tuple((int, int)),
-        asm.TupleFType.from_tuple((int, int, int)),
+        TupleFType.from_tuple((ftypes.int_, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.int_, ftypes.int_, ftypes.int_)),
     )
 
     table_v = asm.Variable("a", ftype(table))
@@ -1009,7 +1012,7 @@ def test_hashtable(compiler, constructor):
                 ),
             ),
             asm.Function(
-                asm.Variable("exists", bool),
+                asm.Variable("exists", ftypes.bool),
                 (table_v, key_v),
                 asm.Block(
                     (
@@ -1059,7 +1062,7 @@ def test_multiple_hashtable(compiler, tabletype):
     """
 
     def _int_tupletype(arity):
-        return asm.TupleFType.from_tuple(tuple(int for _ in range(arity)))
+        return TupleFType.from_tuple(tuple(ftypes.int_ for _ in range(arity)))
 
     def func(table, num: int):
         key_type = table.ftype.key_type
@@ -1088,15 +1091,16 @@ def test_multiple_hashtable(compiler, tabletype):
     table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
     table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
     table3 = tabletype(
-        asm.TupleFType.from_tuple((float, int)),
-        asm.TupleFType.from_tuple((float, float)),
+        TupleFType.from_tuple((ftypes.float_, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
     )
     table4 = tabletype(
-        asm.TupleFType.from_tuple((float, asm.TupleFType.from_tuple((int, float)))),
-        asm.TupleFType.from_tuple((float, float)),
+        TupleFType.from_tuple(
+            (ftypes.float_, TupleFType.from_tuple((ftypes.int_, ftypes.float_)))
+        ),
+        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
     )
-    nestedtype = asm.TupleFType.from_tuple((int, float))
-    table5 = tabletype(int, int)
+    table5 = tabletype(ftypes.int_, ftypes.int_)
 
     mod = compiler(
         asm.Module(
@@ -1114,29 +1118,29 @@ def test_multiple_hashtable(compiler, tabletype):
     # setidx_2 on table2.
     assert mod.setidx_1(
         table1,
-        table1.key_type.from_fields(1, 2),
-        table1.value_type.from_fields(2, 3, 4),
-    ) == table1.value_type.from_fields(2, 3, 4)
+        (1, 2),
+        (2, 3, 4),
+    ) == (2, 3, 4)
 
     assert mod.setidx_2(
         table2,
-        table2.key_type.from_fields(1),
-        table2.value_type.from_fields(2, 3, 4, 5),
-    ) == table2.value_type.from_fields(2, 3, 4, 5)
+        (1,),
+        (2, 3, 4, 5),
+    ) == (2, 3, 4, 5)
 
     assert mod.setidx_3(
         table3,
-        table3.key_type.from_fields(0.1, 2),
-        table3.value_type.from_fields(0.2, 0.2),
-    ) == table3.value_type.from_fields(0.2, 0.2)
+        (0.1, 2),
+        (0.2, 0.2),
+    ) == (0.2, 0.2)
 
     assert mod.setidx_4(
         table4,
-        table4.key_type.from_fields(
+        (
             0.1,
-            nestedtype.from_fields(1, 0.2),
+            (1, 0.2),
         ),
-        table4.value_type.from_fields(0.2, 0.2),
-    ) == table4.value_type.from_fields(0.2, 0.2)
+        (0.2, 0.2),
+    ) == (0.2, 0.2)
 
     assert mod.setidx_5(table5, 3, 2) == 2
