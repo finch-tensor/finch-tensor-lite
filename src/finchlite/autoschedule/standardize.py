@@ -68,14 +68,14 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
 def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
     def rule_1(stmt):
         match stmt:
-            case MapJoin(Literal(op), args) if is_associative(op):
+            case MapJoin(op, args) if is_associative(op.val):
                 new_args = []
                 for arg in args:
-                    if isinstance(arg, MapJoin) and arg.op.val == op:
+                    if isinstance(arg, MapJoin) and arg.op == op:
                         new_args.extend(arg.args)
                     else:
                         new_args.append(arg)
-                return MapJoin(Literal(op), tuple(new_args))
+                return MapJoin(op, tuple(new_args))
 
     root = Rewrite(PostWalk(rule_1))(root)
 
@@ -89,8 +89,8 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
     def rule_3(stmt):
         match stmt:
             case Query(lhs, Reorder(MapJoin(op, args), reorder_idxs)) if is_commutative(
-                op
-            ) and is_associative(op):
+                op.val
+            ) and is_associative(op.val):
                 matches = [arg for arg in args if lhs in PostOrderDFS(arg)]
 
                 if len(matches) == 1:
