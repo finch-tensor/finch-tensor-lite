@@ -110,16 +110,29 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
                         and match_arg.idxs == reorder_idxs
                     ):
                         others = tuple(arg for arg in args if arg is not match_arg)
-                        rhs_2 = others[0] if len(others) == 1 else MapJoin(op, others)
-                        if isinstance(rhs_2, MapJoin):
-                            rhs_2 = Reorder(rhs_2, rhs_2.fields())
                         return Query(
-                            lhs, Reorder(MapJoin(op, (match_arg, rhs_2)), reorder_idxs)
+                            lhs,
+                            Reorder(MapJoin(op, (match_arg, *others)), reorder_idxs),
                         )
 
                 return None
 
-    return Rewrite(PostWalk(rule_3))(root)
+    root = Rewrite(PostWalk(rule_3))(root)
+
+    def rule_4(stmt):
+        match stmt:
+            case Reorder(MapJoin(op, args), idxs) if len(args) > 2 and is_associative(
+                op.val
+            ):
+                rhs = MapJoin(op, args[1:])
+                order_map = {val: i for i, val in enumerate(idxs)}
+                rhs_reorder_idxs = list(rhs.fields())
+                rhs_reorder_idxs.sort(key=lambda x: order_map[x])
+                return Reorder(
+                    MapJoin(op, (args[0], Reorder(rhs, rhs_reorder_idxs))), idxs
+                )
+
+    return Rewrite(PreWalk(rule_4))(root)
 
 
 def split_increments(root: LogicStatement) -> LogicStatement:
