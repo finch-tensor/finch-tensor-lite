@@ -154,10 +154,6 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 lhs, op, idxs, args
             ):
                 return ex
-            case Query(lhs, MapJoin(op, args) as rhs) if is_inplace_expr(
-                lhs, op, rhs.fields(), args
-            ):
-                return Query(lhs, Reorder(rhs, rhs.fields()))
             case Query(lhs, rhs):
                 return Query(
                     lhs,
