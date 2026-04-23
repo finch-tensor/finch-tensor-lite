@@ -19,8 +19,8 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
     def __init__(
         self,
         stats_factory: StatsFactory[NumericStats],
-        block_count : int = 5,
-        block_width : int = 2,
+        block_count: int = 5,
+        block_width: int = 2,
     ):
         self.block_count = block_count
         self.block_width = block_width
@@ -30,7 +30,10 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         return BlockedStats.from_tensor(
             tensor,
             fields,
-            blocks_per_dim= {f : int(min(self.block_count, n/self.block_width)) for f,n in zip(fields, tensor.shape)},
+            blocks_per_dim={
+                f: int(min(self.block_count, n / self.block_width))
+                for f, n in zip(fields, tensor.shape, strict=True)
+            },
             stats_factory=self.inner_factory,
         )
 
@@ -268,14 +271,13 @@ class BlockedStats(NumericStats):
 
     def estimate_non_fill_values(self):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
-    
-    def get_embedding(self) -> np.ndarray: 
+
+    def get_embedding(self) -> np.ndarray:
         total_elements = math.prod(self.tensordef.dim_sizes.values())
         num_blocks = self.blocks.size
         block_volume = total_elements / num_blocks
-        densities = [b.estimate_non_fill_values() / block_volume for b in self.blocks.flat]
+        densities = [
+            b.estimate_non_fill_values() / block_volume for b in self.blocks.flat
+        ]
         density_array = np.array(densities)
         return np.log2(density_array + 1)
-    
-
-    

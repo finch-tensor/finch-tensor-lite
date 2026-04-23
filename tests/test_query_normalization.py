@@ -1,4 +1,4 @@
-from finchlite import ffunc
+from finchlite import ffuncs
 from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
     merge_queries,
     preprocess_plan_for_galley,
@@ -77,7 +77,7 @@ def test_normalize_reorders_produces_single_outer_reorder():
 
     A_lit = Literal("A")
     inner = Reorder(Table(A_lit, (i, j)), (j, i))
-    agg = Aggregate(Literal(ffunc.add), Literal(0), inner, (i,))
+    agg = Aggregate(Literal(ffuncs.add), Literal(0), inner, (i,))
     original_rhs = Reorder(agg, (j,))
     q = Query(Alias("out"), original_rhs)
     plan = Plan((q, Produces((Alias("out"),))))
@@ -116,13 +116,13 @@ def test_preprocess_plan_for_galley_produces_canonical_queries():
     B_lit = Literal("B")
 
     mj = MapJoin(
-        Literal(ffunc.mul),
+        Literal(ffuncs.mul),
         (
             Table(A_lit, (i, j)),
             Table(B_lit, (j, k)),
         ),
     )
-    agg = Aggregate(Literal(ffunc.add), Literal(0), mj, (j,))
+    agg = Aggregate(Literal(ffuncs.add), Literal(0), mj, (j,))
     q1 = Query(Alias("A1"), agg)
     q2 = Query(Alias("A2"), Reorder(Table(Alias("A1"), (i, k)), (i, k)))
     plan = Plan((q1, q2, Produces((Alias("A2"),))))
@@ -275,7 +275,7 @@ def test_normalize_reorders_aggregate_with_reorder_needs_outer():
     j = Field("j")
     A_lit = Literal("A")
 
-    agg = Aggregate(Literal(ffunc.add), Literal(0), Table(A_lit, (i, j)), (j,))
+    agg = Aggregate(Literal(ffuncs.add), Literal(0), Table(A_lit, (i, j)), (j,))
     original_rhs = Reorder(agg, (i,))
     q = Query(Alias("out"), original_rhs)
     plan = Plan((q, Produces((Alias("out"),))))
@@ -305,10 +305,10 @@ def test_preprocess_plan_chain_with_reorder_and_aggregate():
     B_lit = Literal("B")
 
     mj = MapJoin(
-        Literal(ffunc.mul),
+        Literal(ffuncs.mul),
         (Table(A_lit, (i, j)), Table(B_lit, (j, k))),
     )
-    agg = Aggregate(Literal(ffunc.add), Literal(0), mj, (j,))
+    agg = Aggregate(Literal(ffuncs.add), Literal(0), mj, (j,))
     q1 = Query(Alias("A1"), agg)
     q2 = Query(Alias("A2"), Reorder(Table(Alias("A1"), (i, k)), (k, i)))
     plan = Plan((q1, q2, Produces((Alias("A2"),))))
@@ -376,17 +376,17 @@ def test_preprocess_plan_A_at_B_at_C():
 
     # A @ B: (i, j) @ (j, k) -> (i, k)
     ab = MapJoin(
-        Literal(ffunc.mul),
+        Literal(ffuncs.mul),
         (Table(A_lit, (i, j)), Table(B_lit, (j, k))),
     )
-    q1 = Query(Alias("A1"), Aggregate(Literal(ffunc.add), Literal(0), ab, (j,)))
+    q1 = Query(Alias("A1"), Aggregate(Literal(ffuncs.add), Literal(0), ab, (j,)))
 
     # (A @ B) @ C: (i, k) @ (k, l) -> (i, l)
     abc = MapJoin(
-        Literal(ffunc.mul),
+        Literal(ffuncs.mul),
         (Table(Alias("A1"), (i, k)), Table(C_lit, (k, l_))),
     )
-    q2 = Query(Alias("A2"), Aggregate(Literal(ffunc.add), Literal(0), abc, (k,)))
+    q2 = Query(Alias("A2"), Aggregate(Literal(ffuncs.add), Literal(0), abc, (k,)))
     plan = Plan((q1, q2, Produces((Alias("A2"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
@@ -435,7 +435,7 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     q1 = Query(Alias("A"), Table(X_lit, (i, i_2)))
     q2 = Query(Alias("A_2"), Table(Y_lit, (i_3, i_4)))
     a3_rhs = MapJoin(
-        Literal(ffunc.mul),
+        Literal(ffuncs.mul),
         (
             Table(Alias("A"), (i_11, i_12)),
             Table(Alias("A_2"), (i_12, i_13)),
@@ -445,7 +445,7 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     q4 = Query(
         Alias("A_4"),
         Aggregate(
-            Literal(ffunc.add),
+            Literal(ffuncs.add),
             Literal(0),
             Table(Alias("A_3"), (i_16, i_17, i_18)),
             (i_17,),
@@ -518,10 +518,10 @@ def test_merge_queries_same_alias_inlined_twice_unique_internal_fields():
     a_rhs = Table(X_lit, (i, j))
     q_a = Query(Alias("A"), a_rhs)
     b_rhs = Aggregate(
-        Literal(ffunc.add),
+        Literal(ffuncs.add),
         Literal(0),
         MapJoin(
-            Literal(ffunc.mul),
+            Literal(ffuncs.mul),
             (Table(Alias("A"), (i, k)), Table(Alias("A"), (k, j))),
         ),
         (k,),
@@ -529,10 +529,10 @@ def test_merge_queries_same_alias_inlined_twice_unique_internal_fields():
     q_b = Query(Alias("B"), b_rhs)
     # C = B @ B: (i,m) @ (m,j) -> (i,j), contracts over m
     c_rhs = Aggregate(
-        Literal(ffunc.add),
+        Literal(ffuncs.add),
         Literal(0),
         MapJoin(
-            Literal(ffunc.mul),
+            Literal(ffuncs.mul),
             (Table(Alias("B"), (i, m)), Table(Alias("B"), (m, j))),
         ),
         (m,),

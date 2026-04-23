@@ -149,14 +149,13 @@ class UniformStats(NumericStats):
 
     def estimate_non_fill_values(self) -> float:
         return self.nnz
-    
+
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
         volume = self._get_volume(self.tensordef)
-        
+
         prob = self.nnz / volume if volume > 0 else 0.0
-        
+
         vector = sizes + [prob]
 
-        
         return np.log2(vector)

@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from ....algebra import (
     cansplitpush,
-    ffunc,
+    ffuncs,
     is_associative,
     is_commutative,
     is_distributive,
@@ -45,7 +45,7 @@ class AnnotatedQuery:
     stats_factory: StatsFactory
     output_name: Alias
     reduce_idxs: list[Field]
-    point_expr: LogicNode
+    point_expr: LogicExpression
     idx_lowest_root: OrderedDict[Field, LogicExpression]
     idx_op: OrderedDict[Field, Any]
     idx_init: OrderedDict[Field, Any]
@@ -95,12 +95,12 @@ class AnnotatedQuery:
         self.cache = cache
         output_name = q.lhs
         expr = q.rhs
-        output_order: list[Field] = []
+        output_order: None | list[Field] = []
         if isinstance(expr, Reorder):
             output_order = list(expr.idxs)
             expr = expr.arg
         else:
-            output_order = list(q.rhs.fields())
+            output_order = None
         starting_reduce_idxs: list[Field] = []
         idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
@@ -118,7 +118,7 @@ class AnnotatedQuery:
                         top_counter += 1
 
                         if op.val is None:
-                            idx_op[idx] = ffunc.init_write(cache[arg].fill_value)
+                            idx_op[idx] = ffuncs.init_write(cache[arg].fill_value)
                             idx_init[idx] = cache[arg].fill_value
                         else:
                             idx_op[idx] = op.val
@@ -262,6 +262,9 @@ class AnnotatedQuery:
         new.output_order = (
             None if self.output_order is None else list(self.output_order)
         )
+        new.bindings = OrderedDict(self.bindings.items())
+        new.cache = OrderedDict(self.cache.items())
+        new.cache_point = OrderedDict(self.cache_point.items())
 
         return new
 
@@ -752,36 +755,22 @@ class AnnotatedQuery:
         self.connected_components = new_components
         return query
 
-    def get_remaining_query(self) -> Query | None:
+    def get_remaining_query(self) -> Query:
         """
         Build a final `Query` from the remaining pointwise expression in `aq`.
 
-        Returns
-        -------
-        Query | None
-            The constructed final `Query`, or `None` if no expression remains.
+        Always returns a `Query` binding ``self.output_name``. When the
+        remaining expression is just a passthrough alias reference
+        (``Table(Alias, idxs)``), wraps it in a `Reorder` to the recorded
+        ``output_order`` so the result is a no-op alias rebinding the
+        downstream compiler can lower directly.
         """
         expr = self.point_expr
-        insert_statistics(
-            self.stats_factory,
-            expr,
-            bindings=self.bindings,
-            replace=True,
-            cache=self.cache_point,
-        )
-        match expr:
-            case Table(Alias(_), _):
-                return None
-        query = Query(self.output_name, cast(LogicExpression, expr))
-        remaining_cache: dict[object, TensorStats] = {}
-        insert_statistics(
-            self.stats_factory,
-            query.rhs,
-            bindings=self.bindings,
-            replace=True,
-            cache=remaining_cache,
-        )
-        return query
+        if self.output_order is not None:
+            expr = Reorder(
+                cast(LogicExpression, expr), tuple(self.output_order or expr.fields())
+            )
+        return Query(self.output_name, expr)
 
     def get_cost_of_reduce_idx(self, reduce_idx: Field) -> float:
         """

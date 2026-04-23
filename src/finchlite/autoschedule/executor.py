@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from typing import Any
 
-from finchlite.algebra.tensor import Tensor
+from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
@@ -12,7 +12,7 @@ from ..finch_logic import (
     LogicNode,
     StatsFactory,
 )
-from ..symbolic import Namespace, PostWalk, Rewrite, ftype
+from ..symbolic import Namespace, PostWalk, Rewrite
 from .formatter import DefaultLogicFormatter
 
 
@@ -54,7 +54,7 @@ class LogicExecutor(LogicEvaluator):
         self,
         ctx: LogicLoader | None = None,
         stats_factory: StatsFactory | None = None,
-        cache : bool = False,
+        cache: bool = False,
     ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
@@ -63,7 +63,7 @@ class LogicExecutor(LogicEvaluator):
         self.ctx: LogicLoader = ctx
         self.stats_factory = stats_factory
         self.cache = cache
-        self.stats_cache : dict[tuple[Any,Any], OrderedDict] = {}
+        self.stats_cache: dict[tuple[Any, Any], OrderedDict] = {}
 
     def __call__(
         self,
@@ -85,19 +85,23 @@ class LogicExecutor(LogicEvaluator):
             stmt = lgc.Plan((stmt,))
 
         stmt, bindings = extract_tensors(stmt, bindings)
-        binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
-        exec_cache_key = (stmt,tuple(binding_ftypes.items()))
 
-        if self.cache and exec_cache_key in self.stats_cache :
+        binding_ftypes: dict[lgc.Alias, TensorFType] = {
+            var: val.ftype for var, val in bindings.items()
+        }
+        exec_cache_key = (stmt, tuple(binding_ftypes.items()))
+        stats_bindings = OrderedDict()
+
+        if self.cache and exec_cache_key in self.stats_cache:
             stats_bindings = self.stats_cache[exec_cache_key]
 
-        else : 
+        else:
             stats_bindings = OrderedDict()
             for var, T in bindings.items():
                 shape = T.shape
                 fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
                 stats_bindings[var] = self.stats_factory(T, fields)
-            
+
             if self.cache:
                 self.stats_cache[exec_cache_key] = stats_bindings
 
@@ -119,7 +123,7 @@ class LogicExecutor(LogicEvaluator):
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
-                bindings[var] = tns_ftype(shape)
+                bindings[var] = tns_ftype.construct(shape)
 
         args = list(bindings.values())
 

@@ -7,7 +7,7 @@ from numpy import array  # noqa: F401
 
 import finchlite as fl
 import finchlite.finch_logic as lgc
-from finchlite.algebra import ffunc
+from finchlite.algebra import ffuncs
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -50,7 +50,7 @@ def test_matrix_multiplication(a, b):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -58,7 +58,7 @@ def test_matrix_multiplication(a, b):
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Alias("AB"), (i, k, j)),
                         (k,),
@@ -89,7 +89,7 @@ def test_plan_repr():
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -97,7 +97,7 @@ def test_plan_repr():
                 Alias("C"),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Alias("AB"), (i, k, j)),
                         (k,),
@@ -109,7 +109,7 @@ def test_plan_repr():
         )
     )
 
-    assert p == eval(repr(p), {**vars(lgc), **vars(ffunc), **globals()})
+    assert p == eval(repr(p), {**vars(lgc), **vars(ffuncs), **globals()})
 
 
 def test_materialize():
@@ -131,14 +131,14 @@ def test_materialize():
             Query(
                 Alias("C"),
                 MapJoin(
-                    Literal(ffunc.add),
+                    Literal(ffuncs.add),
                     (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j))),
                 ),
             ),
             Query(
                 Alias("D"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j))),
                 ),
             ),

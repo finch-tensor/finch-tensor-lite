@@ -1,5 +1,6 @@
 import numpy as np
 
+import finchlite
 from finchlite import (
     NumpyBufferFType,
     asarray,
@@ -22,16 +23,16 @@ def test_fiber_tensor_attributes():
     assert a.ndim == 2
 
     # Check shape_type
-    assert a.shape_type == (np.intp, np.intp)
+    assert a.shape_type == (finchlite.intp, finchlite.intp)
 
     # Check element_type
-    assert a.element_type == np.float64
+    assert a.element_type == finchlite.float64
 
     # Check fill_value
     assert a.fill_value == 0
 
     # Check position_type
-    assert a.position_type == np.intp
+    assert a.position_type == finchlite.intp
 
     # Check buffer_format exists
     assert a.buffer_factory == NumpyBufferFType
@@ -39,7 +40,11 @@ def test_fiber_tensor_attributes():
 
 def test_fiber_tensor():
     fmt = fiber_tensor(
-        dense(dense(element(np.int64(0), np.int64, np.intp, NumpyBufferFType)))
+        dense(
+            dense(
+                element(np.int64(0), finchlite.int64, finchlite.intp, NumpyBufferFType)
+            )
+        )
     )
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)

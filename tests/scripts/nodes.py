@@ -1,64 +1,69 @@
 import numpy as np
 
+import finchlite
 import finchlite.finch_assembly as asm
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
-from finchlite import ffunc
+from finchlite import ffuncs
 from finchlite.codegen.numpy_buffer import NumpyBuffer
-from finchlite.compile import dimension
 
 
 def create_ntn_simple_node():
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
-    A = ntn.Variable("A", np.ndarray)
-    B = ntn.Variable("B", np.ndarray)
-    C = ntn.Variable("C", np.ndarray)
-    A_ = ntn.Slot("A_", np.ndarray)
-    B_ = ntn.Slot("B_", np.ndarray)
-    C_ = ntn.Slot("C_", np.ndarray)
+    T = finchlite.ftype(finchlite.asarray(np.zeros((1, 1))))
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    A = ntn.Variable("A", T)
+    B = ntn.Variable("B", T)
+    C = ntn.Variable("C", T)
+    A_ = ntn.Slot("A_", T)
+    B_ = ntn.Slot("B_", T)
+    C_ = ntn.Slot("C_", T)
 
-    m = ntn.Variable("m", np.int64)
-    n = ntn.Variable("n", np.int64)
-    p = ntn.Variable("p", np.int64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
+
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
 
     return ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", np.ndarray),
+                ntn.Variable("matmul", T),
                 (C, A, B),
                 ntn.Block(
                     (
-                        ntn.Assign(
-                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
-                        ),
-                        ntn.Assign(
-                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
-                        ),
-                        ntn.Assign(
-                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
-                        ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(ffunc.add), (m, n)
+                            C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
-                            m,
+                            ntn.Call(
+                                ntn.Literal(finchlite.compile.make_extent),
+                                (ntn.Literal(finchlite.int64(0)), m),
+                            ),
                             ntn.Loop(
-                                j,
-                                n,
+                                k,
+                                ntn.Call(
+                                    ntn.Literal(finchlite.compile.make_extent),
+                                    (ntn.Literal(finchlite.int64(0)), p),
+                                ),
                                 ntn.Loop(
-                                    k,
-                                    p,
+                                    j,
+                                    ntn.Call(
+                                        ntn.Literal(finchlite.compile.make_extent),
+                                        (ntn.Literal(finchlite.int64(0)), n),
+                                    ),
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -76,14 +81,14 @@ def create_ntn_simple_node():
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(ffunc.mul),
+                                                    ntn.Literal(ffuncs.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(ntn.Literal(ffunc.add)),
+                                                    ntn.Update(ntn.Literal(ffuncs.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -93,11 +98,8 @@ def create_ntn_simple_node():
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(ffunc.add)),
-                        ntn.Repack(
-                            val=C_,
-                            obj=C,
-                        ),
+                        ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
+                        ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
                 ),
@@ -119,19 +121,19 @@ def create_log_simple_node():
             log.Query(log.Alias("B"), log.Table(log.Literal(b), (k, j))),
             log.Query(
                 log.Alias("AB"),
-                log.MapJoin(log.Literal(ffunc.mul), (log.Alias("A"), log.Alias("B"))),
+                log.MapJoin(log.Literal(ffuncs.mul), (log.Alias("A"), log.Alias("B"))),
             ),
             # matmul
             log.Query(
                 log.Alias("C"),
                 log.Aggregate(
-                    log.Literal(ffunc.add), log.Literal(0), log.Alias("AB"), (k,)
+                    log.Literal(ffuncs.add), log.Literal(0), log.Alias("AB"), (k,)
                 ),
             ),
             # elemwise
             log.Query(
                 log.Alias("RES"),
-                log.MapJoin(log.Literal(ffunc.mul), (log.Alias("C"), log.Alias("S"))),
+                log.MapJoin(log.Literal(ffuncs.mul), (log.Alias("C"), log.Alias("S"))),
             ),
             log.Produces((log.Alias("RES"),)),
         )
@@ -139,18 +141,18 @@ def create_log_simple_node():
 
 
 def create_asm_if_node():
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(ffunc.eq),
+                                asm.Literal(ffuncs.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -158,7 +160,7 @@ def create_asm_if_node():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -167,7 +169,7 @@ def create_asm_if_node():
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(ffunc.lt),
+                                asm.Literal(ffuncs.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -175,7 +177,7 @@ def create_asm_if_node():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.sub),
+                                            asm.Literal(ffuncs.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -186,7 +188,7 @@ def create_asm_if_node():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(ffunc.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -202,8 +204,8 @@ def create_asm_if_node():
 
 
 def create_asm_dot_node():
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = NumpyBuffer(np.array([1, 2, 3], dtype=np.float64))
     bb = NumpyBuffer(np.array([4, 5, 6], dtype=np.float64))
     ab_v = asm.Variable("a", ab.ftype)
@@ -214,7 +216,7 @@ def create_asm_dot_node():
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -233,11 +235,11 @@ def create_asm_dot_node():
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffunc.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffunc.mul),
+                                                    asm.Literal(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -260,26 +262,26 @@ def create_asm_dot_node():
 
 
 def create_asm_comprehensive_node():
-    a = asm.Variable("a", np.int64)
-    b = asm.Variable("b", np.int64)
-    c = asm.Variable("c", np.int64)
-    d = asm.Variable("d", np.int64)
-    result = asm.Variable("result", np.int64)
-    i = asm.Variable("i", np.int64)
-    j = asm.Variable("j", np.int64)
-    temp = asm.Variable("temp", np.int64)
+    a = asm.Variable("a", finchlite.int64)
+    b = asm.Variable("b", finchlite.int64)
+    c = asm.Variable("c", finchlite.int64)
+    d = asm.Variable("d", finchlite.int64)
+    result = asm.Variable("result", finchlite.int64)
+    i = asm.Variable("i", finchlite.int64)
+    j = asm.Variable("j", finchlite.int64)
+    temp = asm.Variable("temp", finchlite.int64)
 
     helper_func = asm.Function(
-        asm.Variable("compute", np.int64),
-        (asm.Variable("x", np.int64), asm.Variable("y", np.int64)),
+        asm.Variable("compute", finchlite.int64),
+        (asm.Variable("x", finchlite.int64), asm.Variable("y", finchlite.int64)),
         asm.Block(
             (
-                asm.Assign(temp, asm.Variable("x", np.int64)),
+                asm.Assign(temp, asm.Variable("x", finchlite.int64)),
                 asm.Assign(
                     temp,
                     asm.Call(
-                        asm.Literal(ffunc.add),
-                        (temp, asm.Variable("y", np.int64)),
+                        asm.Literal(ffuncs.add),
+                        (temp, asm.Variable("y", finchlite.int64)),
                     ),
                 ),
                 asm.Return(temp),
@@ -288,7 +290,7 @@ def create_asm_comprehensive_node():
     )
 
     main_func = asm.Function(
-        asm.Variable("main", np.int64),
+        asm.Variable("main", finchlite.int64),
         (),
         asm.Block(
             (
@@ -298,7 +300,7 @@ def create_asm_comprehensive_node():
                 asm.Assign(d, asm.Literal(np.int64(5))),
                 asm.If(
                     asm.Call(
-                        asm.Literal(ffunc.gt),
+                        asm.Literal(ffuncs.gt),
                         (c, asm.Literal(np.int64(5))),
                     ),
                     asm.Block(
@@ -306,7 +308,7 @@ def create_asm_comprehensive_node():
                             asm.Assign(
                                 a,
                                 asm.Call(
-                                    asm.Literal(ffunc.add),
+                                    asm.Literal(ffuncs.add),
                                     (a, d),
                                 ),
                             ),
@@ -325,16 +327,16 @@ def create_asm_comprehensive_node():
                             asm.Assign(
                                 result,
                                 asm.Call(
-                                    asm.Literal(ffunc.add),
+                                    asm.Literal(ffuncs.add),
                                     (result, temp),
                                 ),
                             ),
                             asm.If(
                                 asm.Call(
-                                    asm.Literal(ffunc.eq),
+                                    asm.Literal(ffuncs.eq),
                                     (
                                         asm.Call(
-                                            asm.Literal(ffunc.mod),
+                                            asm.Literal(ffuncs.mod),
                                             (i, asm.Literal(np.int64(2))),
                                         ),
                                         asm.Literal(np.int64(0)),
@@ -345,7 +347,7 @@ def create_asm_comprehensive_node():
                                         asm.Assign(
                                             result,
                                             asm.Call(
-                                                asm.Literal(ffunc.mul),
+                                                asm.Literal(ffuncs.mul),
                                                 (result, asm.Literal(np.int64(2))),
                                             ),
                                         ),
@@ -357,7 +359,7 @@ def create_asm_comprehensive_node():
                 ),
                 asm.IfElse(
                     asm.Call(
-                        asm.Literal(ffunc.gt),
+                        asm.Literal(ffuncs.gt),
                         (result, asm.Literal(np.int64(20))),
                     ),
                     asm.Block(
@@ -366,7 +368,7 @@ def create_asm_comprehensive_node():
                             asm.Assign(
                                 result,
                                 asm.Call(
-                                    asm.Literal(ffunc.add),
+                                    asm.Literal(ffuncs.add),
                                     (c, b),
                                 ),
                             ),
@@ -378,7 +380,7 @@ def create_asm_comprehensive_node():
                             asm.Assign(
                                 result,
                                 asm.Call(
-                                    asm.Literal(ffunc.mul),
+                                    asm.Literal(ffuncs.mul),
                                     (c, asm.Literal(np.int64(3))),
                                 ),
                             ),
@@ -402,11 +404,11 @@ def create_asm_comprehensive_node():
                                         asm.Assign(
                                             result,
                                             asm.Call(
-                                                asm.Literal(ffunc.add),
+                                                asm.Literal(ffuncs.add),
                                                 (
                                                     result,
                                                     asm.Call(
-                                                        asm.Literal(ffunc.add),
+                                                        asm.Literal(ffuncs.add),
                                                         (a, b),
                                                     ),
                                                 ),
@@ -421,7 +423,7 @@ def create_asm_comprehensive_node():
                 asm.Assign(d, result),
                 asm.IfElse(
                     asm.Call(
-                        asm.Literal(ffunc.lt),
+                        asm.Literal(ffuncs.lt),
                         (d, asm.Literal(np.int64(100))),
                     ),
                     asm.Block(
@@ -429,7 +431,7 @@ def create_asm_comprehensive_node():
                             asm.Assign(c, d),
                             asm.IfElse(
                                 asm.Call(
-                                    asm.Literal(ffunc.gt),
+                                    asm.Literal(ffuncs.gt),
                                     (c, asm.Literal(np.int64(50))),
                                 ),
                                 asm.Block(
@@ -437,7 +439,7 @@ def create_asm_comprehensive_node():
                                         asm.Assign(
                                             result,
                                             asm.Call(
-                                                asm.Literal(ffunc.mul),
+                                                asm.Literal(ffuncs.mul),
                                                 (c, asm.Literal(np.int64(2))),
                                             ),
                                         ),

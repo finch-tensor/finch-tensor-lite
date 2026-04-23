@@ -1,15 +1,12 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import reduce
+from functools import partial, reduce
 from typing import Any
-
-import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import ffunc
-from ..compile.extents import intersect_extents
+from ..algebra import ffuncs
 from ..compile.lower import (
     LoopletContext,
     LoopletPass,
@@ -95,7 +92,7 @@ class SwitchPass(LoopletPass):
         ctx_2 = ctx.scope()
         ctx_2(ext, body_if)
 
-        cond = reduce(lambda x, y: asm.Call(asm.L(ffunc.and_), (x, y)), conditions)
+        cond = reduce(lambda x, y: asm.Call(asm.L(ffuncs.and_), (x, y)), conditions)
 
         body_else = PostWalk(switch_node_else)(body)
         ctx_3 = ctx.scope()
@@ -131,56 +128,6 @@ class StepperPass(LoopletPass):
     def priority(self):
         return 3
 
-    def combine_with(self, other):
-        if isinstance(other, StepperPass):
-            return StepperPass(self.count + other.count)
-        return max(self, other)
-
-    def stepper_range(
-        self,
-        ctx: LoopletContext,
-        node: Stepper,
-        ext: SymbolicExtent,
-        idx_start: ntn.Variable,
-    ) -> SymbolicExtent:
-        if (preamble := node.preamble) is not None:
-            ctx.exec(preamble(ctx))
-        return SymbolicExtent(idx_start, node.stop(ctx))
-
-    def stepper_body(
-        self,
-        ctx: LoopletContext,
-        node: Stepper,
-        total_ext: SymbolicExtent,
-        chunk_ext: SymbolicExtent,
-    ):
-        next = node.next(ctx)
-        assert isinstance(node.chunk, Sequence)
-        full_chunk = Thunk(
-            body=lambda ctx, ext: node.chunk,
-            epilogue=lambda ctx, ext: next,
-        )
-        truncated_chunk = node.chunk.truncate(
-            ctx,
-            total_ext,
-            chunk_ext.bound_above(
-                ntn.Call(ntn.L(ffunc.sub), (total_ext.get_end(), total_ext.get_unit()))
-            ),
-        )
-
-        if prove(ntn.Call(ntn.L(ffunc.le), (node.stop(ctx), chunk_ext.get_end()))):
-            return full_chunk
-        if prove(ntn.Call(ntn.L(ffunc.ge), (node.stop(ctx), chunk_ext.get_end()))):
-            return truncated_chunk
-        return Switch(
-            asm.Call(
-                asm.L(ffunc.eq),
-                (ctx.ctx(node.stop(ctx)), ctx.ctx(chunk_ext.get_end())),
-            ),
-            full_chunk,
-            truncated_chunk,
-        )
-
     def __call__(
         self,
         ctx: LoopletContext,
@@ -189,17 +136,14 @@ class StepperPass(LoopletPass):
         body,
     ) -> None:
 
-        def stepper_body(ctx, node: ntn.NotationNode, total_ext, chunk_ext):
+        def stepper_body(ctx, node: ntn.NotationNode):
             match node:
                 case ntn.Access(Stepper() as st, mode, (j, *idxs)) if j == idx:
                     return ntn.Access(
-                        self.stepper_body(ctx, st, total_ext, chunk_ext),
+                        st.chunk,  # type: ignore[arg-type]
                         mode,
                         (j, *idxs),
                     )
-
-        # total remaining extent
-        ext_1 = ext.bound_below(ext.get_unit())
 
         steppers: list[Stepper] = []
 
@@ -209,70 +153,59 @@ class StepperPass(LoopletPass):
                     ctx.exec(st.seek(ctx, ext))
                     steppers.append(st)
 
-        ctx_2 = ctx.scope()
+        full_body = Rewrite(PostWalk(lambda node: stepper_body(ctx, node)))(body)
 
-        idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_format)
+        final_cond = asm.Call(
+            asm.L(ffuncs.lt),
+            (
+                asm.Call(
+                    asm.L(ffuncs.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
+                ),
+                ctx.ctx(ext.get_end()),
+            ),
+        )
+
+        stepper_blocks = []
+
+        idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_type)
         ctx.exec(asm.Assign(ctx.ctx(idx_start), ctx.ctx(ext.get_start())))
 
-        # intersection of all steppers - chunk extent
-        ext_2 = reduce(
-            lambda x, y: intersect_extents(x, y),
-            [self.stepper_range(ctx_2, st, ext_1, idx_start) for st in steppers],
-        )
-
-        ctx_full_body = ctx_2.scope()
-        full_body = Rewrite(
-            PostWalk(lambda node: stepper_body(ctx_2, node, ext_1, ext_2))
-        )(body)
-        ctx_full_body(ext_2, full_body)
-
-        ext_3 = intersect_extents(ext_1, ext_2)
-
-        ctx_truncated_body = ctx_2.scope()
-        truncated_body = Rewrite(
-            PostWalk(lambda node: stepper_body(ctx_truncated_body, node, ext_1, ext_3))
-        )(body)
-        ctx_truncated_body(ext_3, truncated_body)
-
-        if not prove(
-            ntn.Call(ntn.L(ffunc.ge), (ext_3.get_measure(), ext_3.get_unit()))
-        ):
-            truncated_body = asm.If(
-                asm.Call(
-                    asm.L(ffunc.ge),
-                    (ctx.ctx(ext_3.get_end()), ctx.ctx(ext_3.get_start())),
-                ),
-                truncated_body,
-            )
-
-        while_loop_body = asm.IfElse(
-            asm.Call(
-                asm.L(ffunc.lt),
+        for stepper in steppers:
+            cond = asm.Call(
+                asm.L(ffuncs.eq),
                 (
-                    ctx.ctx(ext_2.get_end()),
                     asm.Call(
-                        asm.L(ffunc.sub),
-                        (ctx.ctx(ext.get_end()), ctx.ctx(ext.get_unit())),
+                        asm.L(ffuncs.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
                     ),
-                ),
-            ),
-            asm.Block(ctx_full_body.emit()),
-            asm.Block((*ctx_truncated_body.emit(), asm.Break())),
-        )
-        while_loop_block = asm.Block(
-            (
-                *ctx_2.emit(),
-                while_loop_body,
-                asm.Assign(
-                    ctx.ctx(idx_start),
-                    asm.Call(
-                        asm.L(ffunc.add),
-                        (ctx.ctx(ext_2.get_end()), ctx.ctx(ext_2.get_unit())),
-                    ),
+                    ctx.ctx(stepper.stop(ctx)),
                 ),
             )
-        )
-        ctx.exec(asm.WhileLoop(asm.L(np.True_), while_loop_block))
+            ctx_2 = ctx.scope()
+            ext_2 = SymbolicExtent(
+                idx_start,
+                ntn.Call(ntn.L(ffuncs.add), (stepper.stop(ctx), ext.get_unit())),
+            )
+            ctx_2(ext_2, full_body)
+            stepper_block = asm.If(
+                cond,
+                asm.Block(
+                    (
+                        *ctx_2.emit(),
+                        asm.Assign(
+                            ctx.ctx(idx_start),
+                            asm.Call(
+                                asm.L(ffuncs.add),
+                                (ctx.ctx(stepper.stop(ctx)), ctx.ctx(ext_2.get_unit())),
+                            ),
+                        ),
+                        stepper.next(ctx),
+                        stepper.preamble(ctx),
+                    )
+                ),
+            )
+            stepper_blocks.append(stepper_block)
+
+        ctx.exec(asm.WhileLoop(final_cond, asm.Block(tuple(stepper_blocks))))
 
 
 @dataclass
@@ -293,10 +226,10 @@ class Sequence(Looplet):
     ):
         if prove(
             ntn.Call(
-                ntn.L(ffunc.ge),
+                ntn.L(ffuncs.ge),
                 (
                     ntn.Call(
-                        ntn.L(ffunc.sub),
+                        ntn.L(ffuncs.sub),
                         (current_ext.get_end(), current_ext.get_unit()),
                     ),
                     remaining_ext.get_end(),
@@ -306,14 +239,14 @@ class Sequence(Looplet):
             return Run(self.head)
         if prove(
             ntn.Call(
-                ntn.L(ffunc.eq),
+                ntn.L(ffuncs.eq),
                 (current_ext.get_end(), remaining_ext.get_end()),
             )
         ):
             return self
         return Switch(
             asm.Call(
-                asm.L(ffunc.lt),
+                asm.L(ffuncs.lt),
                 (ctx.ctx(remaining_ext.get_end()), ctx.ctx(current_ext.get_end())),
             ),
             self,
@@ -321,7 +254,6 @@ class Sequence(Looplet):
         )
 
 
-@dataclass
 class SequencePass(LoopletPass):
     """
     Lowers one Sequence looplet at the time.
@@ -331,44 +263,74 @@ class SequencePass(LoopletPass):
     def priority(self):
         return 4
 
-    def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
-        found_sequence: Sequence | None = None
+    @classmethod
+    def get_sequence_variations(
+        cls, ctx, seqs: list[Sequence], heads, tails, ext: SymbolicExtent
+    ) -> list[tuple]:
+        ext_start, ext_end = ext.get_start(), ext.get_end()
 
-        # process head
-        def sequence_head(node: ntn.NotationNode):
+        match seqs:
+            case []:
+                return [(heads, tails, ext_start, ext_end)]
+            case [Sequence() as seq, *tail]:
+                split = seq.split(ctx, ext)
+                left = cls.get_sequence_variations(
+                    ctx,
+                    tail,
+                    heads + [seq],
+                    tails,
+                    SymbolicExtent(
+                        ext_start,
+                        ntn.Call(ntn.L(ffuncs.min), (ext_end, split)),
+                    ),
+                )
+                right = cls.get_sequence_variations(
+                    ctx,
+                    tail,
+                    heads,
+                    tails + [seq],
+                    SymbolicExtent(
+                        ntn.Call(ntn.L(ffuncs.max), (ext_start, split)),
+                        ext_end,
+                    ),
+                )
+                return left + right
+            case other:
+                raise Exception(f"Invalid sequence: {other}")
+
+    def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
+        found_seqs: list[Sequence] = []
+
+        for node in PostOrderDFS(body):
+            match node:
+                case Sequence() as seq:
+                    found_seqs.append(seq)
+
+        def sequence_node(
+            node: ntn.NotationNode, heads: set[Sequence], tails: set[Sequence]
+        ):
             match node:
                 case ntn.Access(Sequence() as tns, mode, (j, *idxs)) if j == idx:
-                    nonlocal found_sequence
-                    found_sequence = tns
-                    return ntn.Access(tns.head(ctx, idx), mode, (j, *idxs))  # type: ignore[call-arg]
+                    if tns in heads:
+                        new_tns = tns.head(ctx, idx)  # type: ignore[call-arg]
+                    elif tns in tails:
+                        new_tns = tns.tail(ctx, idx)
+                    else:
+                        raise Exception(f"Seq: {tns} not present.")
+                    return ntn.Access(new_tns, mode, (j, *idxs))
 
-        body_head = PostWalk(sequence_head)(body)
-        assert isinstance(found_sequence, Sequence)
-        split_var = found_sequence.split(ctx, ext)
-        ext_2 = SymbolicExtent(
-            ext.get_start(),
-            ntn.Call(ntn.Literal(ffunc.min), (split_var, ext.get_end())),
-        )
-        ctx_2 = ctx.scope()
-        ctx_2(ext_2, body_head)
-        emitted_head = ctx_2.emit()
+        variations = self.get_sequence_variations(ctx, found_seqs, [], [], ext)
+        blocks = []
 
-        # process tail
-        def sequence_tail(node: ntn.NotationNode):
-            match node:
-                case ntn.Access(Sequence() as tns, mode, (j, *idxs)) if (
-                    # Reported: https://github.com/python/mypy/issues/20904
-                    j == idx and tns is found_sequence  # type: ignore[has-type]
-                ):
-                    return ntn.Access(tns.tail(ctx, idx), mode, (j, *idxs))
+        for v in variations:
+            heads, tails, subext_start, subext_end = v
+            sub_body = PostWalk(partial(sequence_node, heads=heads, tails=tails))(body)
+            subext = SymbolicExtent(subext_start, subext_end)
+            sub_ctx = ctx.scope()
+            sub_ctx(subext, sub_body)
+            blocks += sub_ctx.emit()
 
-        body_tail = PostWalk(sequence_tail)(body)
-        ext_3 = SymbolicExtent(split_var, ext.get_end())
-        ctx_3 = ctx.scope()
-        ctx_3(ext_3, body_tail)
-        emitted_tail = ctx_3.emit()
-
-        ctx.exec(asm.Block((*emitted_head, *emitted_tail)))
+        ctx.exec(asm.Block(tuple(blocks)))
 
 
 @dataclass

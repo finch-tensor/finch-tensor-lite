@@ -2,20 +2,17 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
-
-from finchlite.tensor.fiber_tensor import FiberTensor, FiberTensorFields
-
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import ffunc
+from ..algebra import ImmutableStructFType, ffuncs
 from ..compile import looplets as lplt
 from ..interface import Scalar
 from ..tensor import Level, LevelFType
+from .fiber_tensor import FiberTensor, FiberTensorFields
 
 
 @dataclass(unsafe_hash=True)
-class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
+class LoTriMaskFType(LevelFType, ImmutableStructFType):
     body: LevelFType
 
     @property
@@ -50,8 +47,21 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
     def lvl_t(self):
         return self.body.lvl_t
 
-    def __call__(self, shape):
-        return LoTriMask(self.lvl_t(shape=shape))
+    def construct(self, shape):
+        return LoTriMask(self.lvl_t.construct(shape=shape))
+
+    def __call__(self, val: Any) -> "LoTriMask":
+        """
+        Convert a level to this lower triangular mask level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A LoTriMask instance of this type.
+        """
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def from_numpy(self, shape, arr):
         return LoTriMask(self.lvl_t.from_numpy(shape, arr))
@@ -81,7 +91,7 @@ class LoTriMaskFType(LevelFType, asm.AssemblyStructFType):
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
             split=lambda ctx, ext: ntn.Call(
-                ntn.L(ffunc.add), (tns.visited_idxs[-1], ntn.L(np.intp(1)))
+                ntn.L(ffuncs.add), (tns.visited_idxs[-1], ext.get_unit())
             ),
             tail=lambda ctx, idx: lplt.Run(
                 lambda ctx, idx: lplt.Leaf(

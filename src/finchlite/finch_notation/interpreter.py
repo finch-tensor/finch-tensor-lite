@@ -9,10 +9,12 @@ from .. import finch_assembly as asm
 from ..algebra import (
     Tensor,
     TensorFType,
+    fisinstance,
+    ftype,
     query_property,
     register_property,
 )
-from ..symbolic import ScopedDict, fisinstance, ftype
+from ..symbolic import ScopedDict
 from . import nodes as ntn
 from .stages import NotationLoader
 
@@ -348,10 +350,10 @@ class NotationInterpreter(NotationLoader):
                 return val
             case ntn.Value(val, val_t):
                 val_e = self(val)
-                if type(val_e) is not val_t:
+                if ftype(val_e) is not val_t:
                     raise TypeError(
-                        f"Value '{val_e}' is expected to be of type {val_t}, "
-                        f"but is a type {type(val_e)}."
+                        f"Value '{val_e}' is expected to be of ftype {val_t}, "
+                        f"but is a type {ftype(val_e)}."
                     )
                 return val_e
             case ntn.Variable(var_n, var_t):
@@ -376,6 +378,8 @@ class NotationInterpreter(NotationLoader):
             case ntn.Assign(var, val):
                 val_e = self(val)
                 if isinstance(var, ntn.Variable):
+                    if var.type_ is not None:
+                        assert fisinstance(val_e, var.type_)
                     var_n = var.name
                     self.bindings[var_n] = val_e
                     return None

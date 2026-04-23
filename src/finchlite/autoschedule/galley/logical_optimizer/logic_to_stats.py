@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import OrderedDict
-
 from ....finch_logic import (
     Aggregate,
     Alias,
@@ -19,7 +17,7 @@ from ....finch_logic import (
 def insert_statistics(
     stats_factory: StatsFactory,
     node: LogicNode,
-    bindings: OrderedDict[Alias, TensorStats],
+    bindings: dict[Alias, TensorStats],
     replace: bool,
     cache: dict[object, TensorStats],
 ) -> TensorStats:
