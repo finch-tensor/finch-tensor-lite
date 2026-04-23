@@ -4,7 +4,7 @@ from typing import overload
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
 
-from ..algebra import ffunc
+from ..algebra import ffunc, is_associative, is_commutative
 from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from ..finch_logic import (
     Aggregate,
@@ -33,6 +33,7 @@ from ..symbolic import (
     gensym,
 )
 from .normalize import normalize_names
+from .utils import is_inplace_expr
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -64,14 +65,89 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(transform))(root)
 
 
+def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
+    def rule_1(stmt):
+        def compare_idxs_order(parent_idxs, child_idxs):
+            it = iter(parent_idxs)
+            return all(idx in it for idx in child_idxs)
+
+        match stmt:
+            case Reorder(MapJoin(op, args), parent_idxs) if is_associative(op.val):
+                new_args = []
+                for arg in args:
+                    if (
+                        isinstance(arg, Reorder)
+                        and compare_idxs_order(parent_idxs, arg.idxs)
+                        and isinstance(arg.arg, MapJoin)
+                        and arg.arg.op == op
+                    ):
+                        new_args.extend(arg.arg.args)
+                    else:
+                        new_args.append(arg)
+                return Reorder(MapJoin(op, tuple(new_args)), parent_idxs)
+
+    root = Rewrite(PostWalk(rule_1))(root)
+
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, MapJoin() as rhs):
+                return Query(lhs, Reorder(rhs, rhs.fields()))
+
+    root = Rewrite(PostWalk(rule_2))(root)
+
+    def rule_3(stmt):
+        match stmt:
+            case Query(lhs, Reorder(MapJoin(op, args), reorder_idxs)) if is_commutative(
+                op.val
+            ) and is_associative(op.val):
+                matches = [arg for arg in args if lhs in PostOrderDFS(arg)]
+
+                if len(matches) == 1:
+                    match_arg = matches[0]
+                    if (
+                        isinstance(match_arg, Reorder)
+                        and isinstance(match_arg.arg, Table)
+                        and match_arg.idxs == reorder_idxs
+                    ):
+                        others = tuple(arg for arg in args if arg is not match_arg)
+                        return Query(
+                            lhs,
+                            Reorder(MapJoin(op, (match_arg, *others)), reorder_idxs),
+                        )
+
+                return None
+
+    root = Rewrite(PostWalk(rule_3))(root)
+
+    def rule_4(stmt):
+        match stmt:
+            case Reorder(MapJoin(op, args), idxs) if len(args) > 2 and is_associative(
+                op.val
+            ):
+                rhs = MapJoin(op, args[1:])
+                order_map = {val: i for i, val in enumerate(idxs)}
+                rhs_reorder_idxs = list(rhs.fields())
+                rhs_reorder_idxs.sort(key=lambda x: order_map[x])
+                return Reorder(
+                    MapJoin(op, (args[0], Reorder(rhs, rhs_reorder_idxs))), idxs
+                )
+
+    return Rewrite(PreWalk(rule_4))(root)
+
+
 def split_increments(root: LogicStatement) -> LogicStatement:
     def rule_2(stmt):
         match stmt:
+            case Query(
+                lhs,
+                Reorder(MapJoin(op, args), idxs),
+            ) if is_inplace_expr(lhs, op, idxs, args):
+                return None
             case Query(lhs, rhs):
                 if lhs in PostOrderDFS(rhs):
                     var = Alias(gensym("A"))
                     new_query = Query(var, rhs)
-                    new_root = Query(lhs, var)
+                    new_root = Query(lhs, Table(var, rhs.fields()))
                     return Plan((new_query, new_root))
         return None
 
@@ -84,6 +160,7 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     )
 
     def rule(ex):
+
         match ex:
             case Query(
                 lhs,
@@ -97,6 +174,10 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
+            case Query(lhs, Reorder(MapJoin(op, args), idxs)) if is_inplace_expr(
+                lhs, op, idxs, args
+            ):
+                return ex
             case Query(lhs, rhs):
                 return Query(
                     lhs,
@@ -292,6 +373,9 @@ def standardize(
     bindings: dict[Alias, TensorFType],
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
     prgm = isolate_aggregates(prgm)
+    prgm = push_fields(prgm)
+    prgm = drop_reorders(prgm)
+    prgm = standardize_inplace_queries(prgm)
     prgm = split_increments(prgm)
     prgm = standardize_query_roots(prgm, bindings)
     prgm = push_fields(prgm)
@@ -308,8 +392,9 @@ class LogicStandardizer(LogicLoader):
     The LogicStandardizer applies a series of transformations to standardize
     logic statements into a canonical form. Any Logic is accepted as input, and
     the output logic should be a plan with only two forms of queries:
-    1. Queries that perform a Reorder of a single argument
+    1. Queries that perform a Reorder of a single argument.
     2. Queries that perform an Aggregate over a Reorder of a series of map-joins.
+    3. Queries that perform a Reorder of a map-join between query lhs and (1)/(2).
     """
 
     def __init__(self, ctx: LogicLoader | None = None):
