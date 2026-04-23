@@ -90,7 +90,7 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
         match stmt:
             case Query(lhs, Reorder(MapJoin(op, args), reorder_idxs)) if is_commutative(
                 op
-            ):
+            ) and is_associative(op):
                 matches = [arg for arg in args if lhs in PostOrderDFS(arg)]
 
                 if len(matches) == 1:
