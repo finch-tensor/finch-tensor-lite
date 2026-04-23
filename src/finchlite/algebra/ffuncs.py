@@ -14,6 +14,8 @@ from .algebra import (
 )
 from .ftypes import (
     FDType,
+    FDTypeBoolean,
+    FDTypeNumpyInteger,
     FDTypeOrdered,
     FType,
     TupleFType,
@@ -133,7 +135,7 @@ class _Mul(NAryFinchOperator, CNAryOperator, NumbaOperator):
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, (_Add, _Sub))
 
-    def is_annihilator(self, val):
+    def is_annihilator(self, val, *argtypes: Any) -> builtins.bool:
         return val == 0
 
     def init_value(self, type_: FType) -> Any:
@@ -239,7 +241,7 @@ class _Pow(BinaryFinchOperator, COperator):
     def is_identity(self, arg):
         return arg == 1
 
-    def is_annihilator(self, arg):
+    def is_annihilator(self, arg, *argtypes: Any) -> builtins.bool:
         return arg == 0
 
     def __repr__(self) -> str:
@@ -303,7 +305,7 @@ class _And(NAryFinchOperator, CNAryOperator):
     def is_identity(self, arg):
         return bool(arg)
 
-    def is_annihilator(self, arg):
+    def is_annihilator(self, arg, *argtypes: Any) -> builtins.bool:
         return not bool(arg)
 
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
@@ -360,8 +362,19 @@ class _Or(NAryFinchOperator, CNAryOperator):
     def is_identity(self, arg):
         return not bool(arg)
 
-    def is_annihilator(self, arg):
-        return bool(arg)
+    def is_annihilator(self, arg, *argtypes: Any) -> builtins.bool:
+        if not argtypes:
+            return False
+        try:
+            promoted = reduce(promote_type, (ftype(arg), *argtypes))
+        except TypeError:
+            return False
+        cast_arg = promoted(arg)
+        if isinstance(promoted, FDTypeBoolean):
+            return builtins.bool(cast_arg)
+        if isinstance(promoted, FDTypeNumpyInteger):
+            return cast_arg == ~promoted.dtype(0)
+        return False
 
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, _And)
@@ -575,7 +588,7 @@ class _LogAddExp(BinaryFinchOperator):
     def is_identity(self, val) -> builtins.bool:
         return val == -np.inf
 
-    def is_annihilator(self, val) -> builtins.bool:
+    def is_annihilator(self, val, *argtypes: Any) -> builtins.bool:
         return val == np.inf
 
     def init_value(self, type_: FType) -> Any:
@@ -599,7 +612,7 @@ class _LogicalAnd(BinaryFinchOperator):
     def is_identity(self, val) -> builtins.bool:
         return builtins.bool(val)
 
-    def is_annihilator(self, val) -> builtins.bool:
+    def is_annihilator(self, val, *argtypes: Any) -> builtins.bool:
         return not builtins.bool(val)
 
     def is_distributive(self, other_op: FinchOperator) -> builtins.bool:
@@ -626,7 +639,7 @@ class _LogicalOr(BinaryFinchOperator):
     def is_identity(self, val) -> builtins.bool:
         return not builtins.bool(val)
 
-    def is_annihilator(self, val) -> builtins.bool:
+    def is_annihilator(self, val, *argtypes: Any) -> builtins.bool:
         return builtins.bool(val)
 
     def is_distributive(self, other_op: FinchOperator) -> builtins.bool:

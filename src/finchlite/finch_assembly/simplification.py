@@ -1,5 +1,6 @@
 from .. import finch_assembly as asm
 from ..algebra import ffuncs, is_annihilator, is_identity
+from ..algebra.ftypes import ftype
 from ..symbolic import Fixpoint, PostWalk, Rewrite
 from .stages import AssemblyTransform
 
@@ -30,7 +31,15 @@ class AssemblySimplify(AssemblyTransform):
                     match arg:
                         case asm.Literal(val) if isinstance(
                             val, Scalar
-                        ) and is_annihilator(op.val, val.val):
+                        ) and is_annihilator(
+                            op.val,
+                            val.val,
+                            *[
+                                ftype(a.val)
+                                for a in args
+                                if isinstance(a, asm.Literal) and a is not arg
+                            ],
+                        ):
                             return arg
                 return None
             # slot(a, idx) = op(slot(a, idx), arg) where RHS is:

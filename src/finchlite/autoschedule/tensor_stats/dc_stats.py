@@ -57,10 +57,12 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
         join_like_args: list[DCStats] = []
         union_like_args: list[DCStats] = []
-        for stats in all_stats:
+        all_fill_ftypes = [ftype(s.tensordef.fill_value) for s in all_stats]
+        for i, stats in enumerate(all_stats):
             if len(stats.tensordef.index_order) == 0:
                 continue
-            if is_annihilator(op, stats.tensordef.fill_value):
+            other_ftypes = all_fill_ftypes[:i] + all_fill_ftypes[i + 1 :]
+            if is_annihilator(op, stats.tensordef.fill_value, *other_ftypes):
                 join_like_args.append(stats)
             else:
                 union_like_args.append(stats)

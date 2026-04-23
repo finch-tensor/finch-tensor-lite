@@ -194,7 +194,7 @@ class FinchOperator(ABC):
     def is_identity(self, val: Any) -> bool:
         return False
 
-    def is_annihilator(self, val: Any) -> bool:
+    def is_annihilator(self, val: Any, *argtypes: Any) -> bool:
         return False
 
     def init_value(self, type_: FType) -> Any:
@@ -227,8 +227,8 @@ def is_identity(op: FinchOperator, val: Any) -> bool:
     return op.is_identity(val)
 
 
-def is_annihilator(op: FinchOperator, val: Any) -> bool:
-    return op.is_annihilator(val)
+def is_annihilator(op: FinchOperator, val: Any, *argtypes: Any) -> bool:
+    return op.is_annihilator(val, *argtypes)
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:
