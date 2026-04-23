@@ -1,6 +1,7 @@
 from ..finch_logic import (
     Aggregate,
     Alias,
+    Field,
     Literal,
     LogicExpression,
     Reorder,
@@ -11,19 +12,17 @@ from ..finch_logic import (
 def is_inplace_expr(
     query_lhs: Alias,
     mapjoin_op: Literal,
-    rhs: tuple[LogicExpression, ...],
+    mapjoin_idxs: tuple[Field, ...],
+    mapjoin_args: tuple[LogicExpression, ...],
 ):
-    # TODO: This is a temporary measure till we figure out
-    # how to handle the case where args = [lhs_arg, arg1, arg2].
-    if len(rhs) > 2:
-        return False
+    lhs_arg, *non_lhs_arg = mapjoin_args
 
     # Return false if rhs does not contain lhs (i.e. not inplace)
-    if not any(
-        isinstance(arg, Reorder)
-        and isinstance(arg.arg, Table)
-        and arg.arg.tns == query_lhs
-        for arg in rhs
+    if not (
+        isinstance(lhs_arg, Reorder)
+        and isinstance(lhs_arg.arg, Table)
+        and lhs_arg.arg.tns == query_lhs
+        and lhs_arg.idxs == mapjoin_idxs
     ):
         return False
 
@@ -38,5 +37,5 @@ def is_inplace_expr(
             and isinstance(arg.arg, Reorder)
             and arg.op.val == mapjoin_op.val
         )
-        for arg in rhs
+        for arg in non_lhs_arg
     )

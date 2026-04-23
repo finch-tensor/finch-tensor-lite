@@ -103,32 +103,31 @@ class NotationContext:
         query_lhs: lgc.Alias,
         op: Any,
         arg: lgc.Table,
-        arg_idxs: tuple[lgc.Field, ...],
         reorder_idxs: tuple[lgc.Field, ...],
     ):
         arg_dims = arg.dimmap(merge_shapes, self.shapes)
-        shapes_map = dict(zip(arg_idxs, arg_dims, strict=True))
+        shapes_map = dict(zip(arg.idxs, arg_dims, strict=True))
         shapes = {
             idx: shapes_map.get(idx) or ntn.Literal(1)
-            for idx in arg_idxs + reorder_idxs
+            for idx in arg.idxs + reorder_idxs
         }
         arg_types = arg.shape_type(self.shape_types)
-        shape_type_map = dict(zip(arg_idxs, arg_types, strict=True))
+        shape_type_map = dict(zip(arg.idxs, arg_types, strict=True))
         shape_type = {
-            idx: shape_type_map.get(idx) or np.intp for idx in arg_idxs + reorder_idxs
+            idx: shape_type_map.get(idx) or np.intp for idx in arg.idxs + reorder_idxs
         }
         loop_idxs = []
         remap_idxs = {}
         out_idxs = iter(reorder_idxs)
         out_idx = next(out_idxs, None)
         new_idxs = []
-        for idx in arg_idxs:
+        for idx in arg.idxs:
             loop_idxs.append(idx)
             if idx == out_idx:
                 out_idx = next(out_idxs, None)
                 new_idxs.append(idx)
             while (
-                out_idx in loop_idxs or out_idx not in arg_idxs
+                out_idx in loop_idxs or out_idx not in arg.idxs
             ) and out_idx is not None:
                 if out_idx in loop_idxs:
                     new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
@@ -139,7 +138,7 @@ class NotationContext:
                     loop_idxs.append(out_idx)
                     new_idxs.append(out_idx)
                 out_idx = next(out_idxs, None)
-        while (out_idx in loop_idxs or out_idx not in arg_idxs) and out_idx is not None:
+        while (out_idx in loop_idxs or out_idx not in arg.idxs) and out_idx is not None:
             if out_idx in loop_idxs:
                 new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
                 remap_idxs[new_idx] = out_idx
@@ -234,12 +233,8 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(
-                lhs, lgc.Reorder(lgc.Table(lgc.Alias(_), idxs_1) as arg, idxs_2)
-            ):
-                body = self._lower_query_of_reorder(
-                    lhs, ffunc.overwrite, arg, idxs_1, idxs_2
-                )
+            case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(_), _) as arg, idxs_2)):
+                body = self._lower_query_of_reorder(lhs, ffunc.overwrite, arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Declare(
@@ -260,7 +255,7 @@ class NotationContext:
                 lgc.Aggregate(
                     lgc.Literal(op),
                     lgc.Literal(init),
-                    lgc.Reorder(arg, idxs_1) as arg_2,
+                    lgc.Reorder(arg, _) as arg_2,
                     idxs_2,
                 ),
             ):
@@ -282,33 +277,23 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Reorder(lgc.MapJoin(op, args), _),
-            ) if is_inplace_expr(lhs, op, args):
+                lgc.Reorder(lgc.MapJoin(op, (_, arg) as mj_args), mj_idxs),
+            ) if is_inplace_expr(lhs, op, mj_idxs, mj_args):
                 body = None
-                for rhs_arg in args:
-                    match rhs_arg:
-                        case lgc.Reorder(lgc.Table(lhs_1, idxs_1) as arg, idxs_2) if (
-                            lhs_1 == lhs
-                        ):
-                            continue  # Skip the query lhs arg
-                        case lgc.Reorder(
-                            lgc.Table(lgc.Alias(_), idxs_1) as arg, idxs_2
-                        ):
-                            body = self._lower_query_of_reorder(
-                                lhs, op.val, arg, idxs_1, idxs_2
-                            )
-                        case lgc.Aggregate(
-                            lgc.Literal(op_1),
-                            lgc.Literal(init),
-                            lgc.Reorder(arg, idxs_1) as arg_2,
-                            idxs_2,
-                        ):
-                            body = self._lower_query_of_aggregate(
-                                lhs, op_1, arg_2, idxs_2
-                            )
-
-                if body is None:
-                    raise Exception(f"Unrecognized logic: {prgm}")
+                match arg:
+                    case lgc.Reorder(lgc.Table(_) as arg_2, reorder_idxs):
+                        body = self._lower_query_of_reorder(
+                            lhs, op.val, arg_2, reorder_idxs
+                        )
+                    case lgc.Aggregate(
+                        lgc.Literal(op_1),
+                        lgc.Literal(init),
+                        lgc.Reorder(_) as arg_2,
+                        idxs_2,
+                    ):
+                        body = self._lower_query_of_aggregate(lhs, op_1, arg_2, idxs_2)
+                    case _:
+                        raise Exception(f"Unrecognized logic: {prgm}")
 
                 return ntn.Block(
                     (

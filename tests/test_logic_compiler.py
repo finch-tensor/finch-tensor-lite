@@ -149,3 +149,13 @@ def test_logic_compiler_inplace(file_regression):
         extension=".txt",
         basename="test_logic_compiler_program_inplace",
     )
+
+    # result = INTERPRET_NOTATION(plan, bindings)
+
+    # expected = bindings[Alias(name="A2")].to_numpy() + np.matmul(
+    #     bindings[Alias(name="A0")].to_numpy(),
+    #     bindings[Alias(name="A1")].to_numpy(),
+    #     dtype=float,
+    # )
+
+    # finch_assert_equal(result[0].to_numpy(), expected)

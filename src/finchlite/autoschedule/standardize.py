@@ -100,11 +100,6 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
     )
 
     def rule(ex):
-        def wrap_tables_in_reorder(args):
-            return tuple(
-                Reorder(arg, arg.fields()) if isinstance(arg, Table) else arg
-                for arg in args
-            )
 
         match ex:
             case Query(
@@ -119,10 +114,13 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
-            case Query(lhs, Reorder(MapJoin(op, args), _) | MapJoin(op, args)) if (
-                is_inplace_expr(lhs, op, wrap_tables_in_reorder(args))
+            case Query(lhs, Reorder(MapJoin(op, args), idxs)) if is_inplace_expr(
+                lhs, op, idxs, args
             ):
-                rhs = MapJoin(op, wrap_tables_in_reorder(args))
+                return ex
+            case Query(lhs, MapJoin(op, args) as rhs) if is_inplace_expr(
+                lhs, op, rhs.fields(), args
+            ):
                 return Query(lhs, Reorder(rhs, rhs.fields()))
             case Query(lhs, rhs):
                 return Query(
@@ -319,6 +317,7 @@ def standardize(
     bindings: dict[Alias, TensorFType],
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
     prgm = isolate_aggregates(prgm)
+    prgm = push_fields(prgm)
     prgm = split_increments(prgm)
     prgm = standardize_query_roots(prgm, bindings)
     prgm = push_fields(prgm)
