@@ -67,15 +67,24 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
 
 def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
     def rule_1(stmt):
+        def compare_idxs_order(parent_idxs, child_idxs):
+            it = iter(parent_idxs)
+            return all(idx in it for idx in child_idxs)
+
         match stmt:
-            case MapJoin(op, args) if is_associative(op.val):
+            case Reorder(MapJoin(op, args), parent_idxs) if is_associative(op.val):
                 new_args = []
                 for arg in args:
-                    if isinstance(arg, MapJoin) and arg.op == op:
-                        new_args.extend(arg.args)
+                    if (
+                        isinstance(arg, Reorder)
+                        and compare_idxs_order(parent_idxs, arg.idxs)
+                        and isinstance(arg.arg, MapJoin)
+                        and arg.arg.op == op
+                    ):
+                        new_args.extend(arg.arg.args)
                     else:
                         new_args.append(arg)
-                return MapJoin(op, tuple(new_args))
+                return Reorder(MapJoin(op, tuple(new_args)), parent_idxs)
 
     root = Rewrite(PostWalk(rule_1))(root)
 
@@ -100,8 +109,10 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
                         and isinstance(match_arg.arg, Table)
                         and match_arg.idxs == reorder_idxs
                     ):
-                        others = [arg for arg in args if arg is not match_arg]
+                        others = tuple(arg for arg in args if arg is not match_arg)
                         rhs_2 = others[0] if len(others) == 1 else MapJoin(op, others)
+                        if isinstance(rhs_2, MapJoin):
+                            rhs_2 = Reorder(rhs_2, rhs_2.fields())
                         return Query(
                             lhs, Reorder(MapJoin(op, (match_arg, rhs_2)), reorder_idxs)
                         )
@@ -349,8 +360,9 @@ def standardize(
     bindings: dict[Alias, TensorFType],
 ) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
     prgm = isolate_aggregates(prgm)
-    prgm = standardize_inplace_queries(prgm)
     prgm = push_fields(prgm)
+    prgm = drop_reorders(prgm)
+    prgm = standardize_inplace_queries(prgm)
     prgm = split_increments(prgm)
     prgm = standardize_query_roots(prgm, bindings)
     prgm = push_fields(prgm)

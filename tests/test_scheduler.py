@@ -711,12 +711,6 @@ def test_logic_standardizer_inplace(file_regression):
                     arg=MapJoin(
                         op=Literal(ffunc.add),
                         args=(
-                            Reorder(
-                                arg=Table(
-                                    Alias("A2"), (Field(name="i0"), Field(name="i2"))
-                                ),
-                                idxs=(Field(name="i0"), Field(name="i2")),
-                            ),
                             Aggregate(
                                 op=Literal(val=ffunc.add),
                                 init=Literal(val=0),
@@ -741,6 +735,19 @@ def test_logic_standardizer_inplace(file_regression):
                                     ),
                                 ),
                                 idxs=(Field(name="i1"),),
+                            ),
+                            MapJoin(
+                                op=Literal(ffunc.add),
+                                args=(
+                                    Table(
+                                        Alias("A2"),
+                                        (Field(name="i0"), Field(name="i2")),
+                                    ),
+                                    Table(
+                                        Alias("A1"),
+                                        (Field(name="i0"), Field(name="i2")),
+                                    ),
+                                ),
                             ),
                         ),
                     ),

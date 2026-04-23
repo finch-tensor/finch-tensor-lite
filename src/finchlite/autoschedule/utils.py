@@ -31,7 +31,7 @@ def is_inplace_expr(
     # 2. Queries that perform an Aggregate (with mapjoin_op) over a Reorder
     #    of a series of map-joins.
     return all(
-        (isinstance(arg, Reorder) and isinstance(arg.arg, Table))
+        isinstance(arg, Reorder)
         or (
             isinstance(arg, Aggregate)
             and isinstance(arg.arg, Reorder)
