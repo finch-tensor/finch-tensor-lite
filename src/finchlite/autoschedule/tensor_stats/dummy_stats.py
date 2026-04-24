@@ -4,7 +4,7 @@ from typing import Any, Self
 
 from finchlite.finch_logic import Field
 
-from ..algebra import FinchOperator
+from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
