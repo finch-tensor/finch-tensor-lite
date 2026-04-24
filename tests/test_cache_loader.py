@@ -5,7 +5,6 @@ import numpy as np
 import finchlite as fl
 from finchlite.algebra import ffuncs
 from finchlite.autoschedule.cache import (
-    LogicCacheLRU,
     LogicCacheLRU_Embeddings_Norms,
 )
 from finchlite.autoschedule.executor import LogicExecutor
