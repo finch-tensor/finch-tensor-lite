@@ -17,6 +17,8 @@ from finchlite.autoschedule.tensor_stats import (
     DCStats,
     DCStatsFactory,
     DenseStatsFactory,
+    DummyStats,
+    DummyStatsFactory,
     TensorDef,
     UniformStatsFactory,
 )
@@ -27,6 +29,192 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+
+# ─────────────────────────────── DummyStats tests ────────────────────────────────
+
+
+def test_dummy_from_tensor_and_getters():
+    data = np.zeros((2, 3))
+    node = Table(Literal(fl.asarray(data)), (Field("i"), Field("j")))
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    assert stats.index_order == (Field("i"), Field("j"))
+    assert stats.get_dim_size(Field("i")) == 2.0
+    assert stats.get_dim_size(Field("j")) == 3.0
+    assert stats.fill_value == 0
+
+
+def test_dummy_mapjoin_same_axes():
+    i, j = Field("i"), Field("j")
+    ta = Table(Literal(fl.asarray(np.ones((4, 5)))), (i, j))
+    tb = Table(Literal(fl.asarray(np.ones((4, 5)))), (i, j))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    assert stats.index_order == (i, j)
+    assert stats.get_dim_size(i) == 4.0
+    assert stats.get_dim_size(j) == 5.0
+
+
+def test_dummy_mapjoin_non_same_axes():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    ta = Table(Literal(fl.asarray(np.ones((4, 5)))), (i, j))
+    tb = Table(Literal(fl.asarray(np.ones((5, 3)))), (j, k))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=MapJoin(Literal(ffuncs.mul), (ta, tb)),
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    assert set(stats.index_order) == {i, j, k}
+    assert stats.fill_value == 0.0
+
+
+def test_dummy_aggregate():
+    i, j = Field("i"), Field("j")
+    table = Table(Literal(fl.asarray(np.eye(10))), (i, j))
+
+    node_sum = Aggregate(op=Literal(ffuncs.add), init=None, arg=table, idxs=(j,))
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=node_sum,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    assert stats.index_order == (i,)
+    assert stats.get_dim_size(i) == 10.0
+
+
+def test_dummy_issimilar():
+    node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    assert DummyStatsFactory().issimilar(stats, stats)
+
+    other_def = TensorDef(
+        index_order=(Field("i"), Field("j")),
+        dim_sizes={Field("i"): 99.0, Field("j"): 10.0},
+        fill_value=0,
+    )
+    other = DummyStats.from_def(other_def)
+
+    assert not DummyStatsFactory().issimilar(stats, other)
+
+    new_def = TensorDef(
+        index_order=(Field("j"), Field("i")),
+        dim_sizes={Field("i"): 10.0, Field("j"): 10.0},
+        fill_value=0,
+    )
+    swapped = DummyStats.from_def(new_def)
+
+    assert not DummyStatsFactory().issimilar(stats, swapped)
+
+
+def test_dummy_copy_stats():
+    node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    copy = DummyStatsFactory().copy_stats(stats)
+
+    assert copy.dim_sizes == stats.dim_sizes
+    assert copy.index_order == stats.index_order
+    assert copy is not stats
+
+
+def test_dummy_relabel():
+    node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    relabeled = DummyStatsFactory().relabel(stats, (Field("m"), Field("n")))
+
+    assert relabeled.get_dim_size(Field("m")) == stats.get_dim_size(Field("i"))
+    assert relabeled.get_dim_size(Field("n")) == stats.get_dim_size(Field("j"))
+
+
+def test_dummy_reorder():
+    node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
+
+    stats = insert_statistics(
+        stats_factory=DummyStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    reordered = DummyStatsFactory().reorder(stats, (Field("j"), Field("i")))
+
+    assert reordered.get_dim_size(Field("i")) == stats.get_dim_size(Field("i"))
+    assert reordered.get_dim_size(Field("j")) == stats.get_dim_size(Field("j"))
+
 
 # ─────────────────────────────── DatabaseStats tests ─────────────────────────────
 
@@ -528,6 +716,41 @@ def test_blocked_stats_reorder():
     assert new_block.get_dim_size(Field("j")) == 5.0
     assert new_block.get_dim_size(Field("i")) == 2.0
     assert new_block.index_order == (Field("j"), Field("i"))
+
+
+def test_blocked_stats_reorder_drop_one_index():
+    data = np.ones((4, 1, 9))
+
+    i, j, k = Field("i"), Field("j"), Field("k")
+    blocks_per_dim = {i: 2, j: 1, k: 3}
+    bs = BlockedStats.from_tensor(
+        fl.asarray(data), (i, j, k), blocks_per_dim, UniformStatsFactory()
+    )
+
+    reordered = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
+        bs, (k, i)
+    )
+
+    assert reordered.index_order == (k, i)
+    assert reordered.blocks.shape == (3, 2)
+    assert reordered.estimate_non_fill_values() == bs.estimate_non_fill_values()
+
+
+def test_blocked_stats_reorder_drop_two_index():
+    data = np.ones((4, 1, 9, 1))
+
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    blocks_per_dim = {i: 2, j: 1, k: 3, m: 1}
+    bs = BlockedStats.from_tensor(
+        fl.asarray(data), (i, j, k, m), blocks_per_dim, UniformStatsFactory()
+    )
+    reordered = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
+        bs, (k, i)
+    )
+
+    assert reordered.index_order == (k, i)
+    assert reordered.blocks.shape == (3, 2)
+    assert reordered.estimate_non_fill_values() == bs.estimate_non_fill_values()
 
 
 def test_blocked_stats_issimilar():

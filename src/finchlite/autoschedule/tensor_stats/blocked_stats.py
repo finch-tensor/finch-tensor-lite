@@ -171,17 +171,17 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
 
         old_order = stats.index_order
+        dropped = [
+            i for i, idx in enumerate(old_order) if idx not in set(reorder_indices)
+        ]
         axes_mapping = [
             old_order.index(idx) for idx in reorder_indices if idx in old_order
-        ]
+        ] + dropped
 
         new_blocks = np.transpose(stats.blocks, axes=axes_mapping)
 
-        if len(reorder_indices) > len(old_order):
-            expanded_shape = [
-                stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices
-            ]
-            new_blocks = new_blocks.reshape(expanded_shape)
+        expanded_shape = [stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices]
+        new_blocks = new_blocks.reshape(expanded_shape)
 
         final_blocks = np.empty_like(new_blocks)
         for coord in np.ndindex(new_blocks.shape):
