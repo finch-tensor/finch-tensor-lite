@@ -288,6 +288,40 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         )
         return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
 
+    def reshape(self, arr, new_shape: tuple):
+        new_shape = tuple(np.intp(s) for s in new_shape)
+        old_size = int(np.prod(arr.shape, dtype=np.intp)) if arr.shape else 1
+        new_size = int(np.prod(new_shape, dtype=np.intp)) if new_shape else 1
+        if old_size != new_size:
+            raise ValueError(
+                f"Cannot reshape array of size {old_size} into shape {new_shape}"
+            )
+        new_strides = tuple(np.intp(s) for s in _get_default_strides(new_shape))
+        default_strides = tuple(np.intp(s) for s in _get_default_strides(arr.shape))
+        if arr.strides == default_strides:
+            return BufferizedNDArray(arr.val, new_shape, new_strides)
+        return BufferizedNDArray.from_numpy(arr.to_numpy().reshape(new_shape))
+
+    def permute_dims(self, arr, axes: tuple):
+        new_shape = tuple(arr.shape[i] for i in axes)
+        new_strides = tuple(arr.strides[i] for i in axes)
+        return BufferizedNDArray(arr.val, new_shape, new_strides)
+
+    def expand_dims(self, arr, axis: tuple):
+        ndim_new = len(arr.shape) + len(axis)
+        orig_idx = 0
+        new_shape = []
+        new_strides = []
+        for i in range(ndim_new):
+            if i in axis:
+                new_shape.append(np.intp(1))
+                new_strides.append(np.intp(0))
+            else:
+                new_shape.append(arr.shape[orig_idx])
+                new_strides.append(arr.strides[orig_idx])
+                orig_idx += 1
+        return BufferizedNDArray(arr.val, tuple(new_shape), tuple(new_strides))
+
     def lower_unwrap(self, ctx, obj): ...
 
     def lower_increment(self, ctx, obj, op, val): ...
