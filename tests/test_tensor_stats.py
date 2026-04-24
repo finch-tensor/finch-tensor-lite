@@ -137,38 +137,6 @@ def test_dummy_aggregate():
     assert stats.get_dim_size(i) == 10.0
 
 
-def test_dummy_issimilar():
-    node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
-
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-
-    assert DummyStatsFactory().issimilar(stats, stats)
-
-    other_def = TensorDef(
-        index_order=(Field("i"), Field("j")),
-        dim_sizes={Field("i"): 99.0, Field("j"): 10.0},
-        fill_value=0,
-    )
-    other = DummyStats.from_def(other_def)
-
-    assert not DummyStatsFactory().issimilar(stats, other)
-
-    new_def = TensorDef(
-        index_order=(Field("j"), Field("i")),
-        dim_sizes={Field("i"): 10.0, Field("j"): 10.0},
-        fill_value=0,
-    )
-    swapped = DummyStats.from_def(new_def)
-
-    assert not DummyStatsFactory().issimilar(stats, swapped)
-
-
 def test_dummy_copy_stats():
     node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
 
@@ -411,29 +379,6 @@ def test_database_aggregate():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_issimilar():
-    data = np.eye(10)
-    arr = fl.asarray(data)
-    node = Table(Literal(arr), (Field("i"), Field("j")))
-
-    stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert DatabaseStatsFactory().issimilar(stats, stats)
-
-    other = DatabaseStats.from_def(stats.tensordef, stats.nnz + 1.0, dict(stats.V))
-    assert not DatabaseStatsFactory().issimilar(stats, other)
-
-    i, j = Field("i"), Field("j")
-    bad_V = {i: stats.V[i] + 1.0, j: stats.V[j]}
-    other_v = DatabaseStats.from_def(stats.tensordef, stats.nnz, bad_V)
-    assert not DatabaseStatsFactory().issimilar(stats, other_v)
-
-
 def test_database_copy_stats():
     data = np.eye(10)
     arr = fl.asarray(data)
@@ -623,7 +568,7 @@ def test_uniform_mapjoin_mul_and_add():
     assert us_add.estimate_non_fill_values() == pytest.approx(75.0)
 
 
-def test_uniform_aggregate_and_issimilar():
+def test_uniform_aggregate():
     data = np.eye(10)
     table = Table(Literal(fl.asarray(data)), (Field("i"), Field("j")))
     us = insert_statistics(
@@ -653,7 +598,6 @@ def test_uniform_aggregate_and_issimilar():
     assert us_agg.index_order == (Field("i"),)
     assert us_agg.get_dim_size(Field("i")) == 10
     assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
-    assert UniformStatsFactory().issimilar(us, us)
 
 
 # ------------------------------ BlockedStats -------------------------------------
@@ -770,35 +714,6 @@ def test_blocked_stats_reorder_drop_two_index():
     assert reordered.blocks.shape == (3, 2)
     assert reordered.estimate_non_fill_values() == bs.estimate_non_fill_values()
 
-
-def test_blocked_stats_issimilar():
-    indices = (Field("i"), Field("j"))
-    data = np.eye(10)
-    arr = fl.asarray(data)
-    bs_factory = BlockedStatsFactory(UniformStatsFactory())
-
-    # Identical
-    bs1 = bs_factory(arr, indices)
-    bs2 = bs_factory(arr, indices)
-    assert bs_factory.issimilar(bs1, bs2) is True
-
-    # Different data
-    data_diff = np.eye(10)
-    data_diff[0, 0] = 0.0
-    bs_diff_data = bs_factory(fl.asarray(data_diff), indices)
-    assert bs_factory.issimilar(bs1, bs_diff_data) is False
-
-    # Different blocks_per_dim
-    bs_factory_diff = BlockedStatsFactory(
-        UniformStatsFactory(), block_count=10, block_width=10
-    )
-    bs_diff_grid = bs_factory_diff(arr, indices)
-    assert bs_factory_diff.issimilar(bs1, bs_diff_grid) is False
-
-    # Different StatsImpl
-    bs_factory_dense = BlockedStatsFactory(DenseStatsFactory())
-    bs_diff_impl = bs_factory_dense(arr, indices)
-    assert bs_factory_dense.issimilar(bs1, bs_diff_impl) is False
 
 
 def get_structured_example(M, K, matrix_type):
@@ -1175,7 +1090,7 @@ def test_mapjoin_mul_and_add():
     assert ds_sum.fill_value == 1.0 + 2.0
 
 
-def test_aggregate_and_issimilar():
+def test_aggregate():
     table = Table(
         Literal(fl.asarray(np.ones((2, 3)))),
         (Field("i"), Field("j")),
@@ -1206,8 +1121,6 @@ def test_aggregate_and_issimilar():
     assert ds_agg.index_order == (Field("i"),)
     assert ds_agg.get_dim_size(Field("i")) == 2.0
     assert ds_agg.fill_value == dsa.fill_value
-    assert DenseStatsFactory().issimilar(dsa, dsa)
-
 
 def test_relabel_dense_stats():
     arr = fl.asarray(np.zeros((2, 3)))

@@ -45,14 +45,6 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
         return DenseStats.from_def(new_def)
 
-    def issimilar(self, a: DenseStats, b: DenseStats) -> bool:
-        return (
-            isinstance(a, DenseStats)
-            and isinstance(b, DenseStats)
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-        )
-
     def relabel(
         self, stats: DenseStats, relabel_indices: tuple[Field, ...]
     ) -> DenseStats:

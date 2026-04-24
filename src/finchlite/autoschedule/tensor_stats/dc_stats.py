@@ -94,16 +94,6 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs)
 
-    def issimilar(self, a: DCStats, b: DCStats) -> bool:
-        return (
-            isinstance(a, DCStats)
-            and isinstance(b, DCStats)
-            and a.tensordef.index_order == b.tensordef.index_order
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-            and a.dcs == b.dcs
-        )
-
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)

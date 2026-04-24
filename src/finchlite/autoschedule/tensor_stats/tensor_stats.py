@@ -35,9 +35,6 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
     ) -> TS: ...
 
     @abstractmethod
-    def issimilar(self, a: TS, b: TS) -> bool: ...
-
-    @abstractmethod
     def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS: ...
 
     @abstractmethod

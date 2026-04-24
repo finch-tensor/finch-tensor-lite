@@ -134,17 +134,6 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             stats.stats_factory,
         )
 
-    def issimilar(self, a: BlockedStats, b: BlockedStats) -> bool:
-        if not (isinstance(a, BlockedStats) and isinstance(b, BlockedStats)):
-            return False
-
-        if a.blocks_per_dim != b.blocks_per_dim:
-            return False
-
-        for block_a, block_b in zip(a.blocks.flat, b.blocks.flat, strict=True):
-            if not a.stats_factory.issimilar(block_a, block_b):
-                return False
-        return True
 
     def relabel(
         self, stats: BlockedStats, relabel_indices: tuple[Field, ...]

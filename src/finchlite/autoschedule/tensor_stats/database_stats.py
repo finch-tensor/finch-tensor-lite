@@ -177,16 +177,6 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
 
         return DatabaseStats.from_def(new_def, new_nnz, new_V)
 
-    def issimilar(self, a: DatabaseStats, b: DatabaseStats) -> bool:
-        if not (isinstance(a, DatabaseStats) and isinstance(b, DatabaseStats)):
-            return False
-        return (
-            a.fill_value == b.fill_value
-            and a.dim_sizes == b.dim_sizes
-            and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
-            and a.V.keys() == b.V.keys()
-            and all(math.isclose(a.V[k], b.V[k], rel_tol=1e-9) for k in a.V)
-        )
 
     def relabel(
         self, stats: DatabaseStats, relabel_indices: tuple[Field, ...]

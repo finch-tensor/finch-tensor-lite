@@ -84,15 +84,6 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
 
         return UniformStats.from_def(new_def, res_p * res_vol)
 
-    def issimilar(self, a: UniformStats, b: UniformStats) -> bool:
-        return (
-            isinstance(a, UniformStats)
-            and isinstance(b, UniformStats)
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-            and math.isclose(a.nnz, b.nnz, rel_tol=1e-9)
-        )
-
     def relabel(
         self, stats: UniformStats, relabel_indices: tuple[Field, ...]
     ) -> UniformStats:
