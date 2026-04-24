@@ -94,16 +94,6 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs)
 
-    def issimilar(self, a: DCStats, b: DCStats) -> bool:
-        return (
-            isinstance(a, DCStats)
-            and isinstance(b, DCStats)
-            and a.tensordef.index_order == b.tensordef.index_order
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-            and a.dcs == b.dcs
-        )
-
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
         d = stats.tensordef
         new_def = TensorDef.relabel(d, relabel_indices)
@@ -519,3 +509,31 @@ class DCStats(NumericStats):
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
         return min_weight
+
+    def get_embedding(self) -> np.ndarray:
+        all_fields = frozenset(self.tensordef.index_order)
+        total_val = next(
+            dc.value
+            for dc in self.dcs
+            if not dc.from_indices and dc.to_indices == all_fields
+        )
+        projs = []
+        for f in self.tensordef.index_order:
+            val = next(
+                dc.value
+                for dc in self.dcs
+                if not dc.from_indices and dc.to_indices == frozenset({f})
+            )
+            projs.append(val)
+
+        degs = []
+        for f in self.tensordef.index_order:
+            val = next(
+                dc.value
+                for dc in self.dcs
+                if dc.from_indices == frozenset({f}) and dc.to_indices == all_fields
+            )
+            degs.append(val)
+
+        vector = np.array([total_val] + projs + degs)
+        return np.log2(vector)

@@ -16,10 +16,12 @@ from finchlite.autoschedule.tensor_stats import (
     DatabaseStatsFactory,
     DCStats,
     DCStatsFactory,
+    DenseStats,
     DenseStatsFactory,
     DummyStats,
     DummyStatsFactory,
     TensorDef,
+    UniformStats,
     UniformStatsFactory,
 )
 from finchlite.finch_logic import (
@@ -133,38 +135,6 @@ def test_dummy_aggregate():
 
     assert stats.index_order == (i,)
     assert stats.get_dim_size(i) == 10.0
-
-
-def test_dummy_issimilar():
-    node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
-
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-
-    assert DummyStatsFactory().issimilar(stats, stats)
-
-    other_def = TensorDef(
-        index_order=(Field("i"), Field("j")),
-        dim_sizes={Field("i"): 99.0, Field("j"): 10.0},
-        fill_value=0,
-    )
-    other = DummyStats.from_def(other_def)
-
-    assert not DummyStatsFactory().issimilar(stats, other)
-
-    new_def = TensorDef(
-        index_order=(Field("j"), Field("i")),
-        dim_sizes={Field("i"): 10.0, Field("j"): 10.0},
-        fill_value=0,
-    )
-    swapped = DummyStats.from_def(new_def)
-
-    assert not DummyStatsFactory().issimilar(stats, swapped)
 
 
 def test_dummy_copy_stats():
@@ -409,29 +379,6 @@ def test_database_aggregate():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_issimilar():
-    data = np.eye(10)
-    arr = fl.asarray(data)
-    node = Table(Literal(arr), (Field("i"), Field("j")))
-
-    stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert DatabaseStatsFactory().issimilar(stats, stats)
-
-    other = DatabaseStats.from_def(stats.tensordef, stats.nnz + 1.0, dict(stats.V))
-    assert not DatabaseStatsFactory().issimilar(stats, other)
-
-    i, j = Field("i"), Field("j")
-    bad_V = {i: stats.V[i] + 1.0, j: stats.V[j]}
-    other_v = DatabaseStats.from_def(stats.tensordef, stats.nnz, bad_V)
-    assert not DatabaseStatsFactory().issimilar(stats, other_v)
-
-
 def test_database_copy_stats():
     data = np.eye(10)
     arr = fl.asarray(data)
@@ -483,6 +430,39 @@ def test_database_reorder():
     reordered = DatabaseStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
+
+
+# ─────────────────────────────── UniformStats tests ─────────────────────────────
+
+
+# ─────────────────────────────── Test Embeddings ───────────────────────────────
+def test_embeddings():
+    data = np.zeros((20, 20))
+    data[0:10, 0:10] = 1.0
+    data[10:20, 10:20] = 1.0
+
+    arr = fl.asarray(data)
+    fields = (Field("i"), Field("j"))
+
+    print("\n" + "=" * 80)
+    ds = DenseStats(arr, fields)
+    ds_emb = ds.get_embedding()
+    print(f"DenseStats Embeddings : {ds_emb}")
+
+    us = UniformStats(arr, fields)
+    us_emb = us.get_embedding()
+    print(f"UniformStats Embeddings : {us_emb}")
+
+    dc_stats = DCStats(arr, fields)
+    dc_emb = dc_stats.get_embedding()
+    print(f"DCStats Embeddings: {dc_emb}")
+
+    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
+    bs = BlockedStats.from_tensor(arr, fields, blocks_per_dim, UniformStatsFactory())
+    bs_emb = bs.get_embedding()
+    print(f"BlockedStats Embeddings: {bs_emb}")
+
+    print("=" * 80)
 
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
@@ -588,7 +568,7 @@ def test_uniform_mapjoin_mul_and_add():
     assert us_add.estimate_non_fill_values() == pytest.approx(75.0)
 
 
-def test_uniform_aggregate_and_issimilar():
+def test_uniform_aggregate():
     data = np.eye(10)
     table = Table(Literal(fl.asarray(data)), (Field("i"), Field("j")))
     us = insert_statistics(
@@ -618,7 +598,6 @@ def test_uniform_aggregate_and_issimilar():
     assert us_agg.index_order == (Field("i"),)
     assert us_agg.get_dim_size(Field("i")) == 10
     assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
-    assert UniformStatsFactory().issimilar(us, us)
 
 
 # ------------------------------ BlockedStats -------------------------------------
@@ -626,9 +605,8 @@ def test_blocked_stats_from_tensor():
     data = np.eye(10)
     arr = fl.asarray(data)
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-
-    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
+    bs = bs_factory(arr, indices)
 
     assert bs.estimate_non_fill_values() == 10.0
 
@@ -636,15 +614,11 @@ def test_blocked_stats_from_tensor():
 def test_blocked_stats_aggregate():
     data = np.eye(10)
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), indices, blocks_per_dim, DenseStatsFactory()
-    )
+    bs_factory = BlockedStatsFactory(DenseStatsFactory())
+    bs = bs_factory(fl.asarray(data), indices)
 
     reduce_indices = (Field("j"),)
-    agg_bs = BlockedStatsFactory(blocks_per_dim, DenseStatsFactory()).aggregate(
-        ffuncs.add, 0.0, reduce_indices, bs
-    )
+    agg_bs = bs_factory.aggregate(ffuncs.add, 0.0, reduce_indices, bs)
 
     assert agg_bs.blocks.ndim == 1
     assert len(agg_bs.blocks) == 2
@@ -653,23 +627,17 @@ def test_blocked_stats_aggregate():
 
 def test_blocked_stats_mapjoin():
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
 
     data1 = np.zeros((10, 10))
     data1[0:5, 0:5] = 1.0
-    bs1 = BlockedStats.from_tensor(
-        fl.asarray(data1), indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs_factory = BlockedStatsFactory(UniformStatsFactory(), block_count=2)
+    bs1 = bs_factory(fl.asarray(data1), indices)
 
     data2 = np.zeros((10, 10))
     data2[5:10, 5:10] = 1.0
-    bs2 = BlockedStats.from_tensor(
-        fl.asarray(data2), indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs2 = bs_factory(fl.asarray(data2), indices)
 
-    result = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).mapjoin(
-        ffuncs.add, bs1, bs2
-    )
+    result = bs_factory.mapjoin(ffuncs.add, bs1, bs2)
 
     assert result.estimate_non_fill_values() == 50.0
     assert result.blocks[0, 1].estimate_non_fill_values() == 0.0
@@ -677,15 +645,11 @@ def test_blocked_stats_mapjoin():
 
 def test_blocked_stats_relabel():
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(np.eye(10)), indices, blocks_per_dim, UniformStatsFactory()
-    )
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
+    bs = bs_factory(fl.asarray(np.eye(10)), indices)
 
     new_names = (Field("row"), Field("col"))
-    relabeled = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).relabel(
-        bs, new_names
-    )
+    relabeled = bs_factory.relabel(bs, new_names)
 
     assert relabeled.index_order == new_names
     assert Field("row") in relabeled.blocks_per_dim
@@ -698,23 +662,21 @@ def test_blocked_stats_reorder():
     arr = fl.asarray(data)
 
     indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
+    bs_factory = BlockedStatsFactory(UniformStatsFactory())
+    bs = bs_factory(arr, indices)
 
     # Before reordering
-    assert bs.blocks[0, 0].get_dim_size(Field("i")) == 2.0
+    assert bs.blocks[0, 0].get_dim_size(Field("i")) == 4.0
     assert bs.blocks[0, 0].get_dim_size(Field("j")) == 5.0
 
     new_indices = (Field("j"), Field("i"))
-    reordered_bs = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
-        bs, new_indices
-    )
+    reordered_bs = bs_factory.reorder(bs, new_indices)
 
     new_block = reordered_bs.blocks[0, 0]
 
     # After reordering
     assert new_block.get_dim_size(Field("j")) == 5.0
-    assert new_block.get_dim_size(Field("i")) == 2.0
+    assert new_block.get_dim_size(Field("i")) == 4.0
     assert new_block.index_order == (Field("j"), Field("i"))
 
 
@@ -753,39 +715,6 @@ def test_blocked_stats_reorder_drop_two_index():
     assert reordered.estimate_non_fill_values() == bs.estimate_non_fill_values()
 
 
-def test_blocked_stats_issimilar():
-    indices = (Field("i"), Field("j"))
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    data = np.eye(10)
-    arr = fl.asarray(data)
-
-    # Identical
-    bs1 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
-    bs2 = BlockedStats.from_tensor(arr, indices, blocks_per_dim, UniformStatsFactory())
-    blocked_factory = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory())
-    assert blocked_factory.issimilar(bs1, bs2) is True
-
-    # Different data
-    data_diff = np.eye(10)
-    data_diff[0, 0] = 0.0
-    bs_diff_data = BlockedStats.from_tensor(
-        fl.asarray(data_diff), indices, blocks_per_dim, UniformStatsFactory()
-    )
-    assert blocked_factory.issimilar(bs1, bs_diff_data) is False
-
-    # Different blocks_per_dim
-    alt_blocks_per_dim = {Field("i"): 5, Field("j"): 5}
-    bs_diff_grid = BlockedStats.from_tensor(
-        arr, indices, alt_blocks_per_dim, UniformStatsFactory()
-    )
-    assert blocked_factory.issimilar(bs1, bs_diff_grid) is False
-
-    # Different StatsImpl
-    bs_diff_impl = BlockedStats.from_tensor(
-        arr, indices, blocks_per_dim, DenseStatsFactory()
-    )
-    assert blocked_factory.issimilar(bs1, bs_diff_impl) is False
-
 
 def get_structured_example(M, K, matrix_type):
     if matrix_type == "diagonal":
@@ -809,7 +738,6 @@ def get_structured_example(M, K, matrix_type):
 def test_benchmark_structured_comparison():
     M, K, N = 20, 20, 20
     i, j, k = Field("i"), Field("j"), Field("k")
-    blocks_per_dim = {i: 5, j: 5, k: 5}
 
     matrix_types = ["diagonal", "tridiagonal", "banded", "triangular", "striped"]
     implementations = [
@@ -821,7 +749,7 @@ def test_benchmark_structured_comparison():
     print("\n" + "=" * 85)
     print(
         f"{'Matrix Type':<15} | {'Stats':<15} |"
-        f" {'Stats Perf':<18} | {'Blocked Stats Perf'}"
+        f" {'Stats Relative Error':<18} | {'Blocked Stats Relative Error'}"
     )
     print("-" * 85)
 
@@ -849,9 +777,9 @@ def test_benchmark_structured_comparison():
             g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
             # Blocked Stats Performance
-            blocked_factory = BlockedStatsFactory(blocks_per_dim, impl_factory)
-            b_a = BlockedStats.from_tensor(tns_a, (i, k), blocks_per_dim, impl_factory)
-            b_b = BlockedStats.from_tensor(tns_b, (k, j), blocks_per_dim, impl_factory)
+            blocked_factory = BlockedStatsFactory(impl_factory)
+            b_a = blocked_factory(tns_a, (i, k))
+            b_b = blocked_factory(tns_b, (k, j))
             b_res = blocked_factory.aggregate(
                 ffuncs.add, 0.0, (k,), blocked_factory.mapjoin(ffuncs.mul, b_a, b_b)
             )
@@ -1162,7 +1090,7 @@ def test_mapjoin_mul_and_add():
     assert ds_sum.fill_value == 1.0 + 2.0
 
 
-def test_aggregate_and_issimilar():
+def test_aggregate():
     table = Table(
         Literal(fl.asarray(np.ones((2, 3)))),
         (Field("i"), Field("j")),
@@ -1193,8 +1121,6 @@ def test_aggregate_and_issimilar():
     assert ds_agg.index_order == (Field("i"),)
     assert ds_agg.get_dim_size(Field("i")) == 2.0
     assert ds_agg.fill_value == dsa.fill_value
-    assert DenseStatsFactory().issimilar(dsa, dsa)
-
 
 def test_relabel_dense_stats():
     arr = fl.asarray(np.zeros((2, 3)))

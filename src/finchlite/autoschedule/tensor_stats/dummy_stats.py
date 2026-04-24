@@ -41,13 +41,6 @@ class DummyStatsFactory(BaseTensorStatsFactory["DummyStats"]):
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
         return DummyStats.from_def(new_def)
 
-    def issimilar(self, a: DummyStats, b: DummyStats) -> bool:
-        return (
-            isinstance(a, DummyStats)
-            and isinstance(b, DummyStats)
-            and a.dim_sizes == b.dim_sizes
-            and a.tensordef.index_order == b.tensordef.index_order
-        )
 
     def relabel(
         self, stats: DummyStats, relabel_indices: tuple[Field, ...]

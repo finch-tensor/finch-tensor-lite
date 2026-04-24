@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Self
 
+import numpy as np
+
 from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
@@ -43,14 +45,6 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
         new_def = TensorDef.aggregate(op, init, reduce_indices, d)
         return DenseStats.from_def(new_def)
 
-    def issimilar(self, a: DenseStats, b: DenseStats) -> bool:
-        return (
-            isinstance(a, DenseStats)
-            and isinstance(b, DenseStats)
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-        )
-
     def relabel(
         self, stats: DenseStats, relabel_indices: tuple[Field, ...]
     ) -> DenseStats:
@@ -78,3 +72,8 @@ class DenseStats(NumericStats):
         for size in self.dim_sizes.values():
             total *= size
         return total
+
+    def get_embedding(self) -> np.ndarray:
+        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
+
+        return np.array(np.log2(sizes))
