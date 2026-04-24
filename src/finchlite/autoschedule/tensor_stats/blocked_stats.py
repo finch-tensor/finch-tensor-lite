@@ -20,7 +20,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         self,
         stats_factory: StatsFactory[NumericStats],
         block_count: int = 5,
-        block_width: int = 2,
+        block_width: int = 5,
     ):
         self.block_count = block_count
         self.block_width = block_width
@@ -31,7 +31,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             tensor,
             fields,
             blocks_per_dim={
-                f: int(min(self.block_count, n / self.block_width))
+                f: max(1,min(self.block_count, n // self.block_width))
                 for f, n in zip(fields, tensor.shape, strict=True)
             },
             stats_factory=self.inner_factory,
@@ -273,6 +273,7 @@ class BlockedStats(NumericStats):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
 
     def get_embedding(self) -> np.ndarray:
+        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
         total_elements = math.prod(self.tensordef.dim_sizes.values())
         num_blocks = self.blocks.size
         block_volume = total_elements / num_blocks
@@ -280,4 +281,7 @@ class BlockedStats(NumericStats):
             b.estimate_non_fill_values() / block_volume for b in self.blocks.flat
         ]
         density_array = np.array(densities)
-        return np.log2(density_array + 1)
+        dense_part = np.log2((density_array + 1))
+        size_part = np.log2(sizes)
+
+        return np.concatenate([size_part,dense_part])

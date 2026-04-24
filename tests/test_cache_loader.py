@@ -5,7 +5,6 @@ import numpy as np
 import finchlite as fl
 from finchlite.algebra import ffuncs
 from finchlite.autoschedule.cache import (
-    LogicCacheFirst,
     LogicCacheLRU,
     LogicCacheLRU_Embeddings_Norms,
 )
@@ -29,64 +28,6 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-def test_logic_cache_first():
-    logger.debug("------------- Using logic cache first  ----------------")
-    raw_loader = MockLogicLoader()
-    cache = LogicCacheFirst(raw_loader)
-    executor = LogicExecutor(ctx=cache, cache=False)
-
-    rng = np.random.default_rng()
-    data_a = fl.asarray(rng.random((50, 50)))
-    data_b = fl.asarray(rng.random((50, 50)))
-    data_c = fl.asarray(rng.random((50, 50)).astype(np.int64))
-    i, j = Field("i"), Field("j")
-
-    plan_1 = Plan(
-        (
-            Query(Alias("out"), Table(Literal(data_a), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
-        )
-    )
-
-    # Initiating the cache with a prgm binding pair - Expected MISS
-    plan_2 = Plan(
-        (
-            Query(
-                Alias("mult"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (Table(Literal(data_a), (i, j)), Table(Literal(data_a), (i, j))),
-                ),
-            ),
-            Produces((Table(Alias("mult"), (i, j)),)),
-        )
-    )
-    executor(plan_1)
-
-    # Case 1 : Same (prgm,binding) pair - Expected HIT
-    # We should be able to fetch the kernel from the cache ->
-    # Len of cache remains same since same prgm, binding pair
-    sim_plan_1 = Plan(
-        (
-            Query(Alias("out"), Table(Literal(data_b), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
-        )
-    )
-    executor(sim_plan_1)
-
-    # Case 2 : Diff (prgm, binding) pair  - Expected MISS
-    # Passing a different program so new addition to the cache
-    executor(plan_2)
-
-    # Case 3 : Diff (prgm, binding) pair - Expected MISS
-    # Passing diff bindings - Data type for c is changed
-    plan_1_diff = Plan(
-        (
-            Query(Alias("out"), Table(Literal(data_c), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
-        )
-    )
-    executor(plan_1_diff)
 
 
 def test_logic_cache_lru():

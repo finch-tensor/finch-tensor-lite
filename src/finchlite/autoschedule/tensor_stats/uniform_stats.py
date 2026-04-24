@@ -156,6 +156,6 @@ class UniformStats(NumericStats):
 
         prob = self.nnz / volume if volume > 0 else 0.0
 
-        vector = sizes + [prob]
+        uniform_embedding = sizes + [prob]
 
-        return np.log2(vector)
+        return np.log2(uniform_embedding)

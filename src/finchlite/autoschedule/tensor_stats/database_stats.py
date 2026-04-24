@@ -10,7 +10,7 @@ from .dc_stats import DCStats
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory
-
+import numpy as np
 
 class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
     def __init__(self):
@@ -245,4 +245,16 @@ class DatabaseStats(NumericStats):
     def estimate_non_fill_values(self) -> float:
         return self.nnz
 
-    def get_embedding(self): ...
+    def get_embedding(self): 
+        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
+        v_vals = [float(self.V.get(field,0.0)) for field in self.index_order]
+        total_elements = math.prod((self.tensordef.dim_sizes.values()))
+        density = self.nnz / total_elements
+
+        size_part = np.log2(np.array(sizes))
+        v_vals_part = np.log2(np.array(v_vals))
+        density_part = np.log2(np.array([density])+1)
+
+        return np.concatenate([size_part,v_vals_part,density_part])
+    
+

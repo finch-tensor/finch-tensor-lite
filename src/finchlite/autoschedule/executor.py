@@ -2,6 +2,7 @@ from collections import OrderedDict
 from typing import Any
 
 from finchlite.algebra.tensor import Tensor, TensorFType
+from finchlite.autoschedule.cache import LogicCacheFirst
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
@@ -56,14 +57,17 @@ class LogicExecutor(LogicEvaluator):
         stats_factory: StatsFactory | None = None,
         cache: bool = False,
     ):
-        if ctx is None:
-            ctx = DefaultLogicFormatter()
-        if stats_factory is None:
-            stats_factory = DenseStatsFactory()
-        self.ctx: LogicLoader = ctx
-        self.stats_factory = stats_factory
-        self.cache = cache
-        self.stats_cache: dict[tuple[Any, Any], OrderedDict] = {}
+        loader = ctx if ctx is not None else DefaultLogicFormatter()
+        self.stats_factory: StatsFactory = (
+            stats_factory if stats_factory is not None else DenseStatsFactory()
+        )
+
+        if cache :
+            final_loader : lgc.LogicLoader = LogicCacheFirst(loader)
+        else :
+            final_loader = loader
+
+        self.ctx: lgc.LogicLoader = final_loader
 
     def __call__(
         self,
@@ -89,21 +93,13 @@ class LogicExecutor(LogicEvaluator):
         binding_ftypes: dict[lgc.Alias, TensorFType] = {
             var: val.ftype for var, val in bindings.items()
         }
-        exec_cache_key = (stmt, tuple(binding_ftypes.items()))
+
         stats_bindings = OrderedDict()
+        for var, T in bindings.items():
+            shape = T.shape
+            fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
+            stats_bindings[var] = self.stats_factory(T, fields)
 
-        if self.cache and exec_cache_key in self.stats_cache:
-            stats_bindings = self.stats_cache[exec_cache_key]
-
-        else:
-            stats_bindings = OrderedDict()
-            for var, T in bindings.items():
-                shape = T.shape
-                fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
-                stats_bindings[var] = self.stats_factory(T, fields)
-
-            if self.cache:
-                self.stats_cache[exec_cache_key] = stats_bindings
 
         mod, binding_ftypes, binding_idxs = self.ctx(
             stmt,

@@ -489,7 +489,7 @@ def test_blocked_stats_aggregate():
     agg_bs = bs_factory.aggregate(ffuncs.add, 0.0, reduce_indices, bs)
 
     assert agg_bs.blocks.ndim == 1
-    assert len(agg_bs.blocks) == 5
+    assert len(agg_bs.blocks) == 2
     assert agg_bs.estimate_non_fill_values() == 10.0
 
 
@@ -534,8 +534,8 @@ def test_blocked_stats_reorder():
     bs = bs_factory(arr, indices)
 
     # Before reordering
-    assert bs.blocks[0, 0].get_dim_size(Field("i")) == 2.0
-    assert bs.blocks[0, 0].get_dim_size(Field("j")) == 2.0
+    assert bs.blocks[0, 0].get_dim_size(Field("i")) == 4.0
+    assert bs.blocks[0, 0].get_dim_size(Field("j")) == 5.0
 
     new_indices = (Field("j"), Field("i"))
     reordered_bs = bs_factory.reorder(bs, new_indices)
@@ -543,8 +543,8 @@ def test_blocked_stats_reorder():
     new_block = reordered_bs.blocks[0, 0]
 
     # After reordering
-    assert new_block.get_dim_size(Field("j")) == 2.0
-    assert new_block.get_dim_size(Field("i")) == 2.0
+    assert new_block.get_dim_size(Field("j")) == 5.0
+    assert new_block.get_dim_size(Field("i")) == 4.0
     assert new_block.index_order == (Field("j"), Field("i"))
 
 

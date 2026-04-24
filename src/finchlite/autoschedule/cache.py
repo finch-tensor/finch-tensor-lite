@@ -91,69 +91,6 @@ class LogicCacheLRU(LogicLoader):
 
         return result
 
-
-class LogicCacheLRU_Embeddings(LogicLoader):
-    def __init__(self, ctx: LogicLoader, max_depth: int = 10, threshold: int = 1):
-        self.ctx = ctx
-        self.max_depth = max_depth
-        self.cache: dict[tuple, dict] = {}
-        self.threshold = threshold
-
-    def __call__(
-        self,
-        prgm: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-
-        prgm_key = (prgm, tuple(bindings.items()), stats_factory)
-        if prgm_key not in self.cache:
-            self.cache[prgm_key] = {
-                "cached_embeddings": None,
-                "kernels": [],
-            }  # embeddings : result (kernel)
-
-        entry = self.cache[prgm_key]  # fetching the cached vectors and kernels
-
-        if stats:
-            current_vec = np.concatenate(
-                [
-                    s.get_embedding()
-                    for s in stats.values()
-                    if isinstance(s, NumericStats)
-                ]
-            )  # concatenating the embeddings
-            if entry["cached_embeddings"] is not None:
-                dist = np.abs(entry["cached_embeddings"] - current_vec)
-                max_dist = np.max(dist, axis=1)
-                chosen_idx = np.argmin(max_dist)  # threshold = 1
-                if max_dist[chosen_idx] < self.threshold:
-                    logger.debug("CacheLRU_Embeddings HIT, reusing kernel")
-                    return entry["kernels"][chosen_idx]
-
-        logger.debug("CacheLRU_Embeddings MISS, compiling new kernel and embeddings")
-        result = self.ctx(prgm, bindings, stats, stats_factory)
-
-        if stats:
-            if entry["cached_embeddings"] is None:
-                entry["cached_embeddings"] = np.array([current_vec])
-            else:
-                entry["cached_embeddings"] = np.vstack(
-                    [entry["cached_embeddings"], current_vec]
-                )
-
-            entry["kernels"].append(result)
-
-            if len(entry["kernels"]) > self.max_depth:
-                entry["cached_embeddings"] = np.delete(
-                    entry["cached_embeddings"], 0, axis=0
-                )
-                entry["kernels"].pop(0)
-
-        return result
-
-
 class LogicCacheLRU_Embeddings_Norms(LogicLoader):
     def __init__(
         self,
