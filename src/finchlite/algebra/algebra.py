@@ -56,7 +56,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Hashable
 from typing import Any
 
-import numpy as np
+from .ftypes import FDTypeOrdered, FType, ftype
 
 _properties: dict[tuple[type | Hashable, str, str], Any] = {}
 
@@ -156,27 +156,6 @@ def register_property(cls, attr, prop, f):
     _properties[(cls, attr, prop)] = f
 
 
-def promote_type(a: Any, b: Any) -> type:
-    """Returns the data type with the smallest size and smallest scalar kind to
-    which both type1 and type2 may be safely cast.
-
-    Args:
-        *args: The types to promote.
-
-    Returns:
-        The common type of the given arguments.
-    """
-    return promote_type_stable(a, b)
-
-
-def promote_type_stable(a: Any, b: Any) -> type:
-    a = type(a) if not isinstance(a, type) else a
-    b = type(b) if not isinstance(b, type) else b
-    if issubclass(a, np.generic) or issubclass(b, np.generic):
-        return np.promote_types(a, b).type
-    return type(a(False) + b(False))
-
-
 class COperator(ABC):
     @property
     @abstractmethod
@@ -206,7 +185,7 @@ class FinchOperator(ABC):
         pass
 
     @abstractmethod
-    def return_type(self, *args: Any) -> type:
+    def return_type(self, *args: FType) -> FType:
         pass
 
     def is_distributive(self, other_op: "FinchOperator") -> bool:
@@ -218,7 +197,7 @@ class FinchOperator(ABC):
     def is_annihilator(self, val: Any) -> bool:
         return False
 
-    def init_value(self, type_: type) -> Any:
+    def init_value(self, type_: FType) -> Any:
         raise AttributeError(f"{type(self)} has no init_value")
 
     def repeat_operator(self) -> Any:
@@ -256,15 +235,16 @@ def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:
     return op.is_distributive(other_op)
 
 
-def return_type(op: FinchOperator, *args: Any) -> Any:
-    return op.return_type(*args)
+def return_type(op: FinchOperator, *args: FType) -> FType:
+    arg_types = tuple(ftype(arg) for arg in args)
+    return op.return_type(*arg_types)
 
 
 def init_value(op: FinchOperator, arg: Any) -> Any:
     return op.init_value(arg)
 
 
-def fixpoint_type(op: FinchOperator, z: Any, t: type) -> type:
+def fixpoint_type(op: FinchOperator, z: Any, t: FType) -> FType:
     """
     Determines the fixpoint type after repeated calling the given operation.
 
@@ -277,14 +257,15 @@ def fixpoint_type(op: FinchOperator, z: Any, t: type) -> type:
         The fixpoint type.
     """
     s = set()
-    r = type(z)
+    z_type = ftype(z)
+    r = z_type
     while r not in s:
         s.add(r)
-        r = return_type(op, type(z), t)
+        r = return_type(op, z_type, t)
     return r
 
 
-def type_min(type_: type) -> Any:
+def type_min(type_: FDTypeOrdered) -> Any:
     """
     Returns the minimum value of the given type.
 
@@ -297,16 +278,10 @@ def type_min(type_: type) -> Any:
     Raises:
         AttributeError: If the minimum value is not implemented for the given type.
     """
-    if type_ in (bool, np.bool_):
-        return np.bool_(False)
-    if issubclass(type_, (int, np.integer)):
-        return np.iinfo(type_).min
-    if issubclass(type_, (float, np.floating)):
-        return np.finfo(type_).min
-    raise Exception(f"Unsupported type for type_min: {type_}")
+    return type_.type_min
 
 
-def type_max(type_: type) -> Any:
+def type_max(type_: FDTypeOrdered) -> Any:
     """
     Returns the maximum value of the given type.
 
@@ -319,13 +294,7 @@ def type_max(type_: type) -> Any:
     Raises:
         AttributeError: If the maximum value is not implemented for the given type.
     """
-    if type_ in (bool, np.bool_):
-        return np.bool_(True)
-    if issubclass(type_, (int, np.integer)):
-        return np.iinfo(type_).max
-    if issubclass(type_, (float, np.floating)):
-        return np.finfo(type_).max
-    raise Exception(f"Unsupported type for type_max: {type_}")
+    return type_.type_max
 
 
 def repeat_operator(op: FinchOperator):

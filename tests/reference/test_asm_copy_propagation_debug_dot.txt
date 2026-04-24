@@ -5,18 +5,18 @@ EXIT_1: #succs=[]
 dot_product_2: #succs=[dot_product_4, dot_product_5]
     [10] a: np_buf_t(float64) = a
     [11] b: np_buf_t(float64) = b
-    [0] c: float64 = 0.0
+    [0] c: finchlite.float64 = 0.0
     [1] a_: np_buf_t(float64) = unpack(a) 	# a = ('a', 10)
     [2] b_: np_buf_t(float64) = unpack(b) 	# b = ('b', 11)
-    j: int64 = 0
+    j: finchlite.int64 = 0
 
 dot_product_3: #succs=[EXIT_1]
 
 dot_product_4: #succs=[dot_product_4, dot_product_5]
     [8] assert(lt(j, length(slot(a_, np_buf_t(float64)))))
-    [7] i: int64 = j
-    [3] c: float64 = add(c, mul(load(slot(a_, np_buf_t(float64)), i), load(slot(b_, np_buf_t(float64)), i)))
-    j: int64 = add(j, 1)
+    [7] i: finchlite.int64 = j
+    [3] c: finchlite.float64 = add(c, mul(load(slot(a_, np_buf_t(float64)), i), load(slot(b_, np_buf_t(float64)), i)))
+    j: finchlite.int64 = add(j, 1)
 
 dot_product_5: #succs=[dot_product_3]
     [9] assert(not_(lt(j, length(slot(a_, np_buf_t(float64))))))

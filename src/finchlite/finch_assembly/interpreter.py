@@ -4,7 +4,8 @@ import sys
 from dataclasses import dataclass
 from typing import Any, overload
 
-from ..symbolic import ScopedDict, fisinstance
+from ..algebra import fisinstance
+from ..symbolic import ScopedDict
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 
@@ -169,12 +170,12 @@ class AssemblyInterpreter(AssemblyLoader):
             case asm.GetAttr(obj, attr):
                 obj_e = self(obj)
                 attr = attr.val
-                return obj.result_format.struct_getattr(obj_e, attr)
+                return obj.result_type.struct_getattr(obj_e, attr)
             case asm.SetAttr(obj, attr, val):
                 obj_e = self(obj)
                 attr = attr.val
                 val_e = self(val)
-                obj.result_format.struct_setattr(obj_e, attr, val_e)
+                obj.result_type.struct_setattr(obj_e, attr, val_e)
                 return None
             case asm.Slot(var_n, var_t):
                 if var_n in self.types:
@@ -255,7 +256,7 @@ class AssemblyInterpreter(AssemblyLoader):
             case asm.ForLoop(asm.Variable(var_n, var_t) as var, start, end, body):
                 start_e = self(start)
                 end_e = self(end)
-                if not isinstance(start_e, var_t):
+                if not fisinstance(start_e, var_t):
                     raise TypeError(
                         f"Start value {start_e} is not of type {var_t} for "
                         f"variable '{var_n}'."

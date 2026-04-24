@@ -1,13 +1,11 @@
-"""AI modified: 2026-03-16T14:23:28Z parent=18fbb013175241f5081102d7b13f81f0e6c3de04"""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self
 
-from ..algebra import return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
+from ..algebra import ftype, return_type
+from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
 from ..util import qual_str
 
 """
@@ -55,7 +53,7 @@ class FusedTree(FusedNode, TermTree, ABC):
 class FusedExpression(FusedNode, ABC):
     @property
     @abstractmethod
-    def result_format(self) -> Any: ...
+    def result_type(self) -> Any: ...
 
 
 class FusedStatement(FusedNode, ABC):
@@ -67,7 +65,7 @@ class Literal(FusedExpression):
     val: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         return ftype(self.val)
 
     def __repr__(self) -> str:
@@ -80,7 +78,7 @@ class Variable(FusedExpression, NamedTerm):
     type_: Any = None
 
     @property
-    def result_format(self):
+    def result_type(self):
         return self.type_
 
     @property
@@ -107,8 +105,8 @@ class Call(FusedTree, FusedExpression):
         return cls(fn, tuple(args))
 
     @property
-    def result_format(self):
-        arg_types = [arg.result_format for arg in self.args]
+    def result_type(self):
+        arg_types = [arg.result_type for arg in self.args]
         if isinstance(self.fn, Literal):
             return return_type(self.fn.val, *arg_types)
         return None
@@ -125,7 +123,7 @@ class Compare(FusedTree, FusedExpression):
         return [self.left, self.op, self.right]
 
     @property
-    def result_format(self):
+    def result_type(self):
         return bool
 
 
@@ -140,10 +138,10 @@ class BinaryOp(FusedTree, FusedExpression):
         return [self.left, self.op, self.right]
 
     @property
-    def result_format(self):
+    def result_type(self):
         if isinstance(self.op, Literal):
             return return_type(
-                self.op.val, self.left.result_format, self.right.result_format
+                self.op.val, self.left.result_type, self.right.result_type
             )
         return None
 

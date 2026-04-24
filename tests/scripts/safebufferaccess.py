@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 """
 safebufferaccess.py: A safe buffer testing script for finch
 
@@ -12,6 +13,7 @@ import argparse
 
 import numpy as np
 
+import finchlite
 import finchlite.finch_assembly as asm
 from finchlite.codegen import CCompiler, NumpyBuffer, SafeBuffer
 
@@ -38,8 +40,8 @@ ab = NumpyBuffer(a)
 ab_safe = SafeBuffer(ab)
 ab_v = asm.Variable("a", ab_safe.ftype)
 ab_slt = asm.Slot("a_", ab_safe.ftype)
-idx = asm.Variable("idx", np.intp)
-val = asm.Variable("val", np.int64)
+idx = asm.Variable("idx", finchlite.intp)
+val = asm.Variable("val", finchlite.int64)
 
 res_var = asm.Variable("val", ab_safe.ftype.element_type)
 res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
