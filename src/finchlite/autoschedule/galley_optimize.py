@@ -22,7 +22,10 @@ from ..finch_logic import (
 )
 from ..util.logging import LOG_GALLEY
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
+from .galley.logical_optimizer.branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
 from .galley.logical_optimizer.logic_to_stats import insert_statistics
 from .galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
@@ -38,13 +41,15 @@ def optimize_query(
     stats_bindings,
     use_components: bool = True,
     *,
-    use_exact_branch_and_bound: bool = False,
+    optimizer: GalleyOptimizer = "dfs",
 ):
-    """Rewrite a single logical Query via greedy or exact branch-and-bound reduction."""
+    """Rewrite a single logical Query using ``optimizer``:
+    greedy, bfs, or dfs."""
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
-    use_greedy = not use_exact_branch_and_bound
     new_queries, _ = pruned_query_to_plan(
-        annotated_query, use_components=use_components, use_greedy=use_greedy
+        annotated_query,
+        use_components=use_components,
+        optimizer=optimizer,
     )
     return new_queries
 
@@ -55,7 +60,7 @@ def optimize_plan(
     stats_bindings: dict[Alias, TensorStats],
     use_components: bool = True,
     *,
-    use_exact_branch_and_bound: bool = False,
+    optimizer: GalleyOptimizer = "greedy",
 ):
     """
     Optimize a full Plan: run the Galley optimizer on each Query body,
@@ -71,7 +76,7 @@ def optimize_plan(
                 stats_factory,
                 stats_bindings,
                 use_components=use_components,
-                use_exact_branch_and_bound=use_exact_branch_and_bound,
+                optimizer=optimizer,
             )
             for new_query in new_queries:
                 insert_statistics(
@@ -90,9 +95,12 @@ def optimize_plan(
 
 class GalleyLogicalOptimizer(LogicLoader):
     """
-    LogicLoader stage that optimizes logical Plans with the Galley greedy
-    rewriter (or exact branch-and-bound when enabled), then forwards to a
-    downstream LogicLoader (ctx).
+    LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
+    then forwards the Plan to the downstream loader ``ctx``.
+
+    Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the
+    DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not
+    inside ``branch_and_bound_dfs``.
     """
 
     def __init__(
@@ -100,11 +108,11 @@ class GalleyLogicalOptimizer(LogicLoader):
         ctx: LogicLoader,
         use_components: bool = True,
         *,
-        use_exact_branch_and_bound: bool = True,
+        optimizer: GalleyOptimizer = "bfs",
     ):
         self.ctx = ctx
         self.use_components = use_components
-        self.use_exact_branch_and_bound = use_exact_branch_and_bound
+        self.optimizer = optimizer
         self.last_optimize_plan_s: float | None = None
 
     def __call__(
@@ -127,7 +135,7 @@ class GalleyLogicalOptimizer(LogicLoader):
             stats_factory,
             stats,
             use_components=self.use_components,
-            use_exact_branch_and_bound=self.use_exact_branch_and_bound,
+            optimizer=self.optimizer,
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
         return self.ctx(term, bindings, stats, stats_factory)
