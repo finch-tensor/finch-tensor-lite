@@ -10,6 +10,8 @@ def _f1_jit(A, B, C, D, E):
 
 
 class JITCompare:
+    timeout = 120
+
     def mat(self, n, m):
         rng = np.random.default_rng()
         return fl.asarray(rng.integers(0, 10, (n, m)))
