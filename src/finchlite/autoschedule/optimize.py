@@ -3,6 +3,7 @@ from itertools import chain as join_chains
 from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
+from finchlite.algebra.ftypes import ftype
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_logic.nodes import LogicExpression
@@ -210,7 +211,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                     match item:
                         case Aggregate(Literal(g), Literal(init), arg, idxs) as agg if (
                             is_distributive(f, g)
-                            and is_annihilator(f, init)
+                            and is_annihilator(f, init, ftype(init))
                             and len(agg.fields())
                             == len(
                                 MapJoin(
