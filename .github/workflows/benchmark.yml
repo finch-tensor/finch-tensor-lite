@@ -1,0 +1,29 @@
+name: Benchmark
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+            fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - name: Configure Poetry
+        run: |
+            poetry env use python3.12
+      - name: Install package
+        run: |
+          poetry install --extras benchmark
+      - name: Run benchmarks
+        run: |
+          poetry run asv machine --yes
+          poetry run asv continuous origin/main HEAD -f 1.10
+
+on:
+  pull_request:
+    branches:
+      - main
