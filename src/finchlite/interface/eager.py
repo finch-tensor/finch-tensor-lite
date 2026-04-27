@@ -1,6 +1,7 @@
 import builtins
 import operator
 import sys
+import time
 from abc import ABC
 from collections.abc import Sequence
 from typing import Any
@@ -416,6 +417,7 @@ def matmul(x1, x2, /):
     Returns a LazyTensor if either x1 or x2 is a LazyTensor.
     Otherwise, computes the result eagerly.
     """
+    time.sleep(0.5)
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.matmul(x1, x2)
     c = lazy.matmul(x1, x2)
