@@ -13,7 +13,7 @@ import numpy as np
 
 from lark import Lark, Token, Tree
 
-from ..algebra import ffunc
+from ..algebra import ffuncs
 from . import nodes as asm
 
 assembly_parser = Lark(
@@ -59,19 +59,19 @@ assembly_parser = Lark(
 )
 
 _OPS = {
-    "+": ffunc.add,
-    "-": ffunc.sub,
-    "*": ffunc.mul,
-    "/": ffunc.truediv,
-    "<": ffunc.lt,
-    "<=": ffunc.le,
-    ">": ffunc.gt,
-    ">=": ffunc.ge,
-    "min": ffunc.min,
-    "max": ffunc.max,
-    "add": ffunc.add,
-    "sub": ffunc.sub,
-    "mul": ffunc.mul,
+    "+": ffuncs.add,
+    "-": ffuncs.sub,
+    "*": ffuncs.mul,
+    "/": ffuncs.truediv,
+    "<": ffuncs.lt,
+    "<=": ffuncs.le,
+    ">": ffuncs.gt,
+    ">=": ffuncs.ge,
+    "min": ffuncs.min,
+    "max": ffuncs.max,
+    "add": ffuncs.add,
+    "sub": ffuncs.sub,
+    "mul": ffuncs.mul,
 }
 
 
@@ -143,7 +143,7 @@ def parse_assembly(
                 return asm.Call(asm.Literal(np.resize), (ctx(arr), ctx(size)))
             case Tree("scansearch", [arr, x, lo, hi]):
                 return asm.Call(
-                    asm.Literal(ffunc.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
+                    asm.Literal(ffuncs.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
                 )
             case Tree("bin_op", [op, expr1, expr2]):
                 return asm.Call(asm.Literal(ctx(op)), (ctx(expr1), ctx(expr2)))

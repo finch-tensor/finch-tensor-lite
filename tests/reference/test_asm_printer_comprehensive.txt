@@ -1,42 +1,42 @@
-def compute(x: int64, y: int64) -> int64:
-    temp: int64 = x
-    temp: int64 = add(temp, y)
+def compute(x: finchlite.int64, y: finchlite.int64) -> finchlite.int64:
+    temp: finchlite.int64 = x
+    temp: finchlite.int64 = add(temp, y)
     return temp
 
-def main() -> int64:
-    a: int64 = 10
-    b: int64 = a
-    c: int64 = b
-    d: int64 = 5
+def main() -> finchlite.int64:
+    a: finchlite.int64 = 10
+    b: finchlite.int64 = a
+    c: finchlite.int64 = b
+    d: finchlite.int64 = 5
     if gt(c, 5):
-        a: int64 = add(a, d)
-        b: int64 = a
-    result: int64 = 0
+        a: finchlite.int64 = add(a, d)
+        b: finchlite.int64 = a
+    result: finchlite.int64 = 0
     for i in range(0, 5):
-        temp: int64 = i
-        result: int64 = add(result, temp)
+        temp: finchlite.int64 = i
+        result: finchlite.int64 = add(result, temp)
         if eq(mod(i, 2), 0):
-            result: int64 = mul(result, 2)
+            result: finchlite.int64 = mul(result, 2)
     if gt(result, 20):
-        c: int64 = result
-        result: int64 = add(c, b)
+        c: finchlite.int64 = result
+        result: finchlite.int64 = add(c, b)
     else:
-        c: int64 = b
-        result: int64 = mul(c, 3)
+        c: finchlite.int64 = b
+        result: finchlite.int64 = mul(c, 3)
     for i in range(0, 3):
-        a: int64 = i
+        a: finchlite.int64 = i
         for j in range(0, 2):
-            b: int64 = j
-            result: int64 = add(result, add(a, b))
-    d: int64 = result
+            b: finchlite.int64 = j
+            result: finchlite.int64 = add(result, add(a, b))
+    d: finchlite.int64 = result
     if lt(d, 100):
-        c: int64 = d
+        c: finchlite.int64 = d
         if gt(c, 50):
-            result: int64 = mul(c, 2)
+            result: finchlite.int64 = mul(c, 2)
         else:
-            result: int64 = c
+            result: finchlite.int64 = c
     else:
-        result: int64 = d
-    a: int64 = result
-    b: int64 = a
+        result: finchlite.int64 = d
+    a: finchlite.int64 = result
+    b: finchlite.int64 = a
     return b

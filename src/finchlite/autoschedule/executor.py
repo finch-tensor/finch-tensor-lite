@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from finchlite.algebra.tensor import Tensor
+from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
@@ -11,7 +11,7 @@ from ..finch_logic import (
     LogicNode,
     StatsFactory,
 )
-from ..symbolic import Namespace, PostWalk, Rewrite, ftype
+from ..symbolic import Namespace, PostWalk, Rewrite
 from .formatter import DefaultLogicFormatter
 
 
@@ -81,7 +81,9 @@ class LogicExecutor(LogicEvaluator):
             stmt = lgc.Plan((stmt,))
 
         stmt, bindings = extract_tensors(stmt, bindings)
-        binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
+        binding_ftypes: dict[lgc.Alias, TensorFType] = {
+            var: val.ftype for var, val in bindings.items()
+        }
         stats_bindings = OrderedDict()
 
         for var, T in bindings.items():
@@ -107,7 +109,7 @@ class LogicExecutor(LogicEvaluator):
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
-                bindings[var] = tns_ftype(shape)
+                bindings[var] = tns_ftype.construct(shape)
 
         args = list(bindings.values())
 

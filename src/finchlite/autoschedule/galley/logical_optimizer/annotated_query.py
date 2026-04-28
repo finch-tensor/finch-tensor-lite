@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from ....algebra import (
     cansplitpush,
-    ffunc,
+    ffuncs,
     is_associative,
     is_commutative,
     is_distributive,
@@ -118,7 +118,7 @@ class AnnotatedQuery:
                         top_counter += 1
 
                         if op.val is None:
-                            idx_op[idx] = ffunc.init_write(cache[arg].fill_value)
+                            idx_op[idx] = ffuncs.init_write(cache[arg].fill_value)
                             idx_init[idx] = cache[arg].fill_value
                         else:
                             idx_op[idx] = op.val

@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 
 import finchlite as fl
-from finchlite.algebra import ffunc
+from finchlite.algebra import ffuncs
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     branch_and_bound,
@@ -41,10 +41,10 @@ def _make_aq_four_index_chain():
     q = Query(
         Alias("out"),
         Aggregate(
-            Literal(ffunc.add),
+            Literal(ffuncs.add),
             Literal(0),
             MapJoin(
-                Literal(ffunc.mul),
+                Literal(ffuncs.mul),
                 (
                     Table(Literal(A), (Field("i"), Field("j"))),
                     Table(Literal(B), (Field("j"), Field("k"))),
@@ -64,10 +64,10 @@ def _make_aq_three_index_chain():
     q = Query(
         Alias("out"),
         Aggregate(
-            Literal(ffunc.add),
+            Literal(ffuncs.add),
             Literal(0),
             MapJoin(
-                Literal(ffunc.mul),
+                Literal(ffuncs.mul),
                 (
                     Table(Literal(A), (Field("i"), Field("j"))),
                     Table(Literal(B), (Field("j"), Field("k"))),
