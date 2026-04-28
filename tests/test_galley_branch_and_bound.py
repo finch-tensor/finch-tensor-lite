@@ -92,10 +92,10 @@ def test_layered_bnb_exact_matches_dfs_bnb_exact_on_matmul_chain():
     q = Query(
         Alias("out"),
         Aggregate(
-            Literal(ffunc.add),
+            Literal(ffuncs.add),
             Literal(0),
             MapJoin(
-                Literal(ffunc.mul),
+                Literal(ffuncs.mul),
                 (
                     Table(Literal(mats[0]), (Field("i"), Field("j"))),
                     Table(Literal(mats[1]), (Field("j"), Field("k"))),
