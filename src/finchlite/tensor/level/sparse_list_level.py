@@ -5,7 +5,7 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
-from ...algebra import ffunc
+from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
 from ...interface.scalar import Scalar
@@ -20,9 +20,12 @@ class SparseListLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
+class SparseListLevelFType(LevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
-    dimension_type: Any = None
+    dimension_type: FType = ftypes.intp
+
+    def __post_init__(self):
+        self.dimension_type = ftype(self.dimension_type)
 
     @property
     def struct_name(self):
@@ -41,10 +44,6 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
             ("ptr", self.buffer_factory(self.dimension_type)),
             ("idx", self.buffer_factory(self.dimension_type)),
         ]
-
-    def __post_init__(self):  # TODO: use different constructor instead
-        if self.dimension_type is None:
-            self.dimension_type = np.intp
 
     def __str__(self):
         return f"SparseListLevelFType({self.lvl_t})"
@@ -97,7 +96,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
     def idx_type(self):
         return self.buffer_factory(self.dimension_type)
 
-    def __call__(self, *, shape):
+    def construct(self, *, shape):
         """
         Creates an instance of SparseListLevel.
 
@@ -106,8 +105,21 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl_t(shape=shape[1:])
+        lvl = self.lvl_t.construct(shape=shape[1:])
         return SparseListLevel(lvl, self.dimension_type(shape[0]))
+
+    def __call__(self, val: Any) -> "SparseListLevel":
+        """
+        Convert a level to this sparse list level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A SparseListLevel instance of this type.
+        """
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     @property
     def lvl_t(self):
@@ -196,7 +208,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                 asm.Assign(
                     level_fields.ptr_s,  # type: ignore[arg-type]
                     asm.Call(
-                        asm.Literal(ffunc.resize_if_smaller),
+                        asm.Literal(ffuncs.resize_if_smaller),
                         (
                             level_fields.ptr_s,
                             pos_stop,
@@ -211,6 +223,8 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
         self, ctx, stack: asm.Stack, ext, mode: ntn.AccessMode, proto, pos
     ):
         tns: FiberTensorFields = stack.obj
+        if not isinstance(stack.type, FiberTensorFType):
+            raise TypeError(f"Expected FiberTensorFType, got: {stack.type}")
         ft_ftype: FiberTensorFType = stack.type
         assert isinstance(tns.lvl_fields, SparseListLevelFields)
         ptr_s = tns.lvl_fields.ptr_s
@@ -271,7 +285,7 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
             body=lambda ctx, ext: lplt.Sequence(
                 head=lambda ctx, idx: lplt.Stepper(
                     preamble=lambda ctx: asm.IfElse(
-                        asm.Call(asm.L(ffunc.lt), (q, q_stop)),
+                        asm.Call(asm.L(ffuncs.lt), (q, q_stop)),
                         asm.Block((asm.Assign(i_stop, asm.Load(idx_s, q)),)),
                         asm.Block(
                             (
@@ -298,14 +312,14 @@ class SparseListLevelFType(LevelFType, asm.AssemblyStructFType):
                         (
                             asm.Assign(
                                 q,
-                                asm.Call(asm.L(ffunc.add), (q, asm.L(self.p_t(1)))),
+                                asm.Call(asm.L(ffuncs.add), (q, asm.L(self.p_t(1)))),
                             ),
                         )
                     ),
                     seek=seek_fn,
                 ),
                 split=lambda ctx, idx: ntn.Call(
-                    ntn.L(ffunc.add),
+                    ntn.L(ffuncs.add),
                     (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
                 ),
                 tail=lambda ctx, idx: lplt.Run(
@@ -341,9 +355,9 @@ class SparseListLevel(Level):
 
     def __post_init__(self):
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type())
+            self.ptr = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
         if self.idx is None:
-            self.idx = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type())
+            self.idx = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
 
     @property
     def stride(self) -> np.integer:
@@ -353,7 +367,7 @@ class SparseListLevel(Level):
     def ftype(self) -> SparseListLevelFType:
         # mypy does not understand that dataclasses generate __hash__ and __eq__
         # https://github.com/python/mypy/issues/19799
-        return SparseListLevelFType(self.lvl.ftype, type(self.dimension))  # type: ignore[abstract]
+        return SparseListLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
 
     @property
     def val(self) -> Any:

@@ -1,7 +1,7 @@
 import numpy as np
 
 import finchlite.finch_logic as logic
-from finchlite import ffunc, ftype
+from finchlite import ffuncs, ftype
 from finchlite.autoschedule import NotationGenerator
 from finchlite.compile.bufferized_ndarray import (
     BufferizedNDArray,
@@ -29,11 +29,11 @@ def test_logic_compiler(file_regression):
             Query(
                 lhs=Alias(name="A2"),
                 rhs=Aggregate(
-                    op=logic.Literal(val=ffunc.add),
+                    op=logic.Literal(val=ffuncs.add),
                     init=logic.Literal(val=0),
                     arg=Reorder(
                         arg=MapJoin(
-                            op=logic.Literal(val=ffunc.mul),
+                            op=logic.Literal(val=ffuncs.mul),
                             args=(
                                 Table(
                                     Alias(name="A0"),
@@ -90,7 +90,7 @@ def test_logic_compiler_inplace(file_regression):
                 lhs=Alias(name="A2"),
                 rhs=Reorder(
                     arg=MapJoin(
-                        op=Literal(ffunc.add),
+                        op=Literal(ffuncs.add),
                         args=(
                             Reorder(
                                 arg=Table(
@@ -99,11 +99,11 @@ def test_logic_compiler_inplace(file_regression):
                                 idxs=(Field(name="i0"), Field(name="i2")),
                             ),
                             Aggregate(
-                                op=logic.Literal(val=ffunc.add),
+                                op=logic.Literal(val=ffuncs.add),
                                 init=logic.Literal(val=0),
                                 arg=Reorder(
                                     arg=MapJoin(
-                                        op=logic.Literal(val=ffunc.mul),
+                                        op=logic.Literal(val=ffuncs.mul),
                                         args=(
                                             Table(
                                                 Alias(name="A0"),

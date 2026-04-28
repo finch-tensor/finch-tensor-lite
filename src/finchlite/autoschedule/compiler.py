@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any
-
-import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_notation.stages import NotationLoader
@@ -13,7 +10,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import ffunc
+from ..algebra import FType, ffuncs, ftypes
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
@@ -83,7 +80,7 @@ class NotationContext:
         args: dict[lgc.Alias, ntn.Variable],
         slots: dict[lgc.Alias, ntn.Slot],
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
-        shape_types: dict[lgc.Alias, tuple[Any, ...]] | None = None,
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
     ):
         self.bindings = bindings
@@ -101,7 +98,7 @@ class NotationContext:
     def _lower_query_of_reorder(
         self,
         query_lhs: lgc.Alias,
-        op: Any,
+        op: lgc.Literal,
         arg: lgc.Table,
         reorder_idxs: tuple[lgc.Field, ...],
     ):
@@ -114,7 +111,8 @@ class NotationContext:
         arg_types = arg.shape_type(self.shape_types)
         shape_type_map = dict(zip(arg.idxs, arg_types, strict=True))
         shape_type = {
-            idx: shape_type_map.get(idx) or np.intp for idx in arg.idxs + reorder_idxs
+            idx: shape_type_map.get(idx) or ftypes.intp(1)
+            for idx in arg.idxs + reorder_idxs
         }
         loop_idxs = []
         remap_idxs = {}
@@ -159,7 +157,7 @@ class NotationContext:
         rhs = ctx(arg, loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
-            ntn.Update(ntn.Literal(op)),
+            ntn.Update(ntn.Literal(op.val)),
             tuple(loops[idx] for idx in new_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
@@ -172,7 +170,7 @@ class NotationContext:
             if idx in remap_idxs:
                 body = ntn.If(
                     ntn.Call(
-                        ntn.Literal(ffunc.eq),
+                        ntn.Literal(ffuncs.eq),
                         (loops[idx], loops[remap_idxs[idx]]),
                     ),
                     body,
@@ -188,7 +186,7 @@ class NotationContext:
     def _lower_query_of_aggregate(
         self,
         query_lhs: lgc.Alias,
-        agg_op: Any,
+        agg_op: lgc.Literal,
         agg_arg: lgc.Reorder,
         agg_idxs: tuple[lgc.Field, ...],
     ):
@@ -198,7 +196,9 @@ class NotationContext:
         shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in agg_arg.idxs}
         arg_types = agg_arg.shape_type(self.shape_types)
         shape_type_map = dict(zip(agg_arg.idxs, arg_types, strict=True))
-        shape_type = {idx: shape_type_map.get(idx) or np.intp for idx in agg_arg.idxs}
+        shape_type = {
+            idx: shape_type_map.get(idx) or ftypes.intp(1) for idx in agg_arg.idxs
+        }
         loops = {
             idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in agg_arg.idxs
         }
@@ -206,7 +206,7 @@ class NotationContext:
         rhs = ctx(agg_arg.arg, loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
-            ntn.Update(ntn.Literal(agg_op)),
+            ntn.Update(ntn.Literal(agg_op.val)),
             tuple(loops[idx] for idx in agg_arg.idxs if idx not in agg_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
@@ -234,19 +234,19 @@ class NotationContext:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
-                body = self._lower_query_of_reorder(lhs, ffunc.overwrite, arg, idxs_2)
+                body = self._lower_query_of_reorder(lhs, ffuncs.overwrite, arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Declare(
                             self.slots[lhs],
                             ntn.Literal(self.bindings[lhs].fill_value),
-                            ntn.Literal(ffunc.overwrite),
+                            ntn.Literal(ffuncs.overwrite),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(ffunc.overwrite),
+                            ntn.Literal(ffuncs.overwrite),
                         ),
                     )
                 )
@@ -320,7 +320,7 @@ class NotationContext:
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
-                                ntn.Literal(ffunc.make_tuple),
+                                ntn.Literal(ffuncs.make_tuple),
                                 tuple(self.args[var] for var in vars),
                             )
                         ),
@@ -374,7 +374,7 @@ class NotationGenerator(LogicNotationLowerer):
         for node in PostOrderDFS(body):
             match node:
                 case ntn.Return(expr):
-                    ret_t = expr.result_format
+                    ret_t = expr.result_type
         return ntn.Module(
             (
                 ntn.Function(

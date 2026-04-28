@@ -18,17 +18,22 @@ from .tensor_def import TensorDef
 class BlockedStatsFactory(StatsFactory["BlockedStats"]):
     def __init__(
         self,
-        blocks_per_dim: Mapping[Field, int],
         stats_factory: StatsFactory[NumericStats],
+        block_count: int = 5,
+        block_width: int = 5,
     ):
-        self.blocks_per_dim = dict(blocks_per_dim)
+        self.block_count = block_count
+        self.block_width = block_width
         self.inner_factory = stats_factory
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> BlockedStats:
         return BlockedStats.from_tensor(
             tensor,
             fields,
-            blocks_per_dim=self.blocks_per_dim,
+            blocks_per_dim={
+                f: max(1, min(self.block_count, n // self.block_width))
+                for f, n in zip(fields, tensor.shape, strict=True)
+            },
             stats_factory=self.inner_factory,
         )
 
@@ -129,18 +134,6 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             stats.stats_factory,
         )
 
-    def issimilar(self, a: BlockedStats, b: BlockedStats) -> bool:
-        if not (isinstance(a, BlockedStats) and isinstance(b, BlockedStats)):
-            return False
-
-        if a.blocks_per_dim != b.blocks_per_dim:
-            return False
-
-        for block_a, block_b in zip(a.blocks.flat, b.blocks.flat, strict=True):
-            if not a.stats_factory.issimilar(block_a, block_b):
-                return False
-        return True
-
     def relabel(
         self, stats: BlockedStats, relabel_indices: tuple[Field, ...]
     ) -> BlockedStats:
@@ -171,17 +164,17 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
 
         old_order = stats.index_order
+        dropped = [
+            i for i, idx in enumerate(old_order) if idx not in set(reorder_indices)
+        ]
         axes_mapping = [
             old_order.index(idx) for idx in reorder_indices if idx in old_order
-        ]
+        ] + dropped
 
         new_blocks = np.transpose(stats.blocks, axes=axes_mapping)
 
-        if len(reorder_indices) > len(old_order):
-            expanded_shape = [
-                stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices
-            ]
-            new_blocks = new_blocks.reshape(expanded_shape)
+        expanded_shape = [stats.blocks_per_dim.get(idx, 1) for idx in reorder_indices]
+        new_blocks = new_blocks.reshape(expanded_shape)
 
         final_blocks = np.empty_like(new_blocks)
         for coord in np.ndindex(new_blocks.shape):
@@ -266,3 +259,17 @@ class BlockedStats(NumericStats):
 
     def estimate_non_fill_values(self):
         return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
+
+    def get_embedding(self) -> np.ndarray:
+        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
+        total_elements = math.prod(self.tensordef.dim_sizes.values())
+        num_blocks = self.blocks.size
+        block_volume = total_elements / num_blocks
+        densities = [
+            b.estimate_non_fill_values() / block_volume for b in self.blocks.flat
+        ]
+        density_array = np.array(densities)
+        dense_part = np.log2(density_array + 1)
+        size_part = np.log2(sizes)
+
+        return np.concatenate([size_part, dense_part])

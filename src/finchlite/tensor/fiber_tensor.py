@@ -6,9 +6,8 @@ import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import Tensor
+from ..algebra import FType, FTyped, ImmutableStructFType, Tensor, TupleFType
 from ..compile.lower import FinchTensorFType
-from ..symbolic import FType, FTyped
 
 
 class LevelFType(FType, ABC):
@@ -142,9 +141,9 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(self, shape):
+    def construct(self, shape, **kwargs):
         """
-        Construct level
+        Construct a level instance with the given shape.
         """
         ...
 
@@ -281,7 +280,7 @@ class FiberTensorFields:
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
+class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     """
     An abstract base class representing the ftype of a fiber tensor.
 
@@ -300,16 +299,29 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def struct_fields(self):
         return [
             ("lvl", self.lvl_t),
-            ("shape", asm.TupleFType.from_tuple(self.shape_type)),
+            ("shape", TupleFType.from_tuple(self.shape_type)),
             ("pos", self.position_type),
             ("dirty_bit", np.bool_),
         ]
 
-    def __call__(self, shape: tuple[int, ...]):
+    def construct(self, shape: tuple[int, ...]):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape=shape), self.position_type(0))
+        return FiberTensor(self.lvl_t.construct(shape=shape), self.position_type(0))
+
+    def __call__(self, val: Any) -> FiberTensor:
+        """
+        Convert a tensor to this fiber tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A FiberTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
