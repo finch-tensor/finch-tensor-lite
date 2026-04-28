@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import math
-from typing import Any, cast
+from typing import Any
 
-from ...algebra import is_annihilator
+import numpy as np
+
 from ...algebra.algebra import FinchOperator
 from ...finch_logic import Field
 from .dc_stats import DCStats
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory
-import numpy as np
+
 
 class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
     def __init__(self):
@@ -121,34 +122,22 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
 
         return DatabaseStats.from_def(new_def, cur_nnz, new_V)
 
-    def mapjoin(self, op: FinchOperator, *all_stats: DatabaseStats) -> DatabaseStats:
-        if not all(isinstance(s, DatabaseStats) for s in all_stats):
-            raise TypeError("DatabaseStats expected for mapjoin")
+    def _mapjoin_union(
+        self, new_def: TensorDef, op: FinchOperator, union_args: list[DatabaseStats]
+    ) -> DatabaseStats:
 
-        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
-        join_like: list[DatabaseStats] = []
-        union_like: list[DatabaseStats] = []
+        return self._merge_union(new_def, union_args)
 
-        for stats in all_stats:
-            if len(stats.tensordef.index_order) == 0:
-                continue
-            s = cast(DatabaseStats, stats)
-            if is_annihilator(op, stats.tensordef.fill_value):
-                join_like.append(s)
-            else:
-                union_like.append(s)
+    def _mapjoin_join(
+        self, new_def: TensorDef, op: FinchOperator, join_args: list[DatabaseStats]
+    ) -> DatabaseStats:
 
-        if len(union_like) == 0 and len(join_like) == 0:
+        if not join_args:
             return DatabaseStats.from_def(new_def, 0.0, {})
-        if len(union_like) == 0:
-            return self._merge_join(new_def, join_like)
-        if len(join_like) == 0:
-            return self._merge_union(new_def, union_like)
-
-        join_cover = set().union(*(set(s.index_order) for s in join_like))
+        join_cover = set().union(*(s.tensordef.index_order for s in join_args))
         if join_cover == set(new_def.index_order):
-            return self._merge_join(new_def, join_like)
-        return self._merge_union(new_def, join_like + union_like)
+            return self._merge_join(new_def, join_args)
+        return self._merge_union(new_def, join_args)
 
     def aggregate(
         self,
@@ -176,7 +165,6 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             new_V[idx] = stats.V[idx]
 
         return DatabaseStats.from_def(new_def, new_nnz, new_V)
-
 
     def relabel(
         self, stats: DatabaseStats, relabel_indices: tuple[Field, ...]
@@ -235,16 +223,12 @@ class DatabaseStats(NumericStats):
     def estimate_non_fill_values(self) -> float:
         return self.nnz
 
-    def get_embedding(self): 
+    def get_embedding(self):
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
-        v_vals = [float(self.V.get(field,0.0)) for field in self.index_order]
-        total_elements = math.prod((self.tensordef.dim_sizes.values()))
-        density = self.nnz / total_elements
+        v_vals = [float(self.V.get(field, 0.0)) for field in self.index_order]
 
         size_part = np.log2(np.array(sizes))
         v_vals_part = np.log2(np.array(v_vals))
-        density_part = np.log2(np.array([density])+1)
+        nnz_part = np.log2(np.array([self.nnz]))
 
-        return np.concatenate([size_part,v_vals_part,density_part])
-    
-
+        return np.concatenate([size_part, v_vals_part, nnz_part])

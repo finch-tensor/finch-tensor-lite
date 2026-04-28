@@ -21,17 +21,24 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
             raise TypeError("copy_stats expected a DenseStats instance")
         return DenseStats.from_def(stat.tensordef.copy())
 
-    def mapjoin(self, op: FinchOperator, *args: DenseStats) -> DenseStats:
-        axes_set = [set(s.index_order) for s in args]
+    def _mapjoin_union(
+        self, new_def: TensorDef, op: FinchOperator, union_args: list[DenseStats]
+    ) -> DenseStats:
+        axes_set = [set(s.index_order) for s in union_args]
         same_axes = all(axes_set[0] == axes for axes in axes_set)
 
-        def_args = [stat.tensordef for stat in args]
-        new_def = TensorDef.mapjoin(op, *def_args)
+        if not same_axes:
+            new_def.fill_value = 0.0
+        return DenseStats.from_def(new_def)
+
+    def _mapjoin_join(
+        self, new_def: TensorDef, op: FinchOperator, join_args: list[DenseStats]
+    ) -> DenseStats:
+        axes_set = [set(s.index_order) for s in join_args]
+        same_axes = all(axes_set[0] == axes for axes in axes_set)
 
         if not same_axes:
-            # Additional check needed for the case when dimesions do not match
             new_def.fill_value = 0.0
-
         return DenseStats.from_def(new_def)
 
     def aggregate(

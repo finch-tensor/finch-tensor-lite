@@ -12,13 +12,11 @@ from finchlite.autoschedule.tensor_stats import (
     DC,
     BlockedStats,
     BlockedStatsFactory,
-    DatabaseStats,
     DatabaseStatsFactory,
     DCStats,
     DCStatsFactory,
     DenseStats,
     DenseStatsFactory,
-    DummyStats,
     DummyStatsFactory,
     TensorDef,
     UniformStats,
@@ -571,13 +569,6 @@ def test_uniform_mapjoin_mul_and_add():
 def test_uniform_aggregate():
     data = np.eye(10)
     table = Table(Literal(fl.asarray(data)), (Field("i"), Field("j")))
-    us = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=table,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
         init=None,
@@ -713,7 +704,6 @@ def test_blocked_stats_reorder_drop_two_index():
     assert reordered.index_order == (k, i)
     assert reordered.blocks.shape == (3, 2)
     assert reordered.estimate_non_fill_values() == bs.estimate_non_fill_values()
-
 
 
 def get_structured_example(M, K, matrix_type):
@@ -1121,6 +1111,7 @@ def test_aggregate():
     assert ds_agg.index_order == (Field("i"),)
     assert ds_agg.get_dim_size(Field("i")) == 2.0
     assert ds_agg.fill_value == dsa.fill_value
+
 
 def test_relabel_dense_stats():
     arr = fl.asarray(np.zeros((2, 3)))

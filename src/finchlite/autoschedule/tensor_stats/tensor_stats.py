@@ -22,8 +22,33 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
     @abstractmethod
     def copy_stats(self, stat: TS) -> TS: ...
 
+    def mapjoin(self, op: FinchOperator, *args: TS) -> TS:
+        def_args = [stat.tensordef for stat in args]
+        new_def = TensorDef.mapjoin(op, *def_args)
+
+        join_args: list[TS] = []
+        union_args: list[TS] = []
+        for s in args:
+            if op.is_annihilator(s.fill_value):
+                join_args.append(s)
+            else:
+                union_args.append(s)
+
+        if union_args:
+            join_args.append(self._mapjoin_union(new_def, op, union_args))
+            # Add test cases - To test both join and union
+
+        return self._mapjoin_join(new_def, op, join_args)
+
     @abstractmethod
-    def mapjoin(self, op: FinchOperator, *args: TS) -> TS: ...
+    def _mapjoin_union(
+        self, new_def: TensorDef, op: FinchOperator, union_args: list[TS]
+    ) -> TS: ...
+
+    @abstractmethod
+    def _mapjoin_join(
+        self, new_def: TensorDef, op: FinchOperator, join_args: list[TS]
+    ) -> TS: ...
 
     @abstractmethod
     def aggregate(

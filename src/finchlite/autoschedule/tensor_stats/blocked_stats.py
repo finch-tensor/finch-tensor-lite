@@ -31,7 +31,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             tensor,
             fields,
             blocks_per_dim={
-                f: max(1,min(self.block_count, n // self.block_width))
+                f: max(1, min(self.block_count, n // self.block_width))
                 for f, n in zip(fields, tensor.shape, strict=True)
             },
             stats_factory=self.inner_factory,
@@ -133,7 +133,6 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             new_def,
             stats.stats_factory,
         )
-
 
     def relabel(
         self, stats: BlockedStats, relabel_indices: tuple[Field, ...]
@@ -270,7 +269,7 @@ class BlockedStats(NumericStats):
             b.estimate_non_fill_values() / block_volume for b in self.blocks.flat
         ]
         density_array = np.array(densities)
-        dense_part = np.log2((density_array + 1))
+        dense_part = np.log2(density_array + 1)
         size_part = np.log2(sizes)
 
-        return np.concatenate([size_part,dense_part])
+        return np.concatenate([size_part, dense_part])

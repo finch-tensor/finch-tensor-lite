@@ -27,7 +27,6 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-
 def test_logic_cache_embeddings_norms_linf():
     logger.debug("------------- Using linf norm  ----------------")
     raw_loader = MockLogicLoader()

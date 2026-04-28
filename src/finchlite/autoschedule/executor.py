@@ -2,7 +2,6 @@ from collections import OrderedDict
 from typing import Any
 
 from finchlite.algebra.tensor import Tensor, TensorFType
-from finchlite.autoschedule.cache import LogicCacheFirst
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
@@ -57,23 +56,21 @@ class LogicExecutor(LogicEvaluator):
         stats_factory: StatsFactory | None = None,
         cache: bool = False,
     ):
-        loader = ctx if ctx is not None else DefaultLogicFormatter()
-        self.stats_factory: StatsFactory = (
-            stats_factory if stats_factory is not None else DenseStatsFactory()
-        )
-
-        if cache :
-            final_loader : lgc.LogicLoader = LogicCacheFirst(loader)
-        else :
-            final_loader = loader
-
-        self.ctx: lgc.LogicLoader = final_loader
+        if ctx is None:
+            ctx = DefaultLogicFormatter()
+        if stats_factory is None:
+            stats_factory = DenseStatsFactory()
+        self.ctx: LogicLoader = ctx
+        self.stats_factory = stats_factory
+        self.cache = cache
+        self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
     def __call__(
         self,
         prgm: LogicNode,
         bindings: dict[lgc.Alias, Tensor] | None = None,
     ):
+
         if bindings is None:
             bindings = {}
         if isinstance(prgm, lgc.LogicExpression):
@@ -94,19 +91,27 @@ class LogicExecutor(LogicEvaluator):
             var: val.ftype for var, val in bindings.items()
         }
 
-        stats_bindings = OrderedDict()
-        for var, T in bindings.items():
-            shape = T.shape
-            fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
-            stats_bindings[var] = self.stats_factory(T, fields)
+        key = (stmt, tuple(binding_ftypes.items()))
 
+        if self.cache and key in self.cached_kernels:
+            mod, binding_ftypes, binding_idxs = self.cached_kernels[key]
 
-        mod, binding_ftypes, binding_idxs = self.ctx(
-            stmt,
-            binding_ftypes,
-            stats_bindings,
-            stats_factory=self.stats_factory,
-        )
+        else:
+            stats_bindings = OrderedDict()
+            for var, T in bindings.items():
+                shape = T.shape
+                fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
+                stats_bindings[var] = self.stats_factory(T, fields)
+
+            mod, binding_ftypes, binding_idxs = self.ctx(
+                stmt,
+                binding_ftypes,
+                stats_bindings,
+                stats_factory=self.stats_factory,
+            )
+
+            if self.cache:
+                self.cached_kernels[key] = mod, binding_ftypes, binding_idxs
 
         bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))
 

@@ -22,40 +22,47 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
             raise TypeError("copy_stats expected a UniformStats instance")
         return UniformStats.from_def(stat.tensordef.copy(), stat.nnz)
 
-    def mapjoin(self, op: FinchOperator, *args: UniformStats) -> UniformStats:
-        def_args = [stat.tensordef for stat in args]
-        new_def = TensorDef.mapjoin(op, *def_args)
+    def _mapjoin_union(
+        self, new_def: TensorDef, op: FinchOperator, union_args: list[UniformStats]
+    ) -> UniformStats:
+
         new_vol = UniformStats._get_volume(new_def)
 
         if new_vol == 0.0:
             return UniformStats.from_def(new_def, 0.0)
 
-        join_probs: list[float] = []
-        union_probs: list[float] = []
+        inv_p = 1.0
 
-        for s in args:
+        for s in union_args:
             vol = UniformStats._get_volume(s.tensordef)
             if isinstance(s, NumericStats):
                 p = s.estimate_non_fill_values() / vol if vol > 0 else 0.0
+                inv_p *= 1 - p
             else:
                 raise TypeError("Stats Class must be inherit from NumericStats")
 
-            if is_annihilator(op, s.tensordef.fill_value):
-                join_probs.append(p)
-            else:
-                union_probs.append(p)
+        res_p = 1 - inv_p
+
+        return UniformStats.from_def(new_def, res_p * new_vol)
+
+    def _mapjoin_join(
+        self, new_def: TensorDef, op: FinchOperator, join_args: list[UniformStats]
+    ) -> UniformStats:
+
+        new_vol = UniformStats._get_volume(new_def)
+
+        if new_vol == 0.0:
+            return UniformStats.from_def(new_def, 0.0)
 
         res_p = 1.0
-        if join_probs:
-            for p in join_probs:
+
+        for s in join_args:
+            vol = UniformStats._get_volume(s.tensordef)
+            if isinstance(s, NumericStats):
+                p = s.estimate_non_fill_values() / vol if vol > 0 else 0.0
                 res_p *= p
-        elif union_probs:
-            inv_p = 1.0
-            for p in union_probs:
-                inv_p *= 1 - p
-            res_p = 1 - inv_p
-        else:
-            res_p = 1.0
+            else:
+                raise TypeError("Stats Class must be inherit from NumericStats")
 
         return UniformStats.from_def(new_def, res_p * new_vol)
 
