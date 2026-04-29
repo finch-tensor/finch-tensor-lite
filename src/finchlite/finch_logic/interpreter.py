@@ -1,3 +1,4 @@
+import logging
 from itertools import product
 
 import numpy as np
@@ -6,8 +7,9 @@ import finchlite
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
-from ..algebra import fixpoint_type, return_type
-from ..symbolic import fisinstance
+from ..algebra import fisinstance, fixpoint_type, ftype, return_type
+from ..codegen.numba_codegen import to_numpy_type
+from ..util.logging import LOG_LOGIC_PRE_OPT
 from . import nodes as lgc
 from .nodes import (
     Aggregate,
@@ -25,39 +27,39 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .tensor_stats import StatsFactory, TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
     if dtype is None:
-        dtype = type(fill_value)
-    return finchlite.asarray(np.full(shape, fill_value, dtype=dtype))
+        dtype = ftype(fill_value)
+    return finchlite.asarray(
+        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
+    )
 
 
 class LogicInterpreter(LogicEvaluator):
-    def __init__(self, *, make_tensor=make_tensor, verbose=False):
-        self.verbose = verbose
+    def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        machine = LogicMachine(
-            make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
-        )
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
         return machine(node)
 
 
 class LogicMachine:
-    def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
-        self.verbose = verbose
+    def __init__(self, *, make_tensor=np.full, bindings=None):
         if bindings is None:
             bindings = {}
         self.bindings = bindings
         self.make_tensor = make_tensor
 
     def __call__(self, node):
-        if self.verbose:
-            print(f"Evaluating: {node}")
+        logger.debug("Evaluating: %s", node)
         match node:
             case Literal(val):
                 return val
@@ -209,7 +211,11 @@ class MockLogicLoader(LogicLoader):
         pass
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],

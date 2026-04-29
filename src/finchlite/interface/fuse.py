@@ -55,7 +55,6 @@ import threading
 from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.autoschedule.tensor_stats import DenseStats
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.finch_notation.interpreter import NotationInterpreter
 
@@ -75,7 +74,7 @@ from ..finch_logic import (
     Table,
 )
 from ..symbolic import gensym
-from .lazy import lazy
+from .lazy import LazyTensor, asarray, lazy
 
 _DEFAULT_SCHEDULER = threading.local()
 
@@ -124,16 +123,13 @@ COMPILE_NUMBA = LogicNormalizer(
     )
 )
 
-# TODO: Make Galley a LogicLoader that gets passed a stats bindings dictionary
-# rather than the tensors themselves.
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
-    GalleyLogicalOptimizer(
-        DenseStats,
-        LogicExecutor(
+    LogicExecutor(
+        GalleyLogicalOptimizer(
             LogicStandardizer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
-        ),
+        )
     )
 )
 
@@ -175,25 +171,44 @@ def compute(arg, ctx=None):
         ctx = get_default_scheduler()
 
     args = arg if isinstance(arg, tuple) else (arg,)
-    vars = tuple(Alias(gensym("A")) for _ in args)
-    ctx_2 = args[0].ctx.join(*[x.ctx for x in args[1:]])
-    bodies = tuple(
-        map(
-            lambda arg, var: Query(
-                var,
-                Table(
-                    arg.data, tuple(Field(gensym("i")) for _ in range(len(arg.shape)))
+    outputs = [None for _ in args]
+    lazy_args = []
+    lazy_arg_idxs = []
+    for i, arg_i in enumerate(args):
+        if not isinstance(arg_i, LazyTensor):
+            outputs[i] = arg_i
+        else:
+            lazy_args.append(arg_i)
+            lazy_arg_idxs.append(i)
+
+    if lazy_args:
+        vars = tuple(Alias(gensym("A")) for _ in lazy_args)
+        ctx_2 = lazy_args[0].ctx.join(*[x.ctx for x in lazy_args[1:]])
+        bodies = tuple(
+            map(
+                lambda arg, var: Query(
+                    var,
+                    Table(
+                        arg.data,
+                        tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
+                    ),
                 ),
-            ),
-            args,
-            vars,
+                lazy_args,
+                vars,
+            )
         )
-    )
-    prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
-    res = ctx(prgm)
-    if isinstance(arg, tuple):
-        return tuple(tns for tns in res)
-    return res[0]
+        prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
+        res = ctx(prgm)
+        for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
+            if (
+                len(res[lazy_idx].shape) == 0
+            ):  # if the result is a scalar, extract the value and turn it into a
+                # finch `Scalar`
+                outputs[out_idx] = asarray(res[lazy_idx][()])
+            else:
+                outputs[out_idx] = res[lazy_idx]
+
+    return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
 
 def fuse(f, *args, ctx=None):

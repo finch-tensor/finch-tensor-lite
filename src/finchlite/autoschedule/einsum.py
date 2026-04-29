@@ -1,10 +1,11 @@
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
-from finchlite.algebra import init_value, overwrite
+from finchlite.algebra import ffuncs, ftype, init_value
 from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
-from finchlite.finch_logic import LogicStatement
+from finchlite.finch_logic import LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
 
 from .stages import LogicEinsumLowerer
@@ -25,11 +26,13 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 idxs=einidxs,
                 arg=generate_einsum_expr(arg),
             )
-            if operation != overwrite and init != init_value(operation, type(init)):
+            if operation != ffuncs.overwrite and init != init_value(
+                operation, ftype(init)
+            ):
                 return ein.Plan(
                     (
                         ein.Einsum(
-                            op=ein.Literal(overwrite),
+                            op=ein.Literal(ffuncs.overwrite),
                             tns=ein.Alias(name),
                             idxs=einidxs,
                             arg=ein.Literal(init),
@@ -42,7 +45,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             assert isinstance(rhs, lgc.LogicExpression)
             einarg = generate_einsum_expr(rhs)
             return ein.Einsum(
-                op=ein.Literal(overwrite),
+                op=ein.Literal(ffuncs.overwrite),
                 tns=ein.Alias(name),
                 idxs=tuple(ein.Index(field.name) for field in rhs.fields()),
                 arg=einarg,
@@ -95,7 +98,11 @@ class LogicEinsumLoader(LogicLoader):
         self.ctx_load: EinsumLoader = ctx_load
 
     def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],

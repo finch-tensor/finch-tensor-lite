@@ -1,6 +1,7 @@
 from enum import Enum
 
 from .. import finch_notation as ntn
+from ..algebra import ffuncs
 from .lower import SymbolicExtent
 
 # TODO: move all extent classes and functions here
@@ -14,10 +15,12 @@ class _CombineStyle(Enum):
 def _combine_extents(
     ext_1: SymbolicExtent, ext_2: SymbolicExtent, style: _CombineStyle
 ) -> SymbolicExtent:
+    start_fn: ffuncs.FinchOperator
+    end_fn: ffuncs.FinchOperator
     if style == _CombineStyle.UNION:
-        start_fn, end_fn = min, max
+        start_fn, end_fn = ffuncs.min, ffuncs.max
     else:
-        start_fn, end_fn = max, min
+        start_fn, end_fn = ffuncs.max, ffuncs.min
 
     start_1, start_2 = ext_1.get_start(), ext_2.get_start()
     end_1, end_2 = ext_1.get_end(), ext_2.get_end()

@@ -1,9 +1,18 @@
-from finchlite.algebra.tensor import Tensor
+from collections import OrderedDict
+from typing import Any
+
+from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
-from ..finch_logic import LogicEvaluator, LogicLoader, LogicNode
-from ..symbolic import Namespace, PostWalk, Rewrite, ftype
+from ..autoschedule.tensor_stats import DenseStatsFactory
+from ..finch_logic import (
+    LogicEvaluator,
+    LogicLoader,
+    LogicNode,
+    StatsFactory,
+)
+from ..symbolic import Namespace, PostWalk, Rewrite
 from .formatter import DefaultLogicFormatter
 
 
@@ -15,18 +24,23 @@ def extract_tensors(
     Extracts tensors from logic plan, replacing them with aliases.
     """
     bindings = bindings.copy()
+    # ids is a dictionary that has key value as memory_address : Alias
     ids: dict[int, lgc.Alias] = {id(val): key for key, val in bindings.items()}
     spc = Namespace(root)
     for alias in bindings:
+        # Reserving the Alias names that already exist
         spc.freshen(alias.name)
 
     def rule_0(node):
         match node:
+            # Case where we have table with actual tensor
             case lgc.Table(lgc.Literal(tns), idxs):
                 if id(tns) in ids:
                     var = ids[id(tns)]
                     return lgc.Table(var, idxs)
+                # If we don't have an Alias for the tensor we just found we create one
                 var = lgc.Alias(spc.freshen("A"))
+                # Updating the ids and bindings
                 ids[id(tns)] = var
                 bindings[var] = tns
                 return lgc.Table(var, idxs)
@@ -36,18 +50,29 @@ def extract_tensors(
 
 
 class LogicExecutor(LogicEvaluator):
-    def __init__(self, ctx: LogicLoader | None = None, verbose: bool = False):
+    def __init__(
+        self,
+        ctx: LogicLoader | None = None,
+        stats_factory: StatsFactory | None = None,
+        cache: bool = False,
+    ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
+        if stats_factory is None:
+            stats_factory = DenseStatsFactory()
         self.ctx: LogicLoader = ctx
-        self.verbose: bool = verbose
+        self.stats_factory = stats_factory
+        self.cache = cache
+        self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
     def __call__(
-        self, prgm: LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
+        self,
+        prgm: LogicNode,
+        bindings: dict[lgc.Alias, Tensor] | None = None,
     ):
+
         if bindings is None:
             bindings = {}
-
         if isinstance(prgm, lgc.LogicExpression):
             var = lgc.Alias("result")
             stmt: lgc.LogicStatement = lgc.Plan(
@@ -57,10 +82,36 @@ class LogicExecutor(LogicEvaluator):
             stmt = prgm
         else:
             raise ValueError(f"Invalid prgm type: {type(prgm)}")
-        stmt, bindings = extract_tensors(stmt, bindings)
-        binding_ftypes = {var: ftype(val) for var, val in bindings.items()}
+        if not isinstance(stmt, lgc.Plan):
+            stmt = lgc.Plan((stmt,))
 
-        mod, binding_ftypes, binding_idxs = self.ctx(stmt, binding_ftypes)
+        stmt, bindings = extract_tensors(stmt, bindings)
+
+        binding_ftypes: dict[lgc.Alias, TensorFType] = {
+            var: val.ftype for var, val in bindings.items()
+        }
+
+        key = (stmt, tuple(binding_ftypes.items()))
+
+        if self.cache and key in self.cached_kernels:
+            mod, binding_ftypes, binding_idxs = self.cached_kernels[key]
+
+        else:
+            stats_bindings = OrderedDict()
+            for var, T in bindings.items():
+                shape = T.shape
+                fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
+                stats_bindings[var] = self.stats_factory(T, fields)
+
+            mod, binding_ftypes, binding_idxs = self.ctx(
+                stmt,
+                binding_ftypes,
+                stats_bindings,
+                stats_factory=self.stats_factory,
+            )
+
+            if self.cache:
+                self.cached_kernels[key] = mod, binding_ftypes, binding_idxs
 
         bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))
 
@@ -73,7 +124,7 @@ class LogicExecutor(LogicEvaluator):
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
-                bindings[var] = tns_ftype(shape)
+                bindings[var] = tns_ftype.construct(shape)
 
         args = list(bindings.values())
 

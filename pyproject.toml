@@ -3,7 +3,7 @@
 [project]
 name = "finch-tensor-lite"
 description = ""
-version = "0.3.0"
+version = "0.4.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<3.14'
@@ -69,3 +69,4 @@ exclude = [
     "src/finchlite/codegen/stc",
     "(^|/)array-api-tests/",
 ]
+exclude = ["tests/reference", "src/finchlite/codegen/stc", "(^|/)benchmarks/"]
