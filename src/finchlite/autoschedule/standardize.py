@@ -33,7 +33,6 @@ from ..symbolic import (
     gensym,
 )
 from .normalize import normalize_names
-from .utils import is_inplace_expr
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -109,12 +108,8 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
             case Reorder(MapJoin(op, args), idxs) if len(args) > 2 and is_associative(
                 op.val
             ):
-                rhs = MapJoin(op, args[1:])
-                order_map = {val: i for i, val in enumerate(idxs)}
-                rhs_reorder_idxs = list(rhs.fields())
-                rhs_reorder_idxs.sort(key=lambda x: order_map[x])
                 return Reorder(
-                    MapJoin(op, (args[0], Reorder(rhs, rhs_reorder_idxs))), idxs
+                    MapJoin(op, (args[0], Reorder(MapJoin(op, args[1:]), idxs))), idxs
                 )
 
     return Rewrite(PreWalk(rule_4))(root)
@@ -125,8 +120,25 @@ def split_increments(root: LogicStatement) -> LogicStatement:
         match stmt:
             case Query(
                 lhs,
-                Reorder(MapJoin(op, args), idxs),
-            ) if is_inplace_expr(lhs, op, idxs, args):
+                Reorder(
+                    MapJoin(op, (Reorder(Table(lhs_1), idxs_1), Reorder(Table(), _))),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2:
+                return None
+            case Query(
+                lhs,
+                Reorder(
+                    MapJoin(
+                        Literal(op),
+                        (
+                            Reorder(Table(lhs_1), idxs_1),
+                            Aggregate(Literal(op_1), _, _, _),
+                        ),
+                    ),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 == op:
                 return None
             case Query(lhs, rhs):
                 if lhs in PostOrderDFS(rhs):
@@ -159,9 +171,27 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
-            case Query(lhs, Reorder(MapJoin(op, args), idxs)) if is_inplace_expr(
-                lhs, op, idxs, args
-            ):
+            case Query(
+                lhs,
+                Reorder(
+                    MapJoin(op, (Reorder(Table(lhs_1), idxs_1), Reorder(Table(), _))),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2:
+                return ex
+            case Query(
+                lhs,
+                Reorder(
+                    MapJoin(
+                        Literal(op),
+                        (
+                            Reorder(Table(lhs_1), idxs_1),
+                            Aggregate(Literal(op_1), _, _, _),
+                        ),
+                    ),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 == op:
                 return ex
             case Query(lhs, rhs):
                 return Query(

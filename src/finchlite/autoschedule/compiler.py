@@ -278,30 +278,47 @@ class NotationContext:
                 lgc.Reorder(
                     lgc.MapJoin(
                         lgc.Literal(op),
-                        (lgc.Reorder(lgc.Table(lhs_1), idxs_1), non_lhs_arg),
+                        (
+                            lgc.Reorder(lgc.Table(lhs_1), idxs_1),
+                            lgc.Reorder(lgc.Table() as tbl, idxs_2),
+                        ),
+                    ),
+                    idxs_3,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_3:
+                body = self._lower_query_of_reorder(lhs, op, tbl, idxs_2)
+                return ntn.Block(
+                    (
+                        ntn.Thaw(
+                            self.slots[lhs],
+                            ntn.Literal(op),
+                        ),
+                        body,
+                        ntn.Freeze(
+                            self.slots[lhs],
+                            ntn.Literal(op),
+                        ),
+                    )
+                )
+            case lgc.Query(
+                lhs,
+                lgc.Reorder(
+                    lgc.MapJoin(
+                        lgc.Literal(op),
+                        (
+                            lgc.Reorder(lgc.Table(lhs_1), idxs_1),
+                            lgc.Aggregate(
+                                lgc.Literal(op_1),
+                                lgc.Literal(init),
+                                lgc.Reorder() as agg_arg,
+                                agg_idxs,
+                            ),
+                        ),
                     ),
                     idxs_2,
                 ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2:
-                body = None
-
-                # For simplicity we restrict inplace to cases with a single
-                # non-lhs argument.
-                match non_lhs_arg:
-                    case lgc.Reorder(lgc.Table() as tbl, reorder_idxs):
-                        body = self._lower_query_of_reorder(lhs, op, tbl, reorder_idxs)
-                    case lgc.Aggregate(
-                        lgc.Literal(op_1),
-                        lgc.Literal(init),
-                        lgc.Reorder() as agg_arg,
-                        agg_idxs,
-                    ) if op_1 == op:
-                        body = self._lower_query_of_aggregate(
-                            lhs, op_1, agg_arg, agg_idxs
-                        )
-                    case _:
-                        raise Exception(f"Unrecognized logic: {prgm}")
-
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 == op:
+                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, agg_idxs)
                 return ntn.Block(
                     (
                         ntn.Thaw(
