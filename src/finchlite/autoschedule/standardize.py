@@ -71,6 +71,7 @@ def standardize_inplace_queries(
         {var: val.fill_value for var, val in bindings.items()}
     )
 
+    # Flatten map joins with the same associative operator as root mapjoin
     def rule_1(stmt):
         match stmt:
             case Reorder(MapJoin(Literal(op), args), idxs) if is_associative(op):
@@ -86,7 +87,8 @@ def standardize_inplace_queries(
 
     root = Rewrite(PostWalk(rule_1))(root)
 
-    def rule_3(stmt):
+    # Reorder operands of commutative mapjoins to have inplace operand first
+    def rule_2(stmt):
         match stmt:
             case Query(lhs, Reorder(MapJoin(op, args), idxs_1)) if is_commutative(
                 op.val
@@ -107,28 +109,53 @@ def standardize_inplace_queries(
                     case _:
                         return None
 
-    root = Rewrite(PostWalk(rule_3))(root)
+    root = Rewrite(PostWalk(rule_2))(root)
 
-    def rule_4(stmt):
+    # Unflatten mapjoins since most operators are not nary
+    def rule_3(stmt):
         match stmt:
             case Reorder(MapJoin(op, args), idxs) if len(args) > 2 and is_associative(
                 op.val
             ):
-                rhs = Reorder(MapJoin(op, args[1:]), idxs)
                 return Reorder(
+                    MapJoin(op, (args[0], Reorder(MapJoin(op, args[1:]), idxs))), idxs
+                )
+
+    root = Rewrite(PreWalk(rule_3))(root)
+
+    # Wrap relevant mapjoin operands in aggregate to conform with normal form
+    def rule_4(stmt):
+        match stmt:
+            case Query(
+                lhs,
+                Reorder(
                     MapJoin(
                         op,
                         (
-                            args[0],
-                            Aggregate(
-                                Literal(ffuncs.overwrite),
-                                Literal(rhs.fill_value(fill_values)),
-                                rhs,
-                                (),
-                            ),
+                            Reorder(Table(lhs_1), idxs_1) as lhs_arg,
+                            Reorder(MapJoin(), _) as non_lhs_arg,
                         ),
                     ),
-                    idxs,
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2:
+                return Query(
+                    lhs,
+                    Reorder(
+                        MapJoin(
+                            op,
+                            (
+                                lhs_arg,
+                                Aggregate(
+                                    Literal(ffuncs.overwrite),
+                                    Literal(non_lhs_arg.fill_value(fill_values)),
+                                    non_lhs_arg,
+                                    (),
+                                ),
+                            ),
+                        ),
+                        idxs_2,
+                    ),
                 )
 
     return Rewrite(PreWalk(rule_4))(root)
