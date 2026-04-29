@@ -64,10 +64,16 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(transform))(root)
 
 
-def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
+def standardize_inplace_queries(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
+    fill_values = root.infer_fill_value(
+        {var: val.fill_value for var, val in bindings.items()}
+    )
+
     def rule_1(stmt):
         match stmt:
-            case Reorder(MapJoin(op, args), idxs) if is_associative(op.val):
+            case Reorder(MapJoin(Literal(op), args), idxs) if is_associative(op):
                 new_args = []
                 for arg in args:
                     match arg:
@@ -76,7 +82,7 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
                         case _:
                             new_args.append(arg)
 
-                return Reorder(MapJoin(op, tuple(new_args)), idxs)
+                return Reorder(MapJoin(Literal(op), tuple(new_args)), idxs)
 
     root = Rewrite(PostWalk(rule_1))(root)
 
@@ -108,8 +114,21 @@ def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
             case Reorder(MapJoin(op, args), idxs) if len(args) > 2 and is_associative(
                 op.val
             ):
+                rhs = Reorder(MapJoin(op, args[1:]), idxs)
                 return Reorder(
-                    MapJoin(op, (args[0], Reorder(MapJoin(op, args[1:]), idxs))), idxs
+                    MapJoin(
+                        op,
+                        (
+                            args[0],
+                            Aggregate(
+                                Literal(ffuncs.overwrite),
+                                Literal(rhs.fill_value(fill_values)),
+                                rhs,
+                                (),
+                            ),
+                        ),
+                    ),
+                    idxs,
                 )
 
     return Rewrite(PreWalk(rule_4))(root)
@@ -151,7 +170,9 @@ def split_increments(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(rule_2))(root)
 
 
-def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
+def standardize_query_roots(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
     fill_values = root.infer_fill_value(
         {var: val.fill_value for var, val in bindings.items()}
     )
@@ -367,6 +388,23 @@ def drop_reorders(root: LogicStatement) -> LogicStatement:
                 arg_3 = Rewrite(PostWalk(rule))(arg)
                 return Query(lhs, Aggregate(op, init, Reorder(arg_3, idxs_1), idxs_2))
 
+            case Query(lhs, Reorder(MapJoin(op, args), idxs)):
+
+                def rule(ex):
+                    match ex:
+                        case Reorder(
+                            Aggregate(_, _, Reorder(_, idxs_2), idxs_3) as agg_arg,
+                            idxs_4,
+                        ):
+                            assert (
+                                tuple(filter(lambda x: x not in idxs_3, idxs_2))
+                                == idxs_4
+                            )
+                            return agg_arg
+
+                arg_3 = tuple(Rewrite(PostWalk(rule))(arg) for arg in args)
+                return Query(lhs, Reorder(MapJoin(op, arg_3), idxs))
+
     return Rewrite(PostWalk(rule_2))(root)
 
 
@@ -390,7 +428,7 @@ def standardize(
     prgm = isolate_aggregates(prgm)
     prgm = push_fields(prgm)
     prgm = drop_reorders(prgm)
-    prgm = standardize_inplace_queries(prgm)
+    prgm = standardize_inplace_queries(prgm, bindings)
     prgm = split_increments(prgm)
     prgm = standardize_query_roots(prgm, bindings)
     prgm = push_fields(prgm)
