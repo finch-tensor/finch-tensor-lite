@@ -317,7 +317,7 @@ class NotationContext:
                     ),
                     idxs_2,
                 ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 == op:
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, agg_idxs)
                 return ntn.Block(
                     (

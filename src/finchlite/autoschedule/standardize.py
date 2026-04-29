@@ -138,7 +138,7 @@ def split_increments(root: LogicStatement) -> LogicStatement:
                     ),
                     idxs_2,
                 ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 == op:
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return None
             case Query(lhs, rhs):
                 if lhs in PostOrderDFS(rhs):
@@ -191,7 +191,7 @@ def standardize_query_roots(root: LogicStatement, bindings) -> LogicStatement:
                     ),
                     idxs_2,
                 ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 == op:
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return ex
             case Query(lhs, rhs):
                 return Query(
