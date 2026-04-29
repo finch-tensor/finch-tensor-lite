@@ -10,7 +10,7 @@ from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
-from ..algebra import FType, ffuncs, ftypes
+from ..algebra import FinchOperator, FType, ffuncs, ftypes
 from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
@@ -98,7 +98,7 @@ class NotationContext:
     def _lower_query_of_reorder(
         self,
         query_lhs: lgc.Alias,
-        op: lgc.Literal,
+        op: FinchOperator,
         arg: lgc.Table,
         reorder_idxs: tuple[lgc.Field, ...],
     ):
@@ -157,7 +157,7 @@ class NotationContext:
         rhs = ctx(arg, loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
-            ntn.Update(ntn.Literal(op.val)),
+            ntn.Update(ntn.Literal(op)),
             tuple(loops[idx] for idx in new_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
@@ -186,7 +186,7 @@ class NotationContext:
     def _lower_query_of_aggregate(
         self,
         query_lhs: lgc.Alias,
-        agg_op: lgc.Literal,
+        agg_op: FinchOperator,
         agg_arg: lgc.Reorder,
         agg_idxs: tuple[lgc.Field, ...],
     ):
@@ -206,7 +206,7 @@ class NotationContext:
         rhs = ctx(agg_arg.arg, loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
-            ntn.Update(ntn.Literal(agg_op.val)),
+            ntn.Update(ntn.Literal(agg_op)),
             tuple(loops[idx] for idx in agg_arg.idxs if idx not in agg_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
