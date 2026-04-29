@@ -162,10 +162,10 @@ class NotationContext:
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(loop_idxs):
-            t = loops[idx].type_
+            stop = shapes.get(idx) or shapes[remap_idxs[idx]]
             ext = ntn.Call(
                 ntn.Literal(make_extent),
-                (ntn.Literal(t(0)), shapes.get(idx) or shapes[remap_idxs[idx]]),
+                (ntn.Literal(stop.result_type(0)), stop),
             )
             if idx in remap_idxs:
                 body = ntn.If(
@@ -211,10 +211,9 @@ class NotationContext:
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(agg_arg.idxs):
-            t = loops[idx].type_
             ext = ntn.Call(
                 ntn.Literal(make_extent),
-                (ntn.Literal(t(0)), shapes[idx]),
+                (ntn.Literal(shape_type[idx](0)), shapes[idx]),
             )
             body = ntn.Loop(
                 loops[idx],
@@ -277,7 +276,7 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Reorder(lgc.MapJoin(op, (_, non_lhs_arg) as mj_args), mj_idxs),
+                lgc.Reorder(lgc.MapJoin(op, (_, *non_lhs_arg) as mj_args), mj_idxs),
             ) if is_inplace_expr(lhs, op, mj_idxs, mj_args):
                 body = None
                 match non_lhs_arg:
