@@ -67,55 +67,40 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
 
 def standardize_inplace_queries(root: LogicStatement) -> LogicStatement:
     def rule_1(stmt):
-        def compare_idxs_order(parent_idxs, child_idxs):
-            it = iter(parent_idxs)
-            return all(idx in it for idx in child_idxs)
-
         match stmt:
-            case Reorder(MapJoin(op, args), parent_idxs) if is_associative(op.val):
+            case Reorder(MapJoin(op, args), idxs) if is_associative(op.val):
                 new_args = []
                 for arg in args:
-                    if (
-                        isinstance(arg, Reorder)
-                        and compare_idxs_order(parent_idxs, arg.idxs)
-                        and isinstance(arg.arg, MapJoin)
-                        and arg.arg.op == op
-                    ):
-                        new_args.extend(arg.arg.args)
-                    else:
-                        new_args.append(arg)
-                return Reorder(MapJoin(op, tuple(new_args)), parent_idxs)
+                    match arg:
+                        case Reorder(MapJoin(Literal(op_1), args_1), _) if op_1 == op:
+                            new_args.extend(args_1)
+                        case _:
+                            new_args.append(arg)
+
+                return Reorder(MapJoin(op, tuple(new_args)), idxs)
 
     root = Rewrite(PostWalk(rule_1))(root)
 
-    def rule_2(stmt):
-        match stmt:
-            case Query(lhs, MapJoin() as rhs):
-                return Query(lhs, Reorder(rhs, rhs.fields()))
-
-    root = Rewrite(PostWalk(rule_2))(root)
-
     def rule_3(stmt):
         match stmt:
-            case Query(lhs, Reorder(MapJoin(op, args), reorder_idxs)) if is_commutative(
+            case Query(lhs, Reorder(MapJoin(op, args), idxs_1)) if is_commutative(
                 op.val
-            ) and is_associative(op.val):
-                matches = [arg for arg in args if lhs in PostOrderDFS(arg)]
+            ):
+                lhs_arg = list(filter(lambda arg: lhs in PostOrderDFS(arg), args))
+                if len(lhs_arg) != 1:
+                    return None
 
-                if len(matches) == 1:
-                    match_arg = matches[0]
-                    if (
-                        isinstance(match_arg, Reorder)
-                        and isinstance(match_arg.arg, Table)
-                        and match_arg.idxs == reorder_idxs
-                    ):
-                        others = tuple(arg for arg in args if arg is not match_arg)
+                lhs_arg = lhs_arg[0]
+                match lhs_arg:
+                    case Reorder(Table(_), idxs_2) if idxs_2 == idxs_1:
+                        others = filter(lambda arg: arg is not lhs_arg, args)
                         return Query(
                             lhs,
-                            Reorder(MapJoin(op, (match_arg, *others)), reorder_idxs),
+                            Reorder(MapJoin(op, (lhs_arg, *others)), idxs_1),
                         )
 
-                return None
+                    case _:
+                        return None
 
     root = Rewrite(PostWalk(rule_3))(root)
 

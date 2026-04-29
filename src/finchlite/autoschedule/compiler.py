@@ -17,7 +17,6 @@ from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_
 from ..finch_notation import NotationInterpreter
 from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
-from .utils import is_inplace_expr
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
@@ -276,22 +275,29 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Reorder(lgc.MapJoin(op, (_, non_lhs_arg) as mj_args), mj_idxs),
-            ) if is_inplace_expr(lhs, op, mj_idxs, mj_args):
+                lgc.Reorder(
+                    lgc.MapJoin(
+                        lgc.Literal(op),
+                        (lgc.Reorder(lgc.Table(lhs_1), idxs_1), non_lhs_arg),
+                    ),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2:
                 body = None
+
+                # For simplicity we restrict inplace to cases with a single
+                # non-lhs argument.
                 match non_lhs_arg:
                     case lgc.Reorder(lgc.Table() as tbl, reorder_idxs):
-                        body = self._lower_query_of_reorder(
-                            lhs, op.val, tbl, reorder_idxs
-                        )
+                        body = self._lower_query_of_reorder(lhs, op, tbl, reorder_idxs)
                     case lgc.Aggregate(
                         lgc.Literal(op_1),
                         lgc.Literal(init),
                         lgc.Reorder() as agg_arg,
-                        idxs_2,
-                    ):
+                        agg_idxs,
+                    ) if op_1 == op:
                         body = self._lower_query_of_aggregate(
-                            lhs, op_1, agg_arg, idxs_2
+                            lhs, op_1, agg_arg, agg_idxs
                         )
                     case _:
                         raise Exception(f"Unrecognized logic: {prgm}")
