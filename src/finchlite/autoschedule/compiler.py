@@ -276,7 +276,7 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Reorder(lgc.MapJoin(op, (_, *non_lhs_arg) as mj_args), mj_idxs),
+                lgc.Reorder(lgc.MapJoin(op, (_, non_lhs_arg) as mj_args), mj_idxs),
             ) if is_inplace_expr(lhs, op, mj_idxs, mj_args):
                 body = None
                 match non_lhs_arg:
