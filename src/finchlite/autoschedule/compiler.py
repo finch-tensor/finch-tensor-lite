@@ -105,13 +105,13 @@ class NotationContext:
         arg_dims = arg.dimmap(merge_shapes, self.shapes)
         shapes_map = dict(zip(arg.idxs, arg_dims, strict=True))
         shapes = {
-            idx: shapes_map.get(idx) or ntn.Literal(1)
+            idx: shapes_map.get(idx) or ntn.Literal(ftypes.intp(1))
             for idx in arg.idxs + reorder_idxs
         }
         arg_types = arg.shape_type(self.shape_types)
         shape_type_map = dict(zip(arg.idxs, arg_types, strict=True))
         shape_type = {
-            idx: shape_type_map.get(idx) or ftypes.intp(1)
+            idx: shape_type_map.get(idx) or ftypes.intp
             for idx in arg.idxs + reorder_idxs
         }
         loop_idxs = []
@@ -197,7 +197,7 @@ class NotationContext:
         arg_types = agg_arg.shape_type(self.shape_types)
         shape_type_map = dict(zip(agg_arg.idxs, arg_types, strict=True))
         shape_type = {
-            idx: shape_type_map.get(idx) or ftypes.intp(1) for idx in agg_arg.idxs
+            idx: shape_type_map.get(idx) or ftypes.intp for idx in agg_arg.idxs
         }
         loops = {
             idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in agg_arg.idxs
