@@ -447,30 +447,39 @@ class LazyTensor(OverrideTensor):
         return not_equal(self, other)
 
 
-def asarray(arg: Any, format: TensorFType | None = None) -> Any:
+def asarray(
+    obj: Any,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: TensorFType | None = None,
+) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
-
-    Args:
-        arg: The object to be converted.
-        format: The format for the result array.
-
-    Returns:
-        The Tensor type result of the given object.
+    https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html
     """
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+
     if format is None:
-        from finchlite.interface.scalar import Scalar
+        from .scalar import Scalar
 
-        if isinstance(arg, np.ndarray):
-            return BufferizedNDArray.from_numpy(arg)
-        if np.isscalar(arg) or arg is None:
-            return Scalar(arg)
-        return arg
+        if isinstance(obj, np.ndarray):
+            return BufferizedNDArray.from_numpy(obj)
+        if np.isscalar(obj) or obj is None:
+            if dtype is not None:
+                obj = ftype(dtype)(obj)
+            elif obj is not None:
+                obj = np.asarray(obj).flat[0]
+            return Scalar(obj)
+        return obj
 
-    if isinstance(arg, np.ndarray):
-        return format.from_numpy(arg)
-    return format(arg)
+    if isinstance(obj, np.ndarray):
+        return format.from_numpy(obj)
+    return format(obj)
 
 
 def _is_convertible_to_array(arg: Any) -> bool:
