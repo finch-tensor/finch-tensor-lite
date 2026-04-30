@@ -1,6 +1,7 @@
 """
-Galley benchmarks: compile profile (with vs without connected components)
-and exact branch-and-bound vs greedy.
+Galley benchmarks: compile profile (with vs without connected components),
+exact branch-and-bound vs greedy, and BFS BnB vs DFS BnB (same optimum).
+
 
 Run: ``poetry run python benchmarks/galley_benchmarks.py``
 """
@@ -54,17 +55,15 @@ def _make_inner_loader():
 
 _GALLEY_WITH = GalleyLogicalOptimizer(_make_inner_loader())
 _GALLEY_WITHOUT = GalleyLogicalOptimizer(_make_inner_loader(), use_components=False)
-_GALLEY_GREEDY = GalleyLogicalOptimizer(
-    _make_inner_loader(), use_exact_branch_and_bound=False
-)
-_GALLEY_EXACT_BNB = GalleyLogicalOptimizer(
-    _make_inner_loader(), use_exact_branch_and_bound=True
-)
+_GALLEY_GREEDY = GalleyLogicalOptimizer(_make_inner_loader(), optimizer="greedy")
+_GALLEY_EXACT_BNB = GalleyLogicalOptimizer(_make_inner_loader(), optimizer="bfs")
+_GALLEY_EXACT_BNB_DFS = GalleyLogicalOptimizer(_make_inner_loader(), optimizer="dfs")
 
 GALLEY_COMPILE_PROFILE_WITH = LogicNormalizer(LogicExecutor(_GALLEY_WITH))
 GALLEY_COMPILE_PROFILE_WITHOUT = LogicNormalizer(LogicExecutor(_GALLEY_WITHOUT))
 GALLEY_PIPELINE_GREEDY = LogicNormalizer(LogicExecutor(_GALLEY_GREEDY))
 GALLEY_PIPELINE_EXACT_BNB = LogicNormalizer(LogicExecutor(_GALLEY_EXACT_BNB))
+GALLEY_PIPELINE_EXACT_BNB_DFS = LogicNormalizer(LogicExecutor(_GALLEY_EXACT_BNB_DFS))
 
 
 def _run_and_time(
@@ -218,6 +217,23 @@ def make_bnb_slow_example() -> LazyTensor:
     return make_chain_expr_from_shapes([(5, 5) for _ in range(12)])
 
 
+_BNB_CORE_DFS_WINS_SHAPES: list[tuple[int, int]] = [
+    (8, 3),
+    (3, 28),
+    (28, 13),
+    (13, 6),
+    (6, 11),
+    (11, 52),
+    (52, 61),
+    (61, 7),
+]
+
+
+def make_bnb_core_dfs_wins_chain() -> LazyTensor:
+    """Eight-matrix matmul chain used for BFS vs DFS Galley benchmarks."""
+    return make_chain_expr_from_shapes(_BNB_CORE_DFS_WINS_SHAPES)
+
+
 # =============================================================================
 # Timing helpers
 # =============================================================================
@@ -308,6 +324,37 @@ def time_galley_bnb_compile_profile(
     )
 
 
+def time_galley_bnb_bfs_vs_dfs_compile_profile(
+    expr,
+    *,
+    n: int = DEFAULT_BNB_PROFILE_N,
+    recursion_limit: int | None = None,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """
+    Average ``optimize_plan_s`` and ``downstream_s`` for BFS exact BnB vs DFS
+    exact BnB (greedy bounds, then exact; same logical plan cost).
+    """
+    bindings: dict = {}
+
+    def run_bfs() -> tuple[Any, dict[str, float]]:
+        return _run_and_time(
+            GALLEY_PIPELINE_EXACT_BNB,
+            _GALLEY_EXACT_BNB,
+            plan_from_expr(expr),
+            bindings,
+        )
+
+    def run_dfs() -> tuple[Any, dict[str, float]]:
+        return _run_and_time(
+            GALLEY_PIPELINE_EXACT_BNB_DFS,
+            _GALLEY_EXACT_BNB_DFS,
+            plan_from_expr(expr),
+            bindings,
+        )
+
+    return _time_profile_pair(run_bfs, run_dfs, n=n, recursion_limit=recursion_limit)
+
+
 def _print_profile_comparison(
     title: str,
     rows: list[tuple[str, dict[str, float], tuple[float, int] | None]],
@@ -346,9 +393,20 @@ def _exact_greedy_plan_stats(
 ) -> tuple[float, float, int, int]:
     aq_e = aq_factory()
     aq_g = aq_factory()
-    queries_exact, cost_exact = pruned_query_to_plan(aq_e, use_greedy=False)
-    queries_greedy, cost_greedy = pruned_query_to_plan(aq_g, use_greedy=True)
+    queries_exact, cost_exact = pruned_query_to_plan(aq_e, optimizer="bfs")
+    queries_greedy, cost_greedy = pruned_query_to_plan(aq_g, optimizer="greedy")
     return cost_exact, cost_greedy, len(queries_exact), len(queries_greedy)
+
+
+def _bfs_dfs_exact_plan_stats(
+    aq_factory: Callable[[], AnnotatedQuery],
+) -> tuple[float, float, int, int]:
+    """BFS exact vs DFS exact: optimal costs (must match) and subquery counts."""
+    aq_b = aq_factory()
+    aq_d = aq_factory()
+    queries_b, cost_b = pruned_query_to_plan(aq_b, optimizer="bfs")
+    queries_d, cost_d = pruned_query_to_plan(aq_d, optimizer="dfs")
+    return cost_b, cost_d, len(queries_b), len(queries_d)
 
 
 def _run_compile_case(case: BenchmarkCaseSpec) -> None:
@@ -382,6 +440,30 @@ def _run_bnb_case(case: BenchmarkCaseSpec) -> None:
     )
 
 
+def _run_bnb_bfs_vs_dfs_case(case: BenchmarkCaseSpec) -> None:
+    if case.recursion_limit is not None:
+        raise ValueError("BFS vs DFS BnB case must use recursion_limit=None")
+    print(f"BnB BFS vs DFS benchmark: {case.title}...", flush=True)
+    expr = case.build_expr()
+    bfs_t, dfs_t = time_galley_bnb_bfs_vs_dfs_compile_profile(
+        expr, n=max(3, DEFAULT_BNB_PROFILE_N)
+    )
+    cost_b, cost_d, nq_b, nq_d = _bfs_dfs_exact_plan_stats(
+        lambda: _annotated_query_from_lazy_expr(expr)
+    )
+    if not np.isclose(cost_b, cost_d, rtol=0.0, atol=1e-6):
+        raise AssertionError(
+            f"BFS vs DFS optimal cost mismatch: bfs={cost_b!r} dfs={cost_d!r}"
+        )
+    _print_profile_comparison(
+        case.title,
+        [
+            ("Exact BnB (BFS)", bfs_t, (cost_b, nq_b)),
+            ("Exact BnB (DFS)", dfs_t, (cost_d, nq_d)),
+        ],
+    )
+
+
 def _compile_benchmark_cases(rng: np.random.Generator) -> tuple[BenchmarkCaseSpec, ...]:
     return (
         BenchmarkCaseSpec(
@@ -411,6 +493,13 @@ BNB_CASES: tuple[BenchmarkCaseSpec, ...] = (
     ),
 )
 
+BNB_BFS_VS_DFS_CASES: tuple[BenchmarkCaseSpec, ...] = (
+    BenchmarkCaseSpec(
+        title="BFS vs DFS — eight-matrix chain",
+        build_expr=make_bnb_core_dfs_wins_chain,
+    ),
+)
+
 
 # =============================================================================
 # main sections (all tests from both original files)
@@ -430,6 +519,12 @@ def main_bnb_benchmarks() -> None:
         _run_bnb_case(case)
 
 
+def main_bnb_bfs_vs_dfs_benchmarks() -> None:
+    """BFS exact BnB vs DFS exact BnB (same cost; compare optimize_plan_s)."""
+    for case in BNB_BFS_VS_DFS_CASES:
+        _run_bnb_bfs_vs_dfs_case(case)
+
+
 def main() -> None:
     print("", flush=True)
     print("### Galley compile benchmarks (with vs without components) ###", flush=True)
@@ -439,6 +534,9 @@ def main() -> None:
     print("", flush=True)
     print("### Galley BnB vs greedy benchmarks ###", flush=True)
     main_bnb_benchmarks()
+    print("", flush=True)
+    print("### Galley BFS BnB vs DFS BnB benchmarks ###", flush=True)
+    main_bnb_bfs_vs_dfs_benchmarks()
     print("", flush=True)
     print("Done.", flush=True)
 

@@ -5,9 +5,9 @@ import numpy as np
 
 from ... import finch_assembly as asm
 from ... import finch_notation as ntn
+from ...algebra import FType, ImmutableStructFType, ftype
 from ...codegen import NumpyBufferFType
 from ...compile.lower import AssemblyContext
-from ...symbolic import FType, ftype
 from ..fiber_tensor import FiberTensorFields, Level, LevelFType
 
 
@@ -16,10 +16,10 @@ class ElementLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
+class ElementLevelFType(LevelFType, ImmutableStructFType):
     fill_value: Any = None
-    element_type: type | FType | None = None
-    position_type: type | FType | None = None
+    element_type: FType | None = None
+    position_type: FType | None = None
     buffer_factory: Any = NumpyBufferFType
     buffer_type: Any = None
 
@@ -34,16 +34,24 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         ]
 
     def __post_init__(self):
+        # Ensure element_type is an FType
         if self.element_type is None:
+            assert self.fill_value is not None, (
+                "Must provide either element_type or fill_value."
+            )
             self.element_type = ftype(self.fill_value)
+        assert isinstance(self.element_type, FType), (
+            "element_type must be an instance of FType"
+        )
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
             self.position_type = np.intp
+        self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape, *, val=None):
+    def construct(self, shape, *, val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
@@ -61,6 +69,19 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         return ElementLevel(self, val)
+
+    def __call__(self, val: Any) -> "ElementLevel":
+        """
+        Convert a level to this element level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            An ElementLevel instance of this type.
+        """
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"ElementLevelFType(fv={self.fill_value})"
@@ -142,7 +163,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def from_numpy(self, shape, val):
-        return self(shape=shape, val=val)
+        return self.construct(shape, val=val)
 
 
 def element(

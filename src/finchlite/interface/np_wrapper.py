@@ -2,6 +2,7 @@ from typing import Any
 
 import numpy as np
 
+from ..algebra import FType, ftype, intp
 from ..algebra.tensor import Tensor, TensorFType
 
 
@@ -15,16 +16,29 @@ class NumPyFType(TensorFType):
         return self._dtype.type(0)
 
     @property
-    def element_type(self) -> Any:
-        return self._dtype
+    def element_type(self) -> FType:
+        return ftype(self._dtype.type)
 
     @property
-    def shape_type(self) -> tuple[type, ...]:
-        return (int,) * self._ndim
+    def shape_type(self) -> tuple[FType, ...]:
+        return (intp,) * self._ndim
 
-    def __call__(self, shape: tuple) -> "NumPyWrapper":
+    def construct(self, shape: tuple) -> "NumPyWrapper":
         # creates a zero-filled tensor
         return NumPyWrapper(np.zeros(shape, dtype=self._dtype))
+
+    def __call__(self, val: "NumPyWrapper") -> "NumPyWrapper":
+        """
+        Convert a tensor to this numpy tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A NumPyWrapper instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
         if not isinstance(other, NumPyFType):
@@ -56,11 +70,11 @@ class NumPyWrapper(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor's elements."""
         return self.ftype.element_type
 
     @property
-    def shape_type(self) -> tuple[type, ...]:
+    def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor."""
         return self.ftype.shape_type

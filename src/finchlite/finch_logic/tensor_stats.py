@@ -52,9 +52,6 @@ class StatsFactory(ABC, Generic[T]):
     ) -> T: ...
 
     @abstractmethod
-    def issimilar(self, a: T, b: T) -> bool: ...
-
-    @abstractmethod
     def relabel(self, stats: T, relabel_indices: tuple[Field, ...]) -> T: ...
 
     @abstractmethod

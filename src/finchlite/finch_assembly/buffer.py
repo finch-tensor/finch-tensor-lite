@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..algebra import query_property
-from ..symbolic import FType, FTyped
+from ..algebra import FType, FTyped, intp, query_property
 
 
 class Buffer(FTyped, ABC):
@@ -23,7 +22,7 @@ class Buffer(FTyped, ABC):
         ...
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
@@ -31,12 +30,12 @@ class Buffer(FTyped, ABC):
         return self.ftype.element_type
 
     @property
-    def length_type(self):
+    def length_type(self) -> FType:
         """
         Return the type of indices used to access elements in the buffer.
         This is typically an integer type.
         """
-        return self.ftype.length_type()
+        return self.ftype.length_type
 
     @abstractmethod
     def load(self, idx: int): ...
@@ -89,7 +88,7 @@ class BufferFType(FType):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
@@ -97,8 +96,8 @@ class BufferFType(FType):
         ...
 
     @property
-    def length_type(self):
+    def length_type(self) -> FType:
         """
         Returns the type used for the length of the buffer.
         """
-        return int
+        return intp
