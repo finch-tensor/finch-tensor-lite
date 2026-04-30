@@ -1045,6 +1045,16 @@ def not_equal(x1, x2):
     return compute(lazy.not_equal(x1, x2))
 
 
+def count_nonzero(a, axis=None, *, keepdims=False):
+    if isinstance(a, lazy.LazyTensor):
+        raise NotImplementedError("count_nonzero is not implemented for LazyTensor")
+    if hasattr(a, "count_nonzero"):
+        return a.count_nonzero(axis=axis, keepdims=keepdims)
+    raise NotImplementedError(
+        f"count_nonzero is not implemented for {type(a).__name__}"
+    )
+
+
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.mean(x, axis=axis, keepdims=keepdims)

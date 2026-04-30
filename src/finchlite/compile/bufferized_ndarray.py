@@ -116,6 +116,9 @@ class BufferizedNDArray(EagerTensor):
             index = np.ravel_multi_index(index, self._shape)
         self.val.store(index, value)
 
+    def count_nonzero(self, axis=None, *, keepdims=False):
+        return np.count_nonzero(self.to_numpy(), axis=axis, keepdims=keepdims)
+
     def __str__(self):
         return f"{self.ftype}(shape={self.shape})"
 
