@@ -158,7 +158,7 @@ def standardize_inplace_queries(
                     ),
                 )
 
-    return Rewrite(PreWalk(rule_4))(root)
+    return Rewrite(PostWalk(rule_4))(root)
 
 
 def split_increments(root: LogicStatement) -> LogicStatement:
