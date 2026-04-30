@@ -11,7 +11,6 @@ from finchlite.symbolic.traversal import PostOrderDFS
 from .. import finch_logic as lgc
 from .. import finch_notation as ntn
 from ..algebra import FinchOperator, FType, ffuncs, ftypes
-from ..compile.lower import make_extent
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
 from ..finch_notation import NotationInterpreter
@@ -101,6 +100,8 @@ class NotationContext:
         arg: lgc.Table,
         reorder_idxs: tuple[lgc.Field, ...],
     ):
+        from ..compile.lower import make_extent
+
         arg_dims = arg.dimmap(merge_shapes, self.shapes)
         shapes_map = dict(zip(arg.idxs, arg_dims, strict=True))
         shapes = {
@@ -189,6 +190,8 @@ class NotationContext:
         agg_arg: lgc.Reorder,
         agg_idxs: tuple[lgc.Field, ...],
     ):
+        from ..compile.lower import make_extent
+
         # Build a dict mapping fields to their shapes
         arg_dims = agg_arg.dimmap(merge_shapes, self.shapes)
         shapes_map = dict(zip(agg_arg.idxs, arg_dims, strict=True))

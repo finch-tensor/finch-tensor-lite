@@ -13,7 +13,6 @@ from finchlite.finch_logic import Field
 from ... import finch_notation as ntn
 from ...algebra import Tensor, ffuncs, ftype, int64
 from ...algebra.algebra import FinchOperator
-from ...compile import BufferizedNDArray, make_extent
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory
@@ -35,9 +34,6 @@ class DC:
     from_indices: frozenset[Field]
     to_indices: frozenset[Field]
     value: float
-
-
-_INT64_VECTOR_FTYPE = BufferizedNDArray.from_numpy(np.zeros(1, dtype=np.int64)).ftype
 
 
 def _int_tuple_ftype(size: int):
@@ -152,17 +148,22 @@ class DCStats(NumericStats):
     # For each field i, we compute DC({}, {i}) and DC({i}, {*fields}).
     # Additionally, we compute the nnz for the full tensor DC({}, {*fields}).
     def _array_to_dcs(self, arr: Any, fields: Iterable[Field]) -> set[DC]:
+        from ...compile import BufferizedNDArray, make_extent
+
+        int64_vector_ftype = BufferizedNDArray.from_numpy(
+            np.zeros(1, dtype=np.int64)
+        ).ftype
         fields = list(fields)
         ndims = len(fields)
         dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
         dim_array_variables = [
-            ntn.Variable(f"x_{fields[i]}", _INT64_VECTOR_FTYPE) for i in range(ndims)
+            ntn.Variable(f"x_{fields[i]}", int64_vector_ftype) for i in range(ndims)
         ]
         dim_size_variables = [
             ntn.Variable(f"n_{fields[i]}", int64) for i in range(ndims)
         ]
         dim_array_slots = [
-            ntn.Slot(f"x_{fields[i]}_", _INT64_VECTOR_FTYPE) for i in range(ndims)
+            ntn.Slot(f"x_{fields[i]}_", int64_vector_ftype) for i in range(ndims)
         ]
         dim_proj_variables = [
             ntn.Variable(f"proj_{fields[i]}", int64) for i in range(ndims)

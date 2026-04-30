@@ -7,7 +7,6 @@ import numpy as np
 from .. import finch_logic as lgc
 from ..algebra import FType, TensorFType, TupleFType, ftype
 from ..codegen import NumpyBufferFType
-from ..compile import BufferizedNDArrayFType
 from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
 from ..util.logging import LOG_LOGIC_POST_OPT
@@ -95,6 +94,8 @@ class DefaultLogicFormatter(LogicFormatter):
         super().__init__(loader)
 
     def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
+        from ..compile.bufferized_ndarray import BufferizedNDArrayFType
+
         return BufferizedNDArrayFType(
             buffer_type=NumpyBufferFType(ftype(fill_value)),
             ndim=len(shape_type),

@@ -1,4 +1,3 @@
-from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 from .lower import (
     AssemblyContext,
     Extent,
@@ -8,6 +7,9 @@ from .lower import (
     dimension,
     make_extent,
 )
+
+# isort: split
+from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 
 __all__ = [
     "AssemblyContext",
