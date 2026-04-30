@@ -28,7 +28,6 @@ from ..algebra import (
 )
 from ..algebra.ftypes import FDType
 from ..autoschedule.tensor_stats import StatsInterpreter
-from ..compile import BufferizedNDArray
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -463,6 +462,8 @@ def asarray(arg: Any, format: TensorFType | None = None) -> Any:
         from finchlite.interface.scalar import Scalar
 
         if isinstance(arg, np.ndarray):
+            from ..compile import BufferizedNDArray
+
             return BufferizedNDArray.from_numpy(arg)
         if np.isscalar(arg) or arg is None:
             return Scalar(arg)
