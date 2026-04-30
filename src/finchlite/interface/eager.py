@@ -6,8 +6,6 @@ from collections.abc import Sequence
 from typing import Any
 
 from ..algebra import FinchOperator
-from . import lazy
-from .fuse import compute
 from .overrides import OverrideTensor
 
 
@@ -231,6 +229,10 @@ class EagerTensor(OverrideTensor, ABC):
         return not_equal(self, other)
 
 
+from . import lazy  # noqa: E402
+from .fuse import compute  # noqa: E402
+
+
 def full(
     shape: int | tuple[int, ...],
     fill_value: bool | complex,
@@ -418,6 +420,7 @@ def matmul(x1, x2, /):
     """
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.matmul(x1, x2)
+
     c = lazy.matmul(x1, x2)
     return compute(c)
 

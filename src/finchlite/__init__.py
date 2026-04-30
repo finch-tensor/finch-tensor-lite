@@ -1,55 +1,6 @@
-from .algebra import (
-    FTyped,
-    Tensor,
-    TensorFType,
-    bool,
-    bool_,
-    complex64,
-    complex128,
-    complex_,
-    ffuncs,
-    finfo,
-    fisinstance,
-    float16,
-    float32,
-    float64,
-    float_,
-    ftype,
-    iinfo,
-    int8,
-    int16,
-    int32,
-    int64,
-    int_,
-    intp,
-    isdtype,
-    none_,
-    str_,
-    uint8,
-    uint16,
-    uint32,
-    uint64,
-)
-from .autoschedule.tensor_stats import (
-    DC,
-    BlockedStats,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
-)
-from .codegen import (
-    NumpyBuffer,
-    NumpyBufferFType,
-)
-from .compile import (
-    AssemblyContext,
-    BufferizedNDArray,
-    Extent,
-    ExtentFType,
-    dimension,
-)
-from .finch_fused import jit
+# isort: split
+# interface must be imported first so EagerTensor is defined before the
+# autoschedule→compile chain runs (compile.BufferizedNDArray inherits from it).
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -161,6 +112,61 @@ from .interface import (
     var,
     vecdot,
 )
+
+# isort: split
+
+from .algebra import (
+    FTyped,
+    Tensor,
+    TensorFType,
+    bool,
+    bool_,
+    complex64,
+    complex128,
+    complex_,
+    ffuncs,
+    finfo,
+    fisinstance,
+    float16,
+    float32,
+    float64,
+    float_,
+    ftype,
+    iinfo,
+    int8,
+    int16,
+    int32,
+    int64,
+    int_,
+    intp,
+    isdtype,
+    none_,
+    str_,
+    uint8,
+    uint16,
+    uint32,
+    uint64,
+)
+from .autoschedule.tensor_stats import (
+    DC,
+    BlockedStats,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
+from .codegen import (
+    NumpyBuffer,
+    NumpyBufferFType,
+)
+from .compile import (
+    AssemblyContext,
+    BufferizedNDArray,
+    Extent,
+    ExtentFType,
+    dimension,
+)
+from .finch_fused import jit
 from .tensor import (
     DenseLevel,
     DenseLevelFType,

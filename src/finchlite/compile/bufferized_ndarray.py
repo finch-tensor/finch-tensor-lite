@@ -8,6 +8,7 @@ from .. import finch_notation as ntn
 from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..codegen.numba_codegen import to_numpy_type
+from ..interface.eager import EagerTensor
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
 
@@ -16,7 +17,7 @@ def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(np.cumprod((1,) + size[::-1]).astype(int))[-2::-1]
 
 
-class BufferizedNDArray(Tensor):
+class BufferizedNDArray(EagerTensor):
     def __init__(
         self,
         val: NumpyBuffer,
