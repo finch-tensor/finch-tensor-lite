@@ -1,6 +1,5 @@
 from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
 from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
-from .ftype import FType, FTyped, fisinstance, ftype
 from .gensym import gensym
 from .rewriters import (
     Chain,
@@ -24,8 +23,6 @@ __all__ = [
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",
-    "FType",
-    "FTyped",
     "Fixpoint",
     "Memo",
     "NamedTerm",
@@ -40,9 +37,6 @@ __all__ = [
     "Stage",
     "Term",
     "TermTree",
-    "fisinstance",
-    "fisinstance",
-    "ftype",
     "gensym",
     "intree",
     "isdescendant",

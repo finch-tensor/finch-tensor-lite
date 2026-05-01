@@ -1,9 +1,8 @@
 from collections.abc import Callable
 from collections.abc import Sequence as Seq
 from functools import partial
-from operator import add, eq, ge, le
 
-from ..algebra import is_associative, is_idempotent
+from ..algebra import ffuncs, is_associative, is_idempotent
 from ..algebra.utils import all_unique, intersect, is_disjoint, setdiff
 from ..symbolic import Chain, Fixpoint, Memo, PreWalk, Rewrite
 from .nodes import Cached, Call, NotationNode
@@ -45,7 +44,7 @@ def rule_idempotent_unique(ex):
 def rule_single_arg(ex):
     """Collapse single-arg calls."""
     match ex:
-        case Call(L(op), (arg,)) if op in (max, min):
+        case Call(L(op), (arg,)) if op in (ffuncs.max, ffuncs.min):
             return arg
 
 
@@ -62,22 +61,22 @@ def rule_associative_flatten(ex):
 def rule_equal_same(ex):
     """Match eq(a, a) => True."""
     match ex:
-        case Call(L(op), (a, b)) if op == eq and a == b:
+        case Call(L(op), (a, b)) if op == ffuncs.eq and a == b:
             return L(True)
 
 
 def rule_ge(ex):
     """Transform ge(a, b) => eq(a, max(a, b))."""
     match ex:
-        case Call(L(op), (a, b)) if op == ge:
-            return Call(L(eq), (a, Call(L(max), (a, b))))
+        case Call(L(op), (a, b)) if op == ffuncs.ge:
+            return Call(L(ffuncs.eq), (a, Call(L(ffuncs.max), (a, b))))
 
 
 def rule_le(ex):
     """Transform le(a, b) => eq(max(a, b), b)."""
     match ex:
-        case Call(L(op), (a, b)) if op == le:
-            return Call(L(eq), (Call(L(max), (a, b)), b))
+        case Call(L(op), (a, b)) if op == ffuncs.le:
+            return Call(L(ffuncs.eq), (Call(L(ffuncs.max), (a, b)), b))
 
 
 def rule_add_with(ex, func):
@@ -91,16 +90,17 @@ def rule_add_with(ex, func):
     """
     match ex:
         case Call(L(op), args) if (
-            op == add and (found := _find_first_call(args, func)) is not None
+            op == ffuncs.add and (found := _find_first_call(args, func)) is not None
         ):
             before, call_args, after = found
             return Call(
-                L(func), tuple(Call(L(add), (*before, ca, *after)) for ca in call_args)
+                L(func),
+                tuple(Call(L(ffuncs.add), (*before, ca, *after)) for ca in call_args),
             )
 
 
-rule_add_with_max = partial(rule_add_with, func=max)
-rule_add_with_min = partial(rule_add_with, func=min)
+rule_add_with_max = partial(rule_add_with, func=ffuncs.max)
+rule_add_with_min = partial(rule_add_with, func=ffuncs.min)
 
 
 def rule_disjoint_nested(ex, func1, func2):
@@ -133,8 +133,12 @@ def rule_disjoint_nested(ex, func1, func2):
             return None
 
 
-rule_disjoint_nested_max_min = partial(rule_disjoint_nested, func1=max, func2=min)
-rule_disjoint_nested_min_max = partial(rule_disjoint_nested, func1=min, func2=max)
+rule_disjoint_nested_max_min = partial(
+    rule_disjoint_nested, func1=ffuncs.max, func2=ffuncs.min
+)
+rule_disjoint_nested_min_max = partial(
+    rule_disjoint_nested, func1=ffuncs.min, func2=ffuncs.max
+)
 
 
 def rule_disjoint_flat_single(ex, func1, func2):
@@ -152,10 +156,10 @@ def rule_disjoint_flat_single(ex, func1, func2):
 
 
 rule_disjoint_flat_single_max_min = partial(
-    rule_disjoint_flat_single, func1=max, func2=min
+    rule_disjoint_flat_single, func1=ffuncs.max, func2=ffuncs.min
 )
 rule_disjoint_flat_single_min_max = partial(
-    rule_disjoint_flat_single, func1=min, func2=max
+    rule_disjoint_flat_single, func1=ffuncs.min, func2=ffuncs.max
 )
 
 
@@ -185,8 +189,12 @@ def rule_disjoint_flat_pair(ex, func1, func2):
             return None
 
 
-rule_disjoint_flat_pair_max_min = partial(rule_disjoint_flat_pair, func1=max, func2=min)
-rule_disjoint_flat_pair_min_max = partial(rule_disjoint_flat_pair, func1=min, func2=max)
+rule_disjoint_flat_pair_max_min = partial(
+    rule_disjoint_flat_pair, func1=ffuncs.max, func2=ffuncs.min
+)
+rule_disjoint_flat_pair_min_max = partial(
+    rule_disjoint_flat_pair, func1=ffuncs.min, func2=ffuncs.max
+)
 
 
 def prove_rules():

@@ -1,7 +1,6 @@
-import operator
-
 import numpy as np
 
+from finchlite.algebra.ftypes import fisinstance
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
 from finchlite.finch_einsum.stages import (
@@ -9,94 +8,89 @@ from finchlite.finch_einsum.stages import (
     EinsumLoader,
     compute_shape_vars,
 )
-from finchlite.symbolic.ftype import fisinstance
 
-from ..algebra import overwrite, promote_max, promote_min
+from ..algebra import ffuncs
 from . import nodes as ein
 
 nary_ops = {
-    operator.add: "add",
-    operator.mul: "multiply",
-    operator.sub: "subtract",
-    operator.truediv: "divide",
-    operator.floordiv: "floor_divide",
-    operator.mod: "remainder",
-    operator.pow: "power",
-    operator.eq: "equal",
-    operator.ne: "not_equal",
-    operator.lt: "less",
-    operator.le: "less_equal",
-    operator.gt: "greater",
-    operator.ge: "greater_equal",
-    operator.and_: "bitwise_and",
-    operator.or_: "bitwise_or",
-    operator.xor: "bitwise_xor",
-    operator.lshift: "bitwise_left_shift",
-    operator.rshift: "bitwise_right_shift",
-    np.logical_and: "logical_and",
-    np.logical_or: "logical_or",
-    np.logical_not: "logical_not",
-    promote_min: "minimum",
-    promote_max: "maximum",
+    ffuncs.add: "add",
+    ffuncs.mul: "multiply",
+    ffuncs.sub: "subtract",
+    ffuncs.truediv: "divide",
+    ffuncs.floordiv: "floor_divide",
+    ffuncs.mod: "remainder",
+    ffuncs.pow: "power",
+    ffuncs.eq: "equal",
+    ffuncs.ne: "not_equal",
+    ffuncs.lt: "less",
+    ffuncs.le: "less_equal",
+    ffuncs.gt: "greater",
+    ffuncs.ge: "greater_equal",
+    ffuncs.and_: "bitwise_and",
+    ffuncs.or_: "bitwise_or",
+    ffuncs.xor: "bitwise_xor",
+    ffuncs.lshift: "bitwise_left_shift",
+    ffuncs.rshift: "bitwise_right_shift",
+    ffuncs.logical_and: "logical_and",
+    ffuncs.logical_or: "logical_or",
+    ffuncs.logical_not: "logical_not",
+    ffuncs.min: "minimum",
+    ffuncs.max: "maximum",
 }
 unary_ops = {
-    operator.pos: "positive",
-    operator.neg: "negative",
-    operator.invert: "bitwise_invert",
-    operator.abs: "absolute",
-    np.sqrt: "sqrt",
-    np.exp: "exp",
-    np.log: "log",
-    np.log1p: "log1p",
-    np.log10: "log10",
-    np.log2: "log2",
-    np.sin: "sin",
-    np.cos: "cos",
-    np.tan: "tan",
-    np.sinh: "sinh",
-    np.cosh: "cosh",
-    np.tanh: "tanh",
-    np.arcsin: "arcsin",
-    np.arccos: "arccos",
-    np.arctan: "arctan",
-    np.arcsinh: "arcsinh",
-    np.arccosh: "arccosh",
-    np.arctanh: "arctanh",
+    ffuncs.pos: "positive",
+    ffuncs.neg: "negative",
+    ffuncs.invert: "bitwise_invert",
+    ffuncs.abs: "absolute",
+    ffuncs.sqrt: "sqrt",
+    ffuncs.exp: "exp",
+    ffuncs.log: "log",
+    ffuncs.log1p: "log1p",
+    ffuncs.log10: "log10",
+    ffuncs.log2: "log2",
+    ffuncs.sin: "sin",
+    ffuncs.cos: "cos",
+    ffuncs.tan: "tan",
+    ffuncs.sinh: "sinh",
+    ffuncs.cosh: "cosh",
+    ffuncs.tanh: "tanh",
+    ffuncs.arcsin: "arcsin",
+    ffuncs.arccos: "arccos",
+    ffuncs.arctan: "arctan",
+    ffuncs.arcsinh: "arcsinh",
+    ffuncs.arccosh: "arccosh",
+    ffuncs.arctanh: "arctanh",
 }
 
 reduction_ops = {
-    operator.add: "sum",
-    operator.mul: "prod",
-    operator.and_: "all",
-    operator.or_: "any",
-    promote_min: "min",
-    promote_max: "max",
-    np.logical_and: "all",
-    np.logical_or: "any",
+    ffuncs.add: "sum",
+    ffuncs.mul: "prod",
+    ffuncs.and_: "all",
+    ffuncs.or_: "any",
+    ffuncs.min: "min",
+    ffuncs.max: "max",
+    ffuncs.logical_and: "all",
+    ffuncs.logical_or: "any",
 }
 
 
 class EinsumInterpreter(EinsumEvaluator):
-    def __init__(self, xp=np, verbose=False):
+    def __init__(self, xp=np):
         self.xp = xp
-        self.verbose = verbose
 
     def __call__(self, node, bindings=None):
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
-        machine = EinsumMachine(
-            xp=self.xp, bindings=bindings.copy(), verbose=self.verbose
-        )
+        machine = EinsumMachine(xp=self.xp, bindings=bindings.copy())
         return machine(node)
 
 
 class PointwiseEinsumMachine:
-    def __init__(self, xp, bindings, loops, verbose):
+    def __init__(self, xp, bindings, loops):
         self.xp = xp
         self.bindings = bindings
         self.loops = loops
-        self.verbose = verbose
 
     def __call__(self, node):
         xp = self.xp
@@ -129,10 +123,9 @@ class PointwiseEinsumMachine:
 
 
 class EinsumMachine:
-    def __init__(self, xp, bindings, verbose):
+    def __init__(self, xp, bindings):
         self.xp = xp
         self.bindings = bindings
-        self.verbose = verbose
 
     def __call__(self, node):
         xp = self.xp
@@ -150,12 +143,10 @@ class EinsumMachine:
             case ein.Einsum(ein.Literal(op), tns, idxs, arg):
                 loops = set(arg.get_idxs()).union(set(idxs))
                 loops = sorted(loops, key=lambda x: x.name)
-                ctx = PointwiseEinsumMachine(
-                    self.xp, self.bindings, loops, self.verbose
-                )
+                ctx = PointwiseEinsumMachine(self.xp, self.bindings, loops)
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
-                if op != overwrite:
+                if op != ffuncs.overwrite:
                     op = getattr(xp, reduction_ops[op])
                     val = op(arg, axis=axis)
                 else:

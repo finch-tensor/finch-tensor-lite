@@ -1,7 +1,10 @@
+"""
+To do : Have n-ary operator for mapjoin
+"""
+
 import math
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Mapping
-from functools import reduce
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -15,6 +18,7 @@ from finchlite.finch_logic import (
 )
 
 from ...algebra import is_idempotent, is_identity, repeat_operator
+from ...algebra.algebra import FinchOperator
 
 
 class TensorDef:
@@ -122,7 +126,7 @@ class TensorDef:
         return float(prod)
 
     @staticmethod
-    def mapjoin(op: Callable, *args: "TensorDef") -> "TensorDef":
+    def mapjoin(op: FinchOperator, *args: "TensorDef") -> "TensorDef":
         """
         Merge multiple TensorDef objects into a single tensor definition.
 
@@ -135,7 +139,7 @@ class TensorDef:
         Returns:
             TensorDef: A new TensorDef representing the merged tensor.
         """
-        new_fill_value = reduce(op, (s.fill_value for s in args))
+        new_fill_value = op(*(s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),
             tuple(
@@ -153,7 +157,7 @@ class TensorDef:
 
     @staticmethod
     def aggregate(
-        op: Callable,
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         d: "TensorDef",
@@ -240,7 +244,6 @@ class TensorDef:
 
     @staticmethod
     def reorder(stats: "TensorDef", reorder_indices: tuple[Field, ...]) -> "TensorDef":
-        print(f"Reordering {stats.index_order} to {reorder_indices}")
         for old_idx in stats.index_order:
             if old_idx not in set(reorder_indices) and stats.get_dim_size(old_idx) != 1:
                 raise ValueError(

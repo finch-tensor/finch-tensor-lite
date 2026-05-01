@@ -1,8 +1,8 @@
-import operator
 from dataclasses import dataclass
 
 import numpy as np
 
+from ..algebra import ffuncs, int64
 from ..symbolic import (
     BasicBlock,
     ControlFlowGraph,
@@ -54,7 +54,11 @@ class NumberedStatement(AssemblyStatement):
     sid: int
 
     def __str__(self) -> str:
-        return str(self.stmt)
+        return f"[{self.sid}] {str(self.stmt)}"
+
+    @property
+    def children(self):
+        return (self.stmt, self.sid)
 
 
 def assembly_build_cfg(
@@ -94,7 +98,7 @@ def assembly_desugar(
 
     def _as_not_expr(cond):
         """Helper to make an expression representing the 'not' of a condition."""
-        return Call(Literal(operator.not_), (cond,))
+        return Call(Literal(ffuncs.not_), (cond,))
 
     def _number_stmt(stmt: AssemblyStatement) -> NumberedStatement:
         """Helper to wrap a statement in a NumberedStatement with a unique id."""
@@ -147,17 +151,17 @@ def assembly_desugar(
                 )
             case ForLoop(var, start, end, body):
                 fic_var_name = namespace.freshen("j")
-                fic_var = Variable(fic_var_name, np.int64)
+                fic_var = Variable(fic_var_name, int64)
 
                 init = Assign(fic_var, start)
-                cond = Call(Literal(operator.lt), (fic_var, end))
+                cond = Call(Literal(ffuncs.lt), (fic_var, end))
 
                 body_block = go(body)
 
                 inc = Assign(
                     fic_var,
                     Call(
-                        Literal(operator.add),
+                        Literal(ffuncs.add),
                         (fic_var, Literal(np.int64(1))),
                     ),
                 )
@@ -170,17 +174,17 @@ def assembly_desugar(
                 return go(Block((init, WhileLoop(cond, loop_body))))
             case BufferLoop(buf, var, body):
                 fic_var_name = namespace.freshen("j")
-                fic_var = Variable(fic_var_name, np.int64)
+                fic_var = Variable(fic_var_name, int64)
 
                 init = Assign(fic_var, Literal(np.int64(0)))
-                cond = Call(Literal(operator.lt), (fic_var, Length(buf)))
+                cond = Call(Literal(ffuncs.lt), (fic_var, Length(buf)))
 
                 body_block = go(body)
 
                 inc = Assign(
                     fic_var,
                     Call(
-                        Literal(operator.add),
+                        Literal(ffuncs.add),
                         (fic_var, Literal(np.int64(1))),
                     ),
                 )

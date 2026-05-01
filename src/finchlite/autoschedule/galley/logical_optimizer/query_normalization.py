@@ -17,7 +17,7 @@ from ....finch_logic import (
     Reorder,
     Table,
 )
-from ....symbolic import Chain, Fixpoint, PostWalk, Rewrite, gensym
+from ....symbolic import Chain, Fixpoint, PostWalk, PreWalk, Rewrite, gensym
 
 """
 Query merging and reorder normalization for Galley.
@@ -359,10 +359,14 @@ def normalize_reorders_in_plan(plan: Plan) -> Plan:
 
 def merge_mapjoin_rule(node: LogicNode) -> LogicNode:
     match node:
-        case MapJoin(Literal(op1), (MapJoin(Literal(op2), args2), *args1)) if (
-            op1 == op2 and is_associative(op1)
-        ):
-            return MapJoin(Literal(op1), tuple(args2) + tuple(args1))
+        case MapJoin(Literal(op1), args) if is_associative(op1):
+            new_args: list[LogicExpression] = []
+            for arg in args:
+                if isinstance(arg, MapJoin) and arg.op.val == op1:
+                    new_args.extend(arg.args)
+                else:
+                    new_args.append(arg)
+            return MapJoin(Literal(op1), tuple(new_args))
         case _:
             return node
 
@@ -414,7 +418,7 @@ def postprocess_plan_after_galley(plan: Plan) -> Plan:
     new_bodies: list[LogicStatement] = []
     for body in plan.bodies:
         if isinstance(body, Query):
-            new_rhs = Rewrite(PostWalk(split_mapjoin))(body.rhs)
+            new_rhs = Rewrite(PreWalk(split_mapjoin))(body.rhs)
             new_bodies.append(Query(body.lhs, new_rhs))
         else:
             new_bodies.append(body)
