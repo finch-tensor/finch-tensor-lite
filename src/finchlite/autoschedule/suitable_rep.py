@@ -20,6 +20,7 @@ from finchlite.finch_logic.nodes import (
     Reorder,
     Table,
 )
+from finchlite.finch_logic.tensor_stats import StatsFactory, TensorStats
 
 from .. import finch_logic as lgc
 from ..algebra import TensorFType
@@ -231,6 +232,8 @@ class SmartLogicFormatter(LogicFormatter):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory[Any],
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -276,5 +279,5 @@ class SmartLogicFormatter(LogicFormatter):
 
         logger.debug(prgm)
 
-        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        lib, bindings, shape_vars = self.loader(prgm, bindings, stats, stats_factory)
         return lib, bindings, shape_vars

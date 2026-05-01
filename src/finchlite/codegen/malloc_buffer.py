@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import numpy as np
 
+from ..algebra import ftype, ftypes
 from ..finch_assembly import Buffer, Stack
 from ..finch_assembly.nodes import AssemblyExpression
 from ..util import qual_str
@@ -25,7 +26,7 @@ from .numpy_buffer import CBufferFields
 class CMallocBufferStruct(ctypes.Structure):
     _fields_ = [
         ("data", ctypes.c_void_p),
-        ("length", c_type(np.intp)),
+        ("length", c_type(ftypes.intp)),
     ]
 
 
@@ -261,14 +262,14 @@ class MallocBufferFType(CBufferFType, CStackFType):
         """
         Returns the type used for the length of the buffer.
         """
-        return np.intp
+        return ftype(np.intp)
 
     @property
     def element_type(self):
         """
         Returns the type of elements stored in the buffer. This will be a ctypes array.
         """
-        return self._dtype
+        return ftype(self._dtype)
 
     def __hash__(self):
         return hash(("MallocBufferFType", self._dtype))

@@ -48,14 +48,8 @@ from .nodes import (
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
-from .struct import (
-    AssemblyStructFType,
-    ImmutableStructFType,
-    MutableStructFType,
-    NamedTupleFType,
-    TupleFType,
-)
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
+from .utils import get_vars_in_expr
 
 __all__ = [
     "AssemblyCFGBuilder",
@@ -68,7 +62,6 @@ __all__ = [
     "AssemblyLoader",
     "AssemblyNode",
     "AssemblySimplify",
-    "AssemblyStructFType",
     "AssemblyTransform",
     "AssemblyTypeChecker",
     "AssemblyTypeError",
@@ -88,15 +81,12 @@ __all__ = [
     "GetAttr",
     "If",
     "IfElse",
-    "ImmutableStructFType",
     "L",
     "Length",
     "Literal",
     "Load",
     "LoadDict",
     "Module",
-    "MutableStructFType",
-    "NamedTupleFType",
     "NumberedStatement",
     "Print",
     "Repack",
@@ -107,7 +97,6 @@ __all__ = [
     "Stack",
     "Store",
     "StoreDict",
-    "TupleFType",
     "Unpack",
     "Variable",
     "WhileLoop",
@@ -116,6 +105,7 @@ __all__ = [
     "assembly_dataflow_analyze",
     "assembly_dataflow_run",
     "element_type",
+    "get_vars_in_expr",
     "length_type",
     "parse_assembly",
 ]

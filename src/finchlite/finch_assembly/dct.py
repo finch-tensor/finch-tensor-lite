@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
-from ..symbolic import FType, FTyped
+import numpy as np
+
+from ..algebra import FType, FTyped
 
 
 class Dict(FTyped, ABC):
@@ -43,7 +45,7 @@ class Dict(FTyped, ABC):
         ...
 
     @abstractmethod
-    def exists(self, idx: tuple) -> bool:
+    def exists(self, idx: tuple) -> np.bool:
         """
         Method to check if the element exists in the map.
         """

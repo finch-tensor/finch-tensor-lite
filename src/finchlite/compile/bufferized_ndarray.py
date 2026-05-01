@@ -1,15 +1,13 @@
-import operator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
 from .. import finch_assembly as asm
 from .. import finch_notation as ntn
-from ..algebra import InitWrite, Tensor, overwrite
+from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
-from ..finch_assembly import AssemblyStructFType, TupleFType
-from ..symbolic import fisinstance, ftype
+from ..codegen.numba_codegen import to_numpy_type
 from . import looplets as lplt
 from .lower import AssemblyContext, FinchTensorFType
 
@@ -72,7 +70,7 @@ class BufferizedNDArray(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 
@@ -118,10 +116,10 @@ class BufferizedNDArray(Tensor):
         self.val.store(index, value)
 
     def __str__(self):
-        return f"BufferizedNDArray(shape={self.shape})"
+        return f"{self.ftype}(shape={self.shape})"
 
     def __repr__(self):
-        return f"BufferizedNDArray(shape={self.shape})"
+        return f"{self.ftype}(shape={self.shape})"
 
 
 @dataclass(unsafe_hash=True)
@@ -132,7 +130,7 @@ class BufferizedNDArrayFields:
     dirty_bit: bool
 
 
-class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
+class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     """
     A ftype for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
@@ -140,17 +138,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     @property
     def struct_name(self):
-        def str_format(types):
-            return "_".join(
-                f"{np.dtype(t).kind}{np.dtype(t).itemsize * 8}" for t in types
-            )
-
-        dt = np.dtype(self.buf_t.element_type)
-        return (
-            f"BufferizedNDArray_{dt.kind}{dt.itemsize * 8}_"
-            f"shape_{str_format(self.shape_t.struct_fieldformats)}_"
-            f"strides_{str_format(self.strides_t.struct_fieldformats)}"
-        )
+        return "BufferizedNDArray"
 
     @property
     def struct_fields(self):
@@ -174,14 +162,12 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
             val=val,
             shape=tuple(
                 t(s)
-                for s, t in zip(
-                    arr.shape, self.shape_t.struct_fieldformats, strict=True
-                )
+                for s, t in zip(arr.shape, self.shape_t.struct_fieldtypes, strict=True)
             ),
             strides=tuple(
                 t(s)
                 for (s, t) in zip(
-                    strides, self.strides_t.struct_fieldformats, strict=True
+                    strides, self.strides_t.struct_fieldtypes, strict=True
                 )
             ),
         )
@@ -191,22 +177,43 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         *,
         buffer_type: NumpyBufferFType,
         ndim: int,
-        dimension_type: TupleFType | tuple[type, ...],
+        dimension_type: TupleFType | tuple[FType, ...],
     ):
-        if not fisinstance(dimension_type, TupleFType):
+        if not isinstance(dimension_type, TupleFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
         assert isinstance(dimension_type, TupleFType)
+        # Normalize dimension field types to Finch ftypes so generated
+        # result_type values are consistent with strict asm type checks.
+        dimension_type = TupleFType.from_tuple(
+            tuple(ftype(t) for t in dimension_type.struct_fieldtypes)
+        )
         self.buf_t = buffer_type
         self._ndim = ndim
         self.shape_t = dimension_type
         self.strides_t = dimension_type  # assuming strides is the same type as shape
 
-    def __call__(
+    def construct(
         self,
         shape: tuple[int, ...],
     ) -> BufferizedNDArray:
-        arr = np.zeros(shape, dtype=self.element_type)
+        arr = np.zeros(shape, dtype=to_numpy_type(self.element_type))
         return self.from_numpy(arr)
+
+    def __call__(
+        self,
+        val: Any,
+    ) -> BufferizedNDArray:
+        """
+        Convert a tensor to this bufferized ndarray type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A BufferizedNDArray instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
@@ -220,7 +227,10 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
         return str(self.struct_name)
 
     def __repr__(self):
-        return f"{self.struct_name}({repr(self.buf_t)})"
+        return (
+            f"BufferizedNDArrayFType(buffer_type={repr(self.buf_t)},"
+            f" ndim = {self.ndim}, dimension_type ={repr(self.shape_t)})"
+        )
 
     @property
     def ndim(self) -> np.intp:
@@ -232,7 +242,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     @property
     def fill_value(self) -> Any:
-        return np.zeros((), dtype=self.buf_t.element_type)[()]
+        return np.zeros((), dtype=to_numpy_type(self.buf_t.element_type))[()]
 
     @property
     def element_type(self):
@@ -240,7 +250,7 @@ class BufferizedNDArrayFType(FinchTensorFType, AssemblyStructFType):
 
     @property
     def shape_type(self) -> tuple:
-        return tuple(np.intp for _ in range(self.ndim))
+        return tuple(self.shape_t.struct_fieldtypes)
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
@@ -318,7 +328,8 @@ class BufferizedNDArrayAccessor(Tensor):
     def __init__(self, tns: BufferizedNDArray, nind=None, pos=None, op=None):
         self.tns = tns
         if pos is None:
-            pos = ftype(self.tns).buf_t.length_type(0)
+            tns_ftype = cast(BufferizedNDArrayFType, ftype(self.tns))
+            pos = tns_ftype.buf_t.length_type(0)
         self.pos = pos
         self.op = op
         if nind is None:
@@ -341,7 +352,7 @@ class BufferizedNDArrayAccessor(Tensor):
         return self.ftype.fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Data type of the tensor elements."""
         return self.ftype.element_type
 
@@ -415,9 +426,22 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def __hash__(self):
         return hash((self.tns, self.nind, self.pos, self.op))
 
-    def __call__(self, shape: tuple) -> BufferizedNDArrayAccessor:
+    def construct(self, shape: tuple) -> BufferizedNDArrayAccessor:
         raise NotImplementedError(
             "Cannot directly instantiate BufferizedNDArrayAccessor from ftype"
+        )
+
+    def __call__(self, val: Any) -> BufferizedNDArrayAccessor:
+        """
+        Convert a tensor to this bufferized ndarray accessor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A BufferizedNDArrayAccessor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
 
     def from_numpy(self, arr):
@@ -503,9 +527,9 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             op_e,
             (asm.Load(obj.tns.buf_s, pos_e), val_e),
         )
-        if obj.tns.dirty_bit and op.val is overwrite:
+        if obj.tns.dirty_bit and op.val is ffuncs.overwrite:
             increment_call = asm.Call(
-                asm.Literal(InitWrite(tns.type.fill_value)),
+                asm.Literal(ffuncs.init_write(tns.type.fill_value)),
                 (asm.Load(obj.tns.buf_s, pos_e), increment_call),
             )
 
@@ -518,11 +542,11 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 asm.Assign(
                     pos_2,
                     asm.Call(
-                        asm.Literal(operator.add),
+                        asm.Literal(ffuncs.add),
                         (
                             tns.obj.pos,
                             asm.Call(
-                                asm.Literal(operator.mul),
+                                asm.Literal(ffuncs.mul),
                                 (
                                     tns.obj.tns.stride[self.nind],
                                     asm.Variable(idx.name, idx.type_),

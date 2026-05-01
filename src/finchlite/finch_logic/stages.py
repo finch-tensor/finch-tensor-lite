@@ -7,14 +7,13 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
+from .tensor_stats import StatsFactory, TensorStats
 
 
 class LogicEvaluator(Stage):
     @abstractmethod
     def __call__(
-        self,
-        term: lgc.LogicNode,
-        bindings: dict[lgc.Alias, Tensor] | None = None,
+        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
     ) -> lgc.TableValue | tuple[Tensor, ...]:
         """
         Evaluate the given logic.
@@ -24,7 +23,11 @@ class LogicEvaluator(Stage):
 class LogicLoader(ABC):
     @abstractmethod
     def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self,
+        term: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -56,6 +59,8 @@ class OptLogicLoader(LogicLoader):
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -63,7 +68,7 @@ class OptLogicLoader(LogicLoader):
     ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
-        return self.ctx(term, bindings)
+        return self.ctx(term, bindings, stats, stats_factory)
 
 
 def compute_shape_vars(

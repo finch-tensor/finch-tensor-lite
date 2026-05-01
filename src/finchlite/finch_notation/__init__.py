@@ -1,6 +1,11 @@
+from .cfg_builder import (
+    NotationCFGBuilder,
+    NumberedStatement,
+)
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
+    AccessMode,
     Assign,
     Block,
     Cached,
@@ -35,6 +40,7 @@ from .stages import NotationLoader, NotationTransform
 
 __all__ = [
     "Access",
+    "AccessMode",
     "Assign",
     "Block",
     "Cached",
@@ -50,12 +56,14 @@ __all__ = [
     "Literal",
     "Loop",
     "Module",
+    "NotationCFGBuilder",
     "NotationExpression",
     "NotationInterpreter",
     "NotationLoader",
     "NotationNode",
     "NotationStatement",
     "NotationTransform",
+    "NumberedStatement",
     "Read",
     "Repack",
     "Return",

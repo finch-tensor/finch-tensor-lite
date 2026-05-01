@@ -5,12 +5,11 @@ from typing import Any
 import numpy as np
 
 from .. import finch_logic as lgc
-from ..algebra import TensorFType
+from ..algebra import FType, TensorFType, TupleFType, ftype
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
-from ..finch_assembly import AssemblyLibrary, TupleFType
-from ..finch_logic import LogicLoader, MockLogicLoader
-from ..symbolic import gensym
+from ..finch_assembly import AssemblyLibrary
+from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
 from ..util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -31,7 +30,7 @@ class DefaultLogicFormatter(LogicFormatter):
         self.loader = loader
 
     @abstractmethod
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
+    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.
@@ -42,6 +41,8 @@ class DefaultLogicFormatter(LogicFormatter):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
@@ -63,7 +64,7 @@ class DefaultLogicFormatter(LogicFormatter):
                 case lgc.Query(lhs, _):
                     if lhs not in bindings:
                         shape_type = tuple(
-                            dim if dim is not None else np.intp
+                            ftype(dim) if dim is not None else ftype(np.intp)
                             for dim in shape_types[lhs]
                         )
 
@@ -81,7 +82,12 @@ class DefaultLogicFormatter(LogicFormatter):
 
         logger.debug(prgm)
 
-        lib, bindings, shape_vars = self.loader(prgm, bindings)
+        lib, bindings, shape_vars = self.loader(
+            prgm,
+            bindings,
+            stats=stats,
+            stats_factory=stats_factory,
+        )
         return lib, bindings, shape_vars
 
 
@@ -92,12 +98,9 @@ class BufferizedNDArrayFormatter(DefaultLogicFormatter):
     ):
         super().__init__(loader)
 
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
+    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
         return BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(type(fill_value)),
+            buffer_type=NumpyBufferFType(ftype(fill_value)),
             ndim=len(shape_type),
-            dimension_type=TupleFType(
-                struct_name=gensym("tuple", sep="_"),
-                struct_formats=shape_type,
-            ),
+            dimension_type=TupleFType.from_tuple(shape_type),
         )

@@ -1,7 +1,10 @@
+"""
+To do : Have n-ary operator for mapjoin
+"""
+
 import math
-import operator
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -14,7 +17,8 @@ from finchlite.finch_logic import (
     Table,
 )
 
-from ...algebra import is_idempotent, is_identity
+from ...algebra import is_idempotent, is_identity, repeat_operator
+from ...algebra.algebra import FinchOperator
 
 
 class TensorDef:
@@ -122,7 +126,7 @@ class TensorDef:
         return float(prod)
 
     @staticmethod
-    def mapjoin(op: Callable, *args: "TensorDef") -> "TensorDef":
+    def mapjoin(op: FinchOperator, *args: "TensorDef") -> "TensorDef":
         """
         Merge multiple TensorDef objects into a single tensor definition.
 
@@ -153,7 +157,7 @@ class TensorDef:
 
     @staticmethod
     def aggregate(
-        op: Callable,
+        op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         d: "TensorDef",
@@ -185,23 +189,22 @@ class TensorDef:
         if init is None:
             if is_identity(op, d.fill_value) or is_idempotent(op):
                 init = op(d.fill_value, d.fill_value)
-            elif op is operator.add:
-                init = d.fill_value * n
-            elif op is operator.mul:
-                init = d.fill_value**n
             else:
-                # This is going to be VERY SLOW. Should raise a warning about reductions
-                # over non-identity fill values. Depending on the
-                # semantics of reductions, we might be able to do this faster.
-                print(
-                    "Warning: A reduction can take place over a tensor whose fill"
-                    "value is not the reduction operator's identity. This can result in"
-                    "a large slowdown as the new fill is calculated."
-                )
-                acc = d.fill_value
-                for _ in range(max(n - 1, 0)):
-                    acc = op(acc, d.fill_value)
-                init = acc
+                try:
+                    init = repeat_operator(op)(d.fill_value, n)
+                except AttributeError:
+                    # This is going to be VERY SLOW. Should raise a warning about
+                    #  reductions over non-identity fill values. Depending on the
+                    # semantics of reductions, we might be able to do this faster.
+                    print(
+                        "Warning: A reduction can take place over a tensor whose fill"
+                        "value is not the reduction operator's identity. This can"
+                        "result in a large slowdown as the new fill is calculated."
+                    )
+                    acc = d.fill_value
+                    for _ in range(max(n - 1, 0)):
+                        acc = op(acc, d.fill_value)
+                    init = acc
 
         new_dim_sizes = OrderedDict(
             (ax, d.dim_sizes[ax]) for ax in d.dim_sizes if ax not in red_set
