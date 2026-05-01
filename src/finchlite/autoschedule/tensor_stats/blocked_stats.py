@@ -53,20 +53,26 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         )
 
     def mapjoin(self, op: FinchOperator, *args: BlockedStats) -> BlockedStats:
-        if not all(isinstance(arg, BlockedStats) for arg in args):
-            raise TypeError("BlockedStats arguments expected")
 
-        b_args: list[BlockedStats] = [a for a in args if isinstance(a, BlockedStats)]
+        b_args: list[BlockedStats] = list(args)
         first_arg = b_args[0]
         def_args = [stat.tensordef for stat in b_args]
         new_def = TensorDef.mapjoin(op, *def_args)
-        new_blocks = np.empty_like(first_arg.blocks)
+
+        blocks_per_dim = {k: v for arg in b_args for k, v in arg.blocks_per_dim.items()}
+
+        new_blocks = np.empty(
+            tuple(blocks_per_dim[idx] for idx in new_def.index_order), dtype=object
+        )
+
         inner_factory = first_arg.stats_factory
 
         for coord in np.ndindex(new_blocks.shape):
             local_blocks: list[NumericStats] = []
+            global_coord = dict(zip(new_def.index_order, coord, strict=True))
             for arg in b_args:
-                block: Any = arg.blocks[coord]
+                local_coord = tuple(global_coord[idx] for idx in arg.index_order)
+                block: Any = arg.blocks[local_coord]
                 if isinstance(block, NumericStats):
                     local_blocks.append(block)
             new_blocks[coord] = inner_factory.mapjoin(op, *local_blocks)
