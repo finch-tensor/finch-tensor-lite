@@ -94,17 +94,11 @@ class DefaultLoopOrderer(LoopOrderer):
         Then do sorting
         """
         occurrences: Counter[Field] = Counter()
-        first_seen: dict[Field, int] = {}
-        clock = 0
 
         def visit(ex) -> None:
-            nonlocal clock
             match ex:
                 case Table(_, idxs):
                     for idx in idxs:
-                        if idx not in first_seen:
-                            first_seen[idx] = clock
-                            clock += 1
                         occurrences[idx] += 1
                 case Aggregate(_, _, arg, _):
                     visit(arg)
@@ -126,9 +120,9 @@ class DefaultLoopOrderer(LoopOrderer):
             case Query(_, rhs):
                 visit(rhs)
 
-        # Sort: highest occurrence first; break ties by first-seen order.
         ordered = sorted(
             occurrences.keys(),
-            key=lambda idx: (-occurrences[idx], first_seen[idx]),
+            key=lambda idx: occurrences[idx],
+            reverse=True,
         )
         return tuple(ordered)
