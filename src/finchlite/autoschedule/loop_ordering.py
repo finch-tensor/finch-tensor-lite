@@ -21,6 +21,95 @@ from ..util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
+def _is_standardized_query(node: Query) -> bool:
+    match node:
+        case Query(_, Reorder(_, _)):
+            return True
+        case Query(_, Aggregate(_, _, Reorder(_, _), _)):
+            return True
+        case _:
+            return False
+
+
+def validate_input(prgm: LogicStatement) -> None:
+    match prgm:
+        case Plan(bodies):
+            seen_produces = False
+            for i, body in enumerate(bodies):
+                if seen_produces:
+                    raise ValueError(
+                        "Invalid loop ordering input: Produces must be final body"
+                    )
+                match body:
+                    case Query() as query:
+                        if not _is_standardized_query(query):
+                            raise ValueError(
+                                "Invalid loop ordering input: expected "
+                                "standardized Query rhs"
+                            )
+                    case Produces(_):
+                        seen_produces = True
+                        if i != len(bodies) - 1:
+                            raise ValueError(
+                                "Invalid loop ordering input: Produces must be "
+                                "final body"
+                            )
+                    case _:
+                        raise ValueError(
+                            "Invalid loop ordering input: expected Query or "
+                            f"Produces in Plan, got {type(body).__name__}"
+                        )
+        case Query() as query:
+            if not _is_standardized_query(query):
+                raise ValueError(
+                    "Invalid loop ordering input: expected standardized Query rhs"
+                )
+        case _:
+            raise ValueError(
+                "Invalid loop ordering input: expected Plan or Query, got "
+                f"{type(prgm).__name__}"
+            )
+
+
+def validate_output(prgm: LogicStatement) -> None:
+    match prgm:
+        case Plan(bodies):
+            seen_produces = False
+            for i, body in enumerate(bodies):
+                if seen_produces:
+                    raise ValueError(
+                        "Invalid loop ordering output: Produces must be final body"
+                    )
+                match body:
+                    case Query(_, Reorder(_, _)):
+                        pass
+                    case Query():
+                        raise ValueError(
+                            "Invalid loop ordering output: Query rhs must be Reorder"
+                        )
+                    case Produces(_):
+                        seen_produces = True
+                        if i != len(bodies) - 1:
+                            raise ValueError(
+                                "Invalid loop ordering output: Produces must be "
+                                "final body"
+                            )
+                    case _:
+                        raise ValueError(
+                            "Invalid loop ordering output: expected Query or "
+                            f"Produces in Plan, got {type(body).__name__}"
+                        )
+        case Query(_, Reorder(_, _)):
+            pass
+        case Query():
+            raise ValueError("Invalid loop ordering output: Query rhs must be Reorder")
+        case _:
+            raise ValueError(
+                "Invalid loop ordering output: expected Plan or Query, got "
+                f"{type(prgm).__name__}"
+            )
+
+
 class LoopOrderer(LogicLoader):
     """
     A LoopOrderer determines the loop ordering for each query in a logic
@@ -54,6 +143,8 @@ class LoopOrderer(LogicLoader):
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
     ):
+        validate_input(prgm)
+
         def reorder(node: LogicStatement) -> LogicStatement:
             match node:
                 case Plan(bodies):
@@ -69,6 +160,7 @@ class LoopOrderer(LogicLoader):
                     )
 
         prgm = reorder(prgm)
+        validate_output(prgm)
         logger.debug(prgm)
         return self.loader(prgm, bindings)
 
