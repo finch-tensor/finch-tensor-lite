@@ -4,6 +4,7 @@ from finchlite.algebra import ffuncs
 from finchlite.autoschedule import (
     DefaultLoopOrderer,
     validate_input,
+    validate_output,
 )
 from finchlite.finch_logic import (
     Aggregate,
@@ -124,3 +125,41 @@ def test_input_rejects_invalid_plan_body():
         validate_input(Plan((Table(Alias("A"), (i,)),)))
 
 
+
+def test_output_rejects_invalid():
+    with pytest.raises(
+        ValueError, match="Invalid loop ordering output: expected Plan or Query"
+    ):
+        validate_output(Produces((Alias("A"),)))
+
+
+def test_output_rejects_bare_rhs_on_query():
+    i = Field("i")
+    with pytest.raises(
+        ValueError, match="Invalid loop ordering output: Query rhs must be Reorder"
+    ):
+        validate_output(Query(Alias("B"), Table(Alias("A"), (i,))))
+
+
+def test_output_rejects_produces_followed_by_query():
+    i = Field("i")
+    plan = Plan(
+        (
+            Produces((Alias("A"),)),
+            Query(Alias("B"), Reorder(Table(Alias("A"), (i,)), (i,))),
+        )
+    )
+    with pytest.raises(
+        ValueError, match="Invalid loop ordering output: Produces must be final body"
+    ):
+        validate_output(plan)
+
+
+def test_default_loop_orderer_passes_validate_output():
+    i, j = Field("i"), Field("j")
+    query = Query(
+        Alias("B"),
+        Reorder(Table(Alias("A"), (i, j)), (i, j)),
+    )
+    reorder_query, _ = DefaultLoopOrderer(capture_prgm)(query, {})
+    validate_output(reorder_query)
