@@ -20,7 +20,7 @@ from finchlite.finch_logic import (
 )
 
 
-def capture_prgm(prgm, bindings):
+def capture_prgm(prgm, bindings, stats=None, stats_factory=None):
     return prgm, bindings
 
 

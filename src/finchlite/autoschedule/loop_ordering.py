@@ -17,9 +17,12 @@ from ..finch_logic import (
     Produces,
     Query,
     Reorder,
+    StatsFactory,
     Table,
+    TensorStats,
 )
 from ..util.logging import LOG_LOGIC_POST_OPT
+from .tensor_stats import DenseStatsFactory
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -205,8 +208,16 @@ class LoopOrderer(LogicLoader):
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats] | None = None,
+        stats_factory: StatsFactory | None = None,
     ):
         validate_input(prgm)
+        # NOTE: change when we have a proper stats factory
+        if stats is None:
+            stats = {}
+        if stats_factory is None:
+            stats_factory = DenseStatsFactory()
+        # End  NOTE
 
         def reorder(node: LogicStatement) -> LogicStatement:
             match node:
@@ -242,7 +253,7 @@ class LoopOrderer(LogicLoader):
         prgm = reorder(prgm)
         validate_output(prgm)
         logger.debug(prgm)
-        return self.loader(prgm, bindings)
+        return self.loader(prgm, bindings, stats, stats_factory)
 
 
 class DefaultLoopOrderer(LoopOrderer):
