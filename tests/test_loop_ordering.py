@@ -24,7 +24,7 @@ def capture_prgm(prgm, bindings):
     return prgm, bindings
 
 """
-Input tests
+Output tests
 """
 
 def test_valid_single_query_is_wrapped_in_loop_reorder():
@@ -86,7 +86,7 @@ def test_valid_plan_with_produces_passes_loop_ordering():
     )
 
 """
-Output tests
+Input tests
 """
 
 def test_input_rejects_invalid_root_node():
@@ -122,6 +122,28 @@ def test_input_rejects_aggregate_without_inner_reorder():
                 ),
             )
         )
+
+
+def test_input_rejects_two_aggregates_on_rhs():
+    """At most one Aggregate per Query rhs (single reduction around map-join)."""
+    i = Field("i")
+    inner = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0),
+        Reorder(Table(Alias("A"), (i,)), (i,)),
+        (),
+    )
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0),
+        Reorder(inner, (i,)),
+        (),
+    )
+    with pytest.raises(
+        ValueError,
+        match="Invalid loop ordering input: at most one Aggregate per Query rhs",
+    ):
+        validate_input(Query(Alias("B"), rhs))
 
 
 def test_input_rejects_invalid_plan_body():

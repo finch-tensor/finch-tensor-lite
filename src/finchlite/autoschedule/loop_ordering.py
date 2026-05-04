@@ -8,6 +8,7 @@ from ..finch_logic import (
     Alias,
     Field,
     LogicLoader,
+    LogicNode,
     LogicStatement,
     LogicTree,
     MockLogicLoader,
@@ -32,6 +33,28 @@ def _is_standardized_query(node: Query) -> bool:
             return False
 
 
+def _assert_one_aggregrate(rhs: LogicNode) -> None:
+    num_aggregrates = 0
+    stack = [rhs]
+    while stack:
+        ex = stack.pop()
+        match ex:
+            case Aggregate(_, _, arg, _):
+                num_aggregrates += 1
+                stack.append(arg)
+            case Reorder(arg, _):
+                stack.append(arg)
+            case Table(_, _):
+                pass
+            case _:
+                if isinstance(ex, LogicTree):
+                    stack.extend(ex.children)
+    if num_aggregrates > 1:
+        raise ValueError(
+            "Invalid loop ordering input: at most one Aggregate per Query rhs"
+        )
+
+
 def validate_input(prgm: LogicStatement) -> None:
     match prgm:
         case Plan(bodies):
@@ -48,6 +71,9 @@ def validate_input(prgm: LogicStatement) -> None:
                                 "Invalid loop ordering input: expected "
                                 "standardized Query rhs"
                             )
+                        match query:
+                            case Query(_, rhs):
+                                _assert_one_aggregrate(rhs)
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
@@ -65,6 +91,9 @@ def validate_input(prgm: LogicStatement) -> None:
                 raise ValueError(
                     "Invalid loop ordering input: expected standardized Query rhs"
                 )
+            match query:
+                case Query(_, rhs):
+                    _assert_one_aggregrate(rhs)
         case _:
             raise ValueError(
                 "Invalid loop ordering input: expected Plan or Query, got "
