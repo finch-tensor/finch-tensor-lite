@@ -23,9 +23,11 @@ from finchlite.finch_logic import (
 def capture_prgm(prgm, bindings):
     return prgm, bindings
 
+
 """
 Output tests
 """
+
 
 def test_valid_single_query_is_wrapped_in_loop_reorder():
     i, j = Field("i"), Field("j")
@@ -63,8 +65,25 @@ def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
 
     result, _ = DefaultLoopOrderer(capture_prgm)(query, {})
 
-    # assert result == Query(Alias("C"), Reorder(query.rhs, (k, i, j)))
-    assert result == Query(Alias("C"), Reorder(query.rhs, (i, j)))
+    # k appears on both operands; nest k outermost — order merged into inner Reorder
+    assert result == Query(
+        Alias("C"),
+        Aggregate(
+            Literal(ffuncs.add),
+            Literal(0),
+            Reorder(
+                MapJoin(
+                    Literal(ffuncs.mul),
+                    (
+                        Table(Alias("A"), (i, k)),
+                        Table(Alias("B"), (k, j)),
+                    ),
+                ),
+                (k, i, j),
+            ),
+            (k,),
+        ),
+    )
 
 
 def test_valid_plan_with_produces_passes_loop_ordering():
@@ -85,9 +104,11 @@ def test_valid_plan_with_produces_passes_loop_ordering():
         )
     )
 
+
 """
 Input tests
 """
+
 
 def test_input_rejects_invalid_root_node():
     with pytest.raises(
@@ -100,7 +121,7 @@ def test_input_rejects_bare_table_rhs():
     i = Field("i")
 
     with pytest.raises(
-        ValueError, match="Invalid loop ordering input: expected standardized Query rhs"
+        ValueError, match="Invalid loop ordering input: Query rhs must be Reorder"
     ):
         validate_input(Query(Alias("B"), Table(Alias("A"), (i,))))
 
@@ -109,7 +130,7 @@ def test_input_rejects_aggregate_without_inner_reorder():
     i = Field("i")
 
     with pytest.raises(
-        ValueError, match="Invalid loop ordering input: expected standardized Query rhs"
+        ValueError, match="Invalid loop ordering input: Query rhs must be Reorder"
     ):
         validate_input(
             Query(
@@ -209,27 +230,36 @@ def test_output_rejects_invalid():
 def test_output_rejects_bare_rhs_on_query():
     i = Field("i")
     with pytest.raises(
-        ValueError, match="Invalid loop ordering output: Query rhs must be Reorder"
+        ValueError,
+        match="Query rhs must be Reorder\\(\\.\\.\\.\\) or Aggregate",
     ):
         validate_output(Query(Alias("B"), Table(Alias("A"), (i,))))
 
 
 def test_output_rejects_nonstandard_inner_rhs():
-    """Inner body under loop-order Reorder must still match standardized Query rhs."""
+    """Loop ordering output must not wrap Aggregate in an outer Reorder."""
     i = Field("i")
     bad = Query(
         Alias("B"),
-        Reorder(Table(Alias("A"), (i,)), (i,)),
+        Reorder(
+            Aggregate(
+                Literal(ffuncs.add),
+                Literal(0),
+                Reorder(Table(Alias("A"), (i,)), (i,)),
+                (),
+            ),
+            (i,),
+        ),
     )
     with pytest.raises(
         ValueError,
-        match="Invalid loop ordering output: expected standardized Query rhs",
+        match="Invalid loop ordering output: Query rhs must be Reorder",
     ):
         validate_output(bad)
 
 
 def test_output_rejects_two_aggregates_inside_reorder():
-    """Output body inside loop-order Reorder must still have at most one Aggregate."""
+    """Query rhs must still have at most one Aggregate (nested aggregate invalid)."""
     i = Field("i")
     inner = Aggregate(
         Literal(ffuncs.add),
@@ -243,7 +273,7 @@ def test_output_rejects_two_aggregates_inside_reorder():
         Reorder(inner, (i,)),
         (),
     )
-    bad = Query(Alias("B"), Reorder(rhs, (i,)))
+    bad = Query(Alias("B"), rhs)
     with pytest.raises(
         ValueError,
         match="Invalid loop ordering: at most one Aggregate per Query rhs",

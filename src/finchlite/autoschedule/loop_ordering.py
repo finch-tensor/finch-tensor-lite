@@ -51,16 +51,10 @@ def _assert_one_aggregrate(rhs: LogicNode) -> None:
                 if isinstance(ex, LogicTree):
                     stack.extend(ex.children)
     if num_aggregrates > 1:
-        raise ValueError(
-            "Invalid loop ordering: at most one Aggregate per Query rhs"
-        )
+        raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
 
 
 def _assert_mapjoin_inside_aggregate(rhs: LogicNode) -> None:
-    """
-    MapJoin is only allowed under an Aggregate's tensor argument (not e.g. a bare
-    Reorder(MapJoin(...)) query rhs).
-    """
     stack: list[tuple[LogicNode, bool]] = [(rhs, False)]
     while stack:
         ex, inside = stack.pop()
@@ -82,8 +76,35 @@ def _assert_mapjoin_inside_aggregate(rhs: LogicNode) -> None:
             case _:
                 pass
         if isinstance(ex, LogicTree):
-            for child in ex.children:
-                stack.append((child, inside))
+            stack.extend((child, inside) for child in ex.children)
+
+
+def _validate_query(query: Query, *, kind: str) -> None:
+    """
+    Validate that a Query rhs matches the loop-ordering grammar: standardized
+    shape, single Aggregate, MapJoin placement, no outer Reorder around
+    Aggregate.
+
+    Used for both ``validate_input`` and ``validate_output``.
+    """
+    prefix = f"Invalid loop ordering {kind}:"
+    if not _is_standardized_query(query):
+        raise ValueError(
+            f"{prefix} Query rhs must be "
+            "Reorder(...) or Aggregate(..., Reorder(...), ...)"
+        )
+    match query:
+        case Query(_, Aggregate() as rhs):
+            _assert_one_aggregrate(rhs)
+            _assert_mapjoin_inside_aggregate(rhs)
+        case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
+            _assert_one_aggregrate(inner)
+            _assert_mapjoin_inside_aggregate(inner)
+        case _:
+            raise ValueError(
+                f"{prefix} Query rhs must be "
+                "Reorder(...) or Aggregate(..., Reorder(...), ...)"
+            )
 
 
 def validate_input(prgm: LogicStatement) -> None:
@@ -97,15 +118,7 @@ def validate_input(prgm: LogicStatement) -> None:
                     )
                 match body:
                     case Query() as query:
-                        if not _is_standardized_query(query):
-                            raise ValueError(
-                                "Invalid loop ordering input: expected "
-                                "standardized Query rhs"
-                            )
-                        match query:
-                            case Query(_, rhs):
-                                _assert_one_aggregrate(rhs)
-                                _assert_mapjoin_inside_aggregate(rhs)
+                        _validate_query(query, kind="input")
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
@@ -119,14 +132,7 @@ def validate_input(prgm: LogicStatement) -> None:
                             f"Produces in Plan, got {type(body).__name__}"
                         )
         case Query() as query:
-            if not _is_standardized_query(query):
-                raise ValueError(
-                    "Invalid loop ordering input: expected standardized Query rhs"
-                )
-            match query:
-                case Query(_, rhs):
-                    _assert_one_aggregrate(rhs)
-                    _assert_mapjoin_inside_aggregate(rhs)
+            _validate_query(query, kind="input")
         case _:
             raise ValueError(
                 "Invalid loop ordering input: expected Plan or Query, got "
@@ -144,18 +150,8 @@ def validate_output(prgm: LogicStatement) -> None:
                         "Invalid loop ordering output: Produces must be final body"
                     )
                 match body:
-                    case Query(lhs, Reorder(inner, _)):
-                        if not _is_standardized_query(Query(lhs, inner)):
-                            raise ValueError(
-                                "Invalid loop ordering output: expected "
-                                "standardized Query rhs"
-                            )
-                        _assert_one_aggregrate(inner)
-                        _assert_mapjoin_inside_aggregate(inner)
-                    case Query():
-                        raise ValueError(
-                            "Invalid loop ordering output: Query rhs must be Reorder"
-                        )
+                    case Query() as query:
+                        _validate_query(query, kind="output")
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
@@ -168,15 +164,8 @@ def validate_output(prgm: LogicStatement) -> None:
                             "Invalid loop ordering output: expected Query or "
                             f"Produces in Plan, got {type(body).__name__}"
                         )
-        case Query(lhs, Reorder(inner, _)):
-            if not _is_standardized_query(Query(lhs, inner)):
-                raise ValueError(
-                    "Invalid loop ordering output: expected standardized Query rhs"
-                )
-            _assert_one_aggregrate(inner)
-            _assert_mapjoin_inside_aggregate(inner)
-        case Query():
-            raise ValueError("Invalid loop ordering output: Query rhs must be Reorder")
+        case Query() as query:
+            _validate_query(query, kind="output")
         case _:
             raise ValueError(
                 "Invalid loop ordering output: expected Plan or Query, got "
@@ -225,7 +214,24 @@ class LoopOrderer(LogicLoader):
                     return Plan(tuple(reorder(body) for body in bodies))
                 case Query(lhs, rhs):
                     loop_order = self.get_loop_order(node, bindings)
-                    return Query(lhs, Reorder(rhs, loop_order))
+                    match rhs:
+                        case Aggregate(
+                            op,
+                            init,
+                            Reorder(inner, _old_loop_order),
+                            reduce_axes,
+                        ):
+                            return Query(
+                                lhs,
+                                Aggregate(
+                                    op,
+                                    init,
+                                    Reorder(inner, loop_order),
+                                    reduce_axes,
+                                ),
+                            )
+                        case _:
+                            return Query(lhs, Reorder(rhs, loop_order))
                 case Produces(_):
                     return node
                 case _:
@@ -275,24 +281,17 @@ class DefaultLoopOrderer(LoopOrderer):
                         for child in ex.children:
                             visit(child)
 
-        output_fields: tuple[Field, ...] | None = None
         match node:
-            case Query(_, Aggregate() as aggregate):
-                visit(aggregate)
-                output_fields = tuple(aggregate.fields())
             case Query(_, rhs):
                 visit(rhs)
+            case _:
+                raise ValueError(
+                    "DefaultLoopOrderer.get_loop_order expected a Query node"
+                )
 
-        if output_fields is not None:
-            ordered = sorted(
-                output_fields,
-                key=lambda idx: occurrences[idx],
-                reverse=True,
-            )
-        else:
-            ordered = sorted(
-                occurrences.keys(),
-                key=lambda idx: occurrences[idx],
-                reverse=True,
-            )
+        ordered = sorted(
+            occurrences.keys(),
+            key=lambda idx: occurrences[idx],
+            reverse=True,
+        )
         return tuple(ordered)
