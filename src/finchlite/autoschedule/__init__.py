@@ -29,9 +29,9 @@ from .standardize import LogicStandardizer
 __all__ = [
     "Aggregate",
     "Alias",
-    "DefaultLoopOrderer",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
+    "DefaultLoopOrderer",
     "Field",
     "Literal",
     "LogicCompiler",

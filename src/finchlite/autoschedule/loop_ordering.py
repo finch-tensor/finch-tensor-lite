@@ -9,6 +9,7 @@ from ..finch_logic import (
     Field,
     LogicLoader,
     LogicStatement,
+    LogicTree,
     MockLogicLoader,
     Plan,
     Produces,
@@ -197,16 +198,9 @@ class DefaultLoopOrderer(LoopOrderer):
                 case Reorder(arg, _):
                     visit(arg)
                 case _:
-                    # MapJoin and other composites expose their children via
-                    # standard dataclass fields; walk them generically.
-                    for child in getattr(ex, "__dataclass_fields__", {}).keys():
-                        val = getattr(ex, child)
-                        if isinstance(val, tuple):
-                            for item in val:
-                                if hasattr(item, "__dataclass_fields__"):
-                                    visit(item)
-                        elif hasattr(val, "__dataclass_fields__"):
-                            visit(val)
+                    if isinstance(ex, LogicTree):
+                        for child in ex.children:
+                            visit(child)
 
         output_fields: tuple[Field, ...] | None = None
         match node:

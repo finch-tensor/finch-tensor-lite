@@ -19,6 +19,7 @@ from finchlite.finch_logic import (
     Table,
 )
 
+
 def capture_prgm(prgm, bindings):
     return prgm, bindings
 
@@ -59,7 +60,7 @@ def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
 
     result, _ = DefaultLoopOrderer(capture_prgm)(query, {})
 
-    #assert result == Query(Alias("C"), Reorder(query.rhs, (k, i, j)))
+    # assert result == Query(Alias("C"), Reorder(query.rhs, (k, i, j)))
     assert result == Query(Alias("C"), Reorder(query.rhs, (i, j)))
 
 
@@ -124,7 +125,6 @@ def test_input_rejects_invalid_plan_body():
         ValueError, match="Invalid loop ordering input: expected Query or Produces"
     ):
         validate_input(Plan((Table(Alias("A"), (i,)),)))
-
 
 
 def test_output_rejects_invalid():
