@@ -295,10 +295,6 @@ class DefaultLoopOrderer(LoopOrderer):
         match node:
             case Query(_, rhs):
                 visit(rhs)
-            case _:
-                raise ValueError(
-                    "DefaultLoopOrderer.get_loop_order expected a Query node"
-                )
 
         ordered = sorted(
             occurrences.keys(),
