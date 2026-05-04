@@ -23,6 +23,9 @@ from finchlite.finch_logic import (
 def capture_prgm(prgm, bindings):
     return prgm, bindings
 
+"""
+Input tests
+"""
 
 def test_valid_single_query_is_wrapped_in_loop_reorder():
     i, j = Field("i"), Field("j")
@@ -82,6 +85,9 @@ def test_valid_plan_with_produces_passes_loop_ordering():
         )
     )
 
+"""
+Output tests
+"""
 
 def test_input_rejects_invalid_root_node():
     with pytest.raises(
