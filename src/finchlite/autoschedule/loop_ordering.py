@@ -1,4 +1,3 @@
-from locale import currency
 import logging
 from abc import abstractmethod
 from collections import Counter
@@ -258,8 +257,8 @@ class LoopOrderer(LogicLoader):
                                 ),
                             )
                         # Check if this is just a Tensor
-                        case Reorder(inner, _old) if (
-                            not _contains_aggregate_or_mapjoin(inner)
+                        case Reorder(inner, _old) if not _contains_aggregate_or_mapjoin(
+                            inner
                         ):
                             return Query(lhs, Reorder(inner, loop_order))
                         case _:
