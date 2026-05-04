@@ -39,7 +39,9 @@ def test_valid_single_query_is_wrapped_in_loop_reorder():
     result, bindings = DefaultLoopOrderer(capture_prgm)(query, {})
 
     assert bindings == {}
-    assert result == Query(Alias("B"), Reorder(query.rhs, (i, j)))
+    assert result == Query(
+        Alias("B"), Reorder(Table(Alias("A"), (i, j)), (i, j))
+    )
 
 
 def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
@@ -99,7 +101,10 @@ def test_valid_plan_with_produces_passes_loop_ordering():
 
     assert result == Plan(
         (
-            Query(Alias("B"), Reorder(plan.bodies[0].rhs, (i,))),
+            Query(
+                Alias("B"),
+                Reorder(Table(Alias("A"), (i,)), (i,)),
+            ),
             Produces((Alias("B"),)),
         )
     )

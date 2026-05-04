@@ -1,3 +1,4 @@
+from locale import currency
 import logging
 from abc import abstractmethod
 from collections import Counter
@@ -25,6 +26,21 @@ from ..util.logging import LOG_LOGIC_POST_OPT
 from .tensor_stats import DenseStatsFactory
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+
+
+def _contains_aggregate_or_mapjoin(ex: LogicNode) -> bool:
+    stack: list[LogicNode] = [ex]
+    while stack:
+        curr = stack.pop()
+        match curr:
+            case Aggregate():
+                return True
+            case MapJoin():
+                return True
+            case _:
+                if isinstance(curr, LogicTree):
+                    stack.extend(curr.children)
+    return False
 
 
 def _is_standardized_query(node: Query) -> bool:
@@ -241,6 +257,11 @@ class LoopOrderer(LogicLoader):
                                     reduce_axes,
                                 ),
                             )
+                        # Check if this is just a Tensor
+                        case Reorder(inner, _old) if (
+                            not _contains_aggregate_or_mapjoin(inner)
+                        ):
+                            return Query(lhs, Reorder(inner, loop_order))
                         case _:
                             return Query(lhs, Reorder(rhs, loop_order))
                 case Produces(_):
