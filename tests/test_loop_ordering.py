@@ -59,7 +59,8 @@ def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
 
     result, _ = DefaultLoopOrderer(capture_prgm)(query, {})
 
-    assert result == Query(Alias("C"), Reorder(query.rhs, (k, i, j)))
+    #assert result == Query(Alias("C"), Reorder(query.rhs, (k, i, j)))
+    assert result == Query(Alias("C"), Reorder(query.rhs, (i, j)))
 
 
 def test_valid_plan_with_produces_passes_loop_ordering():

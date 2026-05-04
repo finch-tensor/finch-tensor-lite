@@ -208,13 +208,24 @@ class DefaultLoopOrderer(LoopOrderer):
                         elif hasattr(val, "__dataclass_fields__"):
                             visit(val)
 
+        output_fields: tuple[Field, ...] | None = None
         match node:
+            case Query(_, Aggregate() as aggregate):
+                visit(aggregate)
+                output_fields = tuple(aggregate.fields())
             case Query(_, rhs):
                 visit(rhs)
 
-        ordered = sorted(
-            occurrences.keys(),
-            key=lambda idx: occurrences[idx],
-            reverse=True,
-        )
+        if output_fields is not None:
+            ordered = sorted(
+                output_fields,
+                key=lambda idx: occurrences[idx],
+                reverse=True,
+            )
+        else:
+            ordered = sorted(
+                occurrences.keys(),
+                key=lambda idx: occurrences[idx],
+                reverse=True,
+            )
         return tuple(ordered)
