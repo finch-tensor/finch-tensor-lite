@@ -11,6 +11,7 @@ from ..finch_logic import (
     LogicNode,
     LogicStatement,
     LogicTree,
+    MapJoin,
     MockLogicLoader,
     Plan,
     Produces,
@@ -51,8 +52,38 @@ def _assert_one_aggregrate(rhs: LogicNode) -> None:
                     stack.extend(ex.children)
     if num_aggregrates > 1:
         raise ValueError(
-            "Invalid loop ordering input: at most one Aggregate per Query rhs"
+            "Invalid loop ordering: at most one Aggregate per Query rhs"
         )
+
+
+def _assert_mapjoin_inside_aggregate(rhs: LogicNode) -> None:
+    """
+    MapJoin is only allowed under an Aggregate's tensor argument (not e.g. a bare
+    Reorder(MapJoin(...)) query rhs).
+    """
+    stack: list[tuple[LogicNode, bool]] = [(rhs, False)]
+    while stack:
+        ex, inside = stack.pop()
+        match ex:
+            case MapJoin():
+                if not inside:
+                    raise ValueError(
+                        "Invalid loop ordering: MapJoin is only allowed "
+                        "inside an Aggregate argument"
+                    )
+            case Aggregate(_, _, arg, _):
+                stack.append((arg, True))
+                continue
+            case Reorder(arg, _):
+                stack.append((arg, inside))
+                continue
+            case Table(_, _):
+                continue
+            case _:
+                pass
+        if isinstance(ex, LogicTree):
+            for child in ex.children:
+                stack.append((child, inside))
 
 
 def validate_input(prgm: LogicStatement) -> None:
@@ -74,6 +105,7 @@ def validate_input(prgm: LogicStatement) -> None:
                         match query:
                             case Query(_, rhs):
                                 _assert_one_aggregrate(rhs)
+                                _assert_mapjoin_inside_aggregate(rhs)
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
@@ -94,6 +126,7 @@ def validate_input(prgm: LogicStatement) -> None:
             match query:
                 case Query(_, rhs):
                     _assert_one_aggregrate(rhs)
+                    _assert_mapjoin_inside_aggregate(rhs)
         case _:
             raise ValueError(
                 "Invalid loop ordering input: expected Plan or Query, got "
@@ -111,8 +144,14 @@ def validate_output(prgm: LogicStatement) -> None:
                         "Invalid loop ordering output: Produces must be final body"
                     )
                 match body:
-                    case Query(_, Reorder(_, _)):
-                        pass
+                    case Query(lhs, Reorder(inner, _)):
+                        if not _is_standardized_query(Query(lhs, inner)):
+                            raise ValueError(
+                                "Invalid loop ordering output: expected "
+                                "standardized Query rhs"
+                            )
+                        _assert_one_aggregrate(inner)
+                        _assert_mapjoin_inside_aggregate(inner)
                     case Query():
                         raise ValueError(
                             "Invalid loop ordering output: Query rhs must be Reorder"
@@ -129,8 +168,13 @@ def validate_output(prgm: LogicStatement) -> None:
                             "Invalid loop ordering output: expected Query or "
                             f"Produces in Plan, got {type(body).__name__}"
                         )
-        case Query(_, Reorder(_, _)):
-            pass
+        case Query(lhs, Reorder(inner, _)):
+            if not _is_standardized_query(Query(lhs, inner)):
+                raise ValueError(
+                    "Invalid loop ordering output: expected standardized Query rhs"
+                )
+            _assert_one_aggregrate(inner)
+            _assert_mapjoin_inside_aggregate(inner)
         case Query():
             raise ValueError("Invalid loop ordering output: Query rhs must be Reorder")
         case _:

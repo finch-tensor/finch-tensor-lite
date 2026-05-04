@@ -141,9 +141,53 @@ def test_input_rejects_two_aggregates_on_rhs():
     )
     with pytest.raises(
         ValueError,
-        match="Invalid loop ordering input: at most one Aggregate per Query rhs",
+        match="Invalid loop ordering: at most one Aggregate per Query rhs",
     ):
         validate_input(Query(Alias("B"), rhs))
+
+
+def test_input_rejects_mapjoin_outside_aggregate():
+    """MapJoin must sit under Aggregate(..., arg, ...), not a bare Reorder rhs."""
+    i, j = Field("i"), Field("j")
+    rhs = Reorder(
+        MapJoin(
+            Literal(ffuncs.mul),
+            (
+                Table(Alias("A"), (i, j)),
+                Table(Alias("B"), (i, j)),
+            ),
+        ),
+        (i, j),
+    )
+    with pytest.raises(
+        ValueError,
+        match="Invalid loop ordering: MapJoin is only allowed "
+        "inside an Aggregate argument",
+    ):
+        validate_input(Query(Alias("C"), rhs))
+
+
+def test_input_accepts_mapjoin_inside_aggregate():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    query = Query(
+        Alias("C"),
+        Aggregate(
+            Literal(ffuncs.add),
+            Literal(0),
+            Reorder(
+                MapJoin(
+                    Literal(ffuncs.mul),
+                    (
+                        Table(Alias("A"), (i, k)),
+                        Table(Alias("B"), (k, j)),
+                    ),
+                ),
+                (i, j, k),
+            ),
+            (k,),
+        ),
+    )
+    validate_input(query)
 
 
 def test_input_rejects_invalid_plan_body():
@@ -168,6 +212,64 @@ def test_output_rejects_bare_rhs_on_query():
         ValueError, match="Invalid loop ordering output: Query rhs must be Reorder"
     ):
         validate_output(Query(Alias("B"), Table(Alias("A"), (i,))))
+
+
+def test_output_rejects_nonstandard_inner_rhs():
+    """Inner body under loop-order Reorder must still match standardized Query rhs."""
+    i = Field("i")
+    bad = Query(
+        Alias("B"),
+        Reorder(Table(Alias("A"), (i,)), (i,)),
+    )
+    with pytest.raises(
+        ValueError,
+        match="Invalid loop ordering output: expected standardized Query rhs",
+    ):
+        validate_output(bad)
+
+
+def test_output_rejects_two_aggregates_inside_reorder():
+    """Output body inside loop-order Reorder must still have at most one Aggregate."""
+    i = Field("i")
+    inner = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0),
+        Reorder(Table(Alias("A"), (i,)), (i,)),
+        (),
+    )
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0),
+        Reorder(inner, (i,)),
+        (),
+    )
+    bad = Query(Alias("B"), Reorder(rhs, (i,)))
+    with pytest.raises(
+        ValueError,
+        match="Invalid loop ordering: at most one Aggregate per Query rhs",
+    ):
+        validate_output(bad)
+
+
+def test_output_rejects_mapjoin_outside_aggregate_inside_reorder():
+    i, j = Field("i"), Field("j")
+    inner = Reorder(
+        MapJoin(
+            Literal(ffuncs.mul),
+            (
+                Table(Alias("A"), (i, j)),
+                Table(Alias("B"), (i, j)),
+            ),
+        ),
+        (i, j),
+    )
+    bad = Query(Alias("C"), Reorder(inner, (i, j)))
+    with pytest.raises(
+        ValueError,
+        match="Invalid loop ordering: MapJoin is only allowed "
+        "inside an Aggregate argument",
+    ):
+        validate_output(bad)
 
 
 def test_output_rejects_produces_followed_by_query():
