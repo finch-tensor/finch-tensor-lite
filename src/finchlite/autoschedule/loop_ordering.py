@@ -7,6 +7,7 @@ from ..finch_logic import (
     Aggregate,
     Alias,
     Field,
+    LogicExpression,
     LogicLoader,
     LogicNode,
     LogicStatement,
@@ -25,6 +26,30 @@ from ..util.logging import LOG_LOGIC_POST_OPT
 from .tensor_stats import DenseStatsFactory
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+
+
+# Tranpose funcs
+def _get_operand_table_and_idxs(
+    arg: LogicExpression,
+) -> tuple[Table, tuple[Field, ...]] | None:
+    """Get table, idxs for rewrap."""
+    match arg:
+        case Table(_, _) as t:
+            return (t, t.idxs)
+        case Reorder(Table(_, _) as t, idxs):
+            return (t, idxs)
+        case _:
+            return None
+
+
+def _get_idx_order(
+    per_operand_idxs: tuple[tuple[Field, ...], ...],
+) -> tuple[Field, ...]:
+    """First appearance across operands"""
+    return tuple(dict.fromkeys(f for seq in per_operand_idxs for f in seq))
+
+
+# End transpose funcs
 
 
 def _contains_aggregate_or_mapjoin(ex: LogicNode) -> bool:
@@ -200,6 +225,10 @@ class LoopOrderer(LogicLoader):
     The input program is expected to be in the standardized form produced by
     ``LogicStandardizer``: every query is either a Reorder of a single
     argument, or an Aggregate over a Reorder of a series of map-joins.
+
+    Before loop nesting, **pass 1** aligns contraction axes: every ``MapJoin``
+    whose arguments are table-shaped gets ``Reorder`` wrappers so index names
+    follow one canonical order across operands (pure view ``Reorder`` only).
     """
 
     def __init__(self, loader: LogicLoader | None = None):
