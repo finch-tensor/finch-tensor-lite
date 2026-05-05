@@ -1,6 +1,7 @@
 import logging
 from abc import abstractmethod
 from collections import Counter
+from typing import cast
 
 from ..algebra import TensorFType
 from ..finch_logic import (
@@ -57,11 +58,12 @@ def _align_mapjoins(mj: MapJoin) -> MapJoin:
     views = tuple(_get_operand_table_and_idxs(a) for a in mj.args)
     if any(v is None for v in views):
         return mj
-    seqs = tuple(v[1] for v in views)
+    table_views = cast(tuple[tuple[Table, tuple[Field, ...]], ...], views)
+    seqs = tuple(v[1] for v in table_views)
     canonical = _get_idx_order(seqs)
     new_args: list[LogicExpression] = []
     changed = False
-    for arg, (base_t, logical) in zip(mj.args, views, strict=True):
+    for arg, (base_t, logical) in zip(mj.args, table_views, strict=True):
         field_set = set(logical)
         new_order = tuple(f for f in canonical if f in field_set)
         if new_order != logical:
@@ -74,7 +76,7 @@ def _align_mapjoins(mj: MapJoin) -> MapJoin:
     return MapJoin(mj.op, tuple(new_args))
 
 
-def _get_mapjoins(ex: LogicNode) -> LogicNode:
+def _get_mapjoins(ex: LogicExpression) -> LogicExpression:
     match ex:
         case MapJoin():
             return _align_mapjoins(ex)
