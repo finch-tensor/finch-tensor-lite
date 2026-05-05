@@ -49,9 +49,67 @@ def _get_idx_order(
     return tuple(dict.fromkeys(f for seq in per_operand_idxs for f in seq))
 
 
-# End transpose funcs
+def _transpose(t: Table, reordered: tuple[Field, ...]) -> Reorder:
+    return Reorder(Table(t.tns, t.idxs), reordered)
 
 
+def _align_mapjoins(mj: MapJoin) -> MapJoin:
+    views = tuple(_get_operand_table_and_idxs(a) for a in mj.args)
+    if any(v is None for v in views):
+        return mj
+    seqs = tuple(v[1] for v in views)
+    canonical = _get_idx_order(seqs)
+    new_args: list[LogicExpression] = []
+    changed = False
+    for arg, (base_t, logical) in zip(mj.args, views, strict=True):
+        field_set = set(logical)
+        new_order = tuple(f for f in canonical if f in field_set)
+        if new_order != logical:
+            changed = True
+            new_args.append(_transpose(base_t, new_order))
+        else:
+            new_args.append(arg)
+    if not changed:
+        return mj
+    return MapJoin(mj.op, tuple(new_args))
+
+
+def _get_mapjoins(ex: LogicNode) -> LogicNode:
+    match ex:
+        case MapJoin():
+            return _align_mapjoins(ex)
+        case Aggregate(op, init, arg, axes):
+            new_arg = _get_mapjoins(arg)
+            return Aggregate(op, init, new_arg, axes)
+        case Reorder(arg, idxs):
+            new_inner = _get_mapjoins(arg)
+            return Reorder(new_inner, idxs)
+        case _:
+            return ex
+
+
+def _align(prgm: LogicStatement) -> LogicStatement:
+    match prgm:
+        case Plan(bodies):
+            out: list[LogicStatement] = []
+            for b in bodies:
+                match b:
+                    case Query(lhs, rhs):
+                        out.append(Query(lhs, _get_mapjoins(rhs)))
+                    case Plan():
+                        out.append(_align(b))
+                    case _:
+                        out.append(b)
+            return Plan(tuple(out))
+        case Query(lhs, rhs):
+            return Query(lhs, _get_mapjoins(rhs))
+        case Produces(_):
+            return prgm
+        case _:
+            raise ValueError(f"_align: unsupported {type(prgm).__name__}")
+
+
+# Validation func
 def _contains_aggregate_or_mapjoin(ex: LogicNode) -> bool:
     stack: list[LogicNode] = [ex]
     while stack:
@@ -216,6 +274,9 @@ def validate_output(prgm: LogicStatement) -> None:
             )
 
 
+# End validation funcs
+
+
 class LoopOrderer(LogicLoader):
     """
     A LoopOrderer determines the loop ordering for each query in a logic
@@ -262,6 +323,9 @@ class LoopOrderer(LogicLoader):
         if stats_factory is None:
             stats_factory = DenseStatsFactory()
         # End  NOTE
+
+        prgm = _align(prgm)
+        validate_input(prgm)
 
         def reorder(node: LogicStatement) -> LogicStatement:
             match node:
