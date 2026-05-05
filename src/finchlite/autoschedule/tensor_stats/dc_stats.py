@@ -4,14 +4,14 @@ import math
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 
 from finchlite.finch_logic import Field
 
 from ... import finch_notation as ntn
-from ...algebra import Tensor, ffuncs, ftype, int64, is_annihilator
+from ...algebra import Tensor, ffuncs, ftype, int64
 from ...algebra.algebra import FinchOperator
 from ...compile import BufferizedNDArray, make_extent
 from .numeric_stats import NumericStats
@@ -53,30 +53,22 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
             raise TypeError("copy_stats expected a DCStats instance")
         return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
 
-    def mapjoin(self, op: FinchOperator, *all_stats: DCStats) -> DCStats:
-        new_def = TensorDef.mapjoin(op, *(s.tensordef for s in all_stats))
-        join_like_args: list[DCStats] = []
-        union_like_args: list[DCStats] = []
-        for stats in all_stats:
-            if len(stats.tensordef.index_order) == 0:
-                continue
-            if is_annihilator(op, stats.tensordef.fill_value):
-                join_like_args.append(stats)
-            else:
-                union_like_args.append(stats)
-        join_like_dc: list[DCStats] = cast(list["DCStats"], join_like_args)
-        union_like_dc: list[DCStats] = cast(list["DCStats"], union_like_args)
+    def _mapjoin_union(
+        self, new_def: TensorDef, op: FinchOperator, union_args: list[DCStats]
+    ) -> DCStats:
 
-        if len(union_like_args) == 0 and len(join_like_args) == 0:
+        return DCStats._merge_dc_union(new_def, union_args)
+
+    def _mapjoin_join(
+        self, new_def: TensorDef, op: FinchOperator, join_args: list[DCStats]
+    ) -> DCStats:
+
+        if not join_args:
             return DCStats.from_def(new_def, set())
-        if len(union_like_args) == 0:
-            return DCStats._merge_dc_join(new_def, join_like_dc)
-        if len(join_like_args) == 0:
-            return DCStats._merge_dc_union(new_def, union_like_dc)
-        join_cover = set().union(*(s.tensordef.index_order for s in join_like_dc))
+        join_cover = set().union(*(s.tensordef.index_order for s in join_args))
         if join_cover == set(new_def.index_order):
-            return DCStats._merge_dc_join(new_def, join_like_dc)
-        return DCStats._merge_dc_union(new_def, join_like_dc + union_like_dc)
+            return DCStats._merge_dc_join(new_def, join_args)
+        return DCStats._merge_dc_union(new_def, join_args)
 
     def aggregate(
         self,
@@ -93,16 +85,6 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
 
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs)
-
-    def issimilar(self, a: DCStats, b: DCStats) -> bool:
-        return (
-            isinstance(a, DCStats)
-            and isinstance(b, DCStats)
-            and a.tensordef.index_order == b.tensordef.index_order
-            and a.dim_sizes == b.dim_sizes
-            and a.fill_value == b.fill_value
-            and a.dcs == b.dcs
-        )
 
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
         d = stats.tensordef
@@ -519,3 +501,18 @@ class DCStats(NumericStats):
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
         return min_weight
+
+    def get_embedding(self) -> np.ndarray:
+        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
+        dcs = self.dcs
+        dc_embedding = [
+            dc.value
+            for dc in sorted(
+                dcs,
+                key=lambda dc: (
+                    tuple(sorted(str(f) for f in dc.from_indices)),
+                    tuple(sorted(str(f) for f in dc.to_indices)),
+                ),
+            )
+        ]
+        return np.log2(np.array([*sizes, *dc_embedding]))
