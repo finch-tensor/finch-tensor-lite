@@ -353,8 +353,7 @@ class LoopOrderer(LogicLoader):
                         case Reorder(inner, _old) if not _contains_aggregate_or_mapjoin(
                             inner
                         ):
-                            #return Query(lhs, Reorder(inner, loop_order))
-                            print("check")
+                            return Query(lhs, Reorder(inner, loop_order))
                         case _:
                             return Query(lhs, Reorder(rhs, loop_order))
                 case Produces(_):
