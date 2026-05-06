@@ -4,11 +4,6 @@ import finchlite as fl
 from finchlite import matmul
 
 
-@fl.jit
-def _f1_jit(A, B, C, D, E):
-    return matmul(A, matmul(B, matmul(C, matmul(D, E))))
-
-
 class JITCompare:
     timeout = 120
 
@@ -28,4 +23,14 @@ class JITCompare:
         return matmul(self.A, matmul(self.B, matmul(self.C, matmul(self.D, self.E))))
 
     def time_f1_jit(self):
+        @fl.jit
+        def _f1_jit(A, B, C, D, E):
+            return matmul(A, matmul(B, matmul(C, matmul(D, E))))
+
         return _f1_jit(self.A, self.B, self.C, self.D, self.E)
+
+    def time_jit_creation(self):
+        def _f1(A, B, C, D, E):
+            return matmul(A, matmul(B, matmul(C, matmul(D, E))))
+
+        return fl.jit(_f1)

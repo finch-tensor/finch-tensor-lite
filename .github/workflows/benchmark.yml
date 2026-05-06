@@ -21,7 +21,7 @@ jobs:
       - name: Run benchmarks
         run: |
           poetry run asv machine --yes
-          poetry run asv continuous origin/main HEAD -f 1.10 --show-stderr
+          poetry run asv continuous origin/main HEAD -f 1.25 --show-stderr
 
 on:
   pull_request:
