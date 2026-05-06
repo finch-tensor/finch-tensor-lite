@@ -55,6 +55,7 @@ def _transpose(t: Table, reordered: tuple[Field, ...]) -> Reorder:
 
 
 def _align_mapjoins(mj: MapJoin) -> MapJoin:
+    """Align mapjoins to idx order from _get_idx_order"""
     views = tuple(_get_operand_table_and_idxs(a) for a in mj.args)
     if any(v is None for v in views):
         return mj
@@ -77,6 +78,7 @@ def _align_mapjoins(mj: MapJoin) -> MapJoin:
 
 
 def _get_mapjoins(ex: LogicExpression) -> LogicExpression:
+    """Get mapjoins from an expression"""
     match ex:
         case MapJoin():
             return _align_mapjoins(ex)
@@ -288,10 +290,6 @@ class LoopOrderer(LogicLoader):
     The input program is expected to be in the standardized form produced by
     ``LogicStandardizer``: every query is either a Reorder of a single
     argument, or an Aggregate over a Reorder of a series of map-joins.
-
-    Before loop nesting, **pass 1** aligns contraction axes: every ``MapJoin``
-    whose arguments are table-shaped gets ``Reorder`` wrappers so index names
-    follow one canonical order across operands (pure view ``Reorder`` only).
     """
 
     def __init__(self, loader: LogicLoader | None = None):
@@ -355,7 +353,8 @@ class LoopOrderer(LogicLoader):
                         case Reorder(inner, _old) if not _contains_aggregate_or_mapjoin(
                             inner
                         ):
-                            return Query(lhs, Reorder(inner, loop_order))
+                            #return Query(lhs, Reorder(inner, loop_order))
+                            print("check")
                         case _:
                             return Query(lhs, Reorder(rhs, loop_order))
                 case Produces(_):
