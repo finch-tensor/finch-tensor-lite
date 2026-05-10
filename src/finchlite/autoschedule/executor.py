@@ -13,7 +13,7 @@ from ..finch_logic import (
     StatsFactory,
 )
 from ..symbolic import Namespace, PostWalk, Rewrite
-from .formatter import DefaultLogicFormatter
+from .formatter import BufferizedNDArrayFormatter
 
 
 def extract_tensors(
@@ -57,7 +57,7 @@ class LogicExecutor(LogicEvaluator):
         cache: bool = False,
     ):
         if ctx is None:
-            ctx = DefaultLogicFormatter()
+            ctx = BufferizedNDArrayFormatter()
         if stats_factory is None:
             stats_factory = DenseStatsFactory()
         self.ctx: LogicLoader = ctx

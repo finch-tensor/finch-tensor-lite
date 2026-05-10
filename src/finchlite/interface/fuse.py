@@ -52,7 +52,8 @@ Performance:
 
 import threading
 
-from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
+from finchlite.autoschedule import LogicExecutor, LogicNormalizer
+from finchlite.autoschedule.formatter import BufferizedNDArrayFormatter
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
@@ -83,7 +84,7 @@ INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(DefaultLogicFormatter(MockLogicLoader()))
+            LogicStandardizer(BufferizedNDArrayFormatter(MockLogicLoader()))
         )
     )
 )
@@ -91,7 +92,7 @@ INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                BufferizedNDArrayFormatter(LogicCompiler(NotationInterpreter()))
             )
         )
     )
@@ -100,7 +101,7 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                DefaultLogicFormatter(
+                BufferizedNDArrayFormatter(
                     LogicCompiler(NotationCompiler(AssemblyInterpreter()))
                 )
             )
@@ -111,7 +112,7 @@ COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
             LogicStandardizer(
-                DefaultLogicFormatter(
+                BufferizedNDArrayFormatter(
                     LogicCompiler(
                         NotationCompiler(
                             NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
@@ -127,7 +128,7 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicalOptimizer(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                BufferizedNDArrayFormatter(LogicCompiler(NotationInterpreter()))
             )
         )
     )
