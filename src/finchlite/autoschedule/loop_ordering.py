@@ -100,8 +100,6 @@ def _align(prgm: LogicStatement) -> LogicStatement:
                 match b:
                     case Query(lhs, rhs):
                         out.append(Query(lhs, _get_mapjoins(rhs)))
-                    case Plan():
-                        out.append(_align(b))
                     case _:
                         out.append(b)
             return Plan(tuple(out))
@@ -353,7 +351,7 @@ class LoopOrderer(LogicLoader):
                         case Reorder(inner, _old) if not _contains_aggregate_or_mapjoin(
                             inner
                         ):
-                            return Query(lhs, Reorder(inner, loop_order))
+                            return node
                         case _:
                             return Query(lhs, Reorder(rhs, loop_order))
                 case Produces(_):
