@@ -25,6 +25,7 @@ from ..finch_logic import (
 )
 from ..symbolic import PostWalk, Rewrite
 from ..util.logging import LOG_LOGIC_POST_OPT
+from .standardize import concordize
 from .tensor_stats import DenseStatsFactory
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -306,9 +307,12 @@ class LoopOrderer(LogicLoader):
                     )
 
         prgm = reorder(prgm)
+        # mutate bindings_out
+        bindings_out = dict(bindings)
+        prgm = concordize(prgm, bindings_out)
         validate_output(prgm)
         logger.debug(prgm)
-        return self.loader(prgm, bindings, stats, stats_factory)
+        return self.loader(prgm, bindings_out, stats, stats_factory)
 
 
 class DefaultLoopOrderer(LoopOrderer):

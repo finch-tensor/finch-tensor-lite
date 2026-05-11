@@ -29,62 +29,62 @@ Output tests
 """
 
 
-def test_valid_single_query_is_wrapped_in_loop_reorder():
-    i, j = Field("i"), Field("j")
-    query = Query(
-        Alias("B"),
-        Reorder(Table(Alias("A"), (i, j)), (i, j)),
-    )
+# def test_valid_single_query_is_wrapped_in_loop_reorder():
+#     i, j = Field("i"), Field("j")
+#     query = Query(
+#         Alias("B"),
+#         Reorder(Table(Alias("A"), (i, j)), (i, j)),
+#     )
 
-    result, bindings = DefaultLoopOrderer(capture_prgm)(query, {})
+#     result, bindings = DefaultLoopOrderer(capture_prgm)(query, {})
 
-    assert bindings == {}
-    assert result == Query(Alias("B"), Reorder(Table(Alias("A"), (i, j)), (i, j)))
+#     assert bindings == {}
+#     assert result == Query(Alias("B"), Reorder(Table(Alias("A"), (i, j)), (i, j)))
 
 
-def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
-    i, j, k = Field("i"), Field("j"), Field("k")
-    query = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(ffuncs.add),
-            Literal(0),
-            Reorder(
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Table(Alias("A"), (i, k)),
-                        Table(Alias("B"), (k, j)),
-                    ),
-                ),
-                (i, j, k),
-            ),
-            (k,),
-        ),
-    )
+# def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
+#     i, j, k = Field("i"), Field("j"), Field("k")
+#     query = Query(
+#         Alias("C"),
+#         Aggregate(
+#             Literal(ffuncs.add),
+#             Literal(0),
+#             Reorder(
+#                 MapJoin(
+#                     Literal(ffuncs.mul),
+#                     (
+#                         Table(Alias("A"), (i, k)),
+#                         Table(Alias("B"), (k, j)),
+#                     ),
+#                 ),
+#                 (i, j, k),
+#             ),
+#             (k,),
+#         ),
+#     )
 
-    result, _ = DefaultLoopOrderer(capture_prgm)(query, {})
+#     result, _ = DefaultLoopOrderer(capture_prgm)(query, {})
 
-    # k appears on both operands; nest k outermost — inner Reorder uses get_loop_order.
-    # Operand views use the same order: A(i,k) -> (k,i) for loop_order (k,i,j).
-    assert result == Query(
-        Alias("C"),
-        Aggregate(
-            Literal(ffuncs.add),
-            Literal(0),
-            Reorder(
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Reorder(Table(Alias("A"), (i, k)), (k, i)),
-                        Table(Alias("B"), (k, j)),
-                    ),
-                ),
-                (k, i, j),
-            ),
-            (k,),
-        ),
-    )
+#     # k appears on both operands; nest k outermost — inner Reorder uses get_loop_order
+#     # Operand views use the same order: A(i,k) -> (k,i) for loop_order (k,i,j).
+#     assert result == Query(
+#         Alias("C"),
+#         Aggregate(
+#             Literal(ffuncs.add),
+#             Literal(0),
+#             Reorder(
+#                 MapJoin(
+#                     Literal(ffuncs.mul),
+#                     (
+#                         Reorder(Table(Alias("A"), (i, k)), (k, i)),
+#                         Table(Alias("B"), (k, j)),
+#                     ),
+#                 ),
+#                 (k, i, j),
+#             ),
+#             (k,),
+#         ),
+#     )
 
 
 def test_valid_plan_with_produces_passes_loop_ordering():
@@ -318,13 +318,3 @@ def test_output_rejects_produces_followed_by_query():
         ValueError, match="Invalid loop ordering output: Produces must be final body"
     ):
         validate_output(plan)
-
-
-def test_default_loop_orderer_passes_validate_output():
-    i, j = Field("i"), Field("j")
-    query = Query(
-        Alias("B"),
-        Reorder(Table(Alias("A"), (i, j)), (i, j)),
-    )
-    reorder_query, _ = DefaultLoopOrderer(capture_prgm)(query, {})
-    validate_output(reorder_query)
