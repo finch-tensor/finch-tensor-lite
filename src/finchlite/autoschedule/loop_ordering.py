@@ -127,82 +127,56 @@ def _contains_aggregate_or_mapjoin(ex: LogicNode) -> bool:
     return False
 
 
-def _is_standardized_query(node: Query) -> bool:
-    match node:
-        case Query(_, Reorder(_, _)):
-            return True
-        case Query(_, Aggregate(_, _, Reorder(_, _), _)):
-            return True
-        case _:
-            return False
-
-
-def _assert_one_aggregrate(rhs: LogicNode) -> None:
-    num_aggregrates = 0
-    stack = [rhs]
-    while stack:
-        ex = stack.pop()
-        match ex:
-            case Aggregate(_, _, arg, _):
-                num_aggregrates += 1
-                stack.append(arg)
-            case Reorder(arg, _):
-                stack.append(arg)
-            case Table(_, _):
-                pass
-            case _:
-                if isinstance(ex, LogicTree):
-                    stack.extend(ex.children)
-    if num_aggregrates > 1:
-        raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
-
-
-def _assert_mapjoin_inside_aggregate(rhs: LogicNode) -> None:
-    stack: list[tuple[LogicNode, bool]] = [(rhs, False)]
-    while stack:
-        ex, inside = stack.pop()
-        match ex:
-            case MapJoin():
-                if not inside:
-                    raise ValueError(
-                        "Invalid loop ordering: MapJoin is only allowed "
-                        "inside an Aggregate argument"
-                    )
-            case Aggregate(_, _, arg, _):
-                stack.append((arg, True))
-                continue
-            case Reorder(arg, _):
-                stack.append((arg, inside))
-                continue
-            case Table(_, _):
-                continue
-            case _:
-                pass
-        if isinstance(ex, LogicTree):
-            stack.extend((child, inside) for child in ex.children)
-
-
 def _validate_query(query: Query, *, kind: str) -> None:
     """
-    Validate that a Query rhs matches the loop-ordering grammar: standardized
-    shape, single Aggregate, MapJoin placement, no outer Reorder around
-    Aggregate.
+    Validate that a Query rhs matches the loop-ordering grammar:
+    ``Aggregate`` with inner ``Reorder``,
+    or ``Reorder`` whose inner is not an ``Aggregate``), at most
+    one ``Aggregate``,
+    ``MapJoin`` only under an ``Aggregate`` body.
 
     Used for both ``validate_input`` and ``validate_output``.
     """
     prefix = f"Invalid loop ordering {kind}:"
-    if not _is_standardized_query(query):
-        raise ValueError(
-            f"{prefix} Query rhs must be "
-            "Reorder(...) or Aggregate(..., Reorder(...), ...)"
-        )
+
+    def walk(ex: LogicNode, inside_aggregate: bool) -> int:
+        match ex:
+            case Aggregate(_, _, arg, _):
+                return 1 + walk(arg, True)
+            case MapJoin():
+                if not inside_aggregate:
+                    raise ValueError(
+                        "Invalid loop ordering: MapJoin is only allowed "
+                        "inside an Aggregate argument"
+                    )
+                n = 0
+                if isinstance(ex, LogicTree):
+                    for c in ex.children:
+                        n += walk(c, inside_aggregate)
+                return n
+            case Reorder(arg, _):
+                return walk(arg, inside_aggregate)
+            case Table(_, _):
+                return 0
+            case _:
+                # anything else
+                n = 0
+                if isinstance(ex, LogicTree):
+                    for c in ex.children:
+                        n += walk(c, inside_aggregate)
+                return n
+
     match query:
-        case Query(_, Aggregate() as rhs):
-            _assert_one_aggregrate(rhs)
-            _assert_mapjoin_inside_aggregate(rhs)
+        case Query(_, Aggregate(_, _, Reorder(_, _), _) as rhs):
+            if walk(rhs, False) != 1:
+                raise ValueError(
+                    "Invalid loop ordering: at most one Aggregate per Query rhs"
+                )
         case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
-            _assert_one_aggregrate(inner)
-            _assert_mapjoin_inside_aggregate(inner)
+            if walk(query.rhs, False) > 1:
+                raise ValueError(
+                    "Invalid loop ordering: at most one Aggregate per Query rhs"
+                )
         case _:
             raise ValueError(
                 f"{prefix} Query rhs must be "
