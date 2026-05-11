@@ -23,6 +23,7 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
+from ..symbolic import PostWalk, Rewrite
 from ..util.logging import LOG_LOGIC_POST_OPT
 from .tensor_stats import DenseStatsFactory
 
@@ -33,7 +34,6 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 def _get_operand_table_and_idxs(
     arg: LogicExpression,
 ) -> tuple[Table, tuple[Field, ...]] | None:
-    """Get table, idxs for rewrap."""
     match arg:
         case Table(_, _) as t:
             return (t, t.idxs)
@@ -43,25 +43,20 @@ def _get_operand_table_and_idxs(
             return None
 
 
-def _get_idx_order(
-    per_operand_idxs: tuple[tuple[Field, ...], ...],
-) -> tuple[Field, ...]:
-    """First appearance across operands"""
-    return tuple(dict.fromkeys(f for seq in per_operand_idxs for f in seq))
-
-
 def _transpose(t: Table, reordered: tuple[Field, ...]) -> Reorder:
     return Reorder(Table(t.tns, t.idxs), reordered)
 
 
-def _align_mapjoins(mj: MapJoin) -> MapJoin:
-    """Align mapjoins to idx order from _get_idx_order"""
+def _transpose_tables(mj: MapJoin, loop_order: tuple[Field, ...]) -> MapJoin:
     views = tuple(_get_operand_table_and_idxs(a) for a in mj.args)
     if any(v is None for v in views):
         return mj
     table_views = cast(tuple[tuple[Table, tuple[Field, ...]], ...], views)
     seqs = tuple(v[1] for v in table_views)
-    canonical = _get_idx_order(seqs)
+    union: set[Field] = set()
+    for seq in seqs:
+        union.update(seq)
+    canonical = tuple(f for f in loop_order if f in union)
     new_args: list[LogicExpression] = []
     changed = False
     for arg, (base_t, logical) in zip(mj.args, table_views, strict=True):
@@ -77,38 +72,16 @@ def _align_mapjoins(mj: MapJoin) -> MapJoin:
     return MapJoin(mj.op, tuple(new_args))
 
 
-def _get_mapjoins(ex: LogicExpression) -> LogicExpression:
-    """Get mapjoins from an expression"""
-    match ex:
-        case MapJoin():
-            return _align_mapjoins(ex)
-        case Aggregate(op, init, arg, axes):
-            new_arg = _get_mapjoins(arg)
-            return Aggregate(op, init, new_arg, axes)
-        case Reorder(arg, idxs):
-            new_inner = _get_mapjoins(arg)
-            return Reorder(new_inner, idxs)
-        case _:
-            return ex
+def _align(ex: LogicExpression, loop_order: tuple[Field, ...]) -> LogicExpression:
+    def rule(node: LogicNode) -> LogicNode | None:
+        match node:
+            case MapJoin() as mj:
+                aligned = _transpose_tables(mj, loop_order)
+                return aligned if aligned is not mj else None
+            case _:
+                return None
 
-
-def _align(prgm: LogicStatement) -> LogicStatement:
-    match prgm:
-        case Plan(bodies):
-            out: list[LogicStatement] = []
-            for b in bodies:
-                match b:
-                    case Query(lhs, rhs):
-                        out.append(Query(lhs, _get_mapjoins(rhs)))
-                    case _:
-                        out.append(b)
-            return Plan(tuple(out))
-        case Query(lhs, rhs):
-            return Query(lhs, _get_mapjoins(rhs))
-        case Produces(_):
-            return prgm
-        case _:
-            raise ValueError(f"_align: unsupported {type(prgm).__name__}")
+    return Rewrite(PostWalk(rule))(ex)
 
 
 # Validation func
@@ -296,15 +269,13 @@ class LoopOrderer(LogicLoader):
             stats_factory = DenseStatsFactory()
         # End  NOTE
 
-        prgm = _align(prgm)
-        validate_input(prgm)
-
         def reorder(node: LogicStatement) -> LogicStatement:
             match node:
                 case Plan(bodies):
                     return Plan(tuple(reorder(body) for body in bodies))
                 case Query(lhs, rhs):
                     loop_order = self.get_loop_order(node, bindings)
+                    rhs = _align(rhs, loop_order)
                     match rhs:
                         case Aggregate(
                             op,
@@ -321,7 +292,6 @@ class LoopOrderer(LogicLoader):
                                     reduce_axes,
                                 ),
                             )
-                        # Check if this is just a Tensor
                         case Reorder(inner, _old) if not _contains_aggregate_or_mapjoin(
                             inner
                         ):

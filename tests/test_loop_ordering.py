@@ -65,7 +65,8 @@ def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
 
     result, _ = DefaultLoopOrderer(capture_prgm)(query, {})
 
-    # k appears on both operands; nest k outermost — order merged into inner Reorder
+    # k appears on both operands; nest k outermost — inner Reorder uses get_loop_order.
+    # Operand views use the same order: A(i,k) -> (k,i) for loop_order (k,i,j).
     assert result == Query(
         Alias("C"),
         Aggregate(
@@ -75,7 +76,7 @@ def test_valid_aggregate_query_is_wrapped_in_loop_reorder():
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
-                        Table(Alias("A"), (i, k)),
+                        Reorder(Table(Alias("A"), (i, k)), (k, i)),
                         Table(Alias("B"), (k, j)),
                     ),
                 ),
