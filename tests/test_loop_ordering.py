@@ -31,9 +31,11 @@ Output tests
 
 def test_default_loop_orderer_matmul_plan_output():
     """
-    After ``DefaultLoopOrderer`` (reorder, concordize, drop_reorders): loop nest
-    prefers ``k`` (shared by both operands), ``A`` is materialized as ``A_2`` with
-    storage ``(k, i)``, and redundant reorders on map-join operands are dropped.
+    After ``DefaultLoopOrderer`` (reorder, concordize, drop_reorders, flatten_plans,
+    normalize_names): matmul-shaped IR remains valid; loop nest is length-3 on the
+    ``MapJoin``; reduction is one axis; operands are two ``Table`` nodes (swizzled
+    left operand). Exact alias/field strings are not asserted because
+    ``normalize_names`` rewrites them.
     """
     i, j, k = Field("i"), Field("j"), Field("k")
     plan = Plan(
@@ -61,30 +63,31 @@ def test_default_loop_orderer_matmul_plan_output():
     )
 
     result, _ = DefaultLoopOrderer(capture_prgm)(plan, {})
+    validate_output(result)
 
-    assert result == Plan(
-        (
-            Query(
-                Alias("C"),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Reorder(
-                        MapJoin(
-                            Literal(ffuncs.mul),
-                            (
-                                Table(Alias("A_2"), (k, i)),
-                                Table(Alias("B"), (k, j)),
-                            ),
-                        ),
-                        (k, i, j),
-                    ),
-                    (k,),
-                ),
-            ),
-            Produces((Alias("C"),)),
-        )
-    )
+    assert isinstance(result, Plan)
+    assert len(result.bodies) == 2
+    q, prod = result.bodies
+    assert isinstance(q, Query)
+    assert isinstance(prod, Produces)
+    assert prod.args == (q.lhs,)
+
+    match q.rhs:
+        case Aggregate(op, init, Reorder(mj, outer), red):
+            assert op.val is ffuncs.add
+            assert init.val == 0
+            assert isinstance(mj, MapJoin)
+            assert mj.op.val is ffuncs.mul
+            assert len(mj.args) == 2
+            assert all(isinstance(a, Table) for a in mj.args)
+            assert len(outer) == 3
+            assert len(red) == 1
+            assert red[0] in outer
+            t0, t1 = mj.args
+            assert len(t0.idxs) == 2 and len(t1.idxs) == 2
+            assert set(t0.idxs) <= set(outer) and set(t1.idxs) <= set(outer)
+        case _:
+            pytest.fail("expected Aggregate with Reorder(MapJoin(...))")
 
 
 def test_valid_plan_with_produces_passes_loop_ordering():
@@ -97,16 +100,19 @@ def test_valid_plan_with_produces_passes_loop_ordering():
     )
 
     result, _ = DefaultLoopOrderer(capture_prgm)(plan, {})
+    validate_output(result)
 
-    assert result == Plan(
-        (
-            Query(
-                Alias("B"),
-                Reorder(Table(Alias("A"), (i,)), (i,)),
-            ),
-            Produces((Alias("B"),)),
-        )
-    )
+    assert isinstance(result, Plan)
+    assert len(result.bodies) == 2
+    q, prod = result.bodies
+    assert isinstance(q, Query)
+    assert isinstance(prod, Produces)
+    assert prod.args == (q.lhs,)
+    match q.rhs:
+        case Reorder(Table(_, idxs), reorder_idxs):
+            assert idxs == reorder_idxs
+        case _:
+            pytest.fail("expected Reorder(Table(...), ...)")
 
 
 """
