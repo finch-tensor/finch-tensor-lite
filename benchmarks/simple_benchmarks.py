@@ -1,3 +1,10 @@
+"""
+ASV simple benchmarks: time core array ops (matmul, elementwise add/multiply, sum) on
+64x64 inputs, parameterized over different backends.
+
+Run: ``poetry run asv run --bench simple_benchmarks``
+"""
+
 import numpy as np
 
 import finchlite as fl
