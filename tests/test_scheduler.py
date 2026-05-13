@@ -703,3 +703,78 @@ def test_scheduler_e2e_sddmm(file_regression):
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"
     )
+
+
+def test_logic_standardizer_inplace(file_regression):
+    plan = Plan(
+        bodies=(
+            Query(
+                lhs=Alias(name="A2"),
+                rhs=Reorder(
+                    arg=MapJoin(
+                        op=Literal(ffuncs.add),
+                        args=(
+                            Aggregate(
+                                op=Literal(val=ffuncs.add),
+                                init=Literal(val=0),
+                                arg=Reorder(
+                                    arg=MapJoin(
+                                        op=Literal(val=ffuncs.mul),
+                                        args=(
+                                            Table(
+                                                Alias(name="A0"),
+                                                (Field(name="i0"), Field(name="i1")),
+                                            ),
+                                            Table(
+                                                Alias(name="A1"),
+                                                (Field(name="i1"), Field(name="i2")),
+                                            ),
+                                        ),
+                                    ),
+                                    idxs=(
+                                        Field(name="i0"),
+                                        Field(name="i1"),
+                                        Field(name="i2"),
+                                    ),
+                                ),
+                                idxs=(Field(name="i1"),),
+                            ),
+                            MapJoin(
+                                op=Literal(ffuncs.add),
+                                args=(
+                                    Table(
+                                        Alias("A2"),
+                                        (Field(name="i0"), Field(name="i2")),
+                                    ),
+                                    Table(
+                                        Alias("A1"),
+                                        (Field(name="i0"), Field(name="i2")),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                    idxs=(Field(name="i0"), Field(name="i2")),
+                ),
+            ),
+            Plan(
+                bodies=(Produces(args=(Alias(name="A2"),)),),
+            ),
+        ),
+    )
+
+    bindings = {
+        Alias(name="A0"): finchlite.asarray(np.array([[1, 2], [3, 4]])),
+        Alias(name="A1"): finchlite.asarray(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): finchlite.asarray(np.array([[1, 1], [1, 1]])),
+    }
+
+    plan_std, bindings = standardize(
+        plan, {var: ftype(val) for var, val in bindings.items()}
+    )
+
+    file_regression.check(
+        str(plan_std),
+        extension=".txt",
+        basename="test_logic_standardizer_inplace_program",
+    )

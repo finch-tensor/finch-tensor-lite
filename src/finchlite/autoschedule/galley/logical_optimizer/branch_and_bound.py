@@ -4,21 +4,13 @@ Converted from Julia.
 Removed general cache. Both alias_hash and cost_cache
 """
 
-from collections import OrderedDict
+from collections import OrderedDict, deque
+from typing import Literal
 
 from ....finch_logic import Query
 from .annotated_query import AnnotatedQuery
 
-
-def _cost_of_reduce(idx, aq: AnnotatedQuery) -> tuple[float, list]:
-    """
-    Return (cost, reduced_vars) for reducing idx in aq.
-    Used to score each candidate reduction and to know which indices
-    get eliminated (reduced_vars) for the branch-and-bound state key.
-    """
-    _, _, _, reduced_idxs = aq.get_reduce_query(idx)
-    cost = aq.get_cost_of_reduce_idx(idx)
-    return cost, list(reduced_idxs)
+GalleyOptimizer = Literal["greedy", "bfs", "dfs"]
 
 
 def branch_and_bound(
@@ -57,7 +49,8 @@ def branch_and_bound(
             reducible_in_comp = aq.get_reducible_idxs_for_component(component)
             for idx in reducible_in_comp:
                 # Cost of this reduction and which vars it eliminates
-                cost, reduced_vars = _cost_of_reduce(idx, aq)
+                _, _, _, reduced_vars = aq.get_reduce_query(idx)
+                cost = aq.get_cost_of_reduce_idx(idx)
                 total_cost = cost + prev_cost
                 new_vars = vars_key | frozenset(reduced_vars)
 
@@ -130,14 +123,104 @@ def branch_and_bound(
     return (optimal_orders[component_set], optimal_subquery_costs)
 
 
+def branch_and_bound_dfs(
+    input_aq: AnnotatedQuery,
+    component: list,
+) -> tuple:
+    """
+    Exact branch-and-bound via iterative DFS (cheapest child expanded first).
+
+    Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` where the
+    second element is an empty ``OrderedDict`` (greedy bounds use layered BnB).
+
+    Raises
+    ------
+    RuntimeError
+        If no complete elimination order exists for ``component``.
+    """
+    component_set = frozenset(component)
+    memo: dict[frozenset, float] = {frozenset(): 0.0}
+    best_complete = float("inf")
+    best_state: tuple[list, list, AnnotatedQuery, float] | None = None
+
+    stack: deque[tuple[frozenset, list, list, AnnotatedQuery, float]] = deque()
+    stack.append((frozenset(), [], [], input_aq, 0.0))
+
+    while stack:
+        vars_key, order, queries, aq, cost = stack.popleft()
+
+        if cost > memo.get(vars_key, float("inf")):
+            continue
+
+        if vars_key == component_set:
+            if cost < best_complete:
+                best_complete = cost
+                best_state = (order, queries, aq, cost)
+            continue
+
+        if cost >= best_complete:
+            continue
+
+        reducible_in_comp = aq.get_reducible_idxs_for_component(component)
+        children: list[tuple[frozenset, list, list, AnnotatedQuery, float]] = []
+        for idx in reducible_in_comp:
+            _, _, _, reduced_vars = aq.get_reduce_query(idx)
+            step_cost = aq.get_cost_of_reduce_idx(idx)
+            new_cost = cost + step_cost
+            new_vars = vars_key | frozenset(reduced_vars)
+
+            # Getting all supersets and getting min cost
+            sup_best = float("inf")
+            # for v, c in max_subquery_costs.items():
+            #    if v >= new_vars:
+            #        sup_best = min(sup_best, c)
+            for v, c in memo.items():
+                if v >= new_vars:
+                    sup_best = min(sup_best, c)
+            if best_complete < float("inf"):
+                sup_best = min(sup_best, best_complete)
+            prev_best = memo.get(new_vars, float("inf"))
+
+            if new_cost > sup_best:
+                continue
+            if new_cost >= prev_best:
+                continue
+
+            memo[new_vars] = new_cost
+            new_aq = aq.copy()
+            reduce_query = new_aq.reduce_idx(idx)
+            new_order = list(order) + [idx]
+            new_queries = list(queries) + [reduce_query]
+            children.append((new_vars, new_order, new_queries, new_aq, new_cost))
+
+        children.sort(key=lambda x: x[4])
+        for ch in reversed(children):
+            stack.appendleft(ch)
+
+    if best_state is None:
+        raise RuntimeError(
+            "branch_and_bound_dfs: no complete reduction order for component "
+            f"{component!r}; reducible idxs on input: "
+            f"{input_aq.get_reducible_idxs()!r}"
+        )
+    return (best_state, OrderedDict())
+
+
 def pruned_query_to_plan(
     input_aq: AnnotatedQuery,
     use_components: bool = True,
-    use_greedy: bool = False,
+    *,
+    optimizer: GalleyOptimizer = "dfs",
 ) -> tuple[list[Query], float]:
     """
-    Pruned optimizer: greedy first for bounds, then exact with pruning.
-    Returns (queries, total_cost).
+    Pruned Galley optimizer.
+
+    * ``"greedy"`` — ``k=1` (also used
+      automatically when ``len(component) > 12``).
+    * ``"bfs"`` — greedy ``k=1`` for bounds, then BFS BnB.
+    * ``"dfs"`` — DFS BnB.
+
+    Returns ``(queries, total_cost)``.
     """
     total_cost = 0.0
     elimination_order: list = []
@@ -154,15 +237,12 @@ def pruned_query_to_plan(
             component = list(
                 set().union(*(set(c) for c in cur_aq.connected_components))
             )
-        # --- Run greedy (k=1) to get subquery costs for pruning bounds ---
-        greedy_result = branch_and_bound(cur_aq, component, 1, OrderedDict())
-        (
-            (greedy_order, _, _, greedy_cost),
-            greedy_subquery_costs,
-        ) = greedy_result
 
-        # --- Large components or use_greedy: use greedy order directly ---
-        if (len(component) > 12) or use_greedy:
+        if (len(component) > 12) or optimizer == "greedy":
+            (
+                (greedy_order, _, _, greedy_cost),
+                _,
+            ) = branch_and_bound(cur_aq, component, 1, OrderedDict())
             elimination_order.extend(greedy_order)
             for idx in greedy_order:
                 reduce_query = cur_aq.reduce_idx(idx)
@@ -170,49 +250,22 @@ def pruned_query_to_plan(
             total_cost += greedy_cost
             continue
 
-        # --- Exact search with pruning: greedy_subquery_costs bounds the search ---
-        (exact_order, _, _, exact_cost), _ = branch_and_bound(
-            cur_aq, component, float("inf"), greedy_subquery_costs
-        )
+        if optimizer == "dfs":
+            (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(cur_aq, component)
+        else:
+            (
+                (greedy_order, _, _, _greedy_cost),
+                greedy_subquery_costs,
+            ) = branch_and_bound(cur_aq, component, 1, OrderedDict())
+            (exact_order, _, _, exact_cost), _ = branch_and_bound(
+                cur_aq, component, float("inf"), greedy_subquery_costs
+            )
         elimination_order.extend(exact_order)
         for idx in exact_order:
             reduce_query = cur_aq.reduce_idx(idx)
             queries.append(reduce_query)
         total_cost += exact_cost
 
-    # --- Append remaining (non-reducible) query and fix output name ---
     remaining_q = cur_aq.get_remaining_query()
     queries.append(remaining_q)
-    return queries, total_cost
-
-
-def exact_query_to_plan(input_aq: AnnotatedQuery) -> tuple[list[Query], float]:
-    """
-    Exact optimizer: branch-and-bound with k=Inf for each component.
-    Returns (queries, total_cost).
-    """
-    total_cost = 0.0
-    elimination_order: list = []
-    cur_aq = input_aq.copy()
-
-    # --- Run exact branch-and-bound on each component, collect order ---
-    for component in input_aq.connected_components:
-        (exact_order, _, _, exact_cost), _ = branch_and_bound(
-            cur_aq, component, float("inf"), OrderedDict()
-        )
-        elimination_order.extend(exact_order)
-        total_cost += exact_cost
-
-    # --- Rebuild queries by applying reductions in elimination order ---
-    queries = []
-    cur_aq = input_aq.copy()
-    for idx in elimination_order:
-        if idx in cur_aq.get_reducible_idxs():
-            q = cur_aq.reduce_idx(idx)
-            queries.append(q)
-    remaining_q = cur_aq.get_remaining_query()
-    if remaining_q is not None:
-        queries.append(remaining_q)
-    if queries and queries[-1].lhs != cur_aq.output_name:
-        queries[-1] = Query(cur_aq.output_name, queries[-1].rhs)
     return queries, total_cost

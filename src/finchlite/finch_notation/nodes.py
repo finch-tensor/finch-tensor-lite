@@ -707,7 +707,8 @@ class NotationPrinterContext(Context):
                 self.exec(f"{feed}freeze({self(tns)}, {self(op)})")
                 return None
             case Thaw(tns, op):
-                return f"thaw({self(tns)}, {self(op)})"
+                self.exec(f"{feed}thaw({self(tns)}, {self(op)})")
+                return None
             case Unpack(Slot(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
