@@ -36,7 +36,8 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 def _get_operand_table_and_idxs(
     arg: LogicExpression,
 ) -> tuple[Table, tuple[Field, ...]] | None:
-    """If ``arg`` is ``Table`` or ``Reorder(Table, logical)``, return storage + logical idxs; else ``None``."""
+    """If ``arg`` is ``Table`` or ``Reorder(Table, logical)``,
+    return table + idxs; else ``None``."""
     match arg:
         case Table(_, _) as t:
             return (t, t.idxs)
@@ -52,7 +53,8 @@ def _transpose(t: Table, reordered: tuple[Field, ...]) -> Reorder:
 
 
 def _transpose_tables(mj: MapJoin, loop_order: tuple[Field, ...]) -> MapJoin:
-    """Reorder each all-table ``MapJoin`` arg to match ``loop_order`` on shared indices."""
+    """Reorder each all-table ``MapJoin`` arg to match
+    ``loop_order`` on shared indices."""
     views = tuple(_get_operand_table_and_idxs(a) for a in mj.args)
     if any(v is None for v in views):
         return mj
@@ -79,6 +81,7 @@ def _transpose_tables(mj: MapJoin, loop_order: tuple[Field, ...]) -> MapJoin:
 
 def _align(ex: LogicExpression, loop_order: tuple[Field, ...]) -> LogicExpression:
     """PostWalk: align every ``MapJoin`` under ``ex`` to ``loop_order``."""
+
     def rule(node: LogicNode) -> LogicNode | None:
         match node:
             case MapJoin() as mj:
@@ -280,7 +283,8 @@ class LoopOrderer(LogicLoader):
         # End  NOTE
 
         def reorder(node: LogicStatement) -> LogicStatement:
-            """Apply ``get_loop_order`` + ``_align`` per ``Query``; recurse into ``Plan``."""
+            """Apply ``get_loop_order`` + ``_align`` per ``Query``,
+            recurse into ``Plan``."""
             match node:
                 case Plan(bodies):
                     return Plan(tuple(reorder(body) for body in bodies))
