@@ -23,8 +23,8 @@ class SimpleBenchmarks:
     def setup(self, scheduler):
         fl.set_default_scheduler(ctx=SCHEDULERS[scheduler])
         rng = np.random.default_rng(42)
-        self.a = fl.asarray(rng.integers(0, 10, (64, 64)))
-        self.b = fl.asarray(rng.integers(0, 10, (64, 64)))
+        self.a = fl.asarray(rng.integers(0, 10, (32, 32)))
+        self.b = fl.asarray(rng.integers(0, 10, (32, 32)))
 
     def time_matmul(self, scheduler):
         fl.matmul(self.a, self.b)
