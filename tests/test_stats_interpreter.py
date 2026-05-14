@@ -3,12 +3,15 @@ import pytest
 import numpy as np
 
 import finchlite as fl
-from finchlite.algebra import ffuncs
-from finchlite.autoschedule.tensor_stats import DatabaseStatsFactory, DCStatsFactory
-from finchlite.autoschedule.tensor_stats.stats_interpreter import (
+from finchlite.adv_autoschedulers.tensor_stats.database_stats import (
+    DatabaseStatsFactory,
+)
+from finchlite.adv_autoschedulers.tensor_stats.dc_stats import DCStatsFactory
+from finchlite.adv_autoschedulers.tensor_stats.stats_interpreter import (
     StatsInterpreter,
     calculate_estimated_error,
 )
+from finchlite.algebra import ffuncs
 from finchlite.finch_logic import (
     Aggregate,
     Alias,

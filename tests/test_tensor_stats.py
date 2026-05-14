@@ -7,14 +7,9 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
-from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
-from finchlite.autoschedule.tensor_stats import (
-    DC,
+from finchlite.adv_autoschedulers.tensor_stats import (
     BlockedStats,
     BlockedStatsFactory,
-    DatabaseStatsFactory,
-    DCStats,
-    DCStatsFactory,
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
@@ -22,6 +17,15 @@ from finchlite.autoschedule.tensor_stats import (
     UniformStats,
     UniformStatsFactory,
 )
+from finchlite.adv_autoschedulers.tensor_stats.database_stats import (
+    DatabaseStatsFactory,
+)
+from finchlite.adv_autoschedulers.tensor_stats.dc_stats import (
+    DC,
+    DCStats,
+    DCStatsFactory,
+)
+from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.finch_logic import (
     Aggregate,
     Field,

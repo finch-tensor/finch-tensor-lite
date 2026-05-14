@@ -3,6 +3,7 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
+from ....adv_autoschedulers.tensor_stats.numeric_stats import NumericStats
 from ....algebra import (
     cansplitpush,
     ffuncs,
@@ -36,7 +37,6 @@ from ....symbolic import (
     intree,
     isdescendant,
 )
-from ...tensor_stats.numeric_stats import NumericStats
 from .logic_to_stats import insert_statistics
 
 

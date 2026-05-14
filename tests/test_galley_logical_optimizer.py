@@ -6,12 +6,12 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
+from finchlite.adv_autoschedulers.tensor_stats import DenseStatsFactory
 from finchlite.autoschedule.galley.logical_optimizer import (
     AnnotatedQuery,
     greedy_query,
     insert_statistics,
 )
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,

@@ -7,6 +7,7 @@ import pytest
 import numpy as np
 
 import finchlite as fl
+from finchlite.adv_autoschedulers.tensor_stats import DenseStatsFactory
 from finchlite.algebra import ffuncs
 from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
 from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
@@ -14,7 +15,6 @@ from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     branch_and_bound_dfs,
     pruned_query_to_plan,
 )
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,

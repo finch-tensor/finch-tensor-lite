@@ -3,8 +3,8 @@ import logging
 import numpy as np
 from numpy.linalg import vector_norm
 
+from finchlite.adv_autoschedulers.tensor_stats.numeric_stats import NumericStats
 from finchlite.algebra.tensor import TensorFType
-from finchlite.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finchlite.finch_logic import (
     Alias,
     LogicLoader,

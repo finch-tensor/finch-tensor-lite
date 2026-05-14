@@ -2,10 +2,9 @@ import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
 from finchlite.algebra import ffuncs, ftype, init_value
 from finchlite.algebra.tensor import TensorFType
-from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
-from finchlite.finch_logic import LogicStatement, StatsFactory
+from finchlite.finch_logic import LogicStatement, StatsFactory, TensorStats
 from finchlite.finch_logic.stages import LogicLoader
 
 from .stages import LogicEinsumLowerer

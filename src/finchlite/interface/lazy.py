@@ -27,7 +27,6 @@ from ..algebra import (
     return_type,
 )
 from ..algebra.ftypes import FDType
-from ..autoschedule.tensor_stats import StatsInterpreter
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -2129,6 +2128,8 @@ def get_lazy_tensor_stats(
     lazy_tensor: LazyTensor,
     stats_factory: StatsFactory,
 ) -> TensorStats:
+    from ..adv_autoschedulers.tensor_stats import StatsInterpreter
+
     trace = lazy_tensor.ctx.trace()
     interpreter = StatsInterpreter(stats_factory=stats_factory)
     bindings: OrderedDict[Alias, TensorStats] = OrderedDict()

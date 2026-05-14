@@ -5,7 +5,6 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.finch_logic.nodes import TableValue
 
 from .. import finch_logic as lgc
-from ..autoschedule.tensor_stats import DenseStatsFactory
 from ..finch_logic import (
     LogicEvaluator,
     LogicLoader,
@@ -59,6 +58,8 @@ class LogicExecutor(LogicEvaluator):
         if ctx is None:
             ctx = DefaultLogicFormatter()
         if stats_factory is None:
+            from ..adv_autoschedulers.tensor_stats import DenseStatsFactory
+
             stats_factory = DenseStatsFactory()
         self.ctx: LogicLoader = ctx
         self.stats_factory = stats_factory

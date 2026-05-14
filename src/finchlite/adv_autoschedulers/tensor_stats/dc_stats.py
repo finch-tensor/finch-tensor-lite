@@ -13,6 +13,7 @@ from finchlite.finch_logic import Field
 from ... import finch_notation as ntn
 from ...algebra import Tensor, ffuncs, ftype, int64
 from ...algebra.algebra import FinchOperator
+from ...compile import BufferizedNDArray, make_extent
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory
@@ -148,8 +149,6 @@ class DCStats(NumericStats):
     # For each field i, we compute DC({}, {i}) and DC({i}, {*fields}).
     # Additionally, we compute the nnz for the full tensor DC({}, {*fields}).
     def _array_to_dcs(self, arr: Any, fields: Iterable[Field]) -> set[DC]:
-        from ...compile import BufferizedNDArray, make_extent
-
         int64_vector_ftype = BufferizedNDArray.from_numpy(
             np.zeros(1, dtype=np.int64)
         ).ftype

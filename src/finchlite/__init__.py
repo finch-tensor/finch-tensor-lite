@@ -1,3 +1,13 @@
+from .adv_autoschedulers.tensor_stats import (
+    BlockedStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
+from .adv_autoschedulers.tensor_stats.dc_stats import (
+    DC,
+    DCStats,
+)
 from .algebra import (
     FTyped,
     Tensor,
@@ -29,14 +39,6 @@ from .algebra import (
     uint16,
     uint32,
     uint64,
-)
-from .autoschedule.tensor_stats import (
-    DC,
-    BlockedStats,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
 )
 from .codegen import (
     NumpyBuffer,
