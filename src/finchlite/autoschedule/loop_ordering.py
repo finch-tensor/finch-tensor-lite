@@ -80,7 +80,10 @@ def _transpose_tables(mj: MapJoin, loop_order: tuple[Field, ...]) -> MapJoin:
 
 
 def _align(ex: LogicExpression, loop_order: tuple[Field, ...]) -> LogicExpression:
-    """PostWalk: align every ``MapJoin`` under ``ex`` to ``loop_order``."""
+    """Line up tensor axes inside each ``MapJoin`` to ``loop_order``.
+
+    Only touches ``Table`` operands. Loop nest order is set later in ``reorder``.
+    """
 
     def rule(node: LogicNode) -> LogicNode | None:
         match node:
@@ -276,8 +279,6 @@ class LoopOrderer(LogicLoader):
         # End  NOTE
 
         def reorder(node: LogicStatement) -> LogicStatement:
-            """Apply ``get_loop_order`` + ``_align`` per ``Query``,
-            recurse into ``Plan``."""
             match node:
                 case Plan(bodies):
                     return Plan(tuple(reorder(body) for body in bodies))
