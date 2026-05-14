@@ -3,8 +3,7 @@ import pytest
 from finchlite.algebra import ffuncs
 from finchlite.autoschedule import (
     DefaultLoopOrderer,
-    validate_input,
-    validate_output,
+    validate,
 )
 from finchlite.finch_logic import (
     Aggregate,
@@ -63,7 +62,7 @@ def test_default_loop_orderer_matmul_plan_output():
     )
 
     result, _ = DefaultLoopOrderer(capture_prgm)(plan, {})
-    validate_output(result)
+    validate(result, kind="output")
 
     assert isinstance(result, Plan)
     assert len(result.bodies) == 2
@@ -100,7 +99,7 @@ def test_valid_plan_with_produces_passes_loop_ordering():
     )
 
     result, _ = DefaultLoopOrderer(capture_prgm)(plan, {})
-    validate_output(result)
+    validate(result, kind="output")
 
     assert isinstance(result, Plan)
     assert len(result.bodies) == 2
@@ -124,7 +123,7 @@ def test_input_rejects_invalid_root_node():
     with pytest.raises(
         ValueError, match="Invalid loop ordering input: expected Plan or Query"
     ):
-        validate_input(Produces((Alias("A"),)))
+        validate(Produces((Alias("A"),)), kind="input")
 
 
 def test_input_rejects_bare_table_rhs():
@@ -133,7 +132,7 @@ def test_input_rejects_bare_table_rhs():
     with pytest.raises(
         ValueError, match="Invalid loop ordering input: Query rhs must be Reorder"
     ):
-        validate_input(Query(Alias("B"), Table(Alias("A"), (i,))))
+        validate(Query(Alias("B"), Table(Alias("A"), (i,))), kind="input")
 
 
 def test_input_rejects_aggregate_without_inner_reorder():
@@ -142,7 +141,7 @@ def test_input_rejects_aggregate_without_inner_reorder():
     with pytest.raises(
         ValueError, match="Invalid loop ordering input: Query rhs must be Reorder"
     ):
-        validate_input(
+        validate(
             Query(
                 Alias("B"),
                 Aggregate(
@@ -151,7 +150,8 @@ def test_input_rejects_aggregate_without_inner_reorder():
                     Table(Alias("A"), (i,)),
                     (i,),
                 ),
-            )
+            ),
+            kind="input",
         )
 
 
@@ -174,7 +174,7 @@ def test_input_rejects_two_aggregates_on_rhs():
         ValueError,
         match="Invalid loop ordering: at most one Aggregate per Query rhs",
     ):
-        validate_input(Query(Alias("B"), rhs))
+        validate(Query(Alias("B"), rhs), kind="input")
 
 
 def test_input_rejects_mapjoin_outside_aggregate():
@@ -195,7 +195,7 @@ def test_input_rejects_mapjoin_outside_aggregate():
         match="Invalid loop ordering: MapJoin is only allowed "
         "inside an Aggregate argument",
     ):
-        validate_input(Query(Alias("C"), rhs))
+        validate(Query(Alias("C"), rhs), kind="input")
 
 
 def test_input_accepts_mapjoin_inside_aggregate():
@@ -218,7 +218,7 @@ def test_input_accepts_mapjoin_inside_aggregate():
             (k,),
         ),
     )
-    validate_input(query)
+    validate(query, kind="input")
 
 
 def test_input_rejects_invalid_plan_body():
@@ -227,14 +227,14 @@ def test_input_rejects_invalid_plan_body():
     with pytest.raises(
         ValueError, match="Invalid loop ordering input: expected Query or Produces"
     ):
-        validate_input(Plan((Table(Alias("A"), (i,)),)))
+        validate(Plan((Table(Alias("A"), (i,)),)), kind="input")
 
 
 def test_output_rejects_invalid():
     with pytest.raises(
         ValueError, match="Invalid loop ordering output: expected Plan or Query"
     ):
-        validate_output(Produces((Alias("A"),)))
+        validate(Produces((Alias("A"),)), kind="output")
 
 
 def test_output_rejects_bare_rhs_on_query():
@@ -243,7 +243,7 @@ def test_output_rejects_bare_rhs_on_query():
         ValueError,
         match="Query rhs must be Reorder\\(\\.\\.\\.\\) or Aggregate",
     ):
-        validate_output(Query(Alias("B"), Table(Alias("A"), (i,))))
+        validate(Query(Alias("B"), Table(Alias("A"), (i,))), kind="output")
 
 
 def test_output_rejects_nonstandard_inner_rhs():
@@ -265,7 +265,7 @@ def test_output_rejects_nonstandard_inner_rhs():
         ValueError,
         match="Invalid loop ordering output: Query rhs must be Reorder",
     ):
-        validate_output(bad)
+        validate(bad, kind="output")
 
 
 def test_output_rejects_two_aggregates_inside_reorder():
@@ -288,7 +288,7 @@ def test_output_rejects_two_aggregates_inside_reorder():
         ValueError,
         match="Invalid loop ordering: at most one Aggregate per Query rhs",
     ):
-        validate_output(bad)
+        validate(bad, kind="output")
 
 
 def test_output_rejects_mapjoin_outside_aggregate_inside_reorder():
@@ -309,7 +309,7 @@ def test_output_rejects_mapjoin_outside_aggregate_inside_reorder():
         match="Invalid loop ordering: MapJoin is only allowed "
         "inside an Aggregate argument",
     ):
-        validate_output(bad)
+        validate(bad, kind="output")
 
 
 def test_output_rejects_produces_followed_by_query():
@@ -323,4 +323,4 @@ def test_output_rejects_produces_followed_by_query():
     with pytest.raises(
         ValueError, match="Invalid loop ordering output: Produces must be final body"
     ):
-        validate_output(plan)
+        validate(plan, kind="output")

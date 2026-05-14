@@ -1,7 +1,7 @@
 import logging
 from abc import abstractmethod
 from collections import Counter
-from typing import cast
+from typing import Literal, cast
 
 from ..algebra import TensorFType
 from ..finch_logic import (
@@ -23,7 +23,7 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import PostOrderDFS, PostWalk, Rewrite
+from ..symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
 from ..util.logging import LOG_LOGIC_POST_OPT
 from .normalize import normalize_names
 from .standardize import concordize, drop_reorders, flatten_plans
@@ -114,118 +114,77 @@ def _validate_query(query: Query, *, kind: str) -> None:
     one ``Aggregate``,
     ``MapJoin`` only under an ``Aggregate`` body.
 
-    Used for both ``validate_input`` and ``validate_output``.
+    Used by :func:`validate`.
     """
     prefix = f"Invalid loop ordering {kind}:"
 
-    def walk(ex: LogicNode, inside_aggregate: bool) -> int:
-        match ex:
-            case Aggregate(_, _, arg, _):
-                return 1 + walk(arg, True)
-            case MapJoin():
-                if not inside_aggregate:
-                    raise ValueError(
-                        "Invalid loop ordering: MapJoin is only allowed "
-                        "inside an Aggregate argument"
-                    )
-                n = 0
-                if isinstance(ex, LogicTree):
-                    for c in ex.children:
-                        n += walk(c, inside_aggregate)
-                return n
-            case Reorder(arg, _):
-                return walk(arg, inside_aggregate)
-            case Table(_, _):
-                return 0
-            case _:
-                # anything else
-                n = 0
-                if isinstance(ex, LogicTree):
-                    for c in ex.children:
-                        n += walk(c, inside_aggregate)
-                return n
+    def walk(ex: LogicNode, inside_aggregate: bool) -> None:
+        in_agg = inside_aggregate
+
+        def rule(node: LogicNode) -> LogicNode | None:
+            nonlocal in_agg
+            match node:
+                case Aggregate(_, _, _, _):
+                    in_agg = True
+                case MapJoin():
+                    if not in_agg:
+                        raise ValueError(
+                            "Invalid loop ordering: MapJoin is only allowed "
+                            "inside an Aggregate argument"
+                        )
+                case _:
+                    return None
+            return None
+
+        Rewrite(PreWalk(rule))(ex)
 
     match query:
         case Query(_, Aggregate(_, _, Reorder(_, _), _) as rhs):
-            if walk(rhs, False) != 1:
-                raise ValueError(
-                    "Invalid loop ordering: at most one Aggregate per Query rhs"
-                )
+            pass
         case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
-            if walk(query.rhs, False) > 1:
-                raise ValueError(
-                    "Invalid loop ordering: at most one Aggregate per Query rhs"
-                )
+            rhs = query.rhs
         case _:
             raise ValueError(
                 f"{prefix} Query rhs must be "
                 "Reorder(...) or Aggregate(..., Reorder(...), ...)"
             )
 
+    n = sum(1 for node in PostOrderDFS(rhs) if isinstance(node, Aggregate))
+    if n > 1:
+        raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
+    walk(rhs, False)
 
-def validate_input(prgm: LogicStatement) -> None:
+
+def validate(
+    prgm: LogicStatement,
+    *,
+    kind: Literal["input", "output"] = "input",
+) -> None:
+    """Reject programs outside the loop-ordering grammar."""
+    prefix = f"Invalid loop ordering {kind}:"
     match prgm:
         case Plan(bodies):
             seen_produces = False
             for i, body in enumerate(bodies):
                 if seen_produces:
-                    raise ValueError(
-                        "Invalid loop ordering input: Produces must be final body"
-                    )
+                    raise ValueError(f"{prefix} Produces must be final body")
                 match body:
                     case Query() as query:
-                        _validate_query(query, kind="input")
+                        _validate_query(query, kind=kind)
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
-                            raise ValueError(
-                                "Invalid loop ordering input: Produces must be "
-                                "final body"
-                            )
+                            raise ValueError(f"{prefix} Produces must be final body")
                     case _:
                         raise ValueError(
-                            "Invalid loop ordering input: expected Query or "
-                            f"Produces in Plan, got {type(body).__name__}"
+                            f"{prefix} expected Query or Produces in Plan, "
+                            f"got {type(body).__name__}"
                         )
         case Query() as query:
-            _validate_query(query, kind="input")
+            _validate_query(query, kind=kind)
         case _:
             raise ValueError(
-                "Invalid loop ordering input: expected Plan or Query, got "
-                f"{type(prgm).__name__}"
-            )
-
-
-def validate_output(prgm: LogicStatement) -> None:
-    match prgm:
-        case Plan(bodies):
-            seen_produces = False
-            for i, body in enumerate(bodies):
-                if seen_produces:
-                    raise ValueError(
-                        "Invalid loop ordering output: Produces must be final body"
-                    )
-                match body:
-                    case Query() as query:
-                        _validate_query(query, kind="output")
-                    case Produces(_):
-                        seen_produces = True
-                        if i != len(bodies) - 1:
-                            raise ValueError(
-                                "Invalid loop ordering output: Produces must be "
-                                "final body"
-                            )
-                    case _:
-                        raise ValueError(
-                            "Invalid loop ordering output: expected Query or "
-                            f"Produces in Plan, got {type(body).__name__}"
-                        )
-        case Query() as query:
-            _validate_query(query, kind="output")
-        case _:
-            raise ValueError(
-                "Invalid loop ordering output: expected Plan or Query, got "
-                f"{type(prgm).__name__}"
+                f"{prefix} expected Plan or Query, got {type(prgm).__name__}"
             )
 
 
@@ -270,7 +229,7 @@ class LoopOrderer(LogicLoader):
         stats: dict[Alias, TensorStats] | None = None,
         stats_factory: StatsFactory | None = None,
     ):
-        validate_input(prgm)
+        validate(prgm, kind="input")
         # NOTE: change when we have a proper stats factory
         if stats is None:
             stats = {}
@@ -318,11 +277,11 @@ class LoopOrderer(LogicLoader):
         # mutate bindings_out
         bindings_out = dict(bindings)
         prgm = concordize(prgm, bindings_out)
-        validate_output(prgm)
+        validate(prgm, kind="output")
         prgm = drop_reorders(prgm)
         prgm = flatten_plans(prgm)
         prgm, bindings_out = normalize_names(prgm, bindings_out)
-        validate_output(prgm)
+        validate(prgm, kind="output")
         logger.debug(prgm)
         return self.loader(prgm, bindings_out, stats, stats_factory)
 

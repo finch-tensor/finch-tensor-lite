@@ -18,8 +18,7 @@ from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
 from .loop_ordering import (
     DefaultLoopOrderer,
-    validate_input,
-    validate_output,
+    validate,
 )
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
@@ -54,6 +53,5 @@ __all__ = [
     "Table",
     "Value",
     "normalize_names",
-    "validate_input",
-    "validate_output",
+    "validate",
 ]
