@@ -23,7 +23,7 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import PostWalk, Rewrite
+from ..symbolic import PostOrderDFS, PostWalk, Rewrite
 from ..util.logging import LOG_LOGIC_POST_OPT
 from .normalize import normalize_names
 from .standardize import concordize, drop_reorders, flatten_plans
@@ -96,17 +96,10 @@ def _align(ex: LogicExpression, loop_order: tuple[Field, ...]) -> LogicExpressio
 # Validation func
 def _contains_aggregate_or_mapjoin(ex: LogicNode) -> bool:
     """True if ``ex`` contains an ``Aggregate`` or ``MapJoin``."""
-    stack: list[LogicNode] = [ex]
-    while stack:
-        curr = stack.pop()
-        match curr:
-            case Aggregate():
+    for node in PostOrderDFS(ex):
+        match node:
+            case Aggregate() | MapJoin():
                 return True
-            case MapJoin():
-                return True
-            case _:
-                if isinstance(curr, LogicTree):
-                    stack.extend(curr.children)
     return False
 
 
