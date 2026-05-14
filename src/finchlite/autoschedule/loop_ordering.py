@@ -139,16 +139,17 @@ def _validate_query(query: Query, *, kind: str) -> None:
         Rewrite(PreWalk(rule))(ex)
 
     match query:
-        case Query(_, Aggregate(_, _, Reorder(_, _), _) as rhs):
+        case Query(_, Aggregate(_, _, Reorder(_, _), _)):
             pass
         case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
-            rhs = query.rhs
+            pass
         case _:
             raise ValueError(
                 f"{prefix} Query rhs must be "
                 "Reorder(...) or Aggregate(..., Reorder(...), ...)"
             )
 
+    rhs = query.rhs
     n = sum(1 for node in PostOrderDFS(rhs) if isinstance(node, Aggregate))
     if n > 1:
         raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
