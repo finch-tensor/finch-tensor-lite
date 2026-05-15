@@ -1,4 +1,4 @@
-from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
+from ..tensor.bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 from .lower import (
     AssemblyContext,
     Extent,

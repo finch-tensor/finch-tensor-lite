@@ -4,7 +4,7 @@ from typing import Any
 
 from ..algebra import FType, TensorFType, ftype
 from ..algebra.ftypes import FDType
-from .eager import EagerTensor
+from ..interface.eager import EagerTensor
 
 
 class ScalarFType(TensorFType):

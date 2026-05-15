@@ -460,7 +460,7 @@ def asarray(arg: Any, format: TensorFType | None = None) -> Any:
         The Tensor type result of the given object.
     """
     if format is None:
-        from finchlite.interface.scalar import Scalar
+        from finchlite.tensor.scalar import Scalar
 
         if isinstance(arg, np.ndarray):
             return BufferizedNDArray.from_numpy(arg)

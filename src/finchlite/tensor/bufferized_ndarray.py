@@ -8,8 +8,8 @@ from .. import finch_notation as ntn
 from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
 from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..codegen.numba_codegen import to_numpy_type
-from . import looplets as lplt
-from .lower import AssemblyContext, FinchTensorFType
+from ..compile import looplets as lplt
+from ..compile.lower import AssemblyContext, FinchTensorFType
 
 
 def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:

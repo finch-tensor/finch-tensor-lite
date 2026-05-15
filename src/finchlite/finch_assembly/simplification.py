@@ -10,7 +10,7 @@ class AssemblySimplify(AssemblyTransform):
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):
-        from finchlite.interface.scalar import Scalar
+        from finchlite.tensor.scalar import Scalar
 
         match term:
             # overwrite(x, y) => y

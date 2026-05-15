@@ -8,7 +8,7 @@ from ... import finch_notation as ntn
 from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from ...compile import looplets as lplt
 from ...finch_assembly import parse_assembly
-from ...interface.scalar import Scalar
+from ..scalar import Scalar
 from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
 
 
