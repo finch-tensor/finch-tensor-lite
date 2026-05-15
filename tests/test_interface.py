@@ -555,6 +555,30 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_equal(result, expected)
 
 
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (
+            np.array([[1.0, 2.0], [3.0, 4.0]]),
+            np.array([[5.0, 6.0], [7.0, 8.0]]),
+        ),
+        (
+            np.arange(12, dtype=np.float64).reshape(3, 4),
+            np.arange(8, dtype=np.float64).reshape(4, 2),
+        ),
+    ],
+)
+def test_matmul_bufferized_ndarray(a, b):
+    ba = finchlite.asarray(a)
+    bb = finchlite.asarray(b)
+    expected = a @ b
+
+    result = finchlite.matmul(ba, bb)
+    result_with_op = ba @ bb
+
+    finch_assert_allclose(result, expected)
+    finch_assert_allclose(result_with_op, expected)
+
 @pytest.mark.usefixtures(
     "interpreter_scheduler"
 )  # batched and broadcasting not supported
