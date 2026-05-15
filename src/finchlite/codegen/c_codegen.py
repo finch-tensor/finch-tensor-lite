@@ -875,19 +875,23 @@ class CContext(Context):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_load(self, buf, idx)
+                idx_symbol = self(idx)
+                return buf_t.c_load(self, buf, idx_symbol, idx.result_type)
             case asm.Store(buf, idx, val):
                 buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_store(self, buf, idx, val)
+                idx_symbol = self(idx)
+                val_symbol = self(val)
+                return buf_t.c_store(self, buf, idx_symbol, idx.result_type, val_symbol, val.result_type)
             case asm.Resize(buf, len):
                 buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_resize(self, buf, len)
+                len_symbol = self(len)
+                return buf_t.c_resize(self, buf, len_symbol, len.result_type)
             case asm.Length(buf):
                 buf = self.resolve(buf)
                 buf_t = buf.result_type
@@ -899,19 +903,23 @@ class CContext(Context):
                 map_t = map.result_type
                 if not isinstance(map_t, CDictFType):
                     raise TypeError(f"Expected C dict type, got: {map_t}")
-                return map_t.c_loaddict(self, map, idx)
+                idx_symbol = self(idx)
+                return map_t.c_loaddict(self, map, idx_symbol, idx.result_type)
             case asm.ExistsDict(map, idx):
                 map = self.resolve(map)
                 map_t = map.result_type
                 if not isinstance(map_t, CDictFType):
                     raise TypeError(f"Expected C dict type, got: {map_t}")
-                return map_t.c_existsdict(self, map, idx)
+                idx_symbol = self(idx)
+                return map_t.c_existsdict(self, map, idx_symbol, idx.result_type)
             case asm.StoreDict(map, idx, val):
                 map = self.resolve(map)
                 map_t = map.result_type
                 if not isinstance(map_t, CDictFType):
                     raise TypeError(f"Expected C dict type, got: {map_t}")
-                return map_t.c_storedict(self, map, idx, val)
+                idx_symbol = self(idx)
+                val_symbol = self(val)
+                return map_t.c_storedict(self, map, idx_symbol, idx.result_type, val_symbol, val.result_type)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -1104,21 +1112,21 @@ class CDictFType(DictFType, CArgumentFType, ABC):
     """
 
     @abstractmethod
-    def c_existsdict(self, ctx, map, idx):
+    def c_existsdict(self, ctx, map, idx_symbol, idx_type):
         """
         Return C code which checks whether a given key exists in a map.
         """
         ...
 
     @abstractmethod
-    def c_loaddict(self, ctx, map, idx):
+    def c_loaddict(self, ctx, map, idx_symbol, idx_type):
         """
         Return C code which gets a value corresponding to a certain key.
         """
         ...
 
     @abstractmethod
-    def c_storedict(self, ctx, buffer, idx, value):
+    def c_storedict(self, ctx, buffer, idx_symbol, idx_type, value_symbol, value_type):
         """
         Return C code which stores a certain value given a certain integer tuple key.
         """
@@ -1139,21 +1147,21 @@ class CBufferFType(BufferFType, CArgumentFType, ABC):
         ...
 
     @abstractmethod
-    def c_load(self, ctx, buffer, index):
+    def c_load(self, ctx, buffer, index_symbol, index_type):
         """
         Return C code which loads a named buffer at the given index.
         """
         ...
 
     @abstractmethod
-    def c_store(self, ctx, buffer, index, value):
+    def c_store(self, ctx, buffer, index_symbol, index_type, value_symbol, value_type):
         """
         Return C code which stores a named buffer to the given index.
         """
         ...
 
     @abstractmethod
-    def c_resize(self, ctx, buffer, new_length):
+    def c_resize(self, ctx, buffer, new_length_symbol, new_length_type):
         """
         Return C code which resizes a named buffer to the given length.
         """

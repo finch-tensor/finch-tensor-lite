@@ -289,21 +289,23 @@ class MallocBufferFType(CBufferFType, CStackFType):
         assert isinstance(buf.obj, CBufferFields)
         return buf.obj.data
 
-    def c_load(self, ctx: CContext, buf: Stack, idx: AssemblyExpression):
+    def c_load(self, ctx: CContext, buf: Stack, idx_symbol: str, idx_type):
         assert isinstance(buf.obj, CBufferFields)
-        return f"({buf.obj.data})[{ctx(idx)}]"
+        return f"({buf.obj.data})[{idx_symbol}]"
 
     def c_store(
         self,
         ctx: CContext,
         buf: Stack,
-        idx: AssemblyExpression,
-        value: AssemblyExpression,
+        idx_symbol: str,
+        idx_type,
+        value_symbol: str,
+        value_type,
     ):
         assert isinstance(buf.obj, CBufferFields)
-        ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.obj.data})[{idx_symbol}] = {value_symbol};")
 
-    def c_resize(self, ctx: CContext, buf: Stack, new_len: AssemblyExpression):
+    def c_resize(self, ctx: CContext, buf: Stack, new_len_symbol: str, new_len_type):
         assert isinstance(buf.obj, CBufferFields)
 
         if self not in ctx.datastructures:
@@ -311,13 +313,12 @@ class MallocBufferFType(CBufferFType, CStackFType):
 
         methods: CMallocBufferMethods = ctx.datastructures[self]
 
-        new_len = ctx(ctx.cache("len", new_len))
         data = buf.obj.data
         length = buf.obj.length
 
         ctx.exec(
-            f"{ctx.feed}{data} = {methods.resize}({data}, {length}, {new_len});\n"
-            f"{ctx.feed}{length} = {new_len};"
+            f"{ctx.feed}{data} = {methods.resize}({data}, {length}, {new_len_symbol});\n"
+            f"{ctx.feed}{length} = {new_len_symbol};"
         )
         return
 

@@ -62,37 +62,39 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
     def c_data(self, *args, **kwargs):
         return self._underlying_format.c_data(*args, **kwargs)
 
-    def _c_check(self, ctx, buf, idx):
+    def _c_check(self, ctx, buf, idx_symbol, idx_type):
         ctx.add_header("#include <stdio.h>")
         ctx.add_header("#include <stdlib.h>")
         ctx.add_header("#include <stddef.h>")
         idx_n = ctx.freshen("computed")
         ctx.exec(
-            f"{ctx.feed}size_t {idx_n} = ({ctx(idx)});\n"
+            f"{ctx.feed}size_t {idx_n} = ({idx_symbol});\n"
             f"{ctx.feed}if ({idx_n} < 0 || {idx_n} >= ({self.c_length(ctx, buf)})) {{\n"
             f'{ctx.feed}    fprintf(stderr, "Index out of bounds error!");\n'
             f"{ctx.feed}    exit(1);\n"
             f"{ctx.feed}}}"
         )
-        return asm.Variable(idx_n, ctypes.c_size_t)
+        return idx_n
 
-    def c_load(self, ctx, buf, idx):
+    def c_load(self, ctx, buf, idx_symbol, idx_type):
         """
         A c_load function with preemptive index checking.
 
-        self.check returns the value of the computed index so things don't
+        self._c_check returns the symbol name of the checked index so things don't
         get computed twice.
         """
-        return self._underlying_format.c_load(ctx, buf, self._c_check(ctx, buf, idx))
+        checked_idx_symbol = self._c_check(ctx, buf, idx_symbol, idx_type)
+        return self._underlying_format.c_load(ctx, buf, checked_idx_symbol, idx_type)
 
-    def c_store(self, ctx, buf, idx, value):
+    def c_store(self, ctx, buf, idx_symbol, idx_type, value_symbol, value_type):
         """
         A c_store function with preemptive index checking.
 
-        self.check returns the variable name of the computed index so
+        self._c_check returns the symbol name of the checked index so
         things don't get computed twice.
         """
-        self._underlying_format.c_store(ctx, buf, self._c_check(ctx, buf, idx), value)
+        checked_idx_symbol = self._c_check(ctx, buf, idx_symbol, idx_type)
+        self._underlying_format.c_store(ctx, buf, checked_idx_symbol, idx_type, value_symbol, value_type)
 
     def c_resize(self, *args, **kwargs):
         return self._underlying_format.c_resize(*args, **kwargs)
