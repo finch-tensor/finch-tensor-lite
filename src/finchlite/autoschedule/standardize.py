@@ -1,17 +1,17 @@
 from functools import reduce
 from typing import overload
 
+from finchlite.algebra import ffuncs, is_associative, is_commutative
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
-
-from ..algebra import ffuncs, is_associative, is_commutative
-from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
-from ..finch_logic import (
+from finchlite.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
     Literal,
+    LogicExpression,
     LogicLoader,
+    LogicNode,
     LogicStatement,
     MapJoin,
     MockLogicLoader,
@@ -20,9 +20,11 @@ from ..finch_logic import (
     Query,
     Relabel,
     Reorder,
+    StatsFactory,
     Table,
+    TensorStats,
 )
-from ..symbolic import (
+from finchlite.symbolic import (
     Chain,
     Fixpoint,
     Namespace,
@@ -32,6 +34,7 @@ from ..symbolic import (
     Rewrite,
     gensym,
 )
+
 from .normalize import normalize_names
 
 

@@ -1,8 +1,9 @@
 from typing import cast
 
-from ..interface import compute, lazy
-from ..symbolic import Chain, Namespace, PostWalk, Rewrite
-from ..symbolic.dataflow import DataFlowAnalysis
+from finchlite.interface import compute, lazy
+from finchlite.symbolic import Chain, Namespace, PostWalk, Rewrite
+from finchlite.symbolic.dataflow import DataFlowAnalysis
+
 from .cfg_builder import (
     NumberedStatement,
     fused_build_cfg,

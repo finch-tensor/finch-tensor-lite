@@ -3,19 +3,24 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 
+from finchlite import finch_logic as lgc
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FinchOperator, FType, ffuncs, ftypes
 from finchlite.algebra.tensor import TensorFType
+from finchlite.compile.lower import make_extent
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.finch_logic import (
+    LogicLoader,
+    StatsFactory,
+    TensorStats,
+    compute_shape_vars,
+)
+from finchlite.finch_notation import NotationInterpreter
 from finchlite.finch_notation.stages import NotationLoader
 from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
+from finchlite.util.logging import LOG_NOTATION
 
-from .. import finch_logic as lgc
-from .. import finch_notation as ntn
-from ..algebra import FinchOperator, FType, ffuncs, ftypes
-from ..compile.lower import make_extent
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import LogicLoader, StatsFactory, TensorStats, compute_shape_vars
-from ..finch_notation import NotationInterpreter
-from ..util.logging import LOG_NOTATION
 from .stages import LogicNotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)

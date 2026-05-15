@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from finchlite.algebra import TensorFType
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.symbolic import Stage
 from finchlite.symbolic.traversal import PostOrderDFS
 
-from ..algebra import TensorFType
-from ..finch_assembly import AssemblyLibrary
-from ..symbolic import Stage
 from . import nodes as ein
 
 

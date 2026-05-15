@@ -12,8 +12,7 @@ from finchlite.finch_logic import (
     StatsFactory,
     TensorStats,
 )
-
-from ..util.logging import LOG_LOGIC_POST_OPT
+from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 

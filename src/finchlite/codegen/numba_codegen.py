@@ -7,9 +7,9 @@ import numpy as np
 
 import numba
 
-from .. import algebra
-from .. import finch_assembly as asm
-from ..algebra import (
+from finchlite import algebra
+from finchlite import finch_assembly as asm
+from finchlite.algebra import (
     ImmutableStructFType,
     MutableStructFType,
     NumbaOperator,
@@ -21,10 +21,11 @@ from ..algebra import (
     query_property,
     register_property,
 )
-from ..finch_assembly import BufferFType
-from ..finch_assembly.dct import DictFType
-from ..symbolic import Context, Namespace, ScopedDict
-from ..util.logging import LOG_BACKEND_NUMBA
+from finchlite.finch_assembly import BufferFType
+from finchlite.finch_assembly.dct import DictFType
+from finchlite.symbolic import Context, Namespace, ScopedDict
+from finchlite.util.logging import LOG_BACKEND_NUMBA
+
 from .stages import NumbaCode, NumbaLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NUMBA)

@@ -5,9 +5,9 @@ from typing import Any, overload
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import (
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import (
     FType,
     FTyped,
     ImmutableStructFType,
@@ -16,16 +16,17 @@ from ..algebra import (
     ftype,
     register_property,
 )
-from ..algebra.algebra import FinchOperator
-from ..finch_assembly import (
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyTransform,
 )
-from ..finch_notation import NotationLoader
-from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
-from ..util.logging import LOG_ASSEMBLY
+from finchlite.finch_notation import NotationLoader
+from finchlite.symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from finchlite.util.logging import LOG_ASSEMBLY
+
 from .stages import NotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)

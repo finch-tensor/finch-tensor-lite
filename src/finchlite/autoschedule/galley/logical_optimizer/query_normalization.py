@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ....algebra import is_associative, is_commutative, is_distributive
-from ....finch_logic import (
+from finchlite.algebra import is_associative, is_commutative, is_distributive
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -17,7 +17,7 @@ from ....finch_logic import (
     Reorder,
     Table,
 )
-from ....symbolic import Chain, Fixpoint, PostWalk, PreWalk, Rewrite, gensym
+from finchlite.symbolic import Chain, Fixpoint, PostWalk, PreWalk, Rewrite, gensym
 
 """
 Query merging and reorder normalization for Galley.

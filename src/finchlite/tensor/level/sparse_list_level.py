@@ -3,13 +3,18 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from ... import finch_assembly as asm
-from ... import finch_notation as ntn
-from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
-from ...compile import looplets as lplt
-from ...finch_assembly import parse_assembly
-from ...interface.scalar import Scalar
-from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
+from finchlite.compile import looplets as lplt
+from finchlite.finch_assembly import parse_assembly
+from finchlite.tensor.fiber_tensor import (
+    FiberTensorFields,
+    FiberTensorFType,
+    Level,
+    LevelFType,
+)
+from finchlite.tensor.scalar import Scalar
 
 
 class SparseListLevelFields(NamedTuple):

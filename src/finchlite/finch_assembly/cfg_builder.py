@@ -2,14 +2,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..algebra import ffuncs, int64
-from ..symbolic import (
+from finchlite.algebra import ffuncs, int64
+from finchlite.symbolic import (
     BasicBlock,
     ControlFlowGraph,
     Namespace,
     PostWalk,
     Rewrite,
 )
+
 from .nodes import (
     AssemblyNode,
     AssemblyStatement,

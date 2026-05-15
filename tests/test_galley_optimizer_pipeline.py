@@ -5,6 +5,7 @@ Galley optimizer pipeline tests.
 import numpy as np
 
 import finchlite.interface as fl_interface
+from finchlite.autoschedule import INTERPRET_NOTATION_GALLEY
 
 
 # --- TEST 1: out = a * b via frontend ---
@@ -14,7 +15,7 @@ def test_elementwise_mul():
     b = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
         fl_interface.lazy(a) * fl_interface.lazy(b),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.array([[1.0, 2.0], [3.0, 4.0]]) * np.array([[1.0, 1.0], [1.0, 1.0]])
     assert np.allclose(np.array(out), np.array(expected))
@@ -30,7 +31,7 @@ def test_add_of_elementwise():
     out = fl_interface.compute(
         fl_interface.lazy(a) * fl_interface.lazy(b)
         + fl_interface.lazy(c) * fl_interface.lazy(d),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.array(a) * np.array(b) + np.array(c) * np.array(d)
     assert np.allclose(np.array(out), np.array(expected))
@@ -45,7 +46,7 @@ def test_matmul_sum_axis0():
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.sum(np.array(A) @ np.array(B), axis=0)
     assert np.allclose(np.array(out), np.array(expected))
@@ -64,7 +65,7 @@ def test_sum_axis0_plus_sum_axis1():
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0)
         + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     left = np.sum(np.array(A) @ np.array(B), axis=0)
@@ -84,7 +85,7 @@ def test_nested_aggregates_full_sum():
 
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B)),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.sum(np.array(A) @ np.array(B))
@@ -103,7 +104,7 @@ def test_deeper_nesting():
         fl_interface.sum(
             (fl_interface.lazy(A) @ fl_interface.lazy(B)) @ fl_interface.lazy(C)
         ),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.sum((np.array(A) @ np.array(B)) @ np.array(C))
@@ -120,7 +121,7 @@ def test_expand_dims_sum_singleton():
     expanded = fl_interface.expand_dims(fl_interface.lazy(A), axis=2)
     out = fl_interface.compute(
         fl_interface.sum(expanded, axis=2),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.sum(np.expand_dims(np.array(A), axis=2), axis=2)
@@ -138,7 +139,7 @@ def test_alias_matmul():
     C = B @ B @ B
     out = fl_interface.compute(
         C,
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = A_np @ A_np @ A_np @ A_np @ A_np @ A_np
@@ -163,7 +164,7 @@ def test_galley_performance_optimization_chain_matmul():
 
     out = fl_interface.compute(
         fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.array(A) @ np.array(B) @ np.array(C)
@@ -183,7 +184,7 @@ def test_galley_chain_matmul_10_2_2_10_10_2():
 
     out = fl_interface.compute(
         fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.array(A) @ np.array(B) @ np.array(C)
@@ -202,7 +203,7 @@ def test_alias_matmul_two_bases():
     A2 = fl_interface.lazy(fl_interface.asarray(A2_np))
     B = A1 @ A2
     C = B @ B
-    out = fl_interface.compute(C, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    out = fl_interface.compute(C, ctx=INTERPRET_NOTATION_GALLEY)
 
     expected = (A1_np @ A2_np) @ (A1_np @ A2_np)
     assert np.allclose(np.array(out), np.array(expected))
@@ -221,7 +222,7 @@ def test_galley_chain_matmul_5_4_4_6_6_3():
 
     out = fl_interface.compute(
         fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.array(A) @ np.array(B) @ np.array(C)
@@ -241,7 +242,7 @@ def test_galley_chain_matmul_3_5_5_2_2_2():
 
     out = fl_interface.compute(
         fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.array(A) @ np.array(B) @ np.array(C)
@@ -264,7 +265,7 @@ def test_galley_chain_matmul_four_matrices():
         @ fl_interface.lazy(B)
         @ fl_interface.lazy(C)
         @ fl_interface.lazy(D),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.array(A) @ np.array(B) @ np.array(C) @ np.array(D)
@@ -281,7 +282,7 @@ def test_alias_matmul_longer_chain():
     A = fl_interface.lazy(fl_interface.asarray(A_np))
     B = A @ A
     C = B @ B @ B @ B
-    out = fl_interface.compute(C, ctx=fl_interface.INTERPRET_NOTATION_GALLEY)
+    out = fl_interface.compute(C, ctx=INTERPRET_NOTATION_GALLEY)
 
     expected = A_np @ A_np @ A_np @ A_np @ A_np @ A_np @ A_np @ A_np
     assert np.allclose(np.array(out), np.array(expected))
@@ -298,7 +299,7 @@ def test_sum_elementwise_mul():
 
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B)),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.sum(np.array(A) * np.array(B))
@@ -315,7 +316,7 @@ def test_sum_elementwise_mul_axis1():
 
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B), axis=1),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = np.sum(np.array(A) * np.array(B), axis=1)
@@ -336,7 +337,7 @@ def test_matmul_plus_matmul():
     out = fl_interface.compute(
         (fl_interface.lazy(A) @ fl_interface.lazy(B))
         + (fl_interface.lazy(C) @ fl_interface.lazy(D)),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = (np.array(A) @ np.array(B)) + (np.array(C) @ np.array(D))
@@ -359,7 +360,7 @@ def test_multiple_compute():
             fl_interface.lazy(A) @ fl_interface.lazy(B),
             fl_interface.lazy(C) @ fl_interface.lazy(D),
         ),
-        ctx=fl_interface.INTERPRET_NOTATION_GALLEY,
+        ctx=INTERPRET_NOTATION_GALLEY,
     )
 
     expected = ((np.array(A) @ np.array(B)), (np.array(C) @ np.array(D)))

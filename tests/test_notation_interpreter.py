@@ -160,6 +160,7 @@ def test_matrix_multiplication(a, b):
             **vars(ntn),
             **vars(finchlite.codegen),
             **vars(finchlite.compile),
+            **vars(finchlite.tensor),
             **vars(ffuncs),
             **globals(),
         },
@@ -220,4 +221,4 @@ def test_count_nonfill_vector(a):
 
     mod = ntn.NotationInterpreter()(prgm)
     cnt = mod.count_nonfill_vector(a)
-    assert cnt == np.count_nonzero(a)
+    assert cnt == np.count_nonzero(a.to_numpy())
