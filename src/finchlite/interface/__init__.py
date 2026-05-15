@@ -1,3 +1,4 @@
+from finchlite.autoschedule import get_default_scheduler, set_default_scheduler
 from finchlite.tensor.np_wrapper import NumPyFType, NumPyWrapper
 from finchlite.tensor.scalar import Scalar, ScalarFType
 
@@ -104,8 +105,6 @@ from .fuse import (
     compute,
     fuse,
     fused,
-    get_default_scheduler,
-    set_default_scheduler,
 )
 from .lazy import LazyTensor, asarray, lazy
 

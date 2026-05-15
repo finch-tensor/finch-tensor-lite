@@ -37,8 +37,8 @@ from .autoschedule import (
     INTERPRET_NOTATION,
     INTERPRET_NOTATION_GALLEY,
     OPTIMIZE_LOGIC,
-    set_default_scheduler,
     get_default_scheduler,
+    set_default_scheduler,
     with_default_scheduler,
 )
 from .autoschedule.tensor_stats import (
@@ -106,7 +106,6 @@ from .interface import (
     floordiv,
     fuse,
     fused,
-    get_default_scheduler,
     greater,
     greater_equal,
     hypot,
@@ -149,7 +148,6 @@ from .interface import (
     reduce,
     remainder,
     round,
-    set_default_scheduler,
     sign,
     signbit,
     sin,
@@ -204,7 +202,6 @@ __all__ = [
     "BlockedStats",
     "BufferizedNDArray",
     "DCStats",
-    "with_default_scheduler",
     "DenseLevel",
     "DenseLevelFType",
     "DenseStats",
@@ -375,4 +372,5 @@ __all__ = [
     "uint64",
     "var",
     "vecdot",
+    "with_default_scheduler",
 ]
