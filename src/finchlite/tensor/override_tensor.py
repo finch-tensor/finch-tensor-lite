@@ -1,4 +1,5 @@
-from abc import ABC, abstractmethod
+import operator
+import sys
 from typing import Any
 
 import numpy as np
@@ -7,8 +8,6 @@ import finchlite
 
 from ..algebra import ffuncs
 from ..algebra.tensor import Tensor
-import sys
-import operator
 
 element_wise_ufunc_map = {
     np.add: ffuncs.add,

@@ -57,9 +57,6 @@ from .compile import (
     dimension,
 )
 from .finch_fused.jit import jit
-from .tensor import (
-    OverrideTensor
-)
 from .interface import (
     LazyTensor,
     NumPyFType,
@@ -171,7 +168,13 @@ from .interface import (
     vecdot,
 )
 from .interface.fuse import set_global_default_scheduler
-from .tensor import BufferizedNDArray, FiberTensor, FiberTensorFType, fiber_tensor
+from .tensor import (
+    BufferizedNDArray,
+    FiberTensor,
+    FiberTensorFType,
+    OverrideTensor,
+    fiber_tensor,
+)
 from .tensor.level import (
     DenseLevel,
     DenseLevelFType,
@@ -208,7 +211,6 @@ __all__ = [
     "ElementLevelFType",
     "Extent",
     "ExtentFType",
-    "OverrideTensor",
     "FType",
     "FTyped",
     "FTyped",
@@ -219,6 +221,7 @@ __all__ = [
     "NumPyWrapper",
     "NumpyBuffer",
     "NumpyBufferFType",
+    "OverrideTensor",
     "Reflector",
     "Scalar",
     "SparseListLevel",

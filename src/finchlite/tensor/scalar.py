@@ -6,6 +6,7 @@ from ..algebra import FType, TensorFType, ftype
 from ..algebra.ftypes import FDType
 from .override_tensor import OverrideTensor
 
+
 class ScalarFType(TensorFType):
     def __init__(self, _element_type: FType, _fill_value: Any):
         elt = _element_type
@@ -60,6 +61,7 @@ class ScalarFType(TensorFType):
 
     def lower_unwrap(self, ctx, obj):
         return obj.obj
+
 
 class Scalar(OverrideTensor):
     def __init__(self, val: Any, fill_value: Any = None):
