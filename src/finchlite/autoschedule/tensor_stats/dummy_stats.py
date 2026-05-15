@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Self
 
+from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
-from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 

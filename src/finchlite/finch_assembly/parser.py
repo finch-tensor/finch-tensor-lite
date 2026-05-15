@@ -13,7 +13,8 @@ import numpy as np
 
 from lark import Lark, Token, Tree
 
-from ..algebra import ffuncs
+from finchlite.algebra import ffuncs
+
 from . import nodes as asm
 
 assembly_parser = Lark(

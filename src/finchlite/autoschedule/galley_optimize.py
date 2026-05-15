@@ -8,9 +8,9 @@ from __future__ import annotations
 import logging
 import time
 
-from ..algebra.tensor import TensorFType
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import (
+from finchlite.algebra.tensor import TensorFType
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.finch_logic import (
     Alias,
     Field,
     LogicLoader,
@@ -20,7 +20,8 @@ from ..finch_logic import (
     StatsFactory,
     TensorStats,
 )
-from ..util.logging import LOG_GALLEY
+from finchlite.util.logging import LOG_GALLEY
+
 from .galley.logical_optimizer.annotated_query import AnnotatedQuery
 from .galley.logical_optimizer.branch_and_bound import (
     GalleyOptimizer,

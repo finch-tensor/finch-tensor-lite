@@ -3,13 +3,21 @@ from typing import Any, cast
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
-from ..codegen import NumpyBuffer, NumpyBufferFType
-from ..codegen.numba_codegen import to_numpy_type
-from ..compile import looplets as lplt
-from ..compile.lower import AssemblyContext, FinchTensorFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import (
+    FType,
+    ImmutableStructFType,
+    Tensor,
+    TupleFType,
+    ffuncs,
+    ftype,
+)
+from finchlite.codegen import NumpyBuffer, NumpyBufferFType
+from finchlite.codegen.numba_codegen import to_numpy_type
+from finchlite.compile import looplets as lplt
+from finchlite.compile.lower import AssemblyContext, FinchTensorFType
+
 from .override_tensor import OverrideTensor
 
 

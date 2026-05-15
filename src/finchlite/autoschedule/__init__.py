@@ -1,10 +1,8 @@
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.finch_notation.interpreter import NotationInterpreter
-
-from ..codegen import NumbaCompiler
-from ..compile import NotationCompiler
-from ..finch_assembly import AssemblyInterpreter, AssemblySimplify
-from ..finch_logic import (
+from finchlite.codegen import NumbaCompiler
+from finchlite.compile import NotationCompiler
+from finchlite.finch_assembly import AssemblyInterpreter, AssemblySimplify
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -20,7 +18,9 @@ from ..finch_logic import (
     Table,
     Value,
 )
-from ..symbolic import PostOrderDFS, PostWalk, PreWalk
+from finchlite.finch_notation.interpreter import NotationInterpreter
+from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk
+
 from .compiler import LogicCompiler, NotationGenerator
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter

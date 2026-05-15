@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import FType, TensorFType, ftype
-from ..algebra.ftypes import FDType
+from finchlite.algebra import FType, TensorFType, ftype
+from finchlite.algebra.ftypes import FDType
+
 from .override_tensor import OverrideTensor
 
 

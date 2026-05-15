@@ -1,4 +1,5 @@
-from ..interface.fuse import get_default_scheduler
+from finchlite.interface.fuse import get_default_scheduler
+
 from .dataflow import insert_lazy_and_compute
 from .parser import fused_function_to_python_function, parse_fused_function
 

@@ -2,7 +2,8 @@ import builtins
 from collections.abc import Sequence
 from typing import Any
 
-from ..algebra import FinchOperator
+from finchlite.algebra import FinchOperator
+
 from . import lazy
 from .fuse import compute
 

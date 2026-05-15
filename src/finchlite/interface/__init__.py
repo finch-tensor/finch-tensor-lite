@@ -1,5 +1,6 @@
-from ..tensor.np_wrapper import NumPyFType, NumPyWrapper
-from ..tensor.scalar import Scalar, ScalarFType
+from finchlite.tensor.np_wrapper import NumPyFType, NumPyWrapper
+from finchlite.tensor.scalar import Scalar, ScalarFType
+
 from .eager import (
     abs,
     acos,

@@ -9,6 +9,8 @@ from typing import Any
 
 import numpy as np
 
+from finchlite.algebra import is_idempotent, is_identity, repeat_operator
+from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_logic import (
     Alias,
     Field,
@@ -16,9 +18,6 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
-
-from ...algebra import is_idempotent, is_identity, repeat_operator
-from ...algebra.algebra import FinchOperator
 
 
 class TensorDef:

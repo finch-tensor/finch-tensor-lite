@@ -1,4 +1,5 @@
-from ...finch_logic import TensorStats
+from finchlite.finch_logic import TensorStats
+
 from .blocked_stats import BlockedStats, BlockedStatsFactory
 from .database_stats import DatabaseStats, DatabaseStatsFactory
 from .dc_stats import DC, DCStats, DCStatsFactory

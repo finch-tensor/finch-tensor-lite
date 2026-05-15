@@ -13,8 +13,8 @@ from typing import Any, cast
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
-from .. import finch_einsum as ein
-from ..algebra import (
+from finchlite import finch_einsum as ein
+from finchlite.algebra import (
     FinchOperator,
     FType,
     Tensor,
@@ -26,9 +26,9 @@ from ..algebra import (
     promote_type,
     return_type,
 )
-from ..algebra.ftypes import FDType
-from ..autoschedule.tensor_stats import StatsInterpreter
-from ..finch_logic import (
+from finchlite.algebra.ftypes import FDType
+from finchlite.autoschedule.tensor_stats import StatsInterpreter
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -43,9 +43,9 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import gensym
-from ..tensor import BufferizedNDArray
-from ..tensor.override_tensor import OverrideTensor
+from finchlite.symbolic import gensym
+from finchlite.tensor import BufferizedNDArray
+from finchlite.tensor.override_tensor import OverrideTensor
 
 
 class LazyTensorFType(TensorFType):

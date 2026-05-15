@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ....finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Literal,

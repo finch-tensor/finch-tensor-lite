@@ -2,12 +2,11 @@ from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from finchlite.algebra import ftypes
+from finchlite.algebra import ftype, ftypes, return_type
 from finchlite.algebra.ftypes import FType
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
 
-from ..algebra import ftype, return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
-from ..util import qual_str
 from .buffer import length_type
 
 

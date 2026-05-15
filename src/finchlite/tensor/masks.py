@@ -2,10 +2,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import ImmutableStructFType, ffuncs
-from ..compile import looplets as lplt
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import ImmutableStructFType, ffuncs
+from finchlite.compile import looplets as lplt
+
 from .fiber_tensor import FiberTensor, FiberTensorFields, Level, LevelFType
 from .scalar import Scalar
 

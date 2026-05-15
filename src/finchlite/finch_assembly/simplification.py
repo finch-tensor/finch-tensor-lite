@@ -1,6 +1,7 @@
-from .. import finch_assembly as asm
-from ..algebra import ffuncs, is_annihilator, is_identity
-from ..symbolic import Fixpoint, PostWalk, Rewrite
+from finchlite import finch_assembly as asm
+from finchlite.algebra import ffuncs, is_annihilator, is_identity
+from finchlite.symbolic import Fixpoint, PostWalk, Rewrite
+
 from .stages import AssemblyTransform
 
 

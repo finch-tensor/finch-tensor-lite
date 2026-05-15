@@ -1,18 +1,13 @@
 from collections import OrderedDict
 from typing import Any
 
+from finchlite import finch_logic as lgc
 from finchlite.algebra.tensor import Tensor, TensorFType
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
+from finchlite.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
 from finchlite.finch_logic.nodes import TableValue
+from finchlite.symbolic import Namespace, PostWalk, Rewrite
 
-from .. import finch_logic as lgc
-from ..autoschedule.tensor_stats import DenseStatsFactory
-from ..finch_logic import (
-    LogicEvaluator,
-    LogicLoader,
-    LogicNode,
-    StatsFactory,
-)
-from ..symbolic import Namespace, PostWalk, Rewrite
 from .formatter import DefaultLogicFormatter
 
 

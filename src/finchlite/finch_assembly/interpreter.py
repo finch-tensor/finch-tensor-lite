@@ -4,8 +4,9 @@ import sys
 from dataclasses import dataclass
 from typing import Any, overload
 
-from ..algebra import fisinstance
-from ..symbolic import ScopedDict
+from finchlite.algebra import fisinstance
+from finchlite.symbolic import ScopedDict
+
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 

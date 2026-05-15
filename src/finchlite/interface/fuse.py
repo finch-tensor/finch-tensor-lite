@@ -52,17 +52,10 @@ Performance:
 
 import threading
 
+from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.finch_logic.stages import LogicEvaluator
+from finchlite.symbolic import gensym
 
-from ..finch_logic import (
-    Alias,
-    Field,
-    Plan,
-    Produces,
-    Query,
-    Table,
-)
-from ..symbolic import gensym
 from .lazy import LazyTensor, asarray, lazy
 
 _GLOBAL_DEFAULT_SCHEDULER: LogicEvaluator | None = None
