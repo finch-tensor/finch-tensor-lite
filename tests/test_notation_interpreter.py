@@ -160,6 +160,7 @@ def test_matrix_multiplication(a, b):
             **vars(ntn),
             **vars(finchlite.codegen),
             **vars(finchlite.compile),
+            **vars(finchlite.tensor),
             **vars(ffuncs),
             **globals(),
         },

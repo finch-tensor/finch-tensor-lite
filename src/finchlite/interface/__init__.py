@@ -1,3 +1,5 @@
+from ..tensor.np_wrapper import NumPyFType, NumPyWrapper
+from ..tensor.scalar import Scalar, ScalarFType
 from .eager import (
     EagerTensor,
     abs,
@@ -106,8 +108,6 @@ from .fuse import (
     set_default_scheduler,
 )
 from .lazy import LazyTensor, asarray, lazy
-from ..tensor.np_wrapper import NumPyFType, NumPyWrapper
-from ..tensor.scalar import Scalar, ScalarFType
 
 __all__ = [
     "EagerTensor",

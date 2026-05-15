@@ -28,7 +28,6 @@ from ..algebra import (
 )
 from ..algebra.ftypes import FDType
 from ..autoschedule.tensor_stats import StatsInterpreter
-from ..compile import BufferizedNDArray
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -45,6 +44,7 @@ from ..finch_logic import (
     TensorStats,
 )
 from ..symbolic import gensym
+from ..tensor import BufferizedNDArray
 from .overrides import OverrideTensor
 
 

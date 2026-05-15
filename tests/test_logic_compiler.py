@@ -3,9 +3,6 @@ import numpy as np
 import finchlite.finch_logic as logic
 from finchlite import ffuncs, ftype
 from finchlite.autoschedule import INTERPRET_NOTATION, NotationGenerator
-from finchlite.tensor.bufferized_ndarray import (
-    BufferizedNDArray,
-)
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -17,6 +14,9 @@ from finchlite.finch_logic import (
     Query,
     Reorder,
     Table,
+)
+from finchlite.tensor.bufferized_ndarray import (
+    BufferizedNDArray,
 )
 
 from .conftest import finch_assert_equal, reset_name_counts

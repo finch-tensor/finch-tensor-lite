@@ -13,7 +13,8 @@ from finchlite.finch_logic import Field
 from ... import finch_notation as ntn
 from ...algebra import Tensor, ffuncs, ftype, int64
 from ...algebra.algebra import FinchOperator
-from ...compile import BufferizedNDArray, make_extent
+from ...compile import make_extent
+from ...tensor import BufferizedNDArray
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory

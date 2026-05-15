@@ -34,7 +34,7 @@ from finchlite.codegen.numba_codegen import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finchlite.compile import BufferizedNDArrayFType
+from finchlite.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 

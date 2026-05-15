@@ -4,7 +4,6 @@ from finchlite.finch_notation.interpreter import NotationInterpreter
 from ..codegen import NumbaCompiler
 from ..compile import NotationCompiler
 from ..finch_assembly import AssemblyInterpreter, AssemblySimplify
-from .galley_optimize import GalleyLogicalOptimizer
 from ..finch_logic import (
     Aggregate,
     Alias,
@@ -25,6 +24,7 @@ from ..symbolic import PostOrderDFS, PostWalk, PreWalk
 from .compiler import LogicCompiler, NotationGenerator
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
+from .galley_optimize import GalleyLogicalOptimizer
 from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer

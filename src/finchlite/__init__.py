@@ -30,14 +30,6 @@ from .algebra import (
     uint32,
     uint64,
 )
-from .autoschedule.tensor_stats import (
-    DC,
-    BlockedStats,
-    DCStats,
-    DenseStats,
-    TensorDef,
-    UniformStats,
-)
 from .autoschedule import (
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
@@ -46,13 +38,20 @@ from .autoschedule import (
     INTERPRET_NOTATION_GALLEY,
     OPTIMIZE_LOGIC,
 )
+from .autoschedule.tensor_stats import (
+    DC,
+    BlockedStats,
+    DCStats,
+    DenseStats,
+    TensorDef,
+    UniformStats,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
 )
 from .compile import (
     AssemblyContext,
-    BufferizedNDArray,
     Extent,
     ExtentFType,
     dimension,
@@ -170,19 +169,19 @@ from .interface import (
     vecdot,
 )
 from .interface.fuse import set_global_default_scheduler
-from .tensor import (
+from .tensor import BufferizedNDArray, FiberTensor, FiberTensorFType, fiber_tensor
+from .tensor.level import (
     DenseLevel,
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
-    FiberTensor,
-    FiberTensorFType,
     SparseListLevel,
     SparseListLevelFType,
     dense,
     element,
-    fiber_tensor,
     sparse_list,
+)
+from .tensor.masks import (
     tril,
 )
 
