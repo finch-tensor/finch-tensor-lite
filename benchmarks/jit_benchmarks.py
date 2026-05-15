@@ -9,7 +9,7 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import matmul
-from finchlite.autoschedule.default_schedulers import INTERPRET_NOTATION_GALLEY
+from finchlite.autoschedule import INTERPRET_NOTATION_GALLEY
 
 
 class JITCompare:
