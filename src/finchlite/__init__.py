@@ -57,8 +57,10 @@ from .compile import (
     dimension,
 )
 from .finch_fused.jit import jit
+from .tensor import (
+    OverrideTensor
+)
 from .interface import (
-    EagerTensor,
     LazyTensor,
     NumPyFType,
     NumPyWrapper,
@@ -202,11 +204,11 @@ __all__ = [
     "DenseLevel",
     "DenseLevelFType",
     "DenseStats",
-    "EagerTensor",
     "ElementLevel",
     "ElementLevelFType",
     "Extent",
     "ExtentFType",
+    "OverrideTensor",
     "FType",
     "FTyped",
     "FTyped",

@@ -11,8 +11,10 @@ from .level import (
     element,
     sparse_list,
 )
+from .override_tensor import OverrideTensor
 
 __all__ = [
+    "OverrideTensor",
     "BufferizedNDArray",
     "BufferizedNDArrayFType",
     "DenseLevel",
@@ -29,4 +31,5 @@ __all__ = [
     "element",
     "fiber_tensor",
     "sparse_list",
+    "OverrideTensor",
 ]

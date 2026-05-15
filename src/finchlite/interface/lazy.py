@@ -45,7 +45,7 @@ from ..finch_logic import (
 )
 from ..symbolic import gensym
 from ..tensor import BufferizedNDArray
-from .overrides import OverrideTensor
+from ..tensor.override_tensor import OverrideTensor
 
 
 class LazyTensorFType(TensorFType):

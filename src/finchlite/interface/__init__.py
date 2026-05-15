@@ -1,7 +1,6 @@
 from ..tensor.np_wrapper import NumPyFType, NumPyWrapper
 from ..tensor.scalar import Scalar, ScalarFType
 from .eager import (
-    EagerTensor,
     abs,
     acos,
     acosh,
@@ -110,7 +109,6 @@ from .fuse import (
 from .lazy import LazyTensor, asarray, lazy
 
 __all__ = [
-    "EagerTensor",
     "LazyTensor",
     "NumPyFType",
     "NumPyWrapper",

@@ -4,8 +4,7 @@ from typing import Any
 
 from ..algebra import FType, TensorFType, ftype
 from ..algebra.ftypes import FDType
-from ..interface.eager import EagerTensor
-
+from .override_tensor import OverrideTensor
 
 class ScalarFType(TensorFType):
     def __init__(self, _element_type: FType, _fill_value: Any):
@@ -62,8 +61,7 @@ class ScalarFType(TensorFType):
     def lower_unwrap(self, ctx, obj):
         return obj.obj
 
-
-class Scalar(EagerTensor):
+class Scalar(OverrideTensor):
     def __init__(self, val: Any, fill_value: Any = None):
         if fill_value is None:
             fill_value = val
