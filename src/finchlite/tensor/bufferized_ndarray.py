@@ -10,13 +10,14 @@ from ..codegen import NumpyBuffer, NumpyBufferFType
 from ..codegen.numba_codegen import to_numpy_type
 from ..compile import looplets as lplt
 from ..compile.lower import AssemblyContext, FinchTensorFType
+from .override_tensor import OverrideTensor
 
 
 def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(np.cumprod((1,) + size[::-1]).astype(int))[-2::-1]
 
 
-class BufferizedNDArray(Tensor):
+class BufferizedNDArray(OverrideTensor):
     def __init__(
         self,
         val: NumpyBuffer,

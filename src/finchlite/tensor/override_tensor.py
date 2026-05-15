@@ -4,8 +4,6 @@ from typing import Any
 
 import numpy as np
 
-import finchlite
-
 from ..algebra import ffuncs
 from ..algebra.tensor import Tensor
 
@@ -79,16 +77,17 @@ ufunc_map: dict[Any, Any] = {
 
 
 class OverrideTensor(Tensor):
+    @property
     def mod(self):
         return sys.modules["finchlite"]
 
     def __array_function__(self, func, types, args, kwargs):
         """Override NumPy functions using the __array_function__ protocol."""
         # https://numpy.org/neps/nep-0018-array-function-protocol.html
-        func = getattr(self.override_module(), func.__name__)
-        if func is None:
+        override_func = getattr(self.mod, func.__name__, None)
+        if override_func is None:
             return NotImplemented
-        return func(*args, **kwargs)
+        return override_func(*args, **kwargs)
 
     def __array_ufunc__(self, ufunc: np.ufunc, method, *inputs, **kwargs):
         """Override NumPy ufuncs using the __array_ufunc__ protocol."""
@@ -106,15 +105,15 @@ class OverrideTensor(Tensor):
             kwargs["axis"] = kwargs.pop("axes")
         if ufunc in element_wise_ufunc_map:
             if method == "__call__":
-                return self.override_module().elementwise(
+                return self.mod.elementwise(
                     element_wise_ufunc_map[ufunc], *inputs, **kwargs
                 )
             if method == "reduce":
-                return self.override_module().reduce(ufunc, *inputs, **kwargs)
+                return self.mod.reduce(ufunc, *inputs, **kwargs)
         if ufunc in ufunc_map:
             func_name = ufunc_map[ufunc]
             if method == "__call__":
-                return getattr(self.override_module(), func_name)(*inputs, **kwargs)
+                return getattr(self.mod, func_name)(*inputs, **kwargs)
         return NotImplemented
 
     def __array_namespace__(self, *, api_version=None):
@@ -125,7 +124,7 @@ class OverrideTensor(Tensor):
         if api_version not in {"2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
 
-        return finchlite
+        return self.mod
 
     def __add__(self, other):
         return self.mod.add(self, other)

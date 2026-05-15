@@ -221,4 +221,4 @@ def test_count_nonfill_vector(a):
 
     mod = ntn.NotationInterpreter()(prgm)
     cnt = mod.count_nonfill_vector(a)
-    assert cnt == np.count_nonzero(a)
+    assert cnt == np.count_nonzero(a.to_numpy())
