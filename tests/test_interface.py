@@ -579,6 +579,7 @@ def test_matmul_bufferized_ndarray(a, b):
     finch_assert_allclose(result, expected)
     finch_assert_allclose(result_with_op, expected)
 
+
 @pytest.mark.usefixtures(
     "interpreter_scheduler"
 )  # batched and broadcasting not supported
