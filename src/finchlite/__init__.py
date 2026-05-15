@@ -37,6 +37,9 @@ from .autoschedule import (
     INTERPRET_NOTATION,
     INTERPRET_NOTATION_GALLEY,
     OPTIMIZE_LOGIC,
+    set_default_scheduler,
+    get_default_scheduler,
+    with_default_scheduler,
 )
 from .autoschedule.tensor_stats import (
     DC,
@@ -167,7 +170,6 @@ from .interface import (
     var,
     vecdot,
 )
-from .interface.fuse import set_global_default_scheduler
 from .tensor import (
     BufferizedNDArray,
     FiberTensor,
@@ -190,8 +192,6 @@ from .tensor.masks import (
     tril,
 )
 
-set_global_default_scheduler(INTERPRET_NOTATION)
-
 __all__ = [
     "COMPILE_NUMBA",
     "DC",
@@ -204,6 +204,7 @@ __all__ = [
     "BlockedStats",
     "BufferizedNDArray",
     "DCStats",
+    "with_default_scheduler",
     "DenseLevel",
     "DenseLevelFType",
     "DenseStats",

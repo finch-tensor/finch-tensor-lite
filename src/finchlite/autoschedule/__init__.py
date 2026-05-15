@@ -29,58 +29,16 @@ from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
 
-INTERPRET_LOGIC = LogicInterpreter()
-OPTIMIZE_LOGIC = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(DefaultLogicFormatter(MockLogicLoader()))
-        )
-    )
-)
-INTERPRET_NOTATION = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-            )
-        )
-    )
-)
-INTERPRET_ASSEMBLY = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(
-                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
-                )
-            )
-        )
-    )
-)
-COMPILE_NUMBA = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(
-                    LogicCompiler(
-                        NotationCompiler(
-                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
-                        )
-                    )
-                )
-            )
-        )
-    )
-)
-
-INTERPRET_NOTATION_GALLEY = LogicNormalizer(
-    LogicExecutor(
-        GalleyLogicalOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-            )
-        )
-    )
+from .default_schedulers import (
+    COMPILE_NUMBA,
+    INTERPRET_ASSEMBLY,
+    INTERPRET_LOGIC,
+    INTERPRET_NOTATION,
+    INTERPRET_NOTATION_GALLEY,
+    OPTIMIZE_LOGIC,
+    set_default_scheduler,
+    get_default_scheduler,
+    with_default_scheduler,
 )
 
 __all__ = [

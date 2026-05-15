@@ -55,32 +55,11 @@ import threading
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.finch_logic.stages import LogicEvaluator
 from finchlite.symbolic import gensym
+from finchlite.autoschedule import (
+    get_default_scheduler
+)
 
 from .lazy import LazyTensor, asarray, lazy
-
-_GLOBAL_DEFAULT_SCHEDULER: LogicEvaluator | None = None
-_DEFAULT_SCHEDULER = threading.local()
-
-
-def set_global_default_scheduler(ctx: LogicEvaluator):
-    global _GLOBAL_DEFAULT_SCHEDULER
-    _GLOBAL_DEFAULT_SCHEDULER = ctx
-
-
-def set_default_scheduler(ctx: LogicEvaluator):
-    if ctx is not None:
-        _DEFAULT_SCHEDULER.value = ctx
-
-
-def get_default_scheduler() -> LogicEvaluator:
-    try:
-        return _DEFAULT_SCHEDULER.value
-    except AttributeError:
-        if _GLOBAL_DEFAULT_SCHEDULER is None:
-            raise RuntimeError(
-                "Default scheduler not set. Please call set_default_scheduler() first."
-            ) from None
-        return _GLOBAL_DEFAULT_SCHEDULER
 
 
 def compute(arg, ctx=None):
