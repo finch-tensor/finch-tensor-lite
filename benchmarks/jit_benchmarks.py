@@ -9,6 +9,7 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import matmul
+from finchlite.autoschedule.default_schedulers import INTERPRET_NOTATION_GALLEY
 
 
 class JITCompare:
@@ -22,7 +23,7 @@ class JITCompare:
         return [self.mat(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
 
     def setup(self):
-        fl.set_default_scheduler(ctx=fl.interface.INTERPRET_NOTATION_GALLEY)
+        fl.set_default_scheduler(ctx=INTERPRET_NOTATION_GALLEY)
         dims = [1, 20, 30, 40, 50, 60]
         self.A, self.B, self.C, self.D, self.E = self.mat_chain(dims)
 

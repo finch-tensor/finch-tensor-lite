@@ -8,7 +8,10 @@ Run: ``poetry run asv run --bench simple_benchmarks``
 import numpy as np
 
 import finchlite as fl
-from finchlite.interface.fuse import COMPILE_NUMBA, INTERPRET_NOTATION_GALLEY
+from finchlite.autoschedule.default_schedulers import (
+    COMPILE_NUMBA,
+    INTERPRET_NOTATION_GALLEY,
+)
 
 SCHEDULERS = {
     "interpret_galley": INTERPRET_NOTATION_GALLEY,
