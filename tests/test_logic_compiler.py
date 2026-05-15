@@ -2,7 +2,7 @@ import numpy as np
 
 import finchlite.finch_logic as logic
 from finchlite import ffuncs, ftype
-from finchlite.autoschedule import NotationGenerator
+from finchlite.autoschedule import INTERPRET_NOTATION, NotationGenerator
 from finchlite.compile.bufferized_ndarray import (
     BufferizedNDArray,
 )
@@ -18,7 +18,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.interface import INTERPRET_NOTATION
 
 from .conftest import finch_assert_equal, reset_name_counts
 

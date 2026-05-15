@@ -38,6 +38,14 @@ from .autoschedule.tensor_stats import (
     TensorDef,
     UniformStats,
 )
+from .autoschedule import (
+    COMPILE_NUMBA,
+    INTERPRET_ASSEMBLY,
+    INTERPRET_LOGIC,
+    INTERPRET_NOTATION,
+    INTERPRET_NOTATION_GALLEY,
+    OPTIMIZE_LOGIC,
+)
 from .codegen import (
     NumpyBuffer,
     NumpyBufferFType,
@@ -49,7 +57,7 @@ from .compile import (
     ExtentFType,
     dimension,
 )
-from .finch_fused import jit
+from .finch_fused.jit import jit
 from .interface import (
     EagerTensor,
     LazyTensor,
@@ -161,6 +169,7 @@ from .interface import (
     var,
     vecdot,
 )
+from .interface.fuse import set_global_default_scheduler
 from .tensor import (
     DenseLevel,
     DenseLevelFType,
@@ -177,8 +186,16 @@ from .tensor import (
     tril,
 )
 
+set_global_default_scheduler(INTERPRET_NOTATION)
+
 __all__ = [
+    "COMPILE_NUMBA",
     "DC",
+    "INTERPRET_ASSEMBLY",
+    "INTERPRET_LOGIC",
+    "INTERPRET_NOTATION",
+    "INTERPRET_NOTATION_GALLEY",
+    "OPTIMIZE_LOGIC",
     "AssemblyContext",
     "BlockedStats",
     "BufferizedNDArray",

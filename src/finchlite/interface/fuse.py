@@ -52,22 +52,11 @@ Performance:
 
 import threading
 
-from finchlite.autoschedule import DefaultLogicFormatter, LogicExecutor, LogicNormalizer
-from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
-from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic.stages import LogicEvaluator
-from finchlite.finch_notation.interpreter import NotationInterpreter
 
-from ..autoschedule.compiler import LogicCompiler
-from ..autoschedule.standardize import LogicStandardizer
-from ..codegen import NumbaCompiler
-from ..compile import NotationCompiler
-from ..finch_assembly import AssemblyInterpreter, AssemblySimplify
 from ..finch_logic import (
     Alias,
     Field,
-    LogicInterpreter,
-    MockLogicLoader,
     Plan,
     Produces,
     Query,
@@ -76,81 +65,29 @@ from ..finch_logic import (
 from ..symbolic import gensym
 from .lazy import LazyTensor, asarray, lazy
 
+_GLOBAL_DEFAULT_SCHEDULER: LogicEvaluator | None = None
 _DEFAULT_SCHEDULER = threading.local()
 
 
-INTERPRET_LOGIC = LogicInterpreter()
-OPTIMIZE_LOGIC = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(DefaultLogicFormatter(MockLogicLoader()))
-        )
-    )
-)
-INTERPRET_NOTATION = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-            )
-        )
-    )
-)
-INTERPRET_ASSEMBLY = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(
-                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
-                )
-            )
-        )
-    )
-)
-COMPILE_NUMBA = LogicNormalizer(
-    LogicExecutor(
-        DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(
-                    LogicCompiler(
-                        NotationCompiler(
-                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
-                        )
-                    )
-                )
-            )
-        )
-    )
-)
-
-INTERPRET_NOTATION_GALLEY = LogicNormalizer(
-    LogicExecutor(
-        GalleyLogicalOptimizer(
-            LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-            )
-        )
-    )
-)
+def set_global_default_scheduler(ctx: LogicEvaluator):
+    global _GLOBAL_DEFAULT_SCHEDULER
+    _GLOBAL_DEFAULT_SCHEDULER = ctx
 
 
-def set_default_scheduler(
-    *,
-    ctx: LogicEvaluator = INTERPRET_NOTATION,
-):
+def set_default_scheduler(ctx: LogicEvaluator):
     if ctx is not None:
         _DEFAULT_SCHEDULER.value = ctx
 
 
-set_default_scheduler()
-
-
-def get_default_scheduler():
+def get_default_scheduler() -> LogicEvaluator:
     try:
         return _DEFAULT_SCHEDULER.value
     except AttributeError:
-        _DEFAULT_SCHEDULER.value = INTERPRET_NOTATION
-        return _DEFAULT_SCHEDULER.value
+        if _GLOBAL_DEFAULT_SCHEDULER is None:
+            raise RuntimeError(
+                "Default scheduler not set. Please call set_default_scheduler() first."
+            ) from None
+        return _GLOBAL_DEFAULT_SCHEDULER
 
 
 def compute(arg, ctx=None):
