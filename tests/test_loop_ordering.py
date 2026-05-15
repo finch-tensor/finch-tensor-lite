@@ -5,6 +5,7 @@ from finchlite.autoschedule import (
     DefaultLoopOrderer,
     validate,
 )
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -21,6 +22,10 @@ from finchlite.finch_logic import (
 
 def capture_prgm(prgm, bindings, stats=None, stats_factory=None):
     return prgm, bindings
+
+
+_DUMMY_STATS: dict = {}
+_DUMMY_STATS_FACTORY = DenseStatsFactory()
 
 
 """
@@ -61,7 +66,9 @@ def test_default_loop_orderer_matmul_plan_output():
         )
     )
 
-    result, _ = DefaultLoopOrderer(capture_prgm)(plan, {})
+    result, _ = DefaultLoopOrderer(capture_prgm)(
+        plan, {}, _DUMMY_STATS, _DUMMY_STATS_FACTORY
+    )
     validate(result, kind="output")
 
     assert isinstance(result, Plan)
@@ -98,7 +105,9 @@ def test_valid_plan_with_produces_passes_loop_ordering():
         )
     )
 
-    result, _ = DefaultLoopOrderer(capture_prgm)(plan, {})
+    result, _ = DefaultLoopOrderer(capture_prgm)(
+        plan, {}, _DUMMY_STATS, _DUMMY_STATS_FACTORY
+    )
     validate(result, kind="output")
 
     assert isinstance(result, Plan)
@@ -133,26 +142,6 @@ def test_input_rejects_bare_table_rhs():
         ValueError, match="Invalid loop ordering input: Query rhs must be Reorder"
     ):
         validate(Query(Alias("B"), Table(Alias("A"), (i,))), kind="input")
-
-
-def test_input_rejects_aggregate_without_inner_reorder():
-    i = Field("i")
-
-    with pytest.raises(
-        ValueError, match="Invalid loop ordering input: Query rhs must be Reorder"
-    ):
-        validate(
-            Query(
-                Alias("B"),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Table(Alias("A"), (i,)),
-                    (i,),
-                ),
-            ),
-            kind="input",
-        )
 
 
 def test_input_rejects_two_aggregates_on_rhs():

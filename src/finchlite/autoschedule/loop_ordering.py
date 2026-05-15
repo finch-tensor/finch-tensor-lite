@@ -27,7 +27,6 @@ from ..symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
 from ..util.logging import LOG_LOGIC_POST_OPT
 from .normalize import normalize_names
 from .standardize import concordize, drop_reorders, flatten_plans
-from .tensor_stats import DenseStatsFactory
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -97,19 +96,10 @@ def _align(ex: LogicExpression, loop_order: tuple[Field, ...]) -> LogicExpressio
 
 
 # Validation func
-def _contains_aggregate_or_mapjoin(ex: LogicNode) -> bool:
-    """True if ``ex`` contains an ``Aggregate`` or ``MapJoin``."""
-    for node in PostOrderDFS(ex):
-        match node:
-            case Aggregate() | MapJoin():
-                return True
-    return False
-
-
-def _validate_query(query: Query, *, kind: str) -> None:
+def _validate_input_query(query: Query, *, kind: str) -> None:
     """
     Validate that a Query rhs matches the loop-ordering grammar:
-    ``Aggregate`` with inner ``Reorder``,
+    ``Aggregate`` (inner form unrestricted),
     or ``Reorder`` whose inner is not an ``Aggregate``), at most
     one ``Aggregate``,
     ``MapJoin`` only under an ``Aggregate`` body.
@@ -125,6 +115,46 @@ def _validate_query(query: Query, *, kind: str) -> None:
             nonlocal in_agg
             match node:
                 case Aggregate(_, _, _, _):
+                    in_agg = True
+                case MapJoin():
+                    if not in_agg:
+                        raise ValueError(
+                            "Invalid loop ordering: MapJoin is only allowed "
+                            "inside an Aggregate argument"
+                        )
+                case _:
+                    return None
+            return None
+
+        Rewrite(PreWalk(rule))(ex)
+
+    match query:
+        case Query(_, Aggregate(_, _, _, _)):
+            pass
+        case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
+            pass
+        case _:
+            raise ValueError(
+                f"{prefix} Query rhs must be Reorder(...) or Aggregate(...)"
+            )
+
+    rhs = query.rhs
+    n = sum(1 for node in PostOrderDFS(rhs) if isinstance(node, Aggregate))
+    if n > 1:
+        raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
+    walk(rhs, False)
+
+
+def _validate_output_query(query: Query, *, kind: str) -> None:
+    prefix = f"Invalid loop ordering {kind}:"
+
+    def walk(ex: LogicNode, inside_aggregate: bool) -> None:
+        in_agg = inside_aggregate
+
+        def rule(node: LogicNode) -> LogicNode | None:
+            nonlocal in_agg
+            match node:
+                case Aggregate(_, _, Reorder(_, _), _):
                     in_agg = True
                 case MapJoin():
                     if not in_agg:
@@ -163,6 +193,9 @@ def validate(
 ) -> None:
     """Reject programs outside the loop-ordering grammar."""
     prefix = f"Invalid loop ordering {kind}:"
+    validate_query = (
+        _validate_input_query if kind == "input" else _validate_output_query
+    )
     match prgm:
         case Plan(bodies):
             seen_produces = False
@@ -171,7 +204,7 @@ def validate(
                     raise ValueError(f"{prefix} Produces must be final body")
                 match body:
                     case Query() as query:
-                        _validate_query(query, kind=kind)
+                        validate_query(query, kind=kind)
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
@@ -182,7 +215,7 @@ def validate(
                             f"got {type(body).__name__}"
                         )
         case Query() as query:
-            _validate_query(query, kind=kind)
+            validate_query(query, kind=kind)
         case _:
             raise ValueError(
                 f"{prefix} expected Plan or Query, got {type(prgm).__name__}"
@@ -202,8 +235,9 @@ class LoopOrderer(LogicLoader):
     ``LogicStandardizer``: every query is either a Reorder of a single
     argument, or an Aggregate over a Reorder of a series of map-joins.
 
-    After ``reorder``, runs ``concordize``, ``drop_reorders``, ``flatten_plans``,
-    and ``normalize_names`` (same as ``standardize.py`` after concordize).
+    After ``apply_loop_order``, runs ``concordize``, ``drop_reorders``,
+    ``flatten_plans``, and ``normalize_names``
+    (same as ``standardize.py`` after concordize).
     """
 
     def __init__(self, loader: LogicLoader | None = None):
@@ -227,21 +261,15 @@ class LoopOrderer(LogicLoader):
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats] | None = None,
-        stats_factory: StatsFactory | None = None,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ):
         validate(prgm, kind="input")
-        # NOTE: change when we have a proper stats factory
-        if stats is None:
-            stats = {}
-        if stats_factory is None:
-            stats_factory = DenseStatsFactory()
-        # End  NOTE
 
-        def reorder(node: LogicStatement) -> LogicStatement:
+        def apply_loop_order(node: LogicStatement) -> LogicStatement:
             match node:
                 case Plan(bodies):
-                    return Plan(tuple(reorder(body) for body in bodies))
+                    return Plan(tuple(apply_loop_order(body) for body in bodies))
                 case Query(lhs, rhs):
                     loop_order = self.get_loop_order(node, bindings)
                     rhs = _align(rhs, loop_order)
@@ -261,9 +289,7 @@ class LoopOrderer(LogicLoader):
                                     reduce_axes,
                                 ),
                             )
-                        case Reorder(inner, _old) if not _contains_aggregate_or_mapjoin(
-                            inner
-                        ):
+                        case Reorder(Table(_, _), _old):
                             return node
                         case _:
                             return Query(lhs, Reorder(rhs, loop_order))
@@ -274,17 +300,15 @@ class LoopOrderer(LogicLoader):
                         f"Unsupported logic statement for loop ordering: {node}"
                     )
 
-        prgm = reorder(prgm)
-        # mutate bindings_out
-        bindings_out = dict(bindings)
-        prgm = concordize(prgm, bindings_out)
+        prgm = apply_loop_order(prgm)
+        prgm = concordize(prgm, bindings)
         validate(prgm, kind="output")
         prgm = drop_reorders(prgm)
         prgm = flatten_plans(prgm)
-        prgm, bindings_out = normalize_names(prgm, bindings_out)
+        prgm, bindings = normalize_names(prgm, bindings)
         validate(prgm, kind="output")
         logger.debug(prgm)
-        return self.loader(prgm, bindings_out, stats, stats_factory)
+        return self.loader(prgm, bindings, stats, stats_factory)
 
 
 class DefaultLoopOrderer(LoopOrderer):
