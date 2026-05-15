@@ -38,7 +38,7 @@ repos:
   rev: v0.15.12
   hooks:
     - id: ruff-check
-      args: [--fix, --unsafe-fixes, --config=pyproject.toml]
+      args: [--fix, --config=pyproject.toml]
       types_or: [python, pyi, jupyter]
     - id: ruff-format
       args: [--config=pyproject.toml]
