@@ -3,8 +3,8 @@ from abc import abstractmethod
 from collections import Counter
 from typing import Literal, cast
 
-from ..algebra import TensorFType
-from ..finch_logic import (
+from finchlite.algebra import TensorFType
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -23,8 +23,8 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
-from ..util.logging import LOG_LOGIC_POST_OPT
+from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
+from finchlite.util.logging import LOG_LOGIC_POST_OPT
 from .normalize import normalize_names
 from .standardize import concordize, drop_reorders, flatten_plans
 
