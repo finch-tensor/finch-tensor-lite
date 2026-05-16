@@ -3,12 +3,12 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from ... import finch_assembly as asm
-from ... import finch_notation as ntn
-from ...algebra import FType, ImmutableStructFType, ftype
-from ...codegen import NumpyBufferFType
-from ...compile.lower import AssemblyContext
-from ..fiber_tensor import FiberTensorFields, Level, LevelFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, ImmutableStructFType, ftype
+from finchlite.codegen import NumpyBufferFType
+from finchlite.compile.lower import AssemblyContext
+from finchlite.tensor.fiber_tensor import FiberTensorFields, Level, LevelFType
 
 
 class ElementLevelFields(NamedTuple):
@@ -63,7 +63,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         """
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):
-            from ...codegen import NumpyBuffer
+            from finchlite.codegen import NumpyBuffer
 
             val = NumpyBuffer(np.asarray(val).reshape(-1))
         if len(shape) != 0:
@@ -101,7 +101,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def from_fields(self, val=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):
-            from ...codegen import NumpyBuffer
+            from finchlite.codegen import NumpyBuffer
 
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)

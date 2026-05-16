@@ -4,13 +4,18 @@ from typing import Any
 
 import numpy as np
 
-from .. import finch_logic as lgc
-from ..algebra import FType, TensorFType, TupleFType, ftype
-from ..codegen import NumpyBufferFType
-from ..compile import BufferizedNDArrayFType
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
-from ..util.logging import LOG_LOGIC_POST_OPT
+from finchlite import finch_logic as lgc
+from finchlite.algebra import FType, TensorFType, TupleFType, ftype
+from finchlite.codegen import NumpyBufferFType
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.finch_logic import (
+    LogicLoader,
+    MockLogicLoader,
+    StatsFactory,
+    TensorStats,
+)
+from finchlite.tensor import BufferizedNDArrayFType
+from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 

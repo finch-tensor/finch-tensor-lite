@@ -8,12 +8,13 @@ from typing import Any
 
 import numpy as np
 
+from finchlite import finch_notation as ntn
+from finchlite.algebra import Tensor, ffuncs, ftype, int64
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.compile import make_extent
 from finchlite.finch_logic import Field
+from finchlite.tensor import BufferizedNDArray
 
-from ... import finch_notation as ntn
-from ...algebra import Tensor, ffuncs, ftype, int64
-from ...algebra.algebra import FinchOperator
-from ...compile import BufferizedNDArray, make_extent
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory

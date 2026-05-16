@@ -3,9 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from finchlite.algebra.tensor import Tensor, TensorFType
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.symbolic import Stage
 
-from ..finch_assembly import AssemblyLibrary
-from ..symbolic import Stage
 from . import nodes as lgc
 from .tensor_stats import StatsFactory, TensorStats
 

@@ -1,8 +1,7 @@
 from abc import abstractmethod
 
+from finchlite import finch_assembly as asm
 from finchlite.symbolic import Stage
-
-from .. import finch_assembly as asm
 
 
 class CCode:

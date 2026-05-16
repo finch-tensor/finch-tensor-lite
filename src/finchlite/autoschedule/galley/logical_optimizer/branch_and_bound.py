@@ -7,7 +7,8 @@ Removed general cache. Both alias_hash and cost_cache
 from collections import OrderedDict, deque
 from typing import Literal
 
-from ....finch_logic import Query
+from finchlite.finch_logic import Query
+
 from .annotated_query import AnnotatedQuery
 
 GalleyOptimizer = Literal["greedy", "bfs", "dfs"]

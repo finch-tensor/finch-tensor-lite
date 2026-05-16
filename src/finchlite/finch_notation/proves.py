@@ -2,9 +2,10 @@ from collections.abc import Callable
 from collections.abc import Sequence as Seq
 from functools import partial
 
-from ..algebra import ffuncs, is_associative, is_idempotent
-from ..algebra.utils import all_unique, intersect, is_disjoint, setdiff
-from ..symbolic import Chain, Fixpoint, Memo, PreWalk, Rewrite
+from finchlite.algebra import ffuncs, is_associative, is_idempotent
+from finchlite.algebra.utils import all_unique, intersect, is_disjoint, setdiff
+from finchlite.symbolic import Chain, Fixpoint, Memo, PreWalk, Rewrite
+
 from .nodes import Cached, Call, NotationNode
 from .nodes import Literal as L
 

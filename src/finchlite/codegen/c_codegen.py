@@ -12,12 +12,9 @@ from typing import Any, TypedDict
 
 import numpy as np
 
-from finchlite.algebra import ffuncs
-from finchlite.algebra.algebra import FinchOperator
-
-from .. import algebra
-from .. import finch_assembly as asm
-from ..algebra import (
+from finchlite import algebra
+from finchlite import finch_assembly as asm
+from finchlite.algebra import (
     COperator,
     FType,
     ImmutableStructFType,
@@ -25,18 +22,18 @@ from ..algebra import (
     NamedTupleFType,
     StructFType,
     TupleFType,
+    ffuncs,
     fisinstance,
     ftype,
     query_property,
     register_property,
 )
-from ..finch_assembly import (
-    BufferFType,
-    DictFType,
-)
-from ..symbolic import Context, Namespace, ScopedDict
-from ..util import config, file_cache
-from ..util.logging import LOG_BACKEND_C
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.finch_assembly import BufferFType, DictFType
+from finchlite.symbolic import Context, Namespace, ScopedDict
+from finchlite.util import config, file_cache
+from finchlite.util.logging import LOG_BACKEND_C
+
 from .stages import CCode, CLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)

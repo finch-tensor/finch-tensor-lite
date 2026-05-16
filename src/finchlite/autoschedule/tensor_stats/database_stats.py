@@ -5,8 +5,9 @@ from typing import Any
 
 import numpy as np
 
-from ...algebra.algebra import FinchOperator
-from ...finch_logic import Field
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.finch_logic import Field
+
 from .dc_stats import DCStats
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef

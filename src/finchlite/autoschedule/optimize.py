@@ -4,13 +4,9 @@ from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
+from finchlite.algebra.utils import intersect, setdiff
 from finchlite.finch_assembly.stages import AssemblyLibrary
-from finchlite.finch_logic.nodes import LogicExpression
-from finchlite.finch_logic.stages import LogicLoader
-from finchlite.symbolic import gensym
-
-from ..algebra.utils import intersect, setdiff
-from ..finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -27,14 +23,18 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import (
+from finchlite.finch_logic.nodes import LogicExpression
+from finchlite.finch_logic.stages import LogicLoader
+from finchlite.symbolic import (
     Fixpoint,
     Namespace,
     PostOrderDFS,
     PostWalk,
     PreWalk,
     Rewrite,
+    gensym,
 )
+
 from .standardize import (
     concordize,
     flatten_plans,

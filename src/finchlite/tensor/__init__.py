@@ -1,3 +1,4 @@
+from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 from .fiber_tensor import FiberTensor, FiberTensorFType, Level, LevelFType, fiber_tensor
 from .level import (
     DenseLevel,
@@ -10,11 +11,11 @@ from .level import (
     element,
     sparse_list,
 )
-from .masks import (
-    tril,
-)
+from .override_tensor import OverrideTensor
 
 __all__ = [
+    "BufferizedNDArray",
+    "BufferizedNDArrayFType",
     "DenseLevel",
     "DenseLevelFType",
     "ElementLevel",
@@ -23,11 +24,11 @@ __all__ = [
     "FiberTensorFType",
     "Level",
     "LevelFType",
+    "OverrideTensor",
     "SparseListLevel",
     "SparseListLevelFType",
     "dense",
     "element",
     "fiber_tensor",
     "sparse_list",
-    "tril",
 ]

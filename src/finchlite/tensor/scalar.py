@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..algebra import FType, TensorFType, ftype
-from ..algebra.ftypes import FDType
-from .eager import EagerTensor
+from finchlite.algebra import FType, TensorFType, ftype
+from finchlite.algebra.ftypes import FDType
+
+from .override_tensor import OverrideTensor
 
 
 class ScalarFType(TensorFType):
@@ -63,7 +64,7 @@ class ScalarFType(TensorFType):
         return obj.obj
 
 
-class Scalar(EagerTensor):
+class Scalar(OverrideTensor):
     def __init__(self, val: Any, fill_value: Any = None):
         if fill_value is None:
             fill_value = val
