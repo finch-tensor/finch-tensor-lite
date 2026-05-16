@@ -29,6 +29,10 @@ from .default_schedulers import (
 )
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
+from .loop_ordering import (
+    DefaultLoopOrderer,
+    validate,
+)
 from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
@@ -44,6 +48,7 @@ __all__ = [
     "Alias",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
+    "DefaultLoopOrderer",
     "Field",
     "Literal",
     "LogicCompiler",
@@ -67,6 +72,5 @@ __all__ = [
     "Value",
     "get_default_scheduler",
     "normalize_names",
-    "set_default_scheduler",
-    "with_default_scheduler",
+    "validate",
 ]
