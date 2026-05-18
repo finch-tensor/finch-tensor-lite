@@ -1,7 +1,7 @@
 import logging
 from abc import abstractmethod
 from collections import Counter
-from typing import Literal, cast
+from typing import Literal
 
 from finchlite.algebra import TensorFType
 from finchlite.finch_logic import (
@@ -23,7 +23,7 @@ from finchlite.finch_logic import (
     Table,
     TensorStats,
 )
-from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
+from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, PreWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 from .normalize import normalize_names
 from .standardize import concordize, drop_reorders, flatten_plans
@@ -31,68 +31,49 @@ from .standardize import concordize, drop_reorders, flatten_plans
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-# Transpose helpers
-def _get_operand_table_and_idxs(
-    arg: LogicExpression,
-) -> tuple[Table, tuple[Field, ...]] | None:
-    """If ``arg`` is ``Table`` or ``Reorder(Table, logical)``,
-    return table + idxs; else ``None``."""
-    match arg:
-        case Table(_, _) as t:
-            return (t, t.idxs)
-        case Reorder(Table(_, _) as t, idxs):
-            return (t, idxs)
-        case _:
-            return None
+def _desired_table_order(
+    logical: tuple[Field, ...], loop_order: tuple[Field, ...]
+) -> tuple[Field, ...]:
+    field_set = set(logical)
+    return tuple(f for f in loop_order if f in field_set)
 
 
-def _transpose(t: Table, reordered: tuple[Field, ...]) -> Reorder:
-    """Logical view ``reordered`` of the same  tensor."""
-    return Reorder(Table(t.tns, t.idxs), reordered)
+def _align(
+    ex: LogicExpression, loop_order: tuple[Field, ...]
+) -> tuple[LogicExpression, tuple[Query, ...]]:
+    """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``.
 
-
-def _transpose_tables(mj: MapJoin, loop_order: tuple[Field, ...]) -> MapJoin:
-    """Reorder each all-table ``MapJoin`` arg to match
-    ``loop_order`` on shared indices."""
-    views = tuple(_get_operand_table_and_idxs(a) for a in mj.args)
-    if any(v is None for v in views):
-        return mj
-    table_views = cast(tuple[tuple[Table, tuple[Field, ...]], ...], views)
-    seqs = tuple(v[1] for v in table_views)
-    union: set[Field] = set()
-    for seq in seqs:
-        union.update(seq)
-    canonical = tuple(f for f in loop_order if f in union)
-    new_args: list[LogicExpression] = []
-    changed = False
-    for arg, (base_t, logical) in zip(mj.args, table_views, strict=True):
-        field_set = set(logical)
-        new_order = tuple(f for f in canonical if f in field_set)
-        if new_order != logical:
-            changed = True
-            new_args.append(_transpose(base_t, new_order))
-        else:
-            new_args.append(arg)
-    if not changed:
-        return mj
-    return MapJoin(mj.op, tuple(new_args))
-
-
-def _align(ex: LogicExpression, loop_order: tuple[Field, ...]) -> LogicExpression:
-    """Line up tensor axes inside each ``MapJoin`` to ``loop_order``.
-
-    Only touches ``Table`` operands. Loop nest order is set later in ``reorder``.
+    Misaligned tensors are hoisted into preceding ``Query`` nodes that
+    ``Reorder`` the original alias; uses are rewritten to the new alias.
+    Loop nest order is set later on the outer ``Reorder``.
     """
+    needed_swizzles: dict[tuple[Alias, tuple[Field, ...], tuple[Field, ...]], Alias] = {}
+    namespace = Namespace(ex)
 
     def rule(node: LogicNode) -> LogicNode | None:
         match node:
-            case MapJoin() as mj:
-                aligned = _transpose_tables(mj, loop_order)
-                return aligned if aligned is not mj else None
+            case Reorder(Table(Alias() as var, physical), logical):
+                pass
+            case Table(Alias() as var, physical):
+                logical = physical
             case _:
                 return None
 
-    return Rewrite(PostWalk(rule))(ex)
+        desired = _desired_table_order(logical, loop_order)
+        if desired == logical:
+            return None
+
+        key = (var, physical, desired)
+        if key not in needed_swizzles:
+            needed_swizzles[key] = Alias(namespace.freshen(var.name))
+        return Table(needed_swizzles[key], desired)
+
+    new_ex = Rewrite(PostWalk(rule))(ex)
+    queries = tuple(
+        Query(alias, Reorder(Table(var, physical), desired))
+        for (var, physical, desired), alias in needed_swizzles.items()
+    )
+    return new_ex, queries
 
 
 # Validation func
@@ -272,7 +253,7 @@ class LoopOrderer(LogicLoader):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
                 case Query(lhs, rhs):
                     loop_order = self.get_loop_order(node, bindings)
-                    rhs = _align(rhs, loop_order)
+                    rhs, swizzles = _align(rhs, loop_order)
                     match rhs:
                         case Aggregate(
                             op,
@@ -280,7 +261,7 @@ class LoopOrderer(LogicLoader):
                             Reorder(inner, _old_loop_order),
                             reduce_axes,
                         ):
-                            return Query(
+                            ordered = Query(
                                 lhs,
                                 Aggregate(
                                     op,
@@ -290,9 +271,12 @@ class LoopOrderer(LogicLoader):
                                 ),
                             )
                         case Reorder(Table(_, _), _old):
-                            return node
+                            ordered = node
                         case _:
-                            return Query(lhs, Reorder(rhs, loop_order))
+                            ordered = Query(lhs, Reorder(rhs, loop_order))
+                    if swizzles:
+                        return Plan((*swizzles, ordered))
+                    return ordered
                 case Produces(_):
                     return node
                 case _:
@@ -302,10 +286,6 @@ class LoopOrderer(LogicLoader):
 
         prgm = apply_loop_order(prgm)
         prgm = concordize(prgm, bindings)
-        validate(prgm, kind="output")
-        prgm = drop_reorders(prgm)
-        prgm = flatten_plans(prgm)
-        prgm, bindings = normalize_names(prgm, bindings)
         validate(prgm, kind="output")
         logger.debug(prgm)
         return self.loader(prgm, bindings, stats, stats_factory)

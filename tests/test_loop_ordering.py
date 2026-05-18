@@ -72,8 +72,16 @@ def test_default_loop_orderer_matmul_plan_output():
     validate(result, kind="output")
 
     assert isinstance(result, Plan)
-    assert len(result.bodies) == 2
-    q, prod = result.bodies
+    assert len(result.bodies) == 3
+    swizzle_q, q, prod = result.bodies
+    assert isinstance(swizzle_q, Query)
+    match swizzle_q.rhs:
+        case Reorder(Table(tns, _), (k_idx, i_idx)):
+            assert tns.name.startswith("A")
+            assert k_idx.name == "k"
+            assert i_idx.name == "i"
+        case _:
+            pytest.fail("expected swizzle Query(Reorder(Table(A, ...), (k, i)))")
     assert isinstance(q, Query)
     assert isinstance(prod, Produces)
     assert prod.args == (q.lhs,)
