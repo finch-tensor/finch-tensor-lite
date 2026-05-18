@@ -25,29 +25,20 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, PreWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
-from .normalize import normalize_names
-from .standardize import concordize, drop_reorders, flatten_plans
+
+from .standardize import concordize
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
-
-
-def _desired_table_order(
-    logical: tuple[Field, ...], loop_order: tuple[Field, ...]
-) -> tuple[Field, ...]:
-    field_set = set(logical)
-    return tuple(f for f in loop_order if f in field_set)
 
 
 def _align(
     ex: LogicExpression, loop_order: tuple[Field, ...]
 ) -> tuple[LogicExpression, tuple[Query, ...]]:
-    """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``.
-
-    Misaligned tensors are hoisted into preceding ``Query`` nodes that
-    ``Reorder`` the original alias; uses are rewritten to the new alias.
-    Loop nest order is set later on the outer ``Reorder``.
-    """
-    needed_swizzles: dict[tuple[Alias, tuple[Field, ...], tuple[Field, ...]], Alias] = {}
+    """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``."""
+    needed_swizzles: dict[
+        tuple[Alias, tuple[Field, ...], tuple[Field, ...]], 
+        Alias
+    ] = {}
     namespace = Namespace(ex)
 
     def rule(node: LogicNode) -> LogicNode | None:
@@ -59,7 +50,8 @@ def _align(
             case _:
                 return None
 
-        desired = _desired_table_order(logical, loop_order)
+        field_set = set(logical)
+        desired = tuple(f for f in loop_order if f in field_set)
         if desired == logical:
             return None
 
