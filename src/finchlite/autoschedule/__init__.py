@@ -71,6 +71,8 @@ __all__ = [
     "Table",
     "Value",
     "get_default_scheduler",
+    "set_default_scheduler",
+    "with_default_scheduler",
     "normalize_names",
     "validate",
 ]
