@@ -207,10 +207,6 @@ class LoopOrderer(LogicLoader):
     The input program is expected to be in the standardized form produced by
     ``LogicStandardizer``: every query is either a Reorder of a single
     argument, or an Aggregate over a Reorder of a series of map-joins.
-
-    After ``apply_loop_order``, runs ``concordize``, ``drop_reorders``,
-    ``flatten_plans``, and ``normalize_names``
-    (same as ``standardize.py`` after concordize).
     """
 
     def __init__(self, loader: LogicLoader | None = None):
