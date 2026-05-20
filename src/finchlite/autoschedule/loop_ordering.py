@@ -69,7 +69,7 @@ def _align(
 
 
 # Validation func
-def _validate_input_query(query: Query, *, kind: str) -> None:
+def _validate_input_query(query: Query) -> None:
     """
     Validate that a Query rhs matches the loop-ordering grammar:
     ``Aggregate`` (inner form unrestricted),
@@ -79,7 +79,7 @@ def _validate_input_query(query: Query, *, kind: str) -> None:
 
     Used by :func:`validate`.
     """
-    prefix = f"Invalid loop ordering {kind}:"
+    prefix = f"Invalid loop ordering input:"
 
     def walk(ex: LogicNode, inside_aggregate: bool) -> None:
         in_agg = inside_aggregate
@@ -118,8 +118,8 @@ def _validate_input_query(query: Query, *, kind: str) -> None:
     walk(rhs, False)
 
 
-def _validate_output_query(query: Query, *, kind: str) -> None:
-    prefix = f"Invalid loop ordering {kind}:"
+def _validate_output_query(query: Query) -> None:
+    prefix = f"Invalid loop ordering output:"
 
     def walk(ex: LogicNode, inside_aggregate: bool) -> None:
         in_agg = inside_aggregate
@@ -177,7 +177,7 @@ def validate(
                     raise ValueError(f"{prefix} Produces must be final body")
                 match body:
                     case Query() as query:
-                        validate_query(query, kind=kind)
+                        validate_query(query)
                     case Produces(_):
                         seen_produces = True
                         if i != len(bodies) - 1:
@@ -188,7 +188,7 @@ def validate(
                             f"got {type(body).__name__}"
                         )
         case Query() as query:
-            validate_query(query, kind=kind)
+            validate_query(query)
         case _:
             raise ValueError(
                 f"{prefix} expected Plan or Query, got {type(prgm).__name__}"
