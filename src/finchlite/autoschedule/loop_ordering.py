@@ -1,9 +1,11 @@
 import logging
 from abc import abstractmethod
-from collections import Counter
+from functools import reduce
+from itertools import chain as join_chains
 from typing import Literal
 
 from finchlite.algebra import TensorFType
+from finchlite.algebra.utils import intersect
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -281,11 +283,68 @@ class LoopOrderer(LogicLoader):
 
 class DefaultLoopOrderer(LoopOrderer):
     """
-    A simple occurrence-based loop-ordering.
+    Heuristic loop ordering.
 
-    Referenced from
-    ``PhysicalOptimizer/loop-ordering.jl``.
+    From ``optimize._heuristic_loop_order``.
     """
+
+    class CycleInFields(Exception): ...
+
+    @staticmethod
+    def _toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
+        chains = [c for c in chains if len(c) > 0]
+        parents = {chain[0]: 0 for chain in chains}
+        for chain in chains:
+            for f in chain[1:]:
+                parents[f] = parents.get(f, 0) + 1
+        roots = [f for f in parents if parents[f] == 0]
+        perm = []
+        while len(parents) > 0:
+            if len(roots) == 0:
+                raise DefaultLoopOrderer.CycleInFields(
+                    "Cycle detected in fields' orders"
+                )
+            perm.append(roots.pop())
+            for chain in chains:
+                if len(chain) > 0 and chain[0] == perm[-1]:
+                    chain.pop(0)
+                    if len(chain) > 0:
+                        parents[chain[0]] -= 1
+                        if parents[chain[0]] == 0:
+                            roots.append(chain[0])
+            parents.pop(perm[-1])
+        return tuple(perm)
+
+    @staticmethod
+    def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
+        chains = []
+        for node in PostOrderDFS(root):
+            match node:
+                case Reorder(Table(_, idxs_1), idxs_2):
+                    chains.append(
+                        list(intersect(intersect(idxs_1, idxs_2), root.fields()))
+                    )
+        chains.extend([f] for f in root.fields())
+
+        need_fix = False
+        try:
+            result = DefaultLoopOrderer._toposort(chains)
+        except DefaultLoopOrderer.CycleInFields:
+            import warnings
+
+            warnings.warn("Cycle in fields detected, need to permute.", stacklevel=1)
+            need_fix = True
+            result = root.fields()
+
+        if need_fix or reduce(max, [len(c) for c in chains], 0) < len(
+            set(join_chains(*chains))
+        ):
+            counts: dict[Field, int] = {}
+            for chain in chains:
+                for f in chain:
+                    counts[f] = counts.get(f, 0) + 1
+            result = tuple(sorted(result, key=lambda x: counts[x] == 1))
+        return result
 
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__(loader)
@@ -295,34 +354,6 @@ class DefaultLoopOrderer(LoopOrderer):
         node: Query,
         bindings: dict[Alias, TensorFType],
     ) -> tuple[Field, ...]:
-        """
-        Count how many times each index appears across all tensors.
-        Then do sorting
-        """
-        occurrences: Counter[Field] = Counter()
-
-        def visit(ex) -> None:
-            """Count index uses from ``Table`` rows (walks rhs)."""
-            match ex:
-                case Table(_, idxs):
-                    for idx in idxs:
-                        occurrences[idx] += 1
-                case Aggregate(_, _, arg, _):
-                    visit(arg)
-                case Reorder(arg, _):
-                    visit(arg)
-                case _:
-                    if isinstance(ex, LogicTree):
-                        for child in ex.children:
-                            visit(child)
-
         match node:
             case Query(_, rhs):
-                visit(rhs)
-
-        ordered = sorted(
-            occurrences.keys(),
-            key=lambda idx: occurrences[idx],
-            reverse=True,
-        )
-        return tuple(ordered)
+                return self._heuristic_loop_order(rhs)
