@@ -73,7 +73,7 @@ def _validate_input_query(query: Query) -> None:
     """
     Validate that a Query rhs matches the loop-ordering grammar:
     ``Aggregate`` (inner form unrestricted),
-    or ``Reorder`` whose inner is not an ``Aggregate``), at most
+    or ``Reorder`` of a ``Table``), at most
     one ``Aggregate``,
     ``MapJoin`` only under an ``Aggregate`` body.
 
@@ -81,16 +81,27 @@ def _validate_input_query(query: Query) -> None:
     """
     prefix = "Invalid loop ordering input:"
 
-    def walk(ex: LogicNode, inside_aggregate: bool) -> None:
-        in_agg = inside_aggregate
+    def walk(ex: LogicNode, *, at_root: bool = False) -> None:
+        if at_root:
+            match ex:
+                case Aggregate(_, _, _, _):
+                    pass
+                case Reorder(Table(_, _), _):
+                    pass
+                case _:
+                    raise ValueError(
+                        f"{prefix} Query rhs must be Reorder(...) or Aggregate(...)"
+                    )
+
+        n_agg = 0
 
         def rule(node: LogicNode) -> LogicNode | None:
-            nonlocal in_agg
+            nonlocal n_agg
             match node:
                 case Aggregate(_, _, _, _):
-                    in_agg = True
+                    n_agg += 1
                 case MapJoin():
-                    if not in_agg:
+                    if n_agg == 0:
                         raise ValueError(
                             "Invalid loop ordering: MapJoin is only allowed "
                             "inside an Aggregate argument"
@@ -100,37 +111,41 @@ def _validate_input_query(query: Query) -> None:
             return None
 
         Rewrite(PreWalk(rule))(ex)
-
-    match query:
-        case Query(_, Aggregate(_, _, _, _)):
-            pass
-        case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
-            pass
-        case _:
+        if n_agg > 1:
             raise ValueError(
-                f"{prefix} Query rhs must be Reorder(...) or Aggregate(...)"
+                "Invalid loop ordering: at most one Aggregate per Query rhs"
             )
 
-    rhs = query.rhs
-    n = sum(1 for node in PostOrderDFS(rhs) if isinstance(node, Aggregate))
-    if n > 1:
-        raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
-    walk(rhs, False)
+    walk(query.rhs, at_root=True)
 
 
 def _validate_output_query(query: Query) -> None:
     prefix = "Invalid loop ordering output:"
 
-    def walk(ex: LogicNode, inside_aggregate: bool) -> None:
-        in_agg = inside_aggregate
+    def walk(ex: LogicNode, *, at_root: bool = False) -> None:
+        if at_root:
+            match ex:
+                case Aggregate(_, _, Reorder(_, _), _):
+                    pass
+                case Reorder(Table(_, _), _):
+                    pass
+                case _:
+                    raise ValueError(
+                        f"{prefix} Query rhs must be "
+                        "Reorder(...) or Aggregate(..., Reorder(...), ...)"
+                    )
+
+        n_agg = 0
 
         def rule(node: LogicNode) -> LogicNode | None:
-            nonlocal in_agg
+            nonlocal n_agg
             match node:
                 case Aggregate(_, _, Reorder(_, _), _):
-                    in_agg = True
+                    n_agg += 1
+                case Aggregate():
+                    n_agg += 1
                 case MapJoin():
-                    if not in_agg:
+                    if n_agg == 0:
                         raise ValueError(
                             "Invalid loop ordering: MapJoin is only allowed "
                             "inside an Aggregate argument"
@@ -140,23 +155,12 @@ def _validate_output_query(query: Query) -> None:
             return None
 
         Rewrite(PreWalk(rule))(ex)
-
-    match query:
-        case Query(_, Aggregate(_, _, Reorder(_, _), _)):
-            pass
-        case Query(_, Reorder(inner, _)) if not isinstance(inner, Aggregate):
-            pass
-        case _:
+        if n_agg > 1:
             raise ValueError(
-                f"{prefix} Query rhs must be "
-                "Reorder(...) or Aggregate(..., Reorder(...), ...)"
+                "Invalid loop ordering: at most one Aggregate per Query rhs"
             )
 
-    rhs = query.rhs
-    n = sum(1 for node in PostOrderDFS(rhs) if isinstance(node, Aggregate))
-    if n > 1:
-        raise ValueError("Invalid loop ordering: at most one Aggregate per Query rhs")
-    walk(rhs, False)
+    walk(query.rhs, at_root=True)
 
 
 def validate(
@@ -220,6 +224,8 @@ class LoopOrderer(LogicLoader):
         self,
         node: Query,
         bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[Field, ...]:
         """
         Return the desired loop order.
@@ -240,7 +246,9 @@ class LoopOrderer(LogicLoader):
                 case Plan(bodies):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
                 case Query(lhs, rhs):
-                    loop_order = self.get_loop_order(node, bindings)
+                    loop_order = self.get_loop_order(
+                        node, bindings, stats, stats_factory
+                    )
                     rhs, swizzles = _align(rhs, loop_order)
                     match rhs:
                         case Aggregate(
@@ -351,6 +359,8 @@ class DefaultLoopOrderer(LoopOrderer):
         self,
         node: Query,
         bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[Field, ...]:
         match node:
             case Query(_, rhs):

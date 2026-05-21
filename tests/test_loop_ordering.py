@@ -188,8 +188,7 @@ def test_input_rejects_mapjoin_outside_aggregate():
     )
     with pytest.raises(
         ValueError,
-        match="Invalid loop ordering: MapJoin is only allowed "
-        "inside an Aggregate argument",
+        match="Invalid loop ordering input: Query rhs must be Reorder",
     ):
         validate(Query(Alias("C"), rhs), kind="input")
 
@@ -302,8 +301,7 @@ def test_output_rejects_mapjoin_outside_aggregate_inside_reorder():
     bad = Query(Alias("C"), Reorder(inner, (i, j)))
     with pytest.raises(
         ValueError,
-        match="Invalid loop ordering: MapJoin is only allowed "
-        "inside an Aggregate argument",
+        match="Invalid loop ordering output: Query rhs must be Reorder",
     ):
         validate(bad, kind="output")
 
