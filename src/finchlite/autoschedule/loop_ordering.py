@@ -14,7 +14,6 @@ from finchlite.finch_logic import (
     LogicLoader,
     LogicNode,
     LogicStatement,
-    LogicTree,
     MapJoin,
     MockLogicLoader,
     Plan,
@@ -38,8 +37,7 @@ def _align(
 ) -> tuple[LogicExpression, tuple[Query, ...]]:
     """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``."""
     needed_swizzles: dict[
-        tuple[Alias, tuple[Field, ...], tuple[Field, ...]], 
-        Alias
+        tuple[Alias, tuple[Field, ...], tuple[Field, ...]], Alias
     ] = {}
     namespace = Namespace(ex)
 
@@ -81,7 +79,7 @@ def _validate_input_query(query: Query) -> None:
 
     Used by :func:`validate`.
     """
-    prefix = f"Invalid loop ordering input:"
+    prefix = "Invalid loop ordering input:"
 
     def walk(ex: LogicNode, inside_aggregate: bool) -> None:
         in_agg = inside_aggregate
@@ -121,7 +119,7 @@ def _validate_input_query(query: Query) -> None:
 
 
 def _validate_output_query(query: Query) -> None:
-    prefix = f"Invalid loop ordering output:"
+    prefix = "Invalid loop ordering output:"
 
     def walk(ex: LogicNode, inside_aggregate: bool) -> None:
         in_agg = inside_aggregate
