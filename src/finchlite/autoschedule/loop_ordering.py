@@ -68,6 +68,16 @@ def _align(
     return new_ex, queries
 
 
+def _check_loop_order(
+    idxs: tuple[Field, ...],
+    loop_order: tuple[Field, ...],
+) -> None:
+    field_set = set(idxs)
+    desired = tuple(f for f in loop_order if f in field_set)
+    if desired != idxs:
+        raise ValueError("Table indices do not match loop order")
+
+
 # Validation func
 def _validate_input_query(query: Query) -> None:
     """
@@ -123,12 +133,15 @@ def _validate_output_query(query: Query) -> None:
     prefix = "Invalid loop ordering output:"
 
     def walk(ex: LogicNode, *, at_root: bool = False) -> None:
+        loop_order: tuple[Field, ...] | None = None
         if at_root:
             match ex:
-                case Aggregate(_, _, Reorder(_, _), _):
-                    pass
-                case Reorder(Table(_, _), _):
-                    pass
+                case Aggregate(_, _, Reorder(_, order), _):
+                    loop_order = order
+                case Reorder(Table(_, idxs), order):
+                    if idxs == order:
+                        loop_order = order
+                        _check_loop_order(idxs, order)
                 case _:
                     raise ValueError(
                         f"{prefix} Query rhs must be "
@@ -144,6 +157,10 @@ def _validate_output_query(query: Query) -> None:
                     n_agg += 1
                 case Aggregate():
                     n_agg += 1
+                case Table(_, idxs) if loop_order is not None:
+                    _check_loop_order(idxs, loop_order)
+                case Reorder(Table(_, _), idxs) if loop_order is not None:
+                    _check_loop_order(idxs, loop_order)
                 case MapJoin():
                     if n_agg == 0:
                         raise ValueError(
