@@ -8,7 +8,7 @@ from textwrap import dedent
 import numpy as np
 
 from finchlite.algebra import ftype, ftypes
-from finchlite.finch_assembly import Buffer
+from finchlite.finch_assembly import Buffer, BufferFType
 from finchlite.util import qual_str
 
 from .c_codegen import (
@@ -234,7 +234,7 @@ class MallocBuffer(Buffer):
         return f"malloc_buf({array})"
 
 
-class MallocBufferFType(CBufferFType, CStackFType):
+class MallocBufferFType(BufferFType, CBufferFType, CStackFType):
     """
     A ftype for buffers that uses libc-provided malloc functions. This is a
     concrete implementation of the BufferFType class.

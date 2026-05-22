@@ -11,7 +11,7 @@ import numpy as np
 import numba
 
 from finchlite.algebra import FType, ImmutableStructFType
-from finchlite.finch_assembly import Dict
+from finchlite.finch_assembly import Dict, DictFType
 
 from .c_codegen import (
     CContext,
@@ -280,7 +280,7 @@ class CHashTable(Dict):
         return CHashTableFType(self._key_type, self._value_type)
 
 
-class CHashTableFType(CDictFType, CStackFType):
+class CHashTableFType(DictFType, CDictFType, CStackFType):
     """
     An implementation of Hash Tables using the stc library.
     """
