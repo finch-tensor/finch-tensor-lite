@@ -36,7 +36,9 @@ from finchlite.util.logging import LOG_BACKEND_C
 
 from .stages import CCode, CLowerer
 from .c_codegen import (
+    CBufferFType,
     CContext,
+    CDictFType,
     CKernel,
     CLibrary,
     c_getattr,

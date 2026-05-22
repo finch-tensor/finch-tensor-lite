@@ -1,11 +1,10 @@
 from .c_codegen import (
     CArgumentFType,
     CBufferFType,
-    CCompiler,
-    CGenerator,
     CKernel,
     CLibrary,
 )
+from .c_compile import CCompiler, CGenerator
 from .hashtable import (
     CHashTable,
     CHashTableFType,
