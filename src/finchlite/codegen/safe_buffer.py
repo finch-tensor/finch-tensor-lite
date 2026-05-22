@@ -1,5 +1,3 @@
-import ctypes
-
 from finchlite.codegen.c_codegen import CBufferFType, CStackFType
 from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaStackFType
 from finchlite.finch_assembly import Buffer
@@ -139,9 +137,7 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
 
     def numba_length(self, ctx, buf_t, buf):
         assert buf_t == self
-        return self._underlying_format.numba_length(
-            ctx, self._underlying_format, buf
-        )
+        return self._underlying_format.numba_length(ctx, self._underlying_format, buf)
 
     def numba_check(self, ctx, buf_t, buf, idx_symbol, idx_type):
         assert buf_t == self
