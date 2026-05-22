@@ -825,6 +825,12 @@ def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fa
     return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
 
 
+def reshape(x, shape: tuple, /, *, copy=None):
+    if not hasattr(x, "reshape"):
+        return NotImplementedError(f"Object of type {type(x)} does not support reshape")
+    return x.reshape(shape, copy=copy)
+
+
 def var(
     x,
     /,
