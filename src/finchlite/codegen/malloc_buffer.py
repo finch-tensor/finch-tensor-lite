@@ -8,7 +8,7 @@ from textwrap import dedent
 import numpy as np
 
 from finchlite.algebra import ftype, ftypes
-from finchlite.finch_assembly import Buffer, Stack
+from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
@@ -281,40 +281,55 @@ class MallocBufferFType(CBufferFType, CStackFType):
     def c_type(self):
         return ctypes.POINTER(CMallocBufferStruct)
 
-    def c_length(self, ctx: CContext, buf: Stack):
-        assert isinstance(buf.obj, CBufferFields)
-        return buf.obj.length
+    def c_length(self, ctx: CContext, buf_t, buf: CBufferFields):
+        assert buf_t == self
+        assert isinstance(buf, CBufferFields)
+        return buf.length
 
-    def c_data(self, ctx: CContext, buf: Stack):
-        assert isinstance(buf.obj, CBufferFields)
-        return buf.obj.data
+    def c_data(self, ctx: CContext, buf_t, buf: CBufferFields):
+        assert buf_t == self
+        assert isinstance(buf, CBufferFields)
+        return buf.data
 
-    def c_load(self, ctx: CContext, buf: Stack, idx_symbol: str, idx_type):
-        assert isinstance(buf.obj, CBufferFields)
-        return f"({buf.obj.data})[{idx_symbol}]"
+    def c_load(
+        self, ctx: CContext, buf_t, buf: CBufferFields, idx_symbol: str, idx_type
+    ):
+        assert buf_t == self
+        assert isinstance(buf, CBufferFields)
+        return f"({buf.data})[{idx_symbol}]"
 
     def c_store(
         self,
         ctx: CContext,
-        buf: Stack,
+        buf_t,
+        buf: CBufferFields,
         idx_symbol: str,
         idx_type,
         value_symbol: str,
         value_type,
     ):
-        assert isinstance(buf.obj, CBufferFields)
-        ctx.exec(f"{ctx.feed}({buf.obj.data})[{idx_symbol}] = {value_symbol};")
+        assert buf_t == self
+        assert isinstance(buf, CBufferFields)
+        ctx.exec(f"{ctx.feed}({buf.data})[{idx_symbol}] = {value_symbol};")
 
-    def c_resize(self, ctx: CContext, buf: Stack, new_len_symbol: str, new_len_type):
-        assert isinstance(buf.obj, CBufferFields)
+    def c_resize(
+        self,
+        ctx: CContext,
+        buf_t,
+        buf: CBufferFields,
+        new_len_symbol: str,
+        new_len_type,
+    ):
+        assert buf_t == self
+        assert isinstance(buf, CBufferFields)
 
         if self not in ctx.datastructures:
             raise Exception("A Mallocbuffer must be unpacked before being operated on!")
 
         methods: CMallocBufferMethods = ctx.datastructures[self]
 
-        data = buf.obj.data
-        length = buf.obj.length
+        data = buf.data
+        length = buf.length
 
         ctx.exec(
             f"{ctx.feed}{data} = {methods.resize}({data}, {length}, {new_len_symbol});\n"

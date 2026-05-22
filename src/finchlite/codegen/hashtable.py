@@ -336,32 +336,40 @@ class CHashTableFType(CDictFType, CStackFType):
     def c_type(self):
         return ctypes.POINTER(CHashTableStruct)
 
-    def c_existsdict(self, ctx: CContext, dct: Stack, idx_symbol: str, idx_type):
-        assert isinstance(dct.obj, CDictFields)
+    def c_existsdict(
+        self, ctx: CContext, dct_t, dct: CDictFields, idx_symbol: str, idx_type
+    ):
+        assert dct_t == self
+        assert isinstance(dct, CDictFields)
         methods: CHashMethods = ctx.datastructures[self]
-        return f"{ctx.feed}{methods.exists}({dct.obj.dct}, {idx_symbol})"
+        return f"{ctx.feed}{methods.exists}({dct.dct}, {idx_symbol})"
 
     def c_storedict(
         self,
         ctx: CContext,
-        dct: Stack,
+        dct_t,
+        dct: CDictFields,
         idx_symbol: str,
         idx_type,
         value_symbol: str,
         value_type,
     ):
-        assert isinstance(dct.obj, CDictFields)
+        assert dct_t == self
+        assert isinstance(dct, CDictFields)
         methods: CHashMethods = ctx.datastructures[self]
-        ctx.exec(f"{ctx.feed}{methods.store}({dct.obj.dct}, {idx_symbol}, {value_symbol});")
+        ctx.exec(f"{ctx.feed}{methods.store}({dct.dct}, {idx_symbol}, {value_symbol});")
 
-    def c_loaddict(self, ctx: CContext, dct: Stack, idx_symbol: str, idx_type):
+    def c_loaddict(
+        self, ctx: CContext, dct_t, dct: CDictFields, idx_symbol: str, idx_type
+    ):
         """
         Get an expression where we can get the value corresponding to a key.
         """
-        assert isinstance(dct.obj, CDictFields)
+        assert dct_t == self
+        assert isinstance(dct, CDictFields)
         methods: CHashMethods = ctx.datastructures[self]
 
-        return f"{methods.load}({dct.obj.dct}, {idx_symbol})"
+        return f"{methods.load}({dct.dct}, {idx_symbol})"
 
     def c_unpack(self, ctx: CContext, var_n: str, val: AssemblyExpression):
         """
