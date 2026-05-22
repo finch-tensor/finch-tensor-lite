@@ -13,30 +13,88 @@ def full(
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
+    device=None,
 ):
-    """
-    Returns a new array having a specified shape and filled with fill_value.
-
-    Parameters:
-    - shape (Union[int, Tuple[int, ...]]): output array shape.
-    - fill_value (Union[bool, int, float, complex]): fill value.
-    - dtype (Optional[dtype]): output array data type. If dtype is None, the
-    output array data type must be inferred from fill_value according to the
-    following rules:
-        * If the fill value is an int, the output array data type must be the
-            default integer data type.
-        * If the fill value is a float, the output array data type must be the
-            default real-valued floating-point data type.
-        * If the fill value is a complex number, the output array data type must
-            be the default complex floating-point data type.
-        * If the fill value is a bool, the output array must have a boolean data
-            type. Default: None.
-
-    Returns:
-
-    - out (array): an array where every element is equal to fill_value.
-    """
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
     return compute(lazy.full(shape, fill_value, dtype=dtype))
+
+
+def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    return full(shape, 0, dtype=dtype)
+
+
+def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    return full(shape, 1, dtype=dtype)
+
+
+def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    return full(shape, 0, dtype=dtype)
+
+
+def full_like(
+    x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
+):
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    if dtype is None:
+        dtype = x.dtype
+    return full(x.shape, fill_value, dtype=dtype)
+
+
+def zeros_like(x, /, *, dtype: Any | None = None, device=None):
+    return full_like(x, 0, dtype=dtype, device=device)
+
+
+def ones_like(x, /, *, dtype: Any | None = None, device=None):
+    return full_like(x, 1, dtype=dtype, device=device)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype: Any | None = None,
+    device=None,
+):
+    import numpy as np
+
+    from finchlite.tensor import BufferizedNDArray
+
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    if stop is None:
+        start, stop = 0, start
+    return BufferizedNDArray.from_numpy(np.arange(start, stop, step, dtype=dtype))
+
+
+def linspace(
+    start: float,
+    stop: float,
+    /,
+    num: int,
+    *,
+    dtype: Any | None = None,
+    device=None,
+    endpoint: bool = True,
+):
+    import numpy as np
+
+    from finchlite.tensor import BufferizedNDArray
+
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    return BufferizedNDArray.from_numpy(
+        np.linspace(start, stop, num, endpoint=endpoint, dtype=dtype)
+    )
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
