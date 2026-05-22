@@ -1,10 +1,21 @@
+import numpy as np
 import pytest
 
+import finchlite.interface as fl
 from finchlite.algebra import ffuncs
 from finchlite.autoschedule import (
     DefaultLoopOrderer,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
     validate,
 )
+from finchlite.autoschedule.formatter import DefaultLogicFormatter
+from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
+from finchlite.autoschedule.standardize import LogicStandardizer
+from finchlite.finch_notation.interpreter import NotationInterpreter
+
+from .conftest import finch_assert_allclose
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
@@ -318,3 +329,32 @@ def test_output_rejects_produces_followed_by_query():
         ValueError, match="Invalid loop ordering output: Produces must be final body"
     ):
         validate(plan, kind="output")
+
+# Full pipeline test
+INTERPRET_NOTATION_GALLEY_LOOP_ORDER = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicalOptimizer(
+            DefaultLoopOrderer(
+                LogicStandardizer(
+                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                )
+            )
+        )
+    )
+)
+
+
+
+def test_galley_loop_order_frontend_pipeline():
+    a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    b = fl.asarray(np.array([[5.0, 6.0], [7.0, 8.0]]))
+
+    out = fl.compute(
+        fl.lazy(a) @ fl.lazy(b), ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER
+    )
+
+    expected = np.array(a) @ np.array(b)
+    finch_assert_allclose(np.array(out), expected)
+
+# NOTE: currently fails in DefaultLogicFormatter due to lhs shape type != rhs shape type
+# dimenision map in dims_binding > dimmap for rhs
