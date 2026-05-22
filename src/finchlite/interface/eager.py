@@ -23,19 +23,19 @@ def full(
 def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    return full(shape, 0, dtype=dtype)
+    return compute(lazy.full(shape, 0, dtype=dtype))
 
 
 def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    return full(shape, 1, dtype=dtype)
+    return compute(lazy.full(shape, 1, dtype=dtype))
 
 
 def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    return full(shape, 0, dtype=dtype)
+    return compute(lazy.full(shape, 0, dtype=dtype))
 
 
 def full_like(
@@ -45,7 +45,7 @@ def full_like(
         raise ValueError(f"device argument is not supported; got {device!r}")
     if dtype is None:
         dtype = x.dtype
-    return full(x.shape, fill_value, dtype=dtype)
+    return compute(lazy.full(x.shape, fill_value, dtype=dtype))
 
 
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
