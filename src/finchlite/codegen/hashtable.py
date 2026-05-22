@@ -371,23 +371,25 @@ class CHashTableFType(CDictFType, CStackFType):
 
         return f"{methods.load}({dct.dct}, {idx_symbol})"
 
-    def c_unpack(self, ctx: CContext, var_n: str, val: AssemblyExpression):
+    def c_unpack(self, ctx, var_n: str, var_t, val_n: str, val_t):
         """
         Unpack the map into C context.
         """
-        assert val.result_type == self
+        assert var_t == self
+        assert val_t == self
         data = ctx.freshen(var_n, "data")
         # Add all the stupid header stuff from above.
         if self not in ctx.datastructures:
             CHashTable.gen_code(ctx, self, inline=True)
 
-        ctx.exec(f"{ctx.feed}void* {data} = {ctx(val)}->dct;")
+        ctx.exec(f"{ctx.feed}void* {data} = {val_n}->dct;")
         return CDictFields(data, var_n)
 
-    def c_repack(self, ctx: CContext, lhs: str, obj: CDictFields):
+    def c_repack(self, ctx: CContext, lhs: str, lhs_t, obj: CDictFields):
         """
         Repack the map out of C context.
         """
+        assert lhs_t == self
         ctx.exec(f"{ctx.feed}{lhs}->dct = {obj.dct};")
 
     def serialize_to_c(self, obj: CHashTable):

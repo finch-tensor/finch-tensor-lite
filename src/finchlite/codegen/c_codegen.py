@@ -883,9 +883,7 @@ class CGeneratorContext:
                 var_t_code = self.ctype_name(c_type(var_t))
                 self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 self.types[var_n] = var_t
-                self.slots[var_n] = var_t.c_unpack(
-                    self, var_n, asm.Variable(var_n, var_t)
-                )
+                self.slots[var_n] = var_t.c_unpack(self, var_n, var_t, var_n, var_t)
                 return None
             case asm.Repack(asm.Slot(var_n, var_t)):
                 if var_n not in self.slots or var_n not in self.types:
@@ -893,7 +891,7 @@ class CGeneratorContext:
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
-                var_t.c_repack(self, var_n, obj)
+                var_t.c_repack(self, var_n, var_t, obj)
                 return None
             case asm.Load(buf, idx):
                 buf_t, buf_fields = self.resolve_fields(buf)
@@ -1230,7 +1228,7 @@ class CStackFType(ABC):
     """
 
     @abstractmethod
-    def c_unpack(self, ctx, lhs, rhs):
+    def c_unpack(self, ctx, lhs_symbol, lhs_type, rhs_symbol, rhs_type):
         """
         Convert a value to a symbolic representation in C. Returns a NamedTuple
         of unpacked variable names, etc. The `lhs` is the variable namespace to
@@ -1239,7 +1237,7 @@ class CStackFType(ABC):
         ...
 
     @abstractmethod
-    def c_repack(self, ctx, lhs, rhs):
+    def c_repack(self, ctx, lhs_symbol, lhs_type, rhs):
         """
         Update an object based on a symbolic representation. The `rhs` is the
         symbolic representation to update from, and `lhs` is a variable name referring

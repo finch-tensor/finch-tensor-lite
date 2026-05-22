@@ -9,7 +9,6 @@ import numpy as np
 
 from finchlite.algebra import ftype, ftypes
 from finchlite.finch_assembly import Buffer
-from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
 from .c_codegen import (
@@ -337,10 +336,12 @@ class MallocBufferFType(CBufferFType, CStackFType):
         )
         return
 
-    def c_unpack(self, ctx: CContext, var_n, val):
+    def c_unpack(self, ctx, var_n: str, var_t, val_n: str, val_t):
         """
         Unpack the malloc buffer into C context.
         """
+        assert var_t == self
+        assert val_t == self
         data = ctx.freshen(var_n, "data")
         length = ctx.freshen(var_n, "length")
         t = ctx.ctype_name(c_type(self.element_type))
@@ -350,16 +351,17 @@ class MallocBufferFType(CBufferFType, CStackFType):
             MallocBufferBackend.gen_code(ctx, self, inline=True)
 
         ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
-            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
+            f"{ctx.feed}{t}* {data} = ({t}*){val_n}->data;\n"
+            f"{ctx.feed}size_t {length} = {val_n}->length;"
         )
 
         return CBufferFields(data, length, var_n)
 
-    def c_repack(self, ctx, var_n: str, obj: CBufferFields):
+    def c_repack(self, ctx, var_n: str, var_t, obj: CBufferFields):
         """
         Repack the buffer from C context.
         """
+        assert var_t == self
         ctx.exec(
             f"{ctx.feed}{var_n}->data = (void*){obj.data};\n"
             f"{ctx.feed}{var_n}->length = {obj.length};"

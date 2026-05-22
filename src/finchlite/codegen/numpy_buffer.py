@@ -7,7 +7,6 @@ import numba
 
 from finchlite.algebra import FType, ftype
 from finchlite.finch_assembly import Buffer
-from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
 from .c_codegen import CBufferFType, CContext, CStackFType, c_type
@@ -177,25 +176,28 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         )
         return
 
-    def c_unpack(self, ctx, var_n, val):
+    def c_unpack(self, ctx, var_n, var_t, val_n, val_t):
         """
         Unpack the buffer into C context.
         """
+        assert var_t == self
+        assert val_t == self
         data = ctx.freshen(var_n, "data")
         length = ctx.freshen(var_n, "length")
         t = ctx.ctype_name(c_type(self._dtype))
         ctx.add_header("#include <stddef.h>")
         ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
-            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
+            f"{ctx.feed}{t}* {data} = ({t}*){val_n}->data;\n"
+            f"{ctx.feed}size_t {length} = {val_n}->length;"
         )
 
         return CBufferFields(data, length, var_n)
 
-    def c_repack(self, ctx, lhs, obj):
+    def c_repack(self, ctx, lhs, lhs_t, obj):
         """
         Repack the buffer from C context.
         """
+        assert lhs_t == self
         ctx.exec(
             f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
             f"{ctx.feed}{lhs}->length = {obj.length};"
