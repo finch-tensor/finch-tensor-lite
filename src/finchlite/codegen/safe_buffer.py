@@ -111,11 +111,16 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
             ctx, self._underlying_format, buf, new_len_symbol, new_len_type
         )
 
-    def c_unpack(self, *args, **kwargs):
-        return self._underlying_format.c_unpack(*args, **kwargs)
+    def c_unpack(self, ctx, var_n, var_t, val_n, val_t):
+        assert var_t == self
+        assert val_t == self
+        return self._underlying_format.c_unpack(
+            ctx, var_n, self._underlying_format, val_n, self._underlying_format
+        )
 
-    def c_repack(self, *args, **kwargs):
-        return self._underlying_format.c_repack(*args, **kwargs)
+    def c_repack(self, ctx, lhs, lhs_t, obj):
+        assert lhs_t == self
+        return self._underlying_format.c_repack(ctx, lhs, self._underlying_format, obj)
 
     def serialize_to_c(self, obj: SafeBuffer, *args, **kwargs):
         return self._underlying_format.serialize_to_c(obj.underlying, *args, **kwargs)
