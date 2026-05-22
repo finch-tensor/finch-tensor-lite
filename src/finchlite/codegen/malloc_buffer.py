@@ -15,7 +15,7 @@ from finchlite.util import qual_str
 from .c_codegen import (
     CBufferFType,
     CContext,
-    CStructFType,
+    CStackFType,
     c_type,
     construct_from_c,
     load_shared_lib,
@@ -235,7 +235,7 @@ class MallocBuffer(Buffer):
         return f"malloc_buf({array})"
 
 
-class MallocBufferFType(CBufferFType, CStructFType):
+class MallocBufferFType(CBufferFType, CStackFType):
     """
     A ftype for buffers that uses libc-provided malloc functions. This is a
     concrete implementation of the BufferFType class.

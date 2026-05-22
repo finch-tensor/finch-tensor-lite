@@ -1168,7 +1168,7 @@ class CBufferFType(BufferFType, CArgumentFType, ABC):
         ...
 
 
-class CStructFType(ABC):
+class CStackFType(ABC):
     """
     Abstract base class for symbolic formats in C. Stack formats must also
     support other functions with symbolic inputs in addition to variable ones.
