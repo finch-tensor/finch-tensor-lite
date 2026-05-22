@@ -1,35 +1,30 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any
 
 from finchlite.symbolic.traversal import PostOrderDFS
 
 from ..algebra import TensorFType
-from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as ein
 
 
 class EinsumEvaluator(Stage):
     @abstractmethod
-    def __call__(
+    def transform(
         self,
         term: ein.EinsumNode,
         bindings: dict[ein.Alias, Any] | None = None,
-    ) -> Any | tuple[Any, ...]:  # TODO eventually Any->Tensor
+    ) -> tuple:  # TODO eventually Any->Tensor
         """
         Evaluate the given logic.
         """
 
 
-class EinsumLoader(ABC):
+class EinsumLoader(Stage):
     @abstractmethod
-    def __call__(
+    def transform(
         self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index | None, ...]],
-    ]:
+    ) -> tuple:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a
@@ -37,9 +32,9 @@ class EinsumLoader(ABC):
         """
 
 
-class EinsumTransform(ABC):
+class EinsumTransform(Stage):
     @abstractmethod
-    def __call__(
+    def transform(
         self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         """
@@ -52,18 +47,28 @@ class OptEinsumLoader(EinsumLoader):
         self.ctx = ctx
         self.opts = opts
 
-    def __call__(
+    def validate_inputs(
         self,
         term: ein.EinsumStatement,
         bindings: dict[ein.Alias, TensorFType],
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index | None, ...]],
-    ]:
+    ):
+        pass
+
+    def transform(
+        self,
+        term: ein.EinsumStatement,
+        bindings: dict[ein.Alias, TensorFType],
+    ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
-        return self.ctx(term, bindings)
+        return term, bindings
+
+    def validate_outputs(
+        self,
+        term: ein.EinsumStatement,
+        bindings: dict[ein.Alias, TensorFType],
+    ):
+        pass
 
 
 def compute_shape_vars(

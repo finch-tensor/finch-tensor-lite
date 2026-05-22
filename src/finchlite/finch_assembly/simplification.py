@@ -5,8 +5,17 @@ from .stages import AssemblyTransform
 
 
 class AssemblySimplify(AssemblyTransform):
-    def __call__(self, term: asm.Module) -> asm.Module:
-        return Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term)
+    def validate_inputs(self, term: asm.Module):
+        pass
+
+    def transform(self, term: asm.Module) -> tuple[asm.Module]:
+        return (Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term),)
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0]
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):

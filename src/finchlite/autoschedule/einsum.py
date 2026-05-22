@@ -7,6 +7,7 @@ from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
 from finchlite.finch_logic import LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
+from finchlite.symbolic import NoTransformStage
 
 from .stages import LogicEinsumLowerer
 
@@ -77,14 +78,25 @@ def generate_einsum_expr(
 
 
 class EinsumGenerator(LogicEinsumLowerer):
-    def __call__(
+    def validate_inputs(
+        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ):
+        pass
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs if len(outputs) > 1 else outputs[0]
+
+    def transform(
         self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
         return (generate_einsum_stmt(prgm), bindings_2)
 
 
-class LogicEinsumLoader(LogicLoader):
+class LogicEinsumLoader(NoTransformStage, LogicLoader):
     def __init__(
         self,
         ctx_lower: LogicEinsumLowerer | None = None,
@@ -97,7 +109,25 @@ class LogicEinsumLoader(LogicLoader):
             ctx_load = MockEinsumLoader()
         self.ctx_load: EinsumLoader = ctx_load
 
-    def __call__(
+    def validate_inputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def validate_outputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],

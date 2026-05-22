@@ -482,17 +482,35 @@ class LogicStandardizer(LogicLoader):
             ctx = MockLogicLoader()
         self.ctx: LogicLoader = ctx
 
-    def __call__(
+    def validate_inputs(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
     ):
+        pass
+
+    def transform(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ) -> tuple[
+        LogicStatement,
+        dict[Alias, TensorFType],
+        dict[Alias, "TensorStats"],
+        StatsFactory,
+    ]:
         prgm, bindings = standardize(prgm, bindings)
-        return self.ctx(
-            prgm,
-            bindings,
-            stats=stats,
-            stats_factory=stats_factory,
-        )
+        return prgm, bindings, stats, stats_factory
+
+    def validate_outputs(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass

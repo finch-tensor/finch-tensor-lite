@@ -4,7 +4,6 @@ from typing import overload
 
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_logic.nodes import LogicExpression
 from finchlite.finch_logic.stages import LogicLoader
 from finchlite.symbolic import gensym
@@ -419,19 +418,35 @@ class DefaultLogicOptimizer(LogicLoader):
     def __init__(self, ctx):
         self.ctx = ctx
 
-    def __call__(
+    def validate_inputs(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def transform(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
     ) -> tuple[
-        AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
+        LogicStatement,
+        dict[Alias, TensorFType],
+        dict[Alias, "TensorStats"],
+        StatsFactory,
     ]:
         prgm, bindings = optimize(prgm, bindings)
-        return self.ctx(
-            prgm,
-            bindings,
-            stats=stats,
-            stats_factory=stats_factory,
-        )
+        return prgm, bindings, stats, stats_factory
+
+    def validate_outputs(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass

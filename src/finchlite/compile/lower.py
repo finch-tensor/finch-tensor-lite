@@ -24,7 +24,14 @@ from ..finch_assembly import (
     AssemblyTransform,
 )
 from ..finch_notation import NotationLoader
-from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from ..symbolic import (
+    Context,
+    NoTransformStage,
+    PostOrderDFS,
+    PostWalk,
+    Rewrite,
+    ScopedDict,
+)
 from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer
 
@@ -301,7 +308,7 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler(NotationLoader):
+class NotationCompiler(NoTransformStage, NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
@@ -316,7 +323,13 @@ class NotationCompiler(NotationLoader):
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
 
-    def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
+    def validate_inputs(self, prgm: ntn.Module):
+        pass
+
+    def validate_outputs(self, prgm: ntn.Module):
+        pass
+
+    def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
         for transform in self.ctx_transforms:
             asm_code = transform(asm_code)
@@ -332,9 +345,18 @@ class AssemblyGenerator(NotationLowerer):
     def __init__(self):
         pass
 
-    def __call__(self, term: ntn.Module) -> asm.Module:
+    def validate_inputs(self, term: ntn.Module):
+        pass
+
+    def transform(self, term: ntn.Module) -> tuple[asm.Module]:
         ctx = AssemblyContext()
-        return ctx(term)
+        return (ctx(term),)
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0]
 
 
 class AssemblyContext(Context):

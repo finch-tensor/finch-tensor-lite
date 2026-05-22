@@ -9,7 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
-from .stage import Stage
+from .stage import NoTransformStage, Stage
 from .term import (
     Term,
     TermTree,
@@ -27,6 +27,7 @@ __all__ = [
     "Memo",
     "NamedTerm",
     "Namespace",
+    "NoTransformStage",
     "PostOrderDFS",
     "PostWalk",
     "PreOrderDFS",

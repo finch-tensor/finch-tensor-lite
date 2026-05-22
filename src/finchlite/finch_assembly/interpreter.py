@@ -131,6 +131,18 @@ class AssemblyInterpreter(AssemblyLoader):
             and self.function_state.should_halt
         )
 
+    def validate_inputs(self, prgm: asm.Module):
+        pass
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def transform(self, prgm: asm.Module) -> tuple:
+        return (self._dispatch(prgm),)
+
+    def lower(self, *outputs):
+        return outputs[0]
+
     @overload
     def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
 
@@ -141,6 +153,11 @@ class AssemblyInterpreter(AssemblyLoader):
         """
         Run the program.
         """
+        if isinstance(prgm, asm.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm):
         match prgm:
             case asm.Literal(value):
                 return value

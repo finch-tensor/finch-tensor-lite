@@ -23,7 +23,7 @@ from ..algebra import (
 )
 from ..finch_assembly import BufferFType
 from ..finch_assembly.dct import DictFType
-from ..symbolic import Context, Namespace, ScopedDict
+from ..symbolic import Context, Namespace, NoTransformStage, ScopedDict
 from ..util.logging import LOG_BACKEND_NUMBA
 from .stages import NumbaCode, NumbaLowerer
 
@@ -480,13 +480,19 @@ class NumbaKernel(asm.AssemblyKernel):
         return construct_from_numba(self.ret_type, res)
 
 
-class NumbaCompiler(asm.AssemblyLoader):
+class NumbaCompiler(NoTransformStage, asm.AssemblyLoader):
     def __init__(self, ctx: NumbaLowerer | None = None):
         if ctx is None:
             ctx = NumbaGenerator()
         self.ctx: NumbaLowerer = ctx
 
-    def __call__(self, prgm: asm.Module) -> NumbaLibrary:
+    def validate_inputs(self, prgm: asm.Module):
+        pass
+
+    def validate_outputs(self, prgm: asm.Module):
+        pass
+
+    def lower(self, prgm: asm.Module) -> NumbaLibrary:
         numba_code = self.ctx(prgm).code
         logger.debug(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
@@ -517,10 +523,19 @@ class NumbaCompiler(asm.AssemblyLoader):
 
 
 class NumbaGenerator(NumbaLowerer):
-    def __call__(self, prgm: asm.AssemblyNode):
+    def validate_inputs(self, prgm: asm.AssemblyNode):
+        pass
+
+    def transform(self, prgm: asm.AssemblyNode) -> tuple:
         ctx = NumbaContext()
         ctx(prgm)
-        return NumbaCode(ctx.emit_global())
+        return (NumbaCode(ctx.emit_global()),)
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0]
 
 
 class NumbaContext(Context):

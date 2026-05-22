@@ -7,7 +7,7 @@ from ..symbolic import Stage
 
 class NotationLowerer(Stage):
     @abstractmethod
-    def __call__(self, term: ntn.Module) -> asm.Module:
+    def transform(self, term: ntn.Module) -> tuple[asm.Module]:
         """
         Compile the given notation term into an assembly term.
         """

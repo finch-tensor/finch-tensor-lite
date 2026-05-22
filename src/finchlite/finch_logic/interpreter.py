@@ -44,11 +44,20 @@ class LogicInterpreter(LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def __call__(self, node, bindings=None):
+    def validate_inputs(self, node, bindings=None):
+        pass
+
+    def transform(self, node, bindings=None) -> tuple:
         if bindings is None:
             bindings = {}
         machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
-        return machine(node)
+        return (machine(node),)
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0]
 
 
 class LogicMachine:
@@ -210,7 +219,16 @@ class MockLogicLoader(LogicLoader):
     def __init__(self):
         pass
 
-    def __call__(
+    def validate_inputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def transform(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
@@ -223,3 +241,9 @@ class MockLogicLoader(LogicLoader):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockLogicLibrary(prgm, bindings), bindings, shape_vars
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs

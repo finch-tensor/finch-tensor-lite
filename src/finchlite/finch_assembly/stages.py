@@ -29,7 +29,7 @@ class AssemblyLibrary(ABC):
 
 class AssemblyLoader(Stage):
     @abstractmethod
-    def __call__(self, term: asm.Module) -> AssemblyLibrary:
+    def transform(self, term: asm.Module) -> tuple:
         """
         Load the given assembly program into a runnable module.
         """
@@ -37,7 +37,7 @@ class AssemblyLoader(Stage):
 
 class AssemblyTransform(Stage):
     @abstractmethod
-    def __call__(self, term: asm.Module) -> asm.Module:
+    def transform(self, term: asm.Module) -> tuple[asm.Module]:
         """
         Transform the given assembly term into another assembly term.
         """

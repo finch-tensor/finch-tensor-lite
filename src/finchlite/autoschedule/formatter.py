@@ -8,7 +8,6 @@ from .. import finch_logic as lgc
 from ..algebra import FType, TensorFType, TupleFType, ftype
 from ..codegen import NumpyBufferFType
 from ..compile import BufferizedNDArrayFType
-from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import LogicLoader, MockLogicLoader, StatsFactory, TensorStats
 from ..util.logging import LOG_LOGIC_POST_OPT
 
@@ -23,7 +22,7 @@ class LogicFormatter(LogicLoader):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
-        self.loader = loader
+        self.ctx = loader
 
     @abstractmethod
     def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
@@ -33,16 +32,26 @@ class LogicFormatter(LogicLoader):
         """
         ...
 
-    def __call__(
+    def validate_inputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def transform(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, "TensorStats"],
         stats_factory: StatsFactory,
     ) -> tuple[
-        AssemblyLibrary,
+        lgc.LogicStatement,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        dict[lgc.Alias, "TensorStats"],
+        StatsFactory,
     ]:
         bindings = bindings.copy()
         shape_types = prgm.infer_shape_type(
@@ -78,13 +87,16 @@ class LogicFormatter(LogicLoader):
 
         logger.debug(prgm)
 
-        lib, bindings, shape_vars = self.loader(
-            prgm,
-            bindings,
-            stats=stats,
-            stats_factory=stats_factory,
-        )
-        return lib, bindings, shape_vars
+        return prgm, bindings, stats, stats_factory
+
+    def validate_outputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        pass
 
 
 class DefaultLogicFormatter(LogicFormatter):

@@ -69,9 +69,16 @@ class LogicNormalizer(LogicEvaluator):
     def __init__(self, ctx: LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
-    def __call__(
+    def validate_inputs(
         self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None
-    ) -> TableValue | tuple[Tensor, ...]:
+    ):
+        pass
+
+    def transform(self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None):
         root, bindings = normalize_names(prgm, bindings or {})
         logger.debug(root)
-        return self.ctx(root, bindings)
+        return root, bindings
+
+    def validate_outputs(self, root: LogicNode, bindings: dict[Alias, Tensor]):
+        pass
+

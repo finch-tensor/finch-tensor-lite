@@ -9,10 +9,8 @@ import logging
 import time
 
 from ..algebra.tensor import TensorFType
-from ..finch_assembly import AssemblyLibrary
 from ..finch_logic import (
     Alias,
-    Field,
     LogicLoader,
     LogicStatement,
     Plan,
@@ -115,16 +113,26 @@ class GalleyLogicalOptimizer(LogicLoader):
         self.optimizer = optimizer
         self.last_optimize_plan_s: float | None = None
 
-    def __call__(
+    def validate_inputs(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def transform(
         self,
         term: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> tuple[
-        AssemblyLibrary,
+        LogicStatement,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],
+        dict[Alias, TensorStats],
+        StatsFactory,
     ]:
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
@@ -138,4 +146,13 @@ class GalleyLogicalOptimizer(LogicLoader):
             optimizer=self.optimizer,
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
-        return self.ctx(term, bindings, stats, stats_factory)
+        return term, bindings, stats, stats_factory
+
+    def validate_outputs(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass

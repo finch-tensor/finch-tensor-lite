@@ -23,7 +23,7 @@ class NumbaCode:
 
 class CLowerer(Stage):
     @abstractmethod
-    def __call__(self, prgm: asm.Module) -> CCode:
+    def transform(self, prgm: asm.Module) -> tuple[CCode]:
         """
         Lower the given assembly program to C code.
         """
@@ -31,7 +31,7 @@ class CLowerer(Stage):
 
 class NumbaLowerer(Stage):
     @abstractmethod
-    def __call__(self, prgm: asm.Module) -> NumbaCode:
+    def transform(self, prgm: asm.Module) -> tuple[NumbaCode]:
         """
         Lower the given assembly program to Numba code.
         """

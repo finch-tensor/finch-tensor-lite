@@ -78,12 +78,21 @@ class EinsumInterpreter(EinsumEvaluator):
     def __init__(self, xp=np):
         self.xp = xp
 
-    def __call__(self, node, bindings=None):
+    def validate_inputs(self, node, bindings=None):
+        pass
+
+    def transform(self, node, bindings=None) -> tuple:
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(xp=self.xp, bindings=bindings.copy())
-        return machine(node)
+        return (machine(node),)
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0]
 
 
 class PointwiseEinsumMachine:
@@ -202,7 +211,12 @@ class MockEinsumLoader(EinsumLoader):
     def __init__(self):
         pass
 
-    def __call__(
+    def validate_inputs(
+        self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
+    ):
+        pass
+
+    def transform(
         self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
     ) -> tuple[
         MockEinsumLibrary,
@@ -211,3 +225,9 @@ class MockEinsumLoader(EinsumLoader):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockEinsumLibrary(prgm, bindings), bindings, shape_vars
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs

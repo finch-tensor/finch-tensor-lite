@@ -5,7 +5,7 @@ from collections.abc import Iterable
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_notation.stages import NotationLoader
-from finchlite.symbolic import gensym
+from finchlite.symbolic import NoTransformStage, gensym
 from finchlite.symbolic.traversal import PostOrderDFS
 
 from .. import finch_logic as lgc
@@ -353,9 +353,20 @@ class NotationContext:
 
 
 class NotationGenerator(LogicNotationLowerer):
-    def __call__(
+    def validate_inputs(
         self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> ntn.Module:
+    ):
+        pass
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0] if len(outputs) == 1 else outputs
+
+    def transform(
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    ) -> tuple[ntn.Module]:
         preamble: list[ntn.NotationStatement] = []
         epilogue: list[ntn.NotationStatement] = []
         args: dict[lgc.Alias, ntn.Variable] = {}
@@ -397,18 +408,20 @@ class NotationGenerator(LogicNotationLowerer):
             match node:
                 case ntn.Return(expr):
                     ret_t = expr.result_type
-        return ntn.Module(
-            (
-                ntn.Function(
-                    ntn.Variable("main", ret_t),
-                    tuple(args.values()),
-                    ntn.Block((*preamble, body)),
-                ),
-            )
+        return (
+            ntn.Module(
+                (
+                    ntn.Function(
+                        ntn.Variable("main", ret_t),
+                        tuple(args.values()),
+                        ntn.Block((*preamble, body)),
+                    ),
+                )
+            ),
         )
 
 
-class LogicCompiler(LogicLoader):
+class LogicCompiler(NoTransformStage, LogicLoader):
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,
@@ -421,7 +434,25 @@ class LogicCompiler(LogicLoader):
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
-    def __call__(
+    def validate_inputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def validate_outputs(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],

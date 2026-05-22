@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from finchlite.algebra.tensor import Tensor, TensorFType
 
-from ..finch_assembly import AssemblyLibrary
 from ..symbolic import Stage
 from . import nodes as lgc
 from .tensor_stats import StatsFactory, TensorStats
@@ -12,27 +11,23 @@ from .tensor_stats import StatsFactory, TensorStats
 
 class LogicEvaluator(Stage):
     @abstractmethod
-    def __call__(
+    def transform(
         self, term: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
-    ) -> lgc.TableValue | tuple[Tensor, ...]:
+    ) -> tuple:
         """
         Evaluate the given logic.
         """
 
 
-class LogicLoader(ABC):
+class LogicLoader(Stage):
     @abstractmethod
-    def __call__(
+    def transform(
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-    ]:
+    ) -> tuple:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a
@@ -40,9 +35,9 @@ class LogicLoader(ABC):
         """
 
 
-class LogicTransform(ABC):
+class LogicTransform(Stage):
     @abstractmethod
-    def __call__(
+    def transform(
         self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
     ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
         """
@@ -55,20 +50,39 @@ class OptLogicLoader(LogicLoader):
         self.ctx = ctx
         self.opts = opts
 
-    def __call__(
+    def validate_inputs(
+        self,
+        term: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass
+
+    def transform(
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> tuple[
-        AssemblyLibrary,
+        lgc.LogicStatement,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        dict[lgc.Alias, TensorStats],
+        StatsFactory,
     ]:
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
-        return self.ctx(term, bindings, stats, stats_factory)
+        return term, bindings, stats, stats_factory
+
+    def validate_outputs(
+        self,
+        term: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ):
+        pass
 
 
 def compute_shape_vars(

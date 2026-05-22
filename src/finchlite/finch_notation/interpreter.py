@@ -335,6 +335,18 @@ class NotationInterpreter(NotationLoader):
             function_state=function_state,
         )
 
+    def validate_inputs(self, prgm: ntn.Module):
+        pass
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def transform(self, prgm: ntn.Module) -> tuple:
+        return (self._dispatch(prgm),)
+
+    def lower(self, *outputs):
+        return outputs[0]
+
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
 
@@ -345,6 +357,11 @@ class NotationInterpreter(NotationLoader):
         """
         Run the program.
         """
+        if isinstance(prgm, ntn.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         match prgm:
             case ntn.Literal(val) | asm.Literal(val):
                 return val

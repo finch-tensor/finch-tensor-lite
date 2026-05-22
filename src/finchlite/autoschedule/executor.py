@@ -65,12 +65,18 @@ class LogicExecutor(LogicEvaluator):
         self.cache = cache
         self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
-    def __call__(
+    def validate_inputs(
         self,
         prgm: LogicNode,
         bindings: dict[lgc.Alias, Tensor] | None = None,
     ):
+        pass
 
+    def transform(
+        self,
+        prgm: LogicNode,
+        bindings: dict[lgc.Alias, Tensor] | None = None,
+    ) -> tuple:
         if bindings is None:
             bindings = {}
         if isinstance(prgm, lgc.LogicExpression):
@@ -91,11 +97,28 @@ class LogicExecutor(LogicEvaluator):
             var: val.ftype for var, val in bindings.items()
         }
 
+        return prgm, stmt, bindings, binding_ftypes
+
+    def validate_outputs(
+        self,
+        prgm: LogicNode,
+        stmt: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, Tensor],
+        binding_ftypes: dict[lgc.Alias, TensorFType],
+    ):
+        pass
+
+    def lower(
+        self,
+        prgm: LogicNode,
+        stmt: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, Tensor],
+        binding_ftypes: dict[lgc.Alias, TensorFType],
+    ):
         key = (stmt, tuple(binding_ftypes.items()))
 
         if self.cache and key in self.cached_kernels:
             mod, binding_ftypes, binding_idxs = self.cached_kernels[key]
-
         else:
             stats_bindings = OrderedDict()
             for var, T in bindings.items():
@@ -107,7 +130,7 @@ class LogicExecutor(LogicEvaluator):
                 stmt,
                 binding_ftypes,
                 stats_bindings,
-                stats_factory=self.stats_factory,
+                self.stats_factory,
             )
 
             if self.cache:

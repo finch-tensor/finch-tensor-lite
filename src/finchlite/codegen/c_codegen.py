@@ -34,7 +34,7 @@ from ..finch_assembly import (
     BufferFType,
     DictFType,
 )
-from ..symbolic import Context, Namespace, ScopedDict
+from ..symbolic import Context, Namespace, NoTransformStage, ScopedDict
 from ..util import config, file_cache
 from ..util.logging import LOG_BACKEND_C
 from .stages import CCode, CLowerer
@@ -393,7 +393,7 @@ class CLibrary(asm.AssemblyLibrary):
         )
 
 
-class CCompiler(asm.AssemblyLoader):
+class CCompiler(NoTransformStage, asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
@@ -412,7 +412,13 @@ class CCompiler(asm.AssemblyLoader):
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
-    def __call__(self, prgm: asm.Module) -> CLibrary:
+    def validate_inputs(self, prgm: asm.Module):
+        pass
+
+    def validate_outputs(self, prgm: asm.Module):
+        pass
+
+    def lower(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
         logger.debug(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
@@ -644,10 +650,19 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 
 
 class CGenerator(CLowerer):
-    def __call__(self, prgm: asm.AssemblyNode):
+    def validate_inputs(self, prgm: asm.AssemblyNode):
+        pass
+
+    def transform(self, prgm: asm.AssemblyNode) -> tuple:
         ctx = CContext()
         ctx(prgm)
-        return CCode(ctx.emit_global())
+        return (CCode(ctx.emit_global()),)
+
+    def validate_outputs(self, *outputs):
+        pass
+
+    def lower(self, *outputs):
+        return outputs[0]
 
 
 class CContext(Context):
