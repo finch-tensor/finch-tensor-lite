@@ -16,7 +16,7 @@ from finchlite.finch_assembly import AssemblyExpression, Dict, Stack
 from .c_codegen import (
     CContext,
     CDictFType,
-    CStackFType,
+    CStructFType,
     c_eq,
     c_hash,
     c_type,
@@ -280,7 +280,7 @@ class CHashTable(Dict):
         return CHashTableFType(self._key_type, self._value_type)
 
 
-class CHashTableFType(CDictFType, CStackFType):
+class CHashTableFType(CDictFType, CStructFType):
     """
     An implementation of Hash Tables using the stc library.
     """

@@ -10,7 +10,7 @@ from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.util import qual_str
 
-from .c_codegen import CBufferFType, CContext, CStackFType, c_type
+from .c_codegen import CBufferFType, CContext, CStructFType, c_type
 from .numba_codegen import NumbaBufferFType, to_numpy_type
 
 
@@ -84,7 +84,7 @@ class NumpyBuffer(Buffer):
         return f"NumpyBuffer({arr_repr})"
 
 
-class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
+class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStructFType):
     """
     A ftype for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFType class.
