@@ -2,10 +2,22 @@ import builtins
 from collections.abc import Sequence
 from typing import Any
 
+import numpy as np
+
 from finchlite.algebra import FinchOperator
+from finchlite.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 
 from . import lazy
 from .fuse import compute
+
+
+def _np_dtype(dtype):
+    """Extract a numpy-compatible dtype from a finchlite FType."""
+    if isinstance(dtype, FDTypeNumpy):
+        return dtype.dtype
+    if isinstance(dtype, FDTypeBuiltin):
+        return dtype.type
+    return dtype
 
 
 def full(
@@ -23,19 +35,22 @@ def full(
 def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    return compute(lazy.full(shape, 0, dtype=dtype))
+    np_dtype = _np_dtype(dtype) if dtype is not None else np.float64
+    return compute(lazy.full(shape, 0, dtype=np_dtype))
 
 
 def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    return compute(lazy.full(shape, 1, dtype=dtype))
+    np_dtype = _np_dtype(dtype) if dtype is not None else np.float64
+    return compute(lazy.full(shape, 1, dtype=np_dtype))
 
 
 def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    return compute(lazy.full(shape, 0, dtype=dtype))
+    np_dtype = _np_dtype(dtype) if dtype is not None else np.float64
+    return compute(lazy.full(shape, 0, dtype=np_dtype))
 
 
 def full_like(
@@ -43,9 +58,8 @@ def full_like(
 ):
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
-    if dtype is None:
-        dtype = x.dtype
-    return compute(lazy.full(x.shape, fill_value, dtype=dtype))
+    np_dtype = _np_dtype(dtype if dtype is not None else x.dtype)
+    return compute(lazy.full(x.shape, fill_value, dtype=np_dtype))
 
 
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
@@ -73,7 +87,8 @@ def arange(
         raise ValueError(f"device argument is not supported; got {device!r}")
     if stop is None:
         start, stop = 0, start
-    return BufferizedNDArray.from_numpy(np.arange(start, stop, step, dtype=dtype))
+    np_dtype = _np_dtype(dtype) if dtype is not None else None
+    return BufferizedNDArray.from_numpy(np.arange(start, stop, step, dtype=np_dtype))
 
 
 def linspace(
@@ -92,8 +107,9 @@ def linspace(
 
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
+    np_dtype = _np_dtype(dtype) if dtype is not None else None
     return BufferizedNDArray.from_numpy(
-        np.linspace(start, stop, num, endpoint=endpoint, dtype=dtype)
+        np.linspace(start, stop, num, endpoint=endpoint, dtype=np_dtype)
     )
 
 
@@ -885,7 +901,7 @@ def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fa
 
 def reshape(x, shape: tuple, /, *, copy=None):
     if not hasattr(x, "reshape"):
-        return NotImplementedError(f"Object of type {type(x)} does not support reshape")
+        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
     return x.reshape(shape, copy=copy)
 
 
