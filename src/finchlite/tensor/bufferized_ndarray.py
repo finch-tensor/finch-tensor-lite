@@ -128,6 +128,9 @@ class BufferizedNDArray(OverrideTensor):
             index = np.ravel_multi_index(index, self._shape)
         self.val.store(index, value)
 
+    def reshape(self, shape, /, *, copy=None):
+        return BufferizedNDArray.from_numpy(self.to_numpy().reshape(shape))
+
     def __str__(self):
         return f"{self.ftype}(shape={self.shape})"
 
