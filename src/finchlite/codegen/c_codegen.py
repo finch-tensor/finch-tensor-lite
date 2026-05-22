@@ -643,7 +643,7 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 class CGenerator(CLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = CContext()
-        ctx(prgm)
+        CGeneratorContext(ctx)(prgm)
         return CCode(ctx.emit_global())
 
 
@@ -660,17 +660,11 @@ class CContext(Context):
         tab="    ",
         indent=0,
         headers=None,
-        types=None,
-        slots=None,
         fptr=None,
         **kwargs,
     ):
         if headers is None:
             headers = []
-        if types is None:
-            types = ScopedDict()
-        if slots is None:
-            slots = ScopedDict()
         super().__init__(**kwargs)
         self.tab = tab
         self.indent = indent
@@ -679,8 +673,6 @@ class CContext(Context):
         if fptr is None:
             fptr = {}
         self.fptr = fptr
-        self.types = types
-        self.slots = slots
         self.datastructures: dict[Hashable, Any] = {}
 
     def add_header(self, header):
@@ -756,17 +748,46 @@ class CContext(Context):
         blk.tab = self.tab
         blk.headers = self.headers
         blk._headerset = self._headerset
-        blk.types = self.types
-        blk.slots = self.slots
         blk.fptr = self.fptr
+        blk.datastructures = self.datastructures
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
-        blk.types = self.types.scope()
-        blk.slots = self.slots.scope()
         return blk
+
+    def emit(self):
+        return "\n".join([*self.preamble, *self.epilogue])
+
+
+class CGeneratorContext:
+    """
+    Lowers Finch Assembly into C code while keeping assembly scope state.
+
+    The held CContext owns C emission details, such as headers, indentation,
+    fresh names, emitted statements, and datastructure metadata.
+    """
+
+    def __init__(self, ctx: CContext | None = None, types=None, slots=None):
+        self.ctx = CContext() if ctx is None else ctx
+        self.types = ScopedDict() if types is None else types
+        self.slots = ScopedDict() if slots is None else slots
+
+    def __getattr__(self, name):
+        return getattr(self.ctx, name)
+
+    @property
+    def feed(self) -> str:
+        return self.ctx.feed
+
+    def block(self) -> "CGeneratorContext":
+        return CGeneratorContext(self.ctx.block(), self.types, self.slots)
+
+    def subblock(self):
+        return CGeneratorContext(
+            self.ctx.subblock(), self.types.scope(), self.slots.scope()
+        )
 
     def resolve(self, node):
         match node:
@@ -785,7 +806,7 @@ class CContext(Context):
         return stack.result_type, stack.obj
 
     def emit(self):
-        return "\n".join([*self.preamble, *self.epilogue])
+        return self.ctx.emit()
 
     def cache(self, name, val):
         if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
