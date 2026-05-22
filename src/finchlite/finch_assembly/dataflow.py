@@ -3,9 +3,14 @@ from abc import abstractmethod
 from collections.abc import Callable
 from typing import TypeVar
 
-from finchlite.symbolic import Namespace
+from finchlite.symbolic import (
+    DataFlowAnalysis,
+    Namespace,
+    PostOrderDFS,
+    PostWalk,
+    Rewrite,
+)
 
-from ..symbolic import DataFlowAnalysis, PostOrderDFS, PostWalk, Rewrite
 from .cfg_builder import (
     NumberedStatement,
     assembly_build_cfg,

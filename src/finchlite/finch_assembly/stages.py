@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..symbolic import Stage
+from finchlite.symbolic import Stage
+
 from . import nodes as asm
 
 

@@ -7,10 +7,11 @@ from textwrap import dedent
 
 import numpy as np
 
-from ..algebra import ftype, ftypes
-from ..finch_assembly import Buffer, Stack
-from ..finch_assembly.nodes import AssemblyExpression
-from ..util import qual_str
+from finchlite.algebra import ftype, ftypes
+from finchlite.finch_assembly import Buffer, Stack
+from finchlite.finch_assembly.nodes import AssemblyExpression
+from finchlite.util import qual_str
+
 from .c_codegen import (
     CBufferFType,
     CContext,

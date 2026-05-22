@@ -22,6 +22,9 @@ test = [
     "pytest-mypy==1.*",
     "pytest-regressions~=2.8.1",
 ]
+benchmark = [
+    "asv>=0.6"
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.8"]
@@ -35,7 +38,7 @@ extend-exclude = [
 line-length = 88
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022"]
+select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022", "TID"]
 ignore = ["PYI024"]
 
 [tool.ruff.lint.isort.sections]

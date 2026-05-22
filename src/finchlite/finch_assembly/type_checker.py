@@ -2,11 +2,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .. import algebra
-from ..algebra import FType, StructFType, ftype
-from ..algebra.ftypes import FDTypeBoolean, FDTypeInteger, FDTypeNumeric
-from ..algebra.ftypes import bool as finch_bool
-from ..symbolic import ScopedDict
+from finchlite import algebra
+from finchlite.algebra import FType, StructFType, ftype
+from finchlite.algebra.ftypes import FDTypeBoolean, FDTypeInteger, FDTypeNumeric
+from finchlite.algebra.ftypes import bool as finch_bool
+from finchlite.symbolic import ScopedDict
+
 from . import nodes as asm
 from .buffer import BufferFType
 from .dct import DictFType

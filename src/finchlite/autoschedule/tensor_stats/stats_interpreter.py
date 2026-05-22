@@ -7,8 +7,7 @@ from typing import overload
 import numpy as np
 
 from finchlite.algebra.tensor import TensorFType
-
-from ...finch_logic import (
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Literal,
@@ -25,7 +24,8 @@ from ...finch_logic import (
     StatsFactory,
     Table,
 )
-from ...util.logging import LOG_LOGIC_PRE_OPT
+from finchlite.util.logging import LOG_LOGIC_PRE_OPT
+
 from .numeric_stats import NumericStats
 from .tensor_stats import TensorStats
 

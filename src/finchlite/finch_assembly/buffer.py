@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..algebra import FType, FTyped, intp, query_property
+from finchlite.algebra import FType, FTyped, intp, query_property
 
 
 class Buffer(FTyped, ABC):

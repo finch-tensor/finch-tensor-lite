@@ -10,8 +10,9 @@ import numpy as np
 
 import numba
 
-from ..algebra import FType, ImmutableStructFType
-from ..finch_assembly import AssemblyExpression, Dict, Stack
+from finchlite.algebra import FType, ImmutableStructFType
+from finchlite.finch_assembly import AssemblyExpression, Dict, Stack
+
 from .c_codegen import (
     CContext,
     CDictFType,

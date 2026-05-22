@@ -2,8 +2,9 @@ from typing import Any
 
 from lark import Lark, Tree
 
-from ..algebra import ffuncs
-from ..symbolic import Namespace
+from finchlite.algebra import ffuncs
+from finchlite.symbolic import Namespace
+
 from . import nodes as ein
 
 nary_ops = {

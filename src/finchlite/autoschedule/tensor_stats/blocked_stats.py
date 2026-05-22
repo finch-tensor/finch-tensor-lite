@@ -7,10 +7,10 @@ from typing import Any
 import numpy as np
 
 import finchlite as fl
+from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 from finchlite.finch_logic.tensor_stats import StatsFactory
 
-from ...algebra import FinchOperator
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
 

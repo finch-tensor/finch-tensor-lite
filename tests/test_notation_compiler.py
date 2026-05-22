@@ -6,12 +6,12 @@ import finchlite
 import finchlite.finch_notation as ntn
 from finchlite import ffuncs, ftype
 from finchlite.compile import (
-    BufferizedNDArray,
     NotationCompiler,
     make_extent,
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
+from finchlite.tensor import BufferizedNDArray
 
 from .conftest import finch_assert_equal
 
@@ -138,7 +138,7 @@ def test_matrix_multiplication(a, b):
     # NOTATION
     ntn_mod = ntn.NotationInterpreter()(prgm)
 
-    c_buf = finchlite.compile.BufferizedNDArray.from_numpy(
+    c_buf = BufferizedNDArray.from_numpy(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
@@ -150,7 +150,7 @@ def test_matrix_multiplication(a, b):
     asm_program = NotationCompiler(Reflector())(prgm)
     asm_mod = AssemblyInterpreter()(asm_program)
 
-    c_buf = finchlite.compile.BufferizedNDArray.from_numpy(
+    c_buf = BufferizedNDArray.from_numpy(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
@@ -165,7 +165,7 @@ def test_matrix_multiplication_regression(file_regression):
     j = ntn.Variable("j", finchlite.int64)
     k = ntn.Variable("k", finchlite.int64)
 
-    a_buf = finchlite.compile.BufferizedNDArray.from_numpy(a)
+    a_buf = BufferizedNDArray.from_numpy(a)
     a_format = ftype(a_buf)
 
     A = ntn.Variable("A", a_format)

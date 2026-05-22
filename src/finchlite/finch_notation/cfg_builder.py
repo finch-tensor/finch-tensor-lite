@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite
+from finchlite.symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite
+
 from .nodes import (
     Assign,
     Block,

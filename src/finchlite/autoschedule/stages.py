@@ -1,12 +1,10 @@
 from abc import abstractmethod
 
+from finchlite import finch_einsum as ein
+from finchlite import finch_logic as lgc
+from finchlite import finch_notation as ntn
 from finchlite.algebra.tensor import TensorFType
-
-from .. import finch_einsum as ein
-from .. import finch_logic as lgc
-from .. import finch_notation as ntn
-from ..symbolic import Stage
-
+from finchlite.symbolic import Stage
 
 class LogicNotationLowerer(Stage):
     @abstractmethod

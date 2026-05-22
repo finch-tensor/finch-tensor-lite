@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import cast
 
-from ..symbolic.dataflow import BasicBlock, ControlFlowGraph
+from finchlite.symbolic.dataflow import BasicBlock, ControlFlowGraph
+
 from .nodes import (
     Assign,
     Block,

@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 
-from ..algebra import FinchOperator
+from finchlite.algebra import FinchOperator
+
 from .nodes import Field
 
 

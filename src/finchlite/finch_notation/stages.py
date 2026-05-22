@@ -1,6 +1,8 @@
 from abc import abstractmethod
 
-from ..symbolic import Stage
+from finchlite import finch_assembly as asm
+from finchlite.symbolic import Stage
+
 from . import nodes as ntn
 
 

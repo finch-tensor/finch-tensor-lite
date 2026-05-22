@@ -30,6 +30,17 @@ from .algebra import (
     uint32,
     uint64,
 )
+from .autoschedule import (
+    COMPILE_NUMBA,
+    INTERPRET_ASSEMBLY,
+    INTERPRET_LOGIC,
+    INTERPRET_NOTATION,
+    INTERPRET_NOTATION_GALLEY,
+    OPTIMIZE_LOGIC,
+    get_default_scheduler,
+    set_default_scheduler,
+    with_default_scheduler,
+)
 from .autoschedule.tensor_stats import (
     DC,
     BlockedStats,
@@ -44,14 +55,12 @@ from .codegen import (
 )
 from .compile import (
     AssemblyContext,
-    BufferizedNDArray,
     Extent,
     ExtentFType,
     dimension,
 )
-from .finch_fused import jit
+from .finch_fused.jit import jit
 from .interface import (
-    EagerTensor,
     LazyTensor,
     NumPyFType,
     NumPyWrapper,
@@ -97,7 +106,6 @@ from .interface import (
     floordiv,
     fuse,
     fused,
-    get_default_scheduler,
     greater,
     greater_equal,
     hypot,
@@ -140,7 +148,6 @@ from .interface import (
     reduce,
     remainder,
     round,
-    set_default_scheduler,
     sign,
     signbit,
     sin,
@@ -162,23 +169,35 @@ from .interface import (
     vecdot,
 )
 from .tensor import (
+    BufferizedNDArray,
+    FiberTensor,
+    FiberTensorFType,
+    OverrideTensor,
+    fiber_tensor,
+)
+from .tensor.level import (
     DenseLevel,
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
-    FiberTensor,
-    FiberTensorFType,
     SparseListLevel,
     SparseListLevelFType,
     dense,
     element,
-    fiber_tensor,
     sparse_list,
+)
+from .tensor.masks import (
     tril,
 )
 
 __all__ = [
+    "COMPILE_NUMBA",
     "DC",
+    "INTERPRET_ASSEMBLY",
+    "INTERPRET_LOGIC",
+    "INTERPRET_NOTATION",
+    "INTERPRET_NOTATION_GALLEY",
+    "OPTIMIZE_LOGIC",
     "AssemblyContext",
     "BlockedStats",
     "BufferizedNDArray",
@@ -186,7 +205,6 @@ __all__ = [
     "DenseLevel",
     "DenseLevelFType",
     "DenseStats",
-    "EagerTensor",
     "ElementLevel",
     "ElementLevelFType",
     "Extent",
@@ -201,6 +219,7 @@ __all__ = [
     "NumPyWrapper",
     "NumpyBuffer",
     "NumpyBufferFType",
+    "OverrideTensor",
     "Reflector",
     "Scalar",
     "SparseListLevel",
@@ -353,4 +372,5 @@ __all__ = [
     "uint64",
     "var",
     "vecdot",
+    "with_default_scheduler",
 ]

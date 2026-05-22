@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
-from ....algebra import (
+from finchlite.algebra import (
     cansplitpush,
     ffuncs,
     is_associative,
@@ -11,8 +11,9 @@ from ....algebra import (
     is_distributive,
     repeat_operator,
 )
-from ....algebra.algebra import FinchOperator
-from ....finch_logic import (
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.autoschedule.tensor_stats.numeric_stats import NumericStats
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -27,7 +28,7 @@ from ....finch_logic import (
     Table,
     TensorStats,
 )
-from ....symbolic import (
+from finchlite.symbolic import (
     Chain,
     PostWalk,
     PreOrderDFS,
@@ -36,7 +37,7 @@ from ....symbolic import (
     intree,
     isdescendant,
 )
-from ...tensor_stats.numeric_stats import NumericStats
+
 from .logic_to_stats import insert_statistics
 
 

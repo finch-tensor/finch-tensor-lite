@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import FType, ftype, return_type
-from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
-from ..util import qual_str
+from finchlite.algebra import FType, ftype, return_type
+from finchlite.finch_assembly import AssemblyNode
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
 
 
 @dataclass(eq=True, frozen=True)

@@ -3,13 +3,18 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from ... import finch_assembly as asm
-from ... import finch_notation as ntn
-from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
-from ...compile import AssemblyContext, LoopletContext
-from ...compile import looplets as lplt
-from ...compile.lower import SymbolicExtent
-from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
+from finchlite.compile import AssemblyContext, LoopletContext
+from finchlite.compile import looplets as lplt
+from finchlite.compile.lower import SymbolicExtent
+from finchlite.tensor.fiber_tensor import (
+    FiberTensorFields,
+    FiberTensorFType,
+    Level,
+    LevelFType,
+)
 
 
 class DenseLevelFields(NamedTuple):

@@ -4,16 +4,12 @@ from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import ffuncs
-from ..compile.lower import (
-    LoopletContext,
-    LoopletPass,
-    SymbolicExtent,
-)
-from ..finch_notation.proves import prove
-from ..symbolic import PostOrderDFS, PostWalk, Rewrite
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import ffuncs
+from finchlite.compile.lower import LoopletContext, LoopletPass, SymbolicExtent
+from finchlite.finch_notation.proves import prove
+from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite
 
 
 class Looplet(ABC):

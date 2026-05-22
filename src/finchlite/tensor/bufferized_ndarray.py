@@ -3,20 +3,29 @@ from typing import Any, cast
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import FType, ImmutableStructFType, Tensor, TupleFType, ffuncs, ftype
-from ..codegen import NumpyBuffer, NumpyBufferFType
-from ..codegen.numba_codegen import to_numpy_type
-from . import looplets as lplt
-from .lower import AssemblyContext, FinchTensorFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import (
+    FType,
+    ImmutableStructFType,
+    Tensor,
+    TupleFType,
+    ffuncs,
+    ftype,
+)
+from finchlite.codegen import NumpyBuffer, NumpyBufferFType
+from finchlite.codegen.numba_codegen import to_numpy_type
+from finchlite.compile import looplets as lplt
+from finchlite.compile.lower import AssemblyContext, FinchTensorFType
+
+from .override_tensor import OverrideTensor
 
 
 def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(np.cumprod((1,) + size[::-1]).astype(int))[-2::-1]
 
 
-class BufferizedNDArray(Tensor):
+class BufferizedNDArray(OverrideTensor):
     def __init__(
         self,
         val: NumpyBuffer,

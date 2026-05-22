@@ -2,17 +2,10 @@ import logging
 from typing import TypeVar, overload
 
 from finchlite.algebra.tensor import Tensor
+from finchlite.finch_logic import Alias, Field, LogicEvaluator, LogicNode, TableValue
 from finchlite.finch_logic.nodes import LogicExpression, LogicStatement
-
-from ..finch_logic import (
-    Alias,
-    Field,
-    LogicEvaluator,
-    LogicNode,
-    TableValue,
-)
-from ..symbolic import Namespace, PostWalk, Rewrite
-from ..util.logging import LOG_LOGIC_PRE_OPT
+from finchlite.symbolic import Namespace, PostWalk, Rewrite
+from finchlite.util.logging import LOG_LOGIC_PRE_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 

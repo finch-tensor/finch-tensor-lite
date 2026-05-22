@@ -5,8 +5,8 @@ from typing import Any, overload
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from ..algebra import (
+from finchlite import finch_assembly as asm
+from finchlite.algebra import (
     Tensor,
     TensorFType,
     fisinstance,
@@ -14,7 +14,8 @@ from ..algebra import (
     query_property,
     register_property,
 )
-from ..symbolic import ScopedDict
+from finchlite.symbolic import ScopedDict
+
 from . import nodes as ntn
 from .stages import NotationLoader
 

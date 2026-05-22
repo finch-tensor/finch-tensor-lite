@@ -1,5 +1,8 @@
+from finchlite.autoschedule import get_default_scheduler, set_default_scheduler
+from finchlite.tensor.np_wrapper import NumPyFType, NumPyWrapper
+from finchlite.tensor.scalar import Scalar, ScalarFType
+
 from .eager import (
-    EagerTensor,
     abs,
     acos,
     acosh,
@@ -99,30 +102,13 @@ from .eager import (
     vecdot,
 )
 from .fuse import (
-    COMPILE_NUMBA,
-    INTERPRET_ASSEMBLY,
-    INTERPRET_LOGIC,
-    INTERPRET_NOTATION,
-    INTERPRET_NOTATION_GALLEY,
-    OPTIMIZE_LOGIC,
     compute,
     fuse,
     fused,
-    get_default_scheduler,
-    set_default_scheduler,
 )
 from .lazy import LazyTensor, asarray, lazy
-from .np_wrapper import NumPyFType, NumPyWrapper
-from .scalar import Scalar, ScalarFType
 
 __all__ = [
-    "COMPILE_NUMBA",
-    "INTERPRET_ASSEMBLY",
-    "INTERPRET_LOGIC",
-    "INTERPRET_NOTATION",
-    "INTERPRET_NOTATION_GALLEY",
-    "OPTIMIZE_LOGIC",
-    "EagerTensor",
     "LazyTensor",
     "NumPyFType",
     "NumPyWrapper",
