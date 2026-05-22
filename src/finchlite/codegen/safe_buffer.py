@@ -1,6 +1,5 @@
 import ctypes
 
-import finchlite.finch_assembly as asm
 from finchlite.codegen.c_codegen import CBufferFType, CStackFType
 from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaStackFType
 from finchlite.finch_assembly import Buffer
@@ -138,48 +137,74 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
     def numba_type(self, *args, **kwargs):
         return self._underlying_format.numba_type(*args, **kwargs)
 
-    def numba_length(self, *args, **kwargs):
-        return self._underlying_format.numba_length(*args, **kwargs)
+    def numba_length(self, ctx, buf_t, buf):
+        assert buf_t == self
+        return self._underlying_format.numba_length(
+            ctx, self._underlying_format, buf
+        )
 
-    def numba_check(self, ctx, buf, idx):
+    def numba_check(self, ctx, buf_t, buf, idx_symbol, idx_type):
+        assert buf_t == self
         idx_n = ctx.freshen("computed")
         ctx.exec(
-            f"{ctx.feed}{idx_n} = ({ctx(idx)})\n"
-            f"{ctx.feed}if {idx_n} < 0 or {idx_n} >= ({self.numba_length(ctx, buf)}):\n"
+            f"{ctx.feed}{idx_n} = ({idx_symbol})\n"
+            f"{ctx.feed}if {idx_n} < 0 or {idx_n} >= ({self.numba_length(ctx, buf_t, buf)}):\n"
             f"{ctx.feed}    raise IndexError()"
         )
-        return asm.Variable(idx_n, int)
+        return idx_n
 
-    def numba_load(self, ctx, buf, idx):
+    def numba_load(self, ctx, buf_t, buf, idx_symbol, idx_type):
         """
         A numba_load function with preemptive index checking.
 
         self.numba_check returns the value of the computed index so things don't
         get computed twice.
         """
+        assert buf_t == self
+        checked_idx_symbol = self.numba_check(ctx, buf_t, buf, idx_symbol, idx_type)
         return self._underlying_format.numba_load(
-            ctx, buf, self.numba_check(ctx, buf, idx)
+            ctx, self._underlying_format, buf, checked_idx_symbol, idx_type
         )
 
-    def numba_store(self, ctx, buf, idx, value):
+    def numba_store(
+        self, ctx, buf_t, buf, idx_symbol, idx_type, value_symbol, value_type
+    ):
         """
         A numba_store function with preemptive index checking.
 
         self.numba_check returns the variable name of the computed index so
         things don't get computed twice.
         """
+        assert buf_t == self
+        checked_idx_symbol = self.numba_check(ctx, buf_t, buf, idx_symbol, idx_type)
         self._underlying_format.numba_store(
-            ctx, buf, self.numba_check(ctx, buf, idx), value
+            ctx,
+            self._underlying_format,
+            buf,
+            checked_idx_symbol,
+            idx_type,
+            value_symbol,
+            value_type,
         )
 
-    def numba_resize(self, *args, **kwargs):
-        return self._underlying_format.numba_resize(*args, **kwargs)
+    def numba_resize(self, ctx, buf_t, buf, new_len_symbol, new_len_type):
+        assert buf_t == self
+        return self._underlying_format.numba_resize(
+            ctx, self._underlying_format, buf, new_len_symbol, new_len_type
+        )
 
-    def numba_unpack(self, *args, **kwargs):
-        return self._underlying_format.numba_unpack(*args, **kwargs)
+    def numba_unpack(self, ctx, var_n, var_t, val_n, val_t):
+        assert var_t == self
+        assert val_t == self
+        return self._underlying_format.numba_unpack(
+            ctx, var_n, self._underlying_format, val_n, self._underlying_format
+        )
 
-    def numba_repack(self, *args, **kwargs):
-        return self._underlying_format.numba_repack(*args, **kwargs)
+    def numba_repack(self, ctx, lhs, lhs_t, obj):
+        assert lhs_t == self
+        return self._underlying_format.numba_repack(
+            ctx, lhs, self._underlying_format, obj
+        )
 
     def serialize_to_numba(self, obj: SafeBuffer, *args, **kwargs):
         return self._underlying_format.serialize_to_numba(

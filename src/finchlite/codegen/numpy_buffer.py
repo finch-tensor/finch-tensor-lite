@@ -235,35 +235,45 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
             numba.types.Array(numba.from_dtype(self._dtype), 1, "C")
         )
 
-    def numba_length(self, ctx, buf):
-        arr = buf.obj.arr
+    def numba_length(self, ctx, buf_t, buf):
+        assert buf_t == self
+        assert isinstance(buf, NumbaBufferFields)
+        arr = buf.arr
         return f"len({arr})"
 
-    def numba_load(self, ctx, buf, idx):
-        arr = buf.obj.arr
-        return f"{arr}[{ctx(idx)}]"
+    def numba_load(self, ctx, buf_t, buf, idx_symbol, idx_type):
+        assert buf_t == self
+        assert isinstance(buf, NumbaBufferFields)
+        return f"{buf.arr}[{idx_symbol}]"
 
-    def numba_store(self, ctx, buf, idx, val):
-        arr = buf.obj.arr
-        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
+    def numba_store(
+        self, ctx, buf_t, buf, idx_symbol, idx_type, value_symbol, value_type
+    ):
+        assert buf_t == self
+        assert isinstance(buf, NumbaBufferFields)
+        ctx.exec(f"{ctx.feed}{buf.arr}[{idx_symbol}] = {value_symbol}")
 
-    def numba_resize(self, ctx, buf, new_len):
-        arr = buf.obj.arr
-        ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
+    def numba_resize(self, ctx, buf_t, buf, new_len_symbol, new_len_type):
+        assert buf_t == self
+        assert isinstance(buf, NumbaBufferFields)
+        ctx.exec(f"{ctx.feed}{buf.arr} = numpy.resize({buf.arr}, {new_len_symbol})")
 
-    def numba_unpack(self, ctx, var_n, val):
+    def numba_unpack(self, ctx, var_n, var_t, val_n, val_t):
         """
         Unpack the buffer into Numba context.
         """
+        assert var_t == self
+        assert val_t == self
         arr = ctx.freshen(var_n, "arr")
-        ctx.exec(f"{ctx.feed}{arr} = {ctx(val)}[0]")
+        ctx.exec(f"{ctx.feed}{arr} = {val_n}[0]")
 
         return NumbaBufferFields(arr, var_n)
 
-    def numba_repack(self, ctx, lhs, obj):
+    def numba_repack(self, ctx, lhs, lhs_t, obj):
         """
         Repack the buffer from Numba context.
         """
+        assert lhs_t == self
         ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.arr}")
         return
 

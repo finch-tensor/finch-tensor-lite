@@ -383,21 +383,23 @@ class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
     """
 
     @abstractmethod
-    def numba_existsdict(self, ctx: "NumbaContext", map, idx):
+    def numba_existsdict(self, ctx: "NumbaContext", map_t, map, idx_symbol, idx_type):
         """
         Return numba code which checks whether a given key exists in a map.
         """
         ...
 
     @abstractmethod
-    def numba_loaddict(self, ctx, buffer, idx):
+    def numba_loaddict(self, ctx, map_t, map, idx_symbol, idx_type):
         """
         Return numba code which gets a value corresponding to a certain key.
         """
         ...
 
     @abstractmethod
-    def numba_storedict(self, ctx, buffer, idx, value):
+    def numba_storedict(
+        self, ctx, map_t, map, idx_symbol, idx_type, value_symbol, value_type
+    ):
         """
         Return C code which stores a certain value given a certain integer tuple key.
         """
@@ -406,21 +408,21 @@ class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
 
 class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
     @abstractmethod
-    def numba_length(self, ctx: "NumbaContext", buffer):
+    def numba_length(self, ctx: "NumbaContext", buf_t, buffer):
         """
         Return a Numba-compatible expression to get the length of the buffer.
         """
         ...
 
     @abstractmethod
-    def numba_resize(self, ctx: "NumbaContext", buffer, size):
+    def numba_resize(self, ctx: "NumbaContext", buf_t, buffer, size_symbol, size_type):
         """
         Return a Numba-compatible expression to resize the buffer to the given size.
         """
         ...
 
     @abstractmethod
-    def numba_load(self, ctx: "NumbaContext", buffer, idx):
+    def numba_load(self, ctx: "NumbaContext", buf_t, buffer, idx_symbol, idx_type):
         """
         Return a Numba-compatible expression to load an element from the buffer
         at the given index.
@@ -428,7 +430,16 @@ class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
         ...
 
     @abstractmethod
-    def numba_store(self, ctx: "NumbaContext", buffer, idx, value=None):
+    def numba_store(
+        self,
+        ctx: "NumbaContext",
+        buf_t,
+        buffer,
+        idx_symbol,
+        idx_type,
+        value_symbol,
+        value_type,
+    ):
         """
         Return a Numba-compatible expression to store an element in the buffer
         at the given index. If value is None, it should store the length of the
@@ -520,23 +531,16 @@ class NumbaCompiler(asm.AssemblyLoader):
 class NumbaGenerator(NumbaLowerer):
     def __call__(self, prgm: asm.AssemblyNode):
         ctx = NumbaContext()
-        ctx(prgm)
+        NumbaGeneratorContext(ctx)(prgm)
         return NumbaCode(ctx.emit_global())
 
 
 class NumbaContext(Context):
-    def __init__(self, tab="    ", indent=0, types=None, slots=None):
-        if types is None:
-            types = ScopedDict()
-        if slots is None:
-            slots = ScopedDict()
-
+    def __init__(self, tab="    ", indent=0):
         super().__init__()
 
         self.tab = tab
         self.indent = indent
-        self.types = types
-        self.slots = slots
 
         self.imports = [
             "import _operator, builtins",
@@ -563,16 +567,34 @@ class NumbaContext(Context):
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
-        blk.types = self.types
-        blk.slots = self.slots
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
-        blk.types = self.types.scope()
-        blk.slots = self.slots.scope()
         return blk
+
+
+class NumbaGeneratorContext:
+    def __init__(self, ctx: NumbaContext | None = None, types=None, slots=None):
+        self.ctx = NumbaContext() if ctx is None else ctx
+        self.types = ScopedDict() if types is None else types
+        self.slots = ScopedDict() if slots is None else slots
+
+    def __getattr__(self, name):
+        return getattr(self.ctx, name)
+
+    @property
+    def feed(self) -> str:
+        return self.ctx.feed
+
+    def block(self) -> "NumbaGeneratorContext":
+        return NumbaGeneratorContext(self.ctx.block(), self.types, self.slots)
+
+    def subblock(self):
+        return NumbaGeneratorContext(
+            self.ctx.subblock(), self.types.scope(), self.slots.scope()
+        )
 
     def cache(self, name, val):
         if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
@@ -593,6 +615,10 @@ class NumbaContext(Context):
                 return node
             case _:
                 raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+
+    def resolve_fields(self, node):
+        stack = self.resolve(node)
+        return stack.result_type, stack.obj
 
     @staticmethod
     def full_name(val: Any) -> str:
@@ -685,7 +711,7 @@ class NumbaContext(Context):
                 self.exec(f"{feed}{var_code} = {self(val)}")
                 self.types[var_n] = var_t
                 self.slots[var_n] = var_t.numba_unpack(
-                    self, var_code, asm.Variable(var_n, var_t)
+                    self.ctx, var_code, var_t, var_code, var_t
                 )
                 return None
             case asm.Repack(asm.Slot(var_n, var_t) as slot):
@@ -695,52 +721,77 @@ class NumbaContext(Context):
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
                 obj = self.slots[var_n]
                 var_code = self(slot)
-                var_t.numba_repack(self, var_code, obj)
+                var_t.numba_repack(self.ctx, var_code, var_t, obj)
                 return None
             case asm.Load(buf, idx):
-                buf = self.resolve(buf)
-                buf_t = buf.result_type
+                buf_t, buf_fields = self.resolve_fields(buf)
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
-                return buf_t.numba_load(self, buf, idx)
+                idx_symbol = self(idx)
+                return buf_t.numba_load(
+                    self.ctx, buf_t, buf_fields, idx_symbol, idx.result_type
+                )
             case asm.Store(buf, idx, val):
-                buf = self.resolve(buf)
-                buf_t = buf.result_type
+                buf_t, buf_fields = self.resolve_fields(buf)
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
-                buf_t.numba_store(self, buf, idx, val)
+                idx_symbol = self(idx)
+                val_symbol = self(val)
+                buf_t.numba_store(
+                    self.ctx,
+                    buf_t,
+                    buf_fields,
+                    idx_symbol,
+                    idx.result_type,
+                    val_symbol,
+                    buf_t.element_type,
+                )
                 return None
             case asm.Resize(buf, size):
-                buf = self.resolve(buf)
-                buf_t = buf.result_type
+                buf_t, buf_fields = self.resolve_fields(buf)
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
-                buf_t.numba_resize(self, buf, size)
+                size_symbol = self(size)
+                buf_t.numba_resize(
+                    self.ctx, buf_t, buf_fields, size_symbol, size.result_type
+                )
                 return None
             case asm.Length(buf):
-                buf = self.resolve(buf)
-                buf_t = buf.result_type
+                buf_t, buf_fields = self.resolve_fields(buf)
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
-                return buf_t.numba_length(self, buf)
+                return buf_t.numba_length(self.ctx, buf_t, buf_fields)
             case asm.LoadDict(dct, idx):
-                dct = self.resolve(dct)
-                dct_t = dct.result_type
+                dct_t, dct_fields = self.resolve_fields(dct)
                 if not isinstance(dct_t, NumbaDictFType):
                     raise TypeError(f"Expected numba dict type, got: {dct_t}")
-                return dct_t.numba_loaddict(self, dct, idx)
+                idx_symbol = self(idx)
+                return dct_t.numba_loaddict(
+                    self.ctx, dct_t, dct_fields, idx_symbol, idx.result_type
+                )
             case asm.ExistsDict(dct, idx):
-                dct = self.resolve(dct)
-                dct_t = dct.result_type
+                dct_t, dct_fields = self.resolve_fields(dct)
                 if not isinstance(dct_t, NumbaDictFType):
                     raise TypeError(f"Expected numba dict type, got: {dct_t}")
-                return dct_t.numba_existsdict(self, dct, idx)
+                idx_symbol = self(idx)
+                return dct_t.numba_existsdict(
+                    self.ctx, dct_t, dct_fields, idx_symbol, idx.result_type
+                )
             case asm.StoreDict(dct, idx, val):
-                dct = self.resolve(dct)
-                dct_t = dct.result_type
+                dct_t, dct_fields = self.resolve_fields(dct)
                 if not isinstance(dct_t, NumbaDictFType):
                     raise TypeError(f"Expected numba dict type, got: {dct_t}")
-                return dct_t.numba_storedict(self, dct, idx, val)
+                idx_symbol = self(idx)
+                val_symbol = self(val)
+                return dct_t.numba_storedict(
+                    self.ctx,
+                    dct_t,
+                    dct_fields,
+                    idx_symbol,
+                    idx.result_type,
+                    val_symbol,
+                    dct_t.value_type,
+                )
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 if bodies == ():
@@ -839,7 +890,7 @@ class NumbaStackFType(ABC):
     """
 
     @abstractmethod
-    def numba_unpack(self, ctx, lhs, rhs):
+    def numba_unpack(self, ctx, lhs_symbol, lhs_type, rhs_symbol, rhs_type):
         """
         Convert a value to a symbolic representation in Numba. Returns a NamedTuple
         of unpacked variable names, etc. The `lhs` is the variable namespace to
@@ -848,7 +899,7 @@ class NumbaStackFType(ABC):
         ...
 
     @abstractmethod
-    def numba_repack(self, ctx, lhs, rhs):
+    def numba_repack(self, ctx, lhs_symbol, lhs_type, rhs):
         """
         Update an object based on a symbolic representation. The `rhs` is the
         symbolic representation to update from, and `lhs` is a variable name referring

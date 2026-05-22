@@ -11,7 +11,7 @@ import numpy as np
 import numba
 
 from finchlite.algebra import FType, ImmutableStructFType
-from finchlite.finch_assembly import AssemblyExpression, Dict, Stack
+from finchlite.finch_assembly import Dict
 
 from .c_codegen import (
     CContext,
@@ -539,41 +539,48 @@ class NumbaHashTableFType(NumbaDictFType, NumbaStackFType):
     def numba_type(self):
         return list
 
-    def numba_existsdict(self, ctx: NumbaContext, dct: Stack, idx: AssemblyExpression):
-        assert isinstance(dct.obj, NumbaDictFields)
-        return f"{ctx(idx)} in {dct.obj.dct}"
+    def numba_existsdict(self, ctx, dct_t, dct, idx_symbol, idx_type):
+        assert dct_t == self
+        assert isinstance(dct, NumbaDictFields)
+        return f"{idx_symbol} in {dct.dct}"
 
-    def numba_loaddict(self, ctx: NumbaContext, dct: Stack, idx: AssemblyExpression):
-        assert isinstance(dct.obj, NumbaDictFields)
-        return f"{dct.obj.dct}[{ctx(idx)}]"
+    def numba_loaddict(self, ctx, dct_t, dct, idx_symbol, idx_type):
+        assert dct_t == self
+        assert isinstance(dct, NumbaDictFields)
+        return f"{dct.dct}[{idx_symbol}]"
 
     def numba_storedict(
         self,
-        ctx: NumbaContext,
-        dct: Stack,
-        idx: AssemblyExpression,
-        value: AssemblyExpression,
+        ctx,
+        dct_t,
+        dct,
+        idx_symbol,
+        idx_type,
+        value_symbol,
+        value_type,
     ):
-        assert isinstance(dct.obj, NumbaDictFields)
-        ctx.exec(f"{ctx.feed}{dct.obj.dct}[{ctx(idx)}] = {ctx(value)}")
+        assert dct_t == self
+        assert isinstance(dct, NumbaDictFields)
+        ctx.exec(f"{ctx.feed}{dct.dct}[{idx_symbol}] = {value_symbol}")
 
     def numba_unpack(
-        self, ctx: NumbaContext, var_n: str, val: AssemblyExpression
+        self, ctx: NumbaContext, var_n: str, var_t, val_n: str, val_t
     ) -> NumbaDictFields:
         """
         Unpack the dictionary into numba context.
         """
-        # the val field will always be asm.Variable(var_n, var_t)
+        assert var_t == self
+        assert val_t == self
         dct = ctx.freshen(var_n, "dct")
-        ctx.exec(f"{ctx.feed}{dct} = {ctx(val)}[0]")
+        ctx.exec(f"{ctx.feed}{dct} = {val_n}[0]")
 
         return NumbaDictFields(dct, var_n)
 
-    def numba_repack(self, ctx: NumbaContext, lhs: str, obj: NumbaDictFields):
+    def numba_repack(self, ctx: NumbaContext, lhs: str, lhs_t, obj: NumbaDictFields):
         """
         Repack the dictionary from Numba context.
         """
-        # obj is the fields corresponding to the self.slots[lhs]
+        assert lhs_t == self
         ctx.exec(f"{ctx.feed}{lhs}[0] = {obj.dct}")
 
     def serialize_to_numba(self, obj: NumbaHashTable):
