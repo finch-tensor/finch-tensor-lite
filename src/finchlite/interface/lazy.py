@@ -475,6 +475,22 @@ def asarray(
             elif obj is not None:
                 obj = np.asarray(obj).flat[0]
             return Scalar(obj)
+        try:
+            np_arr = np.asarray(obj)
+            if np_arr.dtype != object:
+                if dtype is not None:
+                    ft = ftype(dtype)
+                    np_dtype = (
+                        ft.dtype
+                        if hasattr(ft, "dtype")
+                        else ft.type
+                        if hasattr(ft, "type")
+                        else dtype
+                    )
+                    np_arr = np_arr.astype(np_dtype)
+                return BufferizedNDArray.from_numpy(np_arr)
+        except (TypeError, ValueError):
+            pass
         return obj
 
     if isinstance(obj, np.ndarray):
@@ -544,6 +560,17 @@ def full(
     if isinstance(shape, int):
         shape = (shape,)
     return broadcast_to(val, shape)
+
+
+def full_like(x, /, fill_value, *, dtype=None):
+    x = lazy(x)
+    return full(x.shape, fill_value, dtype=dtype)
+
+
+def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
+    return broadcast_to(
+        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=dtype)), (num,)
+    )
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:

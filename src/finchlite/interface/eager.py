@@ -59,7 +59,7 @@ def full_like(
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
     np_dtype = _np_dtype(dtype if dtype is not None else x.dtype)
-    return compute(lazy.full(x.shape, fill_value, dtype=np_dtype))
+    return compute(lazy.full_like(x, fill_value, dtype=np_dtype))
 
 
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
@@ -101,16 +101,10 @@ def linspace(
     device=None,
     endpoint: bool = True,
 ):
-    import numpy as np
-
-    from finchlite.tensor import BufferizedNDArray
-
     if device is not None:
         raise ValueError(f"device argument is not supported; got {device!r}")
     np_dtype = _np_dtype(dtype) if dtype is not None else None
-    return BufferizedNDArray.from_numpy(
-        np.linspace(start, stop, num, endpoint=endpoint, dtype=np_dtype)
-    )
+    return compute(lazy.linspace(start, stop, num, dtype=np_dtype, endpoint=endpoint))
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):

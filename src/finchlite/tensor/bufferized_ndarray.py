@@ -111,6 +111,10 @@ class BufferizedNDArray(OverrideTensor):
         Get an item from the bufferized NDArray.
         This allows for indexing into the bufferized array.
         """
+        if isinstance(index, (slice, np.ndarray)) or (
+            isinstance(index, tuple) and any(isinstance(i, slice) for i in index)
+        ):
+            return BufferizedNDArray.from_numpy(self.to_numpy()[index])
         if isinstance(index, tuple):
             index = 0 if index == () else np.dot(index, self.strides)
         return self.val.load(index)
