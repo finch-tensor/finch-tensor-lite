@@ -203,64 +203,6 @@ def construct_from_c(fmt: FType, c_obj):
         return fmt(c_obj)
 
 
-for t in (
-    ctypes.c_bool,
-    ctypes.c_char,
-    ctypes.c_wchar,
-    ctypes.c_byte,
-    ctypes.c_ubyte,
-    ctypes.c_short,
-    ctypes.c_ushort,
-    ctypes.c_int,
-    ctypes.c_int8,
-    ctypes.c_int16,
-    ctypes.c_int32,
-    ctypes.c_int64,
-    ctypes.c_uint,
-    ctypes.c_uint8,
-    ctypes.c_uint16,
-    ctypes.c_uint32,
-    ctypes.c_uint64,
-    ctypes.c_long,
-    ctypes.c_ulong,
-    ctypes.c_longlong,
-    ctypes.c_ulonglong,
-    ctypes.c_size_t,
-    ctypes.c_ssize_t,
-    ctypes.c_float,
-    ctypes.c_double,
-    ctypes.c_wchar_p,
-):
-    register_property(
-        t,
-        "serialize_to_c",
-        "__attr__",
-        lambda fmt, c_obj: fmt(c_obj.value),
-    )
-    register_property(
-        t,
-        "c_hash",
-        "__attr__",
-        c_hash_default,
-    )
-    register_property(
-        t,
-        "c_eq",
-        "__attr__",
-        c_eq_default,
-    )
-    # ctypes here should be considered pass by value, so no op this.
-    register_property(
-        t,
-        "deserialize_from_c",
-        "__attr__",
-        lambda fmt, obj, c_value: None,
-    )
-    # construction from c is just the identity.
-    register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
-    register_property(t, "numba_type", "__attr__", lambda t: t)
-
-
 register_property(
     algebra.ftypes.FDTypeNumpy,
     "serialize_to_c",
@@ -486,37 +428,22 @@ def c_literal(ctx, val):
 register_property(algebra.int_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
 register_property(algebra.float_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
 register_property(algebra.str_, "c_literal", "__attr__", lambda fmt, x, ctx: f'"{x}"')
+
+
+def numpy_c_literal(fmt, x, ctx):
+    if isinstance(x, np.bool_):
+        value = "true" if x else "false"
+    else:
+        value = str(x.item())
+    return f"({ctx.ctype_name(c_type(fmt))}){value}"
+
+
 register_property(
     algebra.ftypes.FDTypeNumpy,
     "c_literal",
     "__attr__",
-    lambda fmt, x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
+    numpy_c_literal,
 )
-for t in (
-    ctypes.c_bool,
-    ctypes.c_uint8,
-    ctypes.c_uint16,
-    ctypes.c_uint32,
-    ctypes.c_uint64,
-    ctypes.c_int8,
-    ctypes.c_int16,
-    ctypes.c_int32,
-    ctypes.c_int64,
-):
-    register_property(
-        t,
-        "c_literal",
-        "__attr__",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
-    )
-
-for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore[assignment]
-    register_property(
-        t,
-        "c_literal",
-        "__attr__",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
-    )
 
 
 def c_type(t: FType):
@@ -548,7 +475,6 @@ register_property(
     "__attr__",
     lambda x: np.ctypeslib.as_ctypes_type(x.dtype),
 )
-register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 
 # ints and floats should be serialized and constructed trivially.
 register_property(
@@ -594,17 +520,6 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_uint16: ("uint16_t", ["stdint.h"]),
     ctypes.c_uint32: ("uint32_t", ["stdint.h"]),
     ctypes.c_uint64: ("uint64_t", ["stdint.h"]),
-    # use standard types instead of aliases
-    # ctypes.c_short: ("short", []),
-    # ctypes.c_ushort: ("unsigned short", []),
-    # ctypes.c_int: ("int", []),
-    # ctypes.c_uint: ("unsigned int", []),
-    # ctypes.c_long: ("long", []),
-    # ctypes.c_ulong: ("unsigned long", []),
-    # ctypes.c_longlong: ("long long", []),
-    # ctypes.c_ulonglong: ("unsigned long long", []),
-    # ctypes.c_size_t: ("size_t", ["stddef.h"]),
-    # ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
     ctypes.c_float: ("float", []),
     ctypes.c_double: ("double", []),
     ctypes.c_char_p: ("char*", []),
