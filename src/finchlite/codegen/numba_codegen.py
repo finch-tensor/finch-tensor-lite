@@ -35,6 +35,28 @@ numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
 
+class NumbaArgumentFType(ABC):
+    @abstractmethod
+    def serialize_to_numba(self, obj):
+        """
+        Return a Numba-compatible object to be used in place of this argument
+        for the Numba backend.
+        """
+        ...
+
+    @abstractmethod
+    def deserialize_from_numba(self, obj, numba_buffer):
+        """
+        Return an object from Numba returned value.
+        """
+        ...
+
+    @abstractmethod
+    def construct_from_numba(self, numba_buffer):
+        """
+        Construct and return an object from Numba returned value.
+        """
+        ...
 
 def to_numpy_type(t: Any) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
@@ -211,28 +233,6 @@ register_property(
 )
 
 
-class NumbaArgumentFType(ABC):
-    @abstractmethod
-    def serialize_to_numba(self, obj):
-        """
-        Return a Numba-compatible object to be used in place of this argument
-        for the Numba backend.
-        """
-        ...
-
-    @abstractmethod
-    def deserialize_from_numba(self, obj, numba_buffer):
-        """
-        Return an object from Numba returned value.
-        """
-        ...
-
-    @abstractmethod
-    def construct_from_numba(self, numba_buffer):
-        """
-        Construct and return an object from Numba returned value.
-        """
-        ...
 
 
 def serialize_to_numba(fmt, obj):
@@ -364,6 +364,76 @@ register_property(
     "__attr__",
     lambda fmt, numba_obj: fmt(numba_obj),
 )
+
+
+def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
+    args = [
+        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
+    ]
+    return numba_type(fmt)(*args)
+
+
+register_property(
+    StructFType,
+    "serialize_to_numba",
+    "__attr__",
+    _serialize_asm_struct_to_numba,
+)
+
+
+def _deserialize_asm_struct_from_numba(
+    fmt: StructFType, obj, numba_struct: Any
+) -> None:
+    if fmt.is_mutable:
+        for name in fmt.struct_fieldnames:
+            setattr(obj, name, getattr(numba_struct, name))
+        return
+
+
+register_property(
+    StructFType,
+    "deserialize_from_numba",
+    "__attr__",
+    _deserialize_asm_struct_from_numba,
+)
+
+register_property(
+    TupleFType,
+    "deserialize_from_numba",
+    "__attr__",
+    _deserialize_asm_struct_from_numba,
+)
+
+def struct_construct_from_numba(fmt: StructFType, numba_struct):
+    args = [
+        construct_from_numba(field_type, getattr(numba_struct, name))
+        for (name, field_type) in fmt.struct_fields
+    ]
+    return fmt.from_fields(*args)
+
+
+register_property(
+    StructFType,
+    "construct_from_numba",
+    "__attr__",
+    struct_construct_from_numba,
+)
+
+# trivial ser/deser
+for t in (algebra.int_, algebra.bool_, algebra.float_):
+    register_property(
+        t,
+        "construct_from_numba",
+        "__attr__",
+        lambda fmt, obj: obj,
+    )
+
+    register_property(
+        t,
+        "serialize_to_numba",
+        "__attr__",
+        lambda fmt, obj: obj,
+    )
 
 
 class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
@@ -847,45 +917,6 @@ class NumbaStackFType(ABC):
         ...
 
 
-def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
-    args = [
-        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
-    ]
-    return numba_type(fmt)(*args)
-
-
-register_property(
-    StructFType,
-    "serialize_to_numba",
-    "__attr__",
-    _serialize_asm_struct_to_numba,
-)
-
-
-def _deserialize_asm_struct_from_numba(
-    fmt: StructFType, obj, numba_struct: Any
-) -> None:
-    if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(numba_struct, name))
-        return
-
-
-register_property(
-    StructFType,
-    "deserialize_from_numba",
-    "__attr__",
-    _deserialize_asm_struct_from_numba,
-)
-
-register_property(
-    TupleFType,
-    "deserialize_from_numba",
-    "__attr__",
-    _deserialize_asm_struct_from_numba,
-)
-
-
 def struct_numba_getattr(fmt: StructFType, ctx, obj, attr):
     return f"{obj}.{attr}"
 
@@ -930,35 +961,3 @@ register_property(
     struct_numba_setattr,
 )
 
-
-def struct_construct_from_numba(fmt: StructFType, numba_struct):
-    args = [
-        construct_from_numba(field_type, getattr(numba_struct, name))
-        for (name, field_type) in fmt.struct_fields
-    ]
-    return fmt.from_fields(*args)
-
-
-register_property(
-    StructFType,
-    "construct_from_numba",
-    "__attr__",
-    struct_construct_from_numba,
-)
-
-
-# trivial ser/deser
-for t in (algebra.int_, algebra.bool_, algebra.float_):
-    register_property(
-        t,
-        "construct_from_numba",
-        "__attr__",
-        lambda fmt, obj: obj,
-    )
-
-    register_property(
-        t,
-        "serialize_to_numba",
-        "__attr__",
-        lambda fmt, obj: obj,
-    )
