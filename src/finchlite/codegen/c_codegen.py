@@ -109,7 +109,7 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-def c_hash(fmt, ctx: "CContext"):
+def c_hash(fmt: FType, ctx: "CContext"):
     """
     Expand to the name of a macro that c hash can use for hashing fmt.
 
@@ -118,18 +118,17 @@ def c_hash(fmt, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "c_hash"):
         return fmt.c_hash(ctx)
     return query_property(fmt, "c_hash", "__attr__", ctx)
 
 
-def c_hash_default(fmt, ctx: "CContext"):
+def c_hash_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_hash"
 
 
-def c_eq(fmt, ctx: "CContext"):
+def c_eq(fmt: FType, ctx: "CContext"):
     """
     Expand to the name of a macro that c eq can use for checking equivalence of fmt.
 
@@ -138,37 +137,17 @@ def c_eq(fmt, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "c_eq"):
         return fmt.c_eq(ctx)
     return query_property(fmt, "c_eq", "__attr__", ctx)
 
 
-def c_eq_default(fmt, ctx: "CContext"):
+def c_eq_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_eq"
 
 
-def _normalize_fmt(fmt):
-    # Keep ctypes types untouched; use Finch ftypes for builtins/NumPy inputs.
-    if isinstance(fmt, type):
-        if issubclass(fmt, ctypes._SimpleCData):
-            return fmt
-        if issubclass(fmt, ctypes._Pointer):
-            return fmt
-        if issubclass(fmt, ctypes._CFuncPtr):
-            return fmt
-        if issubclass(fmt, ctypes.Structure):
-            return fmt
-        if issubclass(fmt, ctypes.Union):
-            return fmt
-    try:
-        return ftype(fmt)
-    except NotImplementedError:
-        return fmt
-
-
-def serialize_to_c(fmt, obj):
+def serialize_to_c(fmt: FType, obj):
     """
     Serialize an object to a C-compatible ftype.
 
@@ -179,13 +158,12 @@ def serialize_to_c(fmt, obj):
     Returns:
         A ctypes-compatible struct.
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "serialize_to_c"):
         return fmt.serialize_to_c(obj)
     return query_property(fmt, "serialize_to_c", "__attr__", obj)
 
 
-def deserialize_from_c(fmt, obj, c_obj):
+def deserialize_from_c(fmt: FType, obj, c_obj):
     """
     Deserialize a C-compatible object back to the original ftype.
 
@@ -197,7 +175,6 @@ def deserialize_from_c(fmt, obj, c_obj):
     Returns:
         None
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "deserialize_from_c"):
         fmt.deserialize_from_c(obj, c_obj)
     else:
@@ -207,7 +184,7 @@ def deserialize_from_c(fmt, obj, c_obj):
             return
 
 
-def construct_from_c(fmt, c_obj):
+def construct_from_c(fmt: FType, c_obj):
     """
     Construct an object from a C-compatible ftype.
 
@@ -218,7 +195,6 @@ def construct_from_c(fmt, c_obj):
     Returns:
         An instance of the original object type.
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "construct_from_c"):
         return fmt.construct_from_c(c_obj)
     try:
@@ -289,7 +265,7 @@ register_property(
     algebra.ftypes.FDTypeNumpy,
     "serialize_to_c",
     "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
+    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype)),
 )
 
 register_property(
@@ -543,18 +519,17 @@ for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore
     )
 
 
-def c_type(t):
+def c_type(t: FType):
     """
-    Returns the C type corresponding to the given Python type.
+    Returns the C type corresponding to the given Finch type.
 
     Args:
         ctx: The context in which the value is used.
-        t: The Python type.
+        t: The Finch type.
 
     Returns:
         The corresponding C type as a ctypes type.
     """
-    t = _normalize_fmt(t)
     if t is algebra.none_:
         return None
     if hasattr(t, "c_type"):
