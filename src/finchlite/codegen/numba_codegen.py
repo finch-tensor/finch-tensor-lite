@@ -10,6 +10,7 @@ import numba
 from finchlite import algebra
 from finchlite import finch_assembly as asm
 from finchlite.algebra import (
+    FType,
     ImmutableStructFType,
     MutableStructFType,
     NumbaOperator,
@@ -65,9 +66,8 @@ class NumbaArgumentFType(ABC):
         ...
 
 
-def to_numpy_type(t: Any) -> np.dtype:
+def to_numpy_type(t: FType) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
-    assert isinstance(t, algebra.ftypes.FType)
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
         return np.dtype(t.dtype)
     if isinstance(t, algebra.ftypes.FDTypeBuiltin):
@@ -75,7 +75,7 @@ def to_numpy_type(t: Any) -> np.dtype:
     raise NotImplementedError(f"No NumPy dtype mapping for {t}")
 
 
-def numba_type(t):
+def numba_type(t: FType):
     """
     Returns the Numba type/ftype after serialization.
 
@@ -85,7 +85,6 @@ def numba_type(t):
     Returns:
         The corresponding Numba type.
     """
-    assert isinstance(t, algebra.ftypes.FType)
     match t:
         case NumbaArgumentFType():
             return t.numba_type()
@@ -101,7 +100,7 @@ def numba_type(t):
             return t
 
 
-def numba_jitclass_type(t):
+def numba_jitclass_type(t: FType):
     """
     Returns the Numba jitclass spec type/ftype after serialization.
 
@@ -111,7 +110,6 @@ def numba_jitclass_type(t):
     Returns:
         The corresponding Numba jitclass spec type.
     """
-    assert isinstance(t, algebra.ftypes.FType)
     match t:
         case _ if hasattr(t, "numba_jitclass_type"):
             return t.numba_jitclass_type()
@@ -137,7 +135,7 @@ def immutable_struct_jitclass_type(fmt: ImmutableStructFType):
     )
 
 
-def assembly_struct_numba_type(ftype_: Any) -> type:
+def assembly_struct_numba_type(ftype_: StructFType) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
@@ -175,11 +173,11 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     return new_struct
 
 
-def assembly_struct_numba_jitclass_type(ftype_) -> numba.types.Type:
+def assembly_struct_numba_jitclass_type(ftype_: StructFType) -> numba.types.Type:
     return numba_type(ftype_).class_type.instance_type
 
 
-def serialize_to_numba(fmt, obj):
+def serialize_to_numba(fmt: FType, obj):
     """
     Serialize an object to a Numba-compatible ftype.
 
@@ -190,7 +188,6 @@ def serialize_to_numba(fmt, obj):
     Returns:
         A Numba-compatible object.
     """
-    assert isinstance(fmt, algebra.ftypes.FType)
     match fmt:
         case NumbaArgumentFType():
             return fmt.serialize_to_numba(obj)
@@ -215,7 +212,7 @@ def serialize_immutable_to_numba(fmt: ImmutableStructFType, obj):
     )
 
 
-def immutable_construct_from_numba(fmt: StructFType, numba_tuple):
+def immutable_construct_from_numba(fmt: ImmutableStructFType, numba_tuple):
     return fmt.from_fields(
         *[
             construct_from_numba(field_type, field_value)
@@ -226,7 +223,7 @@ def immutable_construct_from_numba(fmt: StructFType, numba_tuple):
     )
 
 
-def deserialize_from_numba(fmt, obj, numba_obj):
+def deserialize_from_numba(fmt: FType, obj, numba_obj):
     """
     Deserialize a Numba-compatible object back to the original ftype.
 
@@ -238,7 +235,6 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     Returns:
         None
     """
-    assert isinstance(fmt, algebra.ftypes.FType)
     match fmt:
         case NumbaArgumentFType():
             fmt.deserialize_from_numba(obj, numba_obj)
@@ -250,7 +246,7 @@ def deserialize_from_numba(fmt, obj, numba_obj):
             return
 
 
-def construct_from_numba(fmt, numba_obj):
+def construct_from_numba(fmt: FType, numba_obj):
     """
     Construct an object from a Numba-compatible ftype.
 
@@ -261,7 +257,6 @@ def construct_from_numba(fmt, numba_obj):
     Returns:
         An instance of the original object type.
     """
-    assert isinstance(fmt, algebra.ftypes.FType)
     match fmt:
         case NumbaArgumentFType():
             return fmt.construct_from_numba(numba_obj)

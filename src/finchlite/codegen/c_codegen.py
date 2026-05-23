@@ -276,7 +276,7 @@ def c_literal(ctx, val):
             raise NotImplementedError(f"No C literal mapping for {fmt}")
 
 
-def numpy_c_literal(fmt, x, ctx):
+def numpy_c_literal(fmt: FType, x, ctx):
     value = ("true" if x else "false") if isinstance(x, np.bool_) else str(x.item())
     return f"({ctx.ctype_name(c_type(fmt))}){value}"
 
@@ -788,7 +788,7 @@ class CStackFType(ABC):
         ...
 
 
-def c_getattr(fmt, ctx, obj, attr):
+def c_getattr(fmt: FType, ctx, obj, attr):
     match fmt:
         case _ if hasattr(fmt, "c_getattr"):
             return fmt.c_getattr(ctx, obj, attr)
@@ -800,7 +800,7 @@ def c_getattr(fmt, ctx, obj, attr):
             raise NotImplementedError(f"No C getattr mapping for {fmt}")
 
 
-def c_setattr(fmt, ctx, obj, attr, val):
+def c_setattr(fmt: FType, ctx, obj, attr, val):
     match fmt:
         case _ if hasattr(fmt, "c_setattr"):
             return fmt.c_setattr(ctx, obj, attr, val)
@@ -882,7 +882,7 @@ def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
     return struct_c_type(fmt)(*args)
 
 
-def serialize_tuple_to_c(fmt, obj):
+def serialize_tuple_to_c(fmt: TupleFType, obj):
     x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
     return serialize_to_c(ftype(x), x)
 
@@ -1029,8 +1029,6 @@ class CHashableProperties(TypedDict):
 
 
 def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable) and isinstance(fmt, ImmutableStructFType)
     if fmt in ctx.datastructures:
         properties: CHashableProperties = ctx.datastructures[fmt]
         if properties.get("hash") is not None:
@@ -1078,8 +1076,6 @@ def c_eq_default(fmt: FType, ctx: "CContext"):
 
 
 def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable) and isinstance(fmt, ImmutableStructFType)
     if fmt in ctx.datastructures:
         properties: CHashableProperties = ctx.datastructures[fmt]
         if properties.get("eq") is not None:
