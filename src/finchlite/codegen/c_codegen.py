@@ -245,8 +245,6 @@ def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
         raise TypeError(f"{op} has no C representation.")
     return op.c_function_call(ctx, *args)
 
-
-
 def c_literal(ctx, val):
     """
     Returns the C literal corresponding to the given Python value.
