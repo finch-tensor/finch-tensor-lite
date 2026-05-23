@@ -91,7 +91,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     """
 
     def __init__(self, element_type: FType):
-        self._element_type = element_type
+        self._element_type = ftype(to_numpy_type(element_type).type)
 
     @property
     def _dtype(self):
