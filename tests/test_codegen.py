@@ -884,6 +884,7 @@ def test_np_c_serialization(value, np_type, c_type):
     assert constructed == np_type(value)
     assert deserialize_from_c(fmt, constructed, serialized) is None
 
+
 @pytest.mark.parametrize(
     "value,fmt,c_type",
     [

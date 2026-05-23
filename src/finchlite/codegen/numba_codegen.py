@@ -33,6 +33,7 @@ numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
 
+
 class NumbaArgumentFType(ABC):
     @abstractmethod
     def numba_type(self):
@@ -62,6 +63,7 @@ class NumbaArgumentFType(ABC):
         Construct and return an object from Numba returned value.
         """
         ...
+
 
 def to_numpy_type(t: Any) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
@@ -177,8 +179,6 @@ def assembly_struct_numba_jitclass_type(ftype_) -> numba.types.Type:
     return numba_type(ftype_).class_type.instance_type
 
 
-
-
 def serialize_to_numba(fmt, obj):
     """
     Serialize an object to a Numba-compatible ftype.
@@ -196,7 +196,9 @@ def serialize_to_numba(fmt, obj):
             return fmt.serialize_to_numba(obj)
         case algebra.none_:
             return None
-        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.bool_ | algebra.float_:
+        case (
+            algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.bool_ | algebra.float_
+        ):
             return obj
         case TupleFType() | ImmutableStructFType():
             return serialize_immutable_to_numba(fmt, obj)

@@ -107,8 +107,6 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-
-
 class CKernel(asm.AssemblyKernel):
     """
     A class to represent a C kernel.
@@ -245,6 +243,7 @@ def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
         raise TypeError(f"{op} has no C representation.")
     return op.c_function_call(ctx, *args)
 
+
 def c_literal(ctx, val):
     """
     Returns the C literal corresponding to the given Python value.
@@ -278,10 +277,7 @@ def c_literal(ctx, val):
 
 
 def numpy_c_literal(fmt, x, ctx):
-    if isinstance(x, np.bool_):
-        value = "true" if x else "false"
-    else:
-        value = str(x.item())
+    value = ("true" if x else "false") if isinstance(x, np.bool_) else str(x.item())
     return f"({ctx.ctype_name(c_type(fmt))}){value}"
 
 
@@ -320,8 +316,10 @@ def c_type(t: FType):
         case _:
             raise NotImplementedError(f"No C type mapping for {t}")
 
+
 c_structs: dict[Any, Any] = {}
 c_structnames = Namespace()
+
 
 def struct_c_type(fmt: StructFType):
     res = c_structs.get(fmt)
@@ -765,8 +763,6 @@ class CContext(Context):
                 )
 
 
-
-
 class CStackFType(ABC):
     """
     Abstract base class for symbolic formats in C. Stack formats must also
@@ -803,6 +799,7 @@ def c_getattr(fmt, ctx, obj, attr):
         case _:
             raise NotImplementedError(f"No C getattr mapping for {fmt}")
 
+
 def c_setattr(fmt, ctx, obj, attr, val):
     match fmt:
         case _ if hasattr(fmt, "c_setattr"):
@@ -816,8 +813,10 @@ def c_setattr(fmt, ctx, obj, attr, val):
 def struct_mutable_setattr(fmt: StructFType, ctx, obj, attr, val):
     ctx.exec(f"{ctx.feed}{obj}->{attr} = {val};")
 
+
 # the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
 # but we will not include that because it's bad.
+
 
 class CArgumentFType(ABC):
     @abstractmethod
@@ -888,7 +887,6 @@ def serialize_tuple_to_c(fmt, obj):
     return serialize_to_c(ftype(x), x)
 
 
-
 def deserialize_from_c(fmt: FType, obj, c_obj):
     """
     Deserialize a C-compatible object back to the original ftype.
@@ -951,7 +949,6 @@ def construct_from_c(fmt: FType, c_obj):
             return fmt(c_obj)
 
 
-
 def struct_construct_from_c(fmt: StructFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return fmt.__class__(*args)
@@ -960,6 +957,7 @@ def struct_construct_from_c(fmt: StructFType, c_struct):
 def tuple_construct_from_c(fmt: TupleFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return tuple(args)
+
 
 class CHashableFType(FType):
     @abstractmethod
@@ -1077,6 +1075,7 @@ def c_eq(fmt: FType, ctx: "CContext"):
 def c_eq_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_eq"
+
 
 def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     # this should be true in whatever structs we have.
