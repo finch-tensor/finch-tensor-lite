@@ -17,7 +17,6 @@ from finchlite.algebra import (
     TupleFType,
     ffuncs,
     fisinstance,
-    ftype,
     query_property,
     register_property,
 )
@@ -37,23 +36,14 @@ numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
 
 
-def _normalize_fmt(fmt):
-    try:
-        return ftype(fmt)
-    except NotImplementedError:
-        return fmt
-
-
 def to_numpy_type(t: Any) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
-    if isinstance(t, np.dtype):
-        return t
-    t = _normalize_fmt(t)
+    assert isinstance(t, algebra.ftypes.FType)
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
         return np.dtype(t.dtype)
     if isinstance(t, algebra.ftypes.FDTypeBuiltin):
         return np.dtype(t.type)
-    return np.dtype(t)
+    raise NotImplementedError(f"No NumPy dtype mapping for {t}")
 
 
 def numba_type(t):
@@ -66,7 +56,7 @@ def numba_type(t):
     Returns:
         The corresponding Numba type.
     """
-    t = _normalize_fmt(t)
+    assert isinstance(t, algebra.ftypes.FType)
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
         return numba.from_dtype(t.dtype)
     if isinstance(t, algebra.ftypes.FDTypeBuiltin):
@@ -89,7 +79,7 @@ def numba_jitclass_type(t):
     Returns:
         The corresponding Numba jitclass spec type.
     """
-    t = _normalize_fmt(t)
+    assert isinstance(t, algebra.ftypes.FType)
     if hasattr(t, "numba_jitclass_type"):
         return t.numba_jitclass_type()
     return query_property(t, "numba_jitclass_type", "__attr__")
@@ -256,8 +246,8 @@ def serialize_to_numba(fmt, obj):
     Returns:
         A Numba-compatible object.
     """
-    fmt = _normalize_fmt(fmt)
-    if fmt is type(None):
+    assert isinstance(fmt, algebra.ftypes.FType)
+    if fmt is algebra.none_:
         return None
     if hasattr(fmt, "serialize_to_numba"):
         return fmt.serialize_to_numba(obj)
@@ -326,8 +316,8 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     Returns:
         None
     """
-    fmt = _normalize_fmt(fmt)
-    if fmt is type(None):
+    assert isinstance(fmt, algebra.ftypes.FType)
+    if fmt is algebra.none_:
         return
     if hasattr(fmt, "deserialize_from_numba"):
         fmt.deserialize_from_numba(obj, numba_obj)
@@ -357,8 +347,8 @@ def construct_from_numba(fmt, numba_obj):
     Returns:
         An instance of the original object type.
     """
-    fmt = _normalize_fmt(fmt)
-    if fmt is type(None):
+    assert isinstance(fmt, algebra.ftypes.FType)
+    if fmt is algebra.none_:
         return None
     if hasattr(fmt, "construct_from_numba"):
         return fmt.construct_from_numba(numba_obj)
