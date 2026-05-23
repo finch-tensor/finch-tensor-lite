@@ -22,6 +22,7 @@ from finchlite.autoschedule.tensor_stats import (
     UniformStats,
     UniformStatsFactory,
 )
+from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Field,
@@ -29,6 +30,394 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+
+# ─────────────────────────────── ExactStats tests ────────────────────────────────
+
+
+def test_exact_elementwise_mul():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    B = np.array([[1.0, 1.0], [0.0, 0.0]])
+    node = MapJoin(
+        Literal(ffuncs.mul),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(B)), (i, j))),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(A * B))
+    )
+
+
+def test_exact_elementwise_add():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    B = np.array([[1.0, 1.0], [0.0, 0.0]])
+    node = MapJoin(
+        Literal(ffuncs.add),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(B)), (i, j))),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(A + B))
+    )
+
+
+def test_exact_broadcast_mul():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    b = np.array([1.0, 0.0])
+    node = MapJoin(
+        Literal(ffuncs.mul),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(b)), (j,))),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(A * b))
+    )
+
+
+def test_exact_broadcast_add():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    b = np.array([1.0, 0.0])
+    node = MapJoin(
+        Literal(ffuncs.add),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(b)), (j,))),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(A + b))
+    )
+
+
+def test_exact_join_mul():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    B = np.array([[1.0, 0.0], [0.0, 1.0]])
+    node = MapJoin(
+        Literal(ffuncs.mul),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(B)), (j, k))),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(A[:, :, None] * B[None, :, :]))
+    )
+
+
+def test_exact_join_add():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    B = np.array([[1.0, 0.0], [0.0, 1.0]])
+    node = MapJoin(
+        Literal(ffuncs.add),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(B)), (j, k))),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(A[:, :, None] + B[None, :, :]))
+    )
+
+
+def test_exact_semiring():
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A = np.eye(3)
+    B = np.eye(3)
+    C = np.eye(3)
+    D = np.eye(3)
+    A_, B_, C_, D_ = fl.asarray(A), fl.asarray(B), fl.asarray(C), fl.asarray(D)
+
+    ab = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul),
+            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul),
+            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.mul), (ab, cd))
+
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    expected = float(np.count_nonzero((A @ B) * (C @ D)))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected)
+
+
+def test_exact_semiring_tropical():
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A = np.eye(2)
+    B = np.eye(2)
+    C = np.eye(2)
+    D = np.eye(2)
+    A_, B_, C_, D_ = fl.asarray(A), fl.asarray(B), fl.asarray(C), fl.asarray(D)
+
+    ab = Aggregate(
+        Literal(ffuncs.min),
+        Literal(float("inf")),
+        MapJoin(
+            Literal(ffuncs.add),
+            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.min),
+        Literal(float("inf")),
+        MapJoin(
+            Literal(ffuncs.add),
+            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.add), (ab, cd))
+
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    AB = np.min(A[:, :, None] + B[None, :, :], axis=1)
+    CD = np.min(C[:, :, None] + D[None, :, :], axis=1)
+    expected = float(np.count_nonzero(AB + CD))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected)
+
+
+def test_exact_semiring_maxplus():
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A = np.eye(2)
+    B = np.eye(2)
+    C = np.eye(2)
+    D = np.eye(2)
+    A_, B_, C_, D_ = fl.asarray(A), fl.asarray(B), fl.asarray(C), fl.asarray(D)
+
+    ab = Aggregate(
+        Literal(ffuncs.max),
+        Literal(float("-inf")),
+        MapJoin(
+            Literal(ffuncs.add),
+            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.max),
+        Literal(float("-inf")),
+        MapJoin(
+            Literal(ffuncs.add),
+            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.add), (ab, cd))
+
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    AB = np.max(A[:, :, None] + B[None, :, :], axis=1)
+    CD = np.max(C[:, :, None] + D[None, :, :], axis=1)
+    expected = float(np.count_nonzero(AB + CD))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected)
+
+
+def test_exact_semiring_boolean():
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A = np.eye(2, dtype=bool)
+    B = np.eye(2, dtype=bool)
+    C = np.eye(2, dtype=bool)
+    D = np.eye(2, dtype=bool)
+    A_, B_, C_, D_ = fl.asarray(A), fl.asarray(B), fl.asarray(C), fl.asarray(D)
+
+    ab = Aggregate(
+        Literal(ffuncs.or_),
+        Literal(False),
+        MapJoin(
+            Literal(ffuncs.and_),
+            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.or_),
+        Literal(False),
+        MapJoin(
+            Literal(ffuncs.and_),
+            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.and_), (ab, cd))
+
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    AB = np.any(A[:, :, None].astype(bool) & B[None, :, :].astype(bool), axis=1)
+    CD = np.any(C[:, :, None].astype(bool) & D[None, :, :].astype(bool), axis=1)
+    expected = float(np.count_nonzero(AB & CD))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected)
+
+
+def test_exact_semiring_maxmin():
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A = np.eye(2)
+    B = np.eye(2)
+    C = np.eye(2)
+    D = np.eye(2)
+    A_, B_, C_, D_ = fl.asarray(A), fl.asarray(B), fl.asarray(C), fl.asarray(D)
+
+    ab = Aggregate(
+        Literal(ffuncs.max),
+        Literal(float("-inf")),
+        MapJoin(
+            Literal(ffuncs.min),
+            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.max),
+        Literal(float("-inf")),
+        MapJoin(
+            Literal(ffuncs.min),
+            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.min), (ab, cd))
+
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    AB = np.max(np.minimum(A[:, :, None], B[None, :, :]), axis=1)
+    CD = np.max(np.minimum(C[:, :, None], D[None, :, :]), axis=1)
+    expected = float(np.count_nonzero(np.minimum(AB, CD)))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected)
+
+
+def test_exact_relabel():
+    i, j = Field("i"), Field("j")
+    data = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
+    node = Table(Literal(fl.asarray(data)), (i, j))
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    row, col = Field("row"), Field("col")
+    relabeled = ExactStatsFactory().relabel(stats, (row, col))
+
+    assert relabeled.index_order == (row, col)
+    assert relabeled.get_dim_size(row) == stats.get_dim_size(i)
+    assert relabeled.get_dim_size(col) == stats.get_dim_size(j)
+
+
+def test_exact_reorder():
+    i, j = Field("i"), Field("j")
+    data = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
+    node = Table(Literal(fl.asarray(data)), (i, j))
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    reordered = ExactStatsFactory().reorder(stats, (j, i))
+
+    assert reordered.index_order == (j, i)
+    assert reordered.get_dim_size(i) == stats.get_dim_size(i)
+    assert reordered.get_dim_size(j) == stats.get_dim_size(j)
+
+
+def test_exact_embedding():
+    i, j = Field("i"), Field("j")
+    data = np.array([[1.0, 0.0], [0.0, 1.0]])
+    node = Table(Literal(fl.asarray(data)), (i, j))
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    emb = stats.get_embedding()
+
+    assert emb.shape == (3,)
+    assert emb[0] == pytest.approx(np.log2(2.0))
+    assert emb[1] == pytest.approx(np.log2(2.0))
+    assert emb[2] == pytest.approx(np.log2(stats.estimate_non_fill_values() + 1))
+
+    reordered = ExactStatsFactory().reorder(stats, (j, i))
+    emb_r = reordered.get_embedding()
+    assert emb_r[0] == pytest.approx(emb[1])
+    assert emb_r[1] == pytest.approx(emb[0])
+    assert emb_r[2] == pytest.approx(emb[2])
+
 
 # ─────────────────────────────── DummyStats tests ────────────────────────────────
 
