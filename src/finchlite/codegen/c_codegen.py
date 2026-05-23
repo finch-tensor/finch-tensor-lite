@@ -105,7 +105,7 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-def c_hash(fmt, ctx: "CContext"):
+def c_hash(fmt: FType, ctx: "CContext"):
     """
     Expand to the name of a macro that c hash can use for hashing fmt.
 
@@ -114,18 +114,17 @@ def c_hash(fmt, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "c_hash"):
         return fmt.c_hash(ctx)
     return query_property(fmt, "c_hash", "__attr__", ctx)
 
 
-def c_hash_default(fmt, ctx: "CContext"):
+def c_hash_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_hash"
 
 
-def c_eq(fmt, ctx: "CContext"):
+def c_eq(fmt: FType, ctx: "CContext"):
     """
     Expand to the name of a macro that c eq can use for checking equivalence of fmt.
 
@@ -134,37 +133,17 @@ def c_eq(fmt, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "c_eq"):
         return fmt.c_eq(ctx)
     return query_property(fmt, "c_eq", "__attr__", ctx)
 
 
-def c_eq_default(fmt, ctx: "CContext"):
+def c_eq_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_eq"
 
 
-def _normalize_fmt(fmt):
-    # Keep ctypes types untouched; use Finch ftypes for builtins/NumPy inputs.
-    if isinstance(fmt, type):
-        if issubclass(fmt, ctypes._SimpleCData):
-            return fmt
-        if issubclass(fmt, ctypes._Pointer):
-            return fmt
-        if issubclass(fmt, ctypes._CFuncPtr):
-            return fmt
-        if issubclass(fmt, ctypes.Structure):
-            return fmt
-        if issubclass(fmt, ctypes.Union):
-            return fmt
-    try:
-        return ftype(fmt)
-    except NotImplementedError:
-        return fmt
-
-
-def serialize_to_c(fmt, obj):
+def serialize_to_c(fmt: FType, obj):
     """
     Serialize an object to a C-compatible ftype.
 
@@ -175,13 +154,12 @@ def serialize_to_c(fmt, obj):
     Returns:
         A ctypes-compatible struct.
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "serialize_to_c"):
         return fmt.serialize_to_c(obj)
     return query_property(fmt, "serialize_to_c", "__attr__", obj)
 
 
-def deserialize_from_c(fmt, obj, c_obj):
+def deserialize_from_c(fmt: FType, obj, c_obj):
     """
     Deserialize a C-compatible object back to the original ftype.
 
@@ -193,7 +171,6 @@ def deserialize_from_c(fmt, obj, c_obj):
     Returns:
         None
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "deserialize_from_c"):
         fmt.deserialize_from_c(obj, c_obj)
     else:
@@ -203,7 +180,7 @@ def deserialize_from_c(fmt, obj, c_obj):
             return
 
 
-def construct_from_c(fmt, c_obj):
+def construct_from_c(fmt: FType, c_obj):
     """
     Construct an object from a C-compatible ftype.
 
@@ -214,7 +191,6 @@ def construct_from_c(fmt, c_obj):
     Returns:
         An instance of the original object type.
     """
-    fmt = _normalize_fmt(fmt)
     if hasattr(fmt, "construct_from_c"):
         return fmt.construct_from_c(c_obj)
     try:
@@ -223,69 +199,11 @@ def construct_from_c(fmt, c_obj):
         return fmt(c_obj)
 
 
-for t in (
-    ctypes.c_bool,
-    ctypes.c_char,
-    ctypes.c_wchar,
-    ctypes.c_byte,
-    ctypes.c_ubyte,
-    ctypes.c_short,
-    ctypes.c_ushort,
-    ctypes.c_int,
-    ctypes.c_int8,
-    ctypes.c_int16,
-    ctypes.c_int32,
-    ctypes.c_int64,
-    ctypes.c_uint,
-    ctypes.c_uint8,
-    ctypes.c_uint16,
-    ctypes.c_uint32,
-    ctypes.c_uint64,
-    ctypes.c_long,
-    ctypes.c_ulong,
-    ctypes.c_longlong,
-    ctypes.c_ulonglong,
-    ctypes.c_size_t,
-    ctypes.c_ssize_t,
-    ctypes.c_float,
-    ctypes.c_double,
-    ctypes.c_wchar_p,
-):
-    register_property(
-        t,
-        "serialize_to_c",
-        "__attr__",
-        lambda fmt, c_obj: fmt(c_obj.value),
-    )
-    register_property(
-        t,
-        "c_hash",
-        "__attr__",
-        c_hash_default,
-    )
-    register_property(
-        t,
-        "c_eq",
-        "__attr__",
-        c_eq_default,
-    )
-    # ctypes here should be considered pass by value, so no op this.
-    register_property(
-        t,
-        "deserialize_from_c",
-        "__attr__",
-        lambda fmt, obj, c_value: None,
-    )
-    # construction from c is just the identity.
-    register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
-    register_property(t, "numba_type", "__attr__", lambda t: t)
-
-
 register_property(
     algebra.ftypes.FDTypeNumpy,
     "serialize_to_c",
     "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
+    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype)),
 )
 
 register_property(
@@ -459,51 +377,35 @@ def c_literal(ctx, val):
 register_property(algebra.int_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
 register_property(algebra.float_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
 register_property(algebra.str_, "c_literal", "__attr__", lambda fmt, x, ctx: f'"{x}"')
+
+
+def numpy_c_literal(fmt, x, ctx):
+    if isinstance(x, np.bool_):
+        value = "true" if x else "false"
+    else:
+        value = str(x.item())
+    return f"({ctx.ctype_name(c_type(fmt))}){value}"
+
+
 register_property(
     algebra.ftypes.FDTypeNumpy,
     "c_literal",
     "__attr__",
-    lambda fmt, x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
+    numpy_c_literal,
 )
-for t in (
-    ctypes.c_bool,
-    ctypes.c_uint8,
-    ctypes.c_uint16,
-    ctypes.c_uint32,
-    ctypes.c_uint64,
-    ctypes.c_int8,
-    ctypes.c_int16,
-    ctypes.c_int32,
-    ctypes.c_int64,
-):
-    register_property(
-        t,
-        "c_literal",
-        "__attr__",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
-    )
-
-for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore[assignment]
-    register_property(
-        t,
-        "c_literal",
-        "__attr__",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
-    )
 
 
-def c_type(t):
+def c_type(t: FType):
     """
-    Returns the C type corresponding to the given Python type.
+    Returns the C type corresponding to the given Finch type.
 
     Args:
         ctx: The context in which the value is used.
-        t: The Python type.
+        t: The Finch type.
 
     Returns:
         The corresponding C type as a ctypes type.
     """
-    t = _normalize_fmt(t)
     if t is algebra.none_:
         return None
     if hasattr(t, "c_type"):
@@ -522,7 +424,6 @@ register_property(
     "__attr__",
     lambda x: np.ctypeslib.as_ctypes_type(x.dtype),
 )
-register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
 
 # ints and floats should be serialized and constructed trivially.
 register_property(
@@ -568,17 +469,6 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_uint16: ("uint16_t", ["stdint.h"]),
     ctypes.c_uint32: ("uint32_t", ["stdint.h"]),
     ctypes.c_uint64: ("uint64_t", ["stdint.h"]),
-    # use standard types instead of aliases
-    # ctypes.c_short: ("short", []),
-    # ctypes.c_ushort: ("unsigned short", []),
-    # ctypes.c_int: ("int", []),
-    # ctypes.c_uint: ("unsigned int", []),
-    # ctypes.c_long: ("long", []),
-    # ctypes.c_ulong: ("unsigned long", []),
-    # ctypes.c_longlong: ("long long", []),
-    # ctypes.c_ulonglong: ("unsigned long long", []),
-    # ctypes.c_size_t: ("size_t", ["stddef.h"]),
-    # ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
     ctypes.c_float: ("float", []),
     ctypes.c_double: ("double", []),
     ctypes.c_char_p: ("char*", []),

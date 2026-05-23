@@ -9,6 +9,9 @@ import numpy as np
 
 from finchlite.algebra import ftype, ftypes
 from finchlite.finch_assembly import Buffer, BufferFType
+from finchlite.algebra import FType, ftypes
+from finchlite.finch_assembly import Buffer, Stack
+from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
 from .c_codegen import (
@@ -164,7 +167,7 @@ class MallocBuffer(Buffer):
     A buffer that uses buffers managed by malloc to store data.
     """
 
-    def __init__(self, length: int, dtype, data=None):
+    def __init__(self, length: int, dtype: FType, data=None):
         """
         Constructor for the MallocBuffer class.
 
@@ -173,7 +176,7 @@ class MallocBuffer(Buffer):
         data (optional): a list of data to initialize the buffer with.
         """
         self._dtype = dtype
-        self._c_dtype = c_type(dtype)
+        self._c_dtype = c_type(self._dtype)
         self.buffer = ctypes.pointer(CMallocBufferStruct())
 
         MallocBufferBackend.library(self.ftype).init(
@@ -242,40 +245,39 @@ class MallocBufferFType(BufferFType, CBufferFType, CStackFType):
     This does not support the numba backend.
     """
 
-    def __init__(self, dtype):
-        self._dtype = dtype
-        self._c_dtype = c_type(dtype)
+    def __init__(self, element_type: FType):
+        self._element_type = element_type
 
     def __eq__(self, other):
         if not isinstance(other, MallocBufferFType):
             return False
-        return self._dtype == other._dtype
+        return self._element_type == other._element_type
 
     def __str__(self):
-        return f"malloc_buf_t({qual_str(self._dtype)})"
+        return f"malloc_buf_t({qual_str(self._element_type)})"
 
     def __repr__(self):
-        return f"MallocBufferFType({qual_str(self._dtype)})"
+        return f"MallocBufferFType({qual_str(self._element_type)})"
 
     @property
     def length_type(self):
         """
         Returns the type used for the length of the buffer.
         """
-        return ftype(np.intp)
+        return ftypes.intp
 
     @property
     def element_type(self):
         """
         Returns the type of elements stored in the buffer. This will be a ctypes array.
         """
-        return ftype(self._dtype)
+        return self._element_type
 
     def __hash__(self):
-        return hash(("MallocBufferFType", self._dtype))
+        return hash(("MallocBufferFType", self._element_type))
 
     def __call__(self, len: int = 0):
-        return MallocBuffer(len, self._dtype)
+        return MallocBuffer(len, self._element_type)
 
     def c_type(self):
         return ctypes.POINTER(CMallocBufferStruct)

@@ -1,3 +1,5 @@
+import finchlite.finch_assembly as asm
+from finchlite.algebra import ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CStackFType
 from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaStackFType
 from finchlite.finch_assembly import Buffer
