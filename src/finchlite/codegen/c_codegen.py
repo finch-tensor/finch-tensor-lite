@@ -109,151 +109,6 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-def c_hash(fmt: FType, ctx: "CContext"):
-    """
-    Expand to the name of a macro that c hash can use for hashing fmt.
-
-    Args:
-        ctx: CContext object
-        var_n: name to be supplied. It is a placeholder for a variable with
-        type fmt* (so indirection)
-    """
-    if hasattr(fmt, "c_hash"):
-        return fmt.c_hash(ctx)
-    return query_property(fmt, "c_hash", "__attr__", ctx)
-
-
-def c_hash_default(fmt: FType, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_hash"
-
-
-def c_eq(fmt: FType, ctx: "CContext"):
-    """
-    Expand to the name of a macro that c eq can use for checking equivalence of fmt.
-
-    Args:
-        ctx: CContext object
-        var_n: name to be supplied. It is a placeholder for a variable with
-        type fmt* (so indirection)
-    """
-    if hasattr(fmt, "c_eq"):
-        return fmt.c_eq(ctx)
-    return query_property(fmt, "c_eq", "__attr__", ctx)
-
-
-def c_eq_default(fmt: FType, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_eq"
-
-
-def serialize_to_c(fmt: FType, obj):
-    """
-    Serialize an object to a C-compatible ftype.
-
-    Args:
-        fmt: FType of obj
-        obj: The object to serialize.
-
-    Returns:
-        A ctypes-compatible struct.
-    """
-    if hasattr(fmt, "serialize_to_c"):
-        return fmt.serialize_to_c(obj)
-    return query_property(fmt, "serialize_to_c", "__attr__", obj)
-
-
-def deserialize_from_c(fmt: FType, obj, c_obj):
-    """
-    Deserialize a C-compatible object back to the original ftype.
-
-    Args:
-        fmt: FType of obj
-        obj: The original object to update.
-        c_obj: The C-compatible object to deserialize from.
-
-    Returns:
-        None
-    """
-    if hasattr(fmt, "deserialize_from_c"):
-        fmt.deserialize_from_c(obj, c_obj)
-    else:
-        try:
-            query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
-        except AttributeError:
-            return
-
-
-def construct_from_c(fmt: FType, c_obj):
-    """
-    Construct an object from a C-compatible ftype.
-
-    Args:
-        fmt: The ftype of the object.
-        c_obj: The C-compatible object to construct from.
-
-    Returns:
-        An instance of the original object type.
-    """
-    if hasattr(fmt, "construct_from_c"):
-        return fmt.construct_from_c(c_obj)
-    try:
-        return query_property(fmt, "construct_from_c", "__attr__", c_obj)
-    except AttributeError:
-        return fmt(c_obj)
-
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "serialize_to_c",
-    "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype)),
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
-
-# pass by value -> no op
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "deserialize_from_c",
-    "__attr__",
-    lambda fmt, obj, c_value: None,
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, c_value: fmt(c_value.value),
-)
-
-# deserialize_to_c should modify in place. TODO: implement
-
-for typ in (algebra.int_, algebra.float_):
-    register_property(
-        typ,
-        "c_hash",
-        "__attr__",
-        c_hash_default,
-    )
-    register_property(
-        typ,
-        "c_eq",
-        "__attr__",
-        c_eq_default,
-    )
 
 
 class CKernel(asm.AssemblyKernel):
@@ -924,68 +779,6 @@ class CContext(Context):
                 )
 
 
-class CHashableFType(FType):
-    @abstractmethod
-    def c_hash(self, ctx: CContext) -> str:
-        """
-        Emit code from CContext that takes an expression and returns the NAME
-        of a macro that performs our hashing with STC functions.
-
-        Please reference finch_assembly/struct.py for reference.
-
-        The macro should take one argument (type of fmt*, so there is one layer
-        of indirection) and expand to an expression that returns a size_t of
-        the final hash.
-
-        The main idea for implementing this is for unpacked structs where you
-        want the unused bytes to be set to zero.
-
-        This is important to note for immutable structs because you need to do
-        something like &var_n->property if you want to do recursive hashing.
-        """
-        ...
-
-    @abstractmethod
-    def c_eq(self, ctx: CContext) -> str:
-        """
-        Emit code from CContext that takes an expression and returns the NAME
-        of a macro that can be used to check.
-
-        The macro should take two arguments (each a type of fmt*, so there is
-        one layer of indirection) and expand to an expression that checks
-        equality.
-
-        The main idea for implementing this is for unpacked structs where you
-        want the unused bytes to be set to zero.
-
-        This is important to note for immutable structs because you need to do
-        something like &var_n->property if you want to do recursive hashing.
-        """
-
-
-class CArgumentFType(ABC):
-    @abstractmethod
-    def serialize_to_c(self, obj):
-        """
-        Return a ctypes-compatible struct to be used in place of `obj`
-        for the c backend.
-        """
-        ...
-
-    @abstractmethod
-    def deserialize_from_c(self, obj, res):
-        """
-        Update this `obj` based on how the c call modified `res`, the result
-        of `serialize_to_c`.
-        """
-        ...
-
-    @abstractmethod
-    def construct_from_c(self, res):
-        """
-        Construct a new object based on the return value from c
-        """
-
 
 class CDictFType(DictFType, CArgumentFType, ABC):
     """
@@ -1075,24 +868,6 @@ class CStackFType(ABC):
         ...
 
 
-def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
-    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
-    return struct_c_type(fmt)(*args)
-
-
-register_property(StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c)
-
-
-def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
-    if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(c_struct, name))
-        return
-
-
-register_property(
-    StructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
-)
 
 c_structs: dict[Any, Any] = {}
 c_structnames = Namespace()
@@ -1164,6 +939,142 @@ register_property(
 )
 
 
+register_property(
+    TupleFType,
+    "c_type",
+    "__attr__",
+    lambda fmt: struct_c_type(NamedTupleFType("CTuple", fmt.struct_fields)),
+)
+
+register_property(
+    TupleFType,
+    "c_getattr",
+    "__attr__",
+    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
+)
+
+def serialize_to_c(fmt: FType, obj):
+    """
+    Serialize an object to a C-compatible ftype.
+
+    Args:
+        fmt: FType of obj
+        obj: The object to serialize.
+
+    Returns:
+        A ctypes-compatible struct.
+    """
+    if hasattr(fmt, "serialize_to_c"):
+        return fmt.serialize_to_c(obj)
+    return query_property(fmt, "serialize_to_c", "__attr__", obj)
+
+
+def deserialize_from_c(fmt: FType, obj, c_obj):
+    """
+    Deserialize a C-compatible object back to the original ftype.
+
+    Args:
+        fmt: FType of obj
+        obj: The original object to update.
+        c_obj: The C-compatible object to deserialize from.
+
+    Returns:
+        None
+    """
+    if hasattr(fmt, "deserialize_from_c"):
+        fmt.deserialize_from_c(obj, c_obj)
+    else:
+        try:
+            query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
+        except AttributeError:
+            return
+
+
+def construct_from_c(fmt: FType, c_obj):
+    """
+    Construct an object from a C-compatible ftype.
+
+    Args:
+        fmt: The ftype of the object.
+        c_obj: The C-compatible object to construct from.
+
+    Returns:
+        An instance of the original object type.
+    """
+    if hasattr(fmt, "construct_from_c"):
+        return fmt.construct_from_c(c_obj)
+    try:
+        return query_property(fmt, "construct_from_c", "__attr__", c_obj)
+    except AttributeError:
+        return fmt(c_obj)
+
+
+register_property(
+    algebra.ftypes.FDTypeNumpy,
+    "serialize_to_c",
+    "__attr__",
+    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype)),
+)
+# pass by value -> no op
+register_property(
+    algebra.ftypes.FDTypeNumpy,
+    "deserialize_from_c",
+    "__attr__",
+    lambda fmt, obj, c_value: None,
+)
+
+register_property(
+    algebra.ftypes.FDTypeNumpy,
+    "construct_from_c",
+    "__attr__",
+    lambda fmt, c_value: fmt(c_value.value),
+)
+
+# deserialize_to_c should modify in place. TODO: implement
+
+
+class CArgumentFType(ABC):
+    @abstractmethod
+    def serialize_to_c(self, obj):
+        """
+        Return a ctypes-compatible struct to be used in place of `obj`
+        for the c backend.
+        """
+        ...
+
+    @abstractmethod
+    def deserialize_from_c(self, obj, res):
+        """
+        Update this `obj` based on how the c call modified `res`, the result
+        of `serialize_to_c`.
+        """
+        ...
+
+    @abstractmethod
+    def construct_from_c(self, res):
+        """
+        Construct a new object based on the return value from c
+        """
+
+
+def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
+    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
+    return struct_c_type(fmt)(*args)
+
+
+register_property(StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c)
+
+
+def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
+    if fmt.is_mutable:
+        for name in fmt.struct_fieldnames:
+            setattr(obj, name, getattr(c_struct, name))
+        return
+
+
+register_property(
+    StructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
+)
 def struct_construct_from_c(fmt: StructFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return fmt.__class__(*args)
@@ -1204,25 +1115,112 @@ register_property(
 
 register_property(
     TupleFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: struct_c_type(NamedTupleFType("CTuple", fmt.struct_fields)),
-)
-
-register_property(
-    TupleFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
-)
-
-register_property(
-    TupleFType,
     "deserialize_from_c",
     "__attr__",
     lambda fmt, obj, c_struct: None,
 )
 
+
+def c_hash(fmt: FType, ctx: "CContext"):
+    """
+    Expand to the name of a macro that c hash can use for hashing fmt.
+
+    Args:
+        ctx: CContext object
+        var_n: name to be supplied. It is a placeholder for a variable with
+        type fmt* (so indirection)
+    """
+    if hasattr(fmt, "c_hash"):
+        return fmt.c_hash(ctx)
+    return query_property(fmt, "c_hash", "__attr__", ctx)
+
+
+def c_hash_default(fmt: FType, ctx: "CContext"):
+    ctx.add_header(f'#include "{common_h}"')
+    return "c_default_hash"
+
+
+def c_eq(fmt: FType, ctx: "CContext"):
+    """
+    Expand to the name of a macro that c eq can use for checking equivalence of fmt.
+
+    Args:
+        ctx: CContext object
+        var_n: name to be supplied. It is a placeholder for a variable with
+        type fmt* (so indirection)
+    """
+    if hasattr(fmt, "c_eq"):
+        return fmt.c_eq(ctx)
+    return query_property(fmt, "c_eq", "__attr__", ctx)
+
+
+def c_eq_default(fmt: FType, ctx: "CContext"):
+    ctx.add_header(f'#include "{common_h}"')
+    return "c_default_eq"
+register_property(
+    algebra.ftypes.FDTypeNumpy,
+    "c_hash",
+    "__attr__",
+    c_hash_default,
+)
+
+register_property(
+    algebra.ftypes.FDTypeNumpy,
+    "c_eq",
+    "__attr__",
+    c_eq_default,
+)
+for typ in (algebra.int_, algebra.float_):
+    register_property(
+        typ,
+        "c_hash",
+        "__attr__",
+        c_hash_default,
+    )
+    register_property(
+        typ,
+        "c_eq",
+        "__attr__",
+        c_eq_default,
+    )
+
+class CHashableFType(FType):
+    @abstractmethod
+    def c_hash(self, ctx: CContext) -> str:
+        """
+        Emit code from CContext that takes an expression and returns the NAME
+        of a macro that performs our hashing with STC functions.
+
+        Please reference finch_assembly/struct.py for reference.
+
+        The macro should take one argument (type of fmt*, so there is one layer
+        of indirection) and expand to an expression that returns a size_t of
+        the final hash.
+
+        The main idea for implementing this is for unpacked structs where you
+        want the unused bytes to be set to zero.
+
+        This is important to note for immutable structs because you need to do
+        something like &var_n->property if you want to do recursive hashing.
+        """
+        ...
+
+    @abstractmethod
+    def c_eq(self, ctx: CContext) -> str:
+        """
+        Emit code from CContext that takes an expression and returns the NAME
+        of a macro that can be used to check.
+
+        The macro should take two arguments (each a type of fmt*, so there is
+        one layer of indirection) and expand to an expression that checks
+        equality.
+
+        The main idea for implementing this is for unpacked structs where you
+        want the unused bytes to be set to zero.
+
+        This is important to note for immutable structs because you need to do
+        something like &var_n->property if you want to do recursive hashing.
+        """
 
 class CHashableProperties(TypedDict):
     eq: str | None
