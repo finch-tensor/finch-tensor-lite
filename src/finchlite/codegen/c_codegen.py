@@ -104,7 +104,6 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     # Load the shared library using ctypes
     return ctypes.CDLL(str(shared_lib_path))
 
-
 def c_hash(fmt: FType, ctx: "CContext"):
     """
     Expand to the name of a macro that c hash can use for hashing fmt.
@@ -199,57 +198,9 @@ def construct_from_c(fmt: FType, c_obj):
         return fmt(c_obj)
 
 
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "serialize_to_c",
-    "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype)),
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
-
-# pass by value -> no op
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "deserialize_from_c",
-    "__attr__",
-    lambda fmt, obj, c_value: None,
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, c_value: fmt(c_value.value),
-)
-
 # deserialize_to_c should modify in place. TODO: implement
 
-for typ in (algebra.int_, algebra.float_):
-    register_property(
-        typ,
-        "c_hash",
-        "__attr__",
-        c_hash_default,
-    )
-    register_property(
-        typ,
-        "c_eq",
-        "__attr__",
-        c_eq_default,
-    )
+
 
 
 def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
@@ -322,27 +273,6 @@ def c_literal(ctx, val):
     return query_property(fmt, "c_literal", "__attr__", val, ctx)
 
 
-register_property(algebra.int_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
-register_property(algebra.float_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
-register_property(algebra.str_, "c_literal", "__attr__", lambda fmt, x, ctx: f'"{x}"')
-
-
-def numpy_c_literal(fmt, x, ctx):
-    if isinstance(x, np.bool_):
-        value = "true" if x else "false"
-    else:
-        value = str(x.item())
-    return f"({ctx.ctype_name(c_type(fmt))}){value}"
-
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_literal",
-    "__attr__",
-    numpy_c_literal,
-)
-
-
 def c_type(t: FType):
     """
     Returns the C type corresponding to the given Finch type.
@@ -361,48 +291,9 @@ def c_type(t: FType):
     return query_property(t, "c_type", "__attr__")
 
 
-register_property(algebra.int_, "c_type", "__attr__", lambda x: ctypes.c_int)
-register_property(algebra.float_, "c_type", "__attr__", lambda x: ctypes.c_double)
-register_property(algebra.bool_, "c_type", "__attr__", lambda x: ctypes.c_bool)
-register_property(algebra.str_, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
-register_property(algebra.none_, "c_type", "__attr__", lambda x: None)
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_type",
-    "__attr__",
-    lambda x: np.ctypeslib.as_ctypes_type(x.dtype),
-)
 
-# ints and floats should be serialized and constructed trivially.
-register_property(
-    algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
-)
-register_property(
-    algebra.float_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
-)
-register_property(
-    algebra.bool_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
-)
-register_property(
-    algebra.int_,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, x: int(x.value if hasattr(x, "value") else x),
-)
-register_property(
-    algebra.float_,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, x: float(x.value if hasattr(x, "value") else x),
-)
-register_property(
-    algebra.bool_,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, x: bool(x.value if hasattr(x, "value") else x),
-)
-register_property(algebra.none_, "serialize_to_c", "__attr__", lambda fmt, x: None)
-register_property(algebra.none_, "construct_from_c", "__attr__", lambda fmt, x: None)
+
+
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
     ctypes.c_char: ("char", []),
@@ -705,234 +596,4 @@ class CStackFType(ABC):
         ...
 
 
-def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
-    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
-    return struct_c_type(fmt)(*args)
 
-
-register_property(StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c)
-
-
-def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
-    if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(c_struct, name))
-        return
-
-
-register_property(
-    StructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
-)
-
-c_structs: dict[Any, Any] = {}
-c_structnames = Namespace()
-
-
-def struct_c_type(fmt: StructFType):
-    res = c_structs.get(fmt)
-    if res:
-        return res
-    fields = [(name, c_type(fmt)) for name, fmt in fmt.struct_fields]
-    new_struct = type(
-        c_structnames.freshen("C", fmt.struct_name),
-        (ctypes.Structure,),
-        {"_fields_": fields},
-    )
-    c_structs[fmt] = new_struct
-    return new_struct
-
-
-"""
-Note: When serializing any struct to C, it will get serialized to a struct with
-no indirection.
-
-When you pass a struct into a kernel that expects a struct pointer, ctypes can
-intelligently infer whether we are working with a pointer arg type (pass by
-reference) or a non-pointer type (in which case it will immediately apply
-indirection)
-"""
-
-register_property(
-    MutableStructFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
-)
-
-register_property(
-    ImmutableStructFType, "c_type", "__attr__", lambda fmt: struct_c_type(fmt)
-)
-
-
-register_property(
-    MutableStructFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}->{attr}",
-)
-
-register_property(
-    ImmutableStructFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
-)
-
-
-def struct_mutable_setattr(fmt: StructFType, ctx, obj, attr, val):
-    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
-
-
-# the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
-# but we will not include that because it's bad.
-
-register_property(
-    MutableStructFType,
-    "c_setattr",
-    "__attr__",
-    struct_mutable_setattr,
-)
-
-
-def struct_construct_from_c(fmt: StructFType, c_struct):
-    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
-    return fmt.__class__(*args)
-
-
-register_property(
-    StructFType,
-    "construct_from_c",
-    "__attr__",
-    struct_construct_from_c,
-)
-
-
-def serialize_tuple_to_c(fmt, obj):
-    x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
-    return serialize_to_c(ftype(x), x)
-
-
-register_property(
-    TupleFType,
-    "serialize_to_c",
-    "__attr__",
-    serialize_tuple_to_c,
-)
-
-
-def tuple_construct_from_c(fmt: TupleFType, c_struct):
-    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
-    return tuple(args)
-
-
-register_property(
-    TupleFType,
-    "construct_from_c",
-    "__attr__",
-    tuple_construct_from_c,
-)
-
-register_property(
-    TupleFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: struct_c_type(NamedTupleFType("CTuple", fmt.struct_fields)),
-)
-
-register_property(
-    TupleFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
-)
-
-register_property(
-    TupleFType,
-    "deserialize_from_c",
-    "__attr__",
-    lambda fmt, obj, c_struct: None,
-)
-
-
-class CHashableProperties(TypedDict):
-    eq: str | None
-    hash: str | None
-
-
-def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable) and isinstance(fmt, ImmutableStructFType)
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("hash") is not None:
-            return properties["hash"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_hash(fmt2, ctx) for fmt2 in fmt.struct_fieldtypes]
-    name = ctx.freshen("hash")
-    ctx.datastructures[fmt]["hash"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var_n = ctx.freshen("var")
-    args = ",".join(
-        f"{macro}(&({var_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
-    return name
-
-
-register_property(
-    ImmutableStructFType,
-    "c_hash",
-    "__attr__",
-    c_hash_struct,
-)
-
-register_property(
-    TupleFType,
-    "c_hash",
-    "__attr__",
-    c_hash_struct,
-)
-
-
-def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable) and isinstance(fmt, ImmutableStructFType)
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("eq") is not None:
-            return properties["eq"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
-    name = ctx.freshen("eq")
-    ctx.datastructures[fmt]["eq"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var1_n = ctx.freshen("var")
-    var2_n = ctx.freshen("var")
-    args = " && ".join(
-        f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
-    return name
-
-
-register_property(
-    ImmutableStructFType,
-    "c_eq",
-    "__attr__",
-    c_eq_struct,
-)
-
-register_property(
-    TupleFType,
-    "c_eq",
-    "__attr__",
-    c_eq_struct,
-)
