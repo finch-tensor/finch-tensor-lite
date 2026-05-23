@@ -6,7 +6,7 @@ import numpy as np
 
 from finchlite import finch_assembly as asm
 from finchlite import finch_notation as ntn
-from finchlite.algebra import FType, FTyped, ImmutableStructFType, TupleFType
+from finchlite.algebra import FType, FTyped, ImmutableStructFType, TupleFType, bool_
 from finchlite.compile.lower import FinchTensorFType
 
 from .override_tensor import OverrideTensor
@@ -303,7 +303,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("lvl", self.lvl_t),
             ("shape", TupleFType.from_tuple(self.shape_type)),
             ("pos", self.position_type),
-            ("dirty_bit", np.bool_),
+            ("dirty_bit", bool_),
         ]
 
     def construct(self, shape: tuple[int, ...]):

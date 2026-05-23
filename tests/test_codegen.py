@@ -912,12 +912,13 @@ def test_ctypes_c_serialization(value, fmt, c_type):
 )
 def test_np_numba_serialization(value, np_type):
     cvalue = np_type(value)
-    serialized = serialize_to_numba(np_type, cvalue)
+    fmt = ftype(np_type)
+    serialized = serialize_to_numba(fmt, cvalue)
     assert serialized == np_type(value)
     assert isinstance(serialized, np_type)
-    constructed = construct_from_numba(np_type, serialized)
+    constructed = construct_from_numba(fmt, serialized)
     assert constructed == np_type(value)
-    assert deserialize_from_numba(np_type, constructed, serialized) is None
+    assert deserialize_from_numba(fmt, constructed, serialized) is None
 
 
 @pytest.mark.parametrize(
