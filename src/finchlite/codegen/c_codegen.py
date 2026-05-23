@@ -252,58 +252,6 @@ for typ in (algebra.int_, algebra.float_):
     )
 
 
-class CKernel(asm.AssemblyKernel):
-    """
-    A class to represent a C kernel.
-    """
-
-    def __init__(self, c_function, ret_type, argtypes):
-        self.c_function = c_function
-        self.ret_type = ret_type
-        self.argtypes = argtypes
-        self.c_function.restype = c_type(ret_type)
-        self.c_function.argtypes = tuple(c_type(argtype) for argtype in argtypes)
-
-    def __call__(self, *args):
-        """
-        Calls the C function with the given arguments.
-        """
-        if len(args) != len(self.argtypes):
-            raise ValueError(
-                f"Expected {len(self.argtypes)} arguments, got {len(args)}"
-            )
-        for argtype, arg in zip(self.argtypes, args, strict=False):
-            if not fisinstance(arg, argtype):
-                raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        serial_args = list(map(serialize_to_c, self.argtypes, args))
-        res = self.c_function(*serial_args)
-        for type_, arg, serial_arg in zip(
-            self.argtypes, args, serial_args, strict=False
-        ):
-            deserialize_from_c(type_, arg, serial_arg)
-        if self.ret_type is algebra.none_:
-            return None
-        return construct_from_c(self.ret_type, res)
-
-
-class CLibrary(asm.AssemblyLibrary):
-    """
-    A class to represent a C module.
-    """
-
-    def __init__(self, c_module, kernels):
-        self.c_module = c_module
-        self.kernels = kernels
-
-    def __getattr__(self, name):
-        # Allow attribute access to kernels by name
-        if name in self.kernels:
-            return self.kernels[name]
-        raise AttributeError(
-            f"{type(self).__name__!r} object has no attribute {name!r}"
-        )
-
-
 def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
     """Returns the C function name corresponding to the given Python function
     and argument types.
