@@ -25,8 +25,6 @@ from finchlite.algebra import (
     ffuncs,
     fisinstance,
     ftype,
-    query_property,
-    register_property,
 )
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_assembly import BufferFType, DictFType
@@ -260,18 +258,25 @@ def c_literal(ctx, val):
     Returns:
         The C literal as a string.
     """
-    if hasattr(val, "c_literal"):
-        return val.c_literal(ctx)
     try:
         fmt = ftype(val)
     except NotImplementedError:
-        return query_property(val, "c_literal", "__attr__", ctx)
-    return query_property(fmt, "c_literal", "__attr__", val, ctx)
-
-
-register_property(algebra.int_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
-register_property(algebra.float_, "c_literal", "__attr__", lambda fmt, x, ctx: str(x))
-register_property(algebra.str_, "c_literal", "__attr__", lambda fmt, x, ctx: f'"{x}"')
+        if hasattr(val, "c_literal"):
+            return val.c_literal(ctx)
+        raise
+    match fmt:
+        case algebra.int_ | algebra.float_:
+            return str(val)
+        case algebra.bool_:
+            return "true" if val else "false"
+        case algebra.str_:
+            return f'"{val}"'
+        case algebra.ftypes.FDTypeNumpy():
+            return numpy_c_literal(fmt, val, ctx)
+        case _:
+            if hasattr(val, "c_literal"):
+                return val.c_literal(ctx)
+            raise NotImplementedError(f"No C literal mapping for {fmt}")
 
 
 def numpy_c_literal(fmt, x, ctx):
@@ -280,12 +285,7 @@ def numpy_c_literal(fmt, x, ctx):
     else:
         value = str(x.item())
     return f"({ctx.ctype_name(c_type(fmt))}){value}"
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_literal",
-    "__attr__",
-    numpy_c_literal,
-)
+
 
 def c_type(t: FType):
     """
@@ -298,24 +298,29 @@ def c_type(t: FType):
     Returns:
         The corresponding C type as a ctypes type.
     """
-    if t is algebra.none_:
-        return None
-    if hasattr(t, "c_type"):
-        return t.c_type()
-    return query_property(t, "c_type", "__attr__")
-
-
-register_property(algebra.int_, "c_type", "__attr__", lambda x: ctypes.c_int)
-register_property(algebra.float_, "c_type", "__attr__", lambda x: ctypes.c_double)
-register_property(algebra.bool_, "c_type", "__attr__", lambda x: ctypes.c_bool)
-register_property(algebra.str_, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
-register_property(algebra.none_, "c_type", "__attr__", lambda x: None)
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_type",
-    "__attr__",
-    lambda x: np.ctypeslib.as_ctypes_type(x.dtype),
-)
+    match t:
+        case CArgumentFType():
+            return t.c_type()
+        case algebra.int_:
+            return ctypes.c_int
+        case algebra.float_:
+            return ctypes.c_double
+        case algebra.bool_:
+            return ctypes.c_bool
+        case algebra.str_:
+            return ctypes.c_wchar_p
+        case algebra.none_:
+            return None
+        case algebra.ftypes.FDTypeNumpy():
+            return np.ctypeslib.as_ctypes_type(t.dtype)
+        case TupleFType():
+            return struct_c_type(NamedTupleFType("CTuple", t.struct_fields))
+        case MutableStructFType():
+            return ctypes.POINTER(struct_c_type(t))
+        case ImmutableStructFType():
+            return struct_c_type(t)
+        case _:
+            raise NotImplementedError(f"No C type mapping for {t}")
 
 c_structs: dict[Any, Any] = {}
 c_structnames = Namespace()
@@ -343,26 +348,6 @@ intelligently infer whether we are working with a pointer arg type (pass by
 reference) or a non-pointer type (in which case it will immediately apply
 indirection)
 """
-
-register_property(
-    MutableStructFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
-)
-
-register_property(
-    ImmutableStructFType, "c_type", "__attr__", lambda fmt: struct_c_type(fmt)
-)
-
-
-register_property(
-    TupleFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: struct_c_type(NamedTupleFType("CTuple", fmt.struct_fields)),
-)
-
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
@@ -810,51 +795,40 @@ class CStackFType(ABC):
 
 
 def c_getattr(fmt, ctx, obj, attr):
-    if hasattr(fmt, "c_getattr"):
-        return fmt.c_getattr(ctx, obj, attr)
-    return query_property(fmt, "c_getattr", "__attr__", ctx, obj, attr)
-
-register_property(
-    MutableStructFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}->{attr}",
-)
-
-register_property(
-    ImmutableStructFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
-)
-
-register_property(
-    TupleFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
-)
+    match fmt:
+        case _ if hasattr(fmt, "c_getattr"):
+            return fmt.c_getattr(ctx, obj, attr)
+        case MutableStructFType():
+            return f"{obj}->{attr}"
+        case ImmutableStructFType() | TupleFType():
+            return f"{obj}.{attr}"
+        case _:
+            raise NotImplementedError(f"No C getattr mapping for {fmt}")
 
 def c_setattr(fmt, ctx, obj, attr, val):
-    if hasattr(fmt, "c_setattr"):
-        return fmt.c_setattr(ctx, obj, attr, val)
-    return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
+    match fmt:
+        case _ if hasattr(fmt, "c_setattr"):
+            return fmt.c_setattr(ctx, obj, attr, val)
+        case MutableStructFType():
+            return struct_mutable_setattr(fmt, ctx, obj, attr, val)
+        case _:
+            raise NotImplementedError(f"No C setattr mapping for {fmt}")
 
 
 def struct_mutable_setattr(fmt: StructFType, ctx, obj, attr, val):
-    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
+    ctx.exec(f"{ctx.feed}{obj}->{attr} = {val};")
 
 # the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
 # but we will not include that because it's bad.
 
-register_property(
-    MutableStructFType,
-    "c_setattr",
-    "__attr__",
-    struct_mutable_setattr,
-)
-
 class CArgumentFType(ABC):
+    @abstractmethod
+    def c_type(self):
+        """
+        Return a ctypes type for this ftype.
+        """
+        ...
+
     @abstractmethod
     def serialize_to_c(self, obj):
         """
@@ -889,41 +863,31 @@ def serialize_to_c(fmt: FType, obj):
     Returns:
         A ctypes-compatible struct.
     """
-    if hasattr(fmt, "serialize_to_c"):
-        return fmt.serialize_to_c(obj)
-    return query_property(fmt, "serialize_to_c", "__attr__", obj)
+    match fmt:
+        case CArgumentFType():
+            return fmt.serialize_to_c(obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype))
+        case algebra.int_ | algebra.float_ | algebra.bool_:
+            return c_type(fmt)(obj)
+        case algebra.none_:
+            return None
+        case TupleFType():
+            return serialize_tuple_to_c(fmt, obj)
+        case StructFType():
+            return serialize_struct_to_c(fmt, obj)
+        case _:
+            raise NotImplementedError(f"No C serialization mapping for {fmt}")
 
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "serialize_to_c",
-    "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype)),
-)
-# ints and floats should be serialized and constructed trivially.
-register_property(
-    algebra.int_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
-)
-register_property(
-    algebra.float_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
-)
-register_property(
-    algebra.bool_, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x)
-)
-register_property(algebra.none_, "serialize_to_c", "__attr__", lambda fmt, x: None)
+
 def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
     args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
     return struct_c_type(fmt)(*args)
-register_property(StructFType, "serialize_to_c", "__attr__", serialize_struct_to_c)
+
 
 def serialize_tuple_to_c(fmt, obj):
     x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
     return serialize_to_c(ftype(x), x)
-register_property(
-    TupleFType,
-    "serialize_to_c",
-    "__attr__",
-    serialize_tuple_to_c,
-)
 
 
 
@@ -939,21 +903,15 @@ def deserialize_from_c(fmt: FType, obj, c_obj):
     Returns:
         None
     """
-    if hasattr(fmt, "deserialize_from_c"):
-        fmt.deserialize_from_c(obj, c_obj)
-    else:
-        try:
-            query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
-        except AttributeError:
+    match fmt:
+        case CArgumentFType():
+            fmt.deserialize_from_c(obj, c_obj)
+        case algebra.ftypes.FDTypeNumpy() | TupleFType():
             return
-
-# pass by value -> no op
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "deserialize_from_c",
-    "__attr__",
-    lambda fmt, obj, c_value: None,
-)
+        case StructFType():
+            deserialize_struct_from_c(fmt, obj, c_obj)
+        case _:
+            return
 
 
 def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
@@ -961,17 +919,6 @@ def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
         for name in fmt.struct_fieldnames:
             setattr(obj, name, getattr(c_struct, name))
         return
-
-
-register_property(
-    StructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
-)
-register_property(
-    TupleFType,
-    "deserialize_from_c",
-    "__attr__",
-    lambda fmt, obj, c_struct: None,
-)
 
 
 def construct_from_c(fmt: FType, c_obj):
@@ -985,43 +932,25 @@ def construct_from_c(fmt: FType, c_obj):
     Returns:
         An instance of the original object type.
     """
-    if hasattr(fmt, "construct_from_c"):
-        return fmt.construct_from_c(c_obj)
-    try:
-        return query_property(fmt, "construct_from_c", "__attr__", c_obj)
-    except AttributeError:
-        return fmt(c_obj)
-
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, c_value: fmt(c_value.value),
-)
-
-# deserialize_to_c should modify in place. TODO: implement
-
-
-register_property(
-    algebra.int_,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, x: int(x.value if hasattr(x, "value") else x),
-)
-register_property(
-    algebra.float_,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, x: float(x.value if hasattr(x, "value") else x),
-)
-register_property(
-    algebra.bool_,
-    "construct_from_c",
-    "__attr__",
-    lambda fmt, x: bool(x.value if hasattr(x, "value") else x),
-)
-register_property(algebra.none_, "construct_from_c", "__attr__", lambda fmt, x: None)
+    match fmt:
+        case CArgumentFType():
+            return fmt.construct_from_c(c_obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return fmt(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.int_:
+            return int(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.float_:
+            return float(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.bool_:
+            return bool(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.none_:
+            return None
+        case TupleFType():
+            return tuple_construct_from_c(fmt, c_obj)
+        case StructFType():
+            return struct_construct_from_c(fmt, c_obj)
+        case _:
+            return fmt(c_obj)
 
 
 
@@ -1030,25 +959,9 @@ def struct_construct_from_c(fmt: StructFType, c_struct):
     return fmt.__class__(*args)
 
 
-register_property(
-    StructFType,
-    "construct_from_c",
-    "__attr__",
-    struct_construct_from_c,
-)
-
-
 def tuple_construct_from_c(fmt: TupleFType, c_struct):
     args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
     return tuple(args)
-
-
-register_property(
-    TupleFType,
-    "construct_from_c",
-    "__attr__",
-    tuple_construct_from_c,
-)
 
 class CHashableFType(FType):
     @abstractmethod
@@ -1098,36 +1011,22 @@ def c_hash(fmt: FType, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
-    if hasattr(fmt, "c_hash"):
-        return fmt.c_hash(ctx)
-    return query_property(fmt, "c_hash", "__attr__", ctx)
+    match fmt:
+        case CHashableFType():
+            return fmt.c_hash(ctx)
+        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.float_:
+            return c_hash_default(fmt, ctx)
+        case ImmutableStructFType() | TupleFType():
+            return c_hash_struct(fmt, ctx)
+        case _:
+            raise NotImplementedError(f"No C hash mapping for {fmt}")
 
 
 def c_hash_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_hash"
 
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
 
-
-
-register_property(
-    algebra.int_,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
-register_property(
-    algebra.float_,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
 class CHashableProperties(TypedDict):
     eq: str | None
     hash: str | None
@@ -1157,21 +1056,6 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     return name
 
 
-register_property(
-    ImmutableStructFType,
-    "c_hash",
-    "__attr__",
-    c_hash_struct,
-)
-
-register_property(
-    TupleFType,
-    "c_hash",
-    "__attr__",
-    c_hash_struct,
-)
-
-
 def c_eq(fmt: FType, ctx: "CContext"):
     """
     Expand to the name of a macro that c eq can use for checking equivalence of fmt.
@@ -1181,34 +1065,20 @@ def c_eq(fmt: FType, ctx: "CContext"):
         var_n: name to be supplied. It is a placeholder for a variable with
         type fmt* (so indirection)
     """
-    if hasattr(fmt, "c_eq"):
-        return fmt.c_eq(ctx)
-    return query_property(fmt, "c_eq", "__attr__", ctx)
+    match fmt:
+        case CHashableFType():
+            return fmt.c_eq(ctx)
+        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.float_:
+            return c_eq_default(fmt, ctx)
+        case ImmutableStructFType() | TupleFType():
+            return c_eq_struct(fmt, ctx)
+        case _:
+            raise NotImplementedError(f"No C equality mapping for {fmt}")
 
 
 def c_eq_default(fmt: FType, ctx: "CContext"):
     ctx.add_header(f'#include "{common_h}"')
     return "c_default_eq"
-
-register_property(
-    algebra.int_,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
-register_property(
-    algebra.float_,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
 
 def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     # this should be true in whatever structs we have.
@@ -1233,21 +1103,6 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     )
     ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
     return name
-
-
-register_property(
-    ImmutableStructFType,
-    "c_eq",
-    "__attr__",
-    c_eq_struct,
-)
-
-register_property(
-    TupleFType,
-    "c_eq",
-    "__attr__",
-    c_eq_struct,
-)
 
 
 class CDictFType(DictFType, CArgumentFType, ABC):
