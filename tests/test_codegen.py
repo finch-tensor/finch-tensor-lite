@@ -22,12 +22,12 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
+from finchlite.codegen.buffers import CHashTable, MallocBuffer, NumbaHashTable
 from finchlite.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
     serialize_to_c,
 )
-from finchlite.codegen.buffers import CHashTable, MallocBuffer, NumbaHashTable
 from finchlite.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,

@@ -8,11 +8,7 @@ from textwrap import dedent
 import numpy as np
 
 from finchlite.algebra import FType, ftypes
-from finchlite.finch_assembly import Buffer, Stack
-from finchlite.finch_assembly.nodes import AssemblyExpression
-from finchlite.util import qual_str
-
-from ..c_codegen import (
+from finchlite.codegen.c_codegen import (
     CBufferFType,
     CContext,
     CStackFType,
@@ -21,6 +17,10 @@ from ..c_codegen import (
     load_shared_lib,
     serialize_to_c,
 )
+from finchlite.finch_assembly import Buffer, Stack
+from finchlite.finch_assembly.nodes import AssemblyExpression
+from finchlite.util import qual_str
+
 from .numpy_buffer import CBufferFields
 
 

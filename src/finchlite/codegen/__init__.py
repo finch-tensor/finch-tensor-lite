@@ -1,13 +1,3 @@
-from .c_codegen import (
-    CArgumentFType,
-    CBufferFType,
-    CCode,
-    CCompiler,
-    CGenerator,
-    CKernel,
-    CLibrary,
-    CLowerer,
-)
 from .buffers import (
     CHashTable,
     CHashTableFType,
@@ -19,6 +9,16 @@ from .buffers import (
     NumpyBufferFType,
     SafeBuffer,
     SafeBufferFType,
+)
+from .c_codegen import (
+    CArgumentFType,
+    CBufferFType,
+    CCode,
+    CCompiler,
+    CGenerator,
+    CKernel,
+    CLibrary,
+    CLowerer,
 )
 from .numba_codegen import (
     NumbaBinaryOperator,
