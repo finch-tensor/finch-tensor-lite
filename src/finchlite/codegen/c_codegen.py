@@ -255,12 +255,7 @@ def c_literal(ctx, val):
     Returns:
         The C literal as a string.
     """
-    try:
-        fmt = ftype(val)
-    except NotImplementedError:
-        if hasattr(val, "c_literal"):
-            return val.c_literal(ctx)
-        raise
+    fmt = ftype(val)
     match fmt:
         case algebra.int_ | algebra.float_:
             return str(val)
