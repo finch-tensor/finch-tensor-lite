@@ -7,7 +7,6 @@ import numpy as np
 
 from .algebra import (
     FinchOperator,
-    NumbaOperator,
     type_max,
     type_min,
 )
@@ -50,7 +49,7 @@ class ComparisonFinchOperator(FinchOperator):
         return bool
 
 
-class _Add(NAryFinchOperator, NumbaOperator):
+class _Add(NAryFinchOperator):
     is_associative = True
     is_commutative = True
 
@@ -78,14 +77,11 @@ class _Add(NAryFinchOperator, NumbaOperator):
         assert isinstance(type_, FDType)
         return self(type_(0), type_(0))
 
-    def numba_name(self) -> str:
-        return "+"
-
 
 add = _Add()
 
 
-class _Mul(NAryFinchOperator, NumbaOperator):
+class _Mul(NAryFinchOperator):
     is_associative = True
     is_commutative = True
 
@@ -111,22 +107,16 @@ class _Mul(NAryFinchOperator, NumbaOperator):
         assert isinstance(type_, FDType)
         return self(type_(1), type_(1))
 
-    def numba_name(self) -> str:
-        return "*"
-
 
 mul = _Mul()
 
 
-class _Sub(BinaryFinchOperator, NumbaOperator):
+class _Sub(BinaryFinchOperator):
     def __repr__(self) -> str:
         return "sub"
 
     def __call__(self, a: Any, b: Any):
         return operator.sub(a, b)
-
-    def numba_name(self) -> str:
-        return "-"
 
 
 sub = _Sub()
@@ -371,11 +361,8 @@ class _Invert(UnaryFinchOperator):
 invert = _Invert()
 
 
-class _Eq(ComparisonFinchOperator, NumbaOperator):
+class _Eq(ComparisonFinchOperator):
     is_commutative = True
-
-    def numba_name(self) -> str:
-        return "=="
 
     def __call__(self, a: Any, b: Any):
         return operator.eq(a, b)
@@ -387,11 +374,8 @@ class _Eq(ComparisonFinchOperator, NumbaOperator):
 eq = _Eq()
 
 
-class _Ne(ComparisonFinchOperator, NumbaOperator):
+class _Ne(ComparisonFinchOperator):
     is_commutative = True
-
-    def numba_name(self) -> str:
-        return "!="
 
     def __call__(self, a: Any, b: Any):
         return operator.ne(a, b)
@@ -403,11 +387,7 @@ class _Ne(ComparisonFinchOperator, NumbaOperator):
 ne = _Ne()
 
 
-class _Gt(ComparisonFinchOperator, NumbaOperator):
-
-    def numba_name(self) -> str:
-        return ">"
-
+class _Gt(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.gt(a, b)
 
@@ -418,11 +398,7 @@ class _Gt(ComparisonFinchOperator, NumbaOperator):
 gt = _Gt()
 
 
-class _Lt(ComparisonFinchOperator, NumbaOperator):
-
-    def numba_name(self) -> str:
-        return "<"
-
+class _Lt(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.lt(a, b)
 
@@ -433,11 +409,7 @@ class _Lt(ComparisonFinchOperator, NumbaOperator):
 lt = _Lt()
 
 
-class _Ge(ComparisonFinchOperator, NumbaOperator):
-
-    def numba_name(self) -> str:
-        return ">="
-
+class _Ge(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.ge(a, b)
 
@@ -448,11 +420,7 @@ class _Ge(ComparisonFinchOperator, NumbaOperator):
 ge = _Ge()
 
 
-class _Le(ComparisonFinchOperator, NumbaOperator):
-
-    def numba_name(self) -> str:
-        return "<="
-
+class _Le(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.le(a, b)
 
@@ -598,7 +566,7 @@ class _Truth(UnaryFinchOperator):
 truth = _Truth()
 
 
-class _Min(NAryFinchOperator, NumbaOperator):
+class _Min(NAryFinchOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -620,12 +588,6 @@ class _Min(NAryFinchOperator, NumbaOperator):
         assert isinstance(type_, FDTypeOrdered)
         return type_max(type_)
 
-    def numba_name(self) -> str:
-        return "min"
-
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
-        return f"min({', '.join(map(ctx, args))})"
-
     def __repr__(self) -> str:
         return "min"
 
@@ -633,7 +595,7 @@ class _Min(NAryFinchOperator, NumbaOperator):
 min = _Min()
 
 
-class _Max(NAryFinchOperator, NumbaOperator):
+class _Max(NAryFinchOperator):
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -654,12 +616,6 @@ class _Max(NAryFinchOperator, NumbaOperator):
     def init_value(self, type_: FType):
         assert isinstance(type_, FDTypeOrdered)
         return type_min(type_)
-
-    def numba_name(self) -> str:
-        return "max"
-
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
-        return f"max({', '.join(map(ctx, args))})"
 
     def __repr__(self) -> str:
         return "max"
@@ -1194,7 +1150,7 @@ class _Sign(UnaryFinchOperator):
 sign = _Sign()
 
 
-class _InitWrite(FinchOperator, NumbaOperator):
+class _InitWrite(FinchOperator):
     """
     init_write may assert that its first argument is
     equal to z, and returns its second argument. This is useful when you want to
@@ -1217,9 +1173,6 @@ class _InitWrite(FinchOperator, NumbaOperator):
 
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         return y
-
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
-        return ctx(args[1])
 
     def __repr__(self) -> str:
         return "_initwrite"
@@ -1303,7 +1256,7 @@ class _Conjugate(FinchOperator):
 conjugate = _Conjugate()
 
 
-class _MakeTuple(FinchOperator, NumbaOperator):
+class _MakeTuple(FinchOperator):
     is_commutative = False
     is_associative = False
 
@@ -1313,9 +1266,6 @@ class _MakeTuple(FinchOperator, NumbaOperator):
     def return_type(self, *args: FType) -> FType:
         return TupleFType.from_tuple(args)
 
-    def numba_literal(self, val: Any, ctx: Any, *args: Any):
-        return f"({','.join([ctx(arg) for arg in args])},)"
-
     def __repr__(self) -> str:
         return "make_tuple"
 
@@ -1323,7 +1273,7 @@ class _MakeTuple(FinchOperator, NumbaOperator):
 make_tuple = _MakeTuple()
 
 
-class _Scansearch(FinchOperator, NumbaOperator):
+class _Scansearch(FinchOperator):
     """
     Scansearch is a search operator that performs a scan search on a sorted array.
 
@@ -1364,13 +1314,6 @@ class _Scansearch(FinchOperator, NumbaOperator):
     def return_type(self, arr: FType, x: FType, lo: FType, hi: FType) -> FType:  # type: ignore[override]
         return hi
 
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
-        arr = args[0]
-        x = args[1]
-        lo = args[2]
-        hi = args[3]
-        return f"scansearch({ctx(arr)}, {ctx(x)}, {ctx(lo)}, {ctx(hi)})"
-
     def __repr__(self) -> str:
         return "scansearch"
 
@@ -1378,7 +1321,7 @@ class _Scansearch(FinchOperator, NumbaOperator):
 scansearch = _Scansearch()
 
 
-class _ResizeIfSmaller(FinchOperator, NumbaOperator):
+class _ResizeIfSmaller(FinchOperator):
     """
     ResizeIfSmaller resizes an array to a new size if the new size is larger
     than the current size.
@@ -1404,12 +1347,6 @@ class _ResizeIfSmaller(FinchOperator, NumbaOperator):
 
     def return_type(self, arr: FType, new_size: FType, fill_value: FType) -> FType:  # type: ignore[override]
         return arr
-
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
-        arr = args[0]
-        new_size = args[1]
-        fill_value = args[2]
-        return f"resize_if_smaller({ctx(arr)}, {ctx(new_size)}, {ctx(fill_value)})"
 
     def __repr__(self) -> str:
         return "resize_if_smaller"

@@ -11,12 +11,12 @@ from finchlite.algebra import (
     FType,
     FTyped,
     ImmutableStructFType,
-    NumbaOperator,
     TensorFType,
     ffuncs,
     ftype,
 )
 from finchlite.algebra.algebra import FinchOperator
+from finchlite.codegen.numba_codegen import NumbaNAryOperator
 from finchlite.finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -123,7 +123,7 @@ def numba_lower_dimension(ctx, tns, mode: int) -> str:
     return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
 
 
-class _Dimension(FinchOperator, NumbaOperator):
+class _Dimension(FinchOperator, NumbaNAryOperator):
     def __call__(self, tns, mode: int) -> Extent:
         end = tns.shape[mode]
         return Extent(ftype(end)(0), end)
@@ -131,9 +131,12 @@ class _Dimension(FinchOperator, NumbaOperator):
     def return_type(self, tns: FType, mode: FType) -> FType:  # type: ignore[override]
         return ExtentFType(ftype(np.intp), ftype(np.intp))  # type: ignore[abstract]
 
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
         tns, mode = args
         return numba_lower_dimension(ctx, tns, mode)
+
+    def numba_name(self) -> str:
+        return "dimension"
 
     def __repr__(self) -> str:
         return "dimension"

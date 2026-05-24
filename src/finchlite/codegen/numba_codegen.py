@@ -13,7 +13,6 @@ from finchlite.algebra import (
     FType,
     ImmutableStructFType,
     MutableStructFType,
-    NumbaOperator,
     StructFType,
     TupleFType,
     ffuncs,
@@ -32,7 +31,148 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
+numba_globals: dict[str, Any] = {
+    "scansearch": numba.njit(ffuncs.scansearch._func),
+    "resize_if_smaller": numba.njit(ffuncs.resize_if_smaller._func),
+}
+
+
+class NumbaOperator(ABC):
+    @abstractmethod
+    def numba_name(self) -> str:
+        ...
+
+    @abstractmethod
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        ...
+
+
+class NumbaNAryOperator(NumbaOperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return numba_nary_function_call(self.numba_name(), ctx, *args)
+
+
+class NumbaBinaryOperator(NumbaOperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return numba_binary_function_call(self.numba_name(), ctx, *args)
+
+
+class NumbaUnaryOperator(NumbaOperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return numba_unary_function_call(self.numba_name(), ctx, *args)
+
+
+def numba_function_name(op, ctx, *args: Any) -> str:
+    match op:
+        case ffuncs.add:
+            return "+"
+        case ffuncs.mul:
+            return "*"
+        case ffuncs.sub:
+            return "-"
+        case ffuncs.truediv:
+            return "/"
+        case ffuncs.floordiv:
+            return "//"
+        case ffuncs.mod:
+            return "%"
+        case ffuncs.pow:
+            return "**"
+        case ffuncs.lshift:
+            return "<<"
+        case ffuncs.rshift:
+            return ">>"
+        case ffuncs.and_:
+            return "&"
+        case ffuncs.xor:
+            return "^"
+        case ffuncs.or_:
+            return "|"
+        case ffuncs.not_:
+            return "not "
+        case ffuncs.invert:
+            return "~"
+        case ffuncs.eq:
+            return "=="
+        case ffuncs.ne:
+            return "!="
+        case ffuncs.gt:
+            return ">"
+        case ffuncs.lt:
+            return "<"
+        case ffuncs.ge:
+            return ">="
+        case ffuncs.le:
+            return "<="
+        case ffuncs.min:
+            return "min"
+        case ffuncs.max:
+            return "max"
+        case ffuncs.scansearch:
+            return "scansearch"
+        case ffuncs.resize_if_smaller:
+            return "resize_if_smaller"
+        case NumbaOperator():
+            return op.numba_name()
+        case _:
+            raise TypeError(f"{op} has no Numba representation.")
+
+
+def numba_nary_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    assert len(args) > 0
+    if len(args) == 1:
+        return f"({ctx(args[0])})"
+    return f"({f' {numba_name} '.join(map(ctx, args))})"
+
+
+def numba_binary_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    a, b = args
+    return f"({ctx(a)} {numba_name} {ctx(b)})"
+
+
+def numba_unary_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    return f"({numba_name}{ctx(args[0])})"
+
+
+def numba_call_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    return f"{numba_name}({', '.join(map(ctx, args))})"
+
+
+def numba_function_call(op, ctx, *args: Any) -> str:
+    match op:
+        case ffuncs._InitWrite():
+            return ctx(args[1])
+        case ffuncs.make_tuple:
+            return f"({','.join([ctx(arg) for arg in args])},)"
+        case NumbaOperator():
+            return op.numba_function_call(op, ctx, *args)
+
+    numba_name = numba_function_name(op, ctx, *args)
+    match op:
+        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+            return numba_nary_function_call(numba_name, ctx, *args)
+        case (
+            ffuncs.sub
+            | ffuncs.truediv
+            | ffuncs.floordiv
+            | ffuncs.mod
+            | ffuncs.pow
+            | ffuncs.lshift
+            | ffuncs.rshift
+            | ffuncs.eq
+            | ffuncs.ne
+            | ffuncs.gt
+            | ffuncs.lt
+            | ffuncs.ge
+            | ffuncs.le
+        ):
+            return numba_binary_function_call(numba_name, ctx, *args)
+        case ffuncs.not_ | ffuncs.invert:
+            return numba_unary_function_call(numba_name, ctx, *args)
+        case ffuncs.min | ffuncs.max | ffuncs.scansearch | ffuncs.resize_if_smaller:
+            return numba_call_function_call(numba_name, ctx, *args)
+        case _:
+            raise TypeError(f"{op} has no Numba representation.")
 
 
 class NumbaArgumentFType(ABC):
@@ -572,9 +712,7 @@ class NumbaContext(Context):
                 numba_setattr(obj_t, self, obj_code, attr.val, val_code)
                 return None
             case asm.Call(asm.Literal(op), args):
-                if not isinstance(op, NumbaOperator):
-                    raise TypeError(f"{op} has no Numba representation.")
-                return op.numba_literal(op, self, *args)
+                return numba_function_call(op, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_type != var_t:

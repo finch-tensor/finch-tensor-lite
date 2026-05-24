@@ -1,7 +1,6 @@
 from . import ffuncs
 from .algebra import (
     FinchOperator,
-    NumbaOperator,
     cansplitpush,
     fixpoint_type,
     init_value,
@@ -64,7 +63,6 @@ __all__ = [
     "ImmutableStructFType",
     "MutableStructFType",
     "NamedTupleFType",
-    "NumbaOperator",
     "StructFType",
     "Tensor",
     "TensorFType",

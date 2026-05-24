@@ -13,10 +13,14 @@ from .hashtable import (
     NumbaHashTableFType,
 )
 from .numba_codegen import (
+    NumbaBinaryOperator,
     NumbaCompiler,
     NumbaGenerator,
     NumbaKernel,
     NumbaLibrary,
+    NumbaNAryOperator,
+    NumbaOperator,
+    NumbaUnaryOperator,
 )
 from .numpy_buffer import NumpyBuffer, NumpyBufferFType
 from .safe_buffer import SafeBuffer, SafeBufferFType
@@ -36,6 +40,7 @@ __all__ = [
     "CStruct",
     "CStructFTypeNumbaCompiler",
     "NumbaCode",
+    "NumbaBinaryOperator",
     "NumbaCompiler",
     "NumbaGenerator",
     "NumbaHashTable",
@@ -43,8 +48,11 @@ __all__ = [
     "NumbaKernel",
     "NumbaLibrary",
     "NumbaLowerer",
+    "NumbaNAryOperator",
+    "NumbaOperator",
     "NumbaStruct",
     "NumbaStructFType",
+    "NumbaUnaryOperator",
     "NumpyBuffer",
     "NumpyBufferFType",
     "SafeBuffer",

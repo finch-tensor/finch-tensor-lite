@@ -156,14 +156,6 @@ def register_property(cls, attr, prop, f):
     _properties[(cls, attr, prop)] = f
 
 
-class NumbaOperator:
-    def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
-        return f"({f' {self.numba_name()} '.join(map(ctx, args))})"
-
-    def numba_name(self) -> str:
-        raise NotImplementedError(f"{type(self)} must implement numba_name")
-
-
 class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
