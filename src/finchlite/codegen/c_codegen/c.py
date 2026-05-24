@@ -70,7 +70,7 @@ class CUnaryOperator(COperator):
         return c_unary_function_call(self.c_symbol, ctx, *args)
 
 
-common_h = Path(__file__).parent / "stc" / "include" / "stc" / "common.h"
+common_h = Path(__file__).parents[1] / "stc" / "include" / "stc" / "common.h"
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")

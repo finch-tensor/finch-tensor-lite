@@ -33,7 +33,7 @@ from ..numba_codegen import (
     serialize_to_numba,
 )
 
-stcpath = Path(__file__).parent / "stc" / "include"
+stcpath = Path(__file__).parents[1] / "stc" / "include"
 hashmap_h = stcpath / "stc" / "hashmap.h"
 
 
@@ -255,6 +255,8 @@ class CHashTable(Dict):
             self.store(key, value)
 
     def __del__(self):
+        if not hasattr(self, "lib") or not hasattr(self, "dct"):
+            return
         getattr(self.lib.library, self.lib.methods.cleanup)(self.dct)
 
     def exists(self, idx) -> np.bool:
