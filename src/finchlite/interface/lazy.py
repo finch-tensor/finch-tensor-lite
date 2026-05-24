@@ -199,6 +199,9 @@ class LazyTensor(OverrideTensor):
         self._fill_value = fill_value
         self._element_type = element_type
 
+    def override_module(self):
+        return sys.modules[__name__]
+
     @property
     def ftype(self):
         return LazyTensorFType(
@@ -229,139 +232,6 @@ class LazyTensor(OverrideTensor):
     def shape_type(self) -> tuple:
         """Shape type of the tensor."""
         return self.ftype.shape_type
-
-    def override_module(self):
-        return sys.modules[__name__]
-
-    def __add__(self, other):
-        return add(self, other)
-
-    def __radd__(self, other):
-        return add(other, self)
-
-    def __sub__(self, other):
-        return subtract(self, other)
-
-    def __rsub__(self, other):
-        return subtract(other, self)
-
-    def __mul__(self, other):
-        return multiply(self, other)
-
-    def __rmul__(self, other):
-        return multiply(other, self)
-
-    def __abs__(self):
-        return abs(self)
-
-    def __pos__(self):
-        return positive(self)
-
-    def __neg__(self):
-        return negative(self)
-
-    # same as before?
-    def __and__(self, other):
-        return bitwise_and(self, other)
-
-    def __rand__(self, other):
-        return bitwise_and(other, self)
-
-    def __lshift__(self, other):
-        return bitwise_left_shift(self, other)
-
-    def __rlshift__(self, other):
-        return bitwise_left_shift(other, self)
-
-    def __or__(self, other):
-        return bitwise_or(self, other)
-
-    def __ror__(self, other):
-        return bitwise_or(other, self)
-
-    def __rshift__(self, other):
-        return bitwise_right_shift(self, other)
-
-    def __rrshift__(self, other):
-        return bitwise_right_shift(other, self)
-
-    def __xor__(self, other):
-        return bitwise_xor(self, other)
-
-    def __rxor__(self, other):
-        return bitwise_xor(other, self)
-
-    def __invert__(self):
-        return bitwise_inverse(self)
-
-    def __truediv__(self, other):
-        return truediv(self, other)
-
-    def __rtruediv__(self, other):
-        return truediv(other, self)
-
-    def __floordiv__(self, other):
-        return floordiv(self, other)
-
-    def __rfloordiv__(self, other):
-        return floordiv(other, self)
-
-    def __mod__(self, other):
-        return mod(self, other)
-
-    def __rmod__(self, other):
-        return mod(other, self)
-
-    def __pow__(self, other):
-        return power(self, other)
-
-    def __rpow__(self, other):
-        return power(other, self)
-
-    def __matmul__(self, other):
-        return matmul(self, other)
-
-    def __rmatmul__(self, other):
-        return matmul(other, self)
-
-    def __sin__(self):
-        return sin(self)
-
-    def __sinh__(self):
-        return sinh(self)
-
-    def __cos__(self):
-        return cos(self)
-
-    def __cosh__(self):
-        return cosh(self)
-
-    def __tan__(self):
-        return tan(self)
-
-    def __tanh__(self):
-        return tanh(self)
-
-    def __asin__(self):
-        return asin(self)
-
-    def __asinh__(self):
-        return asinh(self)
-
-    def __acos__(self):
-        return acos(self)
-
-    def __acosh__(self):
-        return acosh(self)
-
-    def __atan__(self):
-        return atan(self)
-
-    def __atanh__(self):
-        return atanh(self)
-
-    def __atan2__(self, other):
-        return atan2(self, other)
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -400,52 +270,6 @@ class LazyTensor(OverrideTensor):
         raise ValueError(
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
-
-    def __log__(self):
-        return log(self)
-
-    def __log1p__(self):
-        return log1p(self)
-
-    def __log2__(self):
-        return log2(self)
-
-    def __log10__(self):
-        return log10(self)
-
-    def __logaddexp__(self, other):
-        return logaddexp(self, other)
-
-    def __logical_and__(self, other):
-        return logical_and(self, other)
-
-    def __logical_or__(self, other):
-        return logical_or(self, other)
-
-    def __logical_xor__(self, other):
-        return logical_xor(self, other)
-
-    def __logical_not__(self):
-        return logical_not(self)
-
-    def __lt__(self, other):
-        return less(self, other)
-
-    def __le__(self, other):
-        return less_equal(self, other)
-
-    def __gt__(self, other):
-        return greater(self, other)
-
-    def __ge__(self, other):
-        return greater_equal(self, other)
-
-    def __eq__(self, other):
-        return equal(self, other)
-
-    def __ne__(self, other):
-        return not_equal(self, other)
-
 
 def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
