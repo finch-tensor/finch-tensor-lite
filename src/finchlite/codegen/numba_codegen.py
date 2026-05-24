@@ -39,12 +39,10 @@ numba_globals: dict[str, Any] = {
 
 class NumbaOperator(ABC):
     @abstractmethod
-    def numba_name(self) -> str:
-        ...
+    def numba_name(self) -> str: ...
 
     @abstractmethod
-    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
-        ...
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any: ...
 
 
 class NumbaNAryOperator(NumbaOperator):

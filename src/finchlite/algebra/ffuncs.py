@@ -123,7 +123,6 @@ sub = _Sub()
 
 
 class _TrueDiv(BinaryFinchOperator):
-
     def __repr__(self) -> str:
         return "truediv"
 
@@ -138,7 +137,6 @@ truediv = _TrueDiv()
 
 
 class _FloorDiv(BinaryFinchOperator):
-
     def __repr__(self) -> str:
         return "floordiv"
 
@@ -150,7 +148,6 @@ floordiv = _FloorDiv()
 
 
 class _Mod(BinaryFinchOperator):
-
     def __repr__(self) -> str:
         return "mod"
 
@@ -194,7 +191,6 @@ pow = _Pow()
 
 
 class _LShift(BinaryFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.lshift(a, b)
 
@@ -209,7 +205,6 @@ lshift = _LShift()
 
 
 class _RShift(BinaryFinchOperator):
-
     def __call__(self, a: Any, b: Any):
         return operator.rshift(a, b)
 
@@ -301,7 +296,6 @@ or_ = _Or()
 
 
 class _Not(UnaryFinchOperator):
-
     def __call__(self, a: Any):
         return operator.not_(a)
 
@@ -350,7 +344,6 @@ neg = _Neg()
 
 
 class _Invert(UnaryFinchOperator):
-
     def __call__(self, a: Any):
         return operator.invert(a)
 
