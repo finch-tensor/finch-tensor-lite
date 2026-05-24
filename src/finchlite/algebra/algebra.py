@@ -156,17 +156,6 @@ def register_property(cls, attr, prop, f):
     _properties[(cls, attr, prop)] = f
 
 
-class COperator(ABC):
-    @property
-    @abstractmethod
-    def c_symbol(self) -> str:
-        pass
-
-    @abstractmethod
-    def c_function_call(self, ctx: Any, *args: Any) -> Any:
-        pass
-
-
 class NumbaOperator:
     def numba_literal(self, val: Any, ctx: Any, *args: Any) -> Any:
         return f"({f' {self.numba_name()} '.join(map(ctx, args))})"

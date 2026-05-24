@@ -1,6 +1,5 @@
 from . import ffuncs
 from .algebra import (
-    COperator,
     FinchOperator,
     NumbaOperator,
     cansplitpush,
@@ -59,7 +58,6 @@ from .tensor import (
 )
 
 __all__ = [
-    "COperator",
     "FType",
     "FTyped",
     "FinchOperator",

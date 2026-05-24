@@ -15,7 +15,6 @@ import numpy as np
 from finchlite import algebra
 from finchlite import finch_assembly as asm
 from finchlite.algebra import (
-    COperator,
     FType,
     ImmutableStructFType,
     MutableStructFType,
@@ -35,6 +34,41 @@ from finchlite.util.logging import LOG_BACKEND_C
 from .stages import CCode, CLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)
+
+
+class COperator(ABC):
+    """Abstract base class for C language operators."""
+
+    @property
+    @abstractmethod
+    def c_symbol(self) -> str:
+        """Returns the C symbol for this operator (e.g., '+', '-', '*')."""
+
+    @abstractmethod
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        """Generates the C function call for this operator."""
+
+
+class CNAryOperator(COperator):
+    """Base class for n-ary C operators (operators that take multiple arguments)."""
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        return c_nary_function_call(self.c_symbol, ctx, *args)
+
+
+class CBinaryOperator(COperator):
+    """Base class for binary C operators (operators that take exactly two arguments)."""
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        return c_binary_function_call(self.c_symbol, ctx, *args)
+
+
+class CUnaryOperator(COperator):
+    """Base class for unary C operators (operators that take exactly one argument)."""
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        return c_unary_function_call(self.c_symbol, ctx, *args)
+
 
 common_h = Path(__file__).parent / "stc" / "include" / "stc" / "common.h"
 
@@ -219,12 +253,70 @@ def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
         The C function name as a string.
 
     Raises:
-        NotImplementedError: If the C function name is not implemented for the
-        given function and types.
+        TypeError: If the C function name is not implemented for the given function.
     """
-    if isinstance(op, COperator):
-        return op.c_symbol
-    raise TypeError(f"{op} has no C representation.")
+    match op:
+        case ffuncs.add:
+            return "+"
+        case ffuncs.mul:
+            return "*"
+        case ffuncs.sub:
+            return "-"
+        case ffuncs.truediv | ffuncs.floordiv:
+            return "/"
+        case ffuncs.mod:
+            return "%"
+        case ffuncs.lshift:
+            return "<<"
+        case ffuncs.rshift:
+            return ">>"
+        case ffuncs.and_:
+            return "&"
+        case ffuncs.xor:
+            return "^"
+        case ffuncs.or_:
+            return "|"
+        case ffuncs.not_:
+            return "!"
+        case ffuncs.invert:
+            return "~"
+        case ffuncs.eq:
+            return "=="
+        case ffuncs.ne:
+            return "!="
+        case ffuncs.gt:
+            return ">"
+        case ffuncs.lt:
+            return "<"
+        case ffuncs.ge:
+            return ">="
+        case ffuncs.le:
+            return "<="
+        case ffuncs.pow:
+            return "pow"
+        case COperator():
+            return op.c_symbol
+        case _:
+            raise TypeError(f"{op} has no C representation.")
+
+
+def c_nary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
+    """Generate C code for n-ary operators."""
+    assert len(args) > 0
+    if len(args) == 1:
+        return f"{c_symbol}{ctx(args[0])}"
+    return f" {c_symbol} ".join(map(ctx, args))
+
+
+def c_binary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
+    """Generate C code for binary operators."""
+    a, b = args
+    return f"{ctx(a)} {c_symbol} {ctx(b)}"
+
+
+def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
+    """Generate C code for unary operators."""
+    return f"{c_symbol}{ctx(args[0])}"
 
 
 def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
@@ -239,9 +331,34 @@ def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
-    if not isinstance(op, COperator):
-        raise TypeError(f"{op} has no C representation.")
-    return op.c_function_call(ctx, *args)
+    c_symbol = c_function_name(op, ctx, *args)
+    match op:
+        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+            return c_nary_function_call(c_symbol, ctx, *args)
+        case (
+            ffuncs.sub
+            | ffuncs.truediv
+            | ffuncs.floordiv
+            | ffuncs.mod
+            | ffuncs.lshift
+            | ffuncs.rshift
+            | ffuncs.eq
+            | ffuncs.ne
+            | ffuncs.gt
+            | ffuncs.lt
+            | ffuncs.ge
+            | ffuncs.le
+        ):
+            return c_binary_function_call(c_symbol, ctx, *args)
+        case ffuncs.not_ | ffuncs.invert:
+            return c_unary_function_call(c_symbol, ctx, *args)
+        case ffuncs.pow:
+            a, b = args
+            return f"{c_symbol}({ctx(a)}, {ctx(b)})"
+        case COperator():
+            return op.c_function_call(ctx, *args)
+        case _:
+            raise TypeError(f"{op} has no C representation.")
 
 
 def c_literal(ctx, val):
