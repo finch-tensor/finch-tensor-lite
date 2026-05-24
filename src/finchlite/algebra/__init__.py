@@ -10,8 +10,6 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
-    query_property,
-    register_property,
     repeat_operator,
     return_type,
 )
@@ -103,8 +101,6 @@ __all__ = [
     "isdtype",
     "none_",
     "promote_type",
-    "query_property",
-    "register_property",
     "repeat_operator",
     "return_type",
     "str_",
