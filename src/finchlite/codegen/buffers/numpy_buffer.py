@@ -10,8 +10,8 @@ from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
 from finchlite.util import qual_str
 
-from .c_codegen import CBufferFType, CContext, CStackFType, c_type
-from .numba_codegen import NumbaBufferFType, to_numpy_type
+from ..c_codegen import CBufferFType, CContext, CStackFType, c_type
+from ..numba_codegen import NumbaBufferFType, to_numpy_type
 
 
 class NumbaBufferFields(NamedTuple):

@@ -12,7 +12,7 @@ from finchlite.finch_assembly import Buffer, Stack
 from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
-from .c_codegen import (
+from ..c_codegen import (
     CBufferFType,
     CContext,
     CStackFType,

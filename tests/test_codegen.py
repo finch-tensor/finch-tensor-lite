@@ -27,8 +27,7 @@ from finchlite.codegen.c_codegen import (
     deserialize_from_c,
     serialize_to_c,
 )
-from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
-from finchlite.codegen.malloc_buffer import MallocBuffer
+from finchlite.codegen.buffers import CHashTable, MallocBuffer, NumbaHashTable
 from finchlite.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,

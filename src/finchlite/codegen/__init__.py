@@ -1,30 +1,37 @@
 from .c_codegen import (
     CArgumentFType,
     CBufferFType,
+    CCode,
     CCompiler,
     CGenerator,
     CKernel,
     CLibrary,
+    CLowerer,
 )
-from .hashtable import (
+from .buffers import (
     CHashTable,
     CHashTableFType,
+    MallocBuffer,
+    MallocBufferFType,
     NumbaHashTable,
     NumbaHashTableFType,
+    NumpyBuffer,
+    NumpyBufferFType,
+    SafeBuffer,
+    SafeBufferFType,
 )
 from .numba_codegen import (
     NumbaBinaryOperator,
+    NumbaCode,
     NumbaCompiler,
     NumbaGenerator,
     NumbaKernel,
     NumbaLibrary,
+    NumbaLowerer,
     NumbaNAryOperator,
     NumbaOperator,
     NumbaUnaryOperator,
 )
-from .numpy_buffer import NumpyBuffer, NumpyBufferFType
-from .safe_buffer import SafeBuffer, SafeBufferFType
-from .stages import CCode, CLowerer, NumbaCode, NumbaLowerer
 
 __all__ = [
     "CArgumentFType",
@@ -39,6 +46,8 @@ __all__ = [
     "CLowerer",
     "CStruct",
     "CStructFTypeNumbaCompiler",
+    "MallocBuffer",
+    "MallocBufferFType",
     "NumbaBinaryOperator",
     "NumbaCode",
     "NumbaCompiler",

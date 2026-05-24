@@ -13,7 +13,7 @@ import numba
 from finchlite.algebra import FType, ImmutableStructFType
 from finchlite.finch_assembly import AssemblyExpression, Dict, Stack
 
-from .c_codegen import (
+from ..c_codegen import (
     CContext,
     CDictFType,
     CStackFType,
@@ -24,7 +24,7 @@ from .c_codegen import (
     load_shared_lib,
     serialize_to_c,
 )
-from .numba_codegen import (
+from ..numba_codegen import (
     NumbaContext,
     NumbaDictFType,
     NumbaStackFType,
