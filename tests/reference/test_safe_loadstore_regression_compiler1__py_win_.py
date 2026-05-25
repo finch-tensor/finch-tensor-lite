@@ -26,4 +26,4 @@ def finch_change(a: builtins.list, idx: int64, val: int64) -> int64:
     if computed_3 < 0 or computed_3 >= (len(a__arr_2)):
         raise IndexError()
     a__arr_2[computed_3] = val
-    return int64(0)
+    return 0
