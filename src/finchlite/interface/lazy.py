@@ -271,6 +271,7 @@ class LazyTensor(OverrideTensor):
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
 
+
 def asarray(arg: Any, format: TensorFType | None = None) -> Any:
     """
     Convert given argument and return wrapper type instance.

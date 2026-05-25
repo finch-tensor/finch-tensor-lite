@@ -80,7 +80,7 @@ class OverrideTensor(Tensor):
     @property
     def mod(self):
         return self.override_module()
-    
+
     def override_module(self):
         return sys.modules["finchlite.interface"]
 
