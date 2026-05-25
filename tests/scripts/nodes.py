@@ -5,7 +5,7 @@ import finchlite.finch_assembly as asm
 import finchlite.finch_logic as log
 import finchlite.finch_notation as ntn
 from finchlite import ffuncs
-from finchlite.codegen.numpy_buffer import NumpyBuffer
+from finchlite.codegen.buffers import NumpyBuffer
 
 
 def create_ntn_simple_node():

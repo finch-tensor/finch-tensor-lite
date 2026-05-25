@@ -14,9 +14,9 @@ from finchlite.algebra import (
     TensorFType,
     ffuncs,
     ftype,
-    register_property,
 )
 from finchlite.algebra.algebra import FinchOperator
+from finchlite.codegen.numba_codegen import NumbaNAryOperator
 from finchlite.finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -119,29 +119,30 @@ class _MakeExtent(FinchOperator):
 make_extent = _MakeExtent()
 
 
-def dimension(tns, mode: int) -> Extent:
-    end = tns.shape[mode]
-    return Extent(ftype(end)(0), end)
-
-
 def numba_lower_dimension(ctx, tns, mode: int) -> str:
     return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
 
 
-register_property(
-    dimension,
-    "__call__",
-    "return_type",
-    lambda op, x, y: ExtentFType(ftype(np.intp), ftype(np.intp)),  # type: ignore[abstract]
-)
+class _Dimension(FinchOperator, NumbaNAryOperator):
+    def __call__(self, tns, mode: int) -> Extent:
+        end = tns.shape[mode]
+        return Extent(ftype(end)(0), end)
+
+    def return_type(self, tns: FType, mode: FType) -> FType:  # type: ignore[override]
+        return ExtentFType(ftype(np.intp), ftype(np.intp))  # type: ignore[abstract]
+
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        tns, mode = args
+        return numba_lower_dimension(ctx, tns, mode)
+
+    def numba_name(self) -> str:
+        return "dimension"
+
+    def __repr__(self) -> str:
+        return "dimension"
 
 
-register_property(
-    dimension,
-    "numba_literal",
-    "__attr__",
-    lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
-)
+dimension = _Dimension()
 
 
 @dataclass(frozen=True)

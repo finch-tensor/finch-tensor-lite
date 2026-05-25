@@ -1,8 +1,6 @@
 from . import ffuncs
 from .algebra import (
-    COperator,
     FinchOperator,
-    NumbaOperator,
     cansplitpush,
     fixpoint_type,
     init_value,
@@ -12,8 +10,6 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
-    query_property,
-    register_property,
     repeat_operator,
     return_type,
 )
@@ -59,14 +55,12 @@ from .tensor import (
 )
 
 __all__ = [
-    "COperator",
     "FType",
     "FTyped",
     "FinchOperator",
     "ImmutableStructFType",
     "MutableStructFType",
     "NamedTupleFType",
-    "NumbaOperator",
     "StructFType",
     "Tensor",
     "TensorFType",
@@ -107,8 +101,6 @@ __all__ = [
     "isdtype",
     "none_",
     "promote_type",
-    "query_property",
-    "register_property",
     "repeat_operator",
     "return_type",
     "str_",

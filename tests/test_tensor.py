@@ -11,7 +11,7 @@ from finchlite import (
 
 
 def test_fiber_tensor_attributes():
-    fmt = fiber_tensor(dense(dense(element(0.0))))
+    fmt = fiber_tensor(dense(dense(element(0.0, finchlite.float64))))
     shape = (3, 4)
     arr = np.ones(shape)
     a = asarray(arr, format=fmt)

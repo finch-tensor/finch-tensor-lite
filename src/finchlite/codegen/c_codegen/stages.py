@@ -12,14 +12,6 @@ class CCode:
         return self.code
 
 
-class NumbaCode:
-    def __init__(self, code: str):
-        self.code = code
-
-    def __str__(self) -> str:
-        return self.code
-
-
 class CLowerer(Stage):
     @abstractmethod
     def __call__(self, prgm: asm.Module) -> CCode:
@@ -28,9 +20,4 @@ class CLowerer(Stage):
         """
 
 
-class NumbaLowerer(Stage):
-    @abstractmethod
-    def __call__(self, prgm: asm.Module) -> NumbaCode:
-        """
-        Lower the given assembly program to Numba code.
-        """
+__all__ = ["CCode", "CLowerer"]
