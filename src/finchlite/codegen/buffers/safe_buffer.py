@@ -1,6 +1,5 @@
-import ctypes
-
 import finchlite.finch_assembly as asm
+from finchlite.algebra import ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CStackFType
 from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaStackFType
 from finchlite.finch_assembly import Buffer
@@ -74,7 +73,7 @@ class SafeBufferFType(CBufferFType, NumbaBufferFType, CStackFType, NumbaStackFTy
             f"{ctx.feed}    exit(1);\n"
             f"{ctx.feed}}}"
         )
-        return asm.Variable(idx_n, ctypes.c_size_t)
+        return asm.Variable(idx_n, ftypes.intp)
 
     def c_load(self, ctx, buf, idx):
         """
