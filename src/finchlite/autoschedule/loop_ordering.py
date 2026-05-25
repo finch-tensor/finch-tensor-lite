@@ -263,6 +263,49 @@ class LoopOrderer(LogicLoader):
                 case Plan(bodies):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
                 case Query(lhs, rhs):
+                    # quick fix
+                    match rhs:
+                        case Reorder(
+                            Aggregate(op, init, arg, reduce_axes),
+                            output_order,
+                        ):
+                            loop_order = output_order + tuple(
+                                idx for idx in reduce_axes if idx not in output_order
+                            )
+                            arg, swizzles = _align(arg, loop_order)
+                            ordered = Query(
+                                lhs,
+                                Aggregate(
+                                    op,
+                                    init,
+                                    Reorder(arg, loop_order),
+                                    reduce_axes,
+                                ),
+                            )
+                            if swizzles:
+                                return Plan((*swizzles, ordered))
+                            return ordered
+                        case Aggregate(op, init, arg, reduce_axes) if not isinstance(
+                            arg, Reorder
+                        ):
+                            output_order = tuple(rhs.fields())
+                            loop_order = output_order + tuple(
+                                idx for idx in reduce_axes if idx not in output_order
+                            )
+                            arg, swizzles = _align(arg, loop_order)
+                            ordered = Query(
+                                lhs,
+                                Aggregate(
+                                    op,
+                                    init,
+                                    Reorder(arg, loop_order),
+                                    reduce_axes,
+                                ),
+                            )
+                            if swizzles:
+                                return Plan((*swizzles, ordered))
+                            return ordered
+
                     loop_order = self.get_loop_order(
                         node, bindings, stats, stats_factory
                     )
