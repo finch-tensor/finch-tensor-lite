@@ -9,7 +9,7 @@ import finchlite.finch_assembly as asm
 from finchlite import ffuncs
 from finchlite.algebra import FType, TupleFType, ftype
 from finchlite.codegen import NumpyBuffer
-from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
+from finchlite.codegen.buffers import CHashTable, NumbaHashTable
 from finchlite.finch_assembly import assembly_check_types
 
 
