@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from finchlite.algebra import FType, FTyped, intp, query_property
+from finchlite.algebra import FType, FTyped, intp
 
 
 class Buffer(FTyped, ABC):
@@ -66,7 +66,7 @@ def length_type(arg: Any):
     """
     if hasattr(arg, "length_type"):
         return arg.length_type
-    return query_property(arg, "length_type", "__attr__")
+    raise AttributeError(f"{type(arg).__name__} has no length_type")
 
 
 def element_type(arg: Any):

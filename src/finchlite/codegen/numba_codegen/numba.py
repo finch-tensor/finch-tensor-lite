@@ -10,16 +10,13 @@ import numba
 from finchlite import algebra
 from finchlite import finch_assembly as asm
 from finchlite.algebra import (
+    FType,
     ImmutableStructFType,
     MutableStructFType,
-    NumbaOperator,
     StructFType,
     TupleFType,
     ffuncs,
     fisinstance,
-    ftype,
-    query_property,
-    register_property,
 )
 from finchlite.finch_assembly import BufferFType
 from finchlite.finch_assembly.dct import DictFType
@@ -34,29 +31,189 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
-numba_globals: dict[str, Any] = {"scansearch": numba.njit(ffuncs.scansearch._func)}
+numba_globals: dict[str, Any] = {
+    "scansearch": numba.njit(ffuncs.scansearch._func),
+    "resize_if_smaller": numba.njit(ffuncs.resize_if_smaller._func),
+}
 
 
-def _normalize_fmt(fmt):
-    try:
-        return ftype(fmt)
-    except NotImplementedError:
-        return fmt
+class NumbaOperator(ABC):
+    @abstractmethod
+    def numba_name(self) -> str: ...
+
+    @abstractmethod
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any: ...
 
 
-def to_numpy_type(t: Any) -> np.dtype:
+class NumbaNAryOperator(NumbaOperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return numba_nary_function_call(self.numba_name(), ctx, *args)
+
+
+class NumbaBinaryOperator(NumbaOperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return numba_binary_function_call(self.numba_name(), ctx, *args)
+
+
+class NumbaUnaryOperator(NumbaOperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return numba_unary_function_call(self.numba_name(), ctx, *args)
+
+
+def numba_function_name(op, ctx, *args: Any) -> str:
+    match op:
+        case ffuncs.add:
+            return "+"
+        case ffuncs.mul:
+            return "*"
+        case ffuncs.sub:
+            return "-"
+        case ffuncs.truediv:
+            return "/"
+        case ffuncs.floordiv:
+            return "//"
+        case ffuncs.mod:
+            return "%"
+        case ffuncs.pow:
+            return "**"
+        case ffuncs.lshift:
+            return "<<"
+        case ffuncs.rshift:
+            return ">>"
+        case ffuncs.and_:
+            return "&"
+        case ffuncs.xor:
+            return "^"
+        case ffuncs.or_:
+            return "|"
+        case ffuncs.not_:
+            return "not "
+        case ffuncs.invert:
+            return "~"
+        case ffuncs.eq:
+            return "=="
+        case ffuncs.ne:
+            return "!="
+        case ffuncs.gt:
+            return ">"
+        case ffuncs.lt:
+            return "<"
+        case ffuncs.ge:
+            return ">="
+        case ffuncs.le:
+            return "<="
+        case ffuncs.min:
+            return "min"
+        case ffuncs.max:
+            return "max"
+        case ffuncs.scansearch:
+            return "scansearch"
+        case ffuncs.resize_if_smaller:
+            return "resize_if_smaller"
+        case NumbaOperator():
+            return op.numba_name()
+        case _:
+            raise TypeError(f"{op} has no Numba representation.")
+
+
+def numba_nary_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    assert len(args) > 0
+    if len(args) == 1:
+        return f"({ctx(args[0])})"
+    return f"({f' {numba_name} '.join(map(ctx, args))})"
+
+
+def numba_binary_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    a, b = args
+    return f"({ctx(a)} {numba_name} {ctx(b)})"
+
+
+def numba_unary_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    return f"({numba_name}{ctx(args[0])})"
+
+
+def numba_call_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
+    return f"{numba_name}({', '.join(map(ctx, args))})"
+
+
+def numba_function_call(op, ctx, *args: Any) -> str:
+    match op:
+        case ffuncs._InitWrite():
+            return ctx(args[1])
+        case ffuncs.make_tuple:
+            return f"({','.join([ctx(arg) for arg in args])},)"
+        case NumbaOperator():
+            return op.numba_function_call(op, ctx, *args)
+
+    numba_name = numba_function_name(op, ctx, *args)
+    match op:
+        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+            return numba_nary_function_call(numba_name, ctx, *args)
+        case (
+            ffuncs.sub
+            | ffuncs.truediv
+            | ffuncs.floordiv
+            | ffuncs.mod
+            | ffuncs.pow
+            | ffuncs.lshift
+            | ffuncs.rshift
+            | ffuncs.eq
+            | ffuncs.ne
+            | ffuncs.gt
+            | ffuncs.lt
+            | ffuncs.ge
+            | ffuncs.le
+        ):
+            return numba_binary_function_call(numba_name, ctx, *args)
+        case ffuncs.not_ | ffuncs.invert:
+            return numba_unary_function_call(numba_name, ctx, *args)
+        case ffuncs.min | ffuncs.max | ffuncs.scansearch | ffuncs.resize_if_smaller:
+            return numba_call_function_call(numba_name, ctx, *args)
+        case _:
+            raise TypeError(f"{op} has no Numba representation.")
+
+
+class NumbaArgumentFType(ABC):
+    @abstractmethod
+    def numba_type(self):
+        """
+        Return a Numba-compatible type for this ftype.
+        """
+        ...
+
+    @abstractmethod
+    def serialize_to_numba(self, obj):
+        """
+        Return a Numba-compatible object to be used in place of this argument
+        for the Numba backend.
+        """
+        ...
+
+    @abstractmethod
+    def deserialize_from_numba(self, obj, numba_buffer):
+        """
+        Return an object from Numba returned value.
+        """
+        ...
+
+    @abstractmethod
+    def construct_from_numba(self, numba_buffer):
+        """
+        Construct and return an object from Numba returned value.
+        """
+        ...
+
+
+def to_numpy_type(t: FType) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
-    if isinstance(t, np.dtype):
-        return t
-    t = _normalize_fmt(t)
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
         return np.dtype(t.dtype)
     if isinstance(t, algebra.ftypes.FDTypeBuiltin):
         return np.dtype(t.type)
-    return np.dtype(t)
+    raise NotImplementedError(f"No NumPy dtype mapping for {t}")
 
 
-def numba_type(t):
+def numba_type(t: FType):
     """
     Returns the Numba type/ftype after serialization.
 
@@ -66,20 +223,22 @@ def numba_type(t):
     Returns:
         The corresponding Numba type.
     """
-    t = _normalize_fmt(t)
-    if isinstance(t, algebra.ftypes.FDTypeNumpy):
-        return numba.from_dtype(t.dtype)
-    if isinstance(t, algebra.ftypes.FDTypeBuiltin):
-        return t.type
-    if hasattr(t, "numba_type"):
-        return t.numba_type()
-    try:
-        return query_property(t, "numba_type", "__attr__")
-    except AttributeError:
-        return t
+    match t:
+        case NumbaArgumentFType():
+            return t.numba_type()
+        case algebra.ftypes.FDTypeNumpy():
+            return numba.from_dtype(t.dtype)
+        case algebra.ftypes.FDTypeBuiltin():
+            return t.type
+        case TupleFType() | ImmutableStructFType():
+            return tuple
+        case StructFType():
+            return assembly_struct_numba_type(t)
+        case _:
+            return t
 
 
-def numba_jitclass_type(t):
+def numba_jitclass_type(t: FType):
     """
     Returns the Numba jitclass spec type/ftype after serialization.
 
@@ -89,24 +248,23 @@ def numba_jitclass_type(t):
     Returns:
         The corresponding Numba jitclass spec type.
     """
-    t = _normalize_fmt(t)
-    if hasattr(t, "numba_jitclass_type"):
-        return t.numba_jitclass_type()
-    return query_property(t, "numba_jitclass_type", "__attr__")
-
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "numba_type",
-    "__attr__",
-    lambda t: numba.from_dtype(t.dtype),
-)
-register_property(
-    algebra.ftypes.FDTypeBuiltin,
-    "numba_type",
-    "__attr__",
-    lambda t: t.type,
-)
+    match t:
+        case _ if hasattr(t, "numba_jitclass_type"):
+            return t.numba_jitclass_type()
+        case algebra.ftypes.FDTypeNumpy():
+            return numba.from_dtype(t.dtype)
+        case algebra.int_:
+            return numba.int32
+        case algebra.bool_:
+            return numba.boolean
+        case algebra.float_:
+            return numba.float64
+        case TupleFType() | ImmutableStructFType():
+            return immutable_struct_jitclass_type(t)
+        case StructFType():
+            return assembly_struct_numba_jitclass_type(t)
+        case _:
+            raise NotImplementedError(f"No Numba jitclass type mapping for {t}")
 
 
 def immutable_struct_jitclass_type(fmt: ImmutableStructFType):
@@ -115,34 +273,7 @@ def immutable_struct_jitclass_type(fmt: ImmutableStructFType):
     )
 
 
-register_property(
-    ImmutableStructFType,
-    "numba_jitclass_type",
-    "__attr__",
-    immutable_struct_jitclass_type,
-)
-register_property(
-    ImmutableStructFType,
-    "numba_type",
-    "__attr__",
-    lambda t: tuple,
-)
-
-register_property(
-    TupleFType,
-    "numba_jitclass_type",
-    "__attr__",
-    immutable_struct_jitclass_type,
-)
-register_property(
-    TupleFType,
-    "numba_type",
-    "__attr__",
-    lambda t: tuple,
-)
-
-
-def assembly_struct_numba_type(ftype_: Any) -> type:
+def assembly_struct_numba_type(ftype_: StructFType) -> type:
     """
     Method for registering and caching Numba jitclass.
     """
@@ -180,72 +311,11 @@ def assembly_struct_numba_type(ftype_: Any) -> type:
     return new_struct
 
 
-register_property(
-    StructFType,
-    "numba_type",
-    "__attr__",
-    assembly_struct_numba_type,
-)
-
-
-def assembly_struct_numba_jitclass_type(ftype_) -> numba.types.Type:
+def assembly_struct_numba_jitclass_type(ftype_: StructFType) -> numba.types.Type:
     return numba_type(ftype_).class_type.instance_type
 
 
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "numba_jitclass_type",
-    "__attr__",
-    lambda t: numba.from_dtype(t.dtype),
-)
-
-register_property(
-    algebra.int_,
-    "numba_jitclass_type",
-    "__attr__",
-    lambda t: numba.int32,
-)
-
-register_property(
-    algebra.float_,
-    "numba_jitclass_type",
-    "__attr__",
-    lambda t: numba.float64,
-)
-
-register_property(
-    StructFType,
-    "numba_jitclass_type",
-    "__attr__",
-    assembly_struct_numba_jitclass_type,
-)
-
-
-class NumbaArgumentFType(ABC):
-    @abstractmethod
-    def serialize_to_numba(self, obj):
-        """
-        Return a Numba-compatible object to be used in place of this argument
-        for the Numba backend.
-        """
-        ...
-
-    @abstractmethod
-    def deserialize_from_numba(self, obj, numba_buffer):
-        """
-        Return an object from Numba returned value.
-        """
-        ...
-
-    @abstractmethod
-    def construct_from_numba(self, numba_buffer):
-        """
-        Construct and return an object from Numba returned value.
-        """
-        ...
-
-
-def serialize_to_numba(fmt, obj):
+def serialize_to_numba(fmt: FType, obj):
     """
     Serialize an object to a Numba-compatible ftype.
 
@@ -256,20 +326,21 @@ def serialize_to_numba(fmt, obj):
     Returns:
         A Numba-compatible object.
     """
-    fmt = _normalize_fmt(fmt)
-    if fmt is type(None):
-        return None
-    if hasattr(fmt, "serialize_to_numba"):
-        return fmt.serialize_to_numba(obj)
-    return query_property(fmt, "serialize_to_numba", "__attr__", obj)
-
-
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "serialize_to_numba",
-    "__attr__",
-    lambda fmt, numba_obj: numba_obj,
-)
+    match fmt:
+        case NumbaArgumentFType():
+            return fmt.serialize_to_numba(obj)
+        case algebra.none_:
+            return None
+        case (
+            algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.bool_ | algebra.float_
+        ):
+            return obj
+        case TupleFType() | ImmutableStructFType():
+            return serialize_immutable_to_numba(fmt, obj)
+        case StructFType():
+            return _serialize_asm_struct_to_numba(fmt, obj)
+        case _:
+            raise NotImplementedError(f"No Numba serialization mapping for {fmt}")
 
 
 def serialize_immutable_to_numba(fmt: ImmutableStructFType, obj):
@@ -279,16 +350,7 @@ def serialize_immutable_to_numba(fmt: ImmutableStructFType, obj):
     )
 
 
-register_property(
-    ImmutableStructFType, "serialize_to_numba", "__attr__", serialize_immutable_to_numba
-)
-
-register_property(
-    TupleFType, "serialize_to_numba", "__attr__", serialize_immutable_to_numba
-)
-
-
-def immutable_construct_from_numba(fmt: StructFType, numba_tuple):
+def immutable_construct_from_numba(fmt: ImmutableStructFType, numba_tuple):
     return fmt.from_fields(
         *[
             construct_from_numba(field_type, field_value)
@@ -299,22 +361,7 @@ def immutable_construct_from_numba(fmt: StructFType, numba_tuple):
     )
 
 
-register_property(
-    ImmutableStructFType,
-    "construct_from_numba",
-    "__attr__",
-    immutable_construct_from_numba,
-)
-
-register_property(
-    TupleFType,
-    "construct_from_numba",
-    "__attr__",
-    immutable_construct_from_numba,
-)
-
-
-def deserialize_from_numba(fmt, obj, numba_obj):
+def deserialize_from_numba(fmt: FType, obj, numba_obj):
     """
     Deserialize a Numba-compatible object back to the original ftype.
 
@@ -326,27 +373,18 @@ def deserialize_from_numba(fmt, obj, numba_obj):
     Returns:
         None
     """
-    fmt = _normalize_fmt(fmt)
-    if fmt is type(None):
-        return
-    if hasattr(fmt, "deserialize_from_numba"):
-        fmt.deserialize_from_numba(obj, numba_obj)
-    else:
-        try:
-            query_property(fmt, "deserialize_from_numba", "__attr__", obj, numba_obj)
-        except AttributeError:
+    match fmt:
+        case NumbaArgumentFType():
+            fmt.deserialize_from_numba(obj, numba_obj)
+        case algebra.none_ | algebra.ftypes.FDTypeNumpy():
+            return
+        case StructFType():
+            _deserialize_asm_struct_from_numba(fmt, obj, numba_obj)
+        case _:
             return
 
 
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "deserialize_from_numba",
-    "__attr__",
-    lambda fmt, obj, numba_obj: None,
-)
-
-
-def construct_from_numba(fmt, numba_obj):
+def construct_from_numba(fmt: FType, numba_obj):
     """
     Construct an object from a Numba-compatible ftype.
 
@@ -357,23 +395,45 @@ def construct_from_numba(fmt, numba_obj):
     Returns:
         An instance of the original object type.
     """
-    fmt = _normalize_fmt(fmt)
-    if fmt is type(None):
-        return None
-    if hasattr(fmt, "construct_from_numba"):
-        return fmt.construct_from_numba(numba_obj)
-    try:
-        return query_property(fmt, "construct_from_numba", "__attr__", numba_obj)
-    except NotImplementedError:
-        return fmt(numba_obj)
+    match fmt:
+        case NumbaArgumentFType():
+            return fmt.construct_from_numba(numba_obj)
+        case algebra.none_:
+            return None
+        case algebra.ftypes.FDTypeNumpy():
+            return fmt(numba_obj)
+        case algebra.int_ | algebra.bool_ | algebra.float_:
+            return numba_obj
+        case TupleFType() | ImmutableStructFType():
+            return immutable_construct_from_numba(fmt, numba_obj)
+        case StructFType():
+            return struct_construct_from_numba(fmt, numba_obj)
+        case _:
+            return fmt(numba_obj)
 
 
-register_property(
-    algebra.ftypes.FDTypeNumpy,
-    "construct_from_numba",
-    "__attr__",
-    lambda fmt, numba_obj: fmt(numba_obj),
-)
+def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
+    args = [
+        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
+    ]
+    return numba_type(fmt)(*args)
+
+
+def _deserialize_asm_struct_from_numba(
+    fmt: StructFType, obj, numba_struct: Any
+) -> None:
+    if fmt.is_mutable:
+        for name in fmt.struct_fieldnames:
+            setattr(obj, name, getattr(numba_struct, name))
+        return
+
+
+def struct_construct_from_numba(fmt: StructFType, numba_struct):
+    args = [
+        construct_from_numba(field_type, getattr(numba_struct, name))
+        for (name, field_type) in fmt.struct_fields
+    ]
+    return fmt.from_fields(*args)
 
 
 class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
@@ -636,14 +696,7 @@ class NumbaContext(Context):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
                 if not obj_t.struct_hasattr(attr.val):
                     raise ValueError(f"trying to get missing attr: {attr}")
-                return query_property(
-                    obj_t,
-                    "numba_getattr",
-                    "__attr__",
-                    self,
-                    obj_code,
-                    attr.val,
-                )
+                return numba_getattr(obj_t, self, obj_code, attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj_code = self(obj)
                 obj_t = obj.result_type
@@ -655,20 +708,10 @@ class NumbaContext(Context):
                         f"{obj_t.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                query_property(
-                    obj_t,
-                    "numba_setattr",
-                    "__attr__",
-                    self,
-                    obj_code,
-                    attr.val,
-                    val_code,
-                )
+                numba_setattr(obj_t, self, obj_code, attr.val, val_code)
                 return None
             case asm.Call(asm.Literal(op), args):
-                if not isinstance(op, NumbaOperator):
-                    raise TypeError(f"{op} has no Numba representation.")
-                return op.numba_literal(op, self, *args)
+                return numba_function_call(op, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_type != var_t:
@@ -858,55 +901,20 @@ class NumbaStackFType(ABC):
         ...
 
 
-def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
-    args = [
-        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
-    ]
-    return numba_type(fmt)(*args)
-
-
-register_property(
-    StructFType,
-    "serialize_to_numba",
-    "__attr__",
-    _serialize_asm_struct_to_numba,
-)
-
-
-def _deserialize_asm_struct_from_numba(
-    fmt: StructFType, obj, numba_struct: Any
-) -> None:
-    if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(numba_struct, name))
-        return
-
-
-register_property(
-    StructFType,
-    "deserialize_from_numba",
-    "__attr__",
-    _deserialize_asm_struct_from_numba,
-)
-
-register_property(
-    TupleFType,
-    "deserialize_from_numba",
-    "__attr__",
-    _deserialize_asm_struct_from_numba,
-)
-
-
 def struct_numba_getattr(fmt: StructFType, ctx, obj, attr):
     return f"{obj}.{attr}"
 
 
-register_property(
-    StructFType,
-    "numba_getattr",
-    "__attr__",
-    struct_numba_getattr,
-)
+def numba_getattr(fmt: StructFType, ctx, obj, attr):
+    match fmt:
+        case _ if hasattr(fmt, "numba_getattr"):
+            return fmt.numba_getattr(ctx, obj, attr)
+        case TupleFType() | ImmutableStructFType():
+            return immutable_struct_numba_getattr(fmt, ctx, obj, attr)
+        case StructFType():
+            return struct_numba_getattr(fmt, ctx, obj, attr)
+        case _:
+            raise NotImplementedError(f"No Numba getattr mapping for {fmt}")
 
 
 def immutable_struct_numba_getattr(fmt: StructFType, ctx, obj, attr):
@@ -914,62 +922,16 @@ def immutable_struct_numba_getattr(fmt: StructFType, ctx, obj, attr):
     return f"{obj}[{index}]"
 
 
-register_property(
-    ImmutableStructFType,
-    "numba_getattr",
-    "__attr__",
-    immutable_struct_numba_getattr,
-)
-
-register_property(
-    TupleFType,
-    "numba_getattr",
-    "__attr__",
-    immutable_struct_numba_getattr,
-)
-
-
 def struct_numba_setattr(fmt: StructFType, ctx, obj, attr, val):
-    ctx.emit(f"{ctx.feed}{obj}.{attr} = {val}")
+    ctx.exec(f"{ctx.feed}{obj}.{attr} = {val}")
     return
 
 
-register_property(
-    MutableStructFType,
-    "numba_setattr",
-    "__attr__",
-    struct_numba_setattr,
-)
-
-
-def struct_construct_from_numba(fmt: StructFType, numba_struct):
-    args = [
-        construct_from_numba(field_type, getattr(numba_struct, name))
-        for (name, field_type) in fmt.struct_fields
-    ]
-    return fmt.from_fields(*args)
-
-
-register_property(
-    StructFType,
-    "construct_from_numba",
-    "__attr__",
-    struct_construct_from_numba,
-)
-
-
-# trivial ser/deser
-for t in (algebra.int_, algebra.bool_, algebra.float_):
-    register_property(
-        t,
-        "construct_from_numba",
-        "__attr__",
-        lambda fmt, obj: obj,
-    )
-
-    register_property(
-        t,
-        "serialize_to_numba",
-        "__attr__",
-        lambda fmt, obj: obj,
-    )
+def numba_setattr(fmt: StructFType, ctx, obj, attr, val):
+    match fmt:
+        case _ if hasattr(fmt, "numba_setattr"):
+            return fmt.numba_setattr(ctx, obj, attr, val)
+        case MutableStructFType():
+            return struct_numba_setattr(fmt, ctx, obj, attr, val)
+        case _:
+            raise NotImplementedError(f"No Numba setattr mapping for {fmt}")

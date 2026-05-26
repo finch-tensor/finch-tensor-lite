@@ -11,8 +11,6 @@ from finchlite.algebra import (
     TensorFType,
     fisinstance,
     ftype,
-    query_property,
-    register_property,
 )
 from finchlite.symbolic import ScopedDict, UnvalidatedForm
 
@@ -162,10 +160,7 @@ def access(tns, idxs, op=None):
     """
     if hasattr(tns, "access"):
         return tns.access(idxs, op)
-    try:
-        return query_property(tns, "access", "__attr__", idxs, op)
-    except AttributeError:
-        return TensorView(idxs=idxs, tns=tns, op=op)
+    return TensorView(idxs=idxs, tns=tns, op=op)
 
 
 def unwrap(tns):
@@ -175,7 +170,7 @@ def unwrap(tns):
     """
     if hasattr(tns, "unwrap"):
         return tns.unwrap()
-    return query_property(tns, "unwrap", "__attr__")
+    raise AttributeError(f"{type(tns).__name__} has no unwrap")
 
 
 def increment(tns, val):
@@ -185,7 +180,7 @@ def increment(tns, val):
     """
     if hasattr(tns, "increment"):
         return tns.increment(val)
-    return query_property(tns, "increment", "__attr__", val)
+    raise AttributeError(f"{type(tns).__name__} has no increment")
 
 
 def declare(tns, init, op, shape):
@@ -194,7 +189,11 @@ def declare(tns, init, op, shape):
     """
     if hasattr(tns, "declare"):
         return tns.declare(init, op, shape)
-    return query_property(tns, "declare", "__attr__", init, op, shape)
+    match tns:
+        case np.ndarray():
+            return np_declare(tns, init, op, shape)
+        case _:
+            raise AttributeError(f"{type(tns).__name__} has no declare")
 
 
 def np_declare(tns, init, op, shape):
@@ -210,31 +209,22 @@ def np_declare(tns, init, op, shape):
     return tns
 
 
-register_property(np.ndarray, "declare", "__attr__", np_declare)
-
-
 def freeze(tns, op):
     """
     Freeze a tensor.
     """
     if hasattr(tns, "freeze"):
         return tns.freeze(op)
-    try:
-        query_property(tns, "freeze", "__attr__", op)
-    except AttributeError:
-        return tns
+    return tns
 
 
 def thaw(tns, op):
     """
     Thaw a tensor.
     """
-    if hasattr(tns, "freeze"):
-        return tns.freeze(op)
-    try:
-        return query_property(tns, "freeze", "__attr__", op)
-    except AttributeError:
-        return tns
+    if hasattr(tns, "thaw"):
+        return tns.thaw(op)
+    return tns
 
 
 class NotationInterpreterKernel(asm.AssemblyKernel):

@@ -79,7 +79,10 @@ ufunc_map: dict[Any, Any] = {
 class OverrideTensor(Tensor):
     @property
     def mod(self):
-        return sys.modules["finchlite"]
+        return self.override_module()
+
+    def override_module(self):
+        return sys.modules["finchlite.interface"]
 
     def __array_function__(self, func, types, args, kwargs):
         """Override NumPy functions using the __array_function__ protocol."""
