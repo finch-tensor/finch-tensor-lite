@@ -281,7 +281,7 @@ class HaltState:
     return_value: Any = None
 
     
-class NotationInterpreter(NotationLoader, UnvalidatedForm):
+class NotationInterpreter(UnvalidatedForm, NotationLoader):
     """
     An interpreter for FinchNotation.
     """
@@ -336,11 +336,8 @@ class NotationInterpreter(NotationLoader, UnvalidatedForm):
             function_state=function_state,
         )
 
-    def transform(self, prgm: ntn.Module) -> tuple:
-        return (self._dispatch(prgm),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+    def lower(self, prgm: ntn.Module):
+        return self._dispatch(prgm)
 
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...

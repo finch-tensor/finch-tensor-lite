@@ -9,11 +9,11 @@ from . import nodes as ein
 
 class EinsumEvaluator(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self,
         term: ein.EinsumNode,
         bindings: dict[ein.Alias, Any] | None = None,
-    ) -> tuple:  # TODO eventually Any->Tensor
+    ):  # TODO eventually Any->Tensor
         """
         Evaluate the given logic.
         """
@@ -21,9 +21,9 @@ class EinsumEvaluator(Stage):
 
 class EinsumLoader(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
-    ) -> tuple:
+    ):
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a
@@ -33,7 +33,7 @@ class EinsumLoader(Stage):
 
 class EinsumTransform(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         """
@@ -41,19 +41,19 @@ class EinsumTransform(Stage):
         """
 
 
-class OptEinsumLoader(EinsumLoader, UnvalidatedForm):
+class OptEinsumLoader(UnvalidatedForm, EinsumLoader):
     def __init__(self, *opts: EinsumTransform, ctx: EinsumLoader):
         self.ctx = ctx
         self.opts = opts
 
-    def transform(
+    def lower(
         self,
         term: ein.EinsumStatement,
         bindings: dict[ein.Alias, TensorFType],
-    ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
+    ):
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
-        return term, bindings
+        return self.ctx(term, bindings)
 
 
 def compute_shape_vars(

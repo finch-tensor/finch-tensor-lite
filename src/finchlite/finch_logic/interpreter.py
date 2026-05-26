@@ -26,7 +26,9 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicEvaluator, LogicLoader, FormattedForm, compute_shape_vars
+from finchlite.symbolic import UnvalidatedForm
+
+from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
@@ -40,18 +42,15 @@ def make_tensor(shape, fill_value, *, dtype=None):
     )
 
 
-class LogicInterpreter(LogicEvaluator, FormattedForm):
+class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def transform(self, node, bindings=None) -> tuple:
+    def lower(self, node, bindings=None):
         if bindings is None:
             bindings = {}
         machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
-        return (machine(node),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+        return machine(node)
 
 
 class LogicMachine:
@@ -209,11 +208,11 @@ class MockLogicLibrary(AssemblyLibrary):
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
 
-class MockLogicLoader(LogicLoader, FormattedForm):
+class MockLogicLoader(UnvalidatedForm, LogicLoader):
     def __init__(self):
         pass
 
-    def transform(
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
@@ -226,6 +225,3 @@ class MockLogicLoader(LogicLoader, FormattedForm):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockLogicLibrary(prgm, bindings), bindings, shape_vars
-
-    def lower(self, *outputs):
-        return outputs

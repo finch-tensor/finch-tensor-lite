@@ -12,9 +12,9 @@ from .tensor_stats import StatsFactory, TensorStats
 
 class LogicEvaluator(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self, term: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
-    ) -> tuple:
+    ):
         """
         Evaluate the given logic.
         """
@@ -22,13 +22,17 @@ class LogicEvaluator(Stage):
 
 class LogicLoader(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> tuple:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+    ]:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a

@@ -75,19 +75,16 @@ reduction_ops = {
 }
 
 
-class EinsumInterpreter(EinsumEvaluator, UnvalidatedForm):
+class EinsumInterpreter(UnvalidatedForm, EinsumEvaluator):
     def __init__(self, xp=np):
         self.xp = xp
 
-    def transform(self, node, bindings=None) -> tuple:
+    def lower(self, node, bindings=None):
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(xp=self.xp, bindings=bindings.copy())
-        return (machine(node),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+        return machine(node)
 
 
 class PointwiseEinsumMachine:
@@ -202,11 +199,11 @@ class MockEinsumLibrary(AssemblyLibrary):
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
 
-class MockEinsumLoader(EinsumLoader, UnvalidatedForm):
+class MockEinsumLoader(UnvalidatedForm, EinsumLoader):
     def __init__(self):
         pass
 
-    def transform(
+    def lower(
         self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
     ) -> tuple[
         MockEinsumLibrary,
@@ -215,6 +212,3 @@ class MockEinsumLoader(EinsumLoader, UnvalidatedForm):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockEinsumLibrary(prgm, bindings), bindings, shape_vars
-
-    def lower(self, *outputs):
-        return outputs

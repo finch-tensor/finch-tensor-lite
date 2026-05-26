@@ -331,15 +331,12 @@ class NotationContext:
                 raise Exception(f"Unrecognized logic: {prgm}")
 
 
-class NotationGenerator(LogicNotationLowerer, FormattedForm):
+class NotationGenerator(FormattedForm, LogicNotationLowerer):
 
-    def lower(self, *outputs):
-        return outputs[0] if len(outputs) == 1 else outputs
-
-    def transform(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType], 
+    def lower(
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType],
             stats: dict[Alias, TensorStats], stats_factory: StatsFactory
-    ) -> tuple[ntn.Module]:
+    ) -> ntn.Module:
         preamble: list[ntn.NotationStatement] = []
         epilogue: list[ntn.NotationStatement] = []
         args: dict[lgc.Alias, ntn.Variable] = {}
@@ -381,20 +378,18 @@ class NotationGenerator(LogicNotationLowerer, FormattedForm):
             match node:
                 case ntn.Return(expr):
                     ret_t = expr.result_type
-        return (
-            ntn.Module(
-                (
-                    ntn.Function(
-                        ntn.Variable("main", ret_t),
-                        tuple(args.values()),
-                        ntn.Block((*preamble, body)),
-                    ),
-                )
-            ),
+        return ntn.Module(
+            (
+                ntn.Function(
+                    ntn.Variable("main", ret_t),
+                    tuple(args.values()),
+                    ntn.Block((*preamble, body)),
+                ),
+            )
         )
 
 
-class LogicCompiler(LogicLoader, FormattedForm):
+class LogicCompiler(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,
@@ -407,9 +402,6 @@ class LogicCompiler(LogicLoader, FormattedForm):
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
-    def transform(self, *inputs):
-        return inputs
-
     def lower(
         self,
         prgm: lgc.LogicStatement,
@@ -421,7 +413,7 @@ class LogicCompiler(LogicLoader, FormattedForm):
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
-        mod = self.ctx_lower(prgm, bindings)
+        mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
         shape_vars = compute_shape_vars(prgm, bindings)

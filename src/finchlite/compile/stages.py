@@ -7,7 +7,7 @@ from finchlite.symbolic import Stage
 
 class NotationLowerer(Stage):
     @abstractmethod
-    def transform(self, term: ntn.Module) -> tuple[asm.Module]:
+    def lower(self, term: ntn.Module) -> asm.Module:
         """
         Compile the given notation term into an assembly term.
         """

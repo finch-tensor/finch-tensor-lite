@@ -10,7 +10,7 @@ from finchlite.symbolic import PreWalk, Rewrite, Stage, Form
 
 class LogicNotationLowerer(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self, term: LogicStatement, bindings: dict[Alias, TensorFType], 
             stats: dict[Alias, TensorStats], stats_factory: StatsFactory
     ) -> tuple[ntn.Module]:
@@ -21,7 +21,7 @@ class LogicNotationLowerer(Stage):
 
 class LogicEinsumLowerer(Stage):
     @abstractmethod
-    def transform(
+    def lower(
         self, term: LogicStatement, bindings: dict[Alias, TensorFType], 
             stats: dict[Alias, TensorStats], stats_factory: StatsFactory
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:

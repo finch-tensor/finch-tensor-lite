@@ -44,7 +44,7 @@ def extract_tensors(
     return root, bindings
 
 
-class LogicExecutor(LogicEvaluator, UnvalidatedForm):
+class LogicExecutor(UnvalidatedForm, LogicEvaluator):
     def __init__(
         self,
         ctx: LogicLoader | None = None,
@@ -61,11 +61,11 @@ class LogicExecutor(LogicEvaluator, UnvalidatedForm):
         self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
 
-    def transform(
+    def lower(
         self,
         prgm: LogicNode,
         bindings: dict[lgc.Alias, Tensor] | None = None,
-    ) -> tuple:
+    ):
         if bindings is None:
             bindings = {}
         if isinstance(prgm, lgc.LogicExpression):
@@ -86,15 +86,6 @@ class LogicExecutor(LogicEvaluator, UnvalidatedForm):
             var: val.ftype for var, val in bindings.items()
         }
 
-        return prgm, stmt, bindings, binding_ftypes
-
-    def lower(
-        self,
-        prgm: LogicNode,
-        stmt: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, Tensor],
-        binding_ftypes: dict[lgc.Alias, TensorFType],
-    ):
         key = (stmt, tuple(binding_ftypes.items()))
 
         if self.cache and key in self.cached_kernels:

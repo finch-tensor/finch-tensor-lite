@@ -56,7 +56,7 @@ class HaltState:
     return_value: Any = None
 
 
-class AssemblyInterpreter(AssemblyLoader, UnvalidatedForm):
+class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
     """
     An interpreter for FinchAssembly.
     """
@@ -132,11 +132,8 @@ class AssemblyInterpreter(AssemblyLoader, UnvalidatedForm):
             and self.function_state.should_halt
         )
 
-    def transform(self, prgm: asm.Module) -> tuple:
-        return (self._dispatch(prgm),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+    def lower(self, prgm: asm.Module):
+        return self._dispatch(prgm)
 
     @overload
     def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...

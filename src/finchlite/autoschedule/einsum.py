@@ -76,21 +76,18 @@ def generate_einsum_expr(
             raise Exception(f"Unrecognized logic: {ex}")
 
 
-class EinsumGenerator(LogicEinsumLowerer, UnvalidatedForm):
+class EinsumGenerator(UnvalidatedForm, LogicEinsumLowerer):
 
-    def transform(
-        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType], 
+    def lower(
+        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType],
             stats: dict[Alias, TensorStats], stats_factory: StatsFactory
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
         return (generate_einsum_stmt(prgm), bindings_2)
-    
-    def lower(self, *outputs):
-        return outputs if len(outputs) > 1 else outputs[0]
 
 
 
-class LogicEinsumLoader(LogicLoader, UnvalidatedForm):
+class LogicEinsumLoader(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
         ctx_lower: LogicEinsumLowerer | None = None,
@@ -103,10 +100,6 @@ class LogicEinsumLoader(LogicLoader, UnvalidatedForm):
             ctx_load = MockEinsumLoader()
         self.ctx_load: EinsumLoader = ctx_load
 
-
-    def transform(self, *inputs):
-        return inputs
-    
     def lower(
         self,
         prgm: lgc.LogicStatement,
@@ -118,7 +111,7 @@ class LogicEinsumLoader(LogicLoader, UnvalidatedForm):
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
-        ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings)
+        ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
         mod, ein_bindings, ein_shape_vars = self.ctx_load(ein_prgm, ein_bindings)
         lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
         lgc_shape_vars: dict[lgc.Alias, tuple[lgc.Field | None, ...]] = {

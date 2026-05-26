@@ -21,7 +21,7 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicFormatter(LogicLoader, LoopOrderedForm):
+class LogicFormatter(LoopOrderedForm, LogicLoader):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -39,18 +39,13 @@ class LogicFormatter(LogicLoader, LoopOrderedForm):
         """
         ...
 
-    def transform(
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, "TensorStats"],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        lgc.LogicStatement,
-        dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, "TensorStats"],
-        StatsFactory,
-    ]:
+    ):
         bindings = bindings.copy()
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
@@ -62,7 +57,10 @@ class LogicFormatter(LogicLoader, LoopOrderedForm):
         def formatter(node: lgc.LogicStatement):
             match node:
                 case lgc.Plan(bodies):
-                    return node
+                    new_bodies = []
+                    for body in bodies:
+                        new_bodies.append(formatter(body))
+                    return lgc.Plan(new_bodies)
                 case lgc.Query(lhs, rhs):
                     if lhs not in bindings:
                         shape_type = tuple(
@@ -79,17 +77,17 @@ class LogicFormatter(LogicLoader, LoopOrderedForm):
                         case _:
                             return lgc.Reorder(arg, arg.fields())
                 case lgc.Produces(_):
-                    pass
+                    return node
                 case _:
                     raise ValueError(
                         f"Unsupported logic statement for formatting: {node}"
                     )
 
-        formatter(prgm)
+        prgm = formatter(prgm)
 
         logger.debug(prgm)
 
-        return prgm, bindings, stats, stats_factory
+        return self.ctx(prgm, bindings, stats, stats_factory)
 
 
 class DefaultLogicFormatter(LogicFormatter):

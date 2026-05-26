@@ -481,14 +481,11 @@ class NumbaKernel(asm.AssemblyKernel):
         return construct_from_numba(self.ret_type, res)
 
 
-class NumbaCompiler(asm.AssemblyLoader, UnvalidatedForm):
+class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
     def __init__(self, ctx: NumbaLowerer | None = None):
         if ctx is None:
             ctx = NumbaGenerator()
         self.ctx: NumbaLowerer = ctx
-
-    def transform(self, *inputs):
-        return inputs
 
     def lower(self, prgm: asm.Module) -> NumbaLibrary:
         numba_code = self.ctx(prgm).code
@@ -520,15 +517,12 @@ class NumbaCompiler(asm.AssemblyLoader, UnvalidatedForm):
         return NumbaLibrary(kernels)
 
 
-class NumbaGenerator(NumbaLowerer, UnvalidatedForm):
+class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
 
-    def transform(self, prgm: asm.AssemblyNode) -> tuple:
+    def lower(self, prgm: asm.AssemblyNode) -> NumbaCode:
         ctx = NumbaContext()
         ctx(prgm)
-        return (NumbaCode(ctx.emit_global()),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+        return NumbaCode(ctx.emit_global())
 
 
 class NumbaContext(Context):

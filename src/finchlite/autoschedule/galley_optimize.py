@@ -94,7 +94,7 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyLogicalOptimizer(LogicLoader, AliasedForm):
+class GalleyLogicalOptimizer(AliasedForm, LogicLoader):
     """
     LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
     then forwards the Plan to the downstream loader ``ctx``.
@@ -116,18 +116,13 @@ class GalleyLogicalOptimizer(LogicLoader, AliasedForm):
         self.optimizer = optimizer
         self.last_optimize_plan_s: float | None = None
 
-    def transform(
+    def lower(
         self,
         term: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        LogicStatement,
-        dict[Alias, TensorFType],
-        dict[Alias, TensorStats],
-        StatsFactory,
-    ]:
+    ):
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
         logger.debug("Optimizing plan: %s", term)
@@ -140,4 +135,4 @@ class GalleyLogicalOptimizer(LogicLoader, AliasedForm):
             optimizer=self.optimizer,
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
-        return term, bindings, stats, stats_factory
+        return self.ctx(term, bindings, stats, stats_factory)

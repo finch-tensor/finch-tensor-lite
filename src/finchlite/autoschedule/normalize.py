@@ -58,12 +58,12 @@ def normalize_names(
     return root, bindings
 
 
-class LogicNormalizer(LogicEvaluator, UnvalidatedForm):
+class LogicNormalizer(UnvalidatedForm, LogicEvaluator):
     def __init__(self, ctx: LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
 
-    def transform(self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None):
+    def lower(self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None):
         root, bindings = normalize_names(prgm, bindings or {})
         logger.debug(root)
-        return root, bindings
+        return self.ctx(root, bindings)

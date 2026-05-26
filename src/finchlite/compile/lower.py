@@ -302,7 +302,7 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler(NotationLoader, UnvalidatedForm):
+class NotationCompiler(UnvalidatedForm, NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
@@ -317,9 +317,6 @@ class NotationCompiler(NotationLoader, UnvalidatedForm):
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
 
-    def transform(self, *inputs):
-        return inputs
-
     def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
         for transform in self.ctx_transforms:
@@ -328,7 +325,7 @@ class NotationCompiler(NotationLoader, UnvalidatedForm):
         return self.ctx_load(asm_code)
 
 
-class AssemblyGenerator(NotationLowerer, UnvalidatedForm):
+class AssemblyGenerator(UnvalidatedForm, NotationLowerer):
     """
     Compiles Finch Notation to Finch Assembly.
     """
@@ -336,12 +333,9 @@ class AssemblyGenerator(NotationLowerer, UnvalidatedForm):
     def __init__(self):
         pass
 
-    def transform(self, term: ntn.Module) -> tuple[asm.Module]:
+    def lower(self, term: ntn.Module) -> asm.Module:
         ctx = AssemblyContext()
-        return (ctx(term),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+        return ctx(term)
 
 
 class AssemblyContext(Context):

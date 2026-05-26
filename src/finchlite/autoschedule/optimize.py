@@ -5,7 +5,7 @@ from typing import overload
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect, setdiff
-from finchlite.autoschedule.stages import AliasedStage
+from finchlite.autoschedule.stages import AliasedForm
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -415,21 +415,16 @@ def set_loop_order(node: LogicNode) -> LogicNode:
     return _set_loop_order(node, {})
 
 
-class DefaultLogicOptimizer(LogicLoader, AliasedStage):
+class DefaultLogicOptimizer(AliasedForm, LogicLoader):
     def __init__(self, ctx):
         self.ctx = ctx
 
-    def transform(
+    def lower(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        LogicStatement,
-        dict[Alias, TensorFType],
-        dict[Alias, "TensorStats"],
-        StatsFactory,
-    ]:
+    ):
         prgm, bindings = optimize(prgm, bindings)
-        return prgm, bindings, stats, stats_factory
+        return self.ctx(prgm, bindings, stats, stats_factory)

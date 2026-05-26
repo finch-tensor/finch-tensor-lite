@@ -496,7 +496,7 @@ def standardize(
     return normalize_names(prgm, bindings)
 
 
-class LogicStandardizer(LogicLoader, UnvalidatedForm):
+class LogicStandardizer(UnvalidatedForm, LogicLoader):
     """
     The LogicStandardizer applies a series of transformations to standardize
     logic statements into a canonical form. Any Logic is accepted as input, and
@@ -511,18 +511,13 @@ class LogicStandardizer(LogicLoader, UnvalidatedForm):
             ctx = MockLogicLoader()
         self.ctx: LogicLoader = ctx
 
-    def transform(
+    def lower(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        LogicStatement,
-        dict[Alias, TensorFType],
-        dict[Alias, "TensorStats"],
-        StatsFactory,
-    ]:
+    ):
         prgm, bindings = standardize(prgm, bindings)
-        return prgm, bindings, stats, stats_factory
+        return self.ctx(prgm, bindings, stats, stats_factory)
 

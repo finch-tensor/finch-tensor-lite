@@ -5,13 +5,10 @@ from finchlite.symbolic import Fixpoint, PostWalk, Rewrite, UnvalidatedForm
 from .stages import AssemblyTransform
 
 
-class AssemblySimplify(AssemblyTransform, UnvalidatedForm):
+class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
 
-    def transform(self, term: asm.Module) -> tuple[asm.Module]:
-        return (Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+    def lower(self, term: asm.Module) -> asm.Module:
+        return Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term)
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):

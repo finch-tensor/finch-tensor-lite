@@ -19,7 +19,7 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicCacheLRU_Embeddings_Norms(LogicLoader, UnvalidatedForm):
+class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
@@ -33,9 +33,6 @@ class LogicCacheLRU_Embeddings_Norms(LogicLoader, UnvalidatedForm):
         self.threshold = threshold
         self.norm_order = norm_order
 
-    def transform(self, *inputs):
-        return inputs
-    
     def lower(
         self,
         prgm: LogicStatement,

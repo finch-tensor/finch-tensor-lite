@@ -389,7 +389,7 @@ class CLibrary(asm.AssemblyLibrary):
         )
 
 
-class CCompiler(asm.AssemblyLoader, UnvalidatedForm):
+class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
@@ -407,10 +407,6 @@ class CCompiler(asm.AssemblyLoader, UnvalidatedForm):
         self.cflags = cflags
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
-
-    def transform(self, *inputs):
-        return inputs
-    
 
     def lower(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
@@ -643,14 +639,11 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CGenerator(CLowerer, UnvalidatedForm):
-    def transform(self, prgm: asm.AssemblyNode) -> tuple:
+class CGenerator(UnvalidatedForm, CLowerer):
+    def lower(self, prgm: asm.AssemblyNode) -> CCode:
         ctx = CContext()
         ctx(prgm)
-        return (CCode(ctx.emit_global()),)
-
-    def lower(self, *outputs):
-        return outputs[0]
+        return CCode(ctx.emit_global())
 
 
 class CContext(Context):
