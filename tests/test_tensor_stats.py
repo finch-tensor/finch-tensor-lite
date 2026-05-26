@@ -230,7 +230,7 @@ def test_exact_semiring_tropical():
     )
     AB = np.min(A[:, :, None] + B[None, :, :], axis=1)
     CD = np.min(C[:, :, None] + D[None, :, :], axis=1)
-    expected = float(np.count_nonzero(AB + CD))
+    expected = float(np.count_nonzero(np.isfinite(AB + CD)))
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
 
@@ -353,7 +353,7 @@ def test_exact_semiring_maxmin():
     )
     AB = np.max(np.minimum(A[:, :, None], B[None, :, :]), axis=1)
     CD = np.max(np.minimum(C[:, :, None], D[None, :, :]), axis=1)
-    expected = float(np.count_nonzero(np.minimum(AB, CD)))
+    expected = float(np.count_nonzero(np.isfinite(np.minimum(AB, CD))))
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
 
