@@ -2,22 +2,10 @@ import builtins
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
-
 from finchlite.algebra import FinchOperator
-from finchlite.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 
 from . import lazy
 from .fuse import compute
-
-
-def _np_dtype(dtype):
-    """Extract a numpy-compatible dtype from a finchlite FType."""
-    if isinstance(dtype, FDTypeNumpy):
-        return dtype.dtype
-    if isinstance(dtype, FDTypeBuiltin):
-        return dtype.type
-    return dtype
 
 
 def full(
@@ -27,47 +15,39 @@ def full(
     dtype: Any | None = None,
     device=None,
 ):
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
     return compute(lazy.full(shape, fill_value, dtype=dtype))
 
 
 def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    np_dtype = _np_dtype(dtype) if dtype is not None else np.float64
-    return compute(lazy.full(shape, 0, dtype=np_dtype))
+    return compute(lazy.zeros(shape, dtype=dtype))
 
 
 def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    np_dtype = _np_dtype(dtype) if dtype is not None else np.float64
-    return compute(lazy.full(shape, 1, dtype=np_dtype))
+    return compute(lazy.ones(shape, dtype=dtype))
 
 
 def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    np_dtype = _np_dtype(dtype) if dtype is not None else np.float64
-    return compute(lazy.full(shape, 0, dtype=np_dtype))
+    return compute(lazy.empty(shape, dtype=dtype))
 
 
 def full_like(
     x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
 ):
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    np_dtype = _np_dtype(dtype if dtype is not None else x.dtype)
-    return compute(lazy.full_like(x, fill_value, dtype=np_dtype))
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.full_like(x, fill_value, dtype=dtype)
+    return compute(lazy.full_like(x, fill_value, dtype=dtype))
 
 
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
-    return full_like(x, 0, dtype=dtype, device=device)
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.zeros_like(x, dtype=dtype)
+    return full_like(x, 0, dtype=dtype)
 
 
 def ones_like(x, /, *, dtype: Any | None = None, device=None):
-    return full_like(x, 1, dtype=dtype, device=device)
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.ones_like(x, dtype=dtype)
+    return full_like(x, 1, dtype=dtype)
 
 
 def arange(
@@ -79,16 +59,7 @@ def arange(
     dtype: Any | None = None,
     device=None,
 ):
-    import numpy as np
-
-    from finchlite.tensor import BufferizedNDArray
-
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    if stop is None:
-        start, stop = 0, start
-    np_dtype = _np_dtype(dtype) if dtype is not None else None
-    return BufferizedNDArray.from_numpy(np.arange(start, stop, step, dtype=np_dtype))
+    return compute(lazy.arange(start, stop, step, dtype=dtype))
 
 
 def linspace(
@@ -101,10 +72,7 @@ def linspace(
     device=None,
     endpoint: bool = True,
 ):
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    np_dtype = _np_dtype(dtype) if dtype is not None else None
-    return compute(lazy.linspace(start, stop, num, dtype=np_dtype, endpoint=endpoint))
+    return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
 
 
 def permute_dims(arg, /, axis: tuple[int, ...]):
@@ -885,6 +853,16 @@ def not_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.not_equal(x1, x2)
     return compute(lazy.not_equal(x1, x2))
+
+
+def where(condition, x1, x2):
+    if (
+        isinstance(condition, lazy.LazyTensor)
+        or isinstance(x1, lazy.LazyTensor)
+        or isinstance(x2, lazy.LazyTensor)
+    ):
+        return lazy.where(condition, x1, x2)
+    return compute(lazy.where(condition, x1, x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):

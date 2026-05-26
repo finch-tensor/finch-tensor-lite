@@ -175,6 +175,7 @@ from .interface import (
     trunc,
     var,
     vecdot,
+    where,
     zeros,
     zeros_like,
 )
@@ -394,6 +395,7 @@ __all__ = [
     "uint64",
     "var",
     "vecdot",
+    "where",
     "with_default_scheduler",
     "zeros",
     "zeros_like",

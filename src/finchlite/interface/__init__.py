@@ -108,6 +108,7 @@ from .eager import (
     trunc,
     var,
     vecdot,
+    where,
     zeros,
     zeros_like,
 )
@@ -236,6 +237,7 @@ __all__ = [
     "trunc",
     "var",
     "vecdot",
+    "where",
     "zeros",
     "zeros_like",
 ]

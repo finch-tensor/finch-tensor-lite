@@ -398,6 +398,43 @@ def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
     )
 
 
+def zeros(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    np_dtype = dtype if dtype is not None else np.float64
+    return full(shape, 0, dtype=np_dtype)
+
+
+def ones(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    np_dtype = dtype if dtype is not None else np.float64
+    return full(shape, 1, dtype=np_dtype)
+
+
+def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    np_dtype = dtype if dtype is not None else np.float64
+    return full(shape, 0, dtype=np_dtype)
+
+
+def zeros_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype=None,
+) -> LazyTensor:
+    if stop is None:
+        start, stop = 0, start
+    arr = np.arange(start, stop, step, dtype=dtype)
+    return broadcast_to(lazy(arr), (len(arr),))
+
+
 def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
@@ -1914,6 +1951,16 @@ def equal(x1, x2) -> LazyTensor:
 
 def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+
+
+def where(condition, x1, x2) -> LazyTensor:
+    condition = _compute(lazy(condition))
+    x1 = _compute(lazy(x1))
+    x2 = _compute(lazy(x2))
+    result = BufferizedNDArray.from_numpy(
+        np.where(np.asarray(condition), np.asarray(x1), np.asarray(x2))
+    )
+    return lazy(result)
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
