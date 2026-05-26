@@ -1,9 +1,11 @@
-import numpy as np
 import pytest
+
+import numpy as np
 
 import finchlite.interface as fl
 from finchlite.algebra import ffuncs
 from finchlite.autoschedule import (
+    DefaultLogicOptimizer,
     DefaultLoopOrderer,
     LogicCompiler,
     LogicExecutor,
@@ -13,9 +15,6 @@ from finchlite.autoschedule import (
 from finchlite.autoschedule.formatter import DefaultLogicFormatter
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.standardize import LogicStandardizer
-from finchlite.finch_notation.interpreter import NotationInterpreter
-
-from .conftest import finch_assert_allclose
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
@@ -29,6 +28,9 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
+from finchlite.finch_notation.interpreter import NotationInterpreter
+
+from .conftest import finch_assert_allclose
 
 
 def capture_prgm(prgm, bindings, stats=None, stats_factory=None):
@@ -330,12 +332,13 @@ def test_output_rejects_produces_followed_by_query():
     ):
         validate(plan, kind="output")
 
+
 # Full pipeline test
 INTERPRET_NOTATION_GALLEY_LOOP_ORDER = LogicNormalizer(
     LogicExecutor(
         GalleyLogicalOptimizer(
             LogicStandardizer(
-            DefaultLoopOrderer(
+                DefaultLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
                 )
             )
@@ -344,14 +347,24 @@ INTERPRET_NOTATION_GALLEY_LOOP_ORDER = LogicNormalizer(
 )
 
 
+INTERPRET_NOTATION_TEST = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicOptimizer(
+            LogicStandardizer(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                )
+            )
+        )
+    )
+)
+
 
 def test_galley_loop_order_frontend_pipeline():
     a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl.asarray(np.array([[5.0, 6.0], [7.0, 8.0]]))
 
-    out = fl.compute(
-        fl.lazy(a) @ fl.lazy(b), ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER
-    )
+    out = fl.compute(fl.lazy(a) @ fl.lazy(b), ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER)
 
     expected = np.array(a) @ np.array(b)
     finch_assert_allclose(np.array(out), expected)
@@ -362,9 +375,7 @@ def test_galley_loop_order_frontend_elementwise_mul():
     a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl.asarray(np.array([[2.0, 0.5], [1.0, 3.0]]))
 
-    out = fl.compute(
-        fl.lazy(a) * fl.lazy(b), ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER
-    )
+    out = fl.compute(fl.lazy(a) * fl.lazy(b), ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER)
 
     expected = np.array(a) * np.array(b)
     finch_assert_allclose(np.array(out), expected)
@@ -378,6 +389,41 @@ def test_galley_loop_order_frontend_matmul_sum_axis0():
     out = fl.compute(
         fl.sum(fl.lazy(a) @ fl.lazy(b), axis=0),
         ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER,
+    )
+
+    expected = np.sum(np.array(a) @ np.array(b), axis=0)
+    finch_assert_allclose(np.array(out), expected)
+
+
+def test_optimizer_loop_order_frontend_pipeline():
+    a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    b = fl.asarray(np.array([[5.0, 6.0], [7.0, 8.0]]))
+
+    out = fl.compute(fl.lazy(a) @ fl.lazy(b), ctx=INTERPRET_NOTATION_TEST)
+
+    expected = np.array(a) @ np.array(b)
+    finch_assert_allclose(np.array(out), expected)
+
+
+def test_optimizer_loop_order_frontend_elementwise_mul():
+    """Default optimizer + loop orderer pipeline: element-wise multiply."""
+    a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    b = fl.asarray(np.array([[2.0, 0.5], [1.0, 3.0]]))
+
+    out = fl.compute(fl.lazy(a) * fl.lazy(b), ctx=INTERPRET_NOTATION_TEST)
+
+    expected = np.array(a) * np.array(b)
+    finch_assert_allclose(np.array(out), expected)
+
+
+def test_optimizer_loop_order_frontend_matmul_sum_axis0():
+    """Default optimizer + loop orderer pipeline: matmul then reduce along axis 0."""
+    a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    b = fl.asarray(np.array([[5.0, 6.0], [7.0, 8.0]]))
+
+    out = fl.compute(
+        fl.sum(fl.lazy(a) @ fl.lazy(b), axis=0),
+        ctx=INTERPRET_NOTATION_TEST,
     )
 
     expected = np.sum(np.array(a) @ np.array(b), axis=0)
