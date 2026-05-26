@@ -60,7 +60,6 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         self.cache = cache
         self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
-
     def lower(
         self,
         prgm: LogicNode,

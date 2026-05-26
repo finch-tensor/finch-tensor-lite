@@ -30,6 +30,7 @@ from finchlite.finch_assembly import BufferFType, DictFType
 from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finchlite.util import config, file_cache
 from finchlite.util.logging import LOG_BACKEND_C
+
 from .stages import CCode, CLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)

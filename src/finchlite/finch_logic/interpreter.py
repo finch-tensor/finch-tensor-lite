@@ -8,6 +8,7 @@ from finchlite.algebra import fisinstance, fixpoint_type, ftype, return_type
 from finchlite.algebra.tensor import TensorFType
 from finchlite.codegen.numba_codegen import to_numpy_type
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finchlite.symbolic import UnvalidatedForm
 from finchlite.util.logging import LOG_LOGIC_PRE_OPT
 
 from . import nodes as lgc
@@ -26,8 +27,6 @@ from .nodes import (
     TableValue,
     Value,
 )
-from finchlite.symbolic import UnvalidatedForm
-
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
 from .tensor_stats import StatsFactory, TensorStats
 

@@ -9,7 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
-from .stage import Stage, Form, UnvalidatedForm
+from .stage import Form, Stage, UnvalidatedForm
 from .term import (
     Term,
     TermTree,
@@ -24,6 +24,7 @@ __all__ = [
     "ControlFlowGraph",
     "DataFlowAnalysis",
     "Fixpoint",
+    "Form",
     "Memo",
     "NamedTerm",
     "Namespace",
@@ -35,10 +36,9 @@ __all__ = [
     "Rewrite",
     "ScopedDict",
     "Stage",
-    "Form",
-    "UnvalidatedForm",
     "Term",
     "TermTree",
+    "UnvalidatedForm",
     "gensym",
     "intree",
     "isdescendant",

@@ -2,13 +2,12 @@ import logging
 from abc import abstractmethod
 from typing import Any
 
-from finchlite.autoschedule.stages import LoopOrderedForm
 import numpy as np
 
 from finchlite import finch_logic as lgc
 from finchlite.algebra import FType, TensorFType, TupleFType, ftype
+from finchlite.autoschedule.stages import LoopOrderedForm
 from finchlite.codegen import NumpyBufferFType
-from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic import (
     LogicLoader,
     MockLogicLoader,
@@ -57,10 +56,8 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
             match node:
                 case lgc.Plan(bodies):
-                    new_bodies = []
-                    for body in bodies:
-                        new_bodies.append(formatter(body))
-                    return lgc.Plan(tuple(new_bodies))
+                    new_bodies = tuple(formatter(body) for body in bodies)
+                    return lgc.Plan(new_bodies)
                 case lgc.Query(lhs, rhs):
                     if lhs not in bindings:
                         shape_type = tuple(
@@ -72,11 +69,11 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
 
                         bindings[lhs] = tns
                     match rhs:
-                        case lgc.Reorder(arg, _):
+                        case lgc.Reorder():
                             return node
                         case _:
                             return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields()))
-                case lgc.Produces(_):
+                case lgc.Produces():
                     return node
                 case _:
                     raise ValueError(

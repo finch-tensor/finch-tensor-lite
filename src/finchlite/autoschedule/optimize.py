@@ -79,7 +79,9 @@ def with_unique_lhs(
     root, bindings = f(root, bindings)
 
     unrenames = {v: k for k, v in renames.items()}
-    # Some produces may be renamed during the optimization, so we need to be a bit careful here.
+
+    # Some produces may be renamed during the optimization,
+    # so we need to be a bit careful here.
     def rule_1(node):
         match node:
             case Produces(args):
@@ -87,7 +89,9 @@ def with_unique_lhs(
                 v_post_list = args[-n_writes:] if n_writes else ()
 
                 bodies: list[LogicStatement] = []
-                for (k, _v_pre), v_post in zip(writes.items(), v_post_list, strict=True):
+                for (k, _v_pre), v_post in zip(
+                    writes.items(), v_post_list, strict=True
+                ):
                     idxs = tuple(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
@@ -102,19 +106,43 @@ def with_unique_lhs(
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)
 
-def add_aggregates(root: LogicStatement, bindings: dict[Alias, TensorFType]) -> LogicStatement:
-    fill_values = root.infer_fill_value({var: val.fill_value for var, val in bindings.items()})
+
+def add_aggregates(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
+    fill_values = root.infer_fill_value(
+        {var: val.fill_value for var, val in bindings.items()}
+    )
+
     def rule_0(node):
         match node:
-            case Query(lhs, Reorder(Aggregate(op, init, arg, idxs), _)):
+            case Query(lhs, Reorder(Aggregate(_, _, arg, idxs), _)):
                 return node
             case Query(lhs, Reorder(arg, idxs)):
-                return Query(lhs, Reorder(Aggregate(Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, tuple()), idxs))
-            case Query(lhs, Aggregate(op, init, arg, idxs)):
+                return Query(
+                    lhs,
+                    Reorder(
+                        Aggregate(
+                            Literal(ffuncs.overwrite),
+                            Literal(fill_values[lhs]),
+                            arg,
+                            (),
+                        ),
+                        idxs,
+                    ),
+                )
+            case Query(lhs, Aggregate(_, _, arg, idxs)):
                 return node
             case Query(lhs, arg):
-                return Query(lhs, Aggregate(Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, tuple()))
+                return Query(
+                    lhs,
+                    Aggregate(
+                        Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, ()
+                    ),
+                )
+
     return Rewrite(PostWalk(rule_0))(root)
+
 
 def optimize(
     prgm: LogicStatement, bindings: dict[Alias, TensorFType]
@@ -142,8 +170,10 @@ def optimize(
         prgm = propagate_copy_queries(prgm)
         res = add_aggregates(prgm, bindings)
         return res, bindings
+
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
     return flatten_plans(prgm), bindings
+
 
 def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
     match root:
@@ -270,6 +300,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
 
 def propagate_copy_queries(root):
     copies = {}
+
     def rule_0(node):
         match node:
             case Query(lhs, Table(Alias(_) as rhs, _)):

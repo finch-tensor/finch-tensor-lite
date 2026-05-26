@@ -13,7 +13,6 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.symbolic.stage import UnvalidatedForm
-
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)

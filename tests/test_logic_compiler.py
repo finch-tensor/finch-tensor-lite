@@ -34,25 +34,25 @@ def test_logic_compiler(file_regression):
                         arg=Reorder(
                             arg=MapJoin(
                                 op=logic.Literal(val=ffuncs.mul),
-                            args=(
-                                Table(
-                                    Alias(name="A0"),
-                                    (Field(name="i0"), Field(name="i1")),
-                                ),
-                                Table(
-                                    Alias(name="A1"),
-                                    (Field(name="i1"), Field(name="i2")),
+                                args=(
+                                    Table(
+                                        Alias(name="A0"),
+                                        (Field(name="i0"), Field(name="i1")),
+                                    ),
+                                    Table(
+                                        Alias(name="A1"),
+                                        (Field(name="i1"), Field(name="i2")),
+                                    ),
                                 ),
                             ),
+                            idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                         ),
-                        idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
-                        ),
-                    idxs=(Field(name="i1"),),
+                        idxs=(Field(name="i1"),),
                     ),
-                idxs=(Field(name="i0"), Field(name="i2")),
-                )
+                    idxs=(Field(name="i0"), Field(name="i2")),
+                ),
             ),
-            Produces(args=(Alias(name="A2"),))
+            Produces(args=(Alias(name="A2"),)),
         ),
     )
 
@@ -63,8 +63,7 @@ def test_logic_compiler(file_regression):
     }
 
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()},
-        {}, None
+        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
     )
 
     file_regression.check(
@@ -93,9 +92,7 @@ def test_logic_compiler_inplace(file_regression):
                     arg=MapJoin(
                         op=Literal(ffuncs.add),
                         args=(
-                            Table(
-                                Alias("A2"), (Field(name="i0"), Field(name="i2"))
-                            ),
+                            Table(Alias("A2"), (Field(name="i0"), Field(name="i2"))),
                             Aggregate(
                                 op=logic.Literal(val=ffuncs.add),
                                 init=logic.Literal(val=0),
@@ -126,7 +123,7 @@ def test_logic_compiler_inplace(file_regression):
                     idxs=(Field(name="i0"), Field(name="i2")),
                 ),
             ),
-            Produces(args=(Alias(name="A2"),))
+            Produces(args=(Alias(name="A2"),)),
         ),
     )
 
@@ -137,8 +134,7 @@ def test_logic_compiler_inplace(file_regression):
     }
 
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()},
-        {}, None
+        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
     )
 
     file_regression.check(

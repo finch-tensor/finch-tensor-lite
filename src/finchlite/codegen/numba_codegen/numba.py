@@ -578,7 +578,6 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
 
 
 class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
-
     def lower(self, prgm: asm.AssemblyNode) -> NumbaCode:
         ctx = NumbaContext()
         ctx(prgm)

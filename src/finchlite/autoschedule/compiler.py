@@ -257,13 +257,14 @@ class NotationContext:
             case lgc.Query(
                 lhs,
                 lgc.Reorder(
-                lgc.Aggregate(
-                    lgc.Literal(op),
-                    lgc.Literal(init),
-                    lgc.Reorder(arg, _) as arg_2,
-                    idxs_2,
+                    lgc.Aggregate(
+                        lgc.Literal(op),
+                        lgc.Literal(init),
+                        lgc.Reorder(arg, _) as arg_2,
+                        idxs_2,
+                    ),
+                    output_idxs,
                 ),
-                output_idxs)
             ):
                 body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
                 return ntn.Block(
@@ -292,7 +293,7 @@ class NotationContext:
                                 lgc.Literal(op_1),
                                 lgc.Literal(init),
                                 lgc.Reorder() as agg_arg,
-                                agg_idxs,
+                                _,
                             ),
                         ),
                     ),
@@ -334,10 +335,12 @@ class NotationContext:
 
 
 class NotationGenerator(FormattedForm, LogicNotationLowerer):
-
     def lower(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType],
-            stats: dict[Alias, TensorStats], stats_factory: StatsFactory
+        self,
+        term: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> ntn.Module:
         preamble: list[ntn.NotationStatement] = []
         epilogue: list[ntn.NotationStatement] = []

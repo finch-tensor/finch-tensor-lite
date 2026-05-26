@@ -39,6 +39,7 @@ class LogicLoader(Stage):
         dictionary including additional tables needed to run the kernel.
         """
 
+
 def compute_shape_vars(
     prgm: lgc.LogicStatement,
     bindings: dict[lgc.Alias, TensorFType],

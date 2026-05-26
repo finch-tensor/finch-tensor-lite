@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import Any
 
 from finchlite.algebra import TensorFType
-from finchlite.symbolic import Stage, UnvalidatedForm, PostOrderDFS
+from finchlite.symbolic import PostOrderDFS, Stage, UnvalidatedForm
 
 from . import nodes as ein
 
@@ -21,9 +21,7 @@ class EinsumEvaluator(Stage):
 
 class EinsumLoader(Stage):
     @abstractmethod
-    def lower(
-        self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
-    ):
+    def lower(self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]):
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a

@@ -24,7 +24,14 @@ from finchlite.finch_assembly import (
     AssemblyTransform,
 )
 from finchlite.finch_notation import NotationLoader
-from finchlite.symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict, UnvalidatedForm
+from finchlite.symbolic import (
+    Context,
+    PostOrderDFS,
+    PostWalk,
+    Rewrite,
+    ScopedDict,
+    UnvalidatedForm,
+)
 from finchlite.util.logging import LOG_ASSEMBLY
 
 from .stages import NotationLowerer

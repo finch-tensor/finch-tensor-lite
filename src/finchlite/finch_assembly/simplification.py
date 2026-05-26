@@ -6,7 +6,6 @@ from .stages import AssemblyTransform
 
 
 class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
-
     def lower(self, term: asm.Module) -> asm.Module:
         return Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term)
 

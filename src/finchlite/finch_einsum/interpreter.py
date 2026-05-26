@@ -1,4 +1,3 @@
-from finchlite.symbolic.stage import UnvalidatedForm
 import numpy as np
 
 from finchlite.algebra import ffuncs
@@ -10,6 +9,7 @@ from finchlite.finch_einsum.stages import (
     EinsumLoader,
     compute_shape_vars,
 )
+from finchlite.symbolic.stage import UnvalidatedForm
 
 from . import nodes as ein
 

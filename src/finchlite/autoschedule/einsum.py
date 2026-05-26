@@ -8,6 +8,7 @@ from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
 from finchlite.finch_logic import Alias, LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
 from finchlite.symbolic.stage import UnvalidatedForm
+
 from .stages import LogicEinsumLowerer
 
 
@@ -18,8 +19,9 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
         case lgc.Query(
             lgc.Alias(name),
             lgc.Reorder(
-            lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _) as agg,
-            output_idxs)
+                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
+                output_idxs,
+            ),
         ):
             einidxs = tuple(ein.Index(field.name) for field in output_idxs)
             body = ein.Einsum(
@@ -79,14 +81,15 @@ def generate_einsum_expr(
 
 
 class EinsumGenerator(UnvalidatedForm, LogicEinsumLowerer):
-
     def lower(
-        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType],
-            stats: dict[Alias, TensorStats], stats_factory: StatsFactory
+        self,
+        prgm: LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
         return (generate_einsum_stmt(prgm), bindings_2)
-
 
 
 class LogicEinsumLoader(UnvalidatedForm, LogicLoader):

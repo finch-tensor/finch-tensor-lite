@@ -270,7 +270,7 @@ class HaltState:
     has_returned: bool = False
     return_value: Any = None
 
-    
+
 class NotationInterpreter(UnvalidatedForm, NotationLoader):
     """
     An interpreter for FinchNotation.

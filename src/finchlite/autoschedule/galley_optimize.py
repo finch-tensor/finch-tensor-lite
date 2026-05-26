@@ -9,8 +9,21 @@ import logging
 import time
 
 from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.galley.logical_optimizer.annotated_query import (
+    AnnotatedQuery,
+)
+from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
+from finchlite.autoschedule.galley.logical_optimizer.logic_to_stats import (
+    insert_statistics,
+)
+from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
+    postprocess_plan_after_galley,
+    preprocess_plan_for_galley,
+)
 from finchlite.autoschedule.stages import AliasedForm
-from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic import (
     Alias,
     LogicLoader,
@@ -21,17 +34,6 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.util.logging import LOG_GALLEY
-
-from finchlite.autoschedule.galley.logical_optimizer.annotated_query import AnnotatedQuery
-from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
-    GalleyOptimizer,
-    pruned_query_to_plan,
-)
-from finchlite.autoschedule.galley.logical_optimizer.logic_to_stats import insert_statistics
-from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
-    postprocess_plan_after_galley,
-    preprocess_plan_for_galley,
-)
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 

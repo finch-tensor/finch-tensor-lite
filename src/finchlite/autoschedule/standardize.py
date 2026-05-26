@@ -103,7 +103,7 @@ def standardize_inplace_queries(
 
                 lhs_arg = lhs_arg[0]
                 match lhs_arg:
-                    case Reorder(Table(lhs_alias, idxs_2), _) if idxs_2 == idxs_1:
+                    case Reorder(Table(_, idxs_2), _) if idxs_2 == idxs_1:
                         others = filter(lambda arg: arg is not lhs_arg, args)
                         return Query(
                             lhs,
@@ -259,17 +259,31 @@ def standardize_query_roots(
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return Query(
-                lhs,
-                Reorder(
-                    MapJoin(
-                        Literal(op),
-                        (
-                            Table(lhs_1, idxs_1),
-                            Aggregate(Literal(op_1), init, Reorder(agg_arg, idxs_2 + tuple(idx for idx in agg_arg.fields() if idx not in idxs_2)), agg_idxs),
+                    lhs,
+                    Reorder(
+                        MapJoin(
+                            Literal(op),
+                            (
+                                Table(lhs_1, idxs_1),
+                                Aggregate(
+                                    Literal(op_1),
+                                    init,
+                                    Reorder(
+                                        agg_arg,
+                                        idxs_2
+                                        + tuple(
+                                            idx
+                                            for idx in agg_arg.fields()
+                                            if idx not in idxs_2
+                                        ),
+                                    ),
+                                    agg_idxs,
+                                ),
+                            ),
                         ),
+                        idxs_2,
                     ),
-                    idxs_2,
-                ))
+                )
             case Query(lhs, rhs):
                 return Query(
                     lhs,
@@ -521,4 +535,3 @@ class LogicStandardizer(UnvalidatedForm, LogicLoader):
     ):
         prgm, bindings = standardize(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)
-
