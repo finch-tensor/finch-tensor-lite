@@ -26,7 +26,7 @@ from finchlite.algebra import (
     promote_type,
     return_type,
 )
-from finchlite.algebra.ftypes import FDType
+from finchlite.algebra.ftypes import FDType, FDTypeBuiltin, FDTypeNumpy
 from finchlite.autoschedule.tensor_stats import StatsInterpreter
 from finchlite.finch_logic import (
     Aggregate,
@@ -353,6 +353,14 @@ def lazy(arr) -> LazyTensor:
     return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
 
 
+def _np_dtype(dtype):
+    if isinstance(dtype, FDTypeNumpy):
+        return dtype.dtype
+    if isinstance(dtype, FDTypeBuiltin):
+        return dtype.type
+    return dtype
+
+
 def full(
     shape: int | tuple[int, ...],
     fill_value: bool | complex,
@@ -381,7 +389,7 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    val = lazy(np.full((), fill_value, dtype=dtype))
+    val = lazy(np.full((), fill_value, dtype=_np_dtype(dtype)))
     if isinstance(shape, int):
         shape = (shape,)
     return broadcast_to(val, shape)
@@ -394,23 +402,21 @@ def full_like(x, /, fill_value, *, dtype=None):
 
 def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
     return broadcast_to(
-        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=dtype)), (num,)
+        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype))),
+        (num,),
     )
 
 
 def zeros(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
-    np_dtype = dtype if dtype is not None else np.float64
-    return full(shape, 0, dtype=np_dtype)
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
 
 
 def ones(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
-    np_dtype = dtype if dtype is not None else np.float64
-    return full(shape, 1, dtype=np_dtype)
+    return full(shape, 1, dtype=dtype if dtype is not None else np.float64)
 
 
 def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
-    np_dtype = dtype if dtype is not None else np.float64
-    return full(shape, 0, dtype=np_dtype)
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
 
 
 def zeros_like(x, /, *, dtype=None) -> LazyTensor:
@@ -431,7 +437,7 @@ def arange(
 ) -> LazyTensor:
     if stop is None:
         start, stop = 0, start
-    arr = np.arange(start, stop, step, dtype=dtype)
+    arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
     return broadcast_to(lazy(arr), (len(arr),))
 
 
@@ -1953,7 +1959,9 @@ def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
 
 
-def where(condition, x1, x2) -> LazyTensor:
+def where(
+    condition, x1, x2
+) -> LazyTensor:  # FIXME: remove lazy.where, always materializes eagerly
     condition = _compute(lazy(condition))
     x1 = _compute(lazy(x1))
     x2 = _compute(lazy(x2))

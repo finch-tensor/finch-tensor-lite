@@ -147,7 +147,8 @@ array_api_tests/test_data_type_functions.py::test_astype
 array_api_tests/test_data_type_functions.py::TestResultType::test_arrays_and_dtypes
 
 # test_has_names
-
+array_api_tests/test_has_names.py::test_has_names[creation-eye]
+array_api_tests/test_has_names.py::test_has_names[creation-empty_like]
 array_api_tests/test_has_names.py::test_has_names[linalg-cholesky]
 array_api_tests/test_has_names.py::test_has_names[linalg-cross]
 array_api_tests/test_has_names.py::test_has_names[linalg-det]
