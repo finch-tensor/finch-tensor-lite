@@ -334,8 +334,8 @@ def test_output_rejects_produces_followed_by_query():
 INTERPRET_NOTATION_GALLEY_LOOP_ORDER = LogicNormalizer(
     LogicExecutor(
         GalleyLogicalOptimizer(
+            LogicStandardizer(
             DefaultLoopOrderer(
-                LogicStandardizer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
                 )
             )

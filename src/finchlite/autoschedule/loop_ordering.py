@@ -4,7 +4,7 @@ from functools import reduce
 from itertools import chain as join_chains
 from typing import Literal
 
-from finchlite.algebra import TensorFType
+from finchlite.algebra import TensorFType, ffuncs
 from finchlite.algebra.utils import intersect
 from finchlite.finch_logic import (
     Aggregate,
@@ -14,6 +14,7 @@ from finchlite.finch_logic import (
     LogicLoader,
     LogicNode,
     LogicStatement,
+    Literal as LogicLiteral,
     MapJoin,
     MockLogicLoader,
     Plan,
@@ -66,6 +67,63 @@ def _align(
         for (var, physical, desired), alias in needed_swizzles.items()
     )
     return new_ex, queries
+
+
+def _galley_standardize(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
+    """Normalize Galley query roots into loop-orderer input grammar."""
+    fill_values = None
+
+    def get_fill_values():
+        nonlocal fill_values
+        if fill_values is None:
+            fill_values = root.infer_fill_value(
+                {var: val.fill_value for var, val in bindings.items()}
+            )
+        return fill_values
+
+    def rule(node: LogicNode) -> LogicNode | None:
+        match node:
+            case Query(
+                lhs,
+                Reorder(Aggregate(op, init, arg, reduce_axes), output_order),
+            ):
+                loop_order = output_order + tuple(
+                    idx for idx in reduce_axes if idx not in output_order
+                )
+                return Query(
+                    lhs,
+                    Aggregate(op, init, Reorder(arg, loop_order), reduce_axes),
+                )
+            case Query(lhs, Aggregate(op, init, arg, reduce_axes)) if not isinstance(
+                arg, Reorder
+            ):
+                output_order = tuple(arg.fields())
+                loop_order = output_order + tuple(
+                    idx for idx in reduce_axes if idx not in output_order
+                )
+                return Query(
+                    lhs,
+                    Aggregate(op, init, Reorder(arg, loop_order), reduce_axes),
+                )
+            case Query(lhs, Aggregate()):
+                return None
+            case Query(lhs, Reorder(Table(Alias(), _), _)):
+                return None
+            case Query(lhs, rhs):
+                return Query(
+                    lhs,
+                    Aggregate(
+                        LogicLiteral(ffuncs.overwrite),
+                        LogicLiteral(rhs.fill_value(get_fill_values())),
+                        Reorder(rhs, rhs.fields()),
+                        (),
+                    ),
+                )
+        return None
+
+    return Rewrite(PostWalk(rule))(root)
 
 
 def _check_loop_order(
@@ -256,6 +314,7 @@ class LoopOrderer(LogicLoader):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
+        #prgm = _galley_standardize(prgm, bindings)
         validate(prgm, kind="input")
 
         def apply_loop_order(node: LogicStatement) -> LogicStatement:
@@ -263,52 +322,14 @@ class LoopOrderer(LogicLoader):
                 case Plan(bodies):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
                 case Query(lhs, rhs):
-                    # quick fix
-                    match rhs:
-                        case Reorder(
-                            Aggregate(op, init, arg, reduce_axes),
-                            output_order,
-                        ):
-                            loop_order = output_order + tuple(
-                                idx for idx in reduce_axes if idx not in output_order
-                            )
-                            arg, swizzles = _align(arg, loop_order)
-                            ordered = Query(
-                                lhs,
-                                Aggregate(
-                                    op,
-                                    init,
-                                    Reorder(arg, loop_order),
-                                    reduce_axes,
-                                ),
-                            )
-                            if swizzles:
-                                return Plan((*swizzles, ordered))
-                            return ordered
-                        case Aggregate(op, init, arg, reduce_axes) if not isinstance(
-                            arg, Reorder
-                        ):
-                            output_order = tuple(rhs.fields())
-                            loop_order = output_order + tuple(
-                                idx for idx in reduce_axes if idx not in output_order
-                            )
-                            arg, swizzles = _align(arg, loop_order)
-                            ordered = Query(
-                                lhs,
-                                Aggregate(
-                                    op,
-                                    init,
-                                    Reorder(arg, loop_order),
-                                    reduce_axes,
-                                ),
-                            )
-                            if swizzles:
-                                return Plan((*swizzles, ordered))
-                            return ordered
-
                     loop_order = self.get_loop_order(
                         node, bindings, stats, stats_factory
                     )
+                    match rhs:
+                        # This case is used to handle the case where the loop order 
+                        # is already set by the previous loop ordering step.
+                        case Aggregate(_, _, Reorder(_, old_loop_order), _) if bindings:
+                            loop_order = old_loop_order
                     rhs, swizzles = _align(rhs, loop_order)
                     match rhs:
                         case Aggregate(
