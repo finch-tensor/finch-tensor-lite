@@ -65,7 +65,7 @@ class LogicNormalizer(LogicEvaluator):
     def validate_inputs(
         self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None
     ):
-        pass
+        return
 
     def transform(self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None):
         root, bindings = normalize_names(prgm, bindings or {})

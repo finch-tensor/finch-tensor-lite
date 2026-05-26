@@ -9,6 +9,7 @@ import logging
 import time
 
 from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.stages import AliasedForm
 from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic import (
     Alias,
@@ -21,13 +22,13 @@ from finchlite.finch_logic import (
 )
 from finchlite.util.logging import LOG_GALLEY
 
-from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import (
+from finchlite.autoschedule.galley.logical_optimizer.annotated_query import AnnotatedQuery
+from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
     GalleyOptimizer,
     pruned_query_to_plan,
 )
-from .galley.logical_optimizer.logic_to_stats import insert_statistics
-from .galley.logical_optimizer.query_normalization import (
+from finchlite.autoschedule.galley.logical_optimizer.logic_to_stats import insert_statistics
+from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
     postprocess_plan_after_galley,
     preprocess_plan_for_galley,
 )
@@ -93,7 +94,7 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyLogicalOptimizer(LogicLoader):
+class GalleyLogicalOptimizer(LogicLoader, AliasedForm):
     """
     LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
     then forwards the Plan to the downstream loader ``ctx``.

@@ -5,7 +5,7 @@ from finchlite.algebra.tensor import TensorFType
 from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
-from finchlite.finch_logic import LogicStatement, StatsFactory
+from finchlite.finch_logic import Alias, LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
 
 from .stages import LogicEinsumLowerer
@@ -83,7 +83,8 @@ class EinsumGenerator(LogicEinsumLowerer):
         pass
 
     def transform(
-        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType], 
+            stats: dict[Alias, TensorStats], stats_factory: StatsFactory
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
         return (generate_einsum_stmt(prgm), bindings_2)

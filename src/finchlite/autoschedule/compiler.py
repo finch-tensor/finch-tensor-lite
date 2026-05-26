@@ -10,6 +10,7 @@ from finchlite.algebra.tensor import TensorFType
 from finchlite.compile.lower import make_extent
 from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic import (
+    Alias,
     LogicLoader,
     StatsFactory,
     TensorStats,
@@ -21,7 +22,7 @@ from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
 from finchlite.util.logging import LOG_NOTATION
 
-from .stages import LogicNotationLowerer
+from .stages import FormattedForm, LogicNotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
@@ -284,34 +285,7 @@ class NotationContext:
                     lgc.MapJoin(
                         lgc.Literal(op),
                         (
-                            lgc.Reorder(lgc.Table(lhs_1), idxs_1),
-                            lgc.Reorder(lgc.Table() as tbl, idxs_2),
-                        ),
-                    ),
-                    idxs_3,
-                ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_3:
-                body = self._lower_query_of_reorder(lhs, op, tbl, idxs_2)
-                return ntn.Block(
-                    (
-                        ntn.Thaw(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                        body,
-                        ntn.Freeze(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                    )
-                )
-            case lgc.Query(
-                lhs,
-                lgc.Reorder(
-                    lgc.MapJoin(
-                        lgc.Literal(op),
-                        (
-                            lgc.Reorder(lgc.Table(lhs_1), idxs_1),
+                            lgc.Table(lhs_1, idxs_1),
                             lgc.Aggregate(
                                 lgc.Literal(op_1),
                                 lgc.Literal(init),
@@ -357,18 +331,14 @@ class NotationContext:
                 raise Exception(f"Unrecognized logic: {prgm}")
 
 
-class NotationGenerator(LogicNotationLowerer):
-    def validate_inputs(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ):
-        pass
-
+class NotationGenerator(LogicNotationLowerer, FormattedForm):
 
     def lower(self, *outputs):
         return outputs[0] if len(outputs) == 1 else outputs
 
     def transform(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType], 
+            stats: dict[Alias, TensorStats], stats_factory: StatsFactory
     ) -> tuple[ntn.Module]:
         preamble: list[ntn.NotationStatement] = []
         epilogue: list[ntn.NotationStatement] = []
@@ -424,7 +394,7 @@ class NotationGenerator(LogicNotationLowerer):
         )
 
 
-class LogicCompiler(LogicLoader):
+class LogicCompiler(LogicLoader, FormattedForm):
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,

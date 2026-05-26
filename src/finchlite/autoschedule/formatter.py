@@ -2,6 +2,7 @@ import logging
 from abc import abstractmethod
 from typing import Any
 
+from finchlite.autoschedule.stages import LoopOrderedForm
 import numpy as np
 
 from finchlite import finch_logic as lgc
@@ -20,7 +21,7 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicFormatter(LogicLoader):
+class LogicFormatter(LogicLoader, LoopOrderedForm):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -37,15 +38,6 @@ class LogicFormatter(LogicLoader):
         autoscheduler.
         """
         ...
-
-    def validate_inputs(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, "TensorStats"],
-        stats_factory: StatsFactory,
-    ):
-        pass
 
     def transform(
         self,
@@ -70,9 +62,8 @@ class LogicFormatter(LogicLoader):
         def formatter(node: lgc.LogicStatement):
             match node:
                 case lgc.Plan(bodies):
-                    for body in bodies:
-                        formatter(body)
-                case lgc.Query(lhs, _):
+                    return node
+                case lgc.Query(lhs, rhs):
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)
@@ -82,6 +73,11 @@ class LogicFormatter(LogicLoader):
                         tns = self.get_output_tns_ftype(fill_values[lhs], shape_type)
 
                         bindings[lhs] = tns
+                    match rhs:
+                        case lgc.Reorder(arg, _):
+                            return node
+                        case _:
+                            return lgc.Reorder(arg, arg.fields())
                 case lgc.Produces(_):
                     pass
                 case _:

@@ -102,11 +102,11 @@ def standardize_inplace_queries(
 
                 lhs_arg = lhs_arg[0]
                 match lhs_arg:
-                    case Reorder(Table(_), idxs_2) if idxs_2 == idxs_1:
+                    case Reorder(Table(lhs_alias, idxs_2), _) if idxs_2 == idxs_1:
                         others = filter(lambda arg: arg is not lhs_arg, args)
                         return Query(
                             lhs,
-                            Reorder(MapJoin(op, (lhs_arg, *others)), idxs_1),
+                            Reorder(MapJoin(op, (lhs_arg.arg, *others)), idxs_1),
                         )
 
                     case _:
@@ -135,8 +135,8 @@ def standardize_inplace_queries(
                     MapJoin(
                         op,
                         (
-                            Reorder(Table(lhs_1), idxs_1) as lhs_arg,
-                            Reorder(MapJoin(), _) as non_lhs_arg,
+                            Table(lhs_1, idxs_1) as lhs_arg,
+                            Reorder() as non_lhs_arg,
                         ),
                     ),
                     idxs_2,
@@ -236,14 +236,39 @@ def standardize_query_roots(
                     MapJoin(
                         Literal(op),
                         (
-                            Reorder(Table(lhs_1), idxs_1),
-                            Aggregate(Literal(op_1), _, _, _),
+                            Table(lhs_1, idxs_1),
+                            Aggregate(Literal(op_1), _, Reorder(), _),
                         ),
                     ),
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return ex
+            case Query(
+                lhs,
+                Reorder(
+                    MapJoin(
+                        Literal(op),
+                        (
+                            Table(lhs_1, idxs_1),
+                            Aggregate(Literal(op_1), init, agg_arg, agg_idxs),
+                        ),
+                    ),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
+                return Query(
+                lhs,
+                Reorder(
+                    MapJoin(
+                        Literal(op),
+                        (
+                            Table(lhs_1, idxs_1),
+                            Aggregate(Literal(op_1), init, Reorder(agg_arg, idxs_2 + tuple(idx for idx in agg_arg.fields() if idx not in idxs_2)), agg_idxs),
+                        ),
+                    ),
+                    idxs_2,
+                ))
             case Query(lhs, rhs):
                 return Query(
                     lhs,
@@ -474,10 +499,10 @@ class LogicStandardizer(LogicLoader):
     """
     The LogicStandardizer applies a series of transformations to standardize
     logic statements into a canonical form. Any Logic is accepted as input, and
-    the output logic should be a plan with only two forms of queries:
+    the output logic should be a plan with only three forms of queries:
     1. Queries that perform a Reorder of a single argument.
-    2. Queries that perform an Aggregate over a Reorder of a series of map-joins.
-    3. Queries that perform a Reorder of a map-join between query lhs and (1)/(2).
+    2. Queries that perform an Aggregate over a Reorder of tables and mapjoins.
+    3. Queries that perform a Reorder of a map-join between query lhs and (2).
     """
 
     def __init__(self, ctx: LogicLoader | None = None):
