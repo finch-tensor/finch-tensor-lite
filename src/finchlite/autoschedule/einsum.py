@@ -17,9 +17,11 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             return ein.Plan(tuple(generate_einsum_stmt(body) for body in bodies))
         case lgc.Query(
             lgc.Alias(name),
+            lgc.Reorder(
             lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _) as agg,
+            output_idxs)
         ):
-            einidxs = tuple(ein.Index(field.name) for field in agg.fields())
+            einidxs = tuple(ein.Index(field.name) for field in output_idxs)
             body = ein.Einsum(
                 op=ein.Literal(operation),
                 tns=ein.Alias(name),

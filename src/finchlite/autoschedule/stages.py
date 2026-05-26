@@ -121,6 +121,7 @@ class LoopOrderedForm(SingleAggregateForm):
     def validate_inputs(cls, term: Plan, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
         super().validate_inputs(term, bindings, stats, stats_factory)
+        print("Term: ", term)
         def validate(node, loop_order):
             match node:
                 case Plan(bodies):
@@ -147,7 +148,6 @@ class LoopOrderedForm(SingleAggregateForm):
                     if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
                 case Reorder(arg, _):
-                    print("Node: ", node, "agg_idxs", type(arg.idxs))
                     raise ValueError("Reorder nodes should only appear in transposes, output orders, and loop orders!")
                 case Literal():
                     return

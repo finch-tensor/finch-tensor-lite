@@ -490,6 +490,7 @@ def standardize(
     prgm = push_fields(prgm)
     prgm = drop_reorders(prgm)
     prgm = drop_with_aggregation(prgm)
+    prgm = push_fields(prgm)
     prgm = concordize(prgm, bindings)
     prgm = drop_reorders(prgm)
     prgm = flatten_plans(prgm)
@@ -518,6 +519,7 @@ class LogicStandardizer(UnvalidatedForm, LogicLoader):
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
     ):
+        print("Pre-Standardize PRGM: ", prgm)
         prgm, bindings = standardize(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)
 
