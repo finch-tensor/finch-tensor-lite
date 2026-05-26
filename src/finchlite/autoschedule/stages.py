@@ -13,7 +13,7 @@ class LogicNotationLowerer(Stage):
     def lower(
         self, term: LogicStatement, bindings: dict[Alias, TensorFType], 
             stats: dict[Alias, TensorStats], stats_factory: StatsFactory
-    ) -> tuple[ntn.Module]:
+    ) -> ntn.Module:
         """
         Generate Finch Notation from the given logic and input types.  Also
         return a dictionary including additional tables needed to run the kernel.
@@ -36,7 +36,7 @@ class AliasedForm(Form):
     that all Tables are wrapping Aliases.
     """
     @classmethod
-    def validate_inputs(cls, term: LogicNode, bindings: dict[Alias, TensorFType], 
+    def validate_inputs(cls, term: Plan, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
         defined_aliases = set(bindings.keys())
         def validate(node):

@@ -54,13 +54,13 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
             {var: val.fill_value for var, val in bindings.items()}
         )
 
-        def formatter(node: lgc.LogicStatement):
+        def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
             match node:
                 case lgc.Plan(bodies):
                     new_bodies = []
                     for body in bodies:
                         new_bodies.append(formatter(body))
-                    return lgc.Plan(new_bodies)
+                    return lgc.Plan(tuple(new_bodies))
                 case lgc.Query(lhs, rhs):
                     if lhs not in bindings:
                         shape_type = tuple(
