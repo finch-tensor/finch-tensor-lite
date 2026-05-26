@@ -35,48 +35,6 @@ class LogicLoader(Stage):
         dictionary including additional tables needed to run the kernel.
         """
 
-
-class LogicTransform(Stage):
-    @abstractmethod
-    def transform(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
-        """
-        Transform the given logic term into another logic term.
-        """
-
-
-class OptLogicLoader(LogicLoader):
-    def __init__(self, *opts: LogicTransform, ctx: LogicLoader):
-        self.ctx = ctx
-        self.opts = opts
-
-    def validate_inputs(
-        self,
-        term: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass
-
-    def transform(
-        self,
-        term: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> tuple[
-        lgc.LogicStatement,
-        dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, TensorStats],
-        StatsFactory,
-    ]:
-        for opt in self.opts:
-            term, bindings = opt(term, bindings or {})
-        return term, bindings, stats, stats_factory
-
-
 def compute_shape_vars(
     prgm: lgc.LogicStatement,
     bindings: dict[lgc.Alias, TensorFType],
