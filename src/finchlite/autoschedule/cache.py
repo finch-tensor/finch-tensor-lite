@@ -12,14 +12,13 @@ from finchlite.finch_logic import (
     StatsFactory,
     TensorStats,
 )
-from finchlite.symbolic import NoTransformStage
 
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicCacheLRU_Embeddings_Norms(NoTransformStage, LogicLoader):
+class LogicCacheLRU_Embeddings_Norms(LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
@@ -42,15 +41,9 @@ class LogicCacheLRU_Embeddings_Norms(NoTransformStage, LogicLoader):
     ):
         pass
 
-    def validate_outputs(
-        self,
-        prgm: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass
-
+    def transform(self, *inputs):
+        return inputs
+    
     def lower(
         self,
         prgm: LogicStatement,

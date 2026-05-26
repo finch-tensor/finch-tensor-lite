@@ -53,9 +53,6 @@ class LogicInterpreter(LogicEvaluator):
         machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
         return (machine(node),)
 
-    def validate_outputs(self, *outputs):
-        pass
-
     def lower(self, *outputs):
         return outputs[0]
 
@@ -241,9 +238,6 @@ class MockLogicLoader(LogicLoader):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockLogicLibrary(prgm, bindings), bindings, shape_vars
-
-    def validate_outputs(self, *outputs):
-        pass
 
     def lower(self, *outputs):
         return outputs

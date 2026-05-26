@@ -24,7 +24,7 @@ from finchlite.finch_assembly import (
     AssemblyTransform,
 )
 from finchlite.finch_notation import NotationLoader
-from finchlite.symbolic import Context, NoTransformStage, PostOrderDFS, PostWalk, Rewrite, ScopedDict
+from finchlite.symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
 from finchlite.util.logging import LOG_ASSEMBLY
 
 from .stages import NotationLowerer
@@ -302,7 +302,7 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler(NoTransformStage, NotationLoader):
+class NotationCompiler(NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
@@ -320,8 +320,8 @@ class NotationCompiler(NoTransformStage, NotationLoader):
     def validate_inputs(self, prgm: ntn.Module):
         pass
 
-    def validate_outputs(self, prgm: ntn.Module):
-        pass
+    def transform(self, *inputs):
+        return inputs
 
     def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
@@ -345,9 +345,6 @@ class AssemblyGenerator(NotationLowerer):
     def transform(self, term: ntn.Module) -> tuple[asm.Module]:
         ctx = AssemblyContext()
         return (ctx(term),)
-
-    def validate_outputs(self, *outputs):
-        pass
 
     def lower(self, *outputs):
         return outputs[0]

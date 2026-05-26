@@ -94,15 +94,6 @@ class LogicExecutor(LogicEvaluator):
 
         return prgm, stmt, bindings, binding_ftypes
 
-    def validate_outputs(
-        self,
-        prgm: LogicNode,
-        stmt: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, Tensor],
-        binding_ftypes: dict[lgc.Alias, TensorFType],
-    ):
-        pass
-
     def lower(
         self,
         prgm: LogicNode,

@@ -17,7 +17,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.finch_notation import NotationInterpreter
 from finchlite.finch_notation.stages import NotationLoader
-from finchlite.symbolic import NoTransformStage, gensym
+from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
 from finchlite.util.logging import LOG_NOTATION
 
@@ -363,8 +363,6 @@ class NotationGenerator(LogicNotationLowerer):
     ):
         pass
 
-    def validate_outputs(self, *outputs):
-        pass
 
     def lower(self, *outputs):
         return outputs[0] if len(outputs) == 1 else outputs
@@ -426,7 +424,7 @@ class NotationGenerator(LogicNotationLowerer):
         )
 
 
-class LogicCompiler(NoTransformStage, LogicLoader):
+class LogicCompiler(LogicLoader):
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,
@@ -448,14 +446,8 @@ class LogicCompiler(NoTransformStage, LogicLoader):
     ):
         pass
 
-    def validate_outputs(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass
+    def transform(self, *inputs):
+        return inputs
 
     def lower(
         self,

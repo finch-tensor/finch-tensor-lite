@@ -149,12 +149,3 @@ class GalleyLogicalOptimizer(LogicLoader):
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
         return term, bindings, stats, stats_factory
-
-    def validate_outputs(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass

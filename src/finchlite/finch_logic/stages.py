@@ -76,15 +76,6 @@ class OptLogicLoader(LogicLoader):
             term, bindings = opt(term, bindings or {})
         return term, bindings, stats, stats_factory
 
-    def validate_outputs(
-        self,
-        term: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass
-
 
 def compute_shape_vars(
     prgm: lgc.LogicStatement,

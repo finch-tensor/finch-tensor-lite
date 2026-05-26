@@ -63,13 +63,6 @@ class OptEinsumLoader(EinsumLoader):
             term, bindings = opt(term, bindings or {})
         return term, bindings
 
-    def validate_outputs(
-        self,
-        term: ein.EinsumStatement,
-        bindings: dict[ein.Alias, TensorFType],
-    ):
-        pass
-
 
 def compute_shape_vars(
     prgm: ein.EinsumStatement,

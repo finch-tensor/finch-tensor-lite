@@ -509,11 +509,3 @@ class LogicStandardizer(LogicLoader):
         prgm, bindings = standardize(prgm, bindings)
         return prgm, bindings, stats, stats_factory
 
-    def validate_outputs(
-        self,
-        prgm: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, "TensorStats"],
-        stats_factory: StatsFactory,
-    ):
-        pass

@@ -71,7 +71,3 @@ class LogicNormalizer(LogicEvaluator):
         root, bindings = normalize_names(prgm, bindings or {})
         logger.debug(root)
         return root, bindings
-
-    def validate_outputs(self, root: LogicNode, bindings: dict[Alias, Tensor]):
-        pass
-

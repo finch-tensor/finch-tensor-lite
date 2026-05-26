@@ -135,9 +135,6 @@ class AssemblyInterpreter(AssemblyLoader):
     def validate_inputs(self, prgm: asm.Module):
         pass
 
-    def validate_outputs(self, *outputs):
-        pass
-
     def transform(self, prgm: asm.Module) -> tuple:
         return (self._dispatch(prgm),)
 

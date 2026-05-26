@@ -339,9 +339,6 @@ class NotationInterpreter(NotationLoader):
     def validate_inputs(self, prgm: ntn.Module):
         pass
 
-    def validate_outputs(self, *outputs):
-        pass
-
     def transform(self, prgm: ntn.Module) -> tuple:
         return (self._dispatch(prgm),)
 

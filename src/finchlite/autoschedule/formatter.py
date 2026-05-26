@@ -95,15 +95,6 @@ class LogicFormatter(LogicLoader):
 
         return prgm, bindings, stats, stats_factory
 
-    def validate_outputs(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, "TensorStats"],
-        stats_factory: StatsFactory,
-    ):
-        pass
-
 
 class DefaultLogicFormatter(LogicFormatter):
     def __init__(

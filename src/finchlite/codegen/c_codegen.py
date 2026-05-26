@@ -30,7 +30,7 @@ from finchlite.algebra import (
 )
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_assembly import BufferFType, DictFType
-from finchlite.symbolic import Context, Namespace, NoTransformStage, ScopedDict
+from finchlite.symbolic import Context, Namespace, ScopedDict
 from finchlite.util import config, file_cache
 from finchlite.util.logging import LOG_BACKEND_C
 from .stages import CCode, CLowerer
@@ -389,7 +389,7 @@ class CLibrary(asm.AssemblyLibrary):
         )
 
 
-class CCompiler(NoTransformStage, asm.AssemblyLoader):
+class CCompiler(asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
@@ -411,8 +411,9 @@ class CCompiler(NoTransformStage, asm.AssemblyLoader):
     def validate_inputs(self, prgm: asm.Module):
         pass
 
-    def validate_outputs(self, prgm: asm.Module):
-        pass
+    def transform(self, *inputs):
+        return inputs
+    
 
     def lower(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
@@ -653,9 +654,6 @@ class CGenerator(CLowerer):
         ctx = CContext()
         ctx(prgm)
         return (CCode(ctx.emit_global()),)
-
-    def validate_outputs(self, *outputs):
-        pass
 
     def lower(self, *outputs):
         return outputs[0]

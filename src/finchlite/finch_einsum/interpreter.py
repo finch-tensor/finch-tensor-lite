@@ -88,9 +88,6 @@ class EinsumInterpreter(EinsumEvaluator):
         machine = EinsumMachine(xp=self.xp, bindings=bindings.copy())
         return (machine(node),)
 
-    def validate_outputs(self, *outputs):
-        pass
-
     def lower(self, *outputs):
         return outputs[0]
 
@@ -225,9 +222,6 @@ class MockEinsumLoader(EinsumLoader):
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
         return MockEinsumLibrary(prgm, bindings), bindings, shape_vars
-
-    def validate_outputs(self, *outputs):
-        pass
 
     def lower(self, *outputs):
         return outputs
