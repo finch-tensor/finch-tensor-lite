@@ -21,12 +21,13 @@ class Form(ABC):
     Stages should inherit from a Form to validate their inputs. 
     """
     @abstractmethod
-    def validate_inputs(self, *inputs): ...
+    def validate_inputs(cls, *inputs): ...
 
 class UnvalidatedForm(Form):
     """
     UnvalidatedForm does not perform any validation on the input logic.
     This is essentially a to-do for validation and should be replaced.
     """
-    def validate_inputs(self, *inputs):
+    @classmethod
+    def validate_inputs(cls, *inputs):
         return

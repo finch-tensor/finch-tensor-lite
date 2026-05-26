@@ -75,7 +75,7 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
                         case lgc.Reorder(arg, _):
                             return node
                         case _:
-                            return lgc.Reorder(arg, arg.fields())
+                            return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields()))
                 case lgc.Produces(_):
                     return node
                 case _:

@@ -35,7 +35,8 @@ class AliasedForm(Form):
     AliasedForm requires that all aliases in the input are defined in the bindings or in previous queries and
     that all Tables are wrapping Aliases.
     """
-    def validate_inputs(self, term: LogicNode, bindings: dict[Alias, TensorFType], 
+    @classmethod
+    def validate_inputs(cls, term: LogicNode, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
         defined_aliases = set(bindings.keys())
         def validate(node):
@@ -43,7 +44,7 @@ class AliasedForm(Form):
                 case Query(Alias() as lhs, _):
                     defined_aliases.add(lhs)
                 case Alias(name):
-                    if node not in bindings:
+                    if node not in defined_aliases:
                         raise ValueError(f"Alias {name} is not defined in bindings.")
                 case Table(tns, idxs):
                     if not isinstance(tns, Alias):
@@ -61,9 +62,10 @@ class SingleAggregateForm(AliasedForm):
     4) in-place queries Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order), Aggregate(op2, _, arg, _)), _), output_order) 
     (Here, op2 can be ffunc.overwrite or it can be equal to op1).
     """
-    def validate_inputs(self, term: Plan, bindings: dict[Alias, TensorFType], 
+    @classmethod
+    def validate_inputs(cls, term: Plan, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
-        super.validate_inputs(term, bindings, stats, stats_factory)
+        super().validate_inputs(term, bindings, stats, stats_factory)
         def validate(node, agg_allowed):
             match node:
                 case Plan(bodies):
@@ -71,7 +73,9 @@ class SingleAggregateForm(AliasedForm):
                         raise ValueError("The last body of a plan must be a Produces node.")
                     for body in bodies[:-1]:
                         validate(body, True)
-                case Query(Alias(), Reorder(_, Aggregate(_, _, arg, _))):
+                case Query(Alias(), Reorder(Table(), _)):
+                    return None
+                case Query(Alias(), Reorder(Aggregate(_, _, arg, _), _)):
                     return validate(arg, False)
                 case Query(Alias(), Aggregate(_, _, arg, _)):
                     return validate(arg, False)
@@ -89,6 +93,10 @@ class SingleAggregateForm(AliasedForm):
                     return validate(arg, False)
                 case Reorder(arg, _):
                     return validate(arg, agg_allowed)
+                case MapJoin(_, args):
+                    for arg in args:
+                        validate(arg, agg_allowed)
+                    return None
                 case Literal() | Alias() | Table():
                     return None
                 case _:
@@ -107,22 +115,23 @@ class LoopOrderedForm(SingleAggregateForm):
     @staticmethod
     def _check_loop_order(idxs, loop_order): 
         rel_loop_order = [idx for idx in loop_order if idx in idxs]
-        return rel_loop_order == idxs
+        return tuple(rel_loop_order) == tuple(idxs)
 
-    def validate_inputs(self, term: Plan, bindings: dict[Alias, TensorFType], 
+    @classmethod
+    def validate_inputs(cls, term: Plan, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
-        super.validate_inputs(term, bindings, stats, stats_factory)
+        super().validate_inputs(term, bindings, stats, stats_factory)
         def validate(node, loop_order):
             match node:
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body, loop_order)
-                case Query(Alias(), Reorder(Table(tns, idxs), loop_order)):
+                case Query(Alias(), Reorder(Table(tns, idxs), _)):
                     return
-                case Query(Alias(), Aggregate(_, _, Reorder(arg, loop_order), _)):
-                    return validate(arg, loop_order)
-                case Query(Alias(), Reorder(Aggregate(_, _, Reorder(arg, loop_order)), _)):
-                    return validate(arg, loop_order)
+                case Query(Alias(), Aggregate(_, _, Reorder(arg, idxs), _)):
+                    return validate(arg, idxs)
+                case Query(Alias(), Reorder(Aggregate(_, _, Reorder(arg, idxs)), _)):
+                    return validate(arg, idxs)
                 case Query(Alias(), Aggregate(_, _, arg, _)):
                     raise ValueError("All aggregates must wrap a Reorder node specifying the loop order.")
                 case Query(Alias(), Reorder(MapJoin(_, (Table(lhs, lhs_idxs), Aggregate(_, _, Reorder(agg_arg, idxs_1), _))), _)):
@@ -133,17 +142,18 @@ class LoopOrderedForm(SingleAggregateForm):
                     raise ValueError("In-place queries must have an interior loop order!")
                 case MapJoin(_, args):
                     for arg in args:
-                        validate(arg)
+                        validate(arg, loop_order)
                 case Table(tns, idxs):
-                    if not self._check_loop_order(idxs, loop_order):
+                    if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
                 case Reorder(arg, _):
+                    print("Node: ", node, "agg_idxs", type(arg.idxs))
                     raise ValueError("Reorder nodes should only appear in transposes, output orders, and loop orders!")
                 case Literal():
                     return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
-        validate(term)
+        validate(term, None)
 
 class FormattedForm(LoopOrderedForm):
     """
@@ -153,9 +163,10 @@ class FormattedForm(LoopOrderedForm):
         2) aggregate queries with an output and loop order Query(_, Reorder(_, Aggregate(_, _, Reorder(arg, loop_order), _)), output_order)
         3) in-place queries Query(lhs, Reorder(MapJoin(_, (Table(lhs, lhs_idxs), Aggregate(_,_, Reorder(agg_arg, loop_order), _))), lhs_idxs)))
     """
-    def validate_inputs(self, term: Plan, bindings: dict[Alias, TensorFType], 
+    @classmethod
+    def validate_inputs(cls, term: Plan, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
-        super.validate_inputs(term, bindings, stats, stats_factory)
+        super().validate_inputs(term, bindings, stats, stats_factory)
         def validate(node):
             match node:
                 case Plan(bodies):
@@ -179,6 +190,8 @@ class FormattedForm(LoopOrderedForm):
                         raise ValueError(f"Alias {tns.name} is not defined in bindings. All aliases must have TensorFTypes specified at this stage.")
                 case Literal():
                     return
+                case Reorder(arg, _):
+                    validate(arg)
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
         validate(term)

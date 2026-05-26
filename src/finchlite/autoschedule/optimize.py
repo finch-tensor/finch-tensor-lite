@@ -2,6 +2,7 @@ from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
 
+from finchlite.algebra import ffuncs
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect, setdiff
@@ -94,6 +95,19 @@ def with_unique_lhs(
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)
 
+def add_aggregates(root: LogicStatement, bindings: dict[Alias, TensorFType]) -> LogicStatement:
+    fill_values = root.infer_fill_value({var: val.fill_value for var, val in bindings.items()})
+    def rule_0(node):
+        match node:
+            case Query(lhs, Reorder(Aggregate(op, init, arg, idxs), _)):
+                return node
+            case Query(lhs, Reorder(arg, idxs)):
+                return Query(lhs, Reorder(Aggregate(Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, tuple()), idxs))
+            case Query(lhs, Aggregate(op, init, arg, idxs)):
+                return node
+            case Query(lhs, arg):
+                return Query(lhs, Aggregate(Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, tuple()))
+    return Rewrite(PostWalk(rule_0))(root)
 
 def optimize(
     prgm: LogicStatement, bindings: dict[Alias, TensorFType]
@@ -118,8 +132,8 @@ def optimize(
         prgm = push_fields(prgm)
 
         prgm = concordize(prgm, bindings)
-
-        return propagate_copy_queries(prgm), bindings
+        prgm = propagate_copy_queries(prgm)
+        return add_aggregates(prgm, bindings), bindings
 
     return with_unique_lhs(transform, prgm, bindings)
 

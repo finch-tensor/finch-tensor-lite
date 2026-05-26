@@ -193,7 +193,7 @@ class NotationContext:
         query_lhs: lgc.Alias,
         agg_op: FinchOperator,
         agg_arg: lgc.Reorder,
-        agg_idxs: tuple[lgc.Field, ...],
+        output_idxs: tuple[lgc.Field, ...],
     ):
         # Build a dict mapping fields to their shapes
         arg_dims = agg_arg.dimmap(merge_shapes, self.shapes)
@@ -212,7 +212,7 @@ class NotationContext:
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(agg_op)),
-            tuple(loops[idx] for idx in agg_arg.idxs if idx not in agg_idxs),
+            tuple(loops[idx] for idx in output_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(agg_arg.idxs):
@@ -256,14 +256,16 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
+                lgc.Reorder(
                 lgc.Aggregate(
                     lgc.Literal(op),
                     lgc.Literal(init),
                     lgc.Reorder(arg, _) as arg_2,
                     idxs_2,
                 ),
+                output_idxs)
             ):
-                body = self._lower_query_of_aggregate(lhs, op, arg_2, idxs_2)
+                body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
                 return ntn.Block(
                     (
                         ntn.Declare(
@@ -297,7 +299,7 @@ class NotationContext:
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
-                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, agg_idxs)
+                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Thaw(
