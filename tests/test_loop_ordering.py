@@ -356,5 +356,29 @@ def test_galley_loop_order_frontend_pipeline():
     expected = np.array(a) @ np.array(b)
     finch_assert_allclose(np.array(out), expected)
 
-# NOTE: currently fails in DefaultLogicFormatter due to lhs shape type != rhs shape type
-# dimenision map in dims_binding > dimmap for rhs
+
+def test_galley_loop_order_frontend_elementwise_mul():
+    """Galley + loop orderer pipeline: element-wise multiply (no contraction)."""
+    a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    b = fl.asarray(np.array([[2.0, 0.5], [1.0, 3.0]]))
+
+    out = fl.compute(
+        fl.lazy(a) * fl.lazy(b), ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER
+    )
+
+    expected = np.array(a) * np.array(b)
+    finch_assert_allclose(np.array(out), expected)
+
+
+def test_galley_loop_order_frontend_matmul_sum_axis0():
+    """Galley + loop orderer pipeline: matmul then reduce along axis 0."""
+    a = fl.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    b = fl.asarray(np.array([[5.0, 6.0], [7.0, 8.0]]))
+
+    out = fl.compute(
+        fl.sum(fl.lazy(a) @ fl.lazy(b), axis=0),
+        ctx=INTERPRET_NOTATION_GALLEY_LOOP_ORDER,
+    )
+
+    expected = np.sum(np.array(a) @ np.array(b), axis=0)
+    finch_assert_allclose(np.array(out), expected)
