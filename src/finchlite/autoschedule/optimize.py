@@ -51,6 +51,7 @@ def with_unique_lhs(
     Ensures all left-hand sides (LHS) of queries are unique by inserting new
     tensors.
     """
+
     spc = Namespace(root)
     for var in bindings:
         spc.freshen(var.name)
@@ -78,18 +79,24 @@ def with_unique_lhs(
     root, bindings = f(root, bindings)
 
     unrenames = {v: k for k, v in renames.items()}
-
+    # Some produces may be renamed during the optimization, so we need to be a bit careful here.
     def rule_1(node):
         match node:
             case Produces(args):
+                n_writes = len(writes)
+                v_post_list = args[-n_writes:] if n_writes else ()
+
                 bodies: list[LogicStatement] = []
-                for k, v in writes.items():
+                for (k, _v_pre), v_post in zip(writes.items(), v_post_list, strict=True):
                     idxs = tuple(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
-                    bodies.append(Query(k, Table(v, idxs)))
+                    bodies.append(Query(k, Table(v_post, idxs)))
+
+                v_post_to_k = dict(zip(v_post_list, writes.keys(), strict=True))
                 args_2 = tuple(
-                    unrenames.get(a, a) for a in args[: len(args) - len(writes)]
+                    v_post_to_k.get(a, unrenames.get(a, a))
+                    for a in args[: len(args) - n_writes]
                 )
                 return Plan(tuple(bodies) + (Produces(args_2),))
 
@@ -133,10 +140,10 @@ def optimize(
 
         prgm = concordize(prgm, bindings)
         prgm = propagate_copy_queries(prgm)
-        return add_aggregates(prgm, bindings), bindings
-
-    return with_unique_lhs(transform, prgm, bindings)
-
+        res = add_aggregates(prgm, bindings)
+        return res, bindings
+    prgm, bindings = with_unique_lhs(transform, prgm, bindings)
+    return flatten_plans(prgm), bindings
 
 def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
     match root:
@@ -263,7 +270,6 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
 
 def propagate_copy_queries(root):
     copies = {}
-
     def rule_0(node):
         match node:
             case Query(lhs, Table(Alias(_) as rhs, _)):

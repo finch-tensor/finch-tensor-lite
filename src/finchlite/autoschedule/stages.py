@@ -121,7 +121,6 @@ class LoopOrderedForm(SingleAggregateForm):
     def validate_inputs(cls, term: Plan, bindings: dict[Alias, TensorFType], 
                         stats: dict[Alias, TensorStats], stats_factory: StatsFactory) -> None:
         super().validate_inputs(term, bindings, stats, stats_factory)
-        print("Term: ", term)
         def validate(node, loop_order):
             match node:
                 case Plan(bodies):
@@ -136,8 +135,8 @@ class LoopOrderedForm(SingleAggregateForm):
                 case Query(Alias(), Aggregate(_, _, arg, _)):
                     raise ValueError("All aggregates must wrap a Reorder node specifying the loop order.")
                 case Query(Alias(), Reorder(MapJoin(_, (Table(lhs, lhs_idxs), Aggregate(_, _, Reorder(agg_arg, idxs_1), _))), _)):
-                    if not lhs_idxs == idxs_1[:len(lhs_idxs)]:
-                        raise ValueError("The output idxs of an in-place query must be a prefix of the loop order.")
+                    if not cls._check_loop_order(lhs_idxs, idxs_1):
+                        raise ValueError("Table index order does not match loop order.")
                     return validate(agg_arg, idxs_1)
                 case Query(Alias(), Reorder(MapJoin(_, (Table(), Aggregate(_, _, arg, _))), _)):
                     raise ValueError("In-place queries must have an interior loop order!")
@@ -177,9 +176,7 @@ class FormattedForm(LoopOrderedForm):
                 case Query(Alias(), Reorder(Aggregate(_, _, arg, _),_)):
                     return validate(arg)
                 case Query(Alias(), Reorder(MapJoin(_, (Table(lhs, lhs_idxs), Aggregate(_, _, Reorder(agg_arg, idxs_1), _))), _)):
-                    if not lhs_idxs == idxs_1[:len(lhs_idxs)]:
-                        raise ValueError("The output idxs of an in-place query must be a prefix of the loop order.")
-                    return validate(agg_arg, idxs_1)
+                    return validate(agg_arg)
                 case Query(Alias(), Aggregate(_, _, arg, _)):
                     raise ValueError("All aggregates must be wrapped in a Reorder node specifying the output order.")
                 case MapJoin(_, args):

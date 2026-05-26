@@ -171,7 +171,7 @@ def split_increments(root: LogicStatement) -> LogicStatement:
             case Query(
                 lhs,
                 Reorder(
-                    MapJoin(op, (Reorder(Table(lhs_1), idxs_1), Reorder(Table(), _))),
+                    MapJoin(op, (Table(lhs_1), idxs_1, Reorder(Table(), _))),
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2:
@@ -519,7 +519,6 @@ class LogicStandardizer(UnvalidatedForm, LogicLoader):
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
     ):
-        print("Pre-Standardize PRGM: ", prgm)
         prgm, bindings = standardize(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)
 
