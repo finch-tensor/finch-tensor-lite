@@ -27,19 +27,25 @@ from finchlite.finch_logic import (
 from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, PreWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
-from .standardize import concordize
+from .standardize import concordize, flatten_plans
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
 def _align(
-    ex: LogicExpression, loop_order: tuple[Field, ...]
+    ex: LogicExpression,
+    loop_order: tuple[Field, ...],
+    bindings: dict[Alias, TensorFType] | None = None,
+    namespace: Namespace | None = None,
 ) -> tuple[LogicExpression, tuple[Query, ...]]:
     """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``."""
     needed_swizzles: dict[
         tuple[Alias, tuple[Field, ...], tuple[Field, ...]], Alias
     ] = {}
-    namespace = Namespace(ex)
+    # vecdot test
+    # swizzles alias conflict
+    if namespace is None:
+        namespace = Namespace(ex)
 
     def rule(node: LogicNode) -> LogicNode | None:
         match node:
@@ -53,6 +59,14 @@ def _align(
         field_set = set(logical)
         desired = tuple(f for f in loop_order if f in field_set)
         if desired == logical:
+            return None
+        # ValueError: zip() argument 2 is longer/shorter than argument 1
+        # shape mismatch
+        # dont swizzle if not permuation of idxs
+        # and if bindings to preserve shape
+        if bindings and (
+            len(desired) != len(physical) or set(desired) != set(physical)
+        ):
             return None
 
         key = (var, physical, desired)
@@ -257,11 +271,16 @@ class LoopOrderer(LogicLoader):
         stats_factory: StatsFactory,
     ):
         validate(prgm, kind="input")
+        namespace = Namespace(prgm)
 
         def apply_loop_order(node: LogicStatement) -> LogicStatement:
             match node:
                 case Plan(bodies):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
+                # if table and connected to bindings dont touch.
+                # added here to catch earlier
+                case Query(_, Reorder(Table(_, _), _)) if bindings:
+                    return node
                 case Query(lhs, rhs):
                     loop_order = self.get_loop_order(
                         node, bindings, stats, stats_factory
@@ -273,7 +292,7 @@ class LoopOrderer(LogicLoader):
                         # from Logic Optimizer.
                         case Aggregate(_, _, Reorder(_, old_loop_order), _) if bindings:
                             loop_order = old_loop_order
-                    rhs, swizzles = _align(rhs, loop_order)
+                    rhs, swizzles = _align(rhs, loop_order, bindings, namespace)
                     match rhs:
                         case Aggregate(
                             op,
@@ -305,7 +324,10 @@ class LoopOrderer(LogicLoader):
                     )
 
         prgm = apply_loop_order(prgm)
-        prgm = concordize(prgm, bindings)
+        prgm = flatten_plans(prgm)
+        if not bindings:
+            prgm = concordize(prgm, bindings)
+            prgm = flatten_plans(prgm)
         validate(prgm, kind="output")
         logger.debug(prgm)
         return self.loader(prgm, bindings, stats, stats_factory)
