@@ -18,7 +18,11 @@ class Stage(ABC):
         return self.lower(*outputs)
 
 
-class UnvalidatedForm(Stage):
+class Form(ABC):
+    @abstractmethod
+    def validate_inputs(self, *inputs): ...
+
+class UnvalidatedForm(Form):
     """
     UnvalidatedForm does not perform any validation on the input logic.
     This is essentially a to-do for validation and should be replaced.

@@ -9,7 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
-from .stage import Stage, UnvalidatedForm
+from .stage import Stage, Form, UnvalidatedForm
 from .term import (
     Term,
     TermTree,
@@ -35,6 +35,7 @@ __all__ = [
     "Rewrite",
     "ScopedDict",
     "Stage",
+    "Form",
     "UnvalidatedForm",
     "Term",
     "TermTree",

@@ -6,7 +6,7 @@ from finchlite.finch_logic import LogicStatement, LogicNode, Alias, Field, Aggre
 from finchlite import finch_notation as ntn
 from finchlite.algebra.tensor import TensorFType
 from finchlite.finch_logic.tensor_stats import StatsFactory, TensorStats
-from finchlite.symbolic import PreWalk, Rewrite, Stage
+from finchlite.symbolic import PreWalk, Rewrite, Stage, Form
 
 class LogicNotationLowerer(Stage):
     @abstractmethod
@@ -30,7 +30,7 @@ class LogicEinsumLowerer(Stage):
         return a dictionary including additional tables needed to run the kernel.
         """
 
-class AliasedForm(Stage):
+class AliasedForm(Form):
     """
     AliasedForm requires that all aliases in the input are defined in the bindings or in previous queries and
     that all Tables are wrapping Aliases.
