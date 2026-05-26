@@ -7,7 +7,7 @@ from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
 from finchlite.finch_logic import Alias, LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
-
+from finchlite.symbolic.stage import UnvalidatedForm
 from .stages import LogicEinsumLowerer
 
 
@@ -76,11 +76,7 @@ def generate_einsum_expr(
             raise Exception(f"Unrecognized logic: {ex}")
 
 
-class EinsumGenerator(LogicEinsumLowerer):
-    def validate_inputs(
-        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ):
-        pass
+class EinsumGenerator(LogicEinsumLowerer, UnvalidatedForm):
 
     def transform(
         self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType], 
@@ -94,7 +90,7 @@ class EinsumGenerator(LogicEinsumLowerer):
 
 
 
-class LogicEinsumLoader(LogicLoader):
+class LogicEinsumLoader(LogicLoader, UnvalidatedForm):
     def __init__(
         self,
         ctx_lower: LogicEinsumLowerer | None = None,
@@ -107,14 +103,6 @@ class LogicEinsumLoader(LogicLoader):
             ctx_load = MockEinsumLoader()
         self.ctx_load: EinsumLoader = ctx_load
 
-    def validate_inputs(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, "TensorStats"],
-        stats_factory: StatsFactory,
-    ):
-        pass
 
     def transform(self, *inputs):
         return inputs

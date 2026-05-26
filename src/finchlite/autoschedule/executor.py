@@ -6,7 +6,7 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
 from finchlite.finch_logic.nodes import TableValue
-from finchlite.symbolic import Namespace, PostWalk, Rewrite
+from finchlite.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 
 from .formatter import DefaultLogicFormatter
 
@@ -44,7 +44,7 @@ def extract_tensors(
     return root, bindings
 
 
-class LogicExecutor(LogicEvaluator):
+class LogicExecutor(LogicEvaluator, UnvalidatedForm):
     def __init__(
         self,
         ctx: LogicLoader | None = None,
@@ -60,12 +60,6 @@ class LogicExecutor(LogicEvaluator):
         self.cache = cache
         self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
-    def validate_inputs(
-        self,
-        prgm: LogicNode,
-        bindings: dict[lgc.Alias, Tensor] | None = None,
-    ):
-        pass
 
     def transform(
         self,

@@ -30,7 +30,7 @@ from finchlite.algebra import (
 )
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_assembly import BufferFType, DictFType
-from finchlite.symbolic import Context, Namespace, ScopedDict
+from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finchlite.util import config, file_cache
 from finchlite.util.logging import LOG_BACKEND_C
 from .stages import CCode, CLowerer
@@ -389,7 +389,7 @@ class CLibrary(asm.AssemblyLibrary):
         )
 
 
-class CCompiler(asm.AssemblyLoader):
+class CCompiler(asm.AssemblyLoader, UnvalidatedForm):
     """
     A class to compile and run FinchAssembly.
     """
@@ -407,9 +407,6 @@ class CCompiler(asm.AssemblyLoader):
         self.cflags = cflags
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
-
-    def validate_inputs(self, prgm: asm.Module):
-        pass
 
     def transform(self, *inputs):
         return inputs
@@ -646,10 +643,7 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CGenerator(CLowerer):
-    def validate_inputs(self, prgm: asm.AssemblyNode):
-        pass
-
+class CGenerator(CLowerer, UnvalidatedForm):
     def transform(self, prgm: asm.AssemblyNode) -> tuple:
         ctx = CContext()
         ctx(prgm)

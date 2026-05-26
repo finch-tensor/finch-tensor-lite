@@ -407,15 +407,6 @@ class LogicCompiler(LogicLoader, FormattedForm):
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
-    def validate_inputs(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass
-
     def transform(self, *inputs):
         return inputs
 

@@ -32,6 +32,7 @@ from finchlite.symbolic import (
     PostWalk,
     PreWalk,
     Rewrite,
+    UnvalidatedForm,
     gensym,
 )
 
@@ -495,7 +496,7 @@ def standardize(
     return normalize_names(prgm, bindings)
 
 
-class LogicStandardizer(LogicLoader):
+class LogicStandardizer(LogicLoader, UnvalidatedForm):
     """
     The LogicStandardizer applies a series of transformations to standardize
     logic statements into a canonical form. Any Logic is accepted as input, and
@@ -509,15 +510,6 @@ class LogicStandardizer(LogicLoader):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx: LogicLoader = ctx
-
-    def validate_inputs(
-        self,
-        prgm: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, "TensorStats"],
-        stats_factory: StatsFactory,
-    ):
-        pass
 
     def transform(
         self,

@@ -14,7 +14,7 @@ from finchlite.algebra import (
     query_property,
     register_property,
 )
-from finchlite.symbolic import ScopedDict
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
 
 from . import nodes as ntn
 from .stages import NotationLoader
@@ -280,8 +280,8 @@ class HaltState:
     has_returned: bool = False
     return_value: Any = None
 
-
-class NotationInterpreter(NotationLoader):
+    
+class NotationInterpreter(NotationLoader, UnvalidatedForm):
     """
     An interpreter for FinchNotation.
     """
@@ -335,9 +335,6 @@ class NotationInterpreter(NotationLoader):
             loop_state=loop_state,
             function_state=function_state,
         )
-
-    def validate_inputs(self, prgm: ntn.Module):
-        pass
 
     def transform(self, prgm: ntn.Module) -> tuple:
         return (self._dispatch(prgm),)

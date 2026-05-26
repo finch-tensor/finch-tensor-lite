@@ -116,15 +116,6 @@ class GalleyLogicalOptimizer(LogicLoader, AliasedForm):
         self.optimizer = optimizer
         self.last_optimize_plan_s: float | None = None
 
-    def validate_inputs(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
-        pass
-
     def transform(
         self,
         term: LogicStatement,

@@ -26,7 +26,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .stages import LogicEvaluator, LogicLoader, FormattedForm, compute_shape_vars
 from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
@@ -40,12 +40,9 @@ def make_tensor(shape, fill_value, *, dtype=None):
     )
 
 
-class LogicInterpreter(LogicEvaluator):
+class LogicInterpreter(LogicEvaluator, FormattedForm):
     def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
-
-    def validate_inputs(self, node, bindings=None):
-        pass
 
     def transform(self, node, bindings=None) -> tuple:
         if bindings is None:
@@ -212,17 +209,8 @@ class MockLogicLibrary(AssemblyLibrary):
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
 
-class MockLogicLoader(LogicLoader):
+class MockLogicLoader(LogicLoader, FormattedForm):
     def __init__(self):
-        pass
-
-    def validate_inputs(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ):
         pass
 
     def transform(

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, overload
 
 from finchlite.algebra import fisinstance
-from finchlite.symbolic import ScopedDict
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
 
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
@@ -56,7 +56,7 @@ class HaltState:
     return_value: Any = None
 
 
-class AssemblyInterpreter(AssemblyLoader):
+class AssemblyInterpreter(AssemblyLoader, UnvalidatedForm):
     """
     An interpreter for FinchAssembly.
     """
@@ -131,9 +131,6 @@ class AssemblyInterpreter(AssemblyLoader):
             or self.function_state
             and self.function_state.should_halt
         )
-
-    def validate_inputs(self, prgm: asm.Module):
-        pass
 
     def transform(self, prgm: asm.Module) -> tuple:
         return (self._dispatch(prgm),)

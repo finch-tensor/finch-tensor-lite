@@ -4,7 +4,7 @@ from typing import TypeVar, overload
 from finchlite.algebra.tensor import Tensor
 from finchlite.finch_logic import Alias, Field, LogicEvaluator, LogicNode, TableValue
 from finchlite.finch_logic.nodes import LogicExpression, LogicStatement
-from finchlite.symbolic import Namespace, PostWalk, Rewrite
+from finchlite.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 from finchlite.util.logging import LOG_LOGIC_PRE_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
@@ -58,14 +58,10 @@ def normalize_names(
     return root, bindings
 
 
-class LogicNormalizer(LogicEvaluator):
+class LogicNormalizer(LogicEvaluator, UnvalidatedForm):
     def __init__(self, ctx: LogicEvaluator):
         self.ctx: LogicEvaluator = ctx
 
-    def validate_inputs(
-        self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None
-    ):
-        return
 
     def transform(self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None):
         root, bindings = normalize_names(prgm, bindings or {})

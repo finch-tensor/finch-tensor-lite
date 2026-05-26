@@ -1,13 +1,11 @@
 from finchlite import finch_assembly as asm
 from finchlite.algebra import ffuncs, is_annihilator, is_identity
-from finchlite.symbolic import Fixpoint, PostWalk, Rewrite
+from finchlite.symbolic import Fixpoint, PostWalk, Rewrite, UnvalidatedForm
 
 from .stages import AssemblyTransform
 
 
-class AssemblySimplify(AssemblyTransform):
-    def validate_inputs(self, term: asm.Module):
-        pass
+class AssemblySimplify(AssemblyTransform, UnvalidatedForm):
 
     def transform(self, term: asm.Module) -> tuple[asm.Module]:
         return (Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term),)

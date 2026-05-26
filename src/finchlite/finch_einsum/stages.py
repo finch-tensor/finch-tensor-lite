@@ -2,8 +2,7 @@ from abc import abstractmethod
 from typing import Any
 
 from finchlite.algebra import TensorFType
-from finchlite.symbolic import Stage
-from finchlite.symbolic.traversal import PostOrderDFS
+from finchlite.symbolic import Stage, UnvalidatedForm, PostOrderDFS
 
 from . import nodes as ein
 
@@ -42,17 +41,10 @@ class EinsumTransform(Stage):
         """
 
 
-class OptEinsumLoader(EinsumLoader):
+class OptEinsumLoader(EinsumLoader, UnvalidatedForm):
     def __init__(self, *opts: EinsumTransform, ctx: EinsumLoader):
         self.ctx = ctx
         self.opts = opts
-
-    def validate_inputs(
-        self,
-        term: ein.EinsumStatement,
-        bindings: dict[ein.Alias, TensorFType],
-    ):
-        pass
 
     def transform(
         self,
