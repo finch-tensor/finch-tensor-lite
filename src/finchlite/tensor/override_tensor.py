@@ -157,7 +157,7 @@ class OverrideTensor(Tensor):
         return self.mod.negative(self)
 
     def __invert__(self):
-        return self.mod.bitwise_inverse(self)
+        return self.mod.bitwise_invert(self)
 
     def __and__(self, other):
         return self.mod.bitwise_and(self, other)

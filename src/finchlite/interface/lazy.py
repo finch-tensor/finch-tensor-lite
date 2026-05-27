@@ -405,7 +405,9 @@ def full(
 
 def full_like(x, /, fill_value, *, dtype=None):
     x = lazy(x)
-    return full(x.shape, fill_value, dtype=dtype)
+    return full(
+        x.shape, fill_value, dtype=dtype if dtype is not None else x.element_type
+    )
 
 
 def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
