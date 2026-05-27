@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 from finchlite import finch_assembly as asm
 from finchlite.symbolic import Stage
 
@@ -11,10 +13,10 @@ class CCode:
 
 
 class CLowerer(Stage):
+    @abstractmethod
     def lower(self, prgm: asm.Module) -> CCode:
         """
         Lower the given assembly program to C code.
         """
-
 
 __all__ = ["CCode", "CLowerer"]
