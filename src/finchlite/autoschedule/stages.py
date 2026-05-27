@@ -4,9 +4,11 @@ from finchlite import finch_einsum as ein
 from finchlite import finch_notation as ntn
 from finchlite.algebra import ffuncs
 from finchlite.algebra.tensor import TensorFType
+from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
+    Field,
     Literal,
     LogicStatement,
     MapJoin,
@@ -308,12 +310,14 @@ class LogicFusionOptimizer(AliasedForm, LogicLoader):
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> LogicStatement:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[Alias, TensorFType],
+        dict[Alias, tuple[Field | None, ...]],]:
         """
         Optimize the aggregate structure of the given logic statement and
         make decisions about materialization.
         """
-
 
 class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
     @abstractmethod
@@ -323,7 +327,10 @@ class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> LogicStatement:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[Alias, TensorFType],
+        dict[Alias, tuple[Field | None, ...]],]:
         """
         Optimize the loop order of each query and add transposes where
         necessary.
@@ -338,7 +345,10 @@ class LogicFormatOptimizer(LoopOrderedForm, LogicLoader):
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> LogicStatement:
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[Alias, TensorFType],
+        dict[Alias, tuple[Field | None, ...]],]:
         """
         Optimize the tensor formats and output orders for each query.
         """
