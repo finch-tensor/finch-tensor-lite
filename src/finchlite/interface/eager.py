@@ -75,10 +75,10 @@ def linspace(
     return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]):
+def permute_dims(arg, /, axes: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
-        return lazy.permute_dims(arg, axis=axis)
-    return compute(lazy.permute_dims(arg, axis=axis))
+        return lazy.permute_dims(arg, axes=axes)
+    return compute(lazy.permute_dims(arg, axes=axes))
 
 
 def expand_dims(

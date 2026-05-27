@@ -451,7 +451,7 @@ def arange(
     return broadcast_to(lazy(arr), (len(arr),))
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
+def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -470,7 +470,7 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
         data type as ``x``.
     """
     arg = lazy(arg)
-    axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
+    axis = normalize_axis_tuple(axes, arg.ndim + len(axes))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
     expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
     data, ctx = arg.ctx.eval(expr)
