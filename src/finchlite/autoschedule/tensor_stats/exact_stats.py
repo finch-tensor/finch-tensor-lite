@@ -16,6 +16,7 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
+from finchlite.finch_logic.nodes import TableValue
 
 from .numeric_stats import NumericStats
 from .tensor_def import TensorDef
@@ -88,7 +89,11 @@ class ExactStats(NumericStats):
     def estimate_non_fill_values(self) -> float:
         if self.expr is None:
             return 0.0
+
         result = get_default_scheduler()(self.expr)
+        if not isinstance(result, TableValue):
+            raise TypeError("estimate_non_fill_value expected a TableValue instance")
+
         return float(np.count_nonzero(result.tns.to_numpy() != self.fill_value))
 
     def get_embedding(self) -> np.ndarray:
