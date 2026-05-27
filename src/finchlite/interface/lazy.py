@@ -841,6 +841,10 @@ def imag(x) -> LazyTensor:
     return elementwise(ffuncs.imag, lazy(x))
 
 
+def conj(x) -> LazyTensor:
+    return elementwise(ffuncs.conj, lazy(x))
+
+
 def min(
     x,
     /,

@@ -373,6 +373,12 @@ def imag(x):
     return compute(lazy.imag(x))
 
 
+def conj(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.conj(x)
+    return compute(lazy.conj(x))
+
+
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.min(x, axis=axis, keepdims=keepdims)

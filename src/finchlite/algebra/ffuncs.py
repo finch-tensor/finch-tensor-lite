@@ -746,6 +746,17 @@ class _Imag(UnaryFinchOperator):
 imag = _Imag()
 
 
+class _Conj(UnaryFinchOperator):
+    def __call__(self, a: Any):
+        return np.conj(a)
+
+    def __repr__(self) -> str:
+        return "conj"
+
+
+conj = _Conj()
+
+
 class _Clip(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
         return np.clip(a, b, c)
