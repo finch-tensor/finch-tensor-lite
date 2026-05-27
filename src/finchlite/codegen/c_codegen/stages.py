@@ -19,4 +19,5 @@ class CLowerer(Stage):
         Lower the given assembly program to C code.
         """
 
+
 __all__ = ["CCode", "CLowerer"]
