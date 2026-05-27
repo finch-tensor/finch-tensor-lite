@@ -144,7 +144,7 @@ class _FloorDiv(BinaryFinchOperator):
         return operator.floordiv(a, b)
 
 
-floor_divide = _FloorDiv()
+floordiv = _FloorDiv()
 
 
 class _Mod(BinaryFinchOperator):
@@ -1404,7 +1404,7 @@ __all__ = [
     "expm1",
     "first_arg",
     "floor",
-    "floor_divide",
+    "floordiv",
     "ge",
     "greater",
     "greater_equal",
