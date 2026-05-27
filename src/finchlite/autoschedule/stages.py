@@ -313,11 +313,13 @@ class LogicFusionOptimizer(AliasedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],]:
+        dict[Alias, tuple[Field | None, ...]],
+    ]:
         """
         Optimize the aggregate structure of the given logic statement and
         make decisions about materialization.
         """
+
 
 class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
     @abstractmethod
@@ -330,7 +332,8 @@ class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],]:
+        dict[Alias, tuple[Field | None, ...]],
+    ]:
         """
         Optimize the loop order of each query and add transposes where
         necessary.
@@ -348,7 +351,8 @@ class LogicFormatOptimizer(LoopOrderedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],]:
+        dict[Alias, tuple[Field | None, ...]],
+    ]:
         """
         Optimize the tensor formats and output orders for each query.
         """
