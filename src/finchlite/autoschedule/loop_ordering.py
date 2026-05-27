@@ -282,9 +282,6 @@ class LoopOrderer(LogicLoader):
                 case Query(_, Reorder(Table(_, _), _)) if bindings:
                     return node
                 case Query(lhs, rhs):
-                    loop_order = self.get_loop_order(
-                        node, bindings, stats, stats_factory
-                    )
                     match rhs:
                         # ValueError: zip() argument 2 is shorter than argument 1
                         # shape mismtach
@@ -292,6 +289,10 @@ class LoopOrderer(LogicLoader):
                         # from Logic Optimizer.
                         case Aggregate(_, _, Reorder(_, old_loop_order), _) if bindings:
                             loop_order = old_loop_order
+                        case _:
+                            loop_order = self.get_loop_order(
+                                node, bindings, stats, stats_factory
+                            )
                     rhs, swizzles = _align(rhs, loop_order, bindings, namespace)
                     match rhs:
                         case Aggregate(
