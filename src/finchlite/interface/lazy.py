@@ -847,10 +847,6 @@ def imag(x) -> LazyTensor:
     return elementwise(ffuncs.imag, lazy(x))
 
 
-def conj(x) -> LazyTensor:
-    return elementwise(ffuncs.conj, lazy(x))
-
-
 def min(
     x,
     /,
@@ -1070,7 +1066,7 @@ def remainder(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.remainder, lazy(x1), lazy(x2))
 
 
-def conjugate(x) -> LazyTensor:
+def conj(x) -> LazyTensor:
     """
     Computes the complex conjugate of the input tensor `x`.
 
@@ -1166,7 +1162,7 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
     return reduce(
         ffuncs.add,
-        multiply(conjugate(x1), x2),
+        multiply(conj(x1), x2),
         axis=axis,
     )
 
