@@ -167,8 +167,8 @@ def optimize(
 
         prgm = concordize(prgm, bindings)
         prgm = propagate_copy_queries(prgm)
-        res = add_aggregates(prgm, bindings)
-        return res, bindings
+        prgm = add_aggregates(prgm, bindings)
+        return prgm, bindings
 
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
     return flatten_plans(prgm), bindings
