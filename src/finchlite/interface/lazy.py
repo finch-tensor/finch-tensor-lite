@@ -1016,7 +1016,7 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
-def bitwise_inverse(x) -> LazyTensor:
+def bitwise_invert(x) -> LazyTensor:
     return elementwise(ffuncs.invert, lazy(x))
 
 
