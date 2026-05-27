@@ -292,6 +292,10 @@ def asarray(
     if format is None:
         from finchlite.tensor.scalar import Scalar
 
+        if isinstance(obj, BufferizedNDArray):
+            if copy is True:
+                return BufferizedNDArray.from_numpy(obj.to_numpy().copy())
+            return obj
         if isinstance(obj, np.ndarray):
             if copy is True:
                 obj = obj.copy()
@@ -1044,7 +1048,7 @@ def truediv(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
 
 
-def floordiv(x1, x2) -> LazyTensor:
+def floor_divide(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.floordiv, lazy(x1), lazy(x2))
 
 

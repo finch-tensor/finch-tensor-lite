@@ -138,13 +138,13 @@ truediv = _TrueDiv()
 
 class _FloorDiv(BinaryFinchOperator):
     def __repr__(self) -> str:
-        return "floordiv"
+        return "floor_divide"
 
     def __call__(self, a: Any, b: Any):
         return operator.floordiv(a, b)
 
 
-floordiv = _FloorDiv()
+floor_divide = _FloorDiv()
 
 
 class _Mod(BinaryFinchOperator):
@@ -1404,7 +1404,7 @@ __all__ = [
     "expm1",
     "first_arg",
     "floor",
-    "floordiv",
+    "floor_divide",
     "ge",
     "greater",
     "greater_equal",
