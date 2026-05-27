@@ -1959,16 +1959,8 @@ def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
 
 
-def where(
-    condition, x1, x2
-) -> LazyTensor:  # FIXME: remove lazy.where, always materializes eagerly
-    condition = _compute(lazy(condition))
-    x1 = _compute(lazy(x1))
-    x2 = _compute(lazy(x2))
-    result = BufferizedNDArray.from_numpy(
-        np.where(np.asarray(condition), np.asarray(x1), np.asarray(x2))
-    )
-    return lazy(result)
+def where(condition, x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.where, lazy(condition), lazy(x1), lazy(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):

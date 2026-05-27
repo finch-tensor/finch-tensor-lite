@@ -803,6 +803,8 @@ def ftype(x) -> FType:
         return x.ftype
     if isinstance(x, np.dtype):
         x = x.type
+    if isinstance(x, np.ndarray):
+        return ftype(x.dtype)
     if type(x) is builtins.bool or x is builtins.bool:
         return bool_
     if type(x) is builtins.int or x is builtins.int:
