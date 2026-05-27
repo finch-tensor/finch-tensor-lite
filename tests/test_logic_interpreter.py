@@ -147,7 +147,7 @@ def test_materialize():
         )
     )
 
-    result = LogicInterpreter()(p, bindings={Alias("C"): C})[0]
+    result = LogicInterpreter()(p, {Alias("C"): C})[0]
 
     expected = fl.asarray(
         np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]])

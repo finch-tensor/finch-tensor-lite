@@ -27,7 +27,7 @@ from finchlite.algebra import (
 )
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_assembly import BufferFType, DictFType
-from finchlite.symbolic import Context, Namespace, ScopedDict
+from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finchlite.util import config, file_cache
 from finchlite.util.logging import LOG_BACKEND_C
 
@@ -193,7 +193,7 @@ class CLibrary(asm.AssemblyLibrary):
         )
 
 
-class CCompiler(asm.AssemblyLoader):
+class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
@@ -212,7 +212,7 @@ class CCompiler(asm.AssemblyLoader):
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
-    def __call__(self, prgm: asm.Module) -> CLibrary:
+    def lower(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
         logger.debug(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
@@ -481,8 +481,8 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CGenerator(CLowerer):
-    def __call__(self, prgm: asm.AssemblyNode):
+class CGenerator(UnvalidatedForm, CLowerer):
+    def lower(self, prgm: asm.AssemblyNode) -> CCode:
         ctx = CContext()
         ctx(prgm)
         return CCode(ctx.emit_global())
