@@ -293,6 +293,8 @@ def asarray(
         from finchlite.tensor.scalar import Scalar
 
         if isinstance(obj, np.ndarray):
+            if copy is True:
+                obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj)
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
@@ -313,6 +315,8 @@ def asarray(
                         else dtype
                     )
                     np_arr = np_arr.astype(np_dtype)
+                elif copy is True:
+                    np_arr = np_arr.copy()
                 return BufferizedNDArray.from_numpy(np_arr)
         except (TypeError, ValueError):
             pass
