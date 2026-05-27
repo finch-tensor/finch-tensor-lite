@@ -286,10 +286,10 @@ def truediv(x1, x2):
     return compute(lazy.truediv(x1, x2))
 
 
-def floordiv(x1, x2):
+def floor_divide(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.floordiv(x1, x2)
-    return compute(lazy.floordiv(x1, x2))
+        return lazy.floor_divide(x1, x2)
+    return compute(lazy.floor_divide(x1, x2))
 
 
 def mod(x1, x2):
