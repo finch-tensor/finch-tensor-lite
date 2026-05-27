@@ -6,7 +6,7 @@ from finchlite.algebra import ffuncs
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect, setdiff
-from finchlite.autoschedule.stages import AliasedForm
+from finchlite.autoschedule.stages import LogicFusionOptimizer
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -25,7 +25,6 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.finch_logic.nodes import LogicExpression
-from finchlite.finch_logic.stages import LogicLoader
 from finchlite.symbolic import (
     Fixpoint,
     Namespace,
@@ -466,7 +465,7 @@ def set_loop_order(node: LogicNode) -> LogicNode:
     return _set_loop_order(node, {})
 
 
-class DefaultLogicOptimizer(AliasedForm, LogicLoader):
+class DefaultLogicOptimizer(LogicFusionOptimizer):
     def __init__(self, ctx):
         self.ctx = ctx
 

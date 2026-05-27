@@ -9,7 +9,7 @@ from finchlite.finch_logic import Alias, LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
 from finchlite.symbolic.stage import UnvalidatedForm
 
-from .stages import LogicEinsumLowerer
+from .stages import FormattedForm, LogicEinsumLowerer
 
 
 def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
@@ -80,7 +80,7 @@ def generate_einsum_expr(
             raise Exception(f"Unrecognized logic: {ex}")
 
 
-class EinsumGenerator(UnvalidatedForm, LogicEinsumLowerer):
+class EinsumGenerator(LogicEinsumLowerer):
     def lower(
         self,
         prgm: LogicStatement,
@@ -92,7 +92,7 @@ class EinsumGenerator(UnvalidatedForm, LogicEinsumLowerer):
         return (generate_einsum_stmt(prgm), bindings_2)
 
 
-class LogicEinsumLoader(UnvalidatedForm, LogicLoader):
+class LogicEinsumLoader(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx_lower: LogicEinsumLowerer | None = None,

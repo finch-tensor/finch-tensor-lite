@@ -334,7 +334,7 @@ class NotationContext:
                 raise Exception(f"Unrecognized logic: {prgm}")
 
 
-class NotationGenerator(FormattedForm, LogicNotationLowerer):
+class NotationGenerator(LogicNotationLowerer):
     def lower(
         self,
         term: lgc.LogicStatement,

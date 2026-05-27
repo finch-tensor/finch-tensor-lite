@@ -23,7 +23,7 @@ from finchlite.autoschedule.galley.logical_optimizer.query_normalization import 
     postprocess_plan_after_galley,
     preprocess_plan_for_galley,
 )
-from finchlite.autoschedule.stages import AliasedForm
+from finchlite.autoschedule.stages import LogicFusionOptimizer
 from finchlite.finch_logic import (
     Alias,
     LogicLoader,
@@ -96,7 +96,7 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyLogicalOptimizer(AliasedForm, LogicLoader):
+class GalleyLogicalOptimizer(LogicFusionOptimizer):
     """
     LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
     then forwards the Plan to the downstream loader ``ctx``.

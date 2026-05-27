@@ -16,38 +16,9 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
+from finchlite.finch_logic.stages import LogicLoader
 from finchlite.finch_logic.tensor_stats import StatsFactory, TensorStats
 from finchlite.symbolic import Form, PreWalk, Rewrite, Stage
-
-
-class LogicNotationLowerer(Stage):
-    @abstractmethod
-    def lower(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> ntn.Module:
-        """
-        Generate Finch Notation from the given logic and input types.  Also
-        return a dictionary including additional tables needed to run the kernel.
-        """
-
-
-class LogicEinsumLowerer(Stage):
-    @abstractmethod
-    def lower(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
-        """
-        Generate Einsum Notation from the given logic and input types.  Also
-        return a dictionary including additional tables needed to run the kernel.
-        """
 
 
 class AliasedForm(Form):
@@ -327,3 +298,74 @@ class FormattedForm(LoopOrderedForm):
             return None
 
         validate(term)
+
+
+class LogicFusionOptimizer(AliasedForm, LogicLoader):
+    @abstractmethod
+    def lower(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> LogicStatement:
+        """
+        Optimize the aggregate structure of the given logic statement and
+        make decisions about materialization.
+        """
+
+class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
+    @abstractmethod
+    def lower(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> LogicStatement:
+        """
+        Optimize the loop order of the given logic statement.
+        """
+
+class LogicFormatOptimizer(LoopOrderedForm, LogicLoader):
+    @abstractmethod
+    def lower(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> LogicStatement:
+        """
+        Optimize the tensor formats of the given logic statement.
+        """
+    
+
+class LogicNotationLowerer(FormattedForm, Stage):
+    @abstractmethod
+    def lower(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> ntn.Module:
+        """
+        Generate Finch Notation from the given logic and input types.  Also
+        return a dictionary including additional tables needed to run the kernel.
+        """
+
+
+class LogicEinsumLowerer(FormattedForm, Stage):
+    @abstractmethod
+    def lower(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
+        """
+        Generate Einsum Notation from the given logic and input types.  Also
+        return a dictionary including additional tables needed to run the kernel.
+        """
