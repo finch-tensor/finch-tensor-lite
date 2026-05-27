@@ -7,7 +7,6 @@ from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
 from finchlite.finch_logic import Alias, LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
-from finchlite.symbolic.stage import UnvalidatedForm
 
 from .stages import FormattedForm, LogicEinsumLowerer
 

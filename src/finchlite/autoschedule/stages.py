@@ -314,6 +314,7 @@ class LogicFusionOptimizer(AliasedForm, LogicLoader):
         make decisions about materialization.
         """
 
+
 class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
     @abstractmethod
     def lower(
@@ -324,8 +325,10 @@ class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
         stats_factory: StatsFactory,
     ) -> LogicStatement:
         """
-        Optimize the loop order of the given logic statement.
+        Optimize the loop order of each query and add transposes where
+        necessary.
         """
+
 
 class LogicFormatOptimizer(LoopOrderedForm, LogicLoader):
     @abstractmethod
@@ -337,9 +340,9 @@ class LogicFormatOptimizer(LoopOrderedForm, LogicLoader):
         stats_factory: StatsFactory,
     ) -> LogicStatement:
         """
-        Optimize the tensor formats of the given logic statement.
+        Optimize the tensor formats and output orders for each query.
         """
-    
+
 
 class LogicNotationLowerer(FormattedForm, Stage):
     @abstractmethod
