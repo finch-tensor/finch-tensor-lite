@@ -47,7 +47,7 @@ class BufferizedNDArray(OverrideTensor):
     def from_numpy(cls, arr: np.ndarray) -> "BufferizedNDArray":
         itemsize = arr.dtype.itemsize
         strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
-        shape = tuple(np.intp(s) for s in arr.shape)
+        shape = tuple(int(s) for s in arr.shape)
         val = NumpyBuffer(arr.reshape(-1, copy=False))
         return BufferizedNDArray(val, shape, strides)
 
@@ -67,7 +67,7 @@ class BufferizedNDArray(OverrideTensor):
 
     @property
     def shape(self):
-        return self._shape
+        return tuple(int(s) for s in self._shape)
 
     @property
     def ndim(self):
