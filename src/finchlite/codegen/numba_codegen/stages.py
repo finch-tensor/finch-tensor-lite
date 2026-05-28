@@ -14,7 +14,7 @@ class NumbaCode:
 
 class NumbaLowerer(Stage):
     @abstractmethod
-    def __call__(self, prgm: asm.Module) -> NumbaCode:
+    def lower(self, prgm: asm.Module) -> NumbaCode:
         """
         Lower the given assembly program to Numba code.
         """

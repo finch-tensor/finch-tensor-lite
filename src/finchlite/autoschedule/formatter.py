@@ -6,8 +6,8 @@ import numpy as np
 
 from finchlite import finch_logic as lgc
 from finchlite.algebra import FType, TensorFType, TupleFType, ftype
+from finchlite.autoschedule.stages import LoopOrderedForm
 from finchlite.codegen import NumpyBufferFType
-from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic import (
     LogicLoader,
     MockLogicLoader,
@@ -20,7 +20,7 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicFormatter(LogicLoader):
+class LogicFormatter(LoopOrderedForm, LogicLoader):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -28,7 +28,7 @@ class LogicFormatter(LogicLoader):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
-        self.loader = loader
+        self.ctx = loader
 
     @abstractmethod
     def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
@@ -38,17 +38,13 @@ class LogicFormatter(LogicLoader):
         """
         ...
 
-    def __call__(
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, "TensorStats"],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-    ]:
+    ):
         bindings = bindings.copy()
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
@@ -57,12 +53,12 @@ class LogicFormatter(LogicLoader):
             {var: val.fill_value for var, val in bindings.items()}
         )
 
-        def formatter(node: lgc.LogicStatement):
+        def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
             match node:
                 case lgc.Plan(bodies):
-                    for body in bodies:
-                        formatter(body)
-                case lgc.Query(lhs, _):
+                    new_bodies = tuple(formatter(body) for body in bodies)
+                    return lgc.Plan(new_bodies)
+                case lgc.Query(lhs, rhs):
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)
@@ -72,24 +68,23 @@ class LogicFormatter(LogicLoader):
                         tns = self.get_output_tns_ftype(fill_values[lhs], shape_type)
 
                         bindings[lhs] = tns
-                case lgc.Produces(_):
-                    pass
+                    match rhs:
+                        case lgc.Reorder():
+                            return node
+                        case _:
+                            return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields()))
+                case lgc.Produces():
+                    return node
                 case _:
                     raise ValueError(
                         f"Unsupported logic statement for formatting: {node}"
                     )
 
-        formatter(prgm)
+        prgm = formatter(prgm)
 
         logger.debug(prgm)
 
-        lib, bindings, shape_vars = self.loader(
-            prgm,
-            bindings,
-            stats=stats,
-            stats_factory=stats_factory,
-        )
-        return lib, bindings, shape_vars
+        return self.ctx(prgm, bindings, stats, stats_factory)
 
 
 class DefaultLogicFormatter(LogicFormatter):

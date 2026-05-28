@@ -2,10 +2,11 @@ from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
 
+from finchlite.algebra import ffuncs
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect, setdiff
-from finchlite.finch_assembly.stages import AssemblyLibrary
+from finchlite.autoschedule.stages import LogicFusionOptimizer
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -24,7 +25,6 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.finch_logic.nodes import LogicExpression
-from finchlite.finch_logic.stages import LogicLoader
 from finchlite.symbolic import (
     Fixpoint,
     Namespace,
@@ -50,6 +50,7 @@ def with_unique_lhs(
     Ensures all left-hand sides (LHS) of queries are unique by inserting new
     tensors.
     """
+
     spc = Namespace(root)
     for var in bindings:
         spc.freshen(var.name)
@@ -78,21 +79,68 @@ def with_unique_lhs(
 
     unrenames = {v: k for k, v in renames.items()}
 
+    # Some produces may be renamed during the optimization,
+    # so we need to be a bit careful here.
     def rule_1(node):
         match node:
             case Produces(args):
+                n_writes = len(writes)
+                v_post_list = args[-n_writes:] if n_writes else ()
+
                 bodies: list[LogicStatement] = []
-                for k, v in writes.items():
+                for (k, _v_pre), v_post in zip(
+                    writes.items(), v_post_list, strict=True
+                ):
                     idxs = tuple(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
-                    bodies.append(Query(k, Table(v, idxs)))
+                    bodies.append(Query(k, Table(v_post, idxs)))
+
+                v_post_to_k = dict(zip(v_post_list, writes.keys(), strict=True))
                 args_2 = tuple(
-                    unrenames.get(a, a) for a in args[: len(args) - len(writes)]
+                    v_post_to_k.get(a, unrenames.get(a, a))
+                    for a in args[: len(args) - n_writes]
                 )
                 return Plan(tuple(bodies) + (Produces(args_2),))
 
     return (Rewrite(PostWalk(rule_1))(root), bindings)
+
+
+def add_aggregates(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
+    fill_values = root.infer_fill_value(
+        {var: val.fill_value for var, val in bindings.items()}
+    )
+
+    def rule_0(node):
+        match node:
+            case Query(lhs, Reorder(Aggregate(_, _, arg, idxs), _)):
+                return node
+            case Query(lhs, Reorder(arg, idxs)):
+                return Query(
+                    lhs,
+                    Reorder(
+                        Aggregate(
+                            Literal(ffuncs.overwrite),
+                            Literal(fill_values[lhs]),
+                            arg,
+                            (),
+                        ),
+                        idxs,
+                    ),
+                )
+            case Query(lhs, Aggregate(_, _, arg, idxs)):
+                return node
+            case Query(lhs, arg):
+                return Query(
+                    lhs,
+                    Aggregate(
+                        Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, ()
+                    ),
+                )
+
+    return Rewrite(PostWalk(rule_0))(root)
 
 
 def optimize(
@@ -118,10 +166,12 @@ def optimize(
         prgm = push_fields(prgm)
 
         prgm = concordize(prgm, bindings)
+        prgm = propagate_copy_queries(prgm)
+        prgm = add_aggregates(prgm, bindings)
+        return prgm, bindings
 
-        return propagate_copy_queries(prgm), bindings
-
-    return with_unique_lhs(transform, prgm, bindings)
+    prgm, bindings = with_unique_lhs(transform, prgm, bindings)
+    return flatten_plans(prgm), bindings
 
 
 def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
@@ -415,23 +465,16 @@ def set_loop_order(node: LogicNode) -> LogicNode:
     return _set_loop_order(node, {})
 
 
-class DefaultLogicOptimizer(LogicLoader):
+class DefaultLogicOptimizer(LogicFusionOptimizer):
     def __init__(self, ctx):
         self.ctx = ctx
 
-    def __call__(
+    def lower(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, "TensorStats"],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        AssemblyLibrary, dict[Alias, TensorFType], dict[Alias, tuple[Field | None, ...]]
-    ]:
+    ):
         prgm, bindings = optimize(prgm, bindings)
-        return self.ctx(
-            prgm,
-            bindings,
-            stats=stats,
-            stats_factory=stats_factory,
-        )
+        return self.ctx(prgm, bindings, stats, stats_factory)

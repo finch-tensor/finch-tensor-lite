@@ -6,7 +6,7 @@ from finchlite.algebra.tensor import Tensor, TensorFType
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
 from finchlite.finch_logic.nodes import TableValue
-from finchlite.symbolic import Namespace, PostWalk, Rewrite
+from finchlite.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 
 from .formatter import DefaultLogicFormatter
 
@@ -44,7 +44,7 @@ def extract_tensors(
     return root, bindings
 
 
-class LogicExecutor(LogicEvaluator):
+class LogicExecutor(UnvalidatedForm, LogicEvaluator):
     def __init__(
         self,
         ctx: LogicLoader | None = None,
@@ -60,12 +60,11 @@ class LogicExecutor(LogicEvaluator):
         self.cache = cache
         self.cached_kernels: dict[tuple[Any, Any], Any] = {}
 
-    def __call__(
+    def lower(
         self,
         prgm: LogicNode,
         bindings: dict[lgc.Alias, Tensor] | None = None,
     ):
-
         if bindings is None:
             bindings = {}
         if isinstance(prgm, lgc.LogicExpression):
@@ -90,7 +89,6 @@ class LogicExecutor(LogicEvaluator):
 
         if self.cache and key in self.cached_kernels:
             mod, binding_ftypes, binding_idxs = self.cached_kernels[key]
-
         else:
             stats_bindings = OrderedDict()
             for var, T in bindings.items():
@@ -102,7 +100,7 @@ class LogicExecutor(LogicEvaluator):
                 stmt,
                 binding_ftypes,
                 stats_bindings,
-                stats_factory=self.stats_factory,
+                self.stats_factory,
             )
 
             if self.cache:
