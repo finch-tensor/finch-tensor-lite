@@ -696,7 +696,8 @@ class TupleFType(ImmutableStructFType):
 
     def struct_getattr(self, obj, attr):
         index = list(self.struct_fieldnames).index(attr)
-        return obj[index]
+        field_type = self.struct_fieldtypes[index]
+        return field_type(obj[index])
 
     def struct_setattr(self, obj, attr, value):
         index = list(self.struct_fieldnames).index(attr)

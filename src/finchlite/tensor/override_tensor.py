@@ -196,10 +196,10 @@ class OverrideTensor(Tensor):
         return self.mod.truediv(other, self)
 
     def __floordiv__(self, other):
-        return self.mod.floordiv(self, other)
+        return self.mod.floor_divide(self, other)
 
     def __rfloordiv__(self, other):
-        return self.mod.floordiv(other, self)
+        return self.mod.floor_divide(other, self)
 
     def __mod__(self, other):
         return self.mod.mod(self, other)

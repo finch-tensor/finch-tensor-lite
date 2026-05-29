@@ -1015,7 +1015,7 @@ def matrix_transpose(x) -> LazyTensor:
             "Input tensor must have at least 2 dimensions for transposition"
         )
     # swap the last two axes
-    return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
+    return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
 def bitwise_invert(x) -> LazyTensor:
@@ -1795,7 +1795,7 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     for dest, src in sorted(zip(destination, source, strict=True)):
         final_order.insert(dest, src)
 
-    return permute_dims(x, axis=tuple(final_order))
+    return permute_dims(x, axes=tuple(final_order))
 
 
 def stack(arrays, /, axis: int = 0) -> LazyTensor:
