@@ -95,7 +95,7 @@ class ExactStats(NumericStats):
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 
-        return float(fl.sum(result.tns != self.fill_value))
+        return float(fl.sum(fl.multiply(fl.not_equal(result.tns, self.fill_value), 1)))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
