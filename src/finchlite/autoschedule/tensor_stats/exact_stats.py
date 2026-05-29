@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-import finchlite as fl
+import finchlite
 from finchlite.algebra import FinchOperator
 from finchlite.autoschedule.default_schedulers import get_default_scheduler
 from finchlite.finch_logic import (
@@ -95,7 +95,7 @@ class ExactStats(NumericStats):
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 
-        return float(fl.sum(fl.multiply(fl.not_equal(result.tns, self.fill_value), 1)))
+        return float(finchlite.count_nonfill_values(result.tns, self.fill_value))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

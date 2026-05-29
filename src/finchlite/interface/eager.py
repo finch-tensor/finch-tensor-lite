@@ -1146,3 +1146,9 @@ def einsum(*args, **kwargs):
     if builtins.any(isinstance(v, lazy.LazyTensor) for v in args):
         return lazy.einsum(*args, **kwargs)
     return compute(lazy.einsum(*args, **kwargs))
+
+
+def count_nonfill_values(x, fill_value):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonfill_values(x, fill_value)
+    return compute(lazy.count_nonfill_values(x, fill_value))

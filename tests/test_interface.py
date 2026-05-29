@@ -1514,3 +1514,19 @@ def test_eager_compute():
     )
     finch_assert_equal(eager_result, x)
     finch_assert_equal(lazy_result, (2 * eager_tensor))
+
+
+@pytest.mark.parametrize(
+    "arr, fill_value, expected",
+    [
+        (np.array([[1.0, 0.0], [0.0, 1.0]]), 0.0, 2),
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), 0.0, 4),
+        (np.array([[0.0, 0.0], [0.0, 0.0]]), 0.0, 0),
+        (np.array([[1.0, 0.0], [0.0, 0.0]]), 0.0, 1),
+        (np.array([[True, False], [False, True]]), False, 2),
+    ],
+)
+def test_count_nonfill_values(arr, fill_value, expected):
+    tensor = finchlite.asarray(arr)
+    result = finchlite.count_nonfill_values(tensor, fill_value)
+    assert float(result) == expected
