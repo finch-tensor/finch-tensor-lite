@@ -1,35 +1,27 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any
 
 from finchlite.algebra import TensorFType
-from finchlite.finch_assembly import AssemblyLibrary
-from finchlite.symbolic import Stage
-from finchlite.symbolic.traversal import PostOrderDFS
+from finchlite.symbolic import PostOrderDFS, Stage, UnvalidatedForm
 
 from . import nodes as ein
 
 
 class EinsumEvaluator(Stage):
     @abstractmethod
-    def __call__(
+    def lower(
         self,
         term: ein.EinsumNode,
         bindings: dict[ein.Alias, Any] | None = None,
-    ) -> Any | tuple[Any, ...]:  # TODO eventually Any->Tensor
+    ):  # TODO eventually Any->Tensor
         """
         Evaluate the given logic.
         """
 
 
-class EinsumLoader(ABC):
+class EinsumLoader(Stage):
     @abstractmethod
-    def __call__(
-        self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index | None, ...]],
-    ]:
+    def lower(self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]):
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a
@@ -37,9 +29,9 @@ class EinsumLoader(ABC):
         """
 
 
-class EinsumTransform(ABC):
+class EinsumTransform(Stage):
     @abstractmethod
-    def __call__(
+    def lower(
         self, term: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         """
@@ -47,20 +39,16 @@ class EinsumTransform(ABC):
         """
 
 
-class OptEinsumLoader(EinsumLoader):
+class OptEinsumLoader(UnvalidatedForm, EinsumLoader):
     def __init__(self, *opts: EinsumTransform, ctx: EinsumLoader):
         self.ctx = ctx
         self.opts = opts
 
-    def __call__(
+    def lower(
         self,
         term: ein.EinsumStatement,
         bindings: dict[ein.Alias, TensorFType],
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index | None, ...]],
-    ]:
+    ):
         for opt in self.opts:
             term, bindings = opt(term, bindings or {})
         return self.ctx(term, bindings)

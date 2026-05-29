@@ -9,6 +9,7 @@ from finchlite.finch_einsum.stages import (
     EinsumLoader,
     compute_shape_vars,
 )
+from finchlite.symbolic.stage import UnvalidatedForm
 
 from . import nodes as ein
 
@@ -74,11 +75,11 @@ reduction_ops = {
 }
 
 
-class EinsumInterpreter(EinsumEvaluator):
+class EinsumInterpreter(UnvalidatedForm, EinsumEvaluator):
     def __init__(self, xp=np):
         self.xp = xp
 
-    def __call__(self, node, bindings=None):
+    def lower(self, node, bindings=None):
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
@@ -198,11 +199,11 @@ class MockEinsumLibrary(AssemblyLibrary):
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
 
-class MockEinsumLoader(EinsumLoader):
+class MockEinsumLoader(UnvalidatedForm, EinsumLoader):
     def __init__(self):
         pass
 
-    def __call__(
+    def lower(
         self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
     ) -> tuple[
         MockEinsumLibrary,
