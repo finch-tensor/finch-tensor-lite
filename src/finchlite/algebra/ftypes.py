@@ -718,8 +718,8 @@ class TupleFType(ImmutableStructFType):
         )
         return tuple(args)
 
-    def __call__(self, **kwargs):
-        return self.from_fields(*kwargs.values())
+    def __call__(self, arg):
+        return tuple([T(x) for T, x in zip(self._struct_types, arg)])
 
     @staticmethod
     @lru_cache
