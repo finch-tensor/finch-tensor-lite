@@ -24,6 +24,12 @@ from finchlite.autoschedule.galley.logical_optimizer.query_normalization import 
     preprocess_plan_for_galley,
 )
 from finchlite.autoschedule.stages import LogicFusionOptimizer
+from finchlite.autoschedule.standardize import (
+    drop_reorders,
+    flatten_plans,
+    push_fields,
+    standardize_query_roots,
+)
 from finchlite.finch_logic import (
     Alias,
     LogicLoader,
@@ -96,6 +102,21 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
+def canonicalize(
+    plan: LogicStatement,
+    bindings: dict[Alias, TensorFType],
+) -> LogicStatement:
+    """
+    Rewrite Galley plan into the SingleAggregateForm
+    Call functions from standardize.py
+    """
+    plan = push_fields(plan)
+    plan = standardize_query_roots(plan, bindings)
+    plan = push_fields(plan)
+    plan = drop_reorders(plan)
+    return flatten_plans(plan)
+
+
 class GalleyLogicalOptimizer(LogicFusionOptimizer):
     """
     LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
@@ -137,4 +158,5 @@ class GalleyLogicalOptimizer(LogicFusionOptimizer):
             optimizer=self.optimizer,
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
+        term = canonicalize(term, bindings)
         return self.ctx(term, bindings, stats, stats_factory)

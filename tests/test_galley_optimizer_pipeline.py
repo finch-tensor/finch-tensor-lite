@@ -2,20 +2,13 @@
 Galley optimizer pipeline tests.
 """
 
-import pytest
-
 import numpy as np
 
 import finchlite.interface as fl_interface
 from finchlite.autoschedule import INTERPRET_NOTATION_GALLEY
 
-GALLEY_LOOP_ORDER_SKIP = pytest.mark.skip(
-    reason="Galley output is not yet normalized to LoopOrderedForm."
-)
-
 
 # --- TEST 1: out = a * b via frontend ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_elementwise_mul():
     """Running out = a * b with Finch/Galley pipeline using the frontend."""
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -29,7 +22,6 @@ def test_elementwise_mul():
 
 
 # --- TEST 2: out = a * b + c * d via frontend ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_add_of_elementwise():
     """Running out = a * b + c * d with Finch/Galley frontend."""
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -46,7 +38,6 @@ def test_add_of_elementwise():
 
 
 # --- TEST 3: sum(A @ B, axis=0) via frontend ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_matmul_sum_axis0():
     """
     Running out = sum_i sum_j (A[i,j] * B[j,k]) with Finch/Galley frontend.
@@ -62,7 +53,6 @@ def test_matmul_sum_axis0():
 
 
 # --- TEST 4: sum(A@B, axis=0) + sum(C@D, axis=1) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_sum_axis0_plus_sum_axis1():
     """
     Running out = sum(A @ B, axis=0) + sum(C @ D, axis=1). Correctness vs NumPy.
@@ -85,7 +75,6 @@ def test_sum_axis0_plus_sum_axis1():
 
 
 # --- TEST 5: Nested aggregates sum(A @ B) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_nested_aggregates_full_sum():
     """
     Nested aggregates: out = sum_i sum_j (A[i,j] * B[j,k]).
@@ -104,7 +93,6 @@ def test_nested_aggregates_full_sum():
 
 
 # --- TEST 6: sum((A @ B) @ C) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_deeper_nesting():
     """Deeper nesting: out = sum((A @ B) @ C).
     Verified against NumPy."""
@@ -141,7 +129,6 @@ def test_expand_dims_sum_singleton():
 
 
 # --- TEST 8: Alias Matmul ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_alias_matmul():
     """
     Exercises alias-based query merging and reordering.
@@ -160,7 +147,6 @@ def test_alias_matmul():
 
 
 # --- TEST 9: Performance optimization (cost-based reduction order) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_galley_performance_optimization_chain_matmul():
     """
     Test Galley performing a real performance optimization based on
@@ -186,7 +172,6 @@ def test_galley_performance_optimization_chain_matmul():
 
 
 # --- TEST 10: Chain matmul A(10,2) @ B(2,10) @ C(10,2) -> (10,2) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_galley_chain_matmul_10_2_2_10_10_2():
     """
     Chain matmul A(10,2) @ B(2,10) @ C(10,2) -> (10,2)
@@ -207,7 +192,6 @@ def test_galley_chain_matmul_10_2_2_10_10_2():
 
 
 # --- TEST 11: Alias matmul with different base tensors ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_alias_matmul_two_bases():
     """
     Exercises alias-based merging when operands come from different base tensors.
@@ -226,7 +210,6 @@ def test_alias_matmul_two_bases():
 
 
 # --- TEST 12: Chain matmul A(5,4) @ B(4,6) @ C(6,3) -> (5,3) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_galley_chain_matmul_5_4_4_6_6_3():
     """
     Chain matmul A(5,4) @ B(4,6) @ C(6,3) -> (5,3)
@@ -247,7 +230,6 @@ def test_galley_chain_matmul_5_4_4_6_6_3():
 
 
 # --- TEST 13: Chain matmul A(3,5) @ B(5,2) @ C(2,2) -> (3,2) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_galley_chain_matmul_3_5_5_2_2_2():
     """
     Chain matmul A(3,5) @ B(5,2) @ C(2,2) -> (3,2)
@@ -268,7 +250,6 @@ def test_galley_chain_matmul_3_5_5_2_2_2():
 
 
 # --- TEST 14: Longer chain matmul A @ B @ C @ D (4 matrices) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_galley_chain_matmul_four_matrices():
     """
     Longer chain matmul A(6,5) @ B(5,4) @ C(4,3) @ D(3,2) -> (6,2).
@@ -292,7 +273,6 @@ def test_galley_chain_matmul_four_matrices():
 
 
 # --- TEST 15: Longer alias chain B @ B @ B @ B (4 matmuls) ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_alias_matmul_longer_chain():
     """
     Longer alias chain: B = A @ A, C = B @ B @ B @ B.
@@ -309,7 +289,6 @@ def test_alias_matmul_longer_chain():
 
 
 # --- TEST 16: sum(A * B) - elementwise multiply then full sum ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_sum_elementwise_mul():
     """
     out = sum(A * B) - Frobenius inner product.
@@ -328,7 +307,6 @@ def test_sum_elementwise_mul():
 
 
 # --- TEST 17: sum(A * B, axis=1) - elementwise mul then sum over axis ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_sum_elementwise_mul_axis1():
     """
     out = sum(A * B, axis=1) - elementwise multiply then sum over columns.
@@ -346,7 +324,6 @@ def test_sum_elementwise_mul_axis1():
 
 
 # --- TEST 18: (A @ B) + (C @ D) - sum of two matmuls ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_matmul_plus_matmul():
     """
     out = (A @ B) + (C @ D) - sum of two matrix products.
@@ -368,7 +345,6 @@ def test_matmul_plus_matmul():
 
 
 # --- TEST 18: (A @ B) + (C @ D) - sum of two matmuls ---
-@GALLEY_LOOP_ORDER_SKIP
 def test_multiple_compute():
     """
     out = (A @ B) + (C @ D) - sum of two matrix products.

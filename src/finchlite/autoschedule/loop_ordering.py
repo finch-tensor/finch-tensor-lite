@@ -25,7 +25,7 @@ from finchlite.finch_logic import (
 from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
-from .stages import LoopOrderedForm, SingleAggregateForm
+from .stages import SingleAggregateForm
 from .standardize import concordize, flatten_plans
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -278,7 +278,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
         # for mypy test, make sure prgm is a Plan
         if not isinstance(prgm, Plan):
             raise ValueError(f"Loop ordering output must be a Plan: {prgm}")
-        #LoopOrderedForm.validate_inputs(prgm, bindings, stats, stats_factory)
+        # LoopOrderedForm.validate_inputs(prgm, bindings, stats, stats_factory)
         logger.debug(prgm)
         return self.loader(prgm, bindings, stats, stats_factory)
 
