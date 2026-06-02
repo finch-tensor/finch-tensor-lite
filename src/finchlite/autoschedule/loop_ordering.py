@@ -2,7 +2,6 @@ import logging
 from abc import abstractmethod
 from functools import reduce
 from itertools import chain as join_chains
-from typing import Literal
 
 from finchlite.algebra import TensorFType
 from finchlite.algebra.utils import intersect
@@ -14,7 +13,6 @@ from finchlite.finch_logic import (
     LogicLoader,
     LogicNode,
     LogicStatement,
-    MapJoin,
     MockLogicLoader,
     Plan,
     Produces,
@@ -24,9 +22,10 @@ from finchlite.finch_logic import (
     Table,
     TensorStats,
 )
-from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, PreWalk, Rewrite
+from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
+from .stages import LoopOrderedForm, SingleAggregateForm
 from .standardize import concordize, flatten_plans
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -35,38 +34,36 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 def _align(
     ex: LogicExpression,
     loop_order: tuple[Field, ...],
-    bindings: dict[Alias, TensorFType] | None = None,
-    namespace: Namespace | None = None,
+    bindings: dict[Alias, TensorFType],
+    namespace: Namespace,
 ) -> tuple[LogicExpression, tuple[Query, ...]]:
     """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``."""
     needed_swizzles: dict[
         tuple[Alias, tuple[Field, ...], tuple[Field, ...]], Alias
     ] = {}
-    # vecdot test
-    # swizzles alias conflict
-    if namespace is None:
-        namespace = Namespace(ex)
 
     def rule(node: LogicNode) -> LogicNode | None:
         match node:
             case Reorder(Table(Alias() as var, physical), logical):
-                pass
+                is_reorder = True
             case Table(Alias() as var, physical):
                 logical = physical
+                is_reorder = False
             case _:
                 return None
 
         field_set = set(logical)
         desired = tuple(f for f in loop_order if f in field_set)
         if desired == logical:
+            if is_reorder and physical == logical:
+                return Table(var, physical)
+            if is_reorder:
+                key = (var, physical, desired)
+                if key not in needed_swizzles:
+                    needed_swizzles[key] = Alias(namespace.freshen(var.name))
+                return Table(needed_swizzles[key], desired)
             return None
-        # ValueError: zip() argument 2 is longer/shorter than argument 1
-        # shape mismatch
-        # dont swizzle if not permuation of idxs
-        # and if bindings to preserve shape
-        if bindings and (
-            len(desired) != len(physical) or set(desired) != set(physical)
-        ):
+        if len(desired) != len(physical) or set(desired) != set(physical):
             return None
 
         key = (var, physical, desired)
@@ -82,158 +79,162 @@ def _align(
     return new_ex, queries
 
 
-def _check_loop_order(
-    idxs: tuple[Field, ...],
-    loop_order: tuple[Field, ...],
-) -> None:
-    field_set = set(idxs)
-    desired = tuple(f for f in loop_order if f in field_set)
-    if desired != idxs:
-        raise ValueError("Table indices do not match loop order")
+# NOTE: The validate() grammar checker below is no longer used by the
+# LoopOrderer pipeline (validation now happens via LoopOrderedForm in stages.py).
+# It is kept here, commented out, for reference only.
+#
+# def _check_loop_order(
+#     idxs: tuple[Field, ...],
+#     loop_order: tuple[Field, ...],
+# ) -> None:
+#     field_set = set(idxs)
+#     desired = tuple(f for f in loop_order if f in field_set)
+#     if desired != idxs:
+#         raise ValueError("Table indices do not match loop order")
+#
+#
+# # Validation func
+# def _validate_input_query(query: Query) -> None:
+#     """
+#     Validate that a Query rhs matches the loop-ordering grammar:
+#     ``Aggregate`` (inner form unrestricted),
+#     or ``Reorder`` of a ``Table``), at most
+#     one ``Aggregate``,
+#     ``MapJoin`` only under an ``Aggregate`` body.
+#
+#     Used by :func:`validate`.
+#     """
+#     prefix = "Invalid loop ordering input:"
+#
+#     def walk(ex: LogicNode, *, at_root: bool = False) -> None:
+#         if at_root:
+#             match ex:
+#                 case Aggregate(_, _, _, _):
+#                     pass
+#                 case Reorder(Table(_, _), _):
+#                     pass
+#                 case _:
+#                     raise ValueError(
+#                         f"{prefix} Query rhs must be Reorder(...) or Aggregate(...)"
+#                     )
+#
+#         n_agg = 0
+#
+#         def rule(node: LogicNode) -> LogicNode | None:
+#             nonlocal n_agg
+#             match node:
+#                 case Aggregate(_, _, _, _):
+#                     n_agg += 1
+#                 case MapJoin():
+#                     if n_agg == 0:
+#                         raise ValueError(
+#                             "Invalid loop ordering: MapJoin is only allowed "
+#                             "inside an Aggregate argument"
+#                         )
+#                 case _:
+#                     return None
+#             return None
+#
+#         Rewrite(PreWalk(rule))(ex)
+#         if n_agg > 1:
+#             raise ValueError(
+#                 "Invalid loop ordering: at most one Aggregate per Query rhs"
+#             )
+#
+#     walk(query.rhs, at_root=True)
+#
+#
+# def _validate_output_query(query: Query) -> None:
+#     prefix = "Invalid loop ordering output:"
+#
+#     def walk(ex: LogicNode, *, at_root: bool = False) -> None:
+#         loop_order: tuple[Field, ...] | None = None
+#         if at_root:
+#             match ex:
+#                 case Aggregate(_, _, Reorder(_, order), _):
+#                     loop_order = order
+#                 case Reorder(Table(_, idxs), order):
+#                     if idxs == order:
+#                         loop_order = order
+#                         _check_loop_order(idxs, order)
+#                 case _:
+#                     raise ValueError(
+#                         f"{prefix} Query rhs must be "
+#                         "Reorder(...) or Aggregate(..., Reorder(...), ...)"
+#                     )
+#
+#         n_agg = 0
+#
+#         def rule(node: LogicNode) -> LogicNode | None:
+#             nonlocal n_agg
+#             match node:
+#                 case Aggregate(_, _, Reorder(_, _), _):
+#                     n_agg += 1
+#                 case Aggregate():
+#                     n_agg += 1
+#                 case Table(_, idxs) if loop_order is not None:
+#                     _check_loop_order(idxs, loop_order)
+#                 case Reorder(Table(_, _), idxs) if loop_order is not None:
+#                     _check_loop_order(idxs, loop_order)
+#                 case MapJoin():
+#                     if n_agg == 0:
+#                         raise ValueError(
+#                             "Invalid loop ordering: MapJoin is only allowed "
+#                             "inside an Aggregate argument"
+#                         )
+#                 case _:
+#                     return None
+#             return None
+#
+#         Rewrite(PreWalk(rule))(ex)
+#         if n_agg > 1:
+#             raise ValueError(
+#                 "Invalid loop ordering: at most one Aggregate per Query rhs"
+#             )
+#
+#     walk(query.rhs, at_root=True)
+#
+#
+# def validate(
+#     prgm: LogicStatement,
+#     *,
+#     kind: Literal["input", "output"] = "input",
+# ) -> None:
+#     """Reject programs outside the loop-ordering grammar."""
+#     prefix = f"Invalid loop ordering {kind}:"
+#     validate_query = (
+#         _validate_input_query if kind == "input" else _validate_output_query
+#     )
+#     match prgm:
+#         case Plan(bodies):
+#             seen_produces = False
+#             for i, body in enumerate(bodies):
+#                 if seen_produces:
+#                     raise ValueError(f"{prefix} Produces must be final body")
+#                 match body:
+#                     case Query() as query:
+#                         validate_query(query)
+#                     case Produces(_):
+#                         seen_produces = True
+#                         if i != len(bodies) - 1:
+#                             raise ValueError(f"{prefix} Produces must be final body")
+#                     case _:
+#                         raise ValueError(
+#                             f"{prefix} expected Query or Produces in Plan, "
+#                             f"got {type(body).__name__}"
+#                         )
+#         case Query() as query:
+#             validate_query(query)
+#         case _:
+#             raise ValueError(
+#                 f"{prefix} expected Plan or Query, got {type(prgm).__name__}"
+#             )
+#
+#
+# # End validation funcs
 
 
-# Validation func
-def _validate_input_query(query: Query) -> None:
-    """
-    Validate that a Query rhs matches the loop-ordering grammar:
-    ``Aggregate`` (inner form unrestricted),
-    or ``Reorder`` of a ``Table``), at most
-    one ``Aggregate``,
-    ``MapJoin`` only under an ``Aggregate`` body.
-
-    Used by :func:`validate`.
-    """
-    prefix = "Invalid loop ordering input:"
-
-    def walk(ex: LogicNode, *, at_root: bool = False) -> None:
-        if at_root:
-            match ex:
-                case Aggregate(_, _, _, _):
-                    pass
-                case Reorder(Table(_, _), _):
-                    pass
-                case _:
-                    raise ValueError(
-                        f"{prefix} Query rhs must be Reorder(...) or Aggregate(...)"
-                    )
-
-        n_agg = 0
-
-        def rule(node: LogicNode) -> LogicNode | None:
-            nonlocal n_agg
-            match node:
-                case Aggregate(_, _, _, _):
-                    n_agg += 1
-                case MapJoin():
-                    if n_agg == 0:
-                        raise ValueError(
-                            "Invalid loop ordering: MapJoin is only allowed "
-                            "inside an Aggregate argument"
-                        )
-                case _:
-                    return None
-            return None
-
-        Rewrite(PreWalk(rule))(ex)
-        if n_agg > 1:
-            raise ValueError(
-                "Invalid loop ordering: at most one Aggregate per Query rhs"
-            )
-
-    walk(query.rhs, at_root=True)
-
-
-def _validate_output_query(query: Query) -> None:
-    prefix = "Invalid loop ordering output:"
-
-    def walk(ex: LogicNode, *, at_root: bool = False) -> None:
-        loop_order: tuple[Field, ...] | None = None
-        if at_root:
-            match ex:
-                case Aggregate(_, _, Reorder(_, order), _):
-                    loop_order = order
-                case Reorder(Table(_, idxs), order):
-                    if idxs == order:
-                        loop_order = order
-                        _check_loop_order(idxs, order)
-                case _:
-                    raise ValueError(
-                        f"{prefix} Query rhs must be "
-                        "Reorder(...) or Aggregate(..., Reorder(...), ...)"
-                    )
-
-        n_agg = 0
-
-        def rule(node: LogicNode) -> LogicNode | None:
-            nonlocal n_agg
-            match node:
-                case Aggregate(_, _, Reorder(_, _), _):
-                    n_agg += 1
-                case Aggregate():
-                    n_agg += 1
-                case Table(_, idxs) if loop_order is not None:
-                    _check_loop_order(idxs, loop_order)
-                case Reorder(Table(_, _), idxs) if loop_order is not None:
-                    _check_loop_order(idxs, loop_order)
-                case MapJoin():
-                    if n_agg == 0:
-                        raise ValueError(
-                            "Invalid loop ordering: MapJoin is only allowed "
-                            "inside an Aggregate argument"
-                        )
-                case _:
-                    return None
-            return None
-
-        Rewrite(PreWalk(rule))(ex)
-        if n_agg > 1:
-            raise ValueError(
-                "Invalid loop ordering: at most one Aggregate per Query rhs"
-            )
-
-    walk(query.rhs, at_root=True)
-
-
-def validate(
-    prgm: LogicStatement,
-    *,
-    kind: Literal["input", "output"] = "input",
-) -> None:
-    """Reject programs outside the loop-ordering grammar."""
-    prefix = f"Invalid loop ordering {kind}:"
-    validate_query = (
-        _validate_input_query if kind == "input" else _validate_output_query
-    )
-    match prgm:
-        case Plan(bodies):
-            seen_produces = False
-            for i, body in enumerate(bodies):
-                if seen_produces:
-                    raise ValueError(f"{prefix} Produces must be final body")
-                match body:
-                    case Query() as query:
-                        validate_query(query)
-                    case Produces(_):
-                        seen_produces = True
-                        if i != len(bodies) - 1:
-                            raise ValueError(f"{prefix} Produces must be final body")
-                    case _:
-                        raise ValueError(
-                            f"{prefix} expected Query or Produces in Plan, "
-                            f"got {type(body).__name__}"
-                        )
-        case Query() as query:
-            validate_query(query)
-        case _:
-            raise ValueError(
-                f"{prefix} expected Plan or Query, got {type(prgm).__name__}"
-            )
-
-
-# End validation funcs
-
-
-class LoopOrderer(LogicLoader):
+class LoopOrderer(SingleAggregateForm, LogicLoader):
     """
     A LoopOrderer determines the loop ordering for each query in a logic
     program. Subclasses implement ``get_loop_order`` to swap in different
@@ -263,57 +264,156 @@ class LoopOrderer(LogicLoader):
         """
         ...
 
-    def __call__(
+    def lower(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
-        validate(prgm, kind="input")
         namespace = Namespace(prgm)
 
+        def output_ordered_aggregate(rhs: LogicExpression):
+            # Unwrap Reorder(...)/Aggregate(...) to find an output-ordered aggregate.
+            output_order = None
+            while True:
+                match rhs:
+                    case Reorder(arg, order):
+                        output_order = order
+                        rhs = arg
+                    case Aggregate(op, init, arg, reduce_axes) if (
+                        output_order is not None
+                    ):
+                        return op, init, arg, reduce_axes, output_order
+                    case _:
+                        return None
+
+        def strip_noop_reorders(ex: LogicExpression) -> LogicExpression:
+            # Drop Reorder nodes whose order already matches the arg's fields.
+            def rule(node: LogicNode) -> LogicNode | None:
+                match node:
+                    case Reorder(arg, order) if arg.fields() == order:
+                        return arg
+                    case _:
+                        return None
+
+            return Rewrite(PostWalk(rule))(ex)
+
+        def wrap_bare_table_queries(node: LogicStatement) -> LogicStatement:
+            # Wrap bare copy queries (Query(_, Table)) in a Reorder for later forms.
+            match node:
+                case Plan(bodies):
+                    return Plan(tuple(wrap_bare_table_queries(body) for body in bodies))
+                case Query(lhs, Table(_, idxs) as rhs):
+                    return Query(lhs, Reorder(rhs, idxs))
+                case _:
+                    return node
+
         def apply_loop_order(node: LogicStatement) -> LogicStatement:
+            # Rewrite each query rhs to honor the loop order, emitting swizzles.
             match node:
                 case Plan(bodies):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
-                # if table and connected to bindings dont touch.
-                # added here to catch earlier
-                case Query(_, Reorder(Table(_, _), _)) if bindings:
-                    return node
                 case Query(lhs, rhs):
-                    match rhs:
-                        # ValueError: zip() argument 2 is shorter than argument 1
-                        # shape mismtach
-                        # This case preserves an existing aggregate loop order
-                        # from Logic Optimizer.
-                        case Aggregate(_, _, Reorder(_, old_loop_order), _) if bindings:
-                            loop_order = old_loop_order
-                        case _:
-                            loop_order = self.get_loop_order(
-                                node, bindings, stats, stats_factory
-                            )
-                    rhs, swizzles = _align(rhs, loop_order, bindings, namespace)
-                    match rhs:
-                        case Aggregate(
-                            op,
-                            init,
-                            Reorder(inner, _old_loop_order),
-                            reduce_axes,
-                        ):
-                            ordered = Query(
-                                lhs,
+                    output_aggregate = output_ordered_aggregate(rhs)
+                    if output_aggregate is not None:
+                        op, init, arg, reduce_axes, output_order = output_aggregate
+                        match arg:
+                            # This case preserves an existing aggregate loop order
+                            # from Logic Optimizer.
+                            case Reorder(inner, old_loop_order):
+                                arg = inner
+                                if bindings:
+                                    loop_order = old_loop_order
+                                else:
+                                    loop_order = self.get_loop_order(
+                                        node, bindings, stats, stats_factory
+                                    )
+                            case _:
+                                loop_order = self.get_loop_order(
+                                    node, bindings, stats, stats_factory
+                                )
+                        arg, swizzles = _align(arg, loop_order, bindings, namespace)
+                        arg = strip_noop_reorders(arg)
+                        ordered = Query(
+                            lhs,
+                            Reorder(
                                 Aggregate(
                                     op,
                                     init,
-                                    Reorder(inner, loop_order),
+                                    Reorder(arg, loop_order),
                                     reduce_axes,
                                 ),
-                            )
-                        case Reorder(Table(_, _), _old):
-                            ordered = node
-                        case _:
-                            ordered = Query(lhs, Reorder(rhs, loop_order))
+                                output_order,
+                            ),
+                        )
+                    else:
+                        match rhs:
+                            case Table(_, idxs):
+                                swizzles = ()
+                                ordered = Query(lhs, Reorder(rhs, idxs))
+                            case Reorder(arg, output_order):
+                                arg, swizzles = _align(
+                                    arg, output_order, bindings, namespace
+                                )
+                                arg = strip_noop_reorders(arg)
+                                ordered = Query(lhs, Reorder(arg, output_order))
+                            # This case preserves an existing aggregate loop order
+                            # from Logic Optimizer.
+                            case Aggregate(
+                                op,
+                                init,
+                                Reorder(inner, old_loop_order),
+                                reduce_axes,
+                            ):
+                                if bindings:
+                                    loop_order = old_loop_order
+                                else:
+                                    loop_order = self.get_loop_order(
+                                        node, bindings, stats, stats_factory
+                                    )
+                                inner, swizzles = _align(
+                                    inner, loop_order, bindings, namespace
+                                )
+                                inner = strip_noop_reorders(inner)
+                                ordered = Query(
+                                    lhs,
+                                    Aggregate(
+                                        op,
+                                        init,
+                                        Reorder(inner, loop_order),
+                                        reduce_axes,
+                                    ),
+                                )
+                            case Reorder(Table(_, _), _old):
+                                swizzles = ()
+                                ordered = node
+                            case _:
+                                loop_order = self.get_loop_order(
+                                    node, bindings, stats, stats_factory
+                                )
+                                rhs, swizzles = _align(
+                                    rhs, loop_order, bindings, namespace
+                                )
+                                rhs = strip_noop_reorders(rhs)
+                                match rhs:
+                                    case Aggregate(
+                                        op,
+                                        init,
+                                        Reorder(inner, _old_loop_order),
+                                        reduce_axes,
+                                    ):
+                                        ordered = Query(
+                                            lhs,
+                                            Aggregate(
+                                                op,
+                                                init,
+                                                Reorder(inner, loop_order),
+                                                reduce_axes,
+                                            ),
+                                        )
+                                    case _:
+                                        ordered = Query(lhs, Reorder(rhs, loop_order))
                     if swizzles:
                         return Plan((*swizzles, ordered))
                     return ordered
@@ -329,7 +429,11 @@ class LoopOrderer(LogicLoader):
         if not bindings:
             prgm = concordize(prgm, bindings)
             prgm = flatten_plans(prgm)
-        validate(prgm, kind="output")
+        prgm = wrap_bare_table_queries(prgm)
+        # for mypy test, make sure prgm is a Plan
+        if not isinstance(prgm, Plan):
+            raise ValueError(f"Loop ordering output must be a Plan: {prgm}")
+        LoopOrderedForm.validate_inputs(prgm, bindings, stats, stats_factory)
         logger.debug(prgm)
         return self.loader(prgm, bindings, stats, stats_factory)
 

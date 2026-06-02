@@ -18,25 +18,20 @@ from .formatter import DefaultLogicFormatter
 from .galley_optimize import GalleyLogicalOptimizer
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer
-from .standardize import LogicStandardizer
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader()))
-            )
+            DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader()))
         )
     )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-                )
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
         )
     )
@@ -44,11 +39,9 @@ INTERPRET_NOTATION = LogicNormalizer(
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLoopOrderer(
-                    DefaultLogicFormatter(
-                        LogicCompiler(NotationCompiler(AssemblyInterpreter()))
-                    )
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(
+                    LogicCompiler(NotationCompiler(AssemblyInterpreter()))
                 )
             )
         )
@@ -57,13 +50,11 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
-                DefaultLoopOrderer(
-                    DefaultLogicFormatter(
-                        LogicCompiler(
-                            NotationCompiler(
-                                NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
-                            )
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
                         )
                     )
                 )
@@ -75,10 +66,8 @@ COMPILE_NUMBA = LogicNormalizer(
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicalOptimizer(
-            LogicStandardizer(
-                DefaultLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
-                )
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
         )
     )

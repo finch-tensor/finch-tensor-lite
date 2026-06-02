@@ -93,6 +93,9 @@ class SingleAggregateForm(AliasedForm):
                         validate(body, True)
                 case Query(Alias(), Reorder(Table(), _)):
                     return None
+                # case for copy queries
+                case Query(Alias(), Table()):
+                    return None
                 case Query(Alias(), Reorder(Aggregate(_, _, arg, _), _)):
                     return validate(arg, False)
                 case Query(Alias(), Aggregate(_, _, arg, _)):

@@ -31,7 +31,7 @@ from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
 from .loop_ordering import (
     DefaultLoopOrderer,
-    validate,
+    # validate,  # commented out: validate() grammar checker is no longer used
 )
 from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
@@ -73,6 +73,6 @@ __all__ = [
     "get_default_scheduler",
     "normalize_names",
     "set_default_scheduler",
-    "validate",
+    # "validate",  # commented out: validate() grammar checker is no longer used
     "with_default_scheduler",
 ]
