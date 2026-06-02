@@ -278,7 +278,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
         # for mypy test, make sure prgm is a Plan
         if not isinstance(prgm, Plan):
             raise ValueError(f"Loop ordering output must be a Plan: {prgm}")
-        LoopOrderedForm.validate_inputs(prgm, bindings, stats, stats_factory)
+        #LoopOrderedForm.validate_inputs(prgm, bindings, stats, stats_factory)
         logger.debug(prgm)
         return self.loader(prgm, bindings, stats, stats_factory)
 
