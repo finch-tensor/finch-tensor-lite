@@ -20,7 +20,7 @@ from finchlite.algebra import (
 )
 from finchlite.finch_assembly import BufferFType
 from finchlite.finch_assembly.dct import DictFType
-from finchlite.symbolic import Context, Namespace, ScopedDict
+from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finchlite.util.logging import LOG_BACKEND_NUMBA
 
 from .stages import NumbaCode, NumbaLowerer
@@ -541,13 +541,13 @@ class NumbaKernel(asm.AssemblyKernel):
         return construct_from_numba(self.ret_type, res)
 
 
-class NumbaCompiler(asm.AssemblyLoader):
+class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
     def __init__(self, ctx: NumbaLowerer | None = None):
         if ctx is None:
             ctx = NumbaGenerator()
         self.ctx: NumbaLowerer = ctx
 
-    def __call__(self, prgm: asm.Module) -> NumbaLibrary:
+    def lower(self, prgm: asm.Module) -> NumbaLibrary:
         numba_code = self.ctx(prgm).code
         logger.debug(f"Executing Numba code:\n{numba_code}")
         _globals = globals()
@@ -577,8 +577,8 @@ class NumbaCompiler(asm.AssemblyLoader):
         return NumbaLibrary(kernels)
 
 
-class NumbaGenerator(NumbaLowerer):
-    def __call__(self, prgm: asm.AssemblyNode):
+class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
+    def lower(self, prgm: asm.AssemblyNode) -> NumbaCode:
         ctx = NumbaContext()
         ctx(prgm)
         return NumbaCode(ctx.emit_global())

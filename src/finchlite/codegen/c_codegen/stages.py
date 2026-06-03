@@ -14,7 +14,7 @@ class CCode:
 
 class CLowerer(Stage):
     @abstractmethod
-    def __call__(self, prgm: asm.Module) -> CCode:
+    def lower(self, prgm: asm.Module) -> CCode:
         """
         Lower the given assembly program to C code.
         """

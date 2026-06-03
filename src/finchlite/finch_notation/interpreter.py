@@ -12,7 +12,7 @@ from finchlite.algebra import (
     fisinstance,
     ftype,
 )
-from finchlite.symbolic import ScopedDict
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
 
 from . import nodes as ntn
 from .stages import NotationLoader
@@ -271,7 +271,7 @@ class HaltState:
     return_value: Any = None
 
 
-class NotationInterpreter(NotationLoader):
+class NotationInterpreter(UnvalidatedForm, NotationLoader):
     """
     An interpreter for FinchNotation.
     """
@@ -326,6 +326,9 @@ class NotationInterpreter(NotationLoader):
             function_state=function_state,
         )
 
+    def lower(self, prgm: ntn.Module):
+        return self._dispatch(prgm)
+
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
 
@@ -336,6 +339,11 @@ class NotationInterpreter(NotationLoader):
         """
         Run the program.
         """
+        if isinstance(prgm, ntn.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         match prgm:
             case ntn.Literal(val) | asm.Literal(val):
                 return val

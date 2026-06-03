@@ -10,6 +10,7 @@ from finchlite.algebra.tensor import TensorFType
 from finchlite.compile.lower import make_extent
 from finchlite.finch_assembly import AssemblyLibrary
 from finchlite.finch_logic import (
+    Alias,
     LogicLoader,
     StatsFactory,
     TensorStats,
@@ -21,7 +22,7 @@ from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
 from finchlite.util.logging import LOG_NOTATION
 
-from .stages import LogicNotationLowerer
+from .stages import FormattedForm, LogicNotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
@@ -192,7 +193,7 @@ class NotationContext:
         query_lhs: lgc.Alias,
         agg_op: FinchOperator,
         agg_arg: lgc.Reorder,
-        agg_idxs: tuple[lgc.Field, ...],
+        output_idxs: tuple[lgc.Field, ...],
     ):
         # Build a dict mapping fields to their shapes
         arg_dims = agg_arg.dimmap(merge_shapes, self.shapes)
@@ -211,7 +212,7 @@ class NotationContext:
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(agg_op)),
-            tuple(loops[idx] for idx in agg_arg.idxs if idx not in agg_idxs),
+            tuple(loops[idx] for idx in output_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(agg_arg.idxs):
@@ -255,14 +256,17 @@ class NotationContext:
                 )
             case lgc.Query(
                 lhs,
-                lgc.Aggregate(
-                    lgc.Literal(op),
-                    lgc.Literal(init),
-                    lgc.Reorder(arg, _) as arg_2,
-                    idxs_2,
+                lgc.Reorder(
+                    lgc.Aggregate(
+                        lgc.Literal(op),
+                        lgc.Literal(init),
+                        lgc.Reorder(arg, _) as arg_2,
+                        idxs_2,
+                    ),
+                    output_idxs,
                 ),
             ):
-                body = self._lower_query_of_aggregate(lhs, op, arg_2, idxs_2)
+                body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
                 return ntn.Block(
                     (
                         ntn.Declare(
@@ -284,46 +288,19 @@ class NotationContext:
                     lgc.MapJoin(
                         lgc.Literal(op),
                         (
-                            lgc.Reorder(lgc.Table(lhs_1), idxs_1),
-                            lgc.Reorder(lgc.Table() as tbl, idxs_2),
-                        ),
-                    ),
-                    idxs_3,
-                ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_3:
-                body = self._lower_query_of_reorder(lhs, op, tbl, idxs_2)
-                return ntn.Block(
-                    (
-                        ntn.Thaw(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                        body,
-                        ntn.Freeze(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                    )
-                )
-            case lgc.Query(
-                lhs,
-                lgc.Reorder(
-                    lgc.MapJoin(
-                        lgc.Literal(op),
-                        (
-                            lgc.Reorder(lgc.Table(lhs_1), idxs_1),
+                            lgc.Table(lhs_1, idxs_1),
                             lgc.Aggregate(
                                 lgc.Literal(op_1),
                                 lgc.Literal(init),
                                 lgc.Reorder() as agg_arg,
-                                agg_idxs,
+                                _,
                             ),
                         ),
                     ),
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
-                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, agg_idxs)
+                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Thaw(
@@ -358,8 +335,12 @@ class NotationContext:
 
 
 class NotationGenerator(LogicNotationLowerer):
-    def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    def lower(
+        self,
+        term: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> ntn.Module:
         preamble: list[ntn.NotationStatement] = []
         epilogue: list[ntn.NotationStatement] = []
@@ -413,7 +394,7 @@ class NotationGenerator(LogicNotationLowerer):
         )
 
 
-class LogicCompiler(LogicLoader):
+class LogicCompiler(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,
@@ -426,7 +407,7 @@ class LogicCompiler(LogicLoader):
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
-    def __call__(
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
@@ -437,7 +418,7 @@ class LogicCompiler(LogicLoader):
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
-        mod = self.ctx_lower(prgm, bindings)
+        mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
         shape_vars = compute_shape_vars(prgm, bindings)

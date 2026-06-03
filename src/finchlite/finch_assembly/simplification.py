@@ -1,12 +1,12 @@
 from finchlite import finch_assembly as asm
 from finchlite.algebra import ffuncs, is_annihilator, is_identity
-from finchlite.symbolic import Fixpoint, PostWalk, Rewrite
+from finchlite.symbolic import Fixpoint, PostWalk, Rewrite, UnvalidatedForm
 
 from .stages import AssemblyTransform
 
 
-class AssemblySimplify(AssemblyTransform):
-    def __call__(self, term: asm.Module) -> asm.Module:
+class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
+    def lower(self, term: asm.Module) -> asm.Module:
         return Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term)
 
     @classmethod
