@@ -47,7 +47,7 @@ class BufferizedNDArray(OverrideTensor):
     def from_numpy(cls, arr: np.ndarray) -> "BufferizedNDArray":
         itemsize = arr.dtype.itemsize
         strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
-        shape = tuple(int(s) for s in arr.shape)
+        shape = tuple(np.intp(s) for s in arr.shape)
         val = NumpyBuffer(arr.reshape(-1, copy=False))
         return BufferizedNDArray(val, shape, strides)
 
@@ -116,6 +116,7 @@ class BufferizedNDArray(OverrideTensor):
         ):
             return BufferizedNDArray.from_numpy(self.to_numpy()[index])
         if isinstance(index, tuple):
+            index = tuple(i for i in index if i is not Ellipsis)
             index = 0 if index == () else np.dot(index, self.strides)
         return self.val.load(index)
 
@@ -125,6 +126,7 @@ class BufferizedNDArray(OverrideTensor):
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
+            index = tuple(i % s for i, s in zip(index, self._shape, strict=False))
             index = np.ravel_multi_index(index, self._shape)
         self.val.store(index, value)
 

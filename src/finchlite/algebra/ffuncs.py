@@ -842,7 +842,7 @@ class _Where(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
         return np.where(a, b, c)
 
-    def return_type(self, cond: FType, x1: FType, x2: FType) -> FType:  # type: ignore[override]
+    def return_type(self, cond: FDType, x1: FDType, x2: FDType) -> FDType:  # type: ignore[override]
         return promote_type(x1, x2)
 
     def __repr__(self) -> str:

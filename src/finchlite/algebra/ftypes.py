@@ -719,7 +719,7 @@ class TupleFType(ImmutableStructFType):
         return tuple(args)
 
     def __call__(self, arg):
-        return tuple([T(x) for T, x in zip(self._struct_types, arg)])
+        return tuple([T(x) for T, x in zip(self._struct_types, arg, strict=False)])
 
     @staticmethod
     @lru_cache
@@ -804,8 +804,6 @@ def ftype(x) -> FType:
         return x.ftype
     if isinstance(x, np.dtype):
         x = x.type
-    if isinstance(x, np.ndarray):
-        return ftype(x.dtype)
     if type(x) is builtins.bool or x is builtins.bool:
         return bool_
     if type(x) is builtins.int or x is builtins.int:
