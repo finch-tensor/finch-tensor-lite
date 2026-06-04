@@ -26,7 +26,7 @@ from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 from .stages import SingleAggregateForm
-from .standardize import concordize, flatten_plans
+from .standardize import flatten_plans
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -168,12 +168,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
                             # from Logic Optimizer.
                             case Reorder(inner, old_loop_order):
                                 arg = inner
-                                if bindings:
-                                    loop_order = old_loop_order
-                                else:
-                                    loop_order = self.get_loop_order(
-                                        node, bindings, stats, stats_factory
-                                    )
+                                loop_order = old_loop_order
                             case _:
                                 loop_order = self.get_loop_order(
                                     node, bindings, stats, stats_factory
@@ -211,12 +206,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
                                 Reorder(inner, old_loop_order),
                                 reduce_axes,
                             ):
-                                if bindings:
-                                    loop_order = old_loop_order
-                                else:
-                                    loop_order = self.get_loop_order(
-                                        node, bindings, stats, stats_factory
-                                    )
+                                loop_order = old_loop_order
                                 inner, swizzles = _align(
                                     inner, loop_order, bindings, namespace
                                 )
@@ -271,9 +261,6 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
 
         prgm = apply_loop_order(prgm)
         prgm = flatten_plans(prgm)
-        if not bindings:
-            prgm = concordize(prgm, bindings)
-            prgm = flatten_plans(prgm)
         prgm = wrap_bare_table_queries(prgm)
         # for mypy test, make sure prgm is a Plan
         if not isinstance(prgm, Plan):
