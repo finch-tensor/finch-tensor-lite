@@ -1,50 +1,59 @@
 import os
+import shlex
 import subprocess
 import sys
+from pathlib import Path
 
 
 def test_array_api():
-    ARRAY_API_TESTS_DIR = os.environ.get(
-        "ARRAY_API_TESTS_DIR",
-        os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../array-api-tests"),
+    array_api_tests_dir = Path(
+        os.environ.get(
+            "ARRAY_API_TESTS_DIR",
+            Path(__file__).parent.parent / "array-api-tests",
         ),
-    )
-    ARRAY_API_TESTS_REV = os.environ.get(
+    ).resolve()
+    array_api_tests_rev = os.environ.get(
         "ARRAY_API_TESTS_REV", "c48410f96fc58e02eea844e6b7f6cc01680f77ce"
     )
-    ARRAY_API_TESTS_SKIPS = os.environ.get(
-        "ARRAY_API_TESTS_SKIPS",
-        os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../array-api-skips.txt"),
+    array_api_tests_skips = Path(
+        os.environ.get(
+            "ARRAY_API_TESTS_SKIPS",
+            Path(__file__).parent.parent / "array-api-skips.txt",
         ),
-    )
-    ARRAY_API_TESTS_ARGS = os.environ.get("ARRAY_API_TESTS_ARGS", "-vv -s")
+    ).resolve()
+    array_api_tests_args = shlex.split(os.environ.get("ARRAY_API_TESTS_ARGS", "-vv -s"))
 
-    print(f"[array-api] using dir: {ARRAY_API_TESTS_DIR}", flush=True)
-    print(f"[array-api] target rev: {ARRAY_API_TESTS_REV}", flush=True)
+    print(f"[array-api] using dir: {array_api_tests_dir}", flush=True)
+    print(f"[array-api] target rev: {array_api_tests_rev}", flush=True)
 
-    if not os.path.isdir(ARRAY_API_TESTS_DIR):
+    if not (array_api_tests_dir / ".git").exists():
+        if array_api_tests_dir.exists() and any(array_api_tests_dir.iterdir()):
+            raise RuntimeError(
+                f"{array_api_tests_dir} exists but is not a git checkout. "
+                "Set ARRAY_API_TESTS_DIR to a valid checkout or an empty path."
+            )
         print("[array-api] cloning test repo...", flush=True)
         subprocess.run(
             [
                 "git",
                 "clone",
-                "--recursive",
+                "--recurse-submodules",
                 "https://github.com/data-apis/array-api-tests.git",
-                ARRAY_API_TESTS_DIR,
+                str(array_api_tests_dir),
             ],
             check=True,
         )
 
+    array_api_tests_git = [
+        "git",
+        "-C",
+        str(array_api_tests_dir),
+    ]
+
     print("[array-api] cleaning repo...", flush=True)
     subprocess.run(
         [
-            "git",
-            "--git-dir",
-            f"{ARRAY_API_TESTS_DIR}/.git",
-            "--work-tree",
-            ARRAY_API_TESTS_DIR,
+            *array_api_tests_git,
             "clean",
             "-xddf",
         ],
@@ -54,27 +63,31 @@ def test_array_api():
     print("[array-api] fetching latest refs...", flush=True)
     subprocess.run(
         [
-            "git",
-            "--git-dir",
-            f"{ARRAY_API_TESTS_DIR}/.git",
-            "--work-tree",
-            ARRAY_API_TESTS_DIR,
+            *array_api_tests_git,
             "fetch",
         ],
-        check=True,
+        check=False,
     )
 
     print("[array-api] checking out target revision...", flush=True)
     subprocess.run(
         [
-            "git",
-            "--git-dir",
-            f"{ARRAY_API_TESTS_DIR}/.git",
-            "--work-tree",
-            ARRAY_API_TESTS_DIR,
+            *array_api_tests_git,
             "reset",
             "--hard",
-            ARRAY_API_TESTS_REV,
+            array_api_tests_rev,
+        ],
+        check=True,
+    )
+
+    print("[array-api] initializing submodules...", flush=True)
+    subprocess.run(
+        [
+            *array_api_tests_git,
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
         ],
         check=True,
     )
@@ -86,18 +99,21 @@ def test_array_api():
             sys.executable,
             "-m",
             "pytest",
-            *ARRAY_API_TESTS_ARGS.split(),
-            f"{ARRAY_API_TESTS_DIR}/array_api_tests/",
+            "-c",
+            str(array_api_tests_dir / "pytest.ini"),
+            *array_api_tests_args,
+            str(array_api_tests_dir / "array_api_tests"),
             "--max-examples=2",
             "--derandomize",
             "--disable-deadline",
             "--disable-warnings",
             "--skips-file",
-            ARRAY_API_TESTS_SKIPS,
+            str(array_api_tests_skips),
         ],
         env={
             **os.environ,
             "ARRAY_API_TESTS_MODULE": "finchlite",
+            "PYTEST_ADDOPTS": "",
             "PYTHONUNBUFFERED": "1",
         },
         check=False,
