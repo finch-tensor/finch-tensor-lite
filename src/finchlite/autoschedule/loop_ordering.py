@@ -144,16 +144,6 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
 
             return Rewrite(PostWalk(rule))(ex)
 
-        def wrap_bare_table_queries(node: LogicStatement) -> LogicStatement:
-            # Wrap bare copy queries (Query(_, Table)) in a Reorder for later forms.
-            match node:
-                case Plan(bodies):
-                    return Plan(tuple(wrap_bare_table_queries(body) for body in bodies))
-                case Query(lhs, Table(_, idxs) as rhs):
-                    return Query(lhs, Reorder(rhs, idxs))
-                case _:
-                    return node
-
         def apply_loop_order(node: LogicStatement) -> LogicStatement:
             # Rewrite each query rhs to honor the loop order, emitting swizzles.
             match node:
@@ -261,7 +251,6 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
 
         prgm = apply_loop_order(prgm)
         prgm = flatten_plans(prgm)
-        prgm = wrap_bare_table_queries(prgm)
         # for mypy test, make sure prgm is a Plan
         if not isinstance(prgm, Plan):
             raise ValueError(f"Loop ordering output must be a Plan: {prgm}")

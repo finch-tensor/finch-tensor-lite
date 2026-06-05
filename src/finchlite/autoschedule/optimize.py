@@ -40,6 +40,7 @@ from .standardize import (
     flatten_plans,
     isolate_aggregates,
     push_fields,
+    wrap_bare_table_queries,
 )
 
 
@@ -162,8 +163,8 @@ def optimize(
 
         prgm = propagate_transpose_queries(prgm)
         prgm = push_fields(prgm)
-        prgm = set_loop_order(prgm)
-        prgm = push_fields(prgm)
+        # prgm = set_loop_order(prgm)
+        # prgm = push_fields(prgm)
 
         prgm = concordize(prgm, bindings)
         prgm = propagate_copy_queries(prgm)
@@ -361,6 +362,7 @@ def propagate_transpose_queries(root: LogicStatement):
     return flatten_plans(push_fields(root))
 
 
+# Everything down here moved to loop_ordering.py
 class CycleInFields(Exception): ...
 
 
@@ -477,4 +479,5 @@ class DefaultLogicOptimizer(LogicFusionOptimizer):
         stats_factory: StatsFactory,
     ):
         prgm, bindings = optimize(prgm, bindings)
+        prgm = wrap_bare_table_queries(prgm)
         return self.ctx(prgm, bindings, stats, stats_factory)

@@ -201,6 +201,18 @@ def split_increments(root: LogicStatement) -> LogicStatement:
     return Rewrite(PostWalk(rule_2))(root)
 
 
+def wrap_bare_table_queries(node: LogicStatement) -> LogicStatement:
+    """Wrap bare copy queries (``Query(_, Table)``)
+    in a ``Reorder`` for loop ordering."""
+    match node:
+        case Plan(bodies):
+            return Plan(tuple(wrap_bare_table_queries(body) for body in bodies))
+        case Query(lhs, Table(_, idxs) as rhs):
+            return Query(lhs, Reorder(rhs, idxs))
+        case _:
+            return node
+
+
 def standardize_query_roots(
     root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> LogicStatement:
