@@ -2059,7 +2059,3 @@ def get_lazy_tensor_stats(
         return last_stats[0]
 
     return last_stats
-
-
-def count_nonfill_values(x, fill_value) -> LazyTensor:
-    return sum(multiply(not_equal(lazy(x), lazy(fill_value)), 1))

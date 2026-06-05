@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 
 import finchlite
-from finchlite.algebra import FinchOperator
+from finchlite.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finchlite.autoschedule.default_schedulers import get_default_scheduler
 from finchlite.finch_logic import (
     Aggregate,
@@ -31,6 +31,7 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
     def copy_stats(self, stat: ExactStats) -> ExactStats:
         if not isinstance(stat, ExactStats):
             raise TypeError("copy_stats expected a ExactStats instance")
+
         return ExactStats.from_def(stat.tensordef.copy(), stat.expr)
 
     def _mapjoin_join(
@@ -38,13 +39,14 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
     ) -> ExactStats:
         if len(join_args) == 0:
             return ExactStats.from_def(new_def, None)
-        expr = MapJoin(Literal(op), tuple(s.expr for s in join_args))
+
+        expr = MapJoin(Literal(ffuncs.and_), tuple(s.expr for s in join_args))
         return ExactStats.from_def(new_def, expr)
 
     def _mapjoin_union(
         self, new_def: TensorDef, op: FinchOperator, union_args: list[ExactStats]
     ) -> ExactStats:
-        expr = MapJoin(Literal(op), tuple(s.expr for s in union_args))
+        expr = MapJoin(Literal(ffuncs.or_), tuple(s.expr for s in union_args))
         return ExactStats.from_def(new_def, expr)
 
     def aggregate(
@@ -54,8 +56,19 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
         reduce_indices: tuple[Field, ...],
         stats: ExactStats,
     ) -> ExactStats:
+        f = stats.tensordef.fill_value
+
+        if is_identity(op, f):
+            bool_op, bool_init = ffuncs.or_, False
+        elif not is_annihilator(op, f) and not is_identity(op, f):
+            bool_op, bool_init = ffuncs.or_, True
+        else:
+            bool_op, bool_init = ffuncs.and_, True
+
         new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
-        expr = Aggregate(Literal(op), Literal(init), stats.expr, reduce_indices)
+        expr = Aggregate(
+            Literal(bool_op), Literal(bool_init), stats.expr, reduce_indices
+        )
         return ExactStats.from_def(new_def, expr)
 
     def relabel(
@@ -76,7 +89,7 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
 class ExactStats(NumericStats):
     def __init__(self, tensor, fields):
         self.tensordef = TensorDef.from_tensor(tensor, fields)
-        self.expr = Table(Literal(tensor), fields)
+        self.expr = Table(Literal(tensor != tensor.fill_value), fields)
         self.nnz = self.estimate_non_fill_values()
 
     @classmethod
@@ -95,7 +108,7 @@ class ExactStats(NumericStats):
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 
-        return float(finchlite.count_nonfill_values(result.tns, self.fill_value))
+        return float(finchlite.reduce(ffuncs.add, result.tns, init=np.uint64(0)))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

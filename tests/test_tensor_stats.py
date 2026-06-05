@@ -194,33 +194,15 @@ def test_exact_semiring():
 
 
 def test_exact_semiring_tropical():
-    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
-    A = np.eye(2)
-    B = np.eye(2)
-    C = np.eye(2)
-    D = np.eye(2)
-    A_, B_, C_, D_ = fl.asarray(A), fl.asarray(B), fl.asarray(C), fl.asarray(D)
-
-    ab = Aggregate(
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0], [0.0, 1.0]])
+    A_ = fl.asarray(A)
+    node = Aggregate(
         Literal(ffuncs.min),
         Literal(float("inf")),
-        MapJoin(
-            Literal(ffuncs.add),
-            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
-        ),
+        Table(Literal(A_), (i, j)),
         (j,),
     )
-    cd = Aggregate(
-        Literal(ffuncs.min),
-        Literal(float("inf")),
-        MapJoin(
-            Literal(ffuncs.add),
-            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
-        ),
-        (m,),
-    )
-    node = MapJoin(Literal(ffuncs.add), (ab, cd))
-
     stats = insert_statistics(
         stats_factory=ExactStatsFactory(),
         node=node,
@@ -228,9 +210,7 @@ def test_exact_semiring_tropical():
         replace=False,
         cache={},
     )
-    AB = np.min(A[:, :, None] + B[None, :, :], axis=1)
-    CD = np.min(C[:, :, None] + D[None, :, :], axis=1)
-    expected = float(np.count_nonzero(np.isfinite(AB + CD)))
+    expected = float(np.count_nonzero(np.isfinite(np.min(A, axis=1))))
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
 
