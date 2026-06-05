@@ -13,36 +13,72 @@ def full(
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
+    device=None,
 ):
-    """
-    Returns a new array having a specified shape and filled with fill_value.
-
-    Parameters:
-    - shape (Union[int, Tuple[int, ...]]): output array shape.
-    - fill_value (Union[bool, int, float, complex]): fill value.
-    - dtype (Optional[dtype]): output array data type. If dtype is None, the
-    output array data type must be inferred from fill_value according to the
-    following rules:
-        * If the fill value is an int, the output array data type must be the
-            default integer data type.
-        * If the fill value is a float, the output array data type must be the
-            default real-valued floating-point data type.
-        * If the fill value is a complex number, the output array data type must
-            be the default complex floating-point data type.
-        * If the fill value is a bool, the output array must have a boolean data
-            type. Default: None.
-
-    Returns:
-
-    - out (array): an array where every element is equal to fill_value.
-    """
     return compute(lazy.full(shape, fill_value, dtype=dtype))
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]):
+def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.zeros(shape, dtype=dtype))
+
+
+def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.ones(shape, dtype=dtype))
+
+
+def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.empty(shape, dtype=dtype))
+
+
+def full_like(
+    x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.full_like(x, fill_value, dtype=dtype)
+    return compute(lazy.full_like(x, fill_value, dtype=dtype))
+
+
+def zeros_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.zeros_like(x, dtype=dtype)
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.ones_like(x, dtype=dtype)
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype: Any | None = None,
+    device=None,
+):
+    return compute(lazy.arange(start, stop, step, dtype=dtype))
+
+
+def linspace(
+    start: float,
+    stop: float,
+    /,
+    num: int,
+    *,
+    dtype: Any | None = None,
+    device=None,
+    endpoint: bool = True,
+):
+    return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
+
+
+def permute_dims(arg, /, axes: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
-        return lazy.permute_dims(arg, axis=axis)
-    return compute(lazy.permute_dims(arg, axis=axis))
+        return lazy.permute_dims(arg, axes=axes)
+    return compute(lazy.permute_dims(arg, axes=axes))
 
 
 def expand_dims(
@@ -208,10 +244,10 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
-def bitwise_inverse(x):
+def bitwise_invert(x):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.bitwise_inverse(x)
-    return compute(lazy.bitwise_inverse(x))
+        return lazy.bitwise_invert(x)
+    return compute(lazy.bitwise_invert(x))
 
 
 def bitwise_and(x1, x2):
@@ -250,10 +286,10 @@ def truediv(x1, x2):
     return compute(lazy.truediv(x1, x2))
 
 
-def floordiv(x1, x2):
+def floor_divide(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.floordiv(x1, x2)
-    return compute(lazy.floordiv(x1, x2))
+        return lazy.floor_divide(x1, x2)
+    return compute(lazy.floor_divide(x1, x2))
 
 
 def mod(x1, x2):
@@ -335,6 +371,12 @@ def imag(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.imag(x)
     return compute(lazy.imag(x))
+
+
+def conj(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.conj(x)
+    return compute(lazy.conj(x))
 
 
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -819,10 +861,26 @@ def not_equal(x1, x2):
     return compute(lazy.not_equal(x1, x2))
 
 
+def where(condition, x1, x2):
+    if (
+        isinstance(condition, lazy.LazyTensor)
+        or isinstance(x1, lazy.LazyTensor)
+        or isinstance(x2, lazy.LazyTensor)
+    ):
+        return lazy.where(condition, x1, x2)
+    return compute(lazy.where(condition, x1, x2))
+
+
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.mean(x, axis=axis, keepdims=keepdims)
     return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+
+
+def reshape(x, /, shape: tuple, *, copy=None):
+    if not hasattr(x, "reshape"):
+        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
+    return x.reshape(shape, copy=copy)
 
 
 def var(

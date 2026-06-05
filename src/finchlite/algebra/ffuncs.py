@@ -138,7 +138,7 @@ truediv = _TrueDiv()
 
 class _FloorDiv(BinaryFinchOperator):
     def __repr__(self) -> str:
-        return "floordiv"
+        return "floor_divide"
 
     def __call__(self, a: Any, b: Any):
         return operator.floordiv(a, b)
@@ -746,6 +746,17 @@ class _Imag(UnaryFinchOperator):
 imag = _Imag()
 
 
+class _Conj(UnaryFinchOperator):
+    def __call__(self, a: Any):
+        return np.conj(a)
+
+    def __repr__(self) -> str:
+        return "conj"
+
+
+conj = _Conj()
+
+
 class _Clip(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
         return np.clip(a, b, c)
@@ -826,6 +837,19 @@ class _GreaterEqual(BinaryFinchOperator):
     def __repr__(self) -> str:
         return "greater_equal"
 
+
+class _Where(FinchOperator):
+    def __call__(self, a: Any, b: Any, c: Any):
+        return np.where(a, b, c)
+
+    def return_type(self, cond: FDType, x1: FDType, x2: FDType) -> FDType:  # type: ignore[override]
+        return promote_type(x1, x2)
+
+    def __repr__(self) -> str:
+        return "where"
+
+
+where = _Where()
 
 greater_equal = _GreaterEqual()
 

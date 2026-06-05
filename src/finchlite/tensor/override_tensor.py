@@ -157,7 +157,7 @@ class OverrideTensor(Tensor):
         return self.mod.negative(self)
 
     def __invert__(self):
-        return self.mod.bitwise_inverse(self)
+        return self.mod.bitwise_invert(self)
 
     def __and__(self, other):
         return self.mod.bitwise_and(self, other)
@@ -196,10 +196,10 @@ class OverrideTensor(Tensor):
         return self.mod.truediv(other, self)
 
     def __floordiv__(self, other):
-        return self.mod.floordiv(self, other)
+        return self.mod.floor_divide(self, other)
 
     def __rfloordiv__(self, other):
-        return self.mod.floordiv(other, self)
+        return self.mod.floor_divide(other, self)
 
     def __mod__(self, other):
         return self.mod.mod(self, other)

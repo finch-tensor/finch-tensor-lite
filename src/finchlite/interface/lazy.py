@@ -26,7 +26,7 @@ from finchlite.algebra import (
     promote_type,
     return_type,
 )
-from finchlite.algebra.ftypes import FDType
+from finchlite.algebra.ftypes import FDType, FDTypeBuiltin, FDTypeNumpy
 from finchlite.autoschedule.tensor_stats import StatsInterpreter
 from finchlite.finch_logic import (
     Aggregate,
@@ -272,30 +272,63 @@ class LazyTensor(OverrideTensor):
         )
 
 
-def asarray(arg: Any, format: TensorFType | None = None) -> Any:
+def asarray(
+    obj: Any,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: TensorFType | None = None,
+) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
-
-    Args:
-        arg: The object to be converted.
-        format: The format for the result array.
-
-    Returns:
-        The Tensor type result of the given object.
+    https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html
     """
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+
     if format is None:
         from finchlite.tensor.scalar import Scalar
 
-        if isinstance(arg, np.ndarray):
-            return BufferizedNDArray.from_numpy(arg)
-        if np.isscalar(arg) or arg is None:
-            return Scalar(arg)
-        return arg
+        if isinstance(obj, BufferizedNDArray):
+            if copy is True:
+                return BufferizedNDArray.from_numpy(obj.to_numpy().copy())
+            return obj
+        if isinstance(obj, np.ndarray):
+            if copy is True:
+                obj = obj.copy()
+            return BufferizedNDArray.from_numpy(obj)
+        if np.isscalar(obj) or obj is None:
+            if dtype is not None:
+                obj = ftype(dtype)(obj)
+            elif obj is not None:
+                obj = np.asarray(obj).flat[0]
+            return Scalar(obj)
+        try:
+            np_arr = np.asarray(obj)
+            if np_arr.dtype != object:
+                if dtype is not None:
+                    ft = ftype(dtype)
+                    np_dtype = (
+                        ft.dtype
+                        if hasattr(ft, "dtype")
+                        else ft.type
+                        if hasattr(ft, "type")
+                        else dtype
+                    )
+                    np_arr = np_arr.astype(np_dtype)
+                elif copy is True:
+                    np_arr = np_arr.copy()
+                return BufferizedNDArray.from_numpy(np_arr)
+        except (TypeError, ValueError):
+            pass
+        return obj
 
-    if isinstance(arg, np.ndarray):
-        return format.from_numpy(arg)
-    return format(arg)
+    if isinstance(obj, np.ndarray):
+        return format.from_numpy(obj)
+    return format(obj)
 
 
 def _is_convertible_to_array(arg: Any) -> bool:
@@ -328,6 +361,14 @@ def lazy(arr) -> LazyTensor:
     return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
 
 
+def _np_dtype(dtype):
+    if isinstance(dtype, FDTypeNumpy):
+        return dtype.dtype
+    if isinstance(dtype, FDTypeBuiltin):
+        return dtype.type
+    return dtype
+
+
 def full(
     shape: int | tuple[int, ...],
     fill_value: bool | complex,
@@ -356,13 +397,61 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    val = lazy(np.full((), fill_value, dtype=dtype))
+    val = lazy(np.full((), fill_value, dtype=_np_dtype(dtype)))
     if isinstance(shape, int):
         shape = (shape,)
     return broadcast_to(val, shape)
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
+def full_like(x, /, fill_value, *, dtype=None):
+    x = lazy(x)
+    return full(
+        x.shape, fill_value, dtype=dtype if dtype is not None else x.element_type
+    )
+
+
+def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
+    return broadcast_to(
+        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype))),
+        (num,),
+    )
+
+
+def zeros(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+
+
+def ones(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 1, dtype=dtype if dtype is not None else np.float64)
+
+
+def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+
+
+def zeros_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype=None,
+) -> LazyTensor:
+    if stop is None:
+        start, stop = 0, start
+    arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
+    return broadcast_to(lazy(arr), (len(arr),))
+
+
+def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -381,7 +470,7 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
         data type as ``x``.
     """
     arg = lazy(arg)
-    axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
+    axis = normalize_axis_tuple(axes, arg.ndim + len(axes))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
     expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
     data, ctx = arg.ctx.eval(expr)
@@ -926,10 +1015,10 @@ def matrix_transpose(x) -> LazyTensor:
             "Input tensor must have at least 2 dimensions for transposition"
         )
     # swap the last two axes
-    return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
+    return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
-def bitwise_inverse(x) -> LazyTensor:
+def bitwise_invert(x) -> LazyTensor:
     return elementwise(ffuncs.invert, lazy(x))
 
 
@@ -957,7 +1046,7 @@ def truediv(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
 
 
-def floordiv(x1, x2) -> LazyTensor:
+def floor_divide(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.floordiv, lazy(x1), lazy(x2))
 
 
@@ -977,7 +1066,7 @@ def remainder(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.remainder, lazy(x1), lazy(x2))
 
 
-def conjugate(x) -> LazyTensor:
+def conj(x) -> LazyTensor:
     """
     Computes the complex conjugate of the input tensor `x`.
 
@@ -1073,7 +1162,7 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
     return reduce(
         ffuncs.add,
-        multiply(conjugate(x1), x2),
+        multiply(conj(x1), x2),
         axis=axis,
     )
 
@@ -1706,7 +1795,7 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     for dest, src in sorted(zip(destination, source, strict=True)):
         final_order.insert(dest, src)
 
-    return permute_dims(x, axis=tuple(final_order))
+    return permute_dims(x, axes=tuple(final_order))
 
 
 def stack(arrays, /, axis: int = 0) -> LazyTensor:
@@ -1878,6 +1967,10 @@ def equal(x1, x2) -> LazyTensor:
 
 def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+
+
+def where(condition, x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.where, lazy(condition), lazy(x1), lazy(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
