@@ -95,8 +95,11 @@ class DefaultLogicFormatter(LogicFormatter):
         super().__init__(loader)
 
     def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
+        fill_ftype = ftype(
+            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        )
         return BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(fill_value)),
+            buffer_type=NumpyBufferFType(fill_ftype),
             ndim=len(shape_type),
             dimension_type=TupleFType.from_tuple(shape_type),
         )

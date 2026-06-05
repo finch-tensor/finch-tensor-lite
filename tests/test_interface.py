@@ -209,7 +209,7 @@ class TestOverrideTensor(finchlite.OverrideTensor):
             ),
             np.true_divide,
         ),
-        ((ffuncs.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
+        ((ffuncs.floordiv, finchlite.floor_divide, np.floor_divide), np.floor_divide),
         ((ffuncs.mod, finchlite.mod, np.mod), np.mod),
         ((ffuncs.pow, finchlite.power, np.power), np.power),
         (
@@ -289,7 +289,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         ((ffuncs.pos, finchlite.positive, np.positive), np.positive),
         ((ffuncs.neg, finchlite.negative, np.negative), np.negative),
         (
-            (ffuncs.invert, finchlite.bitwise_inverse, np.bitwise_invert),
+            (ffuncs.invert, finchlite.bitwise_invert, np.bitwise_invert),
             np.bitwise_invert,
         ),
         ((finchlite.reciprocal, np.reciprocal), np.reciprocal),

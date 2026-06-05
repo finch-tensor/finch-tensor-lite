@@ -439,7 +439,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 r_e = self(r)
-                return tns_e.shape[r_e]
+                shape_ft = tns_e.ftype.shape_type[r_e]
+                return shape_ft(tns_e.shape[r_e])
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)

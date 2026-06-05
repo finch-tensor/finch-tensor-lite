@@ -67,7 +67,7 @@ class BufferizedNDArray(OverrideTensor):
 
     @property
     def shape(self):
-        return self._shape
+        return tuple(int(s) for s in self._shape)
 
     @property
     def ndim(self):
@@ -111,7 +111,12 @@ class BufferizedNDArray(OverrideTensor):
         Get an item from the bufferized NDArray.
         This allows for indexing into the bufferized array.
         """
+        if isinstance(index, (slice, np.ndarray)) or (
+            isinstance(index, tuple) and any(isinstance(i, slice) for i in index)
+        ):
+            return BufferizedNDArray.from_numpy(self.to_numpy()[index])
         if isinstance(index, tuple):
+            index = tuple(i for i in index if i is not Ellipsis)
             index = 0 if index == () else np.dot(index, self.strides)
         return self.val.load(index)
 
@@ -121,8 +126,12 @@ class BufferizedNDArray(OverrideTensor):
         This allows for indexing into the bufferized array.
         """
         if isinstance(index, tuple):
+            index = tuple(i % s for i, s in zip(index, self._shape, strict=False))
             index = np.ravel_multi_index(index, self._shape)
         self.val.store(index, value)
+
+    def reshape(self, shape, /, *, copy=None):
+        return BufferizedNDArray.from_numpy(self.to_numpy().reshape(shape))
 
     def __str__(self):
         return f"{self.ftype}(shape={self.shape})"
@@ -296,6 +305,20 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             tns, 0, asm.Literal(self.buf_t.length_type(0)), op
         )
         return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
+
+    def reshape(self, arr, new_shape: tuple):
+        new_shape = tuple(np.intp(s) for s in new_shape)
+        old_size = int(np.prod(arr.shape, dtype=np.intp)) if arr.shape else 1
+        new_size = int(np.prod(new_shape, dtype=np.intp)) if new_shape else 1
+        if old_size != new_size:
+            raise ValueError(
+                f"Cannot reshape array of size {old_size} into shape {new_shape}"
+            )
+        new_strides = tuple(np.intp(s) for s in _get_default_strides(new_shape))
+        default_strides = tuple(np.intp(s) for s in _get_default_strides(arr.shape))
+        if arr.strides == default_strides:
+            return BufferizedNDArray(arr.val, new_shape, new_strides)
+        return BufferizedNDArray.from_numpy(arr.to_numpy().reshape(new_shape))
 
     def lower_unwrap(self, ctx, obj): ...
 
