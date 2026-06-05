@@ -57,6 +57,7 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
         stats: ExactStats,
     ) -> ExactStats:
         f = stats.tensordef.fill_value
+        bool_op: FinchOperator
 
         if is_identity(op, f):
             bool_op, bool_init = ffuncs.or_, False
