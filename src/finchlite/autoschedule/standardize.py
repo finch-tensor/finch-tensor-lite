@@ -222,17 +222,14 @@ def standardize_query_roots2(
 
     def rule(ex):
         match ex:
-            # aggregate queries (bare or already Reorder-wrapped) — pass through
             case Query(_, Aggregate(_, _, _, _)):
                 return ex
             case Query(_, Reorder(Aggregate(_, _, _, _), _)):
                 return ex
-            # transpose queries
             case Query(lhs, Reorder(Table(Alias(), _), _)):
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
-            # in-place queries — pass through (LoopOrderer sets interior loop order)
             case Query(
                 lhs,
                 Reorder(
@@ -255,7 +252,6 @@ def standardize_query_roots2(
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return ex
-            # everything else — overwrite wrapper, bare interior (no Reorder)
             case Query(lhs, rhs):
                 return Query(
                     lhs,
@@ -278,17 +274,12 @@ def standardize_query_roots(
     )
 
     def rule(ex):
-
         match ex:
-            case Query(
-                lhs,
-                Aggregate(op, init, Reorder(arg, idxs_1), idxs_2) as rhs,
-            ):
+            case Query(_, Aggregate(_, _, _, _)):
                 return ex
-            case Query(lhs, Aggregate(op, init, arg, idxs_2) as rhs):
-                idxs_1 = arg.fields()
-                return Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2))
-            case Query(lhs, Reorder(Table(Alias(), idxs_1), idxs_2)):
+            case Query(_, Reorder(Aggregate(_, _, _, _), _)):
+                return ex
+            case Query(lhs, Reorder(Table(Alias(), _), _)):
                 return ex
             case Query(lhs, Table(Alias(), idxs) as arg):
                 return Query(lhs, Reorder(arg, idxs))
@@ -307,59 +298,20 @@ def standardize_query_roots(
                         Literal(op),
                         (
                             Table(lhs_1, idxs_1),
-                            Aggregate(Literal(op_1), _, Reorder(), _),
+                            Aggregate(Literal(op_1), _, _, _),
                         ),
                     ),
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return ex
-            case Query(
-                lhs,
-                Reorder(
-                    MapJoin(
-                        Literal(op),
-                        (
-                            Table(lhs_1, idxs_1),
-                            Aggregate(Literal(op_1), init, agg_arg, agg_idxs),
-                        ),
-                    ),
-                    idxs_2,
-                ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
-                return Query(
-                    lhs,
-                    Reorder(
-                        MapJoin(
-                            Literal(op),
-                            (
-                                Table(lhs_1, idxs_1),
-                                Aggregate(
-                                    Literal(op_1),
-                                    init,
-                                    Reorder(
-                                        agg_arg,
-                                        idxs_2
-                                        + tuple(
-                                            idx
-                                            for idx in agg_arg.fields()
-                                            if idx not in idxs_2
-                                        ),
-                                    ),
-                                    agg_idxs,
-                                ),
-                            ),
-                        ),
-                        idxs_2,
-                    ),
-                )
             case Query(lhs, rhs):
                 return Query(
                     lhs,
                     Aggregate(
                         Literal(ffuncs.overwrite),
                         Literal(rhs.fill_value(fill_values)),
-                        Reorder(rhs, rhs.fields()),
+                        rhs,
                         (),
                     ),
                 )
