@@ -28,20 +28,17 @@ from finchlite.autoschedule.stages import LogicFusionOptimizer
 from finchlite.autoschedule.standardize import (
     flatten_plans,
     push_fields,
-    wrap_bare_table_queries,
+    standardize_query_roots2,
 )
 from finchlite.finch_logic import (
-    Aggregate,
     Alias,
     LogicLoader,
     LogicStatement,
     Plan,
     Query,
-    Reorder,
     StatsFactory,
     TensorStats,
 )
-from finchlite.symbolic import PostWalk, Rewrite
 from finchlite.util.logging import LOG_GALLEY
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
@@ -105,43 +102,6 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-def wrap_bare_aggregate_args(prgm: LogicStatement) -> LogicStatement:
-    """
-    Wrap bare aggregate arguments in ``Reorder`` so ``LoopOrderer`` can attach
-    loop order without wrapping the whole ``Aggregate`` in an outer ``Reorder``.
-    """
-
-    def rule(node: LogicStatement) -> LogicStatement | None:
-        match node:
-            case Query(lhs, Aggregate(op, init, arg, reduce_axes)) if not isinstance(
-                arg, Reorder
-            ):
-                return Query(
-                    lhs,
-                    Aggregate(op, init, Reorder(arg, tuple(arg.fields())), reduce_axes),
-                )
-            case Query(
-                lhs,
-                Reorder(Aggregate(op, init, arg, reduce_axes), output_order),
-            ) if not isinstance(arg, Reorder):
-                return Query(
-                    lhs,
-                    Reorder(
-                        Aggregate(
-                            op,
-                            init,
-                            Reorder(arg, tuple(arg.fields())),
-                            reduce_axes,
-                        ),
-                        output_order,
-                    ),
-                )
-            case _:
-                return None
-
-    return Rewrite(PostWalk(rule))(prgm)
-
-
 def canonicalize(
     prgm: LogicStatement,
     bindings: dict[Alias, TensorFType],
@@ -152,7 +112,7 @@ def canonicalize(
     """
     prgm = push_fields(prgm)
     prgm = add_aggregates(prgm, bindings)
-    prgm = wrap_bare_aggregate_args(prgm)
+    prgm = standardize_query_roots2(prgm, bindings)
     prgm = flatten_plans(prgm)
     return prgm, bindings
 
@@ -199,5 +159,4 @@ class GalleyLogicalOptimizer(LogicFusionOptimizer):
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
         term, bindings = canonicalize(term, bindings)
-        term = wrap_bare_table_queries(term)
         return self.ctx(term, bindings, stats, stats_factory)

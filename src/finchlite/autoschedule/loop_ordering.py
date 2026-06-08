@@ -9,6 +9,7 @@ from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Literal,
     LogicExpression,
     LogicLoader,
     LogicNode,
@@ -145,103 +146,71 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
             return Rewrite(PostWalk(rule))(ex)
 
         def apply_loop_order(node: LogicStatement) -> LogicStatement:
-            # Rewrite each query rhs to honor the loop order, emitting swizzles.
+            def with_swizzles(
+                ordered: Query, swizzles: tuple[Query, ...]
+            ) -> LogicStatement:
+                if swizzles:
+                    return Plan((*swizzles, ordered))
+                return ordered
+
+            def align_aggregate(
+                op: Literal,
+                init: Literal,
+                arg: LogicExpression,
+                reduce_axes: tuple[Field, ...],
+            ) -> tuple[Aggregate, tuple[Query, ...]]:
+                # This case preserves an existing aggregate loop order
+                # from Logic Optimizer.
+                match arg:
+                    case Reorder(inner, old_loop_order):
+                        arg = inner
+                        loop_order = old_loop_order
+                    case _:
+                        loop_order = tuple(arg.fields())
+                arg, swizzles = _align(arg, loop_order, bindings, namespace)
+                arg = strip_noop_reorders(arg)
+                return Aggregate(
+                    op, init, Reorder(arg, loop_order), reduce_axes
+                ), swizzles
+
             match node:
                 case Plan(bodies):
                     return Plan(tuple(apply_loop_order(body) for body in bodies))
+                case Query(lhs, rhs) if (
+                    output_aggregate := output_ordered_aggregate(rhs)
+                ) is not None:
+                    op, init, arg, reduce_axes, output_order = output_aggregate
+                    aggregate, swizzles = align_aggregate(op, init, arg, reduce_axes)
+                    return with_swizzles(
+                        Query(lhs, Reorder(aggregate, output_order)), swizzles
+                    )
+                case Query(lhs, Table(_, idxs) as rhs):
+                    return Query(lhs, Reorder(rhs, idxs))
+                case Query(lhs, Reorder(arg, output_order)):
+                    arg, swizzles = _align(arg, output_order, bindings, namespace)
+                    arg = strip_noop_reorders(arg)
+                    return with_swizzles(
+                        Query(lhs, Reorder(arg, output_order)), swizzles
+                    )
+                case Query(lhs, Aggregate(op, init, arg, reduce_axes)):
+                    aggregate, swizzles = align_aggregate(op, init, arg, reduce_axes)
+                    return with_swizzles(Query(lhs, aggregate), swizzles)
                 case Query(lhs, rhs):
-                    output_aggregate = output_ordered_aggregate(rhs)
-                    if output_aggregate is not None:
-                        op, init, arg, reduce_axes, output_order = output_aggregate
-                        match arg:
-                            # This case preserves an existing aggregate loop order
-                            # from Logic Optimizer.
-                            case Reorder(inner, old_loop_order):
-                                arg = inner
-                                loop_order = old_loop_order
-                            case _:
-                                loop_order = self.get_loop_order(
-                                    node, bindings, stats, stats_factory
-                                )
-                        arg, swizzles = _align(arg, loop_order, bindings, namespace)
-                        arg = strip_noop_reorders(arg)
-                        ordered = Query(
-                            lhs,
-                            Reorder(
-                                Aggregate(
-                                    op,
-                                    init,
-                                    Reorder(arg, loop_order),
-                                    reduce_axes,
-                                ),
-                                output_order,
-                            ),
-                        )
-                    else:
-                        match rhs:
-                            case Table(_, idxs):
-                                swizzles = ()
-                                ordered = Query(lhs, Reorder(rhs, idxs))
-                            case Reorder(arg, output_order):
-                                arg, swizzles = _align(
-                                    arg, output_order, bindings, namespace
-                                )
-                                arg = strip_noop_reorders(arg)
-                                ordered = Query(lhs, Reorder(arg, output_order))
-                            # This case preserves an existing aggregate loop order
-                            # from Logic Optimizer.
-                            case Aggregate(
-                                op,
-                                init,
-                                Reorder(inner, old_loop_order),
-                                reduce_axes,
-                            ):
-                                loop_order = old_loop_order
-                                inner, swizzles = _align(
-                                    inner, loop_order, bindings, namespace
-                                )
-                                inner = strip_noop_reorders(inner)
-                                ordered = Query(
-                                    lhs,
-                                    Aggregate(
-                                        op,
-                                        init,
-                                        Reorder(inner, loop_order),
-                                        reduce_axes,
-                                    ),
-                                )
-                            case Reorder(Table(_, _), _old):
-                                swizzles = ()
-                                ordered = node
-                            case _:
-                                loop_order = self.get_loop_order(
-                                    node, bindings, stats, stats_factory
-                                )
-                                rhs, swizzles = _align(
-                                    rhs, loop_order, bindings, namespace
-                                )
-                                rhs = strip_noop_reorders(rhs)
-                                match rhs:
-                                    case Aggregate(
-                                        op,
-                                        init,
-                                        Reorder(inner, _old_loop_order),
-                                        reduce_axes,
-                                    ):
-                                        ordered = Query(
-                                            lhs,
-                                            Aggregate(
-                                                op,
-                                                init,
-                                                Reorder(inner, loop_order),
-                                                reduce_axes,
-                                            ),
-                                        )
-                                    case _:
-                                        ordered = Query(lhs, Reorder(rhs, loop_order))
-                    if swizzles:
-                        return Plan((*swizzles, ordered))
-                    return ordered
+                    loop_order = self.get_loop_order(
+                        node, bindings, stats, stats_factory
+                    )
+                    rhs, swizzles = _align(rhs, loop_order, bindings, namespace)
+                    rhs = strip_noop_reorders(rhs)
+                    match rhs:
+                        case Aggregate(op, init, arg, reduce_axes):
+                            aggregate, swizzles = align_aggregate(
+                                op, init, arg, reduce_axes
+                            )
+                            return with_swizzles(Query(lhs, aggregate), swizzles)
+                        case _:
+                            return with_swizzles(
+                                Query(lhs, Reorder(rhs, loop_order)), swizzles
+                            )
                 case Produces(_):
                     return node
                 case _:
