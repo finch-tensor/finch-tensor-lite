@@ -266,59 +266,6 @@ def standardize_query_roots2(
     return Rewrite(PostWalk(rule))(root)
 
 
-def standardize_query_roots(
-    root: LogicStatement, bindings: dict[Alias, TensorFType]
-) -> LogicStatement:
-    fill_values = root.infer_fill_value(
-        {var: val.fill_value for var, val in bindings.items()}
-    )
-
-    def rule(ex):
-        match ex:
-            case Query(_, Aggregate(_, _, _, _)):
-                return ex
-            case Query(_, Reorder(Aggregate(_, _, _, _), _)):
-                return ex
-            case Query(lhs, Reorder(Table(Alias(), _), _)):
-                return ex
-            case Query(lhs, Table(Alias(), idxs) as arg):
-                return Query(lhs, Reorder(arg, idxs))
-            case Query(
-                lhs,
-                Reorder(
-                    MapJoin(op, (Reorder(Table(lhs_1), idxs_1), Reorder(Table(), _))),
-                    idxs_2,
-                ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2:
-                return ex
-            case Query(
-                lhs,
-                Reorder(
-                    MapJoin(
-                        Literal(op),
-                        (
-                            Table(lhs_1, idxs_1),
-                            Aggregate(Literal(op_1), _, _, _),
-                        ),
-                    ),
-                    idxs_2,
-                ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
-                return ex
-            case Query(lhs, rhs):
-                return Query(
-                    lhs,
-                    Aggregate(
-                        Literal(ffuncs.overwrite),
-                        Literal(rhs.fill_value(fill_values)),
-                        rhs,
-                        (),
-                    ),
-                )
-
-    return Rewrite(PostWalk(rule))(root)
-
-
 def concordize(
     root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> LogicStatement:
