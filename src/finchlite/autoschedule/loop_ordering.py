@@ -145,7 +145,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
 
             return Rewrite(PostWalk(rule))(ex)
 
-        def apply_loop_order(node: LogicStatement) -> LogicStatement:
+        def set_loop_order(node: LogicStatement) -> LogicStatement:
             def with_swizzles(
                 ordered: Query, swizzles: tuple[Query, ...]
             ) -> LogicStatement:
@@ -175,7 +175,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
 
             match node:
                 case Plan(bodies):
-                    return Plan(tuple(apply_loop_order(body) for body in bodies))
+                    return Plan(tuple(set_loop_order(body) for body in bodies))
                 case Query(lhs, rhs) if (
                     output_aggregate := output_ordered_aggregate(rhs)
                 ) is not None:
@@ -218,7 +218,7 @@ class LoopOrderer(SingleAggregateForm, LogicLoader):
                         f"Unsupported logic statement for loop ordering: {node}"
                     )
 
-        prgm = apply_loop_order(prgm)
+        prgm = set_loop_order(prgm)
         prgm = flatten_plans(prgm)
         # for mypy test, make sure prgm is a Plan
         if not isinstance(prgm, Plan):
