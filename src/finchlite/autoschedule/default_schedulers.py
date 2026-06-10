@@ -16,21 +16,21 @@ from .compiler import LogicCompiler
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter
 from .galley_optimize import GalleyLogicalOptimizer
+from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer
-from .standardize import LogicStandardizer
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(DefaultLogicFormatter(MockLogicLoader()))
+            DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader()))
         )
     )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
+            DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
         )
@@ -39,7 +39,7 @@ INTERPRET_NOTATION = LogicNormalizer(
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
+            DefaultLoopOrderer(
                 DefaultLogicFormatter(
                     LogicCompiler(NotationCompiler(AssemblyInterpreter()))
                 )
@@ -50,7 +50,7 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
         DefaultLogicOptimizer(
-            LogicStandardizer(
+            DefaultLoopOrderer(
                 DefaultLogicFormatter(
                     LogicCompiler(
                         NotationCompiler(
@@ -66,7 +66,7 @@ COMPILE_NUMBA = LogicNormalizer(
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicalOptimizer(
-            LogicStandardizer(
+            DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
         )
