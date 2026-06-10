@@ -22,15 +22,11 @@ branch names, e.g. ms/scheduler-pass. This way in bash when you type your initia
 git checkout ms/ and <tab> you can see all your branches. We will use other names
 for special purposes.
 
-### Packaging
+### Developer Interface
 
-Finch uses [poetry](https://python-poetry.org/) for packaging.
+Finch uses [Pixi](https://pixi.prefix.dev) for development.
 
-To install for development, clone the repository and run:
-```bash
-poetry install --extras test
-```
-to install the current project and dev dependencies.
+See below for how to perform development tasks via `pixi run`, which will install Finch and its development dependencies as needed.
 
 ### Publishing
 
@@ -69,11 +65,11 @@ to run these checks.
 
 To install pre-commit hooks to run before committing, run:
 ```bash
-poetry run pre-commit install
+pixi run pre-commit-install
 ```
 If you prefer to instead run pre-commit hooks manually, run:
 ```bash
-poetry run pre-commit run -a
+pixi run pre-commit
 ```
 
 ### Testing
@@ -82,7 +78,9 @@ Finch uses [pytest](https://docs.pytest.org/en/latest/) for testing. To run the
 tests:
 
 ```bash
-poetry run pytest
+pixi run test
+# or to test with the mininum supported Python version:
+pixi run --environment=mindeps test
 ```
 
 - Tests are located in the `tests/` directory at the project root.
@@ -94,7 +92,7 @@ The pytest will run mypy to check for type errors, so you shouldn't need to run 
 In case you do need to run mypy manually, you can do so with:
 
 ```bash
-poetry run mypy ./src/
+pixi run type-check
 ```
 
 #### Regression Tests
