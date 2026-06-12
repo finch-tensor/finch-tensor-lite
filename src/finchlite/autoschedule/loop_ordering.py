@@ -26,6 +26,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite, gensym
 
+from .optimize import propagate_copy_queries, with_unique_lhs
 from .stages import LogicLoopOrderOptimizer
 from .standardize import concordize, flatten_plans, push_fields
 
@@ -198,10 +199,15 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
-        prgm = set_loop_order(prgm)
-        prgm = push_fields(prgm)
-        prgm = concordize(prgm, bindings)
-        prgm = flatten_plans(prgm)
-        prgm = add_aggregates(prgm, bindings)
-        prgm = flatten_plans(prgm)
+        def loop_order_transform(prgm, bindings):
+            prgm = set_loop_order(prgm)
+            prgm = push_fields(prgm)
+            prgm = concordize(prgm, bindings)
+            prgm = propagate_copy_queries(prgm)
+            prgm = flatten_plans(prgm)
+            prgm = add_aggregates(prgm, bindings)
+            prgm = flatten_plans(prgm)
+            return prgm, bindings
+
+        prgm, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)

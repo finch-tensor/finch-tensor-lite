@@ -8,6 +8,7 @@ from finchlite.algebra.ftypes import ftype
 from finchlite.autoschedule import (
     normalize_names,
 )
+from finchlite.autoschedule.loop_ordering import set_loop_order
 from finchlite.autoschedule.optimize import (
     lift_fields,
     optimize,
@@ -15,7 +16,6 @@ from finchlite.autoschedule.optimize import (
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
-    set_loop_order,
 )
 from finchlite.autoschedule.standardize import (
     concordize,
