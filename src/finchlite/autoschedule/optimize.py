@@ -1,11 +1,7 @@
-from functools import reduce
-from itertools import chain as join_chains
-from typing import overload
-
 from finchlite.algebra import ffuncs
 from finchlite.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finchlite.algebra.tensor import TensorFType
-from finchlite.algebra.utils import intersect, setdiff
+from finchlite.algebra.utils import setdiff
 from finchlite.autoschedule.stages import LogicFusionOptimizer
 from finchlite.finch_logic import (
     Aggregate,
@@ -32,11 +28,10 @@ from finchlite.symbolic import (
     PostWalk,
     PreWalk,
     Rewrite,
-    gensym,
 )
 
+from .loop_ordering import set_loop_order
 from .standardize import (
-    concordize,
     flatten_plans,
     isolate_aggregates,
     push_fields,
@@ -162,12 +157,6 @@ def optimize(
 
         prgm = propagate_transpose_queries(prgm)
         prgm = push_fields(prgm)
-        prgm = set_loop_order(prgm)
-        prgm = push_fields(prgm)
-
-        prgm = concordize(prgm, bindings)
-        prgm = propagate_copy_queries(prgm)
-        prgm = add_aggregates(prgm, bindings)
         return prgm, bindings
 
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
@@ -359,110 +348,6 @@ def propagate_transpose_queries(root: LogicStatement):
     root = Rewrite(PostWalk(rule_1))(root)
 
     return flatten_plans(push_fields(root))
-
-
-class CycleInFields(Exception): ...
-
-
-def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
-    chains = [c for c in chains if len(c) > 0]
-    parents = {chain[0]: 0 for chain in chains}
-    for chain in chains:
-        for f in chain[1:]:
-            parents[f] = parents.get(f, 0) + 1
-    roots = [f for f in parents if parents[f] == 0]
-    perm = []
-    while len(parents) > 0:
-        if len(roots) == 0:
-            raise CycleInFields("Cycle detected in fields' orders")
-        perm.append(roots.pop())
-        for chain in chains:
-            if len(chain) > 0 and chain[0] == perm[-1]:
-                chain.pop(0)
-                if len(chain) > 0:
-                    parents[chain[0]] -= 1
-                    if parents[chain[0]] == 0:
-                        roots.append(chain[0])
-        parents.pop(perm[-1])
-    return tuple(perm)
-
-
-def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
-    chains = []
-    for node in PostOrderDFS(root):
-        match node:
-            case Reorder(Table(_, idxs_1), idxs_2):
-                chains.append(list(intersect(intersect(idxs_1, idxs_2), root.fields())))
-    chains.extend([f] for f in root.fields())
-
-    need_fix = False
-    try:
-        result = toposort(chains)
-    except CycleInFields:
-        import warnings
-
-        warnings.warn("Cycle in fields detected, need to permute.", stacklevel=1)
-        need_fix = True
-        result = root.fields()
-
-    if need_fix or reduce(max, [len(c) for c in chains], 0) < len(
-        set(join_chains(*chains))
-    ):
-        counts: dict[Field, int] = {}
-        for chain in chains:
-            for f in chain:
-                counts[f] = counts.get(f, 0) + 1
-        result = tuple(sorted(result, key=lambda x: counts[x] == 1))
-    return result
-
-
-@overload
-def _set_loop_order(
-    node: LogicStatement, perms: dict[LogicNode, LogicExpression]
-) -> LogicStatement: ...
-@overload
-def _set_loop_order(
-    node: LogicNode, perms: dict[LogicNode, LogicExpression]
-) -> LogicNode: ...
-def _set_loop_order(node, perms):
-    def rule_0(node):
-        match node:
-            case Table(Alias(_) as tns, idxs) if tns in perms:
-                return Relabel(perms[tns], idxs)
-        return None
-
-    match node:
-        case Plan(bodies):
-            return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
-        case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(arg, LogicExpression)
-            idxs_2 = _heuristic_loop_order(arg)
-            rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-            perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
-            return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Table(Alias(_) as tns, _), idxs)) as q:
-            tns = perms.get(tns, tns)
-            perms[lhs] = Table(lhs, idxs)
-            return q
-        case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(rhs, LogicExpression)
-            idxs = _heuristic_loop_order(rhs)
-            perms[lhs] = Reorder(Table(lhs, idxs), tuple(rhs.fields()))
-            rhs_2 = Reorder(rhs, idxs)
-            return Query(lhs, rhs_2)
-        case Produces(args):
-            renames = {a: Alias(gensym("A")) for a in args if a in perms}
-            bodies = tuple([Query(v, perms[k]) for k, v in renames.items()])
-            args_2 = tuple([renames.get(a, a) for a in args])
-            return Plan(bodies + (Produces(args_2),))
-        case _:
-            raise Exception(f"Invalid node: {node} in set_loop_order")
-
-
-def set_loop_order(node: LogicNode) -> LogicNode:
-    return _set_loop_order(node, {})
 
 
 class DefaultLogicOptimizer(LogicFusionOptimizer):

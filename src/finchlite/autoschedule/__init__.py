@@ -29,6 +29,7 @@ from .default_schedulers import (
 )
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
+from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
@@ -43,6 +44,7 @@ __all__ = [
     "Aggregate",
     "Alias",
     "DefaultLogicFormatter",
+    "DefaultLoopOrderer",
     "DefaultLogicOptimizer",
     "Field",
     "Literal",
