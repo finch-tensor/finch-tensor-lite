@@ -66,6 +66,7 @@ def add_aggregates(
 
     return Rewrite(PostWalk(rule_0))(root)
 
+
 class CycleInFields(Exception): ...
 
 

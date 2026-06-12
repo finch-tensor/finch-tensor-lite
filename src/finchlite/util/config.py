@@ -1,7 +1,6 @@
 import os
 import shutil
 import sys
-import sysconfig
 from importlib.metadata import version
 from pathlib import Path
 
@@ -29,7 +28,7 @@ is_windows = os.name == "nt"
 is_apple = sys.platform == "darwin"
 
 default = {
-    #"data_path": str(Path(sysconfig.get_path("data")) / "finchlite"),
+    # "data_path": str(Path(sysconfig.get_path("data")) / "finchlite"),
     "data_path": str(Path.home() / ".finchlite"),
     "cache_size": 10_000,
     "cache_enable": True,

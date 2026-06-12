@@ -30,7 +30,6 @@ from finchlite.symbolic import (
     Rewrite,
 )
 
-from .loop_ordering import set_loop_order
 from .standardize import (
     flatten_plans,
     isolate_aggregates,
