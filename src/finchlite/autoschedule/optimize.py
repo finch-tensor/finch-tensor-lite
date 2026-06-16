@@ -361,4 +361,5 @@ class DefaultLogicOptimizer(LogicFusionOptimizer):
         stats_factory: StatsFactory,
     ):
         prgm, bindings = optimize(prgm, bindings)
+        prgm = add_aggregates(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)

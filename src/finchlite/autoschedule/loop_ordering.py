@@ -182,19 +182,6 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             ctx = MockLogicLoader()
         self.ctx = ctx
 
-    @classmethod
-    def validate_inputs(
-        cls,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> None:
-        # TODO: figure out a way to validate the inputs AFTER running lower
-        # as current shape after LoopOrdering is not correct shape expected by
-        # the validator
-        return
-
     def lower(
         self,
         prgm: LogicStatement,
@@ -207,7 +194,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = propagate_copy_queries(prgm)
-            prgm = flatten_plans(prgm)
+            # TODO: regression tests fail unless add_aggregates is called here
             prgm = add_aggregates(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
