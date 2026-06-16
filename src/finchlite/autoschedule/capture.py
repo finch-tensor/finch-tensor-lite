@@ -17,9 +17,9 @@ class LogicCapture(UnvalidatedForm, LogicLoader):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx = ctx
-        self.last_prgm: LogicStatement 
-        self.last_bindings: dict[Alias, TensorFType] 
-        self.last_stats: dict[Alias, TensorStats] 
+        self.last_prgm: LogicStatement
+        self.last_bindings: dict[Alias, TensorFType]
+        self.last_stats: dict[Alias, TensorStats]
 
     def lower(
         self,
