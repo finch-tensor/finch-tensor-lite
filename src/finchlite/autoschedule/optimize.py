@@ -40,6 +40,7 @@ from .standardize import (
     flatten_plans,
     isolate_aggregates,
     push_fields,
+    wrap_bare_table_queries,
 )
 
 
@@ -162,8 +163,8 @@ def optimize(
 
         prgm = propagate_transpose_queries(prgm)
         prgm = push_fields(prgm)
-        prgm = set_loop_order(prgm)
-        prgm = push_fields(prgm)
+        # prgm = set_loop_order(prgm)
+        # prgm = push_fields(prgm)
 
         prgm = concordize(prgm, bindings)
         prgm = propagate_copy_queries(prgm)
@@ -361,6 +362,7 @@ def propagate_transpose_queries(root: LogicStatement):
     return flatten_plans(push_fields(root))
 
 
+# Everything down here moved to loop_ordering.py
 class CycleInFields(Exception): ...
 
 
@@ -416,53 +418,151 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
-@overload
-def _set_loop_order(
-    node: LogicStatement, perms: dict[LogicNode, LogicExpression]
-) -> LogicStatement: ...
-@overload
-def _set_loop_order(
-    node: LogicNode, perms: dict[LogicNode, LogicExpression]
-) -> LogicNode: ...
-def _set_loop_order(node, perms):
-    def rule_0(node):
+def _align(
+    ex: LogicExpression,
+    loop_order: tuple[Field, ...],
+    bindings: dict[Alias, TensorFType],
+    namespace: Namespace,
+) -> tuple[LogicExpression, tuple[Query, ...]]:
+    """Align each ``Table`` / ``Reorder(Table, ...)`` to ``loop_order``."""
+    needed_swizzles: dict[
+        tuple[Alias, tuple[Field, ...], tuple[Field, ...]], Alias
+    ] = {}
+
+    def rule(node: LogicNode) -> LogicNode | None:
         match node:
-            case Table(Alias(_) as tns, idxs) if tns in perms:
-                return Relabel(perms[tns], idxs)
-        return None
+            case Reorder(Table(Alias() as var, physical), logical):
+                is_reorder = True
+            case Table(Alias() as var, physical):
+                logical = physical
+                is_reorder = False
+            case _:
+                return None
+
+        field_set = set(logical)
+        desired = tuple(f for f in loop_order if f in field_set)
+        if desired == logical:
+            if is_reorder and physical == logical:
+                return Table(var, physical)
+            if is_reorder:
+                key = (var, physical, desired)
+                if key not in needed_swizzles:
+                    needed_swizzles[key] = Alias(namespace.freshen(var.name))
+                return Table(needed_swizzles[key], desired)
+            return None
+        if len(desired) != len(physical) or set(desired) != set(physical):
+            return None
+
+        key = (var, physical, desired)
+        if key not in needed_swizzles:
+            needed_swizzles[key] = Alias(namespace.freshen(var.name))
+        return Table(needed_swizzles[key], desired)
+
+    new_ex = Rewrite(PostWalk(rule))(ex)
+    queries = tuple(
+        Query(alias, Reorder(Table(var, physical), desired))
+        for (var, physical, desired), alias in needed_swizzles.items()
+    )
+    return new_ex, queries
+
+def output_ordered_aggregate(rhs: LogicExpression):
+    # Unwrap Reorder(...)/Aggregate(...) to find an output-ordered aggregate.
+    output_order = None
+    while True:
+        match rhs:
+            case Reorder(arg, order):
+                output_order = order
+                rhs = arg
+            case Aggregate(op, init, arg, reduce_axes) if (
+                output_order is not None
+            ):
+                return op, init, arg, reduce_axes, output_order
+            case _:
+                return None
+
+def strip_noop_reorders(ex: LogicExpression) -> LogicExpression:
+# Drop Reorder nodes whose order already matches the arg's fields.
+    def rule(node: LogicNode) -> LogicNode | None:
+        match node:
+            case Reorder(arg, order) if arg.fields() == order:
+                return arg
+            case _:
+                return None
+
+    return Rewrite(PostWalk(rule))(ex)
+
+def set_loop_order(node: LogicStatement) -> LogicStatement:
+    def with_swizzles(
+        ordered: Query, swizzles: tuple[Query, ...]
+    ) -> LogicStatement:
+        if swizzles:
+            return Plan((*swizzles, ordered))
+        return ordered
+
+    def align_aggregate(
+        op: Literal,
+        init: Literal,
+        arg: LogicExpression,
+        reduce_axes: tuple[Field, ...],
+    ) -> tuple[Aggregate, tuple[Query, ...]]:
+        # This case preserves an existing aggregate loop order
+        # from Logic Optimizer.
+        match arg:
+            case Reorder(inner, old_loop_order):
+                arg = inner
+                loop_order = old_loop_order
+            case _:
+                loop_order = tuple(arg.fields())
+        arg, swizzles = _align(arg, loop_order, bindings, namespace)
+        arg = strip_noop_reorders(arg)
+        return Aggregate(
+            op, init, Reorder(arg, loop_order), reduce_axes
+        ), swizzles
 
     match node:
         case Plan(bodies):
-            return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
-        case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(arg, LogicExpression)
-            idxs_2 = _heuristic_loop_order(arg)
-            rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-            perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
-            return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Table(Alias(_) as tns, _), idxs)) as q:
-            tns = perms.get(tns, tns)
-            perms[lhs] = Table(lhs, idxs)
-            return q
-        case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(rhs, LogicExpression)
-            idxs = _heuristic_loop_order(rhs)
-            perms[lhs] = Reorder(Table(lhs, idxs), tuple(rhs.fields()))
-            rhs_2 = Reorder(rhs, idxs)
-            return Query(lhs, rhs_2)
-        case Produces(args):
-            renames = {a: Alias(gensym("A")) for a in args if a in perms}
-            bodies = tuple([Query(v, perms[k]) for k, v in renames.items()])
-            args_2 = tuple([renames.get(a, a) for a in args])
-            return Plan(bodies + (Produces(args_2),))
+            return Plan(tuple(set_loop_order(body) for body in bodies))
+        case Query(lhs, rhs) if (
+            output_aggregate := output_ordered_aggregate(rhs)
+        ) is not None:
+            op, init, arg, reduce_axes, output_order = output_aggregate
+            aggregate, swizzles = align_aggregate(op, init, arg, reduce_axes)
+            return with_swizzles(
+                Query(lhs, Reorder(aggregate, output_order)), swizzles
+            )
+        case Query(lhs, Table(_, idxs) as rhs):
+            return Query(lhs, Reorder(rhs, idxs))
+        case Query(lhs, Reorder(arg, output_order)):
+            arg, swizzles = _align(arg, output_order, bindings, namespace)
+            arg = strip_noop_reorders(arg)
+            return with_swizzles(
+                Query(lhs, Reorder(arg, output_order)), swizzles
+            )
+        case Query(lhs, Aggregate(op, init, arg, reduce_axes)):
+            aggregate, swizzles = align_aggregate(op, init, arg, reduce_axes)
+            return with_swizzles(Query(lhs, aggregate), swizzles)
+        case Query(lhs, rhs):
+            loop_order = self.get_loop_order(
+                node, bindings, stats, stats_factory
+            )
+            rhs, swizzles = _align(rhs, loop_order, bindings, namespace)
+            rhs = strip_noop_reorders(rhs)
+            match rhs:
+                case Aggregate(op, init, arg, reduce_axes):
+                    aggregate, swizzles = align_aggregate(
+                        op, init, arg, reduce_axes
+                    )
+                    return with_swizzles(Query(lhs, aggregate), swizzles)
+                case _:
+                    return with_swizzles(
+                        Query(lhs, Reorder(rhs, loop_order)), swizzles
+                    )
+        case Produces(_):
+            return node
         case _:
-            raise Exception(f"Invalid node: {node} in set_loop_order")
-
-
-def set_loop_order(node: LogicNode) -> LogicNode:
-    return _set_loop_order(node, {})
+            raise ValueError(
+                f"Unsupported logic statement for loop ordering: {node}"
+            )
 
 
 class DefaultLogicOptimizer(LogicFusionOptimizer):
@@ -477,4 +577,5 @@ class DefaultLogicOptimizer(LogicFusionOptimizer):
         stats_factory: StatsFactory,
     ):
         prgm, bindings = optimize(prgm, bindings)
+        prgm = wrap_bare_table_queries(prgm)
         return self.ctx(prgm, bindings, stats, stats_factory)
