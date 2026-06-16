@@ -190,6 +190,9 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> None:
+        # TODO: figure out a way to validate the inputs AFTER running lower
+        # as current shape after LoopOrdering is not correct shape expected by
+        # the validator
         return
 
     def lower(

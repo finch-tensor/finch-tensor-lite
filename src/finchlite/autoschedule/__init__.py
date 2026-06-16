@@ -15,6 +15,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk
 
+from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_NUMBA,
@@ -48,6 +49,7 @@ __all__ = [
     "DefaultLoopOrderer",
     "Field",
     "Literal",
+    "LogicCapture",
     "LogicCompiler",
     "LogicEinsumLowerer",
     "LogicExecutor",
