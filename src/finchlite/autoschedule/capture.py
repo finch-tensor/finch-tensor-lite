@@ -13,13 +13,14 @@ from finchlite.symbolic import UnvalidatedForm
 
 
 class LogicCapture(UnvalidatedForm, LogicLoader):
-    def __init__(self, ctx: LogicLoader):
+    def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx = ctx
         self.last_prgm: LogicStatement
         self.last_bindings: dict[Alias, TensorFType]
         self.last_stats: dict[Alias, TensorStats]
+        self.last_stats_factory: StatsFactory
 
     def lower(
         self,
