@@ -1,3 +1,4 @@
+import logging
 from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
@@ -23,10 +24,13 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite, gensym
+from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 from .optimize import propagate_copy_queries, with_unique_lhs
 from .stages import LogicLoopOrderOptimizer
 from .standardize import concordize, flatten_plans, push_fields
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
 class CycleInFields(Exception): ...
@@ -67,9 +71,7 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     try:
         result = toposort(chains)
     except CycleInFields:
-        import warnings
-
-        warnings.warn("Cycle in fields detected, need to permute.", stacklevel=1)
+        logger.warning("Cycle in fields detected, need to permute.")
         need_fix = True
         result = root.fields()
 
@@ -109,8 +111,7 @@ def _set_loop_order(node, perms):
             rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
             perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
             return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Table(Alias(_) as tns, _), idxs)) as q:
-            tns = perms.get(tns, tns)
+        case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
             perms[lhs] = Reorder(Table(lhs, idxs), idxs)
             return q
         case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
