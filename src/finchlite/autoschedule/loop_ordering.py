@@ -2,14 +2,12 @@ from functools import reduce
 from itertools import chain as join_chains
 from typing import overload
 
-from finchlite.algebra import ffuncs
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Literal,
     LogicExpression,
     LogicLoader,
     LogicNode,
@@ -29,43 +27,6 @@ from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite, gensym
 from .optimize import propagate_copy_queries, with_unique_lhs
 from .stages import LogicLoopOrderOptimizer
 from .standardize import concordize, flatten_plans, push_fields
-
-
-def add_aggregates(
-    root: LogicStatement, bindings: dict[Alias, TensorFType]
-) -> LogicStatement:
-    fill_values = root.infer_fill_value(
-        {var: val.fill_value for var, val in bindings.items()}
-    )
-
-    def rule_0(node):
-        match node:
-            case Query(lhs, Reorder(Aggregate(_, _, arg, idxs), _)):
-                return node
-            case Query(lhs, Reorder(arg, idxs)):
-                return Query(
-                    lhs,
-                    Reorder(
-                        Aggregate(
-                            Literal(ffuncs.overwrite),
-                            Literal(fill_values[lhs]),
-                            arg,
-                            (),
-                        ),
-                        idxs,
-                    ),
-                )
-            case Query(lhs, Aggregate(_, _, arg, idxs)):
-                return node
-            case Query(lhs, arg):
-                return Query(
-                    lhs,
-                    Aggregate(
-                        Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, ()
-                    ),
-                )
-
-    return Rewrite(PostWalk(rule_0))(root)
 
 
 class CycleInFields(Exception): ...
@@ -150,7 +111,7 @@ def _set_loop_order(node, perms):
             return Query(lhs, rhs_2)
         case Query(lhs, Reorder(Table(Alias(_) as tns, _), idxs)) as q:
             tns = perms.get(tns, tns)
-            perms[lhs] = Table(lhs, idxs)
+            perms[lhs] = Reorder(Table(lhs, idxs), idxs)
             return q
         case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
             rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
@@ -194,8 +155,6 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = propagate_copy_queries(prgm)
-            # TODO: regression tests fail unless add_aggregates is called here
-            prgm = add_aggregates(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 

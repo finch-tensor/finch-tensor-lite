@@ -88,7 +88,7 @@ def with_unique_lhs(
                     idxs = tuple(
                         Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
                     )
-                    bodies.append(Query(k, Table(v_post, idxs)))
+                    bodies.append(Query(k, Reorder(Table(v_post, idxs), idxs)))
 
                 v_post_to_k = dict(zip(v_post_list, writes.keys(), strict=True))
                 args_2 = tuple(
@@ -156,6 +156,7 @@ def optimize(
 
         prgm = propagate_transpose_queries(prgm)
         prgm = push_fields(prgm)
+        prgm = add_aggregates(prgm, bindings)
         return prgm, bindings
 
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
@@ -361,5 +362,4 @@ class DefaultLogicOptimizer(LogicFusionOptimizer):
         stats_factory: StatsFactory,
     ):
         prgm, bindings = optimize(prgm, bindings)
-        prgm = add_aggregates(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)
