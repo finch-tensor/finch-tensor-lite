@@ -760,7 +760,7 @@ class AnnotatedQuery:
         """
         Build a final `Query` from the remaining pointwise expression in `aq`.
 
-        Always returns a `Query` binding ``self.output_name``. 
+        Always returns a `Query` binding ``self.output_name``.
         """
         expr = self.point_expr
         output_order = tuple(self.output_order or expr.fields())

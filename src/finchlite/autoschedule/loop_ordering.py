@@ -1,7 +1,6 @@
 import logging
 from functools import reduce
 from itertools import chain as join_chains
-from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect
@@ -17,14 +16,13 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
-    Relabel,
     Reorder,
     StatsFactory,
     Table,
     TensorStats,
 )
 from finchlite.finch_logic.nodes import MapJoin
-from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite, gensym
+from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 from .optimize import propagate_copy_queries, with_unique_lhs
@@ -179,14 +177,12 @@ def set_loop_order(plan: Plan) -> Plan:
 
         def rule_1(query):
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                case Query(lhs, Aggregate(op, init, arg, idxs)):
                     assert isinstance(arg, LogicExpression)
                     idxs_2 = _heuristic_loop_order(arg)
                     rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
                     return Query(lhs, rhs_2)
-                case Query(
-                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
-                ):
+                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
                     idxs_2 = _heuristic_loop_order(arg)
                     rhs_2 = Reorder(
                         Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
@@ -199,6 +195,7 @@ def set_loop_order(plan: Plan) -> Plan:
 
         new_queries.append(rule_1(query))
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
+
 
 class DefaultLoopOrderer(LogicLoopOrderOptimizer):
     def __init__(self, ctx: LogicLoader | None = None):
