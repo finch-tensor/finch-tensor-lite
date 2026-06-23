@@ -8,32 +8,69 @@ from collections import namedtuple
 from collections.abc import Hashable
 from functools import lru_cache
 from pathlib import Path
-from types import NoneType
 from typing import Any, TypedDict
 
 import numpy as np
 
-from finchlite.algebra import ffunc
-from finchlite.algebra.algebra import FinchOperator
-
-from .. import finch_assembly as asm
-from ..algebra import COperator, query_property, register_property
-from ..finch_assembly import (
-    AssemblyStructFType,
-    BufferFType,
-    DictFType,
+from finchlite import algebra
+from finchlite import finch_assembly as asm
+from finchlite.algebra import (
+    FType,
     ImmutableStructFType,
     MutableStructFType,
+    NamedTupleFType,
+    StructFType,
     TupleFType,
+    ffuncs,
+    fisinstance,
+    ftype,
 )
-from ..symbolic import Context, FType, Namespace, ScopedDict, fisinstance, ftype
-from ..util import config, file_cache
-from ..util.logging import LOG_BACKEND_C
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.finch_assembly import BufferFType, DictFType
+from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
+from finchlite.util import config, file_cache
+from finchlite.util.logging import LOG_BACKEND_C
+
 from .stages import CCode, CLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)
 
-common_h = Path(__file__).parent / "stc" / "include" / "stc" / "common.h"
+
+class COperator(ABC):
+    """Abstract base class for C language operators."""
+
+    @property
+    @abstractmethod
+    def c_symbol(self) -> str:
+        """Returns the C symbol for this operator (e.g., '+', '-', '*')."""
+
+    @abstractmethod
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        """Generates the C function call for this operator."""
+
+
+class CNAryOperator(COperator):
+    """Base class for n-ary C operators (operators that take multiple arguments)."""
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        return c_nary_function_call(self.c_symbol, ctx, *args)
+
+
+class CBinaryOperator(COperator):
+    """Base class for binary C operators (operators that take exactly two arguments)."""
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        return c_binary_function_call(self.c_symbol, ctx, *args)
+
+
+class CUnaryOperator(COperator):
+    """Base class for unary C operators (operators that take exactly one argument)."""
+
+    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+        return c_unary_function_call(self.c_symbol, ctx, *args)
+
+
+common_h = Path(__file__).parents[1] / "stc" / "include" / "stc" / "common.h"
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -104,223 +141,6 @@ def load_shared_lib(c_code, cc=None, cflags=None):
     return ctypes.CDLL(str(shared_lib_path))
 
 
-def c_hash(fmt, ctx: "CContext"):
-    """
-    Expand to the name of a macro that c hash can use for hashing fmt.
-
-    Args:
-        ctx: CContext object
-        var_n: name to be supplied. It is a placeholder for a variable with
-        type fmt* (so indirection)
-    """
-    if hasattr(fmt, "c_hash"):
-        return fmt.c_hash(ctx)
-    return query_property(fmt, "c_hash", "__attr__", ctx)
-
-
-def c_hash_default(fmt, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_hash"
-
-
-def c_eq(fmt, ctx: "CContext"):
-    """
-    Expand to the name of a macro that c eq can use for checking equivalence of fmt.
-
-    Args:
-        ctx: CContext object
-        var_n: name to be supplied. It is a placeholder for a variable with
-        type fmt* (so indirection)
-    """
-    if hasattr(fmt, "c_eq"):
-        return fmt.c_eq(ctx)
-    return query_property(fmt, "c_eq", "__attr__", ctx)
-
-
-def c_eq_default(fmt, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_eq"
-
-
-def serialize_to_c(fmt, obj):
-    """
-    Serialize an object to a C-compatible ftype.
-
-    Args:
-        fmt: FType of obj
-        obj: The object to serialize.
-
-    Returns:
-        A ctypes-compatible struct.
-    """
-    if hasattr(fmt, "serialize_to_c"):
-        return fmt.serialize_to_c(obj)
-    return query_property(fmt, "serialize_to_c", "__attr__", obj)
-
-
-def deserialize_from_c(fmt, obj, c_obj):
-    """
-    Deserialize a C-compatible object back to the original ftype.
-
-    Args:
-        fmt: FType of obj
-        obj: The original object to update.
-        c_obj: The C-compatible object to deserialize from.
-
-    Returns:
-        None
-    """
-    if hasattr(fmt, "deserialize_from_c"):
-        fmt.deserialize_from_c(obj, c_obj)
-    else:
-        try:
-            query_property(fmt, "deserialize_from_c", "__attr__", obj, c_obj)
-        except AttributeError:
-            return
-
-
-def construct_from_c(fmt, c_obj):
-    """
-    Construct an object from a C-compatible ftype.
-
-    Args:
-        fmt: The ftype of the object.
-        c_obj: The C-compatible object to construct from.
-
-    Returns:
-        An instance of the original object type.
-    """
-    if hasattr(fmt, "construct_from_c"):
-        return fmt.construct_from_c(c_obj)
-    try:
-        return query_property(fmt, "construct_from_c", "__attr__", c_obj)
-    except AttributeError:
-        return fmt(c_obj)
-
-
-register_property(
-    tuple,
-    "serialize_to_c",
-    "__attr__",
-    lambda c_obj: None,
-)
-
-
-register_property(
-    NoneType,
-    "construct_from_c",
-    "__attr__",
-    lambda c_obj: None,
-)
-
-for t in (
-    ctypes.c_bool,
-    ctypes.c_char,
-    ctypes.c_wchar,
-    ctypes.c_byte,
-    ctypes.c_ubyte,
-    ctypes.c_short,
-    ctypes.c_ushort,
-    ctypes.c_int,
-    ctypes.c_int8,
-    ctypes.c_int16,
-    ctypes.c_int32,
-    ctypes.c_int64,
-    ctypes.c_uint,
-    ctypes.c_uint8,
-    ctypes.c_uint16,
-    ctypes.c_uint32,
-    ctypes.c_uint64,
-    ctypes.c_long,
-    ctypes.c_ulong,
-    ctypes.c_longlong,
-    ctypes.c_ulonglong,
-    ctypes.c_size_t,
-    ctypes.c_ssize_t,
-    ctypes.c_float,
-    ctypes.c_double,
-    ctypes.c_wchar_p,
-):
-    register_property(
-        t,
-        "serialize_to_c",
-        "__attr__",
-        lambda fmt, c_obj: fmt(c_obj.value),
-    )
-    register_property(
-        t,
-        "c_hash",
-        "__attr__",
-        c_hash_default,
-    )
-    register_property(
-        t,
-        "c_eq",
-        "__attr__",
-        c_eq_default,
-    )
-    # ctypes here should be considered pass by value, so no op this.
-    register_property(
-        t,
-        "deserialize_from_c",
-        "__attr__",
-        lambda fmt, obj, c_value: None,
-    )
-    # construction from c is just the identity.
-    register_property(t, "construct_from_c", "__attr__", lambda fmt, c_value: c_value)
-    register_property(t, "numba_type", "__attr__", lambda t: t)
-
-
-register_property(
-    np.generic,
-    "serialize_to_c",
-    "__attr__",
-    lambda fmt, obj: np.ctypeslib.as_ctypes(np.array(obj)),
-)
-
-register_property(
-    np.generic,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
-
-register_property(
-    np.generic,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
-
-# pass by value -> no op
-register_property(
-    np.generic,
-    "deserialize_from_c",
-    "__attr__",
-    lambda fmt, obj, c_value: None,
-)
-
-register_property(
-    np.generic, "construct_from_c", "__attr__", lambda fmt, c_value: fmt(c_value.value)
-)
-
-# deserialize_to_c should modify in place. TODO: implement
-
-for typ in (int, float):
-    register_property(
-        typ,
-        "c_hash",
-        "__attr__",
-        c_hash_default,
-    )
-    register_property(
-        typ,
-        "c_eq",
-        "__attr__",
-        c_eq_default,
-    )
-
-
 class CKernel(asm.AssemblyKernel):
     """
     A class to represent a C kernel.
@@ -350,7 +170,7 @@ class CKernel(asm.AssemblyKernel):
             self.argtypes, args, serial_args, strict=False
         ):
             deserialize_from_c(type_, arg, serial_arg)
-        if self.ret_type is type(None):
+        if self.ret_type is algebra.none_:
             return None
         return construct_from_c(self.ret_type, res)
 
@@ -373,7 +193,7 @@ class CLibrary(asm.AssemblyLibrary):
         )
 
 
-class CCompiler(asm.AssemblyLoader):
+class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
     """
     A class to compile and run FinchAssembly.
     """
@@ -392,7 +212,7 @@ class CCompiler(asm.AssemblyLoader):
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
-    def __call__(self, prgm: asm.Module) -> CLibrary:
+    def lower(self, prgm: asm.Module) -> CLibrary:
         c_code = self.ctx(prgm).code
         logger.debug(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
@@ -410,7 +230,7 @@ class CCompiler(asm.AssemblyLoader):
             match func:
                 case asm.Function(asm.Variable(func_name, return_t), args, _):
                     # return_t = c_type(return_t)
-                    arg_ts = [arg.result_format for arg in args]
+                    arg_ts = [arg.result_type for arg in args]
                     kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
                     kernels[func_name] = kern
                 case _:
@@ -433,12 +253,70 @@ def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
         The C function name as a string.
 
     Raises:
-        NotImplementedError: If the C function name is not implemented for the
-        given function and types.
+        TypeError: If the C function name is not implemented for the given function.
     """
-    if isinstance(op, COperator):
-        return op.c_symbol
-    raise TypeError(f"{op} has no C representation.")
+    match op:
+        case ffuncs.add:
+            return "+"
+        case ffuncs.mul:
+            return "*"
+        case ffuncs.sub:
+            return "-"
+        case ffuncs.truediv | ffuncs.floordiv:
+            return "/"
+        case ffuncs.mod:
+            return "%"
+        case ffuncs.lshift:
+            return "<<"
+        case ffuncs.rshift:
+            return ">>"
+        case ffuncs.and_:
+            return "&"
+        case ffuncs.xor:
+            return "^"
+        case ffuncs.or_:
+            return "|"
+        case ffuncs.not_:
+            return "!"
+        case ffuncs.invert:
+            return "~"
+        case ffuncs.eq:
+            return "=="
+        case ffuncs.ne:
+            return "!="
+        case ffuncs.gt:
+            return ">"
+        case ffuncs.lt:
+            return "<"
+        case ffuncs.ge:
+            return ">="
+        case ffuncs.le:
+            return "<="
+        case ffuncs.pow:
+            return "pow"
+        case COperator():
+            return op.c_symbol
+        case _:
+            raise TypeError(f"{op} has no C representation.")
+
+
+def c_nary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
+    """Generate C code for n-ary operators."""
+    assert len(args) > 0
+    if len(args) == 1:
+        return f"{c_symbol}{ctx(args[0])}"
+    return f" {c_symbol} ".join(map(ctx, args))
+
+
+def c_binary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
+    """Generate C code for binary operators."""
+    a, b = args
+    return f"{ctx(a)} {c_symbol} {ctx(b)}"
+
+
+def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
+    """Generate C code for unary operators."""
+    return f"{c_symbol}{ctx(args[0])}"
 
 
 def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
@@ -453,21 +331,34 @@ def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
-    if not isinstance(op, COperator):
-        raise TypeError(f"{op} has no C representation.")
-    return op.c_function_call(ctx, *args)
-
-
-def c_getattr(fmt, ctx, obj, attr):
-    if hasattr(fmt, "c_getattr"):
-        return fmt.c_getattr(ctx, obj, attr)
-    return query_property(fmt, "c_getattr", "__attr__", ctx, obj, attr)
-
-
-def c_setattr(fmt, ctx, obj, attr, val):
-    if hasattr(fmt, "c_setattr"):
-        return fmt.c_setattr(ctx, obj, attr, val)
-    return query_property(fmt, "c_setattr", "__attr__", ctx, obj, attr, val)
+    c_symbol = c_function_name(op, ctx, *args)
+    match op:
+        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+            return c_nary_function_call(c_symbol, ctx, *args)
+        case (
+            ffuncs.sub
+            | ffuncs.truediv
+            | ffuncs.floordiv
+            | ffuncs.mod
+            | ffuncs.lshift
+            | ffuncs.rshift
+            | ffuncs.eq
+            | ffuncs.ne
+            | ffuncs.gt
+            | ffuncs.lt
+            | ffuncs.ge
+            | ffuncs.le
+        ):
+            return c_binary_function_call(c_symbol, ctx, *args)
+        case ffuncs.not_ | ffuncs.invert:
+            return c_unary_function_call(c_symbol, ctx, *args)
+        case ffuncs.pow:
+            a, b = args
+            return f"{c_symbol}({ctx(a)}, {ctx(b)})"
+        case COperator():
+            return op.c_function_call(ctx, *args)
+        case _:
+            raise TypeError(f"{op} has no C representation.")
 
 
 def c_literal(ctx, val):
@@ -481,77 +372,90 @@ def c_literal(ctx, val):
     Returns:
         The C literal as a string.
     """
-    if hasattr(val, "c_literal"):
-        return val.c_literal(ctx)
-    return query_property(val, "c_literal", "__attr__", ctx)
+    fmt = ftype(val)
+    match fmt:
+        case algebra.int_ | algebra.float_:
+            return str(val)
+        case algebra.bool_:
+            return "true" if val else "false"
+        case algebra.str_:
+            return f'"{val}"'
+        case algebra.ftypes.FDTypeNumpy():
+            return numpy_c_literal(fmt, val, ctx)
+        case _:
+            if hasattr(val, "c_literal"):
+                return val.c_literal(ctx)
+            raise NotImplementedError(f"No C literal mapping for {fmt}")
 
 
-register_property(int, "c_literal", "__attr__", lambda x, ctx: str(x))
-register_property(float, "c_literal", "__attr__", lambda x, ctx: str(x))
-register_property(str, "c_literal", "__attr__", lambda x, ctx: f'"{x}"')
-register_property(
-    np.generic,
-    "c_literal",
-    "__attr__",
-    lambda x, ctx: c_literal(ctx, np.ctypeslib.as_ctypes_type(type(x))(x)),
-)
-for t in (
-    ctypes.c_bool,
-    ctypes.c_uint8,
-    ctypes.c_uint16,
-    ctypes.c_uint32,
-    ctypes.c_uint64,
-    ctypes.c_int8,
-    ctypes.c_int16,
-    ctypes.c_int32,
-    ctypes.c_int64,
-):
-    register_property(
-        t,
-        "c_literal",
-        "__attr__",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
-    )
-
-for t in (ctypes.c_float, ctypes.c_double, ctypes.c_longdouble):  # type: ignore[assignment]
-    register_property(
-        t,
-        "c_literal",
-        "__attr__",
-        lambda x, ctx: f"({ctx.ctype_name(type(x))}){x.value}",
-    )
+def numpy_c_literal(fmt: FType, x, ctx):
+    value = ("true" if x else "false") if isinstance(x, np.bool_) else str(x.item())
+    return f"({ctx.ctype_name(c_type(fmt))}){value}"
 
 
-def c_type(t):
+def c_type(t: FType):
     """
-    Returns the C type corresponding to the given Python type.
+    Returns the C type corresponding to the given Finch type.
 
     Args:
         ctx: The context in which the value is used.
-        t: The Python type.
+        t: The Finch type.
 
     Returns:
         The corresponding C type as a ctypes type.
     """
-    if hasattr(t, "c_type"):
-        return t.c_type()
-    return query_property(t, "c_type", "__attr__")
+    match t:
+        case CArgumentFType():
+            return t.c_type()
+        case algebra.int_:
+            return ctypes.c_int
+        case algebra.float_:
+            return ctypes.c_double
+        case algebra.bool_:
+            return ctypes.c_bool
+        case algebra.str_:
+            return ctypes.c_wchar_p
+        case algebra.none_:
+            return None
+        case algebra.ftypes.FDTypeNumpy():
+            return np.ctypeslib.as_ctypes_type(t.dtype)
+        case TupleFType():
+            return struct_c_type(NamedTupleFType("CTuple", t.struct_fields))
+        case MutableStructFType():
+            return ctypes.POINTER(struct_c_type(t))
+        case ImmutableStructFType():
+            return struct_c_type(t)
+        case _:
+            raise NotImplementedError(f"No C type mapping for {t}")
 
 
-register_property(int, "c_type", "__attr__", lambda x: ctypes.c_int)
-register_property(float, "c_type", "__attr__", lambda x: ctypes.c_double)
-register_property(str, "c_type", "__attr__", lambda x: ctypes.c_wchar_p)
-register_property(
-    np.generic, "c_type", "__attr__", lambda x: np.ctypeslib.as_ctypes_type(x)
-)
-register_property(ctypes._SimpleCData, "c_type", "__attr__", lambda x: x)
-register_property(type(None), "c_type", "__attr__", lambda x: None)
+c_structs: dict[Any, Any] = {}
+c_structnames = Namespace()
 
-# ints and floats should be serialized and constructed trivially.
-register_property(int, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
-register_property(float, "serialize_to_c", "__attr__", lambda fmt, x: c_type(fmt)(x))
-register_property(int, "construct_from_c", "__attr__", lambda fmt, x: x.value)
-register_property(float, "construct_from_c", "__attr__", lambda fmt, x: x.value)
+
+def struct_c_type(fmt: StructFType):
+    res = c_structs.get(fmt)
+    if res:
+        return res
+    fields = [(name, c_type(fmt)) for name, fmt in fmt.struct_fields]
+    new_struct = type(
+        c_structnames.freshen("C", fmt.struct_name),
+        (ctypes.Structure,),
+        {"_fields_": fields},
+    )
+    c_structs[fmt] = new_struct
+    return new_struct
+
+
+"""
+Note: When serializing any struct to C, it will get serialized to a struct with
+no indirection.
+
+When you pass a struct into a kernel that expects a struct pointer, ctypes can
+intelligently infer whether we are working with a pointer arg type (pass by
+reference) or a non-pointer type (in which case it will immediately apply
+indirection)
+"""
 
 ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_bool: ("bool", ["stdbool.h"]),
@@ -567,17 +471,6 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
     ctypes.c_uint16: ("uint16_t", ["stdint.h"]),
     ctypes.c_uint32: ("uint32_t", ["stdint.h"]),
     ctypes.c_uint64: ("uint64_t", ["stdint.h"]),
-    # use standard types instead of aliases
-    # ctypes.c_short: ("short", []),
-    # ctypes.c_ushort: ("unsigned short", []),
-    # ctypes.c_int: ("int", []),
-    # ctypes.c_uint: ("unsigned int", []),
-    # ctypes.c_long: ("long", []),
-    # ctypes.c_ulong: ("unsigned long", []),
-    # ctypes.c_longlong: ("long long", []),
-    # ctypes.c_ulonglong: ("unsigned long long", []),
-    # ctypes.c_size_t: ("size_t", ["stddef.h"]),
-    # ctypes.c_ssize_t: ("ssize_t", ["unistd.h"]),
     ctypes.c_float: ("float", []),
     ctypes.c_double: ("double", []),
     ctypes.c_char_p: ("char*", []),
@@ -588,8 +481,8 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
-class CGenerator(CLowerer):
-    def __call__(self, prgm: asm.AssemblyNode):
+class CGenerator(UnvalidatedForm, CLowerer):
+    def lower(self, prgm: asm.AssemblyNode) -> CCode:
         ctx = CContext()
         ctx(prgm)
         return CCode(ctx.emit_global())
@@ -735,7 +628,7 @@ class CContext(Context):
         if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
             return val
         var_n = self.freshen(name)
-        var_t = val.result_format
+        var_t = val.result_type
         var_t_code = self.ctype_name(c_type(var_t))
         self.exec(f"{self.feed}{var_t_code} {var_n} = {self(val)};")
         return asm.Variable(var_n, var_t)
@@ -754,8 +647,8 @@ class CContext(Context):
                 return name
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_n} = {val_code};")
@@ -765,18 +658,24 @@ class CContext(Context):
                     self.exec(f"{feed}{var_t_code} {var_n} = {val_code};")
                 return None
             case asm.GetAttr(obj, attr):
-                if not obj.result_format.struct_hasattr(attr.val):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not obj_t.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
-                return c_getattr(obj.result_format, self, self(obj), attr.val)
+                return c_getattr(obj_t, self, self(obj), attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
-                if not fisinstance(val, obj.result_format.struct_attrtype(attr.val)):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
                     raise TypeError(
-                        f"Type mismatch: {val.result_format} != "
-                        f"{obj.result_format.struct_attrtype(attr.val)}"
+                        f"Type mismatch: {val.result_type} != "
+                        f"{obj_t.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
-                c_setattr(obj.result_format, self, self(obj), attr.val, val_code)
+                c_setattr(obj_t, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
                 return c_function_call(f.val, self, *args)
@@ -786,8 +685,8 @@ class CContext(Context):
             #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
-                if val.result_format != var_t:
-                    raise TypeError(f"Type mismatch: {val.result_format} != {var_t}")
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
                 if var_n in self.slots:
                     raise KeyError(
                         f"Slot {var_n} already exists in context, cannot unpack"
@@ -814,25 +713,46 @@ class CContext(Context):
                 return None
             case asm.Load(buf, idx):
                 buf = self.resolve(buf)
-                return buf.result_format.c_load(self, buf, idx)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_load(self, buf, idx)
             case asm.Store(buf, idx, val):
                 buf = self.resolve(buf)
-                return buf.result_format.c_store(self, buf, idx, val)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_store(self, buf, idx, val)
             case asm.Resize(buf, len):
                 buf = self.resolve(buf)
-                return buf.result_format.c_resize(self, buf, len)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_resize(self, buf, len)
             case asm.Length(buf):
                 buf = self.resolve(buf)
-                return buf.result_format.c_length(self, buf)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, CBufferFType):
+                    raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                return buf_t.c_length(self, buf)
             case asm.LoadDict(map, idx):
                 map = self.resolve(map)
-                return map.result_format.c_loaddict(self, map, idx)
+                map_t = map.result_type
+                if not isinstance(map_t, CDictFType):
+                    raise TypeError(f"Expected C dict type, got: {map_t}")
+                return map_t.c_loaddict(self, map, idx)
             case asm.ExistsDict(map, idx):
                 map = self.resolve(map)
-                return map.result_format.c_existsdict(self, map, idx)
+                map_t = map.result_type
+                if not isinstance(map_t, CDictFType):
+                    raise TypeError(f"Expected C dict type, got: {map_t}")
+                return map_t.c_existsdict(self, map, idx)
             case asm.StoreDict(map, idx, val):
                 map = self.resolve(map)
-                return map.result_format.c_storedict(self, map, idx, val)
+                map_t = map.result_type
+                if not isinstance(map_t, CDictFType):
+                    raise TypeError(f"Expected C dict type, got: {map_t}")
+                return map_t.c_storedict(self, map, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -840,13 +760,13 @@ class CContext(Context):
                 self.exec(ctx_2.emit())
                 return None
             case asm.ForLoop(asm.Variable(_, _) as var, start, end, body):
-                var_t = self.ctype_name(c_type(var.result_format))
+                var_t = self.ctype_name(c_type(var.result_type))
                 var_2 = self(var)
                 start = self(start)
                 end = self(end)
                 ctx_2 = self.subblock()
                 ctx_2(body)
-                ctx_2.types[var.name] = var.result_format
+                ctx_2.types[var.name] = var.result_type
                 body_code = ctx_2.emit()
                 self.exec(
                     f"{feed}for ({var_t} {var_2} = {start}; "
@@ -855,19 +775,21 @@ class CContext(Context):
                     f"\n{feed}}}"
                 )
                 return None
-            case asm.BufferLoop(buf, asm.Variable(_, _) as var, body):
+            case asm.BufferLoop(buf, asm.Variable(_, t) as var, body):
+                if not isinstance(buf.result_type, BufferFType):
+                    raise TypeError(f"Expected buffer type, got: {buf.result_type}")
                 idx = asm.Variable(
-                    self.freshen(var.name + "_i"), buf.result_format.shape_type()
+                    self.freshen(var.name + "_i"), buf.result_type.length_type
                 )
-                start = asm.Literal(0)
+                start = asm.Literal(t(0))
                 stop = asm.Call(
-                    asm.Literal(ffunc.sub), (asm.Length(buf), asm.Literal(1))
+                    asm.Literal(ffuncs.sub), (asm.Length(buf), asm.Literal(t(1)))
                 )
                 body_2 = asm.Block((asm.Assign(var, asm.Load(buf, idx)), body))
                 return self(asm.ForLoop(idx, start, stop, body_2))
             case asm.WhileLoop(cond, body):
                 if not isinstance(cond, asm.Literal | asm.Variable):
-                    cond_var = asm.Variable(self.freshen("cond"), cond.result_format)
+                    cond_var = asm.Variable(self.freshen("cond"), cond.result_type)
                     new_prgm = asm.Block(
                         (
                             asm.Assign(cond_var, cond),
@@ -953,6 +875,202 @@ class CContext(Context):
                 )
 
 
+class CStackFType(ABC):
+    """
+    Abstract base class for symbolic formats in C. Stack formats must also
+    support other functions with symbolic inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def c_unpack(self, ctx, lhs, rhs):
+        """
+        Convert a value to a symbolic representation in C. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
+        """
+        ...
+
+    @abstractmethod
+    def c_repack(self, ctx, lhs, rhs):
+        """
+        Update an object based on a symbolic representation. The `rhs` is the
+        symbolic representation to update from, and `lhs` is a variable name referring
+        to the original object to update.
+        """
+        ...
+
+
+def c_getattr(fmt: FType, ctx, obj, attr):
+    match fmt:
+        case _ if hasattr(fmt, "c_getattr"):
+            return fmt.c_getattr(ctx, obj, attr)
+        case MutableStructFType():
+            return f"{obj}->{attr}"
+        case ImmutableStructFType() | TupleFType():
+            return f"{obj}.{attr}"
+        case _:
+            raise NotImplementedError(f"No C getattr mapping for {fmt}")
+
+
+def c_setattr(fmt: FType, ctx, obj, attr, val):
+    match fmt:
+        case _ if hasattr(fmt, "c_setattr"):
+            return fmt.c_setattr(ctx, obj, attr, val)
+        case MutableStructFType():
+            return struct_mutable_setattr(fmt, ctx, obj, attr, val)
+        case _:
+            raise NotImplementedError(f"No C setattr mapping for {fmt}")
+
+
+def struct_mutable_setattr(fmt: StructFType, ctx, obj, attr, val):
+    ctx.exec(f"{ctx.feed}{obj}->{attr} = {val};")
+
+
+# the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
+# but we will not include that because it's bad.
+
+
+class CArgumentFType(ABC):
+    @abstractmethod
+    def c_type(self):
+        """
+        Return a ctypes type for this ftype.
+        """
+        ...
+
+    @abstractmethod
+    def serialize_to_c(self, obj):
+        """
+        Return a ctypes-compatible struct to be used in place of `obj`
+        for the c backend.
+        """
+        ...
+
+    @abstractmethod
+    def deserialize_from_c(self, obj, res):
+        """
+        Update this `obj` based on how the c call modified `res`, the result
+        of `serialize_to_c`.
+        """
+        ...
+
+    @abstractmethod
+    def construct_from_c(self, res):
+        """
+        Construct a new object based on the return value from c
+        """
+
+
+def serialize_to_c(fmt: FType, obj):
+    """
+    Serialize an object to a C-compatible ftype.
+
+    Args:
+        fmt: FType of obj
+        obj: The object to serialize.
+
+    Returns:
+        A ctypes-compatible struct.
+    """
+    match fmt:
+        case CArgumentFType():
+            return fmt.serialize_to_c(obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype))
+        case algebra.int_ | algebra.float_ | algebra.bool_:
+            return c_type(fmt)(obj)
+        case algebra.none_:
+            return None
+        case TupleFType():
+            return serialize_tuple_to_c(fmt, obj)
+        case StructFType():
+            return serialize_struct_to_c(fmt, obj)
+        case _:
+            raise NotImplementedError(f"No C serialization mapping for {fmt}")
+
+
+def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
+    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
+    return struct_c_type(fmt)(*args)
+
+
+def serialize_tuple_to_c(fmt: TupleFType, obj):
+    x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
+    return serialize_to_c(ftype(x), x)
+
+
+def deserialize_from_c(fmt: FType, obj, c_obj):
+    """
+    Deserialize a C-compatible object back to the original ftype.
+
+    Args:
+        fmt: FType of obj
+        obj: The original object to update.
+        c_obj: The C-compatible object to deserialize from.
+
+    Returns:
+        None
+    """
+    match fmt:
+        case CArgumentFType():
+            fmt.deserialize_from_c(obj, c_obj)
+        case algebra.ftypes.FDTypeNumpy() | TupleFType():
+            return
+        case StructFType():
+            deserialize_struct_from_c(fmt, obj, c_obj)
+        case _:
+            return
+
+
+def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
+    if fmt.is_mutable:
+        for name in fmt.struct_fieldnames:
+            setattr(obj, name, getattr(c_struct, name))
+        return
+
+
+def construct_from_c(fmt: FType, c_obj):
+    """
+    Construct an object from a C-compatible ftype.
+
+    Args:
+        fmt: The ftype of the object.
+        c_obj: The C-compatible object to construct from.
+
+    Returns:
+        An instance of the original object type.
+    """
+    match fmt:
+        case CArgumentFType():
+            return fmt.construct_from_c(c_obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return fmt(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.int_:
+            return int(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.float_:
+            return float(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.bool_:
+            return bool(c_obj.value if hasattr(c_obj, "value") else c_obj)
+        case algebra.none_:
+            return None
+        case TupleFType():
+            return tuple_construct_from_c(fmt, c_obj)
+        case StructFType():
+            return struct_construct_from_c(fmt, c_obj)
+        case _:
+            return fmt(c_obj)
+
+
+def struct_construct_from_c(fmt: StructFType, c_struct):
+    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
+    return fmt.__class__(*args)
+
+
+def tuple_construct_from_c(fmt: TupleFType, c_struct):
+    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
+    return tuple(args)
+
+
 class CHashableFType(FType):
     @abstractmethod
     def c_hash(self, ctx: CContext) -> str:
@@ -992,28 +1110,104 @@ class CHashableFType(FType):
         """
 
 
-class CArgumentFType(ABC):
-    @abstractmethod
-    def serialize_to_c(self, obj):
-        """
-        Return a ctypes-compatible struct to be used in place of `obj`
-        for the c backend.
-        """
-        ...
+def c_hash(fmt: FType, ctx: "CContext"):
+    """
+    Expand to the name of a macro that c hash can use for hashing fmt.
 
-    @abstractmethod
-    def deserialize_from_c(self, obj, res):
-        """
-        Update this `obj` based on how the c call modified `res`, the result
-        of `serialize_to_c`.
-        """
-        ...
+    Args:
+        ctx: CContext object
+        var_n: name to be supplied. It is a placeholder for a variable with
+        type fmt* (so indirection)
+    """
+    match fmt:
+        case CHashableFType():
+            return fmt.c_hash(ctx)
+        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.float_:
+            return c_hash_default(fmt, ctx)
+        case ImmutableStructFType() | TupleFType():
+            return c_hash_struct(fmt, ctx)
+        case _:
+            raise NotImplementedError(f"No C hash mapping for {fmt}")
 
-    @abstractmethod
-    def construct_from_c(self, res):
-        """
-        Construct a new object based on the return value from c
-        """
+
+def c_hash_default(fmt: FType, ctx: "CContext"):
+    ctx.add_header(f'#include "{common_h}"')
+    return "c_default_hash"
+
+
+class CHashableProperties(TypedDict):
+    eq: str | None
+    hash: str | None
+
+
+def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
+    if fmt in ctx.datastructures:
+        properties: CHashableProperties = ctx.datastructures[fmt]
+        if properties.get("hash") is not None:
+            return properties["hash"]
+    else:
+        ctx.datastructures[fmt] = {}
+
+    macros = [c_hash(fmt2, ctx) for fmt2 in fmt.struct_fieldtypes]
+    name = ctx.freshen("hash")
+    ctx.datastructures[fmt]["hash"] = name
+
+    # implement recursion with &{var_n}->{struct_field}
+    var_n = ctx.freshen("var")
+    args = ",".join(
+        f"{macro}(&({var_n})->{field})"
+        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
+    )
+    ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
+    return name
+
+
+def c_eq(fmt: FType, ctx: "CContext"):
+    """
+    Expand to the name of a macro that c eq can use for checking equivalence of fmt.
+
+    Args:
+        ctx: CContext object
+        var_n: name to be supplied. It is a placeholder for a variable with
+        type fmt* (so indirection)
+    """
+    match fmt:
+        case CHashableFType():
+            return fmt.c_eq(ctx)
+        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.float_:
+            return c_eq_default(fmt, ctx)
+        case ImmutableStructFType() | TupleFType():
+            return c_eq_struct(fmt, ctx)
+        case _:
+            raise NotImplementedError(f"No C equality mapping for {fmt}")
+
+
+def c_eq_default(fmt: FType, ctx: "CContext"):
+    ctx.add_header(f'#include "{common_h}"')
+    return "c_default_eq"
+
+
+def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
+    if fmt in ctx.datastructures:
+        properties: CHashableProperties = ctx.datastructures[fmt]
+        if properties.get("eq") is not None:
+            return properties["eq"]
+    else:
+        ctx.datastructures[fmt] = {}
+
+    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
+    name = ctx.freshen("eq")
+    ctx.datastructures[fmt]["eq"] = name
+
+    # implement recursion with &{var_n}->{struct_field}
+    var1_n = ctx.freshen("var")
+    var2_n = ctx.freshen("var")
+    args = " && ".join(
+        f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
+        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
+    )
+    ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
+    return name
 
 
 class CDictFType(DictFType, CArgumentFType, ABC):
@@ -1077,235 +1271,3 @@ class CBufferFType(BufferFType, CArgumentFType, ABC):
         Return C code which resizes a named buffer to the given length.
         """
         ...
-
-
-class CStackFType(ABC):
-    """
-    Abstract base class for symbolic formats in C. Stack formats must also
-    support other functions with symbolic inputs in addition to variable ones.
-    """
-
-    @abstractmethod
-    def c_unpack(self, ctx, lhs, rhs):
-        """
-        Convert a value to a symbolic representation in C. Returns a NamedTuple
-        of unpacked variable names, etc. The `lhs` is the variable namespace to
-        assign to.
-        """
-        ...
-
-    @abstractmethod
-    def c_repack(self, ctx, lhs, rhs):
-        """
-        Update an object based on a symbolic representation. The `rhs` is the
-        symbolic representation to update from, and `lhs` is a variable name referring
-        to the original object to update.
-        """
-        ...
-
-
-def serialize_struct_to_c(fmt: AssemblyStructFType, obj) -> Any:
-    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
-    return struct_c_type(fmt)(*args)
-
-
-register_property(
-    AssemblyStructFType, "serialize_to_c", "__attr__", serialize_struct_to_c
-)
-
-
-def deserialize_struct_from_c(fmt: AssemblyStructFType, obj, c_struct: Any) -> None:
-    if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(c_struct, name))
-        return
-
-
-register_property(
-    AssemblyStructFType, "deserialize_from_c", "__attr__", deserialize_struct_from_c
-)
-
-c_structs: dict[Any, Any] = {}
-c_structnames = Namespace()
-
-
-def struct_c_type(fmt: AssemblyStructFType):
-    res = c_structs.get(fmt)
-    if res:
-        return res
-    fields = [(name, c_type(fmt)) for name, fmt in fmt.struct_fields]
-    new_struct = type(
-        c_structnames.freshen("C", fmt.struct_name),
-        (ctypes.Structure,),
-        {"_fields_": fields},
-    )
-    c_structs[fmt] = new_struct
-    return new_struct
-
-
-"""
-Note: When serializing any struct to C, it will get serialized to a struct with
-no indirection.
-
-When you pass a struct into a kernel that expects a struct pointer, ctypes can
-intelligently infer whether we are working with a pointer arg type (pass by
-reference) or a non-pointer type (in which case it will immediately apply
-indirection)
-"""
-
-register_property(
-    MutableStructFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: ctypes.POINTER(struct_c_type(fmt)),
-)
-
-register_property(
-    ImmutableStructFType, "c_type", "__attr__", lambda fmt: struct_c_type(fmt)
-)
-
-
-register_property(
-    MutableStructFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}->{attr}",
-)
-
-register_property(
-    ImmutableStructFType,
-    "c_getattr",
-    "__attr__",
-    lambda fmt, ctx, obj, attr: f"{obj}.{attr}",
-)
-
-
-def struct_mutable_setattr(fmt: AssemblyStructFType, ctx, obj, attr, val):
-    ctx.emit(f"{ctx.feed}{obj}->{attr} = {val};")
-
-
-# the equivalent for immutable is f"{ctx.feed}{obj}.{attr} = {val};"
-# but we will not include that because it's bad.
-
-register_property(
-    MutableStructFType,
-    "c_setattr",
-    "__attr__",
-    struct_mutable_setattr,
-)
-
-
-def struct_construct_from_c(fmt: AssemblyStructFType, c_struct):
-    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
-    return fmt.__class__(*args)
-
-
-register_property(
-    AssemblyStructFType,
-    "construct_from_c",
-    "__attr__",
-    struct_construct_from_c,
-)
-
-
-def serialize_tuple_to_c(fmt, obj):
-    x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
-    return serialize_to_c(ftype(x), x)
-
-
-register_property(
-    TupleFType,
-    "serialize_to_c",
-    "__attr__",
-    serialize_tuple_to_c,
-)
-
-
-def tuple_construct_from_c(fmt: TupleFType, c_struct):
-    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
-    return tuple(args)
-
-
-register_property(
-    TupleFType,
-    "construct_from_c",
-    "__attr__",
-    tuple_construct_from_c,
-)
-
-register_property(
-    TupleFType,
-    "c_type",
-    "__attr__",
-    lambda fmt: struct_c_type(asm.NamedTupleFType("CTuple", fmt.struct_fields)),
-)
-
-
-class CHashableProperties(TypedDict):
-    eq: str | None
-    hash: str | None
-
-
-def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable)
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("hash") is not None:
-            return properties["hash"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldformats]
-    name = ctx.freshen("hash")
-    ctx.datastructures[fmt]["hash"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var_n = ctx.freshen("var")
-    args = ",".join(
-        f"{macro}(&({var_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
-    return name
-
-
-register_property(
-    ImmutableStructFType,
-    "c_hash",
-    "__attr__",
-    c_hash_struct,
-)
-
-
-def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable)
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("eq") is not None:
-            return properties["eq"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldformats]
-    name = ctx.freshen("eq")
-    ctx.datastructures[fmt]["eq"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var1_n = ctx.freshen("var")
-    var2_n = ctx.freshen("var")
-    args = " && ".join(
-        f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
-    return name
-
-
-register_property(
-    ImmutableStructFType,
-    "c_eq",
-    "__attr__",
-    c_eq_struct,
-)

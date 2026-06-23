@@ -4,7 +4,9 @@ import sys
 from dataclasses import dataclass
 from typing import Any, overload
 
-from ..symbolic import ScopedDict, fisinstance
+from finchlite.algebra import fisinstance
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
+
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 
@@ -54,7 +56,7 @@ class HaltState:
     return_value: Any = None
 
 
-class AssemblyInterpreter(AssemblyLoader):
+class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
     """
     An interpreter for FinchAssembly.
     """
@@ -130,6 +132,9 @@ class AssemblyInterpreter(AssemblyLoader):
             and self.function_state.should_halt
         )
 
+    def lower(self, prgm: asm.Module):
+        return self._dispatch(prgm)
+
     @overload
     def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
 
@@ -140,6 +145,11 @@ class AssemblyInterpreter(AssemblyLoader):
         """
         Run the program.
         """
+        if isinstance(prgm, asm.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm):
         match prgm:
             case asm.Literal(value):
                 return value
@@ -169,12 +179,12 @@ class AssemblyInterpreter(AssemblyLoader):
             case asm.GetAttr(obj, attr):
                 obj_e = self(obj)
                 attr = attr.val
-                return obj.result_format.struct_getattr(obj_e, attr)
+                return obj.result_type.struct_getattr(obj_e, attr)
             case asm.SetAttr(obj, attr, val):
                 obj_e = self(obj)
                 attr = attr.val
                 val_e = self(val)
-                obj.result_format.struct_setattr(obj_e, attr, val_e)
+                obj.result_type.struct_setattr(obj_e, attr, val_e)
                 return None
             case asm.Slot(var_n, var_t):
                 if var_n in self.types:
@@ -255,7 +265,7 @@ class AssemblyInterpreter(AssemblyLoader):
             case asm.ForLoop(asm.Variable(var_n, var_t) as var, start, end, body):
                 start_e = self(start)
                 end_e = self(end)
-                if not isinstance(start_e, var_t):
+                if not fisinstance(start_e, var_t):
                     raise TypeError(
                         f"Start value {start_e} is not of type {var_t} for "
                         f"variable '{var_n}'."

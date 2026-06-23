@@ -5,7 +5,8 @@ import pytest
 import numpy as np
 
 import finchlite
-from finchlite import ffunc
+from finchlite import ffuncs
+from finchlite.algebra import ftype
 
 from .conftest import finch_assert_allclose, finch_assert_equal
 
@@ -51,7 +52,7 @@ def random_array(shape, dtype=np.complex128, rng: np.random.Generator | None = N
 def test_matrix_multiplication(a, b):
     result = finchlite.fuse(
         lambda a, b: finchlite.reduce(
-            ffunc.add, finchlite.multiply(finchlite.expand_dims(a, 2), b), axis=1
+            ffuncs.add, finchlite.multiply(finchlite.expand_dims(a, 2), b), axis=1
         ),
         a,
         b,
@@ -62,7 +63,7 @@ def test_matrix_multiplication(a, b):
     finch_assert_equal(result, expected)
 
 
-class TestEagerTensorFType(finchlite.TensorFType):
+class TestOverrideTensorFType(finchlite.TensorFType):
     # This class doesn't define any pytests
     __test__ = False
 
@@ -70,20 +71,33 @@ class TestEagerTensorFType(finchlite.TensorFType):
         self.fmt = fmt
 
     def __eq__(self, other):
-        if not isinstance(other, TestEagerTensorFType):
+        if not isinstance(other, TestOverrideTensorFType):
             return False
         return self.fmt == other.fmt
 
     def __hash__(self):
         return hash(self.fmt)
 
-    def __call__(self, shape: tuple):
-        return TestEagerTensor(
+    def construct(self, shape: tuple):
+        return TestOverrideTensor(
             np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
         )
 
+    def __call__(self, val):
+        """
+        Convert a tensor to this test eager tensor type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A TestOverrideTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
     def from_numpy(self, arr):
-        return TestEagerTensor(arr)
+        return TestOverrideTensor(arr)
 
     @property
     def fill_value(self):
@@ -98,7 +112,7 @@ class TestEagerTensorFType(finchlite.TensorFType):
         return self.fmt.shape_type
 
 
-class TestEagerTensor(finchlite.EagerTensor):
+class TestOverrideTensor(finchlite.OverrideTensor):
     # This class doesn't define any pytests
     __test__ = False
 
@@ -106,7 +120,7 @@ class TestEagerTensor(finchlite.EagerTensor):
         self.array = finchlite.asarray(array)
 
     def __repr__(self):
-        return f"TestEagerTensor({self.array})"
+        return f"TestOverrideTensor({self.array})"
 
     def __getitem__(self, item):
         return self.array[item]
@@ -124,7 +138,7 @@ class TestEagerTensor(finchlite.EagerTensor):
 
     @property
     def ftype(self):
-        return TestEagerTensorFType(finchlite.ftype(self.array))
+        return TestOverrideTensorFType(finchlite.ftype(self.array))
 
     @property
     def fill_value(self):
@@ -156,7 +170,7 @@ class TestEagerTensor(finchlite.EagerTensor):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -164,30 +178,30 @@ class TestEagerTensor(finchlite.EagerTensor):
     "b_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((ffunc.add, finchlite.add, np.add), np.add),
-        ((ffunc.sub, finchlite.subtract, np.subtract), np.subtract),
-        ((ffunc.mul, finchlite.multiply, np.multiply), np.multiply),
-        ((ffunc.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
-        ((ffunc.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
-        ((ffunc.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
+        ((ffuncs.add, finchlite.add, np.add), np.add),
+        ((ffuncs.sub, finchlite.subtract, np.subtract), np.subtract),
+        ((ffuncs.mul, finchlite.multiply, np.multiply), np.multiply),
+        ((ffuncs.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
+        ((ffuncs.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
+        ((ffuncs.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         (
-            (ffunc.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
+            (ffuncs.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
             np.bitwise_left_shift,
         ),
         (
-            (ffunc.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
+            (ffuncs.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
         (
             (
-                ffunc.truediv,
+                ffuncs.truediv,
                 finchlite.truediv,
                 np.true_divide,
                 finchlite.divide,
@@ -195,14 +209,14 @@ class TestEagerTensor(finchlite.EagerTensor):
             ),
             np.true_divide,
         ),
-        ((ffunc.floordiv, finchlite.floordiv, np.floor_divide), np.floor_divide),
-        ((ffunc.mod, finchlite.mod, np.mod), np.mod),
-        ((ffunc.pow, finchlite.power, np.power), np.power),
+        ((ffuncs.floordiv, finchlite.floor_divide, np.floor_divide), np.floor_divide),
+        ((ffuncs.mod, finchlite.mod, np.mod), np.mod),
+        ((ffuncs.pow, finchlite.power, np.power), np.power),
         (
-            (ffunc.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
+            (ffuncs.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
             np.mod,
         ),
-        ((ffunc.pow, finchlite.pow, np.pow), np.pow),
+        ((ffuncs.pow, finchlite.pow, np.pow), np.pow),
         ((finchlite.hypot, np.hypot), np.hypot),
         ((finchlite.atan2, np.atan2), np.atan2),
         ((finchlite.logaddexp, np.logaddexp), np.logaddexp),
@@ -211,13 +225,13 @@ class TestEagerTensor(finchlite.EagerTensor):
         ((finchlite.logical_and, np.logical_and), np.logical_and),
         ((finchlite.logical_or, np.logical_or), np.logical_or),
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
-        ((ffunc.eq, finchlite.equal, np.equal), np.equal),
-        ((ffunc.ne, finchlite.not_equal, np.not_equal), np.not_equal),
-        ((ffunc.lt, finchlite.less, np.less), np.less),
-        ((ffunc.le, finchlite.less_equal, np.less_equal), np.less_equal),
-        ((ffunc.gt, finchlite.greater, np.greater), np.greater),
+        ((ffuncs.eq, finchlite.equal, np.equal), np.equal),
+        ((ffuncs.ne, finchlite.not_equal, np.not_equal), np.not_equal),
+        ((ffuncs.lt, finchlite.less, np.less), np.less),
+        ((ffuncs.le, finchlite.less_equal, np.less_equal), np.less_equal),
+        ((ffuncs.gt, finchlite.greater, np.greater), np.greater),
         (
-            (ffunc.ge, finchlite.greater_equal, np.greater_equal),
+            (ffuncs.ge, finchlite.greater_equal, np.greater_equal),
             np.greater_equal,
         ),
     ],
@@ -264,18 +278,18 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((ffunc.abs, finchlite.abs, np.abs), np.abs),
-        ((ffunc.pos, finchlite.positive, np.positive), np.positive),
-        ((ffunc.neg, finchlite.negative, np.negative), np.negative),
+        ((ffuncs.abs, finchlite.abs, np.abs), np.abs),
+        ((ffuncs.pos, finchlite.positive, np.positive), np.positive),
+        ((ffuncs.neg, finchlite.negative, np.negative), np.negative),
         (
-            (ffunc.invert, finchlite.bitwise_inverse, np.bitwise_invert),
+            (ffuncs.invert, finchlite.bitwise_invert, np.bitwise_invert),
             np.bitwise_invert,
         ),
         ((finchlite.reciprocal, np.reciprocal), np.reciprocal),
@@ -350,7 +364,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -416,7 +430,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -424,7 +438,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     "b_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -432,7 +446,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     "c_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -491,7 +505,7 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -539,6 +553,31 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
     else:
         finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (
+            np.array([[1.0, 2.0], [3.0, 4.0]]),
+            np.array([[5.0, 6.0], [7.0, 8.0]]),
+        ),
+        (
+            np.arange(12, dtype=np.float64).reshape(3, 4),
+            np.arange(8, dtype=np.float64).reshape(4, 2),
+        ),
+    ],
+)
+def test_matmul_bufferized_ndarray(a, b):
+    ba = finchlite.asarray(a)
+    bb = finchlite.asarray(b)
+    expected = a @ b
+
+    result = finchlite.matmul(ba, bb)
+    result_with_op = ba @ bb
+
+    finch_assert_allclose(result, expected)
+    finch_assert_allclose(result_with_op, expected)
 
 
 @pytest.mark.usefixtures(
@@ -591,7 +630,7 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -599,7 +638,7 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
     "b_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -628,7 +667,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
         result_with_op = finchlite.compute(result_with_op)
         result_with_np = finchlite.compute(result_with_np)
 
-    assert expected.dtype == result.element_type, (
+    assert finchlite.ftype(expected.dtype.type) == result.element_type, (
         f"Expected dtype {expected.dtype}, got {result.dtype}"
     )
     finch_assert_allclose(result, expected)
@@ -651,7 +690,7 @@ def test_matmul(a, b, a_wrap, b_wrap):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -708,7 +747,7 @@ def test_matrix_transpose(a, a_wrap):
     "a_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -716,7 +755,7 @@ def test_matrix_transpose(a, a_wrap):
     "b_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -792,7 +831,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     "x1_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -800,7 +839,7 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
     "x2_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -923,9 +962,9 @@ def test_scalar_coerce(x, func):
         expected = func(x)
     except (ValueError, TypeError, OverflowError):
         with pytest.raises((ValueError, TypeError, OverflowError)):
-            print(func(TestEagerTensor(np.array(x))))
+            print(func(TestOverrideTensor(np.array(x))))
         return
-    result = func(TestEagerTensor(np.array(x)))
+    result = func(TestOverrideTensor(np.array(x)))
     assert isinstance(result, func), f"Result should be of type {func.__name__}"
     works = result == expected or np.isnan(result) and np.isnan(expected)
     assert works, f"Expected {expected}, got {result}"
@@ -970,7 +1009,7 @@ def test_scalar_coerce(x, func):
     "x_wrap",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1010,7 +1049,7 @@ def test_broadcast_to(x, shape, x_wrap):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1072,7 +1111,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1139,7 +1178,7 @@ def test_concat_invalid(shapes, rng):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1196,7 +1235,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1251,7 +1290,7 @@ def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1314,7 +1353,7 @@ def test_split_dims_errors(array_shape, axis, split_shape):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1379,7 +1418,7 @@ def test_combine_dims_errors(array_shape, axes):
     "wrapper",
     [
         lambda x: x,
-        TestEagerTensor,
+        TestOverrideTensor,
         finchlite.lazy,
     ],
 )
@@ -1440,7 +1479,10 @@ def test_flatten(array_shape, expected_shape, wrapper):
 def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
     # construct dense format
     fmt = finchlite.element(
-        arr1.dtype.type(0), arr1.dtype, np.intp, finchlite.NumpyBufferFType
+        arr1.dtype.type(0),
+        ftype(arr1.dtype),
+        ftype(np.intp),
+        finchlite.NumpyBufferFType,
     )
     for _ in range(arr1.ndim):
         fmt = finchlite.dense(fmt)
@@ -1462,7 +1504,7 @@ def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
 def test_eager_compute():
     # Test that compute on an eager tensor returns the same tensor
     x = np.array([[1, 2], [3, 4]])
-    eager_tensor = TestEagerTensor(x)
+    eager_tensor = TestOverrideTensor(x)
     lazy_tensor = finchlite.add(
         finchlite.lazy(eager_tensor), finchlite.lazy(eager_tensor)
     )  # This should return an eager tensor

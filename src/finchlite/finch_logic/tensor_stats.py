@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 
-from ..algebra import FinchOperator
+from finchlite.algebra import FinchOperator
+
 from .nodes import Field
 
 
@@ -50,9 +51,6 @@ class StatsFactory(ABC, Generic[T]):
         reduce_indices: tuple[Field, ...],
         stats: T,
     ) -> T: ...
-
-    @abstractmethod
-    def issimilar(self, a: T, b: T) -> bool: ...
 
     @abstractmethod
     def relabel(self, stats: T, relabel_indices: tuple[Field, ...]) -> T: ...

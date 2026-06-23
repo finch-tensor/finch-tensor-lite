@@ -15,6 +15,7 @@ from finchlite import (
     dense,
     element,
     fiber_tensor,
+    ftype,
 )
 from finchlite.symbolic.gensym import _sg
 
@@ -29,10 +30,12 @@ def test_selected_ops(dtype):
     idx = NumpyBuffer(np.array([0, 0, 1, 2], dtype=np.intp))
     data = NumpyBuffer(np.array([1, 1, 2, 1], dtype=dtype))
 
+    elem_ftype = element(dtype(0), ftype(dtype), ftype(np.intp(0)), NumpyBufferFType)
+
     a = FiberTensor(
         DenseLevel(
             SparseListLevel(
-                ElementLevel(element(dtype(0), dtype, np.intp, NumpyBufferFType), data),
+                ElementLevel(elem_ftype, data),
                 np.intp(3),
                 ptr,
                 idx,
@@ -43,7 +46,9 @@ def test_selected_ops(dtype):
     a_np = np.array([[1, 0, 0], [1, 2, 0], [0, 0, 1]], dtype=dtype)
 
     fmt = fiber_tensor(
-        dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
+        dense(
+            dense(element(dtype(0), ftype(dtype), ftype(np.intp(0)), NumpyBufferFType))
+        )
     )
     b_np = np.array([[10, 10, 10], [10, 10, 10], [10, 10, 10]], dtype=dtype)
     b = fl.asarray(b_np, format=fmt)

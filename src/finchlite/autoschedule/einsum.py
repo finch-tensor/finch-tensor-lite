@@ -1,14 +1,14 @@
 import finchlite.finch_einsum as ein
 import finchlite.finch_logic as lgc
-from finchlite.algebra import ffunc, init_value
+from finchlite.algebra import ffuncs, ftype, init_value
 from finchlite.algebra.tensor import TensorFType
 from finchlite.autoschedule.tensor_stats import TensorStats
 from finchlite.finch_assembly.stages import AssemblyLibrary
 from finchlite.finch_einsum import EinsumLoader, MockEinsumLoader
-from finchlite.finch_logic import LogicStatement, StatsFactory
+from finchlite.finch_logic import Alias, LogicStatement, StatsFactory
 from finchlite.finch_logic.stages import LogicLoader
 
-from .stages import LogicEinsumLowerer
+from .stages import FormattedForm, LogicEinsumLowerer
 
 
 def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
@@ -17,22 +17,25 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             return ein.Plan(tuple(generate_einsum_stmt(body) for body in bodies))
         case lgc.Query(
             lgc.Alias(name),
-            lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _) as agg,
+            lgc.Reorder(
+                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
+                output_idxs,
+            ),
         ):
-            einidxs = tuple(ein.Index(field.name) for field in agg.fields())
+            einidxs = tuple(ein.Index(field.name) for field in output_idxs)
             body = ein.Einsum(
                 op=ein.Literal(operation),
                 tns=ein.Alias(name),
                 idxs=einidxs,
                 arg=generate_einsum_expr(arg),
             )
-            if operation != ffunc.overwrite and init != init_value(
-                operation, type(init)
+            if operation != ffuncs.overwrite and init != init_value(
+                operation, ftype(init)
             ):
                 return ein.Plan(
                     (
                         ein.Einsum(
-                            op=ein.Literal(ffunc.overwrite),
+                            op=ein.Literal(ffuncs.overwrite),
                             tns=ein.Alias(name),
                             idxs=einidxs,
                             arg=ein.Literal(init),
@@ -45,7 +48,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             assert isinstance(rhs, lgc.LogicExpression)
             einarg = generate_einsum_expr(rhs)
             return ein.Einsum(
-                op=ein.Literal(ffunc.overwrite),
+                op=ein.Literal(ffuncs.overwrite),
                 tns=ein.Alias(name),
                 idxs=tuple(ein.Index(field.name) for field in rhs.fields()),
                 arg=einarg,
@@ -77,14 +80,18 @@ def generate_einsum_expr(
 
 
 class EinsumGenerator(LogicEinsumLowerer):
-    def __call__(
-        self, prgm: LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    def lower(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[ein.EinsumStatement, dict[ein.Alias, TensorFType]]:
         bindings_2 = {ein.Alias(var.name): val for var, val in bindings.items()}
         return (generate_einsum_stmt(prgm), bindings_2)
 
 
-class LogicEinsumLoader(LogicLoader):
+class LogicEinsumLoader(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx_lower: LogicEinsumLowerer | None = None,
@@ -97,7 +104,7 @@ class LogicEinsumLoader(LogicLoader):
             ctx_load = MockEinsumLoader()
         self.ctx_load: EinsumLoader = ctx_load
 
-    def __call__(
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
@@ -108,7 +115,7 @@ class LogicEinsumLoader(LogicLoader):
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
     ]:
-        ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings)
+        ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
         mod, ein_bindings, ein_shape_vars = self.ctx_load(ein_prgm, ein_bindings)
         lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
         lgc_shape_vars: dict[lgc.Alias, tuple[lgc.Field | None, ...]] = {

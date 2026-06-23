@@ -61,8 +61,8 @@ work:
    pybuf.arr = cnp.arr
    ```
 
-The following functions need to be either registered via `register_property`
-(see examples littered in c.py) or added as methods to any data structure:
+For C, backend behavior is inherited through the relevant C codegen base classes
+and implemented as methods on ftypes or data structures:
 
 1. `serialize_to_c(self_fmt, obj)`
 2. `deserialize_from_c(self_fmt, obj, ser_obj)`
@@ -102,8 +102,8 @@ Here's how it works for numba:
    pybuf.arr = cnp[0]
    ```
 
-The following functions need to be either registered via `register_property`
-(see examples littered in numba_backend.py) or added as methods to any data structure:
+For Numba, backend behavior is inherited through the relevant Numba codegen base
+classes and implemented as methods on ftypes or data structures:
 
 1. `serialize_to_numba(self_fmt, obj)`
 2. `deserialize_from_numba(self_fmt, obj, ser_obj)`
@@ -126,33 +126,22 @@ Nothing else is currently supported nor is intended to be supported.
 
 All `ImmutableStructFType`'s will get serialized to typed tuples for numba.
 
-The C Context requires two properties, `c_hash` and `c_eq` for a type that wants
-to be hashed. Each of these returns the *name* of a macro that will get expanded
-for hashing or equality. See some examples below for how these functions work
-(they are currently in the codebase):
+The C Context requires `c_hash` and `c_eq` behavior for a type that wants to be
+hashed. Custom ftypes can implement this by subclassing `CHashableFType`; scalar,
+immutable struct, and tuple ftypes are handled by the standard match cases in
+`c_hash` and `c_eq`. Each method returns the *name* of a macro that will get
+expanded for hashing or equality. See the outline below for how these functions
+work:
 
 ```python
-# For trivial scalars.
-def c_hash_default(fmt, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_hash"
+class CustomFType(FType, CHashableFType):
+    def c_hash(self, ctx: "CContext"):
+        ctx.add_header(f'#include "{common_h}"')
+        return "custom_hash"
 
-def c_eq_default(fmt, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_eq"
-
-register_property(
-    np.generic,
-    "c_hash",
-    "__attr__",
-    c_hash_default,
-)
-register_property(
-    np.generic,
-    "c_eq",
-    "__attr__",
-    c_eq_default,
-)
+    def c_eq(self, ctx: "CContext"):
+        ctx.add_header(f'#include "{common_h}"')
+        return "custom_eq"
 
 # For immutable structs with fields.
 def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
@@ -165,7 +154,7 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldtypes]
     name = ctx.freshen("hash")
     ctx.datastructures[fmt]["hash"] = name
 
@@ -179,14 +168,6 @@ def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     return name
 
 
-register_property(
-    ImmutableStructFType,
-    "c_hash",
-    "__attr__",
-    c_hash_struct,
-)
-
-
 def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     # this should be true in whatever structs we have.
     assert isinstance(fmt, Hashable)
@@ -197,7 +178,7 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     else:
         ctx.datastructures[fmt] = {}
 
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldformats]
+    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
     name = ctx.freshen("eq")
     ctx.datastructures[fmt]["eq"] = name
 
@@ -210,12 +191,4 @@ def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
     )
     ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
     return name
-
-
-register_property(
-    ImmutableStructFType,
-    "c_eq",
-    "__attr__",
-    c_eq_struct,
-)
 ```

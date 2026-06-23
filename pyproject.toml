@@ -1,7 +1,7 @@
 [project]
 name = "finch-tensor-lite"
 description = ""
-version = "0.4.0"
+version = "0.5.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<3.14'
@@ -14,6 +14,9 @@ requires-poetry = '>=2.0,<3.0'
 [project.optional-dependencies]
 test = [
     "pytest>=7.4.4,<7.6",
+    "pytest-json-report>=1.5.0,<1.6",
+    "hypothesis>=6.130.5,<7",
+    "ndindex>=1.8,<2",
     "pre-commit>=3.6.0,<3.9",
     "pytest-cov>=4.1.0,<4.2",
     "sparse>=0.17.0,<0.17.1",
@@ -21,6 +24,9 @@ test = [
     "mypy==1.15.*",
     "pytest-mypy==1.*",
     "pytest-regressions~=2.8.1",
+]
+benchmark = [
+    "asv>=0.6"
 ]
 
 [build-system]
@@ -35,7 +41,7 @@ extend-exclude = [
 line-length = 88
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022"]
+select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022", "TID"]
 ignore = ["PYI024"]
 
 [tool.ruff.lint.isort.sections]

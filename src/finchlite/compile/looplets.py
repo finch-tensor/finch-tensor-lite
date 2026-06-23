@@ -4,16 +4,12 @@ from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Any
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import ffunc
-from ..compile.lower import (
-    LoopletContext,
-    LoopletPass,
-    SymbolicExtent,
-)
-from ..finch_notation.proves import prove
-from ..symbolic import PostOrderDFS, PostWalk, Rewrite
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import ffuncs
+from finchlite.compile.lower import LoopletContext, LoopletPass, SymbolicExtent
+from finchlite.finch_notation.proves import prove
+from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite
 
 
 class Looplet(ABC):
@@ -92,7 +88,7 @@ class SwitchPass(LoopletPass):
         ctx_2 = ctx.scope()
         ctx_2(ext, body_if)
 
-        cond = reduce(lambda x, y: asm.Call(asm.L(ffunc.and_), (x, y)), conditions)
+        cond = reduce(lambda x, y: asm.Call(asm.L(ffuncs.and_), (x, y)), conditions)
 
         body_else = PostWalk(switch_node_else)(body)
         ctx_3 = ctx.scope()
@@ -156,10 +152,10 @@ class StepperPass(LoopletPass):
         full_body = Rewrite(PostWalk(lambda node: stepper_body(ctx, node)))(body)
 
         final_cond = asm.Call(
-            asm.L(ffunc.lt),
+            asm.L(ffuncs.lt),
             (
                 asm.Call(
-                    asm.L(ffunc.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
+                    asm.L(ffuncs.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
                 ),
                 ctx.ctx(ext.get_end()),
             ),
@@ -167,15 +163,15 @@ class StepperPass(LoopletPass):
 
         stepper_blocks = []
 
-        idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_format)
+        idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_type)
         ctx.exec(asm.Assign(ctx.ctx(idx_start), ctx.ctx(ext.get_start())))
 
         for stepper in steppers:
             cond = asm.Call(
-                asm.L(ffunc.eq),
+                asm.L(ffuncs.eq),
                 (
                     asm.Call(
-                        asm.L(ffunc.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
+                        asm.L(ffuncs.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
                     ),
                     ctx.ctx(stepper.stop(ctx)),
                 ),
@@ -183,7 +179,7 @@ class StepperPass(LoopletPass):
             ctx_2 = ctx.scope()
             ext_2 = SymbolicExtent(
                 idx_start,
-                ntn.Call(ntn.L(ffunc.add), (stepper.stop(ctx), ext.get_unit())),
+                ntn.Call(ntn.L(ffuncs.add), (stepper.stop(ctx), ext.get_unit())),
             )
             ctx_2(ext_2, full_body)
             stepper_block = asm.If(
@@ -194,7 +190,7 @@ class StepperPass(LoopletPass):
                         asm.Assign(
                             ctx.ctx(idx_start),
                             asm.Call(
-                                asm.L(ffunc.add),
+                                asm.L(ffuncs.add),
                                 (ctx.ctx(stepper.stop(ctx)), ctx.ctx(ext_2.get_unit())),
                             ),
                         ),
@@ -226,10 +222,10 @@ class Sequence(Looplet):
     ):
         if prove(
             ntn.Call(
-                ntn.L(ffunc.ge),
+                ntn.L(ffuncs.ge),
                 (
                     ntn.Call(
-                        ntn.L(ffunc.sub),
+                        ntn.L(ffuncs.sub),
                         (current_ext.get_end(), current_ext.get_unit()),
                     ),
                     remaining_ext.get_end(),
@@ -239,14 +235,14 @@ class Sequence(Looplet):
             return Run(self.head)
         if prove(
             ntn.Call(
-                ntn.L(ffunc.eq),
+                ntn.L(ffuncs.eq),
                 (current_ext.get_end(), remaining_ext.get_end()),
             )
         ):
             return self
         return Switch(
             asm.Call(
-                asm.L(ffunc.lt),
+                asm.L(ffuncs.lt),
                 (ctx.ctx(remaining_ext.get_end()), ctx.ctx(current_ext.get_end())),
             ),
             self,
@@ -281,7 +277,7 @@ class SequencePass(LoopletPass):
                     tails,
                     SymbolicExtent(
                         ext_start,
-                        ntn.Call(ntn.L(ffunc.min), (ext_end, split)),
+                        ntn.Call(ntn.L(ffuncs.min), (ext_end, split)),
                     ),
                 )
                 right = cls.get_sequence_variations(
@@ -290,7 +286,7 @@ class SequencePass(LoopletPass):
                     heads,
                     tails + [seq],
                     SymbolicExtent(
-                        ntn.Call(ntn.L(ffunc.max), (ext_start, split)),
+                        ntn.Call(ntn.L(ffuncs.max), (ext_start, split)),
                         ext_end,
                     ),
                 )

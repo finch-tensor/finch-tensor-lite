@@ -5,12 +5,12 @@ import numpy as np
 
 import numba
 
+from finchlite.algebra import FType, ftype, ftypes
+from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
+from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
+from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
-
-from ..finch_assembly import Buffer
-from ..util import qual_str
-from .c_codegen import CBufferFType, CContext, CStackFType, c_type
-from .numba_codegen import NumbaBufferFType
+from finchlite.util import qual_str
 
 
 class NumbaBufferFields(NamedTuple):
@@ -59,7 +59,7 @@ class NumpyBuffer(Buffer):
         """
         Returns the ftype of the buffer, which is a NumpyBufferFType.
         """
-        return NumpyBufferFType(self.arr.dtype.type)
+        return NumpyBufferFType(ftype(self.arr.dtype.type))
 
     # TODO should be property
     def length(self):
@@ -89,26 +89,30 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     of the BufferFType class.
     """
 
-    def __init__(self, dtype: type):
-        self._dtype = np.dtype(dtype).type
+    def __init__(self, element_type: FType):
+        self._element_type = ftype(to_numpy_type(element_type).type)
+
+    @property
+    def _dtype(self):
+        return to_numpy_type(self._element_type)
 
     def __eq__(self, other):
         if not isinstance(other, NumpyBufferFType):
             return False
-        return self._dtype == other._dtype
+        return self._element_type == other._element_type
 
     def __str__(self):
-        return f"np_buf_t({qual_str(self._dtype)})"
+        return f"np_buf_t({qual_str(self._dtype.type)})"
 
     def __repr__(self):
-        return f"NumpyBufferFType({qual_str(self._dtype)})"
+        return f"NumpyBufferFType({repr(self._element_type)})"
 
     @property
     def length_type(self):
         """
         Returns the type used for the length of the buffer.
         """
-        return np.intp
+        return ftypes.intp
 
     @property
     def element_type(self):
@@ -116,15 +120,13 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         Returns the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
         """
-        return self._dtype
+        return self._element_type
 
     def __hash__(self):
-        return hash(self._dtype)
+        return hash(self._element_type)
 
-    def __call__(self, len: int = 0, dtype: type | None = None):
-        if dtype is None:
-            dtype = self._dtype
-        return NumpyBuffer(np.zeros(len, dtype=dtype))
+    def __call__(self, len: int = 0, element_type: FType | None = None):
+        return NumpyBuffer(np.zeros(len, dtype=self._dtype))
 
     def c_type(self):
         return ctypes.POINTER(CNumpyBuffer)
@@ -156,7 +158,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         data = buf.obj.data
         length = buf.obj.length
         obj = buf.obj.obj
-        t = ctx.ctype_name(c_type(self._dtype))
+        t = ctx.ctype_name(c_type(self.element_type))
         ctx.exec(
             f"{ctx.feed}{data} = ({t}*){obj}->resize(&{obj}->arr, {new_len});\n"
             f"{ctx.feed}{length} = {new_len};"
@@ -169,7 +171,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         """
         data = ctx.freshen(var_n, "data")
         length = ctx.freshen(var_n, "length")
-        t = ctx.ctype_name(c_type(self._dtype))
+        t = ctx.ctype_name(c_type(self.element_type))
         ctx.add_header("#include <stddef.h>")
         ctx.exec(
             f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
@@ -216,7 +218,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
 
     def numba_jitclass_type(self) -> numba.types.Type:
         return numba.types.ListType(
-            numba.types.Array(numba.from_dtype(self.element_type), 1, "C")
+            numba.types.Array(numba.from_dtype(self._dtype), 1, "C")
         )
 
     def numba_length(self, ctx, buf):

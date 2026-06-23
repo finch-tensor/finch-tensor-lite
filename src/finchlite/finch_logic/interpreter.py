@@ -4,12 +4,13 @@ from itertools import product
 import numpy as np
 
 import finchlite
+from finchlite.algebra import fisinstance, fixpoint_type, ftype, return_type
 from finchlite.algebra.tensor import TensorFType
+from finchlite.codegen.numba_codegen import to_numpy_type
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finchlite.symbolic import UnvalidatedForm
+from finchlite.util.logging import LOG_LOGIC_PRE_OPT
 
-from ..algebra import fixpoint_type, return_type
-from ..symbolic import fisinstance
-from ..util.logging import LOG_LOGIC_PRE_OPT
 from . import nodes as lgc
 from .nodes import (
     Aggregate,
@@ -33,16 +34,17 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
-    if dtype is None:
-        dtype = type(fill_value)
-    return finchlite.asarray(np.full(shape, fill_value, dtype=dtype))
+    dtype = ftype(fill_value) if dtype is None else ftype(dtype)
+    return finchlite.asarray(
+        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
+    )
 
 
-class LogicInterpreter(LogicEvaluator):
+class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def __call__(self, node, bindings=None):
+    def lower(self, node, bindings=None):
         if bindings is None:
             bindings = {}
         machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
@@ -204,11 +206,11 @@ class MockLogicLibrary(AssemblyLibrary):
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
 
-class MockLogicLoader(LogicLoader):
+class MockLogicLoader(UnvalidatedForm, LogicLoader):
     def __init__(self):
         pass
 
-    def __call__(
+    def lower(
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],

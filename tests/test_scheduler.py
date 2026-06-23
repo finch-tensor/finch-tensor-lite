@@ -1,10 +1,16 @@
 import numpy as np
 
 import finchlite
-from finchlite.algebra import ffunc
+from finchlite.algebra import ffuncs
+from finchlite.algebra.ftypes import ftype
 from finchlite.autoschedule import (
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    LogicCapture,
+    LogicStandardizer,
     normalize_names,
 )
+from finchlite.autoschedule.loop_ordering import set_loop_order
 from finchlite.autoschedule.optimize import (
     lift_fields,
     optimize,
@@ -12,7 +18,6 @@ from finchlite.autoschedule.optimize import (
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
-    set_loop_order,
 )
 from finchlite.autoschedule.standardize import (
     concordize,
@@ -21,6 +26,7 @@ from finchlite.autoschedule.standardize import (
     push_fields,
     standardize,
 )
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -34,7 +40,6 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.symbolic.ftype import ftype
 from finchlite.symbolic.gensym import _sg
 
 
@@ -69,11 +74,11 @@ def test_propagate_map_queries_backward():
             Query(Alias("A0"), Alias("A1")),
             Table(Alias("A0"), (Field("i0"), Field("i1"))),
             MapJoin(
-                Literal(ffunc.mul),
+                Literal(ffuncs.mul),
                 (
                     Table(Literal(10), (Field("i2"),)),
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
                         (Field("i3"),),
@@ -82,17 +87,17 @@ def test_propagate_map_queries_backward():
                 ),
             ),
             Aggregate(
-                Literal(ffunc.add),
+                Literal(ffuncs.add),
                 Literal(10),
-                Aggregate(Literal(ffunc.add), Literal(0), Alias("A2"), (Field("i5"),)),
+                Aggregate(Literal(ffuncs.add), Literal(0), Alias("A2"), (Field("i5"),)),
                 (Field("i6"),),
             ),
             Aggregate(
-                Literal(ffunc.add),
+                Literal(ffuncs.add),
                 Literal(0),
                 Reorder(
                     Aggregate(
-                        Literal(ffunc.add),
+                        Literal(ffuncs.add),
                         Literal(0),
                         Table(
                             Alias("A3"),
@@ -113,10 +118,10 @@ def test_propagate_map_queries_backward():
             Plan(()),
             Relabel(Alias("A1"), (Field("i0"), Field("i1"))),
             Aggregate(
-                Literal(ffunc.add),
+                Literal(ffuncs.add),
                 Literal(0),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (
                         Table(Literal(10), (Field("i2"),)),
                         Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
@@ -126,11 +131,14 @@ def test_propagate_map_queries_backward():
                 (Field("i3"),),
             ),
             Aggregate(
-                Literal(ffunc.add), Literal(10), Alias("A2"), (Field("i5"), Field("i6"))
+                Literal(ffuncs.add),
+                Literal(10),
+                Alias("A2"),
+                (Field("i5"), Field("i6")),
             ),
             Reorder(
                 Aggregate(
-                    Literal(ffunc.add),
+                    Literal(ffuncs.add),
                     Literal(0),
                     Reorder(
                         Table(
@@ -162,10 +170,10 @@ def test_isolate_aggregates():
             Query(
                 Alias("A0"),
                 Aggregate(
-                    Literal(ffunc.add),
+                    Literal(ffuncs.add),
                     Literal(0),
                     Aggregate(
-                        Literal(ffunc.mul),
+                        Literal(ffuncs.mul),
                         Literal(1),
                         Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                         (Field("i2"),),
@@ -183,7 +191,7 @@ def test_isolate_aggregates():
                     Query(
                         Alias(f"#A#{_sg.counter}"),
                         Aggregate(
-                            Literal(ffunc.mul),
+                            Literal(ffuncs.mul),
                             Literal(1),
                             Table(Literal(10), (Field("i1"), Field("i2"), Field("i3"))),
                             (Field("i2"),),
@@ -192,7 +200,7 @@ def test_isolate_aggregates():
                     Query(
                         Alias("A0"),
                         Aggregate(
-                            Literal(ffunc.add),
+                            Literal(ffuncs.add),
                             Literal(0),
                             Table(
                                 Alias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))
@@ -522,11 +530,11 @@ def test_set_loop_order():
     plan = Query(
         Alias("C"),
         Aggregate(
-            Literal(ffunc.add),
+            Literal(ffuncs.add),
             Literal(0),
             Reorder(
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (
                         Reorder(
                             Table(Alias("A"), (Field("i0"), Field("i1"))),
@@ -547,12 +555,12 @@ def test_set_loop_order():
     expected = Query(
         Alias("C"),
         Aggregate(
-            Literal(ffunc.add),
+            Literal(ffuncs.add),
             Literal(0),
             Reorder(
                 Reorder(
                     MapJoin(
-                        Literal(ffunc.mul),
+                        Literal(ffuncs.mul),
                         (
                             Reorder(
                                 Table(Alias("A"), (Field("i0"), Field("i1"))),
@@ -625,14 +633,14 @@ def test_scheduler_e2e_matmul(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
                 Alias("C"),
                 Aggregate(
-                    Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                    Literal(ffuncs.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             Produces((Alias("C"),)),
@@ -664,7 +672,7 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("AB"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j))),
                 ),
             ),
@@ -672,14 +680,14 @@ def test_scheduler_e2e_sddmm(file_regression):
             Query(
                 Alias("C"),
                 Aggregate(
-                    Literal(ffunc.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
+                    Literal(ffuncs.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             # elemwise
             Query(
                 Alias("RES"),
                 MapJoin(
-                    Literal(ffunc.mul),
+                    Literal(ffuncs.mul),
                     (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i))),
                 ),
             ),
@@ -687,16 +695,94 @@ def test_scheduler_e2e_sddmm(file_regression):
         )
     )
 
-    plan_opt, bindings = optimize(
-        plan,
-        {
-            Alias("S"): ftype(finchlite.asarray(s)),
-            Alias("A"): ftype(finchlite.asarray(a)),
-            Alias("B"): ftype(finchlite.asarray(b)),
-        },
-    )
-    plan_opt, bindings = standardize(plan_opt, bindings)
+    capture = LogicCapture()
+    scheduler = DefaultLogicOptimizer(DefaultLoopOrderer(LogicStandardizer(capture)))
+    bindings = {
+        Alias("S"): finchlite.asarray(s),
+        Alias("A"): finchlite.asarray(a),
+        Alias("B"): finchlite.asarray(b),
+    }
+    binding_ftypes = {var: val.ftype for var, val in bindings.items()}
+    stats_factory = DenseStatsFactory()
+    stats = {}
+    scheduler(plan, binding_ftypes, stats, stats_factory)
+    plan_opt = capture.last_prgm
 
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"
+    )
+
+
+def test_logic_standardizer_inplace(file_regression):
+    plan = Plan(
+        bodies=(
+            Query(
+                lhs=Alias(name="A2"),
+                rhs=Reorder(
+                    arg=MapJoin(
+                        op=Literal(ffuncs.add),
+                        args=(
+                            Aggregate(
+                                op=Literal(val=ffuncs.add),
+                                init=Literal(val=0),
+                                arg=Reorder(
+                                    arg=MapJoin(
+                                        op=Literal(val=ffuncs.mul),
+                                        args=(
+                                            Table(
+                                                Alias(name="A0"),
+                                                (Field(name="i0"), Field(name="i1")),
+                                            ),
+                                            Table(
+                                                Alias(name="A1"),
+                                                (Field(name="i1"), Field(name="i2")),
+                                            ),
+                                        ),
+                                    ),
+                                    idxs=(
+                                        Field(name="i0"),
+                                        Field(name="i1"),
+                                        Field(name="i2"),
+                                    ),
+                                ),
+                                idxs=(Field(name="i1"),),
+                            ),
+                            MapJoin(
+                                op=Literal(ffuncs.add),
+                                args=(
+                                    Table(
+                                        Alias("A2"),
+                                        (Field(name="i0"), Field(name="i2")),
+                                    ),
+                                    Table(
+                                        Alias("A1"),
+                                        (Field(name="i0"), Field(name="i2")),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                    idxs=(Field(name="i0"), Field(name="i2")),
+                ),
+            ),
+            Plan(
+                bodies=(Produces(args=(Alias(name="A2"),)),),
+            ),
+        ),
+    )
+
+    bindings = {
+        Alias(name="A0"): finchlite.asarray(np.array([[1, 2], [3, 4]])),
+        Alias(name="A1"): finchlite.asarray(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): finchlite.asarray(np.array([[1, 1], [1, 1]])),
+    }
+
+    plan_std, bindings = standardize(
+        plan, {var: ftype(val) for var, val in bindings.items()}
+    )
+
+    file_regression.check(
+        str(plan_std),
+        extension=".txt",
+        basename="test_logic_standardizer_inplace_program",
     )

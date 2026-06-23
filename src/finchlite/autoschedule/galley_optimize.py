@@ -8,11 +8,24 @@ from __future__ import annotations
 import logging
 import time
 
-from ..algebra.tensor import TensorFType
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import (
+from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.galley.logical_optimizer.annotated_query import (
+    AnnotatedQuery,
+)
+from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
+from finchlite.autoschedule.galley.logical_optimizer.logic_to_stats import (
+    insert_statistics,
+)
+from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
+    postprocess_plan_after_galley,
+    preprocess_plan_for_galley,
+)
+from finchlite.autoschedule.stages import LogicFusionOptimizer
+from finchlite.finch_logic import (
     Alias,
-    Field,
     LogicLoader,
     LogicStatement,
     Plan,
@@ -20,14 +33,7 @@ from ..finch_logic import (
     StatsFactory,
     TensorStats,
 )
-from ..util.logging import LOG_GALLEY
-from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import pruned_query_to_plan
-from .galley.logical_optimizer.logic_to_stats import insert_statistics
-from .galley.logical_optimizer.query_normalization import (
-    postprocess_plan_after_galley,
-    preprocess_plan_for_galley,
-)
+from finchlite.util.logging import LOG_GALLEY
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
@@ -38,13 +44,15 @@ def optimize_query(
     stats_bindings,
     use_components: bool = True,
     *,
-    use_exact_branch_and_bound: bool = False,
+    optimizer: GalleyOptimizer = "dfs",
 ):
-    """Rewrite a single logical Query via greedy or exact branch-and-bound reduction."""
+    """Rewrite a single logical Query using ``optimizer``:
+    greedy, bfs, or dfs."""
     annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
-    use_greedy = not use_exact_branch_and_bound
     new_queries, _ = pruned_query_to_plan(
-        annotated_query, use_components=use_components, use_greedy=use_greedy
+        annotated_query,
+        use_components=use_components,
+        optimizer=optimizer,
     )
     return new_queries
 
@@ -55,7 +63,7 @@ def optimize_plan(
     stats_bindings: dict[Alias, TensorStats],
     use_components: bool = True,
     *,
-    use_exact_branch_and_bound: bool = False,
+    optimizer: GalleyOptimizer = "greedy",
 ):
     """
     Optimize a full Plan: run the Galley optimizer on each Query body,
@@ -71,7 +79,7 @@ def optimize_plan(
                 stats_factory,
                 stats_bindings,
                 use_components=use_components,
-                use_exact_branch_and_bound=use_exact_branch_and_bound,
+                optimizer=optimizer,
             )
             for new_query in new_queries:
                 insert_statistics(
@@ -88,11 +96,14 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyLogicalOptimizer(LogicLoader):
+class GalleyLogicalOptimizer(LogicFusionOptimizer):
     """
-    LogicLoader stage that optimizes logical Plans with the Galley greedy
-    rewriter (or exact branch-and-bound when enabled), then forwards to a
-    downstream LogicLoader (ctx).
+    LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
+    then forwards the Plan to the downstream loader ``ctx``.
+
+    Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the
+    DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not
+    inside ``branch_and_bound_dfs``.
     """
 
     def __init__(
@@ -100,24 +111,20 @@ class GalleyLogicalOptimizer(LogicLoader):
         ctx: LogicLoader,
         use_components: bool = True,
         *,
-        use_exact_branch_and_bound: bool = True,
+        optimizer: GalleyOptimizer = "bfs",
     ):
         self.ctx = ctx
         self.use_components = use_components
-        self.use_exact_branch_and_bound = use_exact_branch_and_bound
+        self.optimizer = optimizer
         self.last_optimize_plan_s: float | None = None
 
-    def __call__(
+    def lower(
         self,
         term: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],
-    ]:
+    ):
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
         logger.debug("Optimizing plan: %s", term)
@@ -127,7 +134,7 @@ class GalleyLogicalOptimizer(LogicLoader):
             stats_factory,
             stats,
             use_components=self.use_components,
-            use_exact_branch_and_bound=self.use_exact_branch_and_bound,
+            optimizer=self.optimizer,
         )
         self.last_optimize_plan_s = time.perf_counter() - t0
         return self.ctx(term, bindings, stats, stats_factory)

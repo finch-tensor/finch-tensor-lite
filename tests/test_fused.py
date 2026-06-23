@@ -1,6 +1,3 @@
-"""AI modified: 2026-03-16T14:34:02Z parent=18fbb013175241f5081102d7b13f81f0e6c3de04"""
-# AI modified: 2026-03-16T14:40:22Z parent=18fbb013175241f5081102d7b13f81f0e6c3de04
-
 import ast
 import inspect
 import operator

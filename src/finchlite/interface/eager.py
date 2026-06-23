@@ -1,234 +1,11 @@
 import builtins
-import operator
-import sys
-from abc import ABC
 from collections.abc import Sequence
 from typing import Any
 
-from ..algebra import FinchOperator
+from finchlite.algebra import FinchOperator
+
 from . import lazy
 from .fuse import compute
-from .overrides import OverrideTensor
-
-
-class EagerTensor(OverrideTensor, ABC):
-    def override_module(self):
-        return sys.modules[__name__]
-
-    def __add__(self, other):
-        return add(self, other)
-
-    def __radd__(self, other):
-        return add(other, self)
-
-    def __sub__(self, other):
-        return subtract(self, other)
-
-    def __rsub__(self, other):
-        return subtract(other, self)
-
-    def __mul__(self, other):
-        return multiply(self, other)
-
-    def __rmul__(self, other):
-        return multiply(other, self)
-
-    def __abs__(self):
-        return abs(self)
-
-    def __pos__(self):
-        return positive(self)
-
-    def __neg__(self):
-        return negative(self)
-
-    def __invert__(self):
-        return bitwise_inverse(self)
-
-    def __and__(self, other):
-        return bitwise_and(self, other)
-
-    def __rand__(self, other):
-        return bitwise_and(other, self)
-
-    def __lshift__(self, other):
-        return bitwise_left_shift(self, other)
-
-    def __rlshift__(self, other):
-        return bitwise_left_shift(other, self)
-
-    def __or__(self, other):
-        return bitwise_or(self, other)
-
-    def __ror__(self, other):
-        return bitwise_or(other, self)
-
-    def __rshift__(self, other):
-        return bitwise_right_shift(self, other)
-
-    def __rrshift__(self, other):
-        return bitwise_right_shift(other, self)
-
-    def __xor__(self, other):
-        return bitwise_xor(self, other)
-
-    def __rxor__(self, other):
-        return bitwise_xor(other, self)
-
-    def __truediv__(self, other):
-        return truediv(self, other)
-
-    def __rtruediv__(self, other):
-        return truediv(other, self)
-
-    def __floordiv__(self, other):
-        return floordiv(self, other)
-
-    def __rfloordiv__(self, other):
-        return floordiv(other, self)
-
-    def __mod__(self, other):
-        return mod(self, other)
-
-    def __rmod__(self, other):
-        return mod(other, self)
-
-    def __pow__(self, other):
-        return power(self, other)
-
-    def __rpow__(self, other):
-        return power(other, self)
-
-    def __matmul__(self, other):
-        return matmul(self, other)
-
-    def __rmatmul__(self, other):
-        return matmul(other, self)
-
-    def __sin__(self):
-        return sin(self)
-
-    def __sinh__(self):
-        return sinh(self)
-
-    def __cos__(self):
-        return cos(self)
-
-    def __cosh__(self):
-        return cosh(self)
-
-    def __tan__(self):
-        return tan(self)
-
-    def __tanh__(self):
-        return tanh(self)
-
-    def __asin__(self):
-        return asin(self)
-
-    def __asinh__(self):
-        return asinh(self)
-
-    def __acos__(self):
-        return acos(self)
-
-    def __acosh__(self):
-        return acosh(self)
-
-    def __atan__(self):
-        return atan(self)
-
-    def __atanh__(self):
-        return atanh(self)
-
-    def __atan2__(self, other):
-        return atan2(self, other)
-
-    def __complex__(self):
-        """
-        Converts a zero-dimensional array to a Python `complex` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to complex.")
-        # dispatch to the scalar value's `__complex__` method
-        return complex(self[()])
-
-    def __float__(self):
-        """
-        Converts a zero-dimensional array to a Python `float` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to float.")
-        # dispatch to the scalar value's `__float__` method
-        return float(self[()])
-
-    def __int__(self):
-        """
-        Converts a zero-dimensional array to a Python `int` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to int.")
-        # dispatch to the scalar value's `__int__` method
-        return int(self[()])
-
-    def __bool__(self):
-        """
-        Converts a zero-dimensional array to a Python `bool` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to bool.")
-        # dispatch to the scalar value's `__bool__` method
-        return bool(self[()])
-
-    def __index__(self) -> int:
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to index.")
-        return operator.index(self.__int__())
-
-    def __log__(self):
-        return log(self)
-
-    def __log1p__(self):
-        return log1p(self)
-
-    def __log2__(self):
-        return log2(self)
-
-    def __log10__(self):
-        return log10(self)
-
-    def __logaddexp__(self, other):
-        return logaddexp(self, other)
-
-    def __logical_and__(self, other):
-        return logical_and(self, other)
-
-    def __logical_or__(self, other):
-        return logical_or(self, other)
-
-    def __logical_xor__(self, other):
-        return logical_xor(self, other)
-
-    def __logical_not__(self):
-        return logical_not(self)
-
-    def __lt__(self, other):
-        return less(self, other)
-
-    def __le__(self, other):
-        return less_equal(self, other)
-
-    def __gt__(self, other):
-        return greater(self, other)
-
-    def __ge__(self, other):
-        return greater_equal(self, other)
-
-    def __eq__(self, other):
-        return equal(self, other)
-
-    def __ne__(self, other):
-        return not_equal(self, other)
 
 
 def full(
@@ -236,36 +13,72 @@ def full(
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
+    device=None,
 ):
-    """
-    Returns a new array having a specified shape and filled with fill_value.
-
-    Parameters:
-    - shape (Union[int, Tuple[int, ...]]): output array shape.
-    - fill_value (Union[bool, int, float, complex]): fill value.
-    - dtype (Optional[dtype]): output array data type. If dtype is None, the
-    output array data type must be inferred from fill_value according to the
-    following rules:
-        * If the fill value is an int, the output array data type must be the
-            default integer data type.
-        * If the fill value is a float, the output array data type must be the
-            default real-valued floating-point data type.
-        * If the fill value is a complex number, the output array data type must
-            be the default complex floating-point data type.
-        * If the fill value is a bool, the output array must have a boolean data
-            type. Default: None.
-
-    Returns:
-
-    - out (array): an array where every element is equal to fill_value.
-    """
     return compute(lazy.full(shape, fill_value, dtype=dtype))
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]):
+def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.zeros(shape, dtype=dtype))
+
+
+def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.ones(shape, dtype=dtype))
+
+
+def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.empty(shape, dtype=dtype))
+
+
+def full_like(
+    x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.full_like(x, fill_value, dtype=dtype)
+    return compute(lazy.full_like(x, fill_value, dtype=dtype))
+
+
+def zeros_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.zeros_like(x, dtype=dtype)
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.ones_like(x, dtype=dtype)
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype: Any | None = None,
+    device=None,
+):
+    return compute(lazy.arange(start, stop, step, dtype=dtype))
+
+
+def linspace(
+    start: float,
+    stop: float,
+    /,
+    num: int,
+    *,
+    dtype: Any | None = None,
+    device=None,
+    endpoint: bool = True,
+):
+    return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
+
+
+def permute_dims(arg, /, axes: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
-        return lazy.permute_dims(arg, axis=axis)
-    return compute(lazy.permute_dims(arg, axis=axis))
+        return lazy.permute_dims(arg, axes=axes)
+    return compute(lazy.permute_dims(arg, axes=axes))
 
 
 def expand_dims(
@@ -431,10 +244,10 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
-def bitwise_inverse(x):
+def bitwise_invert(x):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.bitwise_inverse(x)
-    return compute(lazy.bitwise_inverse(x))
+        return lazy.bitwise_invert(x)
+    return compute(lazy.bitwise_invert(x))
 
 
 def bitwise_and(x1, x2):
@@ -473,10 +286,10 @@ def truediv(x1, x2):
     return compute(lazy.truediv(x1, x2))
 
 
-def floordiv(x1, x2):
+def floor_divide(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.floordiv(x1, x2)
-    return compute(lazy.floordiv(x1, x2))
+        return lazy.floor_divide(x1, x2)
+    return compute(lazy.floor_divide(x1, x2))
 
 
 def mod(x1, x2):
@@ -558,6 +371,12 @@ def imag(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.imag(x)
     return compute(lazy.imag(x))
+
+
+def conj(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.conj(x)
+    return compute(lazy.conj(x))
 
 
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -1042,10 +861,26 @@ def not_equal(x1, x2):
     return compute(lazy.not_equal(x1, x2))
 
 
+def where(condition, x1, x2):
+    if (
+        isinstance(condition, lazy.LazyTensor)
+        or isinstance(x1, lazy.LazyTensor)
+        or isinstance(x2, lazy.LazyTensor)
+    ):
+        return lazy.where(condition, x1, x2)
+    return compute(lazy.where(condition, x1, x2))
+
+
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.mean(x, axis=axis, keepdims=keepdims)
     return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+
+
+def reshape(x, /, shape: tuple, *, copy=None):
+    if not hasattr(x, "reshape"):
+        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
+    return x.reshape(shape, copy=copy)
 
 
 def var(

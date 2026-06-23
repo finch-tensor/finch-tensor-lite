@@ -1,3 +1,7 @@
+from .cfg_builder import (
+    NotationCFGBuilder,
+    NumberedStatement,
+)
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
@@ -54,12 +58,14 @@ __all__ = [
     "Loop",
     "LoopletSimplify",
     "Module",
+    "NotationCFGBuilder",
     "NotationExpression",
     "NotationInterpreter",
     "NotationLoader",
     "NotationNode",
     "NotationStatement",
     "NotationTransform",
+    "NumberedStatement",
     "Read",
     "Repack",
     "Return",
