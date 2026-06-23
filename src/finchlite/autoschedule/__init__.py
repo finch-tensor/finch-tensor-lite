@@ -15,6 +15,7 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk
 
+from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_NUMBA,
@@ -29,6 +30,7 @@ from .default_schedulers import (
 )
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter, LogicFormatter
+from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
@@ -44,8 +46,10 @@ __all__ = [
     "Alias",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
+    "DefaultLoopOrderer",
     "Field",
     "Literal",
+    "LogicCapture",
     "LogicCompiler",
     "LogicEinsumLowerer",
     "LogicExecutor",

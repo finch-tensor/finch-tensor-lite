@@ -4,8 +4,13 @@ import finchlite
 from finchlite.algebra import ffuncs
 from finchlite.algebra.ftypes import ftype
 from finchlite.autoschedule import (
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    LogicCapture,
+    LogicStandardizer,
     normalize_names,
 )
+from finchlite.autoschedule.loop_ordering import set_loop_order
 from finchlite.autoschedule.optimize import (
     lift_fields,
     optimize,
@@ -13,7 +18,6 @@ from finchlite.autoschedule.optimize import (
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
-    set_loop_order,
 )
 from finchlite.autoschedule.standardize import (
     concordize,
@@ -22,6 +26,7 @@ from finchlite.autoschedule.standardize import (
     push_fields,
     standardize,
 )
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -690,15 +695,18 @@ def test_scheduler_e2e_sddmm(file_regression):
         )
     )
 
-    plan_opt, bindings = optimize(
-        plan,
-        {
-            Alias("S"): ftype(finchlite.asarray(s)),
-            Alias("A"): ftype(finchlite.asarray(a)),
-            Alias("B"): ftype(finchlite.asarray(b)),
-        },
-    )
-    plan_opt, bindings = standardize(plan_opt, bindings)
+    capture = LogicCapture()
+    scheduler = DefaultLogicOptimizer(DefaultLoopOrderer(LogicStandardizer(capture)))
+    bindings = {
+        Alias("S"): finchlite.asarray(s),
+        Alias("A"): finchlite.asarray(a),
+        Alias("B"): finchlite.asarray(b),
+    }
+    binding_ftypes = {var: val.ftype for var, val in bindings.items()}
+    stats_factory = DenseStatsFactory()
+    stats = {}
+    scheduler(plan, binding_ftypes, stats, stats_factory)
+    plan_opt = capture.last_prgm
 
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"
