@@ -578,9 +578,7 @@ class AssemblyContext(Context):
                 ctx_3 = self.scope()
                 ctx_3(else_body)
                 self.exec(
-                    asm.IfElse(
-                        cond_e, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit())
-                    )
+                    asm.IfElse(cond_e, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit()))
                 )
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):

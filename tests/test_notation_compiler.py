@@ -323,7 +323,9 @@ def test_if_in_loop_is_lowered():
                                         ntn.Increment(
                                             ntn.Access(
                                                 OUT_,
-                                                ntn.Update(ntn.Literal(ffuncs.overwrite)),
+                                                ntn.Update(
+                                                    ntn.Literal(ffuncs.overwrite)
+                                                ),
                                                 (i,),
                                             ),
                                             a_i,
