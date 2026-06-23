@@ -14,9 +14,9 @@ import numpy as np
 import finchlite.interface as fl_interface
 from finchlite.autoschedule import (
     DefaultLogicFormatter,
+    DefaultLoopOrderer,
     LogicExecutor,
     LogicNormalizer,
-    DefaultLoopOrderer
 )
 from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
