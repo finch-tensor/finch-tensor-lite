@@ -33,7 +33,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 
 
 def add_output_orders(prgm: LogicStatement) -> LogicStatement:
-    produced_aliases = set()
+    produced_aliases: set[Alias] = set()
     for stmt in PostOrderDFS(prgm):
         match stmt:
             case Produces(vars):
@@ -47,6 +47,7 @@ def add_output_orders(prgm: LogicStatement) -> LogicStatement:
                 if lhs in produced_aliases:
                     return Query(lhs, Reorder(rhs, rhs.fields()))
                 return node
+        return None
 
     return Rewrite(PostWalk(rule_1))(prgm)
 
@@ -68,13 +69,14 @@ def drop_internal_reorders(
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(lhs, Reorder(Aggregate(op, init, arg_1, ag_idxs), idxs))
             case Query(
-                lhs, Reorder(MapJoin(op, tbl, Aggregate(op1, init, arg, ag_idxs)), idxs)
+                lhs,
+                Reorder(MapJoin(op, (tbl, Aggregate(op1, init, arg, ag_idxs))), idxs),
             ):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(
                     lhs,
                     Reorder(
-                        MapJoin(op, tbl, Aggregate(op1, init, arg_1, ag_idxs)), idxs
+                        MapJoin(op, (tbl, Aggregate(op1, init, arg_1, ag_idxs))), idxs
                     ),
                 )
 
@@ -95,7 +97,7 @@ def drop_internal_reorders(
                 lhs,
                 Reorder(
                     MapJoin(
-                        op, tbl, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs)
+                        op, (tbl, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs))
                     ),
                     idxs,
                 ),
