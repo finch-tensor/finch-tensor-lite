@@ -2059,3 +2059,18 @@ def get_lazy_tensor_stats(
         return last_stats[0]
 
     return last_stats
+    
+def outer(x1, x2):
+
+    x1 = lazy(x1)
+    x2 = lazy(x2)
+
+    if x1.ndim != 1:
+        raise ValueError(f"x1 must be a 1D array, got {x1.ndim}D array")
+    if x2.ndim != 1:
+        raise ValueError(f"x2 must be a 1D array, got {x2.ndim}D array")
+
+    # x1: (N,) -> (N, 1)
+    # x2: (M,) -> (1, M)
+    # multiply broadcasts elementwise to (N, M)
+    return multiply(expand_dims(x1, axis=-1), expand_dims(x2, axis=0))
