@@ -745,8 +745,8 @@ def rename_aliases(expr):
         return Aggregate(
             expr.op,
             expr.init,
-            expr.reduce_idxs,
-            rename_aliases(expr.rhs),
+            rename_aliases(expr.arg),
+            expr.idxs,
         )
     return expr
 
@@ -768,12 +768,17 @@ def rename_aliases(expr):
             [],
             Query(
                 Alias("out"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Table(Literal(A), (Field("i"),)),
-                        Table(Literal(A), (Field("i"),)),
+                Aggregate(
+                    Literal(ffuncs.overwrite),
+                    Literal(0.0),
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Table(Literal(A), (Field("i"),)),
+                            Table(Literal(A), (Field("i"),)),
+                        ),
                     ),
+                    (),
                 ),
             ),
         ),
@@ -796,12 +801,17 @@ def rename_aliases(expr):
             [Field("i")],
             Query(
                 Alias("out"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Table(Alias("A"), ()),
-                        Table(Literal(A), (Field("j"),)),
+                Aggregate(
+                    Literal(ffuncs.overwrite),
+                    Literal(0.0),
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Table(Alias("A"), ()),
+                            Table(Literal(A), (Field("j"),)),
+                        ),
                     ),
+                    (),
                 ),
             ),
         ),
@@ -823,16 +833,21 @@ def rename_aliases(expr):
                 ),
             ),
             [Field("i"), Field("j")],
-            # Expect: Query(out, <same MapJoin>)
+            # Expect: Query(out, overwrite-Aggregate wrapping the same MapJoin)
             Query(
                 Alias("out"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Table(Alias("A"), ()),
-                        Table(Alias("B"), ()),
-                        Table(Literal(A), (Field("k"),)),
+                Aggregate(
+                    Literal(ffuncs.overwrite),
+                    Literal(0.0),
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Table(Alias("A"), ()),
+                            Table(Alias("B"), ()),
+                            Table(Literal(A), (Field("k"),)),
+                        ),
                     ),
+                    (),
                 ),
             ),
         ),

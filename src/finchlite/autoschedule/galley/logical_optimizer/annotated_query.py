@@ -760,17 +760,19 @@ class AnnotatedQuery:
         """
         Build a final `Query` from the remaining pointwise expression in `aq`.
 
-        Always returns a `Query` binding ``self.output_name``. When the
-        remaining expression is just a passthrough alias reference
-        (``Table(Alias, idxs)``), wraps it in a `Reorder` to the recorded
-        ``output_order`` so the result is a no-op alias rebinding the
-        downstream compiler can lower directly.
+        Always returns a `Query` binding ``self.output_name``. 
         """
         expr = self.point_expr
-        if self.output_order is not None:
-            expr = Reorder(
-                cast(LogicExpression, expr), tuple(self.output_order or expr.fields())
+        output_order = tuple(self.output_order or expr.fields())
+        if not isinstance(expr, Table):
+            expr = Aggregate(
+                Literal(ffuncs.overwrite),
+                Literal(self.cache_point[expr].fill_value),
+                cast(LogicExpression, expr),
+                (),
             )
+        if self.output_order is not None:
+            expr = Reorder(cast(LogicExpression, expr), output_order)
         return Query(self.output_name, expr)
 
     def get_cost_of_reduce_idx(self, reduce_idx: Field) -> float:

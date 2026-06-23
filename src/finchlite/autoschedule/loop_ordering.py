@@ -173,7 +173,7 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
-def set_loop_order_2(plan: Plan) -> Plan:
+def set_loop_order(plan: Plan) -> Plan:
     new_queries = []
     for query in plan.bodies[:-1]:
 
@@ -188,10 +188,8 @@ def set_loop_order_2(plan: Plan) -> Plan:
                     lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
                 ):
                     idxs_2 = _heuristic_loop_order(arg)
-                    # For the moment, we assume that output formats require sequential writes
-                    idxs_3 = idxs + tuple(i for i in idxs_2 if i not in idxs)
                     rhs_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_3), ag_idxs), idxs
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
                     )
                     return Query(lhs, rhs_2)
                 case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
@@ -201,60 +199,6 @@ def set_loop_order_2(plan: Plan) -> Plan:
 
         new_queries.append(rule_1(query))
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
-
-
-@overload
-def _set_loop_order(
-    node: LogicStatement, perms: dict[LogicNode, LogicExpression]
-) -> LogicStatement: ...
-@overload
-def _set_loop_order(
-    node: LogicNode, perms: dict[LogicNode, LogicExpression]
-) -> LogicNode: ...
-def _set_loop_order(node, perms):
-    def rule_0(node):
-        match node:
-            case Table(Alias(_) as tns, idxs) if tns in perms:
-                return Relabel(perms[tns], idxs)
-        return None
-
-    match node:
-        case Plan(bodies):
-            return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
-        case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(arg, LogicExpression)
-            idxs_2 = _heuristic_loop_order(arg)
-            rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-            perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
-            return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(arg))
-            idxs_2 = _heuristic_loop_order(arg)
-            # For the moment, we assume that output formats require sequential writes
-            idxs_3 = idxs + tuple(i for i in idxs_2 if i not in idxs)
-            rhs_2 = Reorder(Aggregate(op, init, Reorder(arg, idxs_3), ag_idxs), idxs)
-            perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
-            return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
-            perms[lhs] = Reorder(Table(lhs, idxs), idxs)
-            return q
-        case Produces(args):
-            renames = {a: Alias(gensym("A")) for a in args if a in perms}
-            bodies = tuple([Query(v, perms[k]) for k, v in renames.items()])
-            args_2 = tuple([renames.get(a, a) for a in args])
-            return Plan(bodies + (Produces(args_2),))
-        case _:
-            raise Exception(f"Invalid node: {node} in set_loop_order")
-
-
-@overload
-def set_loop_order(node: LogicStatement) -> LogicStatement: ...
-@overload
-def set_loop_order(node: LogicNode) -> LogicNode: ...
-def set_loop_order(node):
-    return _set_loop_order(node, {})
-
 
 class DefaultLoopOrderer(LogicLoopOrderOptimizer):
     def __init__(self, ctx: LogicLoader | None = None):
@@ -272,9 +216,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         def loop_order_transform(prgm, bindings):
             prgm = add_output_orders(prgm)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            print("Program before set_loop_order:", prgm)
-            prgm = set_loop_order_2(prgm)
-            print("Program after set_loop_order:", prgm)
+            prgm = set_loop_order(prgm)
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
@@ -282,8 +224,6 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             prgm = flatten_plans(prgm)
             return prgm, bindings
 
-        print("Program before loop ordering:", prgm)
         prgm, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
         prgm = flatten_plans(prgm)
-        print("Program after loop ordering:", prgm)
         return self.ctx(prgm, bindings, stats, stats_factory)

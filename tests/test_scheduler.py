@@ -1,3 +1,4 @@
+from finchlite.autoschedule.formatter import DefaultLogicFormatter
 import numpy as np
 
 import finchlite
@@ -527,7 +528,7 @@ def test_concordize():
 
 
 def test_set_loop_order():
-    plan = Query(
+    plan = Plan((Query(
         Alias("C"),
         Aggregate(
             Literal(ffuncs.add),
@@ -550,9 +551,10 @@ def test_set_loop_order():
             ),
             (Field("i1"),),
         ),
-    )
+    ),
+    Produces((Alias("C"),))))
 
-    expected = Query(
+    expected = Plan((Query(
         Alias("C"),
         Aggregate(
             Literal(ffuncs.add),
@@ -578,7 +580,8 @@ def test_set_loop_order():
             ),
             (Field("i1"),),
         ),
-    )
+    ),
+    Produces((Alias("C"),))))
 
     result = set_loop_order(plan)
     assert result == expected
@@ -696,7 +699,7 @@ def test_scheduler_e2e_sddmm(file_regression):
     )
 
     capture = LogicCapture()
-    scheduler = DefaultLogicOptimizer(DefaultLoopOrderer(LogicStandardizer(capture)))
+    scheduler = DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
     bindings = {
         Alias("S"): finchlite.asarray(s),
         Alias("A"): finchlite.asarray(a),
