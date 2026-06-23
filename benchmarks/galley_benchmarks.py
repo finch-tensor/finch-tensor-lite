@@ -16,7 +16,7 @@ from finchlite.autoschedule import (
     DefaultLogicFormatter,
     LogicExecutor,
     LogicNormalizer,
-    LogicStandardizer,
+    DefaultLoopOrderer
 )
 from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
@@ -65,7 +65,7 @@ def _build_expr(empty_last):
 
 def _make_pipeline():
     optimizer = GalleyLogicalOptimizer(
-        LogicStandardizer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
+        DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
     )
     executor = LogicExecutor(optimizer, stats_factory=UniformStatsFactory())
     return LogicNormalizer(executor), optimizer
