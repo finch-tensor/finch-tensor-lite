@@ -21,8 +21,9 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                     match arg:
                         case ntn.Unwrap(
                             ntn.Access(lplt.Run() as tns, ntn.Read(), idxs)
-                        ) if isinstance(tns.body, Scalar) and is_annihilator(
-                            op.val, tns.body.val
                         ):
-                            return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
+                            if isinstance(tns.body, Scalar) and is_annihilator(
+                                op.val, tns.body.val
+                            ):
+                                return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
         return None

@@ -25,7 +25,6 @@ from .conftest import reset_name_counts
 @pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize("dtype", [np.int64, np.float64])
 def test_selected_ops(dtype):
-
     ptr = NumpyBuffer(np.array([0, 1, 3, 4], dtype=np.intp))
     idx = NumpyBuffer(np.array([0, 0, 1, 2], dtype=np.intp))
     data = NumpyBuffer(np.array([1, 1, 2, 1], dtype=dtype))
@@ -73,10 +72,9 @@ def test_selected_ops(dtype):
     np.testing.assert_array_equal(res.to_numpy(), a_np + b_np)
 
 
-def test_asm_sparse_elemwise(file_regression, caplog):
+def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
     _sg.counter = 0
 
-    fl.set_default_scheduler(ctx=fl.interface.COMPILE_NUMBA)
     dtype = np.float64
     ptr = NumpyBuffer(np.array([0, 1, 3, 4], dtype=np.intp))
     idx = NumpyBuffer(np.array([0, 0, 1, 2], dtype=np.intp))
@@ -85,7 +83,12 @@ def test_asm_sparse_elemwise(file_regression, caplog):
     a = FiberTensor(
         DenseLevel(
             SparseListLevel(
-                ElementLevel(element(dtype(0), dtype, np.intp, NumpyBufferFType), data),
+                ElementLevel(
+                    element(
+                        dtype(0), fl.ftype(dtype), fl.ftype(np.intp), NumpyBufferFType
+                    ),
+                    data,
+                ),
                 np.intp(3),
                 ptr,
                 idx,
@@ -96,7 +99,12 @@ def test_asm_sparse_elemwise(file_regression, caplog):
     b = FiberTensor(
         DenseLevel(
             SparseListLevel(
-                ElementLevel(element(dtype(0), dtype, np.intp, NumpyBufferFType), data),
+                ElementLevel(
+                    element(
+                        dtype(0), fl.ftype(dtype), fl.ftype(np.intp), NumpyBufferFType
+                    ),
+                    data,
+                ),
                 np.intp(3),
                 ptr,
                 idx,
