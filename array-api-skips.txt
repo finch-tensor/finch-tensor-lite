@@ -46,6 +46,7 @@ array_api_tests/test_signatures.py::test_extension_func_signature[linalg.cross]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matmul]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.cholesky]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matrix_norm]
+array_api_tests/test_signatures.py::test_extension_func_signature[linalg.vector_norm]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matrix_rank]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matrix_transpose]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.outer]
@@ -230,6 +231,7 @@ array_api_tests/test_indexing_functions.py::test_take
 # not implemented
 array_api_tests/test_linalg.py::test_matrix_transpose
 array_api_tests/test_linalg.py::test_vecdot
+array_api_tests/test_linalg.py::test_cross
 array_api_tests/test_linalg.py::test_eigh
 array_api_tests/test_linalg.py::test_eigvalsh
 array_api_tests/test_linalg.py::test_inv
