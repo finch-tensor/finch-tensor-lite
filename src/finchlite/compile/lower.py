@@ -566,18 +566,22 @@ class AssemblyContext(Context):
                 op_e = self(op)
                 return tns.result_type.lower_thaw(self, tns, op_e)
             case ntn.If(cond, body):
-                ctx = self.block()
-                ctx_2 = ctx.scope()
+                cond_e = self(cond)
+                ctx_2 = self.scope()
                 ctx_2(body)
-                ctx.exec(asm.If(ctx(cond), ctx_2.emit()))
+                self.exec(asm.If(cond_e, asm.Block(ctx_2.emit())))
                 return None
             case ntn.IfElse(cond, body, else_body):
-                ctx = self.block()
-                ctx_2 = ctx.scope()
+                cond_e = self(cond)
+                ctx_2 = self.scope()
                 ctx_2(body)
-                ctx_3 = ctx.scope()
+                ctx_3 = self.scope()
                 ctx_3(else_body)
-                ctx.exec(asm.IfElse(ctx(cond), ctx_2.emit(), ctx_3.emit()))
+                self.exec(
+                    asm.IfElse(
+                        cond_e, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit())
+                    )
+                )
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
                 ctx = self.scope()
