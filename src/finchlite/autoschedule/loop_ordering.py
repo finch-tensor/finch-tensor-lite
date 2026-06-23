@@ -155,7 +155,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             prgm = set_loop_order(prgm)
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
-            prgm = propagate_copy_queries(prgm)
+            prgm = propagate_copy_queries(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 

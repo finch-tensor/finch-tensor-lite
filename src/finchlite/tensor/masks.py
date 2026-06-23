@@ -93,12 +93,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             split=lambda ctx, ext: ntn.Call(
                 ntn.L(ffuncs.add), (tns.visited_idxs[-1], ext.get_unit())
             ),
-            tail=lambda ctx, idx: lplt.Run(
-                lambda ctx, idx: lplt.Leaf(
-                    # TODO: proper handling for scalars
-                    lambda ctx: ntn.Stack(asm.L(scalar), scalar.ftype)
-                )
-            ),
+            tail=lambda ctx, idx: lplt.Run(scalar),
         )
 
     def level_asm_unpack(self, ctx, var_n, val):
