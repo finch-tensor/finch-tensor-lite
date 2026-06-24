@@ -13,6 +13,7 @@ from .override_tensor import OverrideTensor
 
 
 class LevelFType(FType, ABC):
+    
     """
     An abstract base class representing the ftype of levels.
     """
@@ -75,6 +76,19 @@ class LevelFType(FType, ABC):
         """
         Get the nested level.
         """
+        ...
+
+    @abstractmethod
+    def size_level(self,fields,stats,stats_factory,num_pos,l)->float:
+        """
+        Returns estimated memory cost of this level and all inner levels
+        fields : tuple of fields for each dimension
+        stats : stats object for the tensor
+        stats_factory : to compute using stats
+        num_pos : positions recieved from parent level
+        l : current dimension index
+        """
+
         ...
 
     @abstractmethod

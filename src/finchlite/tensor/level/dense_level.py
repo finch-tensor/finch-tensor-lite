@@ -38,6 +38,11 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             ("dimension", self.dimension_type),
             ("stride", self.dimension_type),
         ]
+    
+    def size_level(self,fields,stats,stats_factory,num_pos,l)->float:
+        n = stats.get_dim_size(fields[l])
+        return self.lvl_t.size_level(fields,stats,stats_factory,num_pos*n,l+1)
+
 
     def __post_init__(self):
         self.dimension_type = ftype(self.dimension_type)
