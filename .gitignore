@@ -2,6 +2,7 @@
 */DS_Store
 */.python-version
 .python-version
+/array-api-tests/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

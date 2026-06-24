@@ -209,7 +209,6 @@ def standardize_query_roots(
     )
 
     def rule(ex):
-
         match ex:
             case Query(
                 lhs,
@@ -445,7 +444,7 @@ def flatten_plans(root):
 
 
 def drop_reorders(root: LogicStatement) -> LogicStatement:
-    def rule_2(stmt):
+    def rule_1(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
 
@@ -475,7 +474,14 @@ def drop_reorders(root: LogicStatement) -> LogicStatement:
                 arg_3 = tuple(Rewrite(PostWalk(rule))(arg) for arg in args)
                 return Query(lhs, Reorder(MapJoin(op, arg_3), idxs))
 
-    return Rewrite(PostWalk(rule_2))(root)
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, Reorder(Table(), _)):
+                return None
+            case Query(lhs, Reorder(arg, idxs)) if arg.fields() == idxs:
+                return Query(lhs, arg)
+
+    return Rewrite(PostWalk(Chain([rule_1, rule_2])))(root)
 
 
 def drop_with_aggregation(root: LogicStatement) -> LogicStatement:
@@ -487,6 +493,30 @@ def drop_with_aggregation(root: LogicStatement) -> LogicStatement:
                     lhs,
                     Aggregate(op, init, Reorder(arg, idxs_1 + idxs_3), idxs_2 + idxs_3),
                 )
+
+    return Rewrite(PostWalk(rule_2))(root)
+
+
+def propagate_copy_queries(root, bindings):
+    copies = {}
+
+    def rule_1(node):
+        match node:
+            case Query(lhs, Table(Alias(_) as rhs, _)) if lhs not in bindings:
+                copies[lhs] = copies.get(rhs, rhs)
+                return Plan()
+            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if (
+                idxs_1 == idxs_2 and lhs not in bindings
+            ):
+                copies[lhs] = copies.get(rhs, rhs)
+                return Plan()
+
+    root = Rewrite(PostWalk(rule_1))(root)
+
+    def rule_2(ex):
+        match ex:
+            case Alias() as a if a in copies:
+                return copies[a]
 
     return Rewrite(PostWalk(rule_2))(root)
 
@@ -507,6 +537,7 @@ def standardize(
     prgm = push_fields(prgm)
     prgm = concordize(prgm, bindings)
     prgm = drop_reorders(prgm)
+    prgm = propagate_copy_queries(prgm, bindings)
     prgm = flatten_plans(prgm)
     return normalize_names(prgm, bindings)
 
