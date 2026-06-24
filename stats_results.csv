@@ -1,0 +1,257 @@
+kernel,dataset,model,log2_ratio
+Hadamard,Diagonal,Dense,5.643856189774724
+Hadamard,Diagonal,Uniform,-5.643856189774724
+Hadamard,Diagonal,DC,0.0
+Hadamard,Diagonal,Database,0.0
+Hadamard,Diagonal,Blocked-Dense,5.643856189774724
+Hadamard,Diagonal,Blocked-Uniform,-3.321928094887362
+Hadamard,Diagonal,Blocked-DC,0.0
+Hadamard,Diagonal,Blocked-Database,0.0
+Hadamard,Tridiagonal,Dense,4.0782590139204995
+Hadamard,Tridiagonal,Uniform,-4.0782590139204995
+Hadamard,Tridiagonal,DC,0.0
+Hadamard,Tridiagonal,Database,1.565597175854225
+Hadamard,Tridiagonal,Blocked-Dense,4.0782590139204995
+Hadamard,Tridiagonal,Blocked-Uniform,-1.9137303410889814
+Hadamard,Tridiagonal,Blocked-DC,0.0
+Hadamard,Tridiagonal,Blocked-Database,1.434402824145775
+Hadamard,Banded,Dense,2.265344566520995
+Hadamard,Banded,Uniform,-2.265344566520995
+Hadamard,Banded,DC,0.0
+Hadamard,Banded,Database,3.37851162325373
+Hadamard,Banded,Blocked-Dense,2.265344566520995
+Hadamard,Banded,Blocked-Uniform,-0.6214883767462699
+Hadamard,Banded,Blocked-DC,0.0
+Hadamard,Banded,Blocked-Database,2.7752937128253055
+Hadamard,Triangular,Dense,0.9714308478032291
+Hadamard,Triangular,Uniform,-0.9714308478032291
+Hadamard,Triangular,DC,0.0
+Hadamard,Triangular,Database,4.672425341971495
+Hadamard,Triangular,Blocked-Dense,0.9714308478032291
+Hadamard,Triangular,Blocked-Uniform,-0.14729609076752234
+Hadamard,Triangular,Blocked-DC,0.0
+Hadamard,Triangular,Blocked-Database,3.17463200411984
+Hadamard,Striped,Dense,2.321928094887362
+Hadamard,Striped,Uniform,-2.321928094887362
+Hadamard,Striped,DC,0.0
+Hadamard,Striped,Database,3.321928094887362
+Hadamard,Striped,Blocked-Dense,2.321928094887362
+Hadamard,Striped,Blocked-Uniform,-2.3219280948873617
+Hadamard,Striped,Blocked-DC,0.0
+Hadamard,Striped,Blocked-Database,1.0
+Hadamard,ca-GrQc,Dense,8.965784284662087
+Hadamard,ca-GrQc,Uniform,-2.321928094887362
+Hadamard,ca-GrQc,DC,0.0
+Hadamard,ca-GrQc,Database,0.0
+Hadamard,ca-GrQc,Blocked-Dense,8.965784284662087
+Hadamard,ca-GrQc,Blocked-Uniform,-2.321928094887362
+Hadamard,ca-GrQc,Blocked-DC,0.0
+Hadamard,ca-GrQc,Blocked-Database,0.0
+Hadamard,ca-HepTh,Dense,10.287712379549449
+Hadamard,ca-HepTh,Uniform,-1.0
+Hadamard,ca-HepTh,DC,0.0
+Hadamard,ca-HepTh,Database,0.0
+Hadamard,ca-HepTh,Blocked-Dense,10.287712379549449
+Hadamard,ca-HepTh,Blocked-Uniform,-1.0
+Hadamard,ca-HepTh,Blocked-DC,0.0
+Hadamard,ca-HepTh,Blocked-Database,0.0
+Hadamard,web-NotreDame,Dense,3.5734668618833267
+Hadamard,web-NotreDame,Uniform,-3.5734668618833267
+Hadamard,web-NotreDame,DC,0.0
+Hadamard,web-NotreDame,Database,2.070389327891398
+Hadamard,web-NotreDame,Blocked-Dense,3.5734668618833267
+Hadamard,web-NotreDame,Blocked-Uniform,-2.3722597704375072
+Hadamard,web-NotreDame,Blocked-DC,0.0
+Hadamard,web-NotreDame,Blocked-Database,1.353423585533355
+SpGEMM,Diagonal,Dense,5.643856189774724
+SpGEMM,Diagonal,Uniform,-0.01411719500061129
+SpGEMM,Diagonal,DC,0.0
+SpGEMM,Diagonal,Database,0.0
+SpGEMM,Diagonal,Blocked-Dense,5.643856189774724
+SpGEMM,Diagonal,Blocked-Uniform,-0.06464699685071804
+SpGEMM,Diagonal,Blocked-DC,0.0
+SpGEMM,Diagonal,Blocked-Database,0.0
+SpGEMM,Tridiagonal,Dense,3.3569750419865634
+SpGEMM,Tridiagonal,Uniform,0.7220716180588378
+SpGEMM,Tridiagonal,DC,0.8636785287872197
+SpGEMM,Tridiagonal,Database,0.8443132039202885
+SpGEMM,Tridiagonal,Blocked-Dense,3.3569750419865634
+SpGEMM,Tridiagonal,Blocked-Uniform,0.4072409691963842
+SpGEMM,Tridiagonal,Blocked-DC,2.020547377404086
+SpGEMM,Tridiagonal,Blocked-Database,0.8856063677219728
+SpGEMM,Banded,Dense,1.4111954329844496
+SpGEMM,Banded,Uniform,1.2438046348638252
+SpGEMM,Banded,DC,1.4111954329844496
+SpGEMM,Banded,Database,1.4111954329844496
+SpGEMM,Banded,Blocked-Dense,1.4111954329844496
+SpGEMM,Banded,Blocked-Uniform,0.5329343708795071
+SpGEMM,Banded,Blocked-DC,1.0152667566533107
+SpGEMM,Banded,Blocked-Database,0.8117333625681783
+SpGEMM,Triangular,Dense,0.9714308478032291
+SpGEMM,Triangular,Uniform,0.9714304330154355
+SpGEMM,Triangular,DC,0.9714308478032291
+SpGEMM,Triangular,Database,0.9714308478032291
+SpGEMM,Triangular,Blocked-Dense,0.9714308478032291
+SpGEMM,Triangular,Blocked-Uniform,0.22129854693878662
+SpGEMM,Triangular,Blocked-DC,0.23446525363702297
+SpGEMM,Triangular,Blocked-Database,1.456857674973471
+SpGEMM,Striped,Dense,2.321928094887362
+SpGEMM,Striped,Uniform,2.121204773726689
+SpGEMM,Striped,DC,0.0
+SpGEMM,Striped,Database,0.0
+SpGEMM,Striped,Blocked-Dense,2.321928094887362
+SpGEMM,Striped,Blocked-Uniform,2.1212047737266886
+SpGEMM,Striped,Blocked-DC,2.321928094887362
+SpGEMM,Striped,Blocked-Database,2.321928094887362
+SpGEMM,ca-GrQc,Dense,8.965784284662087
+SpGEMM,ca-GrQc,Uniform,-2.321928094887362
+SpGEMM,ca-GrQc,DC,0.0
+SpGEMM,ca-GrQc,Database,0.0
+SpGEMM,ca-GrQc,Blocked-Dense,8.965784284662087
+SpGEMM,ca-GrQc,Blocked-Uniform,-2.321928094887362
+SpGEMM,ca-GrQc,Blocked-DC,2.070389327891398
+SpGEMM,ca-GrQc,Blocked-Database,0.8479969065549501
+SpGEMM,ca-HepTh,Dense,10.287712379549449
+SpGEMM,ca-HepTh,Uniform,-1.0
+SpGEMM,ca-HepTh,DC,0.0
+SpGEMM,ca-HepTh,Database,0.0
+SpGEMM,ca-HepTh,Blocked-Dense,10.287712379549449
+SpGEMM,ca-HepTh,Blocked-Uniform,-1.0
+SpGEMM,ca-HepTh,Blocked-DC,0.0
+SpGEMM,ca-HepTh,Blocked-Database,0.0
+SpGEMM,web-NotreDame,Dense,1.3510744405468789
+SpGEMM,web-NotreDame,Uniform,-0.39476440572024724
+SpGEMM,web-NotreDame,DC,0.916671616401104
+SpGEMM,web-NotreDame,Database,-0.15200309344504995
+SpGEMM,web-NotreDame,Blocked-Dense,1.3510744405468789
+SpGEMM,web-NotreDame,Blocked-Uniform,-0.29182353420434365
+SpGEMM,web-NotreDame,Blocked-DC,1.2618071024497917
+SpGEMM,web-NotreDame,Blocked-Database,0.47189230958444395
+SpGEMM2,Diagonal,Dense,5.643856189774724
+SpGEMM2,Diagonal,Uniform,-0.028097127441831134
+SpGEMM2,Diagonal,DC,0.0
+SpGEMM2,Diagonal,Database,0.0
+SpGEMM2,Diagonal,Blocked-Dense,5.643856189774724
+SpGEMM2,Diagonal,Blocked-Uniform,-0.12647275700604935
+SpGEMM2,Diagonal,Blocked-DC,5.643856189774724
+SpGEMM2,Diagonal,Blocked-Database,0.0
+SpGEMM2,Tridiagonal,Dense,2.8868329432672653
+SpGEMM2,Tridiagonal,Uniform,1.4927802544396014
+SpGEMM2,Tridiagonal,DC,1.978498930789078
+SpGEMM2,Tridiagonal,Database,1.9397682810552155
+SpGEMM2,Tridiagonal,Blocked-Dense,2.8868329432672653
+SpGEMM2,Tridiagonal,Blocked-Uniform,0.7439209773592548
+SpGEMM2,Tridiagonal,Blocked-DC,2.8868329432672653
+SpGEMM2,Tridiagonal,Blocked-Database,1.1246248883077576
+SpGEMM2,Banded,Dense,0.9323612831246368
+SpGEMM2,Banded,Uniform,0.9323098359370479
+SpGEMM2,Banded,DC,0.9323612831246368
+SpGEMM2,Banded,Database,0.9323612831246368
+SpGEMM2,Banded,Blocked-Dense,0.9323612831246368
+SpGEMM2,Banded,Blocked-Uniform,0.5986660487306331
+SpGEMM2,Banded,Blocked-DC,0.9323612831246368
+SpGEMM2,Banded,Blocked-Database,1.1711481427117532
+SpGEMM2,Triangular,Dense,0.9714308478032291
+SpGEMM2,Triangular,Uniform,0.9714308478032285
+SpGEMM2,Triangular,DC,0.9714308478032291
+SpGEMM2,Triangular,Database,0.9714308478032291
+SpGEMM2,Triangular,Blocked-Dense,0.9714308478032291
+SpGEMM2,Triangular,Blocked-Uniform,0.23423799277740115
+SpGEMM2,Triangular,Blocked-DC,0.9714308478032291
+SpGEMM2,Triangular,Blocked-Database,1.456857674973471
+SpGEMM2,Striped,Dense,2.321928094887362
+SpGEMM2,Striped,Uniform,2.321826331456967
+SpGEMM2,Striped,DC,0.0
+SpGEMM2,Striped,Database,0.0
+SpGEMM2,Striped,Blocked-Dense,2.321928094887362
+SpGEMM2,Striped,Blocked-Uniform,2.321826331456967
+SpGEMM2,Striped,Blocked-DC,2.321928094887362
+SpGEMM2,Striped,Blocked-Database,2.321928094887362
+SpGEMM2,ca-GrQc,Dense,8.965784284662087
+SpGEMM2,ca-GrQc,Uniform,-2.321928094887362
+SpGEMM2,ca-GrQc,DC,0.0
+SpGEMM2,ca-GrQc,Database,0.0
+SpGEMM2,ca-GrQc,Blocked-Dense,8.965784284662087
+SpGEMM2,ca-GrQc,Blocked-Uniform,-2.321928094887362
+SpGEMM2,ca-GrQc,Blocked-DC,4.643856189774724
+SpGEMM2,ca-GrQc,Blocked-Database,1.2630344058337937
+SpGEMM2,ca-HepTh,Dense,10.287712379549449
+SpGEMM2,ca-HepTh,Uniform,-1.0
+SpGEMM2,ca-HepTh,DC,0.0
+SpGEMM2,ca-HepTh,Database,0.0
+SpGEMM2,ca-HepTh,Blocked-Dense,10.287712379549449
+SpGEMM2,ca-HepTh,Blocked-Uniform,-1.0
+SpGEMM2,ca-HepTh,Blocked-DC,2.321928094887362
+SpGEMM2,ca-HepTh,Blocked-Database,0.0
+SpGEMM2,web-NotreDame,Dense,0.5063526660247898
+SpGEMM2,web-NotreDame,Uniform,0.029751796208751537
+SpGEMM2,web-NotreDame,DC,0.07194984187901474
+SpGEMM2,web-NotreDame,Database,0.07194984187901474
+SpGEMM2,web-NotreDame,Blocked-Dense,0.5063526660247898
+SpGEMM2,web-NotreDame,Blocked-Uniform,-0.07142493319051298
+SpGEMM2,web-NotreDame,Blocked-DC,0.5063526660247898
+SpGEMM2,web-NotreDame,Blocked-Database,0.9094715355258277
+Triangle Counting,Diagonal,Dense,5.643856189774724
+Triangle Counting,Diagonal,Uniform,-5.643856189774724
+Triangle Counting,Diagonal,DC,0.0
+Triangle Counting,Diagonal,Database,0.0
+Triangle Counting,Diagonal,Blocked-Dense,5.643856189774724
+Triangle Counting,Diagonal,Blocked-Uniform,-3.3865750917380804
+Triangle Counting,Diagonal,Blocked-DC,0.0
+Triangle Counting,Diagonal,Blocked-Database,0.0
+Triangle Counting,Tridiagonal,Dense,4.0782590139204995
+Triangle Counting,Tridiagonal,Uniform,-2.634903423927725
+Triangle Counting,Tridiagonal,DC,0.0
+Triangle Counting,Tridiagonal,Database,3.13119435170845
+Triangle Counting,Tridiagonal,Blocked-Dense,4.0782590139204995
+Triangle Counting,Tridiagonal,Blocked-Uniform,-0.9119892275777635
+Triangle Counting,Tridiagonal,Blocked-DC,0.0
+Triangle Counting,Tridiagonal,Blocked-Database,2.9349365437062254
+Triangle Counting,Banded,Dense,2.265344566520995
+Triangle Counting,Banded,Uniform,-0.16739079812062457
+Triangle Counting,Banded,DC,0.0
+Triangle Counting,Banded,Database,5.643856189774724
+Triangle Counting,Banded,Blocked-Dense,2.265344566520995
+Triangle Counting,Banded,Blocked-Uniform,-0.026085738246845104
+Triangle Counting,Banded,Blocked-DC,0.0
+Triangle Counting,Banded,Blocked-Database,3.7089512179966095
+Triangle Counting,Triangular,Dense,0.9714308478032291
+Triangle Counting,Triangular,Uniform,-4.1478779325343656e-07
+Triangle Counting,Triangular,DC,0.0
+Triangle Counting,Triangular,Database,5.643856189774724
+Triangle Counting,Triangular,Blocked-Dense,0.9714308478032291
+Triangle Counting,Triangular,Blocked-Uniform,-0.008505923939072414
+Triangle Counting,Triangular,Blocked-DC,0.0
+Triangle Counting,Triangular,Blocked-Database,4.682925754453317
+Triangle Counting,Striped,Dense,2.321928094887362
+Triangle Counting,Striped,Uniform,-0.2007233211606734
+Triangle Counting,Striped,DC,0.0
+Triangle Counting,Striped,Database,3.321928094887362
+Triangle Counting,Striped,Blocked-Dense,2.321928094887362
+Triangle Counting,Striped,Blocked-Uniform,-0.20072332116067376
+Triangle Counting,Striped,Blocked-DC,0.0
+Triangle Counting,Striped,Blocked-Database,3.321928094887362
+Triangle Counting,ca-GrQc,Dense,11.287712379549449
+Triangle Counting,ca-GrQc,Uniform,0.0
+Triangle Counting,ca-GrQc,DC,2.321928094887362
+Triangle Counting,ca-GrQc,Database,2.321928094887362
+Triangle Counting,ca-GrQc,Blocked-Dense,11.287712379549449
+Triangle Counting,ca-GrQc,Blocked-Uniform,0.0
+Triangle Counting,ca-GrQc,Blocked-DC,1.584962500721156
+Triangle Counting,ca-GrQc,Blocked-Database,1.584962500721156
+Triangle Counting,ca-HepTh,Dense,11.287712379549449
+Triangle Counting,ca-HepTh,Uniform,0.0
+Triangle Counting,ca-HepTh,DC,1.0
+Triangle Counting,ca-HepTh,Database,1.0
+Triangle Counting,ca-HepTh,Blocked-Dense,11.287712379549449
+Triangle Counting,ca-HepTh,Blocked-Uniform,0.0
+Triangle Counting,ca-HepTh,Blocked-DC,1.0
+Triangle Counting,ca-HepTh,Blocked-Database,1.0
+Triangle Counting,web-NotreDame,Dense,3.8119789485830515
+Triangle Counting,web-NotreDame,Uniform,-1.5073267595674011
+Triangle Counting,web-NotreDame,DC,0.23851208669972487
+Triangle Counting,web-NotreDame,Database,4.379290742482521
+Triangle Counting,web-NotreDame,Blocked-Dense,3.8119789485830515
+Triangle Counting,web-NotreDame,Blocked-Uniform,-0.6363288889341641
+Triangle Counting,web-NotreDame,Blocked-DC,0.23851208669972487
+Triangle Counting,web-NotreDame,Blocked-Database,3.269262938776786
