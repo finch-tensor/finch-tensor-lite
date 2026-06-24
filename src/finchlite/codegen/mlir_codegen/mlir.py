@@ -1,14 +1,174 @@
+from abc import ABC, abstractmethod
+from typing import Any
+
+import numpy as np
+
+from finchlite import algebra
 from finchlite import finch_assembly as asm
-from finchlite.symbolic import Context, PostOrderDFS, ScopedDict
+from finchlite.algebra import FType, ffuncs
+from finchlite.symbolic import Context, ScopedDict
 
 
-def loop_vars(node: asm.AssemblyNode):
-    out: set[str] = set()
-    for n in PostOrderDFS(node):
-        match n:
-            case asm.Assign(asm.Variable(name, _), _):
-                out.add(name)
-    return out
+class MLIROperator(ABC):
+    @abstractmethod
+    def mlir_name(self): ...
+
+    # def mlir_function_Call(self): ...
+
+
+class MLIRNAryOperator(MLIROperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return mlir_nary_function_call(self.mlir_name(), ctx, *args)
+
+
+class MLIRBinaryOperator(MLIROperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return mlir_binary_function_call(self.mlir_name(), ctx, *args)
+
+
+class MLIRUnaryOperator(MLIROperator):
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        return mlir_unary_function_call(self.mlir_name(), ctx, *args)
+
+
+def mlir_function_name(op, t: str) -> str:
+    f = t.startswith("f")
+    match op:
+        case ffuncs.add:
+            if f:
+                return "arith.addf"
+            return "arith.addi"
+        case ffuncs.sub:
+            if f:
+                return "arith.subf"
+            return "arith.subi"
+        case ffuncs.mul:
+            if f:
+                return "arith.mulf"
+            return "arith.muli"
+        case ffuncs.truediv | ffuncs.floordiv:
+            if f:
+                return "arith.divf"
+            return "arith.divsi"
+        case ffuncs.mod:
+            if f:
+                return "arith.remf"
+            return "arith.remsi"
+        case ffuncs.min:
+            if f:
+                return "arith.minimumf"
+            return "arith.minsi"
+        case ffuncs.max:
+            if f:
+                return "arith.maximumf"
+            return "arith.maxsi"
+        case ffuncs.and_:
+            return "arith.andi"
+        case ffuncs.or_:
+            return "arith.ori"
+        case ffuncs.xor:
+            return "arith.xori"
+        case ffuncs.eq:
+            if f:
+                return "arith.cmpf oeq"
+            return "arith.cmpi eq"
+        case ffuncs.ne:
+            if f:
+                return "arith.cmpf one"
+            return "arith.cmpi ne"
+        case ffuncs.lt:
+            if f:
+                return "arith.cmpf olt"
+            return "arith.cmpi slt"
+        case ffuncs.le:
+            if f:
+                return "arith.cmpf ole"
+            return "arith.cmpi sle"
+        case ffuncs.gt:
+            if f:
+                return "arith.cmpf ogt"
+            return "arith.cmpi sgt"
+        case ffuncs.ge:
+            if f:
+                return "arith.cmpf oge"
+            return "arith.cmpi sge"
+        case MLIROperator():
+            return op.mlir_name()
+        case _:
+            raise NotImplementedError(f"{op} has no MLIR representation.")
+
+
+def mlir_nary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+    t = mlir_type(args[0].result_type)
+    acc = ctx(args[0])
+    for a in args[1:]:
+        rhs = ctx(a)
+        res = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{res} = {mlir_name} {acc}, {rhs} : {t}")
+        acc = res
+    return acc
+
+
+def mlir_binary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+    a, b = args
+    t = mlir_type(a.result_type)
+    av, bv = ctx(a), ctx(b)
+    res = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {t}")
+    return res
+
+
+def mlir_unary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+    (a,) = args
+    t = mlir_type(a.result_type)
+    av = ctx(a)
+    res = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av} : {t}")
+    return res
+
+
+class MLIRArgumentFType(ABC):
+    @abstractmethod
+    def mlir_type(self): ...
+
+    @abstractmethod
+    def serialize_to_mlir(self, obj): ...
+
+    @abstractmethod
+    def deserialize_from_mlir(self, obj, mlir_buffer): ...
+
+    @abstractmethod
+    def construct_from_mlir(self, mlir_buffer): ...
+
+
+def numpy_to_mlir_types(t):
+    dt = np.dtype(t.dtype)
+    if dt.kind == "b":
+        return "i1"
+
+    bits = dt.itemsize * 8
+    if dt.kind in ("i", "u"):
+        return f"i{bits}"
+    if dt.kind == "f":
+        return f"f{bits}"
+
+    raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
+
+
+def mlir_type(t: FType):
+    match t:
+        case MLIRArgumentFType():
+            return t.mlir_type()
+        case algebra.bool_:
+            return "i1"
+        case algebra.int_:
+            return "i64"
+        case algebra.float_:
+            return "f64"
+        case algebra.ftypes.FDTypeNumpy():
+            return numpy_to_mlir_types(t)
+        case _:
+            raise NotImplementedError(f"No MLIR type mapping for {t}")
 
 
 class MLIRContext(Context):
@@ -30,6 +190,11 @@ class MLIRContext(Context):
     def feed(self) -> str:
         return self.tab * self.indent
 
+    def new_ssa(self):
+        n = self.val_counter[0]
+        self.val_counter[0] = n + 1
+        return f"%v{n}"
+
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
@@ -50,7 +215,7 @@ class MLIRContext(Context):
         return blk
 
     def __call__(self, prgm: asm.AssemblyNode):
-        # feed = self.feed
+        feed = self.feed
         match prgm:
             # case asm.Literal(value):
             #     ...
@@ -91,9 +256,12 @@ class MLIRContext(Context):
             # case asm.Function(asm.Variable(func_name, return_t), args, body):
             #     ...
 
-            # case asm.Return(value):
-            #     if value.result_type == algebra.none_:
-            #         self.exec(f"{feed}func.return")
+            case asm.Return(value):
+                if value.result_type == algebra.none_:
+                    self.exec(f"{feed}func.return")
+                else:
+                    v = self.value
+                    self.exec(f"{feed}func.return {v} : {mlir_type(value.result_type)}")
 
             case asm.Module(funcs):
                 for func in funcs:
