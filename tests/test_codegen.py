@@ -955,6 +955,33 @@ def test_e2e_numba(fmt_fn, dtype):
     finch_assert_equal(result, a @ b)
 
 
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_numba(a, dtype):
+    """Transposing through the compiled (assembly/numba) backend must produce
+    the actual transpose, not zeros.
+
+    Regression: a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = in[..., i]``). The notation->assembly
+    lowering dropped that ``If`` body (it was emitted into a throwaway block),
+    so ``compute(permute_dims(x))`` returned an all-zero array on every
+    compiled backend while the notation interpreter stayed correct. See the
+    lower-level reproduction in
+    ``test_notation_compiler.test_if_in_loop_is_lowered``.
+    """
+    a = a.astype(dtype)
+    wa = finchlite.lazy(finchlite.asarray(a))
+    result = finchlite.compute(finchlite.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
+
+
 @pytest.mark.parametrize(
     ["compiler", "constructor"],
     [
