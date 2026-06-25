@@ -936,11 +936,9 @@ def test_np_numba_serialization(value, np_type):
         ),
     ],
 )
+@pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_numba(fmt_fn, dtype):
-    ctx = finchlite.get_default_scheduler()  # TODO: as fixture
-    finchlite.set_default_scheduler(ctx=finchlite.COMPILE_NUMBA)
-
     a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
     b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
@@ -955,8 +953,6 @@ def test_e2e_numba(fmt_fn, dtype):
     result = finchlite.compute(plan)
 
     finch_assert_equal(result, a @ b)
-
-    finchlite.set_default_scheduler(ctx=ctx)
 
 
 @pytest.mark.usefixtures("numba_compiler")

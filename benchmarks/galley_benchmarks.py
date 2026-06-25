@@ -14,12 +14,13 @@ import numpy as np
 import finchlite.interface as fl_interface
 from finchlite.autoschedule import (
     DefaultLogicFormatter,
+    DefaultLoopOrderer,
     LogicExecutor,
     LogicNormalizer,
-    LogicStandardizer,
 )
 from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
+from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.autoschedule.tensor_stats import UniformStatsFactory
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.finch_notation.interpreter import NotationInterpreter
@@ -65,7 +66,11 @@ def _build_expr(empty_last):
 
 def _make_pipeline():
     optimizer = GalleyLogicalOptimizer(
-        LogicStandardizer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
+        DefaultLoopOrderer(
+            LogicStandardizer(
+                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
+        )
     )
     executor = LogicExecutor(optimizer, stats_factory=UniformStatsFactory())
     return LogicNormalizer(executor), optimizer
