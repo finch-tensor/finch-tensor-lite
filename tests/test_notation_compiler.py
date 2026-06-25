@@ -260,3 +260,98 @@ def test_matrix_multiplication_regression(file_regression):
 
     asm_program = NotationCompiler(Reflector())(prgm)
     file_regression.check(str(asm_program), extension=".txt")
+
+
+def test_if_in_loop_is_lowered():
+    """An ``If`` nested inside a ``Loop`` must survive notation->assembly
+    lowering.
+
+    Regression test: the ``If``/``IfElse`` lowering used to emit the statement
+    into a throwaway block that was never spliced back into the enclosing scope,
+    so conditional writes inside loops silently disappeared. This is exactly the
+    shape produced when a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = ...``), which made transposes compile to
+    all-zero results on every assembly backend while the notation interpreter
+    stayed correct.
+    """
+    a = np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float64)
+    half = np.int64(2)
+    # Only the first ``half`` elements are copied; the rest keep the fill value.
+    expected = np.array([10.0, 20.0, 0.0, 0.0], dtype=np.float64)
+
+    a_buf = BufferizedNDArray.from_numpy(a)
+    vec_format = ftype(a_buf)
+
+    i = ntn.Variable("i", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    A = ntn.Variable("A", vec_format)
+    OUT = ntn.Variable("OUT", vec_format)
+    A_ = ntn.Slot("A_", vec_format)
+    OUT_ = ntn.Slot("OUT_", vec_format)
+    a_i = ntn.Variable("a_i", finchlite.float64)
+
+    n_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), n))
+
+    prgm = ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable("masked_copy", vec_format),
+                (OUT, A),
+                ntn.Block(
+                    (
+                        ntn.Unpack(A_, A),
+                        ntn.Unpack(OUT_, OUT),
+                        ntn.Assign(n, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Declare(
+                            OUT_, ntn.Literal(0.0), ntn.Literal(ffuncs.overwrite), (n,)
+                        ),
+                        ntn.Loop(
+                            i,
+                            n_ext,
+                            ntn.If(
+                                ntn.Call(
+                                    ntn.Literal(ffuncs.lt), (i, ntn.Literal(half))
+                                ),
+                                ntn.Block(
+                                    (
+                                        ntn.Assign(
+                                            a_i,
+                                            ntn.Unwrap(
+                                                ntn.Access(A_, ntn.Read(), (i,))
+                                            ),
+                                        ),
+                                        ntn.Increment(
+                                            ntn.Access(
+                                                OUT_,
+                                                ntn.Update(
+                                                    ntn.Literal(ffuncs.overwrite)
+                                                ),
+                                                (i,),
+                                            ),
+                                            a_i,
+                                        ),
+                                    )
+                                ),
+                            ),
+                        ),
+                        ntn.Freeze(OUT_, ntn.Literal(ffuncs.overwrite)),
+                        ntn.Repack(OUT_, OUT),
+                        ntn.Return(OUT),
+                    )
+                ),
+            ),
+        )
+    )
+
+    # NOTATION interpreter is the reference semantics.
+    ntn_mod = ntn.NotationInterpreter()(prgm)
+    out_buf = BufferizedNDArray.from_numpy(np.zeros_like(a))
+    ntn_result = ntn_mod.masked_copy(out_buf, a_buf).to_numpy()
+    finch_assert_equal(ntn_result, expected)
+
+    # ASSEMBLY path must agree (this is what regressed).
+    asm_program = NotationCompiler(Reflector())(prgm)
+    asm_mod = AssemblyInterpreter()(asm_program)
+    out_buf = BufferizedNDArray.from_numpy(np.zeros_like(a))
+    asm_result = asm_mod.masked_copy(out_buf, a_buf).to_numpy()
+    finch_assert_equal(asm_result, expected)
