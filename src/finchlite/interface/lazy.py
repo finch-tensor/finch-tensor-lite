@@ -1083,6 +1083,15 @@ def conj(x) -> LazyTensor:
     return elementwise(ffuncs.conjugate, lazy(x))
 
 
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+) -> LazyTensor:
+    x = lazy(x)
+    return reduce(
+        ffuncs.add, elementwise(ffuncs.truth, x), axis=axis, keepdims=keepdims, init=0
+    )
+
+
 def tensordot(
     x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]
 ) -> LazyTensor:

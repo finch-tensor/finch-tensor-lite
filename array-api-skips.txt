@@ -36,7 +36,6 @@ array_api_tests/test_signatures.py::test_func_signature[repeat]
 array_api_tests/test_signatures.py::test_func_signature[tile]
 array_api_tests/test_signatures.py::test_func_signature[unstack]
 array_api_tests/test_signatures.py::test_func_signature[clip]
-array_api_tests/test_signatures.py::test_func_signature[count_nonzero]
 array_api_tests/test_signatures.py::test_func_signature[take_along_axis]
 array_api_tests/test_signatures.py::test_func_signature[astype]
 array_api_tests/test_signatures.py::test_func_signature[cumulative_prod]
@@ -218,7 +217,6 @@ array_api_tests/test_has_names.py::test_has_names[fft-rfft]
 array_api_tests/test_has_names.py::test_has_names[elementwise-reciprocal]
 array_api_tests/test_has_names.py::test_has_names[utility-diff]
 array_api_tests/test_has_names.py::test_has_names[statistical-cumulative_prod]
-array_api_tests/test_has_names.py::test_has_names[searching-count_nonzero]
 array_api_tests/test_has_names.py::test_has_names[indexing-take_along_axis]
 
 # test_indexing_functions
@@ -274,7 +272,6 @@ array_api_tests/test_manipulation_functions.py::test_tile
 # not implemented
 array_api_tests/test_searching_functions.py::test_argmax
 array_api_tests/test_searching_functions.py::test_argmin
-array_api_tests/test_searching_functions.py::test_count_nonzero
 # 0D issue
 array_api_tests/test_searching_functions.py::test_nonzero
 

@@ -771,6 +771,14 @@ def copysign(x1, x2):
     return compute(lazy.copysign(x1, x2))
 
 
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonzero(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonzero(x, axis=axis, keepdims=keepdims))
+
+
 def nextafter(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.nextafter(x1, x2)
