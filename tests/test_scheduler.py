@@ -313,7 +313,7 @@ def test_propagate_copy_queries():
         )
     )
 
-    result = propagate_copy_queries(plan)
+    result = propagate_copy_queries(plan, {})
     assert result == expected
 
 

@@ -219,7 +219,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
-            prgm = propagate_copy_queries(prgm)
+            prgm = propagate_copy_queries(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 

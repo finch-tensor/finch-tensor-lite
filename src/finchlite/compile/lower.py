@@ -23,7 +23,7 @@ from finchlite.finch_assembly import (
     AssemblyLoader,
     AssemblyTransform,
 )
-from finchlite.finch_notation import NotationLoader
+from finchlite.finch_notation import LoopletSimplify, NotationLoader
 from finchlite.symbolic import (
     Context,
     PostOrderDFS,
@@ -672,6 +672,9 @@ class LoopletPass(ABC):
     @property
     @abstractmethod
     def priority(self): ...
+
+    def __init__(self):
+        self.looplet_simplify = LoopletSimplify()
 
     def __lt__(self, other):
         assert isinstance(other, LoopletPass)
