@@ -33,6 +33,7 @@ from finchlite.symbolic import (
 from .standardize import (
     flatten_plans,
     isolate_aggregates,
+    propagate_copy_queries,
     push_fields,
 )
 
@@ -146,7 +147,7 @@ def optimize(
 
         prgm = isolate_aggregates(prgm)
 
-        prgm = propagate_copy_queries(prgm)
+        prgm = propagate_copy_queries(prgm, bindings)
         prgm = propagate_transpose_queries(prgm)
         prgm = propagate_map_queries(prgm)
 
@@ -284,30 +285,6 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
         return None
 
     return Rewrite(Fixpoint(PreWalk(rule_2)))(root)
-
-
-def propagate_copy_queries(root):
-    copies = {}
-
-    def rule_0(node):
-        match node:
-            case Query(lhs, Table(Alias(_) as rhs, _)):
-                copies[lhs] = copies.get(rhs, rhs)
-                return Plan()
-            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if (
-                idxs_1 == idxs_2
-            ):
-                copies[lhs] = copies.get(rhs, rhs)
-                return Plan()
-
-    root = Rewrite(PostWalk(rule_0))(root)
-
-    def rule_1(ex):
-        match ex:
-            case Alias() as a if a in copies:
-                return copies[a]
-
-    return Rewrite(PostWalk(rule_1))(root)
 
 
 def lift_fields(root):
