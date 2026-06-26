@@ -46,6 +46,12 @@ def is_unsigned(arg):
     )
 
 
+def is_bool(arg):
+    return arg == algebra.bool_ or (
+        isinstance(arg, algebra.ftypes.FDTypeNumpy) and np.dtype(arg.dtype).kind == "b"
+    )
+
+
 def mlir_function_name(op, arg: FType) -> str:
     match op:
         case ffuncs.add:
@@ -334,8 +340,12 @@ class MLIRContext(Context):
     def __call__(self, prgm: asm.AssemblyNode):
         feed = self.feed
         match prgm:
-            # case asm.Literal(value):
-            #     ...
+            case asm.Literal(value):
+                t = mlir_type(prgm.result_type)
+                new = float(value) if is_float(prgm.result_type) else int(value)
+                s = self.new_ssa()
+                self.exec(f"{self.feed}{s} = arith.constant {new} : {t}")
+                return s
 
             # case asm.Variable(name, _):
             #     ...
