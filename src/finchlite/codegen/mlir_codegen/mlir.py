@@ -8,59 +8,87 @@ from finchlite import finch_assembly as asm
 from finchlite.algebra import FType, ffuncs
 from finchlite.symbolic import Context, ScopedDict
 
+from .mlir_scansearch import MLIR_HELPERS
+
 
 class MLIROperator(ABC):
     @abstractmethod
-    def mlir_name(self): ...
+    def mlir_name(self) -> str: ...
 
-    # def mlir_function_Call(self): ...
+    @abstractmethod
+    def mlir_function_call(self, ctx: Any, *args: Any) -> Any: ...
 
 
 class MLIRNAryOperator(MLIROperator):
-    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+    def mlir_function_call(self, ctx: Any, *args: Any) -> Any:
         return mlir_nary_function_call(self.mlir_name(), ctx, *args)
 
 
 class MLIRBinaryOperator(MLIROperator):
-    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+    def mlir_function_call(self, ctx: Any, *args: Any) -> Any:
         return mlir_binary_function_call(self.mlir_name(), ctx, *args)
 
 
 class MLIRUnaryOperator(MLIROperator):
-    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+    def mlir_function_call(self, ctx: Any, *args: Any) -> Any:
         return mlir_unary_function_call(self.mlir_name(), ctx, *args)
 
 
-def mlir_function_name(op, t: str) -> str:
-    f = t.startswith("f")
+def is_float(arg):
+    return arg == algebra.float_ or (
+        isinstance(arg, algebra.ftypes.FDTypeNumpy) and np.dtype(arg.dtype).kind == "f"
+    )
+
+
+def is_unsigned(arg):
+    return (
+        isinstance(arg, algebra.ftypes.FDTypeNumpy) and np.dtype(arg.dtype).kind == "u"
+    )
+
+
+def mlir_function_name(op, arg: FType) -> str:
     match op:
         case ffuncs.add:
-            if f:
+            if is_float(arg):
                 return "arith.addf"
             return "arith.addi"
         case ffuncs.sub:
-            if f:
+            if is_float(arg):
                 return "arith.subf"
             return "arith.subi"
         case ffuncs.mul:
-            if f:
+            if is_float(arg):
                 return "arith.mulf"
             return "arith.muli"
-        case ffuncs.truediv | ffuncs.floordiv:
-            if f:
+        case ffuncs.truediv:
+            if is_float(arg):
                 return "arith.divf"
+            if is_unsigned(arg):
+                return "arith.divui"
             return "arith.divsi"
+        case ffuncs.floordiv:
+            if is_float(arg):
+                return "arith.divf"
+            if is_unsigned(arg):
+                return "arith.divui"
+            return "arith.floordivsi"
         case ffuncs.mod:
-            if f:
+            if is_float(arg):
                 return "arith.remf"
+            if is_unsigned(arg):
+                return "arith.remui"
             return "arith.remsi"
         case ffuncs.min:
-            if f:
+            if is_float(arg):
                 return "arith.minimumf"
+            if is_unsigned(arg):
+                return "arith.minui"
             return "arith.minsi"
         case ffuncs.max:
-            if f:
+            if is_float(arg):
                 return "arith.maximumf"
+            if is_unsigned(arg):
+                return "arith.maxui"
             return "arith.maxsi"
         case ffuncs.and_:
             return "arith.andi"
@@ -68,30 +96,50 @@ def mlir_function_name(op, t: str) -> str:
             return "arith.ori"
         case ffuncs.xor:
             return "arith.xori"
+        case ffuncs.lshift:
+            return "arith.shli"
+        case ffuncs.rshift:
+            if is_unsigned(arg):
+                return "arith.shrui"
+            return "arith.shrsi"
+        case ffuncs.trunc:
+            if is_float(arg):
+                return "arith.truncf"
+            return "arith.trunci"
         case ffuncs.eq:
-            if f:
-                return "arith.cmpf oeq"
-            return "arith.cmpi eq"
+            if is_float(arg):
+                return "arith.cmpf oeq,"
+            return "arith.cmpi eq,"
         case ffuncs.ne:
-            if f:
-                return "arith.cmpf one"
-            return "arith.cmpi ne"
+            if is_float(arg):
+                return "arith.cmpf one,"
+            return "arith.cmpi ne,"
         case ffuncs.lt:
-            if f:
-                return "arith.cmpf olt"
-            return "arith.cmpi slt"
+            if is_float(arg):
+                return "arith.cmpf olt,"
+            if is_unsigned(arg):
+                return "arith.cmpi ult,"
+            return "arith.cmpi slt,"
         case ffuncs.le:
-            if f:
-                return "arith.cmpf ole"
-            return "arith.cmpi sle"
+            if is_float(arg):
+                return "arith.cmpf ole,"
+            if is_unsigned(arg):
+                return "arith.cmpi ule,"
+            return "arith.cmpi sle,"
         case ffuncs.gt:
-            if f:
-                return "arith.cmpf ogt"
-            return "arith.cmpi sgt"
+            if is_float(arg):
+                return "arith.cmpf ogt,"
+            if is_unsigned(arg):
+                return "arith.cmpi ugt,"
+            return "arith.cmpi sgt,"
         case ffuncs.ge:
-            if f:
-                return "arith.cmpf oge"
-            return "arith.cmpi sge"
+            if is_float(arg):
+                return "arith.cmpf oge,"
+            if is_unsigned(arg):
+                return "arith.cmpi uge,"
+            return "arith.cmpi sge,"
+        case ffuncs.scansearch:
+            return "scansearch"
         case MLIROperator():
             return op.mlir_name()
         case _:
@@ -125,6 +173,57 @@ def mlir_unary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
     res = ctx.new_ssa()
     ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av} : {t}")
     return res
+
+
+def mlir_call_function_call(mlir_name: str, ctx: Any, ret_t: str, *args: Any) -> str:
+    vs = [ctx(a) for a in args]
+    ts = [mlir_type(a.result_type) for a in args]
+    res = ctx.new_ssa()
+    ctx.exec(
+        f"{ctx.feed}{res} = func.call @{mlir_name}({', '.join(vs)}) "
+        f": ({', '.join(ts)}) -> {ret_t}"
+    )
+    return res
+
+
+def mlir_function_call(op, ctx, *args: Any) -> str:
+    match op:
+        case MLIROperator():
+            return op.mlir_function_call(ctx, *args)
+
+    match op:
+        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+            return mlir_nary_function_call(
+                mlir_function_name(op, args[0].result_type), ctx, *args
+            )
+        case (
+            ffuncs.sub
+            | ffuncs.truediv
+            | ffuncs.floordiv
+            | ffuncs.mod
+            | ffuncs.lshift
+            | ffuncs.rshift
+            | ffuncs.min
+            | ffuncs.max
+            | ffuncs.eq
+            | ffuncs.ne
+            | ffuncs.gt
+            | ffuncs.lt
+            | ffuncs.ge
+            | ffuncs.le
+        ):
+            return mlir_binary_function_call(
+                mlir_function_name(op, args[0].result_type), ctx, *args
+            )
+        case ffuncs.scansearch:
+            return mlir_call_function_call(
+                mlir_function_name(op, args[0].result_type),
+                ctx,
+                mlir_type(args[-1].result_type),
+                *args,
+            )
+        case _:
+            raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
 class MLIRArgumentFType(ABC):
@@ -199,7 +298,8 @@ class MLIRContext(Context):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def emit_global(self):
-        return "\n".join([*self.headers, self.emit()])
+        body = "\n".join([*MLIR_HELPERS.values(), self.emit()])
+        return f"module {{\n{body}\n}}\n"
 
     def block(self) -> "MLIRContext":
         blk = super().block()
