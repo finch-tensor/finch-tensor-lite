@@ -1,7 +1,8 @@
 from enum import Enum
 
-from .. import finch_notation as ntn
-from ..algebra import ffuncs
+from finchlite import finch_notation as ntn
+from finchlite.algebra import ffuncs
+
 from .lower import SymbolicExtent
 
 # TODO: move all extent classes and functions here

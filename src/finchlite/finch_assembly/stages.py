@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..symbolic import Stage
+from finchlite.symbolic import Stage
+
 from . import nodes as asm
 
 
@@ -29,7 +30,7 @@ class AssemblyLibrary(ABC):
 
 class AssemblyLoader(Stage):
     @abstractmethod
-    def __call__(self, term: asm.Module) -> AssemblyLibrary:
+    def lower(self, term: asm.Module) -> AssemblyLibrary:
         """
         Load the given assembly program into a runnable module.
         """
@@ -37,7 +38,7 @@ class AssemblyLoader(Stage):
 
 class AssemblyTransform(Stage):
     @abstractmethod
-    def __call__(self, term: asm.Module) -> asm.Module:
+    def lower(self, term: asm.Module) -> asm.Module:
         """
         Transform the given assembly term into another assembly term.
         """

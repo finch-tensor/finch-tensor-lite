@@ -4,10 +4,12 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import FType, FTyped, ImmutableStructFType, Tensor, TupleFType
-from ..compile.lower import FinchTensorFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, FTyped, ImmutableStructFType, TupleFType, bool_
+from finchlite.compile.lower import FinchTensorFType
+
+from .override_tensor import OverrideTensor
 
 
 class LevelFType(FType, ABC):
@@ -208,7 +210,7 @@ class Level(FTyped, ABC):
 
 
 @dataclass
-class FiberTensor(Tensor):
+class FiberTensor(OverrideTensor):
     """
     A class representing a tensor with fiber structure.
 
@@ -301,7 +303,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("lvl", self.lvl_t),
             ("shape", TupleFType.from_tuple(self.shape_type)),
             ("pos", self.position_type),
-            ("dirty_bit", np.bool_),
+            ("dirty_bit", bool_),
         ]
 
     def construct(self, shape: tuple[int, ...]):

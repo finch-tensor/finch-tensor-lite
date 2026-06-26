@@ -2,10 +2,7 @@ import numpy as np
 
 import finchlite.finch_logic as logic
 from finchlite import ffuncs, ftype
-from finchlite.autoschedule import NotationGenerator
-from finchlite.compile.bufferized_ndarray import (
-    BufferizedNDArray,
-)
+from finchlite.autoschedule import INTERPRET_NOTATION, NotationGenerator
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -18,7 +15,9 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.interface import INTERPRET_NOTATION
+from finchlite.tensor.bufferized_ndarray import (
+    BufferizedNDArray,
+)
 
 from .conftest import finch_assert_equal, reset_name_counts
 
@@ -28,31 +27,32 @@ def test_logic_compiler(file_regression):
         bodies=(
             Query(
                 lhs=Alias(name="A2"),
-                rhs=Aggregate(
-                    op=logic.Literal(val=ffuncs.add),
-                    init=logic.Literal(val=0),
-                    arg=Reorder(
-                        arg=MapJoin(
-                            op=logic.Literal(val=ffuncs.mul),
-                            args=(
-                                Table(
-                                    Alias(name="A0"),
-                                    (Field(name="i0"), Field(name="i1")),
-                                ),
-                                Table(
-                                    Alias(name="A1"),
-                                    (Field(name="i1"), Field(name="i2")),
+                rhs=Reorder(
+                    arg=Aggregate(
+                        op=logic.Literal(val=ffuncs.add),
+                        init=logic.Literal(val=0),
+                        arg=Reorder(
+                            arg=MapJoin(
+                                op=logic.Literal(val=ffuncs.mul),
+                                args=(
+                                    Table(
+                                        Alias(name="A0"),
+                                        (Field(name="i0"), Field(name="i1")),
+                                    ),
+                                    Table(
+                                        Alias(name="A1"),
+                                        (Field(name="i1"), Field(name="i2")),
+                                    ),
                                 ),
                             ),
+                            idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                         ),
-                        idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
+                        idxs=(Field(name="i1"),),
                     ),
-                    idxs=(Field(name="i1"),),
+                    idxs=(Field(name="i0"), Field(name="i2")),
                 ),
             ),
-            Plan(
-                bodies=(Produces(args=(Alias(name="A2"),)),),
-            ),
+            Produces(args=(Alias(name="A2"),)),
         ),
     )
 
@@ -63,7 +63,7 @@ def test_logic_compiler(file_regression):
     }
 
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}
+        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
     )
 
     file_regression.check(
@@ -92,12 +92,7 @@ def test_logic_compiler_inplace(file_regression):
                     arg=MapJoin(
                         op=Literal(ffuncs.add),
                         args=(
-                            Reorder(
-                                arg=Table(
-                                    Alias("A2"), (Field(name="i0"), Field(name="i2"))
-                                ),
-                                idxs=(Field(name="i0"), Field(name="i2")),
-                            ),
+                            Table(Alias("A2"), (Field(name="i0"), Field(name="i2"))),
                             Aggregate(
                                 op=logic.Literal(val=ffuncs.add),
                                 init=logic.Literal(val=0),
@@ -128,9 +123,7 @@ def test_logic_compiler_inplace(file_regression):
                     idxs=(Field(name="i0"), Field(name="i2")),
                 ),
             ),
-            Plan(
-                bodies=(Produces(args=(Alias(name="A2"),)),),
-            ),
+            Produces(args=(Alias(name="A2"),)),
         ),
     )
 
@@ -141,7 +134,7 @@ def test_logic_compiler_inplace(file_regression):
     }
 
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}
+        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
     )
 
     file_regression.check(

@@ -12,13 +12,13 @@ from finchlite.finch_logic import (
     StatsFactory,
     TensorStats,
 )
-
-from ..util.logging import LOG_LOGIC_POST_OPT
+from finchlite.symbolic.stage import UnvalidatedForm
+from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicCacheLRU_Embeddings_Norms(LogicLoader):
+class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
@@ -32,14 +32,13 @@ class LogicCacheLRU_Embeddings_Norms(LogicLoader):
         self.threshold = threshold
         self.norm_order = norm_order
 
-    def __call__(
+    def lower(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
-
         def apply_norm(cached_matrix, current_vec, norm_order):
             dist = np.abs(cached_matrix - current_vec)
             return vector_norm(dist, ord=norm_order, axis=1)

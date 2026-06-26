@@ -13,8 +13,8 @@ from typing import Any, cast
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
-from .. import finch_einsum as ein
-from ..algebra import (
+from finchlite import finch_einsum as ein
+from finchlite.algebra import (
     FinchOperator,
     FType,
     Tensor,
@@ -26,10 +26,9 @@ from ..algebra import (
     promote_type,
     return_type,
 )
-from ..algebra.ftypes import FDType
-from ..autoschedule.tensor_stats import StatsInterpreter
-from ..compile import BufferizedNDArray
-from ..finch_logic import (
+from finchlite.algebra.ftypes import FDType, FDTypeBuiltin, FDTypeNumpy
+from finchlite.autoschedule.tensor_stats import StatsInterpreter
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -44,8 +43,9 @@ from ..finch_logic import (
     Table,
     TensorStats,
 )
-from ..symbolic import gensym
-from .overrides import OverrideTensor
+from finchlite.symbolic import gensym
+from finchlite.tensor import BufferizedNDArray
+from finchlite.tensor.override_tensor import OverrideTensor
 
 
 class LazyTensorFType(TensorFType):
@@ -199,6 +199,9 @@ class LazyTensor(OverrideTensor):
         self._fill_value = fill_value
         self._element_type = element_type
 
+    def override_module(self):
+        return sys.modules[__name__]
+
     @property
     def ftype(self):
         return LazyTensorFType(
@@ -229,139 +232,6 @@ class LazyTensor(OverrideTensor):
     def shape_type(self) -> tuple:
         """Shape type of the tensor."""
         return self.ftype.shape_type
-
-    def override_module(self):
-        return sys.modules[__name__]
-
-    def __add__(self, other):
-        return add(self, other)
-
-    def __radd__(self, other):
-        return add(other, self)
-
-    def __sub__(self, other):
-        return subtract(self, other)
-
-    def __rsub__(self, other):
-        return subtract(other, self)
-
-    def __mul__(self, other):
-        return multiply(self, other)
-
-    def __rmul__(self, other):
-        return multiply(other, self)
-
-    def __abs__(self):
-        return abs(self)
-
-    def __pos__(self):
-        return positive(self)
-
-    def __neg__(self):
-        return negative(self)
-
-    # same as before?
-    def __and__(self, other):
-        return bitwise_and(self, other)
-
-    def __rand__(self, other):
-        return bitwise_and(other, self)
-
-    def __lshift__(self, other):
-        return bitwise_left_shift(self, other)
-
-    def __rlshift__(self, other):
-        return bitwise_left_shift(other, self)
-
-    def __or__(self, other):
-        return bitwise_or(self, other)
-
-    def __ror__(self, other):
-        return bitwise_or(other, self)
-
-    def __rshift__(self, other):
-        return bitwise_right_shift(self, other)
-
-    def __rrshift__(self, other):
-        return bitwise_right_shift(other, self)
-
-    def __xor__(self, other):
-        return bitwise_xor(self, other)
-
-    def __rxor__(self, other):
-        return bitwise_xor(other, self)
-
-    def __invert__(self):
-        return bitwise_inverse(self)
-
-    def __truediv__(self, other):
-        return truediv(self, other)
-
-    def __rtruediv__(self, other):
-        return truediv(other, self)
-
-    def __floordiv__(self, other):
-        return floordiv(self, other)
-
-    def __rfloordiv__(self, other):
-        return floordiv(other, self)
-
-    def __mod__(self, other):
-        return mod(self, other)
-
-    def __rmod__(self, other):
-        return mod(other, self)
-
-    def __pow__(self, other):
-        return power(self, other)
-
-    def __rpow__(self, other):
-        return power(other, self)
-
-    def __matmul__(self, other):
-        return matmul(self, other)
-
-    def __rmatmul__(self, other):
-        return matmul(other, self)
-
-    def __sin__(self):
-        return sin(self)
-
-    def __sinh__(self):
-        return sinh(self)
-
-    def __cos__(self):
-        return cos(self)
-
-    def __cosh__(self):
-        return cosh(self)
-
-    def __tan__(self):
-        return tan(self)
-
-    def __tanh__(self):
-        return tanh(self)
-
-    def __asin__(self):
-        return asin(self)
-
-    def __asinh__(self):
-        return asinh(self)
-
-    def __acos__(self):
-        return acos(self)
-
-    def __acosh__(self):
-        return acosh(self)
-
-    def __atan__(self):
-        return atan(self)
-
-    def __atanh__(self):
-        return atanh(self)
-
-    def __atan2__(self, other):
-        return atan2(self, other)
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -401,76 +271,64 @@ class LazyTensor(OverrideTensor):
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
 
-    def __log__(self):
-        return log(self)
 
-    def __log1p__(self):
-        return log1p(self)
-
-    def __log2__(self):
-        return log2(self)
-
-    def __log10__(self):
-        return log10(self)
-
-    def __logaddexp__(self, other):
-        return logaddexp(self, other)
-
-    def __logical_and__(self, other):
-        return logical_and(self, other)
-
-    def __logical_or__(self, other):
-        return logical_or(self, other)
-
-    def __logical_xor__(self, other):
-        return logical_xor(self, other)
-
-    def __logical_not__(self):
-        return logical_not(self)
-
-    def __lt__(self, other):
-        return less(self, other)
-
-    def __le__(self, other):
-        return less_equal(self, other)
-
-    def __gt__(self, other):
-        return greater(self, other)
-
-    def __ge__(self, other):
-        return greater_equal(self, other)
-
-    def __eq__(self, other):
-        return equal(self, other)
-
-    def __ne__(self, other):
-        return not_equal(self, other)
-
-
-def asarray(arg: Any, format: TensorFType | None = None) -> Any:
+def asarray(
+    obj: Any,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: TensorFType | None = None,
+) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
-
-    Args:
-        arg: The object to be converted.
-        format: The format for the result array.
-
-    Returns:
-        The Tensor type result of the given object.
+    https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html
     """
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+
     if format is None:
-        from finchlite.interface.scalar import Scalar
+        from finchlite.tensor.scalar import Scalar
 
-        if isinstance(arg, np.ndarray):
-            return BufferizedNDArray.from_numpy(arg)
-        if np.isscalar(arg) or arg is None:
-            return Scalar(arg)
-        return arg
+        if isinstance(obj, BufferizedNDArray):
+            if copy is True:
+                return BufferizedNDArray.from_numpy(obj.to_numpy().copy())
+            return obj
+        if isinstance(obj, np.ndarray):
+            if copy is True:
+                obj = obj.copy()
+            return BufferizedNDArray.from_numpy(obj)
+        if np.isscalar(obj) or obj is None:
+            if dtype is not None:
+                obj = ftype(dtype)(obj)
+            elif obj is not None:
+                obj = np.asarray(obj).flat[0]
+            return Scalar(obj)
+        try:
+            np_arr = np.asarray(obj)
+            if np_arr.dtype != object:
+                if dtype is not None:
+                    ft = ftype(dtype)
+                    np_dtype = (
+                        ft.dtype
+                        if hasattr(ft, "dtype")
+                        else ft.type
+                        if hasattr(ft, "type")
+                        else dtype
+                    )
+                    np_arr = np_arr.astype(np_dtype)
+                elif copy is True:
+                    np_arr = np_arr.copy()
+                return BufferizedNDArray.from_numpy(np_arr)
+        except (TypeError, ValueError):
+            pass
+        return obj
 
-    if isinstance(arg, np.ndarray):
-        return format.from_numpy(arg)
-    return format(arg)
+    if isinstance(obj, np.ndarray):
+        return format.from_numpy(obj)
+    return format(obj)
 
 
 def _is_convertible_to_array(arg: Any) -> bool:
@@ -503,6 +361,14 @@ def lazy(arr) -> LazyTensor:
     return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
 
 
+def _np_dtype(dtype):
+    if isinstance(dtype, FDTypeNumpy):
+        return dtype.dtype
+    if isinstance(dtype, FDTypeBuiltin):
+        return dtype.type
+    return dtype
+
+
 def full(
     shape: int | tuple[int, ...],
     fill_value: bool | complex,
@@ -531,13 +397,61 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    val = lazy(np.full((), fill_value, dtype=dtype))
+    val = lazy(np.full((), fill_value, dtype=_np_dtype(dtype)))
     if isinstance(shape, int):
         shape = (shape,)
     return broadcast_to(val, shape)
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
+def full_like(x, /, fill_value, *, dtype=None):
+    x = lazy(x)
+    return full(
+        x.shape, fill_value, dtype=dtype if dtype is not None else x.element_type
+    )
+
+
+def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
+    return broadcast_to(
+        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype))),
+        (num,),
+    )
+
+
+def zeros(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+
+
+def ones(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 1, dtype=dtype if dtype is not None else np.float64)
+
+
+def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+
+
+def zeros_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype=None,
+) -> LazyTensor:
+    if stop is None:
+        start, stop = 0, start
+    arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
+    return broadcast_to(lazy(arr), (len(arr),))
+
+
+def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -556,7 +470,7 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
         data type as ``x``.
     """
     arg = lazy(arg)
-    axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
+    axis = normalize_axis_tuple(axes, arg.ndim + len(axes))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
     expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
     data, ctx = arg.ctx.eval(expr)
@@ -1101,10 +1015,10 @@ def matrix_transpose(x) -> LazyTensor:
             "Input tensor must have at least 2 dimensions for transposition"
         )
     # swap the last two axes
-    return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
+    return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
-def bitwise_inverse(x) -> LazyTensor:
+def bitwise_invert(x) -> LazyTensor:
     return elementwise(ffuncs.invert, lazy(x))
 
 
@@ -1132,7 +1046,7 @@ def truediv(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
 
 
-def floordiv(x1, x2) -> LazyTensor:
+def floor_divide(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.floordiv, lazy(x1), lazy(x2))
 
 
@@ -1152,7 +1066,7 @@ def remainder(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.remainder, lazy(x1), lazy(x2))
 
 
-def conjugate(x) -> LazyTensor:
+def conj(x) -> LazyTensor:
     """
     Computes the complex conjugate of the input tensor `x`.
 
@@ -1248,7 +1162,7 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
 
     return reduce(
         ffuncs.add,
-        multiply(conjugate(x1), x2),
+        multiply(conj(x1), x2),
         axis=axis,
     )
 
@@ -1881,7 +1795,7 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     for dest, src in sorted(zip(destination, source, strict=True)):
         final_order.insert(dest, src)
 
-    return permute_dims(x, axis=tuple(final_order))
+    return permute_dims(x, axes=tuple(final_order))
 
 
 def stack(arrays, /, axis: int = 0) -> LazyTensor:
@@ -2053,6 +1967,10 @@ def equal(x1, x2) -> LazyTensor:
 
 def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+
+
+def where(condition, x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.where, lazy(condition), lazy(x1), lazy(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):

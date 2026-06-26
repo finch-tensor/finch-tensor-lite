@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self
 
-from ..algebra import ftype, return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, literal_repr
-from ..util import qual_str
+from finchlite.algebra import ftype, return_type
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
 
 """
 Finch Fused IR draft.

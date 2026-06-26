@@ -2,8 +2,8 @@ from typing import Any
 
 import numpy as np
 
-from ..algebra import FType, ftype, intp
-from ..algebra.tensor import Tensor, TensorFType
+from finchlite.algebra import FType, ftype, intp
+from finchlite.algebra.tensor import Tensor, TensorFType
 
 
 class NumPyFType(TensorFType):

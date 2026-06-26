@@ -4,8 +4,13 @@ import finchlite
 from finchlite.algebra import ffuncs
 from finchlite.algebra.ftypes import ftype
 from finchlite.autoschedule import (
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    LogicCapture,
     normalize_names,
 )
+from finchlite.autoschedule.formatter import DefaultLogicFormatter
+from finchlite.autoschedule.loop_ordering import set_loop_order
 from finchlite.autoschedule.optimize import (
     lift_fields,
     optimize,
@@ -13,7 +18,6 @@ from finchlite.autoschedule.optimize import (
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
-    set_loop_order,
 )
 from finchlite.autoschedule.standardize import (
     concordize,
@@ -22,6 +26,7 @@ from finchlite.autoschedule.standardize import (
     push_fields,
     standardize,
 )
+from finchlite.autoschedule.tensor_stats import DenseStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -308,7 +313,7 @@ def test_propagate_copy_queries():
         )
     )
 
-    result = propagate_copy_queries(plan)
+    result = propagate_copy_queries(plan, {})
     assert result == expected
 
 
@@ -522,57 +527,67 @@ def test_concordize():
 
 
 def test_set_loop_order():
-    plan = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(ffuncs.add),
-            Literal(0),
-            Reorder(
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Reorder(
-                            Table(Alias("A"), (Field("i0"), Field("i1"))),
-                            (Field("i0"), Field("i1")),
+    plan = Plan(
+        (
+            Query(
+                Alias("C"),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Reorder(
+                        MapJoin(
+                            Literal(ffuncs.mul),
+                            (
+                                Reorder(
+                                    Table(Alias("A"), (Field("i0"), Field("i1"))),
+                                    (Field("i0"), Field("i1")),
+                                ),
+                                Reorder(
+                                    Table(Alias("B"), (Field("i1"), Field("i2"))),
+                                    (Field("i1"), Field("i2")),
+                                ),
+                            ),
                         ),
-                        Reorder(
-                            Table(Alias("B"), (Field("i1"), Field("i2"))),
-                            (Field("i1"), Field("i2")),
-                        ),
+                        (Field("i0"), Field("i2"), Field("i1")),
                     ),
+                    (Field("i1"),),
                 ),
-                (Field("i0"), Field("i2"), Field("i1")),
             ),
-            (Field("i1"),),
-        ),
+            Produces((Alias("C"),)),
+        )
     )
 
-    expected = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(ffuncs.add),
-            Literal(0),
-            Reorder(
-                Reorder(
-                    MapJoin(
-                        Literal(ffuncs.mul),
-                        (
-                            Reorder(
-                                Table(Alias("A"), (Field("i0"), Field("i1"))),
-                                (Field("i0"), Field("i1")),
+    expected = Plan(
+        (
+            Query(
+                Alias("C"),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Reorder(
+                        Reorder(
+                            MapJoin(
+                                Literal(ffuncs.mul),
+                                (
+                                    Reorder(
+                                        Table(Alias("A"), (Field("i0"), Field("i1"))),
+                                        (Field("i0"), Field("i1")),
+                                    ),
+                                    Reorder(
+                                        Table(Alias("B"), (Field("i1"), Field("i2"))),
+                                        (Field("i1"), Field("i2")),
+                                    ),
+                                ),
                             ),
-                            Reorder(
-                                Table(Alias("B"), (Field("i1"), Field("i2"))),
-                                (Field("i1"), Field("i2")),
-                            ),
+                            (Field("i0"), Field("i2"), Field("i1")),
                         ),
+                        (Field("i0"), Field("i1"), Field("i2")),
                     ),
-                    (Field("i0"), Field("i2"), Field("i1")),
+                    (Field("i1"),),
                 ),
-                (Field("i0"), Field("i1"), Field("i2")),
             ),
-            (Field("i1"),),
-        ),
+            Produces((Alias("C"),)),
+        )
     )
 
     result = set_loop_order(plan)
@@ -690,15 +705,20 @@ def test_scheduler_e2e_sddmm(file_regression):
         )
     )
 
-    plan_opt, bindings = optimize(
-        plan,
-        {
-            Alias("S"): ftype(finchlite.asarray(s)),
-            Alias("A"): ftype(finchlite.asarray(a)),
-            Alias("B"): ftype(finchlite.asarray(b)),
-        },
+    capture = LogicCapture()
+    scheduler = DefaultLogicOptimizer(
+        DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
-    plan_opt, bindings = standardize(plan_opt, bindings)
+    bindings = {
+        Alias("S"): finchlite.asarray(s),
+        Alias("A"): finchlite.asarray(a),
+        Alias("B"): finchlite.asarray(b),
+    }
+    binding_ftypes = {var: val.ftype for var, val in bindings.items()}
+    stats_factory = DenseStatsFactory()
+    stats = {}
+    scheduler(plan, binding_ftypes, stats, stats_factory)
+    plan_opt = capture.last_prgm
 
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"

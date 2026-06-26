@@ -1,6 +1,7 @@
 from functools import reduce
 
-from ....finch_logic import Field, Query
+from finchlite.finch_logic import Field, Query
+
 from .annotated_query import AnnotatedQuery
 
 

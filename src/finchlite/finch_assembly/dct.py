@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..algebra import FType, FTyped
+from finchlite.algebra import FType, FTyped
 
 
 class Dict(FTyped, ABC):

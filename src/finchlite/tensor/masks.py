@@ -2,13 +2,13 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import ImmutableStructFType, ffuncs
-from ..compile import looplets as lplt
-from ..interface import Scalar
-from ..tensor import Level, LevelFType
-from .fiber_tensor import FiberTensor, FiberTensorFields
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import ImmutableStructFType, ffuncs
+from finchlite.compile import looplets as lplt
+
+from .fiber_tensor import FiberTensor, FiberTensorFields, Level, LevelFType
+from .scalar import Scalar
 
 
 @dataclass(unsafe_hash=True)
@@ -93,12 +93,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             split=lambda ctx, ext: ntn.Call(
                 ntn.L(ffuncs.add), (tns.visited_idxs[-1], ext.get_unit())
             ),
-            tail=lambda ctx, idx: lplt.Run(
-                lambda ctx, idx: lplt.Leaf(
-                    # TODO: proper handling for scalars
-                    lambda ctx: ntn.Stack(asm.L(scalar), scalar.ftype)
-                )
-            ),
+            tail=lambda ctx, idx: lplt.Run(scalar),
         )
 
     def level_asm_unpack(self, ctx, var_n, val):

@@ -5,27 +5,35 @@ from typing import Any, overload
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import (
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import (
     FType,
     FTyped,
     ImmutableStructFType,
     TensorFType,
     ffuncs,
     ftype,
-    register_property,
 )
-from ..algebra.algebra import FinchOperator
-from ..finch_assembly import (
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.codegen.numba_codegen import NumbaNAryOperator
+from finchlite.finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyTransform,
 )
-from ..finch_notation import NotationLoader
-from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
-from ..util.logging import LOG_ASSEMBLY
+from finchlite.finch_notation import LoopletSimplify, NotationLoader
+from finchlite.symbolic import (
+    Context,
+    PostOrderDFS,
+    PostWalk,
+    Rewrite,
+    ScopedDict,
+    UnvalidatedForm,
+)
+from finchlite.util.logging import LOG_ASSEMBLY
+
 from .stages import NotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
@@ -118,29 +126,30 @@ class _MakeExtent(FinchOperator):
 make_extent = _MakeExtent()
 
 
-def dimension(tns, mode: int) -> Extent:
-    end = tns.shape[mode]
-    return Extent(ftype(end)(0), end)
-
-
 def numba_lower_dimension(ctx, tns, mode: int) -> str:
     return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
 
 
-register_property(
-    dimension,
-    "__call__",
-    "return_type",
-    lambda op, x, y: ExtentFType(ftype(np.intp), ftype(np.intp)),  # type: ignore[abstract]
-)
+class _Dimension(FinchOperator, NumbaNAryOperator):
+    def __call__(self, tns, mode: int) -> Extent:
+        end = tns.shape[mode]
+        return Extent(ftype(end)(0), end)
+
+    def return_type(self, tns: FType, mode: FType) -> FType:  # type: ignore[override]
+        return ExtentFType(ftype(np.intp), ftype(np.intp))  # type: ignore[abstract]
+
+    def numba_function_call(self, val: Any, ctx: Any, *args: Any) -> Any:
+        tns, mode = args
+        return numba_lower_dimension(ctx, tns, mode)
+
+    def numba_name(self) -> str:
+        return "dimension"
+
+    def __repr__(self) -> str:
+        return "dimension"
 
 
-register_property(
-    dimension,
-    "numba_literal",
-    "__attr__",
-    lambda func, ctx, tns, mode: numba_lower_dimension(ctx, tns, mode),
-)
+dimension = _Dimension()
 
 
 @dataclass(frozen=True)
@@ -301,7 +310,7 @@ class HaltState:
     return_var: Any = None
 
 
-class NotationCompiler(NotationLoader):
+class NotationCompiler(UnvalidatedForm, NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
@@ -316,7 +325,7 @@ class NotationCompiler(NotationLoader):
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
 
-    def __call__(self, prgm: ntn.Module) -> AssemblyLibrary:
+    def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
         for transform in self.ctx_transforms:
             asm_code = transform(asm_code)
@@ -324,7 +333,7 @@ class NotationCompiler(NotationLoader):
         return self.ctx_load(asm_code)
 
 
-class AssemblyGenerator(NotationLowerer):
+class AssemblyGenerator(UnvalidatedForm, NotationLowerer):
     """
     Compiles Finch Notation to Finch Assembly.
     """
@@ -332,7 +341,7 @@ class AssemblyGenerator(NotationLowerer):
     def __init__(self):
         pass
 
-    def __call__(self, term: ntn.Module) -> asm.Module:
+    def lower(self, term: ntn.Module) -> asm.Module:
         ctx = AssemblyContext()
         return ctx(term)
 
@@ -557,18 +566,20 @@ class AssemblyContext(Context):
                 op_e = self(op)
                 return tns.result_type.lower_thaw(self, tns, op_e)
             case ntn.If(cond, body):
-                ctx = self.block()
-                ctx_2 = ctx.scope()
+                cond_e = self(cond)
+                ctx_2 = self.scope()
                 ctx_2(body)
-                ctx.exec(asm.If(ctx(cond), ctx_2.emit()))
+                self.exec(asm.If(cond_e, asm.Block(ctx_2.emit())))
                 return None
             case ntn.IfElse(cond, body, else_body):
-                ctx = self.block()
-                ctx_2 = ctx.scope()
+                cond_e = self(cond)
+                ctx_2 = self.scope()
                 ctx_2(body)
-                ctx_3 = ctx.scope()
+                ctx_3 = self.scope()
                 ctx_3(else_body)
-                ctx.exec(asm.IfElse(ctx(cond), ctx_2.emit(), ctx_3.emit()))
+                self.exec(
+                    asm.IfElse(cond_e, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit()))
+                )
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
                 ctx = self.scope()
@@ -663,6 +674,9 @@ class LoopletPass(ABC):
     @property
     @abstractmethod
     def priority(self): ...
+
+    def __init__(self):
+        self.looplet_simplify = LoopletSimplify()
 
     def __lt__(self, other):
         assert isinstance(other, LoopletPass)

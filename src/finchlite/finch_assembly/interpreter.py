@@ -4,8 +4,9 @@ import sys
 from dataclasses import dataclass
 from typing import Any, overload
 
-from ..algebra import fisinstance
-from ..symbolic import ScopedDict
+from finchlite.algebra import fisinstance
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
+
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 
@@ -55,7 +56,7 @@ class HaltState:
     return_value: Any = None
 
 
-class AssemblyInterpreter(AssemblyLoader):
+class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
     """
     An interpreter for FinchAssembly.
     """
@@ -131,6 +132,9 @@ class AssemblyInterpreter(AssemblyLoader):
             and self.function_state.should_halt
         )
 
+    def lower(self, prgm: asm.Module):
+        return self._dispatch(prgm)
+
     @overload
     def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
 
@@ -141,6 +145,11 @@ class AssemblyInterpreter(AssemblyLoader):
         """
         Run the program.
         """
+        if isinstance(prgm, asm.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm):
         match prgm:
             case asm.Literal(value):
                 return value

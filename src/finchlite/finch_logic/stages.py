@@ -1,28 +1,28 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from finchlite.algebra.tensor import Tensor, TensorFType
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.symbolic import Stage
 
-from ..finch_assembly import AssemblyLibrary
-from ..symbolic import Stage
 from . import nodes as lgc
 from .tensor_stats import StatsFactory, TensorStats
 
 
 class LogicEvaluator(Stage):
     @abstractmethod
-    def __call__(
+    def lower(
         self, term: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
-    ) -> lgc.TableValue | tuple[Tensor, ...]:
+    ):
         """
         Evaluate the given logic.
         """
 
 
-class LogicLoader(ABC):
+class LogicLoader(Stage):
     @abstractmethod
-    def __call__(
+    def lower(
         self,
         term: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
@@ -38,37 +38,6 @@ class LogicLoader(ABC):
         single method called `main` which implements the logic. Also return a
         dictionary including additional tables needed to run the kernel.
         """
-
-
-class LogicTransform(ABC):
-    @abstractmethod
-    def __call__(
-        self, term: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
-    ) -> tuple[lgc.LogicStatement, dict[lgc.Alias, TensorFType]]:
-        """
-        Transform the given logic term into another logic term.
-        """
-
-
-class OptLogicLoader(LogicLoader):
-    def __init__(self, *opts: LogicTransform, ctx: LogicLoader):
-        self.ctx = ctx
-        self.opts = opts
-
-    def __call__(
-        self,
-        term: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-    ]:
-        for opt in self.opts:
-            term, bindings = opt(term, bindings or {})
-        return self.ctx(term, bindings, stats, stats_factory)
 
 
 def compute_shape_vars(

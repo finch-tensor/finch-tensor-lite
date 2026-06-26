@@ -22,19 +22,18 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
+from finchlite.codegen.buffers import CHashTable, MallocBuffer, NumbaHashTable
 from finchlite.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
     serialize_to_c,
 )
-from finchlite.codegen.hashtable import CHashTable, NumbaHashTable
-from finchlite.codegen.malloc_buffer import MallocBuffer
 from finchlite.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finchlite.compile import BufferizedNDArrayFType
+from finchlite.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 
@@ -88,7 +87,7 @@ def test_buffer_function():
     b = NumpyBuffer(a)
     f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
     k = finchlite.codegen.c_codegen.CKernel(
-        f, finchlite.none_, [NumpyBufferFType(np.float64)]
+        f, finchlite.none_, [NumpyBufferFType(ftypes.float64)]
     )
     k(b)
     result = b.arr
@@ -166,10 +165,10 @@ def test_dot_product_malloc(compiler, buffer):
     a = [1.0, 2.0, 3.0]
     b = [4.0, 5.0, 6.0]
 
-    a_buf = buffer(len(a), np.float64, a)
-    b_buf = buffer(len(b), np.float64, b)
-    ab = buffer(len(a), np.float64, a)
-    bb = buffer(len(b), np.float64, b)
+    a_buf = buffer(len(a), ftypes.float64, a)
+    b_buf = buffer(len(b), ftypes.float64, b)
+    ab = buffer(len(a), ftypes.float64, a)
+    bb = buffer(len(b), ftypes.float64, b)
 
     c = asm.Variable("c", finchlite.float64)
     i = asm.Variable("i", finchlite.int64)
@@ -247,7 +246,7 @@ def test_dot_product_malloc(compiler, buffer):
 def test_malloc_resize(compiler, new_size):
     a = [1.0, 4.0, 3.0, 4.0]
 
-    ab = MallocBuffer(len(a), np.float64, a)
+    ab = MallocBuffer(len(a), ftypes.float64, a)
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("b_", ab.ftype)
@@ -370,8 +369,8 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
 
     c = asm.Variable("c", finchlite.float64)
     i = asm.Variable("i", finchlite.int64)
-    ab = buffer(len(a), np.float64, a)
-    bb = buffer(len(b), np.float64, b)
+    ab = buffer(len(a), ftypes.float64, a)
+    bb = buffer(len(b), ftypes.float64, b)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -652,8 +651,8 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
     ab_safe = SafeBuffer(ab)
     ab_v = asm.Variable("a", ab_safe.ftype)
     ab_slt = asm.Slot("a_", ab_safe.ftype)
-    idx = asm.Variable("idx", ctypes.c_size_t)
-    val = asm.Variable("val", ctypes.c_int64)
+    idx = asm.Variable("idx", ftype(np.intp))
+    val = asm.Variable("val", ftype(np.int64))
 
     res_var = asm.Variable("val", ab_safe.ftype.element_type)
     res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
@@ -690,7 +689,7 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
                             idx,
                             val,
                         ),
-                        asm.Return(asm.Literal(ctypes.c_int64(0))),
+                        asm.Return(asm.Literal(np.int64(0))),
                     )
                 ),
             ),
@@ -876,30 +875,31 @@ def test_c_store_safebuffer(size, idx, value):
     ],
 )
 def test_np_c_serialization(value, np_type, c_type):
-    serialized = serialize_to_c(np_type, np_type(value))
+    fmt = ftype(np_type)
+    serialized = serialize_to_c(fmt, np_type(value))
     assert serialized.value == c_type(value).value
     assert isinstance(serialized, c_type)
-    constructed = construct_from_c(np_type, serialized)
+    constructed = construct_from_c(fmt, serialized)
     assert constructed == np_type(value)
-    assert deserialize_from_c(np_type, constructed, serialized) is None
+    assert deserialize_from_c(fmt, constructed, serialized) is None
 
 
 @pytest.mark.parametrize(
-    "value,c_type",
+    "value,fmt,c_type",
     [
-        (3, ctypes.c_int64),
-        (1, ctypes.c_float),
-        (1.2, ctypes.c_double),
+        (3, ftype(np.int64), ctypes.c_int64),
+        (1, ftype(np.float32), ctypes.c_float),
+        (1.2, ftype(np.float64), ctypes.c_double),
     ],
 )
-def test_ctypes_c_serialization(value, c_type):
+def test_ctypes_c_serialization(value, fmt, c_type):
     cvalue = c_type(value)
-    serialized = serialize_to_c(c_type, cvalue)
+    serialized = serialize_to_c(fmt, cvalue.value)
     assert serialized.value == c_type(value).value
     assert isinstance(serialized, c_type)
-    constructed = construct_from_c(c_type, serialized)
-    assert constructed.value == c_type(value).value
-    assert deserialize_from_c(c_type, constructed, serialized) is None
+    constructed = construct_from_c(fmt, serialized)
+    assert constructed == fmt(value)
+    assert deserialize_from_c(fmt, constructed, serialized) is None
 
 
 @pytest.mark.parametrize(
@@ -912,19 +912,20 @@ def test_ctypes_c_serialization(value, c_type):
 )
 def test_np_numba_serialization(value, np_type):
     cvalue = np_type(value)
-    serialized = serialize_to_numba(np_type, cvalue)
+    fmt = ftype(np_type)
+    serialized = serialize_to_numba(fmt, cvalue)
     assert serialized == np_type(value)
     assert isinstance(serialized, np_type)
-    constructed = construct_from_numba(np_type, serialized)
+    constructed = construct_from_numba(fmt, serialized)
     assert constructed == np_type(value)
-    assert deserialize_from_numba(np_type, constructed, serialized) is None
+    assert deserialize_from_numba(fmt, constructed, serialized) is None
 
 
 @pytest.mark.parametrize(
     "fmt_fn",
     [
         lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(dtype),
+            buffer_type=NumpyBufferFType(ftype(dtype)),
             ndim=2,
             dimension_type=(ftypes.intp, ftypes.intp),
         ),
@@ -935,11 +936,9 @@ def test_np_numba_serialization(value, np_type):
         ),
     ],
 )
+@pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_numba(fmt_fn, dtype):
-    ctx = finchlite.get_default_scheduler()  # TODO: as fixture
-    finchlite.set_default_scheduler(ctx=finchlite.interface.COMPILE_NUMBA)
-
     a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
     b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
@@ -955,7 +954,32 @@ def test_e2e_numba(fmt_fn, dtype):
 
     finch_assert_equal(result, a @ b)
 
-    finchlite.set_default_scheduler(ctx=ctx)
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_numba(a, dtype):
+    """Transposing through the compiled (assembly/numba) backend must produce
+    the actual transpose, not zeros.
+
+    Regression: a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = in[..., i]``). The notation->assembly
+    lowering dropped that ``If`` body (it was emitted into a throwaway block),
+    so ``compute(permute_dims(x))`` returned an all-zero array on every
+    compiled backend while the notation interpreter stayed correct. See the
+    lower-level reproduction in
+    ``test_notation_compiler.test_if_in_loop_is_lowered``.
+    """
+    a = a.astype(dtype)
+    wa = finchlite.lazy(finchlite.asarray(a))
+    result = finchlite.compute(finchlite.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
 
 
 @pytest.mark.parametrize(

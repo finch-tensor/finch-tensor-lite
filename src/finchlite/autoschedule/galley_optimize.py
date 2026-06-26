@@ -8,11 +8,24 @@ from __future__ import annotations
 import logging
 import time
 
-from ..algebra.tensor import TensorFType
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import (
+from finchlite.algebra.tensor import TensorFType
+from finchlite.autoschedule.galley.logical_optimizer.annotated_query import (
+    AnnotatedQuery,
+)
+from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
+from finchlite.autoschedule.galley.logical_optimizer.logic_to_stats import (
+    insert_statistics,
+)
+from finchlite.autoschedule.galley.logical_optimizer.query_normalization import (
+    postprocess_plan_after_galley,
+    preprocess_plan_for_galley,
+)
+from finchlite.autoschedule.stages import LogicFusionOptimizer
+from finchlite.finch_logic import (
     Alias,
-    Field,
     LogicLoader,
     LogicStatement,
     Plan,
@@ -20,17 +33,7 @@ from ..finch_logic import (
     StatsFactory,
     TensorStats,
 )
-from ..util.logging import LOG_GALLEY
-from .galley.logical_optimizer.annotated_query import AnnotatedQuery
-from .galley.logical_optimizer.branch_and_bound import (
-    GalleyOptimizer,
-    pruned_query_to_plan,
-)
-from .galley.logical_optimizer.logic_to_stats import insert_statistics
-from .galley.logical_optimizer.query_normalization import (
-    postprocess_plan_after_galley,
-    preprocess_plan_for_galley,
-)
+from finchlite.util.logging import LOG_GALLEY
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
@@ -93,7 +96,7 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyLogicalOptimizer(LogicLoader):
+class GalleyLogicalOptimizer(LogicFusionOptimizer):
     """
     LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
     then forwards the Plan to the downstream loader ``ctx``.
@@ -115,17 +118,13 @@ class GalleyLogicalOptimizer(LogicLoader):
         self.optimizer = optimizer
         self.last_optimize_plan_s: float | None = None
 
-    def __call__(
+    def lower(
         self,
         term: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> tuple[
-        AssemblyLibrary,
-        dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],
-    ]:
+    ):
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
         logger.debug("Optimizing plan: %s", term)

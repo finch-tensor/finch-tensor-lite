@@ -1,4 +1,5 @@
-from ..symbolic import PostOrderDFS
+from finchlite.symbolic import PostOrderDFS
+
 from .nodes import AssemblyNode, Variable
 
 

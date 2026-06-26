@@ -3,13 +3,18 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from ... import finch_assembly as asm
-from ... import finch_notation as ntn
-from ...algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
-from ...compile import looplets as lplt
-from ...finch_assembly import parse_assembly
-from ...interface.scalar import Scalar
-from ..fiber_tensor import FiberTensorFields, FiberTensorFType, Level, LevelFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
+from finchlite.compile import looplets as lplt
+from finchlite.finch_assembly import parse_assembly
+from finchlite.tensor.fiber_tensor import (
+    FiberTensorFields,
+    FiberTensorFType,
+    Level,
+    LevelFType,
+)
+from finchlite.tensor.scalar import Scalar
 
 
 class SparseListLevelFields(NamedTuple):
@@ -298,11 +303,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ),
                     stop=lambda ctx: ntn.Variable(i_stop.name, self.position_type),
                     chunk=lplt.Sequence(
-                        head=lambda ctx, idx: lplt.Run(
-                            lambda ctx, idx: lplt.Leaf(
-                                lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
-                            ),
-                        ),
+                        head=lambda ctx, idx: lplt.Run(scalar),
                         split=lambda ctx, ext: ntn.Variable(
                             i_stop.name, self.position_type
                         ),
@@ -322,11 +323,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ntn.L(ffuncs.add),
                     (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
                 ),
-                tail=lambda ctx, idx: lplt.Run(
-                    lambda ctx, idx: lplt.Leaf(
-                        lambda ctx: ntn.Stack(asm.Literal(scalar), scalar.ftype)
-                    )
-                ),
+                tail=lambda ctx, idx: lplt.Run(scalar),
             ),
         )
 

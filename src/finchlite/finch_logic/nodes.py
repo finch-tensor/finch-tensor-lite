@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
-from ..algebra import (
+from finchlite.algebra import (
     FType,
     FTyped,
     ffuncs,
@@ -14,14 +14,8 @@ from ..algebra import (
     promote_type,
     return_type,
 )
-from ..symbolic import (
-    Context,
-    NamedTerm,
-    Term,
-    TermTree,
-    literal_repr,
-)
-from ..util import qual_str
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
 
 
 def merge_dim_type(d1, d2):

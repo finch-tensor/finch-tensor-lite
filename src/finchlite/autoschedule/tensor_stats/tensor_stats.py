@@ -4,9 +4,9 @@ from abc import abstractmethod
 from collections.abc import Iterable, Mapping
 from typing import Any, Generic, TypeVar
 
+from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field, StatsFactory, TensorStats
 
-from ...algebra import FinchOperator
 from .tensor_def import TensorDef
 
 TS = TypeVar("TS", bound="BaseTensorStats")

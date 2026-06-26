@@ -27,7 +27,6 @@ from .nodes import (
 from .stages import (
     LogicEvaluator,
     LogicLoader,
-    LogicTransform,
     compute_shape_vars,
 )
 from .tensor_stats import StatsFactory, TensorStats
@@ -43,7 +42,6 @@ __all__ = [
     "LogicLoader",
     "LogicNode",
     "LogicStatement",
-    "LogicTransform",
     "LogicTree",
     "MapJoin",
     "MockLogicKernel",

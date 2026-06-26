@@ -1,17 +1,17 @@
 from functools import reduce
 from typing import overload
 
+from finchlite.algebra import ffuncs, is_associative, is_commutative
 from finchlite.algebra.tensor import TensorFType
-from finchlite.finch_logic import LogicExpression, LogicNode, StatsFactory, TensorStats
-
-from ..algebra import ffuncs, is_associative, is_commutative
-from ..algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
-from ..finch_logic import (
+from finchlite.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
     Literal,
+    LogicExpression,
     LogicLoader,
+    LogicNode,
     LogicStatement,
     MapJoin,
     MockLogicLoader,
@@ -20,9 +20,11 @@ from ..finch_logic import (
     Query,
     Relabel,
     Reorder,
+    StatsFactory,
     Table,
+    TensorStats,
 )
-from ..symbolic import (
+from finchlite.symbolic import (
     Chain,
     Fixpoint,
     Namespace,
@@ -30,8 +32,10 @@ from ..symbolic import (
     PostWalk,
     PreWalk,
     Rewrite,
+    UnvalidatedForm,
     gensym,
 )
+
 from .normalize import normalize_names
 
 
@@ -99,11 +103,11 @@ def standardize_inplace_queries(
 
                 lhs_arg = lhs_arg[0]
                 match lhs_arg:
-                    case Reorder(Table(_), idxs_2) if idxs_2 == idxs_1:
+                    case Reorder(Table(_, idxs_2), _) if idxs_2 == idxs_1:
                         others = filter(lambda arg: arg is not lhs_arg, args)
                         return Query(
                             lhs,
-                            Reorder(MapJoin(op, (lhs_arg, *others)), idxs_1),
+                            Reorder(MapJoin(op, (lhs_arg.arg, *others)), idxs_1),
                         )
 
                     case _:
@@ -132,8 +136,8 @@ def standardize_inplace_queries(
                     MapJoin(
                         op,
                         (
-                            Reorder(Table(lhs_1), idxs_1) as lhs_arg,
-                            Reorder(MapJoin(), _) as non_lhs_arg,
+                            Table(lhs_1, idxs_1) as lhs_arg,
+                            Reorder() as non_lhs_arg,
                         ),
                     ),
                     idxs_2,
@@ -167,7 +171,7 @@ def split_increments(root: LogicStatement) -> LogicStatement:
             case Query(
                 lhs,
                 Reorder(
-                    MapJoin(op, (Reorder(Table(lhs_1), idxs_1), Reorder(Table(), _))),
+                    MapJoin(op, (Table(lhs_1), idxs_1, Reorder(Table(), _))),
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2:
@@ -205,7 +209,6 @@ def standardize_query_roots(
     )
 
     def rule(ex):
-
         match ex:
             case Query(
                 lhs,
@@ -233,14 +236,53 @@ def standardize_query_roots(
                     MapJoin(
                         Literal(op),
                         (
-                            Reorder(Table(lhs_1), idxs_1),
-                            Aggregate(Literal(op_1), _, _, _),
+                            Table(lhs_1, idxs_1),
+                            Aggregate(Literal(op_1), _, Reorder(), _),
                         ),
                     ),
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 return ex
+            case Query(
+                lhs,
+                Reorder(
+                    MapJoin(
+                        Literal(op),
+                        (
+                            Table(lhs_1, idxs_1),
+                            Aggregate(Literal(op_1), init, agg_arg, agg_idxs),
+                        ),
+                    ),
+                    idxs_2,
+                ),
+            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
+                return Query(
+                    lhs,
+                    Reorder(
+                        MapJoin(
+                            Literal(op),
+                            (
+                                Table(lhs_1, idxs_1),
+                                Aggregate(
+                                    Literal(op_1),
+                                    init,
+                                    Reorder(
+                                        agg_arg,
+                                        idxs_2
+                                        + tuple(
+                                            idx
+                                            for idx in agg_arg.fields()
+                                            if idx not in idxs_2
+                                        ),
+                                    ),
+                                    agg_idxs,
+                                ),
+                            ),
+                        ),
+                        idxs_2,
+                    ),
+                )
             case Query(lhs, rhs):
                 return Query(
                     lhs,
@@ -402,7 +444,7 @@ def flatten_plans(root):
 
 
 def drop_reorders(root: LogicStatement) -> LogicStatement:
-    def rule_2(stmt):
+    def rule_1(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
 
@@ -432,7 +474,14 @@ def drop_reorders(root: LogicStatement) -> LogicStatement:
                 arg_3 = tuple(Rewrite(PostWalk(rule))(arg) for arg in args)
                 return Query(lhs, Reorder(MapJoin(op, arg_3), idxs))
 
-    return Rewrite(PostWalk(rule_2))(root)
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, Reorder(Table(), _)):
+                return None
+            case Query(lhs, Reorder(arg, idxs)) if arg.fields() == idxs:
+                return Query(lhs, arg)
+
+    return Rewrite(PostWalk(Chain([rule_1, rule_2])))(root)
 
 
 def drop_with_aggregation(root: LogicStatement) -> LogicStatement:
@@ -444,6 +493,30 @@ def drop_with_aggregation(root: LogicStatement) -> LogicStatement:
                     lhs,
                     Aggregate(op, init, Reorder(arg, idxs_1 + idxs_3), idxs_2 + idxs_3),
                 )
+
+    return Rewrite(PostWalk(rule_2))(root)
+
+
+def propagate_copy_queries(root, bindings):
+    copies = {}
+
+    def rule_1(node):
+        match node:
+            case Query(lhs, Table(Alias(_) as rhs, _)) if lhs not in bindings:
+                copies[lhs] = copies.get(rhs, rhs)
+                return Plan()
+            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if (
+                idxs_1 == idxs_2 and lhs not in bindings
+            ):
+                copies[lhs] = copies.get(rhs, rhs)
+                return Plan()
+
+    root = Rewrite(PostWalk(rule_1))(root)
+
+    def rule_2(ex):
+        match ex:
+            case Alias() as a if a in copies:
+                return copies[a]
 
     return Rewrite(PostWalk(rule_2))(root)
 
@@ -461,20 +534,22 @@ def standardize(
     prgm = push_fields(prgm)
     prgm = drop_reorders(prgm)
     prgm = drop_with_aggregation(prgm)
+    prgm = push_fields(prgm)
     prgm = concordize(prgm, bindings)
     prgm = drop_reorders(prgm)
+    prgm = propagate_copy_queries(prgm, bindings)
     prgm = flatten_plans(prgm)
     return normalize_names(prgm, bindings)
 
 
-class LogicStandardizer(LogicLoader):
+class LogicStandardizer(UnvalidatedForm, LogicLoader):
     """
     The LogicStandardizer applies a series of transformations to standardize
     logic statements into a canonical form. Any Logic is accepted as input, and
-    the output logic should be a plan with only two forms of queries:
+    the output logic should be a plan with only three forms of queries:
     1. Queries that perform a Reorder of a single argument.
-    2. Queries that perform an Aggregate over a Reorder of a series of map-joins.
-    3. Queries that perform a Reorder of a map-join between query lhs and (1)/(2).
+    2. Queries that perform an Aggregate over a Reorder of tables and mapjoins.
+    3. Queries that perform a Reorder of a map-join between query lhs and (2).
     """
 
     def __init__(self, ctx: LogicLoader | None = None):
@@ -482,7 +557,7 @@ class LogicStandardizer(LogicLoader):
             ctx = MockLogicLoader()
         self.ctx: LogicLoader = ctx
 
-    def __call__(
+    def lower(
         self,
         prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
@@ -490,9 +565,4 @@ class LogicStandardizer(LogicLoader):
         stats_factory: StatsFactory,
     ):
         prgm, bindings = standardize(prgm, bindings)
-        return self.ctx(
-            prgm,
-            bindings,
-            stats=stats,
-            stats_factory=stats_factory,
-        )
+        return self.ctx(prgm, bindings, stats, stats_factory)
