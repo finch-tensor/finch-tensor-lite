@@ -141,9 +141,9 @@ def mlir_function_name(op, arg: FType) -> str:
         case ffuncs.scansearch:
             return "scansearch"
         case ffuncs.invert:
-            return "-1"
+            return "arith.xori -1"
         case ffuncs.not_:
-            return "1"
+            return "arith.xori 1"
         case MLIROperator():
             return op.mlir_name()
         case _:
@@ -163,19 +163,17 @@ def mlir_nary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
 
 def mlir_binary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
     a, b = args
-    t = mlir_type(a.result_type)
     av, bv = ctx(a), ctx(b)
     res = ctx.new_ssa()
-    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {t}")
+    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {mlir_type(a.result_type)}")
     return res
 
 
 def mlir_unary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
     (a,) = args
-    t = mlir_type(a.result_type)
     av = ctx(a)
     res = ctx.new_ssa()
-    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av} : {t}")
+    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av} : {mlir_type(a.result_type)}")
     return res
 
 
@@ -190,14 +188,14 @@ def mlir_call_function_call(mlir_name: str, ctx: Any, ret_t: str, *args: Any) ->
     return res
 
 
-def mlir_new_function_call(const: str, ctx: Any, *args: Any) -> str:
+def mlir_new_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+    name, const = mlir_name.split()
     (a,) = args
-    t = mlir_type(a.result_type)
     av = ctx(a)
     c = ctx.new_ssa()
-    ctx.exec(f"{ctx.feed}{c} = arith.constant {const} : {t}")
+    ctx.exec(f"{ctx.feed}{c} = arith.constant {const} : {mlir_type(a.result_type)}")
     res = ctx.new_ssa()
-    ctx.exec(f"{ctx.feed}{res} = arith.xori {av}, {c} : {t}")
+    ctx.exec(f"{ctx.feed}{res} = {name} {av}, {c} : {mlir_type(a.result_type)}")
     return res
 
 
