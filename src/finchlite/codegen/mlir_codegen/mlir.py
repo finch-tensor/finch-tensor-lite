@@ -140,6 +140,10 @@ def mlir_function_name(op, arg: FType) -> str:
             return "arith.cmpi sge,"
         case ffuncs.scansearch:
             return "scansearch"
+        case ffuncs.invert:
+            return "-1"
+        case ffuncs.not_:
+            return "1"
         case MLIROperator():
             return op.mlir_name()
         case _:
@@ -186,6 +190,17 @@ def mlir_call_function_call(mlir_name: str, ctx: Any, ret_t: str, *args: Any) ->
     return res
 
 
+def mlir_new_function_call(const: str, ctx: Any, *args: Any) -> str:
+    (a,) = args
+    t = mlir_type(a.result_type)
+    av = ctx(a)
+    c = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{c} = arith.constant {const} : {t}")
+    res = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{res} = arith.xori {av}, {c} : {t}")
+    return res
+
+
 def mlir_function_call(op, ctx, *args: Any) -> str:
     match op:
         case MLIROperator():
@@ -221,6 +236,10 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
                 ctx,
                 mlir_type(args[-1].result_type),
                 *args,
+            )
+        case ffuncs.not_ | ffuncs.invert:
+            return mlir_new_function_call(
+                mlir_function_name(op, args[0].result_type), ctx, *args
             )
         case _:
             raise NotImplementedError(f"{op} has no MLIR representation.")
