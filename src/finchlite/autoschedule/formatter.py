@@ -103,3 +103,7 @@ class DefaultLogicFormatter(LogicFormatter):
             ndim=len(shape_type),
             dimension_type=TupleFType.from_tuple(shape_type),
         )
+
+
+class BufferizedNDArrayFormatter(DefaultLogicFormatter):
+    pass
