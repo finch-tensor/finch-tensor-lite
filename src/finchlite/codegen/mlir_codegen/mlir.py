@@ -312,10 +312,8 @@ class MLIRContext(Context):
     def feed(self) -> str:
         return self.tab * self.indent
 
-    def new_ssa(self):
-        n = self.val_counter[0]
-        self.val_counter[0] = n + 1
-        return f"%v{n}"
+    def new_ssa(self) -> str:
+        return "%" + self.freshen("v")
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
@@ -347,8 +345,10 @@ class MLIRContext(Context):
                 self.exec(f"{self.feed}{s} = arith.constant {new} : {t}")
                 return s
 
-            # case asm.Variable(name, _):
-            #     ...
+            case asm.Variable(name, _):
+                if name not in self.bindings:
+                    raise ValueError(f"Variable does not exist: {name!r}")
+                return self.bindings[name][0]
 
             # case asm.Assign(asm.Variable(var_n, var_t) as var, val):
             #     ...
