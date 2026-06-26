@@ -5,8 +5,6 @@ import numpy as np
 import finchlite
 from finchlite.autoschedule.einsum import LogicEinsumLoader
 from finchlite.autoschedule.executor import LogicExecutor
-from finchlite.autoschedule.formatter import BufferizedNDArrayFormatter
-from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.autoschedule.formatter import DefaultLogicFormatter
 from finchlite.autoschedule.loop_ordering import DefaultLoopOrderer
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer

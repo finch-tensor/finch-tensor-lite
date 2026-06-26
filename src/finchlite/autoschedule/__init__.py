@@ -30,6 +30,7 @@ from .default_schedulers import (
 )
 from .executor import LogicExecutor
 from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
+from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
 from .rep_operations import (
@@ -50,9 +51,6 @@ from .representation import (
     RepeatData,
     SparseData,
 )
-from .formatter import DefaultLogicFormatter, LogicFormatter
-from .loop_ordering import DefaultLoopOrderer
-from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 from .standardize import LogicStandardizer
 from .suitable_rep import SmartLogicFormatter, SuitableRep, toposort
@@ -69,10 +67,10 @@ __all__ = [
     "BufferizedNDArrayFormatter",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
+    "DefaultLoopOrderer",
     "DenseData",
     "ElementData",
     "ExtrudeData",
-    "DefaultLoopOrderer",
     "Field",
     "HollowData",
     "Literal",
@@ -106,12 +104,11 @@ __all__ = [
     "eltype",
     "expanddims_rep",
     "fill_value",
+    "get_default_scheduler",
     "map_rep",
     "normalize_names",
     "permutedims_rep",
-    "toposort",
-    "get_default_scheduler",
-    "normalize_names",
     "set_default_scheduler",
+    "toposort",
     "with_default_scheduler",
 ]

@@ -11,6 +11,10 @@ from typing import Any
 
 import numpy as np
 
+from finchlite import finch_logic as lgc
+from finchlite.algebra import TensorFType
+from finchlite.finch_assembly import AssemblyLibrary
+from finchlite.finch_logic import LogicLoader, MockLogicLoader
 from finchlite.finch_logic.nodes import (
     Aggregate,
     Alias,
@@ -21,12 +25,8 @@ from finchlite.finch_logic.nodes import (
     Table,
 )
 from finchlite.finch_logic.tensor_stats import StatsFactory, TensorStats
+from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
-from .. import finch_logic as lgc
-from ..algebra import TensorFType
-from ..finch_assembly import AssemblyLibrary
-from ..finch_logic import LogicLoader, MockLogicLoader
-from ..util.logging import LOG_LOGIC_POST_OPT
 from .formatter import LogicFormatter
 from .rep_operations import (
     aggregate_rep,
