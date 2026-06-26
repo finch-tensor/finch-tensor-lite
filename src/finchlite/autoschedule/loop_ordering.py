@@ -1,7 +1,6 @@
 import logging
 from functools import reduce
 from itertools import chain as join_chains
-from typing import overload
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.algebra.utils import intersect
@@ -17,13 +16,13 @@ from finchlite.finch_logic import (
     Plan,
     Produces,
     Query,
-    Relabel,
     Reorder,
     StatsFactory,
     Table,
     TensorStats,
 )
-from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite, gensym
+from finchlite.finch_logic.nodes import MapJoin
+from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 from .optimize import propagate_copy_queries, with_unique_lhs
@@ -31,6 +30,94 @@ from .stages import LogicLoopOrderOptimizer
 from .standardize import concordize, flatten_plans, push_fields
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+
+
+def add_output_orders(prgm: LogicStatement) -> LogicStatement:
+    produced_aliases: set[Alias] = set()
+    for stmt in PostOrderDFS(prgm):
+        match stmt:
+            case Produces(vars):
+                produced_aliases.update(vars)
+
+    def rule_1(node: LogicNode) -> LogicNode | None:
+        match node:
+            case Query(lhs, Reorder()):
+                return node
+            case Query(lhs, rhs):
+                if lhs in produced_aliases:
+                    return Query(lhs, Reorder(rhs, rhs.fields()))
+                return node
+        return None
+
+    return Rewrite(PostWalk(rule_1))(prgm)
+
+
+def drop_internal_reorders(
+    root: LogicStatement, keep_loop_orders: bool
+) -> LogicStatement:
+    def reorder_remover(ex):
+        match ex:
+            case Reorder(arg_2, _):
+                return arg_2
+
+    def rule_1(stmt):
+        match stmt:
+            case Query(lhs, Aggregate(op, init, arg, idxs_2)):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return Query(lhs, Aggregate(op, init, arg_1, idxs_2))
+            case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return Query(lhs, Reorder(Aggregate(op, init, arg_1, ag_idxs), idxs))
+            case Query(
+                lhs,
+                Reorder(MapJoin(op, (tbl, Aggregate(op1, init, arg, ag_idxs))), idxs),
+            ):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return Query(
+                    lhs,
+                    Reorder(
+                        MapJoin(op, (tbl, Aggregate(op1, init, arg_1, ag_idxs))), idxs
+                    ),
+                )
+
+    def rule_2(stmt):
+        match stmt:
+            case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return Query(lhs, Aggregate(op, init, Reorder(arg_1, idxs_1), idxs_2))
+            case Query(
+                lhs, Reorder(Aggregate(op, init, Reorder(arg, idxs_1), ag_idxs), idxs)
+            ):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return Query(
+                    lhs,
+                    Reorder(Aggregate(op, init, Reorder(arg_1, idxs_1), ag_idxs), idxs),
+                )
+            case Query(
+                lhs,
+                Reorder(
+                    MapJoin(
+                        op, (tbl, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs))
+                    ),
+                    idxs,
+                ),
+            ):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return Query(
+                    lhs,
+                    Reorder(
+                        MapJoin(
+                            op,
+                            tbl,
+                            Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs),
+                        ),
+                        idxs,
+                    ),
+                )
+
+    if keep_loop_orders:
+        return Rewrite(PostWalk(rule_2))(root)
+    return Rewrite(PostWalk(rule_1))(root)
 
 
 class CycleInFields(Exception): ...
@@ -63,8 +150,8 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     chains = []
     for node in PostOrderDFS(root):
         match node:
-            case Reorder(Table(_, idxs_1), idxs_2):
-                chains.append(list(intersect(intersect(idxs_1, idxs_2), root.fields())))
+            case Table(_, idxs_1):
+                chains.append(list(intersect(idxs_1, root.fields())))
     chains.extend([f] for f in root.fields())
 
     need_fix = False
@@ -86,56 +173,30 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
-@overload
-def _set_loop_order(
-    node: LogicStatement, perms: dict[LogicNode, LogicExpression]
-) -> LogicStatement: ...
-@overload
-def _set_loop_order(
-    node: LogicNode, perms: dict[LogicNode, LogicExpression]
-) -> LogicNode: ...
-def _set_loop_order(node, perms):
-    def rule_0(node):
-        match node:
-            case Table(Alias(_) as tns, idxs) if tns in perms:
-                return Relabel(perms[tns], idxs)
-        return None
+def set_loop_order(plan: Plan) -> Plan:
+    new_queries = []
+    for query in plan.bodies[:-1]:
 
-    match node:
-        case Plan(bodies):
-            return Plan(tuple(_set_loop_order(body, perms) for body in bodies))
-        case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(arg, LogicExpression)
-            idxs_2 = _heuristic_loop_order(arg)
-            rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-            perms[lhs] = Reorder(Table(lhs, tuple(rhs_2.fields())), tuple(rhs.fields()))
-            return Query(lhs, rhs_2)
-        case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
-            perms[lhs] = Reorder(Table(lhs, idxs), idxs)
-            return q
-        case Query(lhs, rhs):  # assuming rhs is a bunch of mapjoins
-            rhs = push_fields(Rewrite(PostWalk(rule_0))(rhs))
-            assert isinstance(rhs, LogicExpression)
-            idxs = _heuristic_loop_order(rhs)
-            perms[lhs] = Reorder(Table(lhs, idxs), tuple(rhs.fields()))
-            rhs_2 = Reorder(rhs, idxs)
-            return Query(lhs, rhs_2)
-        case Produces(args):
-            renames = {a: Alias(gensym("A")) for a in args if a in perms}
-            bodies = tuple([Query(v, perms[k]) for k, v in renames.items()])
-            args_2 = tuple([renames.get(a, a) for a in args])
-            return Plan(bodies + (Produces(args_2),))
-        case _:
-            raise Exception(f"Invalid node: {node} in set_loop_order")
+        def rule_1(query):
+            match query:
+                case Query(lhs, Aggregate(op, init, arg, idxs)):
+                    assert isinstance(arg, LogicExpression)
+                    idxs_2 = _heuristic_loop_order(arg)
+                    rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
+                    return Query(lhs, rhs_2)
+                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
+                    idxs_2 = _heuristic_loop_order(arg)
+                    rhs_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
+                    )
+                    return Query(lhs, rhs_2)
+                case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
+                    return q
+                case _:
+                    raise Exception(f"Invalid node: {query} in set_loop_order")
 
-
-@overload
-def set_loop_order(node: LogicStatement) -> LogicStatement: ...
-@overload
-def set_loop_order(node: LogicNode) -> LogicNode: ...
-def set_loop_order(node):
-    return _set_loop_order(node, {})
+        new_queries.append(rule_1(query))
+    return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
 class DefaultLoopOrderer(LogicLoopOrderOptimizer):
@@ -152,12 +213,16 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         stats_factory: StatsFactory,
     ):
         def loop_order_transform(prgm, bindings):
+            prgm = add_output_orders(prgm)
+            prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
             prgm = set_loop_order(prgm)
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
+            prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
             prgm = propagate_copy_queries(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 
         prgm, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
+        prgm = flatten_plans(prgm)
         return self.ctx(prgm, bindings, stats, stats_factory)

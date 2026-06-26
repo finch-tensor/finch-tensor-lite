@@ -1,3 +1,3 @@
-A_4 = Aggregate(add, 0, Reorder(MapJoin(mul, MapJoin(mul, Table(A_2, i, i_2), Table(A_3, i_3, i_2)), Table(A, i_3, i)), i_3, i, i_2), i_2)
-A_5 = Reorder(Table(A_4, i_4, i_5), i_5, i_4)
-return A_5
+S_2 = Reorder(Table(S, i_0, i_1), i_1, i_0)
+RES = Reorder(Aggregate(add, 0, Reorder(MapJoin(mul, MapJoin(mul, Table(A, i, k), Table(B, j, k)), Table(S_2, i, j)), i, j, k), k), i, j)
+return RES
