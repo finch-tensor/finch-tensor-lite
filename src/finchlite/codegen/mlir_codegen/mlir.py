@@ -326,8 +326,8 @@ class MLIRContext(Context):
             # case asm.Assign(asm.Variable(var_n, var_t) as var, val):
             #     ...
 
-            # case asm.Call(op, args):
-            #     ...
+            case asm.Call(asm.Literal(op), args):
+                return mlir_function_call(op, self, *args)
 
             # case asm.Load(buffer, index):
             #     ...
@@ -360,8 +360,9 @@ class MLIRContext(Context):
                 if value.result_type == algebra.none_:
                     self.exec(f"{feed}func.return")
                 else:
-                    v = self.value
+                    v = self(value)
                     self.exec(f"{feed}func.return {v} : {mlir_type(value.result_type)}")
+                return None
 
             case asm.Module(funcs):
                 for func in funcs:
@@ -370,7 +371,7 @@ class MLIRContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
-                return
+                return None
 
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
