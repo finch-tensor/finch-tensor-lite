@@ -399,10 +399,7 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    if isinstance(shape, int):
-        shape = (shape,)
-    else:
-        shape = tuple(shape)
+    shape = (shape,) if isinstance(shape, int) else tuple(shape)
     return broadcast_to(asarray(fill_value, dtype=dtype), shape)
 
 

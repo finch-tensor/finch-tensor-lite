@@ -86,9 +86,7 @@ def test_same_ffunc():
     assert not ffuncs.same(float("nan"), 1.0)
     assert ffuncs.same(None, None)
     np.testing.assert_array_equal(
-        ffuncs.same(
-            np.array([1.0, np.nan, 2.0]), np.array([1.0, np.nan, np.nan])
-        ),
+        ffuncs.same(np.array([1.0, np.nan, 2.0]), np.array([1.0, np.nan, np.nan])),
         np.array([True, True, False]),
     )
     assert not ffuncs.not_same(1, 1)
@@ -96,9 +94,7 @@ def test_same_ffunc():
     assert not ffuncs.not_same(float("nan"), float("nan"))
     assert not ffuncs.not_same(None, None)
     np.testing.assert_array_equal(
-        ffuncs.not_same(
-            np.array([1.0, np.nan, 2.0]), np.array([1.0, np.nan, np.nan])
-        ),
+        ffuncs.not_same(np.array([1.0, np.nan, 2.0]), np.array([1.0, np.nan, np.nan])),
         np.array([False, False, True]),
     )
 

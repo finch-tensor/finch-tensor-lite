@@ -18,9 +18,8 @@ class ScalarFType(TensorFType):
 
     def __eq__(self, other):
         if isinstance(other, ScalarFType):
-            return (
-                self._element_type == other._element_type
-                and ffuncs.same(self._fill_value, other._fill_value)
+            return self._element_type == other._element_type and ffuncs.same(
+                self._fill_value, other._fill_value
             )
         return False
 
