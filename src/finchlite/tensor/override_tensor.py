@@ -63,6 +63,8 @@ element_wise_ufunc_map = {
     np.logical_or: ffuncs.logical_or,
     np.logical_xor: ffuncs.logical_xor,
     np.logical_not: ffuncs.logical_not,
+    np.minimum: ffuncs.min,
+    np.maximum: ffuncs.max,
     np.equal: ffuncs.equal,
     np.not_equal: ffuncs.not_equal,
     np.less: ffuncs.less,
@@ -127,7 +129,7 @@ class OverrideTensor(Tensor):
         if api_version not in {"2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
 
-        return self.mod
+        return sys.modules["finchlite"]
 
     def __add__(self, other):
         return self.mod.add(self, other)

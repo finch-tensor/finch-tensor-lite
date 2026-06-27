@@ -26,7 +26,7 @@ from finchlite.algebra import (
     promote_type,
     return_type,
 )
-from finchlite.algebra.ftypes import FDType, FDTypeBuiltin, FDTypeNumpy
+from finchlite.algebra.ftypes import FDType, FDTypeBoolean, FDTypeBuiltin, FDTypeNumpy
 from finchlite.autoschedule.tensor_stats import StatsInterpreter
 from finchlite.finch_logic import (
     Aggregate,
@@ -46,6 +46,7 @@ from finchlite.finch_logic import (
 from finchlite.symbolic import gensym
 from finchlite.tensor import BufferizedNDArray
 from finchlite.tensor.override_tensor import OverrideTensor
+from finchlite.tensor.scalar import Scalar
 
 
 class LazyTensorFType(TensorFType):
@@ -67,13 +68,15 @@ class LazyTensorFType(TensorFType):
         if not isinstance(other, LazyTensorFType):
             return False
         return (
-            self._fill_value == other._fill_value
+            ffuncs.same(self._fill_value, other._fill_value)
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
-        return hash((self._fill_value, self._element_type, self._shape_type))
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
 
     def construct(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
@@ -290,11 +293,11 @@ def asarray(
         raise ValueError(f"device argument is not supported; got {device!r}")
 
     if format is None:
-        from finchlite.tensor.scalar import Scalar
-
         if isinstance(obj, BufferizedNDArray):
             if copy is True:
-                return BufferizedNDArray.from_numpy(obj.to_numpy().copy())
+                return BufferizedNDArray.from_numpy(
+                    obj.to_numpy().copy(), fill_value=obj.fill_value
+                )
             return obj
         if isinstance(obj, np.ndarray):
             if copy is True:
@@ -303,8 +306,8 @@ def asarray(
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
-            elif obj is not None:
-                obj = np.asarray(obj).flat[0]
+            elif isinstance(obj, bool | int | float | complex):
+                obj = np.asarray(obj)[()]
             return Scalar(obj)
         try:
             np_arr = np.asarray(obj)
@@ -353,7 +356,7 @@ def lazy(arr) -> LazyTensor:
 
     if isinstance(arr, LazyTensor):
         return arr
-    arr = asarray(arr)
+    arr = Scalar(arr) if isinstance(arr, bool | int | float | complex) else asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
@@ -397,10 +400,8 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    val = lazy(np.full((), fill_value, dtype=_np_dtype(dtype)))
-    if isinstance(shape, int):
-        shape = (shape,)
-    return broadcast_to(val, shape)
+    shape = (shape,) if isinstance(shape, int) else tuple(shape)
+    return broadcast_to(asarray(fill_value, dtype=dtype), shape)
 
 
 def full_like(x, /, fill_value, *, dtype=None):
@@ -877,6 +878,14 @@ def max(
     return reduce(ffuncs.max, x, axis=axis, keepdims=keepdims, init=init)
 
 
+def minimum(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.min, lazy(x1), lazy(x2))
+
+
+def maximum(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.max, lazy(x1), lazy(x2))
+
+
 def clip(x, /, *, min=None, max=None) -> LazyTensor:
     return elementwise(ffuncs.clip, lazy(x), lazy(min), lazy(max))
 
@@ -1083,6 +1092,35 @@ def conj(x) -> LazyTensor:
     return elementwise(ffuncs.conjugate, lazy(x))
 
 
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+) -> LazyTensor:
+    x = lazy(x)
+    element_type = x.element_type
+    zero = element_type(False if isinstance(element_type, FDTypeBoolean) else 0)
+    return reduce(
+        ffuncs.add,
+        elementwise(ffuncs.not_equal, x, lazy(zero)),
+        axis=axis,
+        keepdims=keepdims,
+        init=0,
+    )
+
+
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+) -> LazyTensor:
+    x = lazy(x)
+    fill = full(x.shape, x.fill_value, dtype=x.element_type)
+    return reduce(
+        ffuncs.add,
+        elementwise(ffuncs.not_same, x, fill),
+        axis=axis,
+        keepdims=keepdims,
+        init=0,
+    )
+
+
 def tensordot(
     x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]
 ) -> LazyTensor:
@@ -1223,8 +1261,22 @@ class WrapperTensorFType(TensorFType):
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class FillTensorFType(DefaultTensorFType):
+    def __eq__(self, other):
+        if not isinstance(other, FillTensorFType):
+            return False
+        return (
+            ffuncs.same(self._fill_value, other._fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
+
     def construct(self, shape: tuple) -> FillTensor:
         return FillTensor(shape, self.fill_value)
 
@@ -1965,8 +2017,16 @@ def equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.equal, lazy(x1), lazy(x2))
 
 
+def same(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.same, lazy(x1), lazy(x2))
+
+
 def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+
+
+def not_same(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.not_same, lazy(x1), lazy(x2))
 
 
 def where(condition, x1, x2) -> LazyTensor:
