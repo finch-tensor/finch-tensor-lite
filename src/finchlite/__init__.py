@@ -68,6 +68,7 @@ from .interface import (
     NumPyFType,
     NumPyWrapper,
     Scalar,
+    ScalarFType,
     abs,
     acos,
     acosh,
@@ -190,6 +191,7 @@ from .interface import (
 )
 from .tensor import (
     BufferizedNDArray,
+    BufferizedNDArrayFType,
     FiberTensor,
     FiberTensorFType,
     OverrideTensor,
@@ -227,6 +229,7 @@ __all__ = [
     "AssemblyContext",
     "BlockedStats",
     "BufferizedNDArray",
+    "BufferizedNDArrayFType",
     "DCStats",
     "DenseLevel",
     "DenseLevelFType",
@@ -249,6 +252,7 @@ __all__ = [
     "OverrideTensor",
     "Reflector",
     "Scalar",
+    "ScalarFType",
     "SparseListLevel",
     "SparseListLevelFType",
     "Tensor",
