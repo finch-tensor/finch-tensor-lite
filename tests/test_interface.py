@@ -665,10 +665,10 @@ def test_min_max_nan_propagation(wrap, op, np_op, axis):
 def test_minimum_maximum_python_scalar_promotion(wrap, op):
     x = np.array([1.0, 2.0], dtype=np.float32)
     result = op(wrap(x), 1.0)
-    assert result.dtype == finchlite.float64
+    assert result.dtype == finchlite.float32
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
-    assert result.dtype == finchlite.float64
+    assert result.dtype == finchlite.float32
 
 
 @pytest.mark.parametrize(
