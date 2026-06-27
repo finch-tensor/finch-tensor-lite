@@ -296,7 +296,9 @@ def asarray(
 
         if isinstance(obj, BufferizedNDArray):
             if copy is True:
-                return BufferizedNDArray.from_numpy(obj.to_numpy().copy())
+                return BufferizedNDArray.from_numpy(
+                    obj.to_numpy().copy(), fill_value=obj.fill_value
+                )
             return obj
         if isinstance(obj, np.ndarray):
             if copy is True:
