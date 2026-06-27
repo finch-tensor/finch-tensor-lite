@@ -1,3 +1,5 @@
+import math
+
 from .algebra import (
     FTyped,
     Tensor,
@@ -207,6 +209,12 @@ from .tensor.level import (
 from .tensor.masks import (
     tril,
 )
+
+e = math.e
+pi = math.pi
+inf = math.inf
+nan = math.nan
+newaxis = None
 
 __all__ = [
     "COMPILE_NUMBA",

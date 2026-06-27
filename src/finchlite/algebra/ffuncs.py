@@ -788,7 +788,22 @@ class _Same(BinaryFinchOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
-        return np.bool_(np.array_equal(a, b, equal_nan=True))
+        same_method = getattr(a, "__same__", None)
+        if same_method is not None:
+            res = same_method(b)
+            if res is not NotImplemented:
+                return res
+        rsame_method = getattr(b, "__rsame__", None)
+        if rsame_method is not None:
+            res = rsame_method(a)
+            if res is not NotImplemented:
+                return res
+        try:
+            return np.logical_or(
+                np.equal(a, b), np.logical_and(np.isnan(a), np.isnan(b))
+            )
+        except TypeError:
+            return np.equal(a, b)
 
     def __repr__(self) -> str:
         return "same"
@@ -797,11 +812,22 @@ class _Same(BinaryFinchOperator):
 same = _Same()
 
 
+def samehash(a: Any):
+    samehash_method = getattr(a, "__samehash__", None)
+    if samehash_method is not None:
+        res = samehash_method()
+        if res is not NotImplemented:
+            return res
+    if np.all(same(a, a)) and not np.array_equal(a, a):
+        return ("nan", ftype(a))
+    return a
+
+
 class _NotSame(BinaryFinchOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
-        return np.bool_(not np.array_equal(a, b, equal_nan=True))
+        return np.logical_not(same(a, b))
 
     def __repr__(self) -> str:
         return "not_same"
@@ -1479,6 +1505,7 @@ __all__ = [
     "round",
     "rshift",
     "same",
+    "samehash",
     "scansearch",
     "sign",
     "signbit",

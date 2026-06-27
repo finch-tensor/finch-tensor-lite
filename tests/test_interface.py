@@ -1,3 +1,4 @@
+import math
 import warnings
 
 import pytest
@@ -305,6 +306,36 @@ def test_count_nonfill_nan_fill_value():
     x = finchlite.full((2, 3), np.nan)
     assert np.isnan(x.fill_value)
     finch_assert_equal(finchlite.count_nonfill(x), np.array(0))
+
+
+def test_array_api_constants():
+    assert finchlite.e == math.e
+    assert finchlite.pi == math.pi
+    assert finchlite.inf == math.inf
+    assert math.isnan(finchlite.nan)
+    assert finchlite.nan != finchlite.nan
+    assert finchlite.newaxis is None
+
+    assert bool(finchlite.isinf(finchlite.asarray(finchlite.inf)))
+    assert bool(finchlite.isnan(finchlite.asarray(finchlite.nan)))
+
+
+def test_nan_fill_value_ftype_equality():
+    x = finchlite.full((2, 3), np.nan)
+    y = finchlite.full((2, 3), np.nan)
+    assert finchlite.same(x.fill_value, y.fill_value)
+    assert x.ftype == y.ftype
+    assert hash(x.ftype) == hash(y.ftype)
+
+    lazy_x = finchlite.lazy(x)
+    lazy_y = finchlite.lazy(y)
+    assert lazy_x.ftype == lazy_y.ftype
+    assert hash(lazy_x.ftype) == hash(lazy_y.ftype)
+
+    scalar_x = finchlite.asarray(finchlite.nan)
+    scalar_y = finchlite.asarray(finchlite.nan)
+    assert scalar_x.ftype == scalar_y.ftype
+    assert hash(scalar_x.ftype) == hash(scalar_y.ftype)
 
 
 @pytest.mark.parametrize(

@@ -67,13 +67,15 @@ class LazyTensorFType(TensorFType):
         if not isinstance(other, LazyTensorFType):
             return False
         return (
-            self._fill_value == other._fill_value
+            ffuncs.same(self._fill_value, other._fill_value)
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
-        return hash((self._fill_value, self._element_type, self._shape_type))
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
 
     def construct(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
@@ -1254,8 +1256,22 @@ class WrapperTensorFType(TensorFType):
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class FillTensorFType(DefaultTensorFType):
+    def __eq__(self, other):
+        if not isinstance(other, FillTensorFType):
+            return False
+        return (
+            ffuncs.same(self._fill_value, other._fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
+
     def construct(self, shape: tuple) -> FillTensor:
         return FillTensor(shape, self.fill_value)
 

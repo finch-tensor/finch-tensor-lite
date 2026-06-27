@@ -444,13 +444,6 @@ array_api_tests/test_statistical_functions.py::test_mean
 array_api_tests/test_statistical_functions.py::test_cumulative_prod
 array_api_tests/test_statistical_functions.py::test_cumulative_sum
 
-# constants not yet exposed
-array_api_tests/test_constants.py::test_irrational_numbers[e-2.718281828459045]
-array_api_tests/test_constants.py::test_irrational_numbers[pi-3.141592653589793]
-array_api_tests/test_constants.py::test_inf
-array_api_tests/test_constants.py::test_nan
-array_api_tests/test_constants.py::test_newaxis
-
 # issue: array-api-tests-mypy — mypy errors in the array-api-tests suite itself
 array_api_tests/__init__.py::mypy
 array_api_tests/__init__.py::mypy-status

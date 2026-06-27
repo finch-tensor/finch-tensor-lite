@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from finchlite.algebra import FType, TensorFType, ftype
+from finchlite.algebra import FType, TensorFType, ffuncs, ftype
 from finchlite.algebra.ftypes import FDType
 
 from .override_tensor import OverrideTensor
@@ -20,12 +20,12 @@ class ScalarFType(TensorFType):
         if isinstance(other, ScalarFType):
             return (
                 self._element_type == other._element_type
-                and self._fill_value == other._fill_value
+                and ffuncs.same(self._fill_value, other._fill_value)
             )
         return False
 
     def __hash__(self):
-        return hash((self._element_type, self._fill_value))
+        return hash((self._element_type, ffuncs.samehash(self._fill_value)))
 
     def construct(self, shape: tuple) -> Scalar:
         if shape != ():
